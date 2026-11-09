@@ -4787,6 +4787,21 @@ is bounded at 180 seconds, with a 1,800-second campaign limit. The pinned
 adapter/Wasm hashes are in every seed record. This remains implemented-subset
 validation, not complete fuzz acceptance while target encoders are missing.
 
+### Batch 134 private UASTC BC7 checkpoint
+
+The private UASTC-to-BC7 target matches all 345 primary image hashes across 26
+files, including every served mip/layer/face. Another 5,504 crafted blocks
+cover all 19 UASTC modes, every partition and every component selector, in
+linear and sRGB transfer modes. All 3,072 solid cases also match in both modes.
+[Evidence](whitepaper/results/batch-134-uastc-bc7.json) pins source and output hashes.
+One input block produces one 16-byte BC7 block with fixed stack scratch and
+no full RGBA staging image. This is a work/allocation fact, without new timing
+or peak-memory acceptance. Current incomplete draft: 141,859 raw / 50,955 gzip
+Wasm bytes, measured with the baseline's Node gzip9 compressor.
+ETC1S BC7, other encoders and public package/worker integration remain pending.
+Jobs 2-5 are incomplete; GPU requests stay stopped until the new browser
+teardown repair is on origin/main, and job 4 timing remains deferred.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

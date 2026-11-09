@@ -3835,3 +3835,18 @@ The two prebuilt-unserved 3D seeds are checked for coded rejection. Each process
 is bounded at 180 seconds, with a 1,800-second campaign limit. The pinned
 adapter/Wasm hashes are in every seed record. This remains implemented-subset
 validation, not complete fuzz acceptance while target encoders are missing.
+
+### Section 5 evidence: batch 134 private UASTC BC7
+
+The private target-6 path converts UASTC endpoints/weights/partitions directly
+to BC7, preserving the checked KTX2 and .basis adapters. [Evidence](../whitepaper/results/batch-134-uastc-bc7.json)
+records 345/345 primary payload hashes, all 19 modes/every partition/CSEL in
+5,504 crafted blocks, and 3,072 solid cases, both transfer modes. A failing-before
+regression protects the explicit BC7 anchor table against ambiguous figure
+emphasis. Native tests: 39; private Node tests: 17; TypeScript and Wasm build pass.
+Current incomplete Wasm: 141,859 raw / 50,955 gzip bytes. Each block is visited
+once, emits 16 bytes, and uses fixed stack scratch without RGBA image staging.
+These facts do not establish old/new timing or isolated per-pair peak memory.
+No new GPU requests are allowed before the pending teardown repair reaches
+origin/main. Other target encoders, public integration and job 2/3 closure
+remain open; job 4 timing stays in the deferred speed phase.

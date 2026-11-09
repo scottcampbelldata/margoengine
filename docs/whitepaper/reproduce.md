@@ -1520,3 +1520,18 @@ frozen prebuilt payloads. Seed records pin the input, adapter and Wasm hashes.
 [Campaign result](results/batch-134-whole-container-fuzz.json): 51 seeds, 2,856
 mutations and 13,507 decode calls, with no trap, uncoded refusal or hard timeout.
 No timing A/B or fuzzer-speed comparison runs in this campaign.
+
+For the private [UASTC BC7 checkpoint](results/batch-134-uastc-bc7.json), run
+`measure/bc7-solid-probe.mjs` then `measure/bc7-solid-contract.mjs` against the
+pinned outside opaque prebuilt. The published-format inputs sweep 3,072 solids
+in both transfer modes; the contract was documented before implementation.
+`measure/extract-bc7-tables.py` reads only the pinned format specification and
+uses explicit anchor tables 129-131. Build the same private Rust crate and Wasm,
+then run `measure/bc7-compare.mjs`, `measure/bc7-crafted.mjs` and
+`measure/bc7.test.mjs` with the bounded CPU runner. The crafted comparison has
+5,504 cases, every mode/partition/CSEL and two transfer modes. The native anchor
+regression fails with the earlier typography-derived table and passes using
+the explicit table. All primary BC7 mip/layer/face payloads compare strictly.
+`measure/report12-bc7-evidence.mjs` records source hashes, the exact corpus and
+crafted outputs, and the baseline-compatible raw/gzip draft size. Remaining
+encoders/public integration and full job 2/3 acceptance remain pending.

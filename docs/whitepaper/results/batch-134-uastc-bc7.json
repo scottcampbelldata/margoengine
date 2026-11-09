@@ -1,0 +1,3514 @@
+{
+  "status": "pass-private-uastc-bc7-subset",
+  "scope": "UASTC to BC7 target6 only,all primary served mips/layers/faces,strict frozen prebuilt hashes. ETC1S BC7 and full jobs2/3 acceptance remain pending.",
+  "corpus": {
+    "status": "pass",
+    "scope": "UASTC to BC7 target6 only,all primary served mips/layers/faces,strict frozen prebuilt hashes. ETC1S BC7 and full jobs2/3 acceptance remain pending.",
+    "files": 26,
+    "pairs": 26,
+    "hashes": 345,
+    "failures": [],
+    "wasmSha256": "6c2f4e7e6ee425bd935938c19cb4455150a7b6fbb1c974c8ab2d2e0ac432a4d5",
+    "adapterSha256": "ffe23d1f3d4d7b3a899a96085619c2d9eb22d90a181953179e4ac0191a60c679",
+    "results": [
+      {
+        "file": "donmccurdy-ktx2_2d_uastc.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 40,
+            "height": 40,
+            "bytes": 1600,
+            "sha256": "4045cb0afb5aeca25b6deb3fb96e5cb5dc89787b5d949827b7a4f169ca0ba5bc"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 20,
+            "height": 20,
+            "bytes": 400,
+            "sha256": "afe214b3b7a701c84105e9980069f95326b85bd5a225a8327a525993ce2f8cab"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 10,
+            "height": 10,
+            "bytes": 144,
+            "sha256": "d943b77bbca06bbfc73ec622117ad27661f28477115c1ef4aebae7e482403e3f"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 5,
+            "height": 5,
+            "bytes": 64,
+            "sha256": "0404c837b7cbac89943b566b6b933edd44bd80e678c53e74ba8820a43610cf58"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "35312915209a749784c950601eef371e6b58b04de72e5052ce2424b61d259f54"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "e60d8cf5ad53742d195f12e92f15dc44f01617ed68bd73e3a03c1746e3474479"
+          }
+        ]
+      },
+      {
+        "file": "donmccurdy-ktx2_array_uastc.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "72a992221a6985a618a0c8c1673f235d02186e21aaaf9f58736179a90f7e1b0f"
+          },
+          {
+            "level": 0,
+            "layer": 1,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "5f4bbb6f885779941642e86cc54a2102b03edc181ea8069bdfe0e267eeea6650"
+          },
+          {
+            "level": 0,
+            "layer": 2,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "adbca4bc74921fb4f618815cf3eef27a907d0ff9f18eb81a7f1203aff08479c8"
+          },
+          {
+            "level": 0,
+            "layer": 3,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "5e87e848fa04a987214dce86cd225f551c764f90674aacd400a9407816ea1d6d"
+          },
+          {
+            "level": 0,
+            "layer": 4,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "0d8968ec068d018562e68d561b7cbcd1262504c3f09d32520065fcc8609427cd"
+          },
+          {
+            "level": 0,
+            "layer": 5,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "f2072cbd4742fe58cfd1c63e67f44956156ac546b12d648aa6513518fb234fb6"
+          },
+          {
+            "level": 0,
+            "layer": 6,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "4a60eae9b7fe7f1e6430cd2bfe7f152d1226a8b691841aac8b658d318241106d"
+          },
+          {
+            "level": 0,
+            "layer": 7,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "e10502d2d53ff1b86795058768e700a6f45a06e5d3c156098d8938fb6cb61fb7"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "f810b1139c29a423de51744b4c3423f4f9bdddcee8eea0979eb95ecd2fbab6be"
+          },
+          {
+            "level": 1,
+            "layer": 1,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "50748037defefe969bf88b3e74f4cb81599467004c7b42b16a90dcfae5d28d1f"
+          },
+          {
+            "level": 1,
+            "layer": 2,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "2720cd6f5216ae49c89eedbabf725d07bd645f6b9ff0abe2c1d1e340de8f9e0c"
+          },
+          {
+            "level": 1,
+            "layer": 3,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "a9c5c86d8d026f1a8ea5f4d3f8b49d24cf17cbe0f04abd5ea496f717587c35d2"
+          },
+          {
+            "level": 1,
+            "layer": 4,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "46677fcfbd2d39352d433b2df9cfb67605897015aed898878c14bf1d0c8618c9"
+          },
+          {
+            "level": 1,
+            "layer": 5,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "3124188067292af105c9fb1eb41c8918fe12865dcda467e8b0d69fa5f272083a"
+          },
+          {
+            "level": 1,
+            "layer": 6,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "6b6e6de5cec089b1cfd432b63b0828fa66a6384be8ed67aeab17eaeb7091505a"
+          },
+          {
+            "level": 1,
+            "layer": 7,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "9cfaecb5e0d5ef4bc5f81347b9ef0ec25ee9d2c6e2c88912e8b3e16986257f02"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "3bf6b29b633cd08e56a5c54f4ecea8c5eee58dd1d5d8913bd6e3342e2012cd48"
+          },
+          {
+            "level": 2,
+            "layer": 1,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "e34ef5f45a2225f8bd5ffcc8e6114b8184b09846479bbe4c66f301f0b1a240c4"
+          },
+          {
+            "level": 2,
+            "layer": 2,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "8ba8d0684d284876792ea733f71f7b455aaddf8d295ce313c251f8b5ac3185a8"
+          },
+          {
+            "level": 2,
+            "layer": 3,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "7de21f14aeb5118703f63682a3e80edcafac49bdb8a05c23e872a9cf4d89961a"
+          },
+          {
+            "level": 2,
+            "layer": 4,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "2f26a64005f74436b195a76ca6c1696023f129f8f95896bcbb824b3381f7b047"
+          },
+          {
+            "level": 2,
+            "layer": 5,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "e190529c8f904df2b02bc8edfb6ad630a33ca20e84845485ad5d7266ae6f79fe"
+          },
+          {
+            "level": 2,
+            "layer": 6,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "aa716c035c34345e9473fd7622fdc8d4994a8e1c57b858fca0bf832b4d8b69a1"
+          },
+          {
+            "level": 2,
+            "layer": 7,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "75612b289f7a01bff42be1cee3f10322d374d2b4ecf0b0acd69248372b9a156c"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "7ee7abdde47d5ffdd49bfa83e865f5b1ed4d42eeee1162d19501b405d351c31e"
+          },
+          {
+            "level": 3,
+            "layer": 1,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "b34b21d0fa58776eec32129148e387d863d7501d533ae760673e65f8eb036a9c"
+          },
+          {
+            "level": 3,
+            "layer": 2,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "b6c650fd41e7e613bb6617ec78859c631e0c6205992fd7d09702b8ebd5c2cf2f"
+          },
+          {
+            "level": 3,
+            "layer": 3,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5632026309b06e79fd0948d3446e078308ca1b1aab06bf77de4636f434c78070"
+          },
+          {
+            "level": 3,
+            "layer": 4,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "73f408fdf7c86760b8c89ba052cf83f84dc47d9df9de4d8108587422e80a2262"
+          },
+          {
+            "level": 3,
+            "layer": 5,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5a64b79503eb4311a2855a24c05ca8ddf3caf22b5b6c469951c6ec68491b1dec"
+          },
+          {
+            "level": 3,
+            "layer": 6,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "ff7f6b5058096a154d7116152ea59e10c939ff86d526a9d41b99ecb0eee1cd64"
+          },
+          {
+            "level": 3,
+            "layer": 7,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "08c5c0087450615fbced4726065c88700cf4f13708b201b5ce7dae61b1f4b6c1"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 1,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 2,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 3,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "982124c5a3ae74a8cef3012a7215fd1fef5734d649aefa608c05052f8895e59c"
+          },
+          {
+            "level": 4,
+            "layer": 4,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2cf7249d25b492775965ea2b5ebc96159c426419697191199e3a5b228c25eb64"
+          },
+          {
+            "level": 4,
+            "layer": 5,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "87b70f01bab00aae7d12e22563c923b61352ac44138235c6ae221151b37ef3c1"
+          },
+          {
+            "level": 4,
+            "layer": 6,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "3efb409326baa30a0bc72f401f52b7206ce527e6d46f25a837fae7e71bf28a81"
+          },
+          {
+            "level": 4,
+            "layer": 7,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "87b70f01bab00aae7d12e22563c923b61352ac44138235c6ae221151b37ef3c1"
+          }
+        ]
+      },
+      {
+        "file": "donmccurdy-ktx2_cubemap_uastc.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "72a992221a6985a618a0c8c1673f235d02186e21aaaf9f58736179a90f7e1b0f"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 1,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "5f4bbb6f885779941642e86cc54a2102b03edc181ea8069bdfe0e267eeea6650"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 2,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "adbca4bc74921fb4f618815cf3eef27a907d0ff9f18eb81a7f1203aff08479c8"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 3,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "5e87e848fa04a987214dce86cd225f551c764f90674aacd400a9407816ea1d6d"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 4,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "0d8968ec068d018562e68d561b7cbcd1262504c3f09d32520065fcc8609427cd"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 5,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "f2072cbd4742fe58cfd1c63e67f44956156ac546b12d648aa6513518fb234fb6"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "f810b1139c29a423de51744b4c3423f4f9bdddcee8eea0979eb95ecd2fbab6be"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 1,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "50748037defefe969bf88b3e74f4cb81599467004c7b42b16a90dcfae5d28d1f"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 2,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "2720cd6f5216ae49c89eedbabf725d07bd645f6b9ff0abe2c1d1e340de8f9e0c"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 3,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "a9c5c86d8d026f1a8ea5f4d3f8b49d24cf17cbe0f04abd5ea496f717587c35d2"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 4,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "46677fcfbd2d39352d433b2df9cfb67605897015aed898878c14bf1d0c8618c9"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 5,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "3124188067292af105c9fb1eb41c8918fe12865dcda467e8b0d69fa5f272083a"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "3bf6b29b633cd08e56a5c54f4ecea8c5eee58dd1d5d8913bd6e3342e2012cd48"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 1,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "e34ef5f45a2225f8bd5ffcc8e6114b8184b09846479bbe4c66f301f0b1a240c4"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 2,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "8ba8d0684d284876792ea733f71f7b455aaddf8d295ce313c251f8b5ac3185a8"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 3,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "7de21f14aeb5118703f63682a3e80edcafac49bdb8a05c23e872a9cf4d89961a"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 4,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "2f26a64005f74436b195a76ca6c1696023f129f8f95896bcbb824b3381f7b047"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 5,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "e190529c8f904df2b02bc8edfb6ad630a33ca20e84845485ad5d7266ae6f79fe"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "7ee7abdde47d5ffdd49bfa83e865f5b1ed4d42eeee1162d19501b405d351c31e"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 1,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "b34b21d0fa58776eec32129148e387d863d7501d533ae760673e65f8eb036a9c"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 2,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "b6c650fd41e7e613bb6617ec78859c631e0c6205992fd7d09702b8ebd5c2cf2f"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 3,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5632026309b06e79fd0948d3446e078308ca1b1aab06bf77de4636f434c78070"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 4,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "73f408fdf7c86760b8c89ba052cf83f84dc47d9df9de4d8108587422e80a2262"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 5,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5a64b79503eb4311a2855a24c05ca8ddf3caf22b5b6c469951c6ec68491b1dec"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 1,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 2,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "73b3a528493ce5b1adc8c08a3c5ee651cf96124bdbd899fb169295068ad27e12"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 3,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "982124c5a3ae74a8cef3012a7215fd1fef5734d649aefa608c05052f8895e59c"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 4,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2cf7249d25b492775965ea2b5ebc96159c426419697191199e3a5b228c25eb64"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 5,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "87b70f01bab00aae7d12e22563c923b61352ac44138235c6ae221151b37ef3c1"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dot_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "934749977e9d8acb4b96efcf25fb42c3841c8ecbd1d3a06efb540c7b0d9849ae"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "936c670ab18eedb18ff076062bcc0133e2c9a19125961fd6c6b72a701f159de9"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "b3ea0133b04a492c8144e339550dd9b7fea16976f3a22569a3d8f7173feb951e"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "d26f90db02515a9406d1e53810d7d173e004a623391d169260286be5b4fa775d"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "934704f751914a92f5586280c5f024184c4bf77d94e52aa2c236f63a7af2d2d5"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "d6d8b09e7aee8e6d1da735dd2176ff4bb5a10076b77ffcbc084030bcd4e6cb4c"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "81b1385797c260c0a1da54723318bbc9bb707e2160e8db7754c31a99cf8cbaf2"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "81b1385797c260c0a1da54723318bbc9bb707e2160e8db7754c31a99cf8cbaf2"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Hex_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 32,
+            "bytes": 2048,
+            "sha256": "6f139b6f6b8ed89d28dc2fa727ea6a9f6659991eda3e087c686ce38d7b6f9d3d"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 16,
+            "bytes": 512,
+            "sha256": "5942bb795e197aa0ffec884859fb9ce6a29e94f8ecb91b0ef3062990a473acd1"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 8,
+            "bytes": 128,
+            "sha256": "1c38690a2f36dd634c8a4917fb4523a9a0a1025a61fdb821912ffb8cc4dd6c93"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 4,
+            "bytes": 32,
+            "sha256": "dac412488348c69f50a1c3fe349cd6a33d17bf72677f7cb2bfa2305c7ca01f3a"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "e308f621d392bb863f6e5965503f601fc6292a3ecfed95ceccdaa2c65b2cfa3c"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "56172e80e6d53bfec65921d8bb7ba6371013f251959d25357538ec591784609c"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "28b0f916e8a35d582e4457f36735ecfad20c97b599354ffd7d67c0c8aa1a2264"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Mechanical_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "52ab56cba8d39b14cf36cdaabc94f6eb3f8d0e286d31e1236c7aa2536ffbb00a"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "9dd5f90389bb445a9459d28884e6fafc26dd4603ec0fe8af83a28f2b838bf7b0"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "7b49a23329c9b9adc5df25bee28b393d43b8373e45afe464d5f4c6da8aa127cc"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "411311231d0b66aa35ba5392f7a7e453a78006d28eecb05140db965fb0e6f8ec"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "07330d03e79556e8c22447c285cec95bd90eee01de2d9bd720dd151a4222c747"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "84e83e210e4e1a9e7fdbf1ba011e6cccbd74ba566d26fb674529abded4bcc15c"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "ddebffff555eb5326ae749b3ef02582b6cd5c2ccf4a77bfb1bab937abdc9cdf6"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "4dc7b4b5623bd141315971fb0c584a5c90d8376b5da52b373195b78f864c21ea"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "70d56d673fd3ac365a3ab488da0e0cdae45da616f55e8f6e013835739b3afc07"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "7a6c6a66567a020306123a99ba5bfda57f36a70a86dfa776c2ae90935688f7dc"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Mechanical_ORM.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "6fe9358a88e1f3c7a988793db8676c9cbbb4ede5813c5db6752579ba879c5a68"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "6c3280b5f5b4e9094ccd3e4f87cb31d9a917d7df08d0f880a1909a331fdf6013"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "16ae996f55a23504d76d78e9b1973d736693a51e8e4708a86997251aa22fde13"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "35b8e1ed1c451a63df260837fb6e9fc6af236dbbe6e3521bf6ed3ce722951437"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "835b3defe3abcc02f54e008c65b527e9e9311a92f5e2a2dd32923edfd76ce34b"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "3439904738e6f074464122cb4fbbaece13df96c9cd620b355761bb02cd191066"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "52ba281747881b1518ab2883f9c9115e5fc2519dfccdd7f2846664995459e4c1"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "46157422ac4fea3772e9808681f41789b554fc0fc2e2ace3d064c3d16bd38eb2"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "99737b88822c0c8f7e75b8c652c737a6a37d1a805593bd4660f2bc4fc0a0e38f"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "99737b88822c0c8f7e75b8c652c737a6a37d1a805593bd4660f2bc4fc0a0e38f"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Powdercoat_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "25f09731842e6fc594e882e12a79b1a8c20bf20ad76b07e4bec42316e11b0569"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "9a5304496da355addf2966b6164e5fd08e22085cffe5db1330539bf66a06d047"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "3eac1cee5b692be124b2c3022d8f183cf44dec48c27806502e0e43740f71767e"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "9b7f318d7a8277cd5674a9c765420df45418a87f5ce0e959053b01240b564452"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "ac0d9e5921c604cfd7a8c0a4939bd31d2e62ede70a3054ecdf9e5d25e1e727bf"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "8e266ba56a82709e37459b6f740f4d6d49a69fb40d857dabb6b7152e63be5f2b"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "4ade595aa6e61ecc72070f1eee8eb8a84a0c643a86645304bb19b7832f742c61"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "64365fe5fde715bf267154ce7eacdb478ab0352c76b3e90cb320df8ac4193f39"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Rib_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "6bc379a08fa800e36e629e39236357088b8e11b24645392c4ba2dbb6d8a12583"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "5dd23e72d7968091af5b66ea8618e03c3e424a261524643d9d1b141e0eca5b7a"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "a4933d615cd67d384561db1678ddf38b7578d9524d5ecf5db2c935110d5d19a2"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "34231ef38fdd337ddb9ea4bb722f835256b9f03ca396496c9231315b5c8a98ab"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "9b780a8690653173d504a060fa9ee847888c0eb618f14f278439bb3a3b4ba7fb"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2f1d771577cb9676afab09d0c96227357a3848d906aaada1911b80ea21c6e0e7"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Tireside_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "617845191981163082198d22cbd3303290c1873f149df282eb9f168f0da5e080"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "0775ca60e12e4f12a84cf0be51cc8c6cf771719771a6ab2848f984e4e8005302"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "955ca3395c0925661427b659fd69d1c11e708a0edd1000c7bae86e5eaa5133c5"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "b5e363500ea3e5a68f33e173ba8419f350a4491c407028df77f098e2ad1e3f19"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "39e9b3c233b4197b9c3562e3d0526e12abe0c9457b3e8e4b45996f175b2c87e8"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "c12fbb367c016cd0b46d90a14c40d64e1bc738ee1e3f48e6b2b0731ce8825785"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "bcc2fc46ce11164c3e62673ae97a9fb97b97325fb96622f26338be295e6cf5c4"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "97123090db2d024142870384ba074aa4fa63499b938a316b0aa3ae56503aba6d"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "e9e19927727a0b7b0965e4bc2fb263fea2f63f6bad33b6fdcc8307e258cea5d1"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "59000e1aaff1549a50466d12c2c43dda18fbb0c0b84bef402ffb28f3f9c092ac"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "f65e7f1d17eeda121eb31b5f630609f6f3847844fd55a5a02b9a92231af2e899"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Tiretread_N.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 128,
+            "bytes": 65536,
+            "sha256": "e214321e23bba296bff24e8588e6db6144dd4b44e0f655a966cede8a62c7f41d"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 64,
+            "bytes": 16384,
+            "sha256": "4041f0ac9dd80909360734f381415bb763552fe4684d33a8b37818ceba13b8ff"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 32,
+            "bytes": 4096,
+            "sha256": "eede0665d3b0e986a770d8185380693cbf02633363f7590c7cd38ff375d5ce91"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 16,
+            "bytes": 1024,
+            "sha256": "0ae15a0d5095edf7227666f253d995f447fd09a2e6d648e35e5d3e7bee856fad"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 8,
+            "bytes": 256,
+            "sha256": "58745190474de818e97c6fe68986eaa891cab070bbb4ca4471fc001de220d1ab"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 4,
+            "bytes": 64,
+            "sha256": "6f587afdcd1a60c41e86e3ecfa6ef98a1dd79e9285a325f7ee7b7fd2a1eb925f"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 2,
+            "bytes": 32,
+            "sha256": "0b41f1d91e1f97b4b4e1908c9ac68e3ed4a1e1a8fa43f6db1015c3cae0e32271"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2935071708b96f38f325d440b29e95f7dd9d733ec27bbaacf55c734a2ee6755e"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "41809a5dbe7af1e18e64bf312b58b0d86c5f11e04a6c911705e910578c6a7f1f"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "d8030d83a3ae158e1f82dc6b8dd7aa342333dd91c5e08e89a8d02b0fb67143c9"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_GlassPlasticMat_Normal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "015e9bc9337c77608efda07f3d7a6509f8ca628f0ffe029132355a73bc2d50d4"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "b6d1185b0841658c10e5868fd2740b5baef83a8111195d65cf892421e5bb5566"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "cf33e2530bf8a76ed635b11bdbaac309a197384458af25eb3fe0e7394607dd91"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "2bd8af7ff4207ffa8e6363b33c95cf35492c345d242cc36559b713d7979841f0"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "7c98b01d59c183a27ab4dfae990a70785881b919c899655a13c1dec2d86ee7bb"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "08b5544dd259d39af3375e48ef867194998a340f873a3cf10f5fbad5fe9c51cd"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "5db544d40d8cf190c03a08807de753aadb8d5bbef570e2cbfb088b6a0dab506a"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "46a7403783bc0c08e09da5b0882797c853c13ac17b90a8d6113e9f8ac89330d7"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "fcd7635a964267d30118ac5ac6c8b6f581b05c6289b2a33d3e8a33d02aa5b9c3"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "f3a0799049ad6b0da1f3a03b043736b5b95b8b6ce9f59f664b58777df7ca244f"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "99794df1ac666c7a8664bad6741d913bd89a216e64a2eee1053edb4f54324e0d"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2c8762d722491e2b5c6e771c41184b5b872344bb0c53f9d3740122a398765929"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_GlassPlasticMat_OcclusionRoughMetal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "4f82698b850ce0ad2eea7f7bee0a2d51269d3c7c328e55492387ceef6083b684"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "6fc92ac6808158df637474631ffd7074aba6a2a0ec6a20398050044374c398f1"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "bb232dcad3ce37f907435a4f446998ec76e1de6f7e5ca655fcc267df0cba0059"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "7a85a26b01eb70a51b415298ffabb3846e6e6b737a1db1e551fcfc81e60e8877"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "9b74ce5dbade46f30d292872a4ce7563ce39b7a2e08d66f6e54895244d97cc58"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "8e28f2664794d9c27de2b5b1e3f1c5b0513a0913d66def80f9475e6102169fa7"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "3a44e3db2786a966c0e11bbb864591b7c101d4a7ae74927d1985f4e8cb900a56"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "464e3b8d0f7386308a0ee3f33a2a223fb144b614586d3e479a898a6c67e9914c"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "3604a11d44ad63ad468064b0dd5c3089961f20a070f332d4d360f7fb894d9bf8"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "b0b81e5ec66deb4fe4f39bc96e2cf6a476fdeb5df4f956d717d23a2a8672eaf3"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "07e0acfd8cbd0c2f4edab06a0c057e4cb95d9030fb292c565c602f5912084147"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "2dc686c150f1986a7178b981eeec3df622d27d3d4e222f51ba437dada6f5d073"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LeatherPartsMat_Normal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "d756aba097c0be21df87a2def9ecc957dd578bf6c1f9bf3bd22927902474f9a5"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "f340e7493a6c623f436a981763d0cf225968147abdac9ed81b23ba6ee7a1b310"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "ee5668887813d430033e6fbe2a607a9dc53a70e7eaed97ae09c353eb9185015d"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "cb969d9b89a7084810088e347c56729dcf6fbe31fa20310840876827378f7bae"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "6533ca0b5254ffb1220ed1b2c776f5b260e8e50d1a4cf6627991ad4718158491"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "6735cdd0ebd1a64822e7f529a9c706d57ef28b81f50890cce8ea23e7534d018d"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "d4ca9247c25368d8dc837f678e9ff1c1a31fadc9b17e9bb3f0c202e11d33f430"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "bf4bafcbb1b5834314f394896814732bd5fc4956aae2a9e0c1f12949b88ad011"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "5c9d43e530849d8a1d1260582278e555b022921fc864c8bd1596ac8ab95aae5e"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "b5f243e104973d20920f2b17e6f5c309061fb8dd7a99633c87d178fe91d1d482"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "45727d5a1b1f0c618b5162a244c698bacbd50f633f23e69a48aa7e612abf54cb"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "4831ca6c2e00fc00bdb6827b8497b45e0a60846cdf13cc7712be88d55c8b44fb"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LeatherPartsMat_OcclusionRoughMetal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "38bc6f65d1c0e4a5ffad1413be7320267f1810804329d3898e491600deb428aa"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "b5ae140f42d25703dc653288fd7d12270b8fba31a28d7e1624ee8591923f598c"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "eda8225818f8ca6bf83b595a6561bee44659a17c5de94741000b1f262cb0b0e3"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "b385ad8a7ce0af3fe45f680d787012eb868809c85b2fd3c69d67d954c152f44c"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "382f1d6d94a8e9fae19e3e2d4702f0b9f72d591f733ba0b82df6f4acbca8cf61"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "fc89126e3097ba33ffe133956874bb137f551e6e1916cc7142d742e971365dfa"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "415cbcddce16afc51ebcb6a56cd750cccef414539c73761bb4bfab69151dc0b2"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "b4805c628d2f6bec0e926e7022a4106a1e8f105424338b1243cba0691b66114e"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "8de56f322ea3aba7835d393ad7087d0fb16e86792c3e3afac3c53f4cd99b7d7c"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "008ee3d5ff552f38fe19ba7f2128751fb0cbd5e3203dd6bd49e7741d0a076ac9"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "9688e4e12f460b28471c3e6ab97872166fb2b9f07ab9e744f9c4fa16e8a0e821"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "aa9b0ed5896b5abbd40fe423e81eebc95cf50902d077e97d064cd4ae4c1756b2"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_Normal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "496894c14fb02196f402e229d897cbe387fd5cfc880d465b38977fb47cd5355e"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "5445609a88842b9af1d40c22a1d1676927980b9482a060c59990e38ef90fa7e7"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "a5fa10218c30cc125ca582c6e955303ac3f4c97e32749176efa892cc9677176d"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "cfcde293a58d74d5aee1ef8dab1363736f0d97c08314ff063a8adec58fe4544f"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "71e401ab30a21db9b624c93fc42b4d73fa4a91865a8682f3261a17fe3bfb36d9"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "4d471f66cbfc4289eb6bb2a9b9bc59f02c21ba5dc12c0d247646cdc2939baff7"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "dcaf79a9b0a8fe4017c32e6d6dd7af25d55a2f91cb0a5b3c6b2b8947890c8e49"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "e0c4514449f665ded58185f66456a881fab2a88ac50c1b5ece70acb7a7d92ce0"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "6f72910e52b6b2e7d2430b2a48df8b37e049a4f00278e8bd4281453ea249f542"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "6f72910e52b6b2e7d2430b2a48df8b37e049a4f00278e8bd4281453ea249f542"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "6f72910e52b6b2e7d2430b2a48df8b37e049a4f00278e8bd4281453ea249f542"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "0632578a1760f81cbc82f10fcb33e95c05bdfe7351d3574455cebd551e605187"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "9a8d5155a95548af0ea2e1d6089e77bae7991981a7cc41bcaeef4522bd82cdf3"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "72173fbdfe4832f8ed43886c34659163f95bc91d1f9b3c2040628ddadc83ba6f"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "51e15a14caf8c20d4c95336be4c677b2555280177016ca76a1e06a39e3d0d963"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "5a53051c17224fdbb64f0f55c6d543aeb6398c34451a912e2d493c432374765f"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "037606b41a3c1a14cc1a9c7019f9afa8d4f1ac0e532907be9284e91b506edb49"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "b4b10333d0fbdb98dabe45389b0bc6bb4dcd9d37cb70819b7ccce94ef2cf90fb"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "bdf36f375f0aa314b64c83789e5dacb859d02f4ee5d0c2e432bcc7032d3998b8"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "bf7148da4e84ead031982d24b1e1880abc0c193a0709478e039fe610b294eeab"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5a0bb074ad5079229e8eed74610f5375dcdc09017b6502939c76e6da898ed2cb"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "a00221a1d38446562a388d334139591cbf097690e92c105683caa868dcf97319"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_MetalPartsMat_Normal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "ab452f66009e6742dfa811baee3ca040fb2087c6bf5fa01fbac54dd10e77a147"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "d7785064d350677d8376eae92f56747018083dfeec24ae6ede83f2c7c5d7ae45"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "ec1c1b9dec0b345b978e5d9db9e0286cea0e2d2138cb3ad99d8fd90ab08a8a01"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "5af559a9424dbd3492d57208c6c6fefdcef823a3fe770c9cfce4c7a8380b7ed8"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "82081169d94158bd3fc80e1970eb0e449be512bf510cd4fc98a116900f826382"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "ee97e9368dd6f0fc3c144751ea5410efe94c377cf38e84d24183a90e1d2634f9"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "60f357eb3b7043a9c9d61dd7b4ed73da09b0689b90eb3756aba4e095eb1f79e3"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "8fd4ed7fbfa9dee0bda570bb0c19c6232d6cf6deb4b4643502064bc3058ce9ee"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "7cc7c7ca6627bc55d014387ad951e41f2a6033e73e3f3b55d2ee108825655ff3"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "cd91226b86bb1fb47c40dffeb043f764d65fcfe1e3263b291b41816227022513"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "55713da8c3efc454b766f8e607eb82ddbccabb2a577addcdcfec3ac5ca7854e3"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "693df243183797871607e0c456ee3fd02f6b0b8403c8fa0a28fff1ce1e24aa03"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_MetalPartsMat_OcclusionRoughMetal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "743fc70d985064d9d49e375175903fc6e62ac4944f5fc9bb3c600e5fd189da17"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "c8f7b6de2eb56a6ada739a812dc6883931ef1221c9a780ab39964dfa0cf93871"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "ce58f007852b479845288bc4d920cdc9b0c1aa5de66f9438f73f403328daa66c"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "da972128db9d8ba7d1f4778b8246ab69334a8968aeebddac493c93d6f8e5b8ab"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "ce92fa7651c7e9fa81da997d649a7b79eec4fa611bbf07aabb50eb6d46e3c977"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "cdb5d0bc3b6932810ab236aa4bc5e95bd7d958bf158b1e91b3bea18626a06c74"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "ece5de513babc4ae5e6cadb88ae9792c9d5c27b51dddf5a77a8ff97ca48a34f0"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "2733effaec316a40c60a2127b72c1c91a63a53deae56454af3747e96a4dc3c69"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "9229597d0a8a8d3804caadb4f8d1d20c8cc3eaee0a00ae6f6edb32d73155cb57"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "b133cfc336d9e1b81d748a6458cb4eadc380644ae20c0611e98d41a0ecc9bd35"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "93dd3ee753894e41c6418dd417a503e34db559c91e02a14754e640fb1ba3e9aa"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "fe8c3a36cc2b3a39c177f8d4c461f59de669c23fcc6bd820d3c8fbff8e811111"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_RubberWoodMat_Normal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "3d783e8fc94cde6fa67ba99fcc116d20e815779b7687f522e845717d4df0bd78"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "7cf3d25d733cbcd5174c07cfcc7b0fd991d807ec0e2ad91e59f1ec6ff0d3d86a"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "92e31b98b6c9b7016e55f03799c6cef8a9517f648bdb9b02387f0f1da4c5297c"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "a09f0627a438257eb9f2fe5c521104fab6fb04f23a4f3e239f6c74852bd603bb"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "1d93df6449c09398481fd9b5a434a01dca22667bddaaa7571761796f6c50c028"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "9de747e9b7919856d8e30678bf34a6c8723e1e714701c62ba0c82dd0b36caf40"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "121a0ea5adced380d2ebb168a17546a377585a0929ac02eda19fb1cb9d42f669"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "f3b6319c5f82f33306f1a55e9ee5923475dd413f14cfeeff06c352ae9bfdcea2"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "78ea904d423a1c1021fde21003fae3ee99b69dab65dccae56265011489b1b68e"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "817429feed8453bda390ca7194173be5874f9bd00e3676871e59a7712a9a81f4"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "09db7c0b42e3af100f398cd854866817958e50e96a9c17c60c977da74c747580"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "b41221fd18616f47983b06fbb05186c7678301b9693550a0fe7c0df7104fa1fb"
+          }
+        ]
+      },
+      {
+        "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_RubberWoodMat_OcclusionRoughMetal.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4194304,
+            "sha256": "ef805c768ebdf76a0ed24291f812441ad8825660e29218775764736cdbf1b6d8"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1048576,
+            "sha256": "f3022b6433c464fdf7e6ef37b8f9748d10eacfe059b2e53b2e57b56079aa8452"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 512,
+            "height": 512,
+            "bytes": 262144,
+            "sha256": "4a846c3648ac21c998287c4aeeba7f8ecffc9ec66c13cb6975db0f67753e5cc6"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 256,
+            "height": 256,
+            "bytes": 65536,
+            "sha256": "6acf3e0c21f08b97b1f9254ef0de4e0a17213cb16c5b958ebb5e533eb25d337d"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "fd37afa275386f30b424515ba46e405e5ba71a8e691e7fd8a114cae7ae0960d2"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "dc598d5849aff5e754edf267b4dfb27f4c1bcda146a76195389f30a0dbb7b6f5"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "5269f44d2e60040971f77a73af45a3cade082ed7b88a0de9a83b4f97fea68ae2"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "f18045b0168e8e9887ef1f8cf1a9115d32af4081a3773826d29016f73c05a0a7"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "94fa608a666b2f04ad9a01e9f67371fa8a22cf21a02b080ab17bd7a160c8e698"
+          },
+          {
+            "level": 9,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "f788896502966bb2d1720456f6059804132eff3bc3a59dc567c834d71edd27ee"
+          },
+          {
+            "level": 10,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "640c9341bc0a156eded7fdb245bf9faf1989b064f1cfcfe2e1f57a0604c6e207"
+          },
+          {
+            "level": 11,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "3ef3088cb8ca4408cc9dbc24d2030630066392e81fce1507707f059cf671449a"
+          }
+        ]
+      },
+      {
+        "file": "Margo-ktx2-gpu-alpha-uastc-zstd.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 128,
+            "height": 128,
+            "bytes": 16384,
+            "sha256": "a83cb0c6ad93306bfc48d68ec660d65087ea28a0e6159306cf6e7163e3733f05"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "6a00e24fdf880caa907f4850d081dab98a092f0b5c0e694d43f9865e3e3bc5b8"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "1820d20115548309884e68acf6a4f28bdcc250848ba548d975176ab5127645e2"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "3297a5b18fe4b6b01865eab1c1110b0e868bc8040a2761c21b3ac09461d20abb"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "6fada8701b40d779ac19b29fc92282ec21503bfc50eaa14407d0dd454ba834c8"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "0b7c3b1882894afbcc35c50d71ed3556db018c8d34ea96cc6553f42f807d9c9e"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "5a44103022f03149f9a64c0c3beba624ebd4a36e2077dae91527bd419ba140a5"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "71b6a9f7c7a40f515aec904bc26f43e0159bd5829133bf2b1720ab44c0dada7d"
+          }
+        ]
+      },
+      {
+        "file": "Margo-ktx2-gpu-odd-uastc-zstd.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 301,
+            "height": 203,
+            "bytes": 62016,
+            "sha256": "2f802b74534357881ceae379f2b9f92760033f067459e8082df9d8c34f609cea"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 150,
+            "height": 101,
+            "bytes": 15808,
+            "sha256": "a4c1a370be22f3d899211bdd07aa1a9f3ccfcf0ff4ae0b59f59f256c5a2035cd"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 75,
+            "height": 50,
+            "bytes": 3952,
+            "sha256": "153b53d9c76d1d232a96cdc69064e727f22e5b1ed43c50b0bedba1223fdb1b19"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 37,
+            "height": 25,
+            "bytes": 1120,
+            "sha256": "e71528e73ddc79abb3196eb7eb06872225e856e62efdfdf0e4dd3332343e5768"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 18,
+            "height": 12,
+            "bytes": 240,
+            "sha256": "7759ae223628e59d3be1a3da52abb26528f1887ff6a66e3a664e0225ec1f1da7"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 9,
+            "height": 6,
+            "bytes": 96,
+            "sha256": "0f95a58075f90ad715b62d2cfda221cb85185da6968b4ffc5d6d16f44fc07b3a"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 3,
+            "bytes": 16,
+            "sha256": "0efc17c0c225200057305baa5795700c6dbdfa7677c99d7a7e0e85fbcb97bc15"
+          },
+          {
+            "level": 7,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "95f23cdc332b18944b25afb0c67264f02f7b8c45ab6dc1f82f9fd9f94ae6c909"
+          },
+          {
+            "level": 8,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "af288a666076bf738bc902b37e1e6ac02d47f26f8adcf3ff0b9d82b1832d65f9"
+          }
+        ]
+      },
+      {
+        "file": "Margo-ktx2-layers-array-uastc.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "79a37a81af1be87f9726258d337a2d63668aa6ce7b9f6a3a2ecaca0461e5af7d"
+          },
+          {
+            "level": 0,
+            "layer": 1,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "c379bff698e16a760db59c7be8191e9dcbc740ec199bbc597b2c6cb810f98434"
+          },
+          {
+            "level": 0,
+            "layer": 2,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "94b7404613fb1e5ed0c6cfbff9a1dd8961f5d2e4b7b13a95bc914875c0db31d6"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "f18ec38253f865ddccaa85d26ae88bb98912902feccb4ad4c5820670c6fc46e0"
+          },
+          {
+            "level": 1,
+            "layer": 1,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "129d09dadaf1f297a2b3b733ece3441f646b80195c77f1f11eff7593b45667c3"
+          },
+          {
+            "level": 1,
+            "layer": 2,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "4c3b0c8ab946ee95917e7de2948de8515a02fcbd66b6a55bbde23a165d6a3e23"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "e4e3090b0207a08de7625670dde5c9f7b424b8629d35bebcd4008e7c9c43e661"
+          },
+          {
+            "level": 2,
+            "layer": 1,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "a7b6d5738fe513fdffb18b95d52efd90d536dae125db727f153fc853a88892ab"
+          },
+          {
+            "level": 2,
+            "layer": 2,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "df08d850c5d02f2c29e52d8f9df6fb19c36a7a62bd805f20f3ad5332e01a8ec2"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "2ebac67cbc5abdc47729f286866b52136dc9bc0fe96d4cf3256fd58a554ca2f0"
+          },
+          {
+            "level": 3,
+            "layer": 1,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "53316c93393d75287d41b6817c83394592ff528402e12680de943587f26471f2"
+          },
+          {
+            "level": 3,
+            "layer": 2,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "86596ac9f5b2268b77d816481df89c31891acacf38de11db11dade0351aa3b47"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "1fc40e74673095682b1cd9b1b9a54bbaa239ab609ba25dcfc9259e5b813ba756"
+          },
+          {
+            "level": 4,
+            "layer": 1,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "7536021d3e098679bc683823ef7669728fdeeaffa92437634ae5aa01ff99c086"
+          },
+          {
+            "level": 4,
+            "layer": 2,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "5207164c6d2c6ea5863f33143e46e88571c9bf8993a8e4643ef2a890b5af3ad0"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "cfb6f3d1190460b548ac40aeb1a1865565a5b5741a7f2371f315c5e33651e5d9"
+          },
+          {
+            "level": 5,
+            "layer": 1,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "a81afdc7662f8ae8dbd44274868afb5a865869cd5eb043c0c6d283c2de4ea4a5"
+          },
+          {
+            "level": 5,
+            "layer": 2,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "ebc1b71c088bd55cf0e572ea4ac34ee45753097d14f8c1da2cb68081dd265180"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "342bb1f274c30379a237c5da53b54d9c1969decedfea5ad0877429d0629244d0"
+          },
+          {
+            "level": 6,
+            "layer": 1,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "67a8cf0d744a93215c5fa85d58852583c101b71d5a33fed82e018b20f815f0f1"
+          },
+          {
+            "level": 6,
+            "layer": 2,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "ef19bc02105f8ca2a683b7b57b0417d74170f9c054384344c2aaca00ecba7815"
+          }
+        ]
+      },
+      {
+        "file": "Margo-ktx2-layers-cube-uastc-zstd.ktx2",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "79a37a81af1be87f9726258d337a2d63668aa6ce7b9f6a3a2ecaca0461e5af7d"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 1,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "b650dd63606b4dbef8e3f52ba108323f2ace8932a7deb47005e432a00d308430"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 2,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "c379bff698e16a760db59c7be8191e9dcbc740ec199bbc597b2c6cb810f98434"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 3,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "70918f8d6d85422abc7bc7ed1273f79ef8a5bb2712855c756cb82316d1f5aed5"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 4,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "94b7404613fb1e5ed0c6cfbff9a1dd8961f5d2e4b7b13a95bc914875c0db31d6"
+          },
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 5,
+            "width": 64,
+            "height": 64,
+            "bytes": 4096,
+            "sha256": "a8c05ad9224854f9069e04b3544aede46831f0aa219714b194d667309340905b"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 0,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "f18ec38253f865ddccaa85d26ae88bb98912902feccb4ad4c5820670c6fc46e0"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 1,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "c5fd8c0f71332bff3d3d439a5920c2189035c4f81f1f9c52388febea2bcc8eaf"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 2,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "129d09dadaf1f297a2b3b733ece3441f646b80195c77f1f11eff7593b45667c3"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 3,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "46d9ec269238fb6992f8d386e15a86d29d99143df4b9442b18d0c3a93a6d2052"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 4,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "4c3b0c8ab946ee95917e7de2948de8515a02fcbd66b6a55bbde23a165d6a3e23"
+          },
+          {
+            "level": 1,
+            "layer": 0,
+            "face": 5,
+            "width": 32,
+            "height": 32,
+            "bytes": 1024,
+            "sha256": "972cc09a12cfe4082d42828fc1ae549d5d43cf1e0b2f9b43a62f06ff8b81e075"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 0,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "e4e3090b0207a08de7625670dde5c9f7b424b8629d35bebcd4008e7c9c43e661"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 1,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "2416b0e6e72273f4b442c7466fd87a773c9b4e7433ffe889e63536ce7bc8f0b3"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 2,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "a7b6d5738fe513fdffb18b95d52efd90d536dae125db727f153fc853a88892ab"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 3,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "40be853494b3be539b1e1380368771f7a1ed668613fa85c21c460de8d7fd70f7"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 4,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "df08d850c5d02f2c29e52d8f9df6fb19c36a7a62bd805f20f3ad5332e01a8ec2"
+          },
+          {
+            "level": 2,
+            "layer": 0,
+            "face": 5,
+            "width": 16,
+            "height": 16,
+            "bytes": 256,
+            "sha256": "0fd487bfb67fa05fb2aaa6a773ef56bab8063e082ad22fe1f819be047e590ca0"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 0,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "2ebac67cbc5abdc47729f286866b52136dc9bc0fe96d4cf3256fd58a554ca2f0"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 1,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "68125a7c20d82099541f59f3d22bf0aded96d8ca170567bb9ccf26afa38e2476"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 2,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "53316c93393d75287d41b6817c83394592ff528402e12680de943587f26471f2"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 3,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "6795c5f76acde78dcce5d7c962b3ac8b781fb279c7a63e8e23c616627432a40f"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 4,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "86596ac9f5b2268b77d816481df89c31891acacf38de11db11dade0351aa3b47"
+          },
+          {
+            "level": 3,
+            "layer": 0,
+            "face": 5,
+            "width": 8,
+            "height": 8,
+            "bytes": 64,
+            "sha256": "a696ca0fe2f02b13ba781834a77ac12091a5013de00a4941733fcc6834e3d48a"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 0,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "1fc40e74673095682b1cd9b1b9a54bbaa239ab609ba25dcfc9259e5b813ba756"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 1,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "f06456d5d46e47b2c0588a51d2acb42cfedb6a7f4dfdadea3a0a1f58f3e2f313"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 2,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "7536021d3e098679bc683823ef7669728fdeeaffa92437634ae5aa01ff99c086"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 3,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "266fb669951f6264360e8d35111eb731fc7f4f269a060fd0b0ee27c15ce30c3c"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 4,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "5207164c6d2c6ea5863f33143e46e88571c9bf8993a8e4643ef2a890b5af3ad0"
+          },
+          {
+            "level": 4,
+            "layer": 0,
+            "face": 5,
+            "width": 4,
+            "height": 4,
+            "bytes": 16,
+            "sha256": "148243a1e4958707c84b59331a3fd5921324f8f3d35c5a5908e8c6e9e69a24f1"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 0,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "cfb6f3d1190460b548ac40aeb1a1865565a5b5741a7f2371f315c5e33651e5d9"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 1,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "f77977dd8387af67e5a85d46fcebb58fc13b56ee21adb0bec1d675df878d126a"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 2,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "a81afdc7662f8ae8dbd44274868afb5a865869cd5eb043c0c6d283c2de4ea4a5"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 3,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "fbe2287b9d9cc415935d14bea0d6b9ffd5dd2da33633d4145ebbc2b2185ca92e"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 4,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "ebc1b71c088bd55cf0e572ea4ac34ee45753097d14f8c1da2cb68081dd265180"
+          },
+          {
+            "level": 5,
+            "layer": 0,
+            "face": 5,
+            "width": 2,
+            "height": 2,
+            "bytes": 16,
+            "sha256": "30487c00a3fd28d2e4782d092a7f0ec776bded18351cf8da6b26179cd76fa4e9"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 0,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "342bb1f274c30379a237c5da53b54d9c1969decedfea5ad0877429d0629244d0"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 1,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "ea672062f5b408e4f3fe6fe4ffaea4331b03d079397081e50a3c2e260f756b2c"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 2,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "67a8cf0d744a93215c5fa85d58852583c101b71d5a33fed82e018b20f815f0f1"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 3,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "0080bfc7cf30843ef8f664a308b7094ae5e3354c08303c5ba4b0ada676190822"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 4,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "ef19bc02105f8ca2a683b7b57b0417d74170f9c054384344c2aaca00ecba7815"
+          },
+          {
+            "level": 6,
+            "layer": 0,
+            "face": 5,
+            "width": 1,
+            "height": 1,
+            "bytes": 16,
+            "sha256": "3dd649e47823f29ca744caed7f9ec4e24ec3869b5dff035e25f38df88a0de4b1"
+          }
+        ]
+      },
+      {
+        "file": "cc0-flighthelmet-uastc.basis",
+        "target": 6,
+        "images": [
+          {
+            "level": 0,
+            "layer": 0,
+            "face": 0,
+            "width": 768,
+            "height": 512,
+            "bytes": 393216,
+            "sha256": "d5361bf38d6bf7fbda83de426732357f1ae38eb17cc6bd5c008fb4294dfc7444"
+          }
+        ]
+      }
+    ]
+  },
+  "crafted": {
+    "status": "pass",
+    "cases": 5504,
+    "includingPaddingBlocks": 5550,
+    "modes": 19,
+    "allPartitions": true,
+    "allComponentSelectors": true,
+    "roundsPerCombination": 32,
+    "prebuiltWasmSha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a",
+    "wasmSha256": "6c2f4e7e6ee425bd935938c19cb4455150a7b6fbb1c974c8ab2d2e0ac432a4d5",
+    "rows": [
+      {
+        "srgb": false,
+        "inputSha256": "f85f433c0cbc02a4c115233d67186bfec01764d118e5d2e456a430475bc44308",
+        "outputSha256": "2b688e0277014a36adfa57d9bebd3e8958e34b5fc19f1788cfce1304751f07f6",
+        "expectedSha256": "2b688e0277014a36adfa57d9bebd3e8958e34b5fc19f1788cfce1304751f07f6",
+        "failures": []
+      },
+      {
+        "srgb": true,
+        "inputSha256": "a81b6ee5717292176f50ee5412c5e2f901a4cd45e88a5b9bd09de974bb8f0dbc",
+        "outputSha256": "2b688e0277014a36adfa57d9bebd3e8958e34b5fc19f1788cfce1304751f07f6",
+        "expectedSha256": "2b688e0277014a36adfa57d9bebd3e8958e34b5fc19f1788cfce1304751f07f6",
+        "failures": []
+      }
+    ]
+  },
+  "solid": {
+    "status": "pass",
+    "cases": 3072,
+    "transferModes": 2,
+    "prebuiltSha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a",
+    "rule": "SOLID-BC7-1: mode6 weights5,pbits both equal,choose p0 on equal total error;mode5 only if neither p gives zero error. In each fixed-index decoded-value tie select lexicographically smallest(low,high) endpoint pair. Mode5 alpha endpoints preserve A,secondary weights0.",
+    "modes": [
+      {
+        "5": 517,
+        "6": 2555
+      },
+      {
+        "5": 517,
+        "6": 2555
+      }
+    ],
+    "failures": []
+  },
+  "size": {
+    "status": "incomplete-draft",
+    "rawBytes": 141859,
+    "gzipBytes": 50955,
+    "sha256": "6c2f4e7e6ee425bd935938c19cb4455150a7b6fbb1c974c8ab2d2e0ac432a4d5",
+    "compressor": "Node node:zlib gzipSync level9, exactly reproduces pinned prebuilt raw527333/gzip247535",
+    "node": "v26.12.0",
+    "zlib": "1.3.2.1-motley-456ae73",
+    "scope": "One private dependency-free Rust/Wasm decoder; checked containers,ETC1S,LDR/HDR reconstruction,UASTC LDR ASTC. Most targets/public integration and performance acceptance pending. Previous Python gzip9 figure41235 used a different compressor; not comparable to the baseline."
+  },
+  "work": {
+    "primaryBlocks": 3145215,
+    "inputBytes": 50323440,
+    "outputBytes": 50323440,
+    "inputBlocksVisitedOnce": true,
+    "rgbaImageStagingBytes": 0,
+    "perBlockHeapAllocations": 0,
+    "description": "One input block unpack and one 16-byte BC7 block emission per input block; fixed stack endpoints/indices/anchors; normative lookup data and compile-time uniform tables. This is a work/allocation description, not measured old/new timing or peak-memory acceptance."
+  },
+  "regression": {
+    "cause": "Spec table128 typography marks two subset1 anchors for partition1. The new extractor incorrectly retained the last highlight; explicit tables129-131 resolve the ambiguity.",
+    "test": "private/batch-134/transcoder/tests/bc7.rs:explicit_bc7_anchor_table_wins_over_duplicate_partition_emphasis",
+    "before": "regression fails;5 of345 primary hashes differ",
+    "after": "regression passes;345 of345 exact",
+    "changedInputOrTolerance": false
+  },
+  "checks": {
+    "bc7-anchor-red": {
+      "ok": false,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.9
+    },
+    "bc7-anchor-green": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5
+    },
+    "node-bc7-contract": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.6
+    },
+    "typecheck-bc7": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.3
+    },
+    "wasm-bc7-anchor": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.9
+    },
+    "bc7-corpus-anchor": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.9
+    },
+    "bc7-crafted": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.5
+    },
+    "basis-unchanged": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.9
+    },
+    "draft-size-bc7": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.2
+    }
+  },
+  "nativeTests": 39,
+  "nodeTests": 17,
+  "sourceFiles": [
+    {
+      "path": "src/astc.rs",
+      "sha256": "4f64735a3b018256fb5ecf04845370ebe13fa5b0bda4df8f1d897602d86d7242"
+    },
+    {
+      "path": "src/basis.rs",
+      "sha256": "d393d5415d93832e3a5a5978a283534ff970de83f5312fbdbee8914743f9dd87"
+    },
+    {
+      "path": "src/bc7.rs",
+      "sha256": "95867fc11ee47d1f6b41cc9d52006f554e72e01fc8722315f097e06fe0bfaafe"
+    },
+    {
+      "path": "src/bc7_tables.rs",
+      "sha256": "8a1e0e18404e4a98c02b6a8c38d8586cd38e6e6bd7d1919fba9860b731e44a09"
+    },
+    {
+      "path": "src/etc1s.rs",
+      "sha256": "8c8d45731b7d3113c969c1ef54b5f41d71f2006d5ccb27935706cc86242c388f"
+    },
+    {
+      "path": "src/hdr.rs",
+      "sha256": "1b78fef6dbb57234680852f9157bb68af6490f2c6a9e3088a39575ac9049aa1d"
+    },
+    {
+      "path": "src/huffman.rs",
+      "sha256": "4e12be89ab3d19dafc1600082a9e4bd90be883965909a6fe687ed4cb0b1cb743"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "fccf2a59c18eb6bde8072f682f498ecc7b1686096d26edc170702df06c89cd85"
+    },
+    {
+      "path": "src/packed.rs",
+      "sha256": "0e1449e419f1536f6a2fc055fa10ad59783b51403567338f615980e372276848"
+    },
+    {
+      "path": "src/tables.rs",
+      "sha256": "c35a594946ea2684ebdf1e6679f23ef8a21dd1570513a0cb6aaa2a20f208f792"
+    },
+    {
+      "path": "src/uastc.rs",
+      "sha256": "8a22f47846cf9b37db7e85f4fbe116dc2b745769ef9bb7830d18c5b82f5c36e6"
+    },
+    {
+      "path": "src/wasm.rs",
+      "sha256": "5a4cfd09a22116d6cfb6292a0a88e432300b1b217b6e0cd2da47dbd9e02a30a1"
+    },
+    {
+      "path": "tests/basis.rs",
+      "sha256": "73ffa4cb97a12a9695f6e0bf1323d4444556c9d206534dfab3bf6e1aa211356f"
+    },
+    {
+      "path": "tests/bc7.rs",
+      "sha256": "7705a4edb4d7bb329108408dd806a3342420c6262bdca8a7a725a5f8a9e448b5"
+    },
+    {
+      "path": "tests/blocks.bin",
+      "sha256": "38145ccbff9bc319455423d721ab8fb42410f1fcfa61cce9f46b6e971a894390"
+    },
+    {
+      "path": "tests/etc1s.rs",
+      "sha256": "20bb72451778195374530374c24bc028183188ef53cfecf39ab0b459c7a92709"
+    },
+    {
+      "path": "tests/hdr-blocks.bin",
+      "sha256": "c4d6f395c390c56445377c195ba50d3281d70e1f1e5375e6edfcadfdfa4f810b"
+    },
+    {
+      "path": "tests/hdr-pixels.bin",
+      "sha256": "0be97b6d0c332c66cd54d468bb22161de3a9c2c1148fbed6a30a9f985d9095ad"
+    },
+    {
+      "path": "tests/hdr.rs",
+      "sha256": "6ce1c4bd2175b267e569552315ce2c40d737d9bc67647a21ed77a1614c787276"
+    },
+    {
+      "path": "tests/packed.rs",
+      "sha256": "8d030dfe1b2331ded0dff49bce29d9b1f4e94b993fd9f2d1cbb31c76ffb870fe"
+    },
+    {
+      "path": "tests/pixels.bin",
+      "sha256": "7c1fa23155fffd8f921024c68b36cc5cb7df8581614a95ebcad9b3c740cc69bd"
+    },
+    {
+      "path": "tests/uastc.rs",
+      "sha256": "4d87bcf1830781b4a0d63a4b980bc52abf1f7072889966b1875c78e886de1e03"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "7cd586f654f744d95b74d7eb4b10334276f689f50aff97ed84918b7cf148375b"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "e6a955dc99f5c62f42da4796bca1e97960ed228f14b4af9e50fb8d1924aae8a2"
+    },
+    {
+      "path": "ktx2.ts",
+      "sha256": "ffe23d1f3d4d7b3a899a96085619c2d9eb22d90a181953179e4ac0191a60c679"
+    }
+  ],
+  "limitations": [
+    "ETC1S BC7,other compressed encoders,public TS/worker/package integration and full jobs2/3 remain incomplete.",
+    "Current Wasm raw/gzip is an incomplete draft,not final size or per-pair peak-memory acceptance.",
+    "No new GPU request,benchmark,paired wall-clock A/B,startup timing or timing-only assertion;job4 timings remain deferred.",
+    "Inherited full verify remains13548pass;not rerun for this private-source checkpoint. Required browser gates/push remain blocked until the new teardown fix is on origin/main."
+  ]
+}

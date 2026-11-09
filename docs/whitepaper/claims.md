@@ -1949,3 +1949,11 @@ to remove the prebuilt decoder. The primary corpus remains 51 files.
 checks 2,856 mutations from all 51 primary seeds with 13,507 coded decode outcomes
 and unchanged strict specification controls, including RGB9E5. This is a
 reproducible bounded correctness result, not a coverage or defect-free claim.
+
+The private [UASTC BC7 checkpoint](results/batch-134-uastc-bc7.json) matches all
+345 primary frozen payloads over 26 files, 5,504 crafted blocks covering every
+mode/partition/component selector, and 3,072 solid cases in both transfer modes.
+The implementation consumes input blocks directly and emits 16-byte BC7 blocks
+without full-image RGBA staging or per-block heap allocation. This is a
+deterministic work/allocation claim; final timing and memory acceptance remain
+open. ETC1S BC7 and public decoder integration are outside this checkpoint.

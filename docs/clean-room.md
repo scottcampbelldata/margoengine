@@ -2539,6 +2539,52 @@ The experiment selects the omitted conversion convention only, never a codec alg
 Evidence: private/batch-134/measure/packed-ldr-probe.json and eight frozen payloads.
 No implementation source, companion code, foreign glue, disassembly or remembered internals used.
 
+## Batch 134 BC7 conversion research and SOLID-BC7-1 (2026-11-09)
+
+Before implementation, searched broadly for fixed-rate texture coding, BPTC endpoint
+quantization and partition research. Read Pavel Krajcevski, Adam Lake and Dinesh
+Manocha, [FasTC: Accelerated Fixed-Rate Texture Encoding (2013)](https://gamma-web.iacs.umd.edu/FasTC/extra/paper.pdf),
+sections 2 and 3.1-3.3, including its uniform-block discussion; not the full paper.
+Read Jorn Nystad, Anders Lassen, Andy Pomianowski, Sean Ellis and Thomas Olson,
+[Adaptive Scalable Texture Compression (2012)](https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/nystad12_astc.pdf),
+sections 2-3.2; not the full paper. The search also considered Lee and Nah's
+QuickBC7 (2026) abstract, without accessing its full paper or implementation.
+The papers distinguish general partition/endpoint search from fixed input-format
+conversion. This piece selects the published UASTC mappings, avoiding a new
+partition search; general encoder research remains relevant to later ETC1S BC7.
+No companion code, foreign implementation, glue or disassembly was read.
+
+Reread the pinned Data Format 1.4 sections 20.1 and 25.8.2 in full, including
+tables 122-133 and 231-236, and the published UASTC BC7 conversion descriptions.
+Only standard tables and descriptions supply partitioning, anchors, channel
+rotation, endpoint quantization and weight conversion. The example under table
+233 conflicts with its own row for PAT 8; match each destination partition's
+texel labels to the input labels to derive and validate the subset permutation.
+This is a check against the two published partition layouts, without inference
+from codec pixels. Published helper code in the format description was reviewed
+as specification text; Margo's implementation is independently written.
+
+SOLID-BC7-1 was recorded before use: 3,072 authored UASTC solids sweep every
+component 0..255 against three fixed backgrounds, including 0 and 255, in both
+linear and sRGB KTX2. Pinned outside prebuilt outputs agree in all 6,144 cases
+with fixed weight index 5 for BC7 mode 6, equal endpoint p-bits, p=0 on equal
+total endpoint error, and mode 5 only if neither p produces zero error.
+For fixed-index endpoint ties, the lexicographically smallest (low, high) pair
+reproduces every output. Mode 5 uses RGB weight 1, exact alpha endpoints and
+secondary weights 0. This resolves the permitted solid encoding choice between
+the wiki and Data Format's alternative recommendation; decoded solids remain exact.
+Evidence: private `measure/bc7-solid-{probe,contract}.json` and six-bit-weight
+decode-equation enumeration, with pinned input/output hashes. No encoder search
+algorithm was inferred. Non-solid prescribed conversions remain strict comparisons.
+
+The first extractor incorrectly treated table 128's emphasis as the anchor
+index source: partition 1 highlights both texels 3 and 15 for subset 1.
+Using the explicit tables 129-131 resolves this typo. A native regression fails
+with the old extraction and passes after the correction; no output comparison
+was loosened. Final evidence: [UASTC BC7 checkpoint](whitepaper/results/batch-134-uastc-bc7.json).
+All 345 primary payloads, 5,504 crafted blocks covering every mode/partition/CSEL
+in both transfer modes, and the 6,144 solid cases match the frozen prebuilt.
+
 ## Batch 134 whole-container mutation research (2026-11-09)
 
 Before expanding hostile-input validation, searched research on structured-input
