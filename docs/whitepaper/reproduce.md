@@ -1341,3 +1341,15 @@ Actual character-asset contracts: `node --test --test-timeout=120000 packages/an
 All generated controls are stand-ins except the existing Khronos/Cesium Box,
 RobotExpressive, RiggedFigure and calibrated brick reference noted in their
 existing source notices. No test-page source files are imported or committed.
+
+
+API snapshot-query and README ownership regressions (2026-11-09): after the normal
+package build, run node --test tests/api-report-globals.test.js
+tests/api-report-short-path.test.js tests/api-report-scope-full.test.js
+tests/api-report-scope.test.js tests/readme-effect-ownership.test.js. The short-path
+test executes the entire real CLI and checks one file-list query without changing
+its 280 s deadline; the API reports must match byte for byte. Run the real examples
+with npm run check:readme-run -- --packages=shadows,quality,post. The retained paired
+slow-send record uses the existing unmodified flythrough fixture, three rounds of
+two flights per version, alternating version order, slowSends(2, 0.02). It is
+diagnostic evidence under load, not a published speed ratio or a passing timing gate.

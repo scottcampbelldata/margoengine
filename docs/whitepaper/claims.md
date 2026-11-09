@@ -1704,3 +1704,15 @@ lattice method used by other primitives. `packages/geometry/tests/geometry.test.
 checks the unchanged strict 1,550 B gzip budget and excludes the unused method;
 its shape, normals, winding, UV and group controls still apply. This is a
 packaging claim, without a rendering-speed claim or a reduced mesh.
+
+
+## Missing-items API snapshot and README ownership follow-up
+
+The actual full Windows 8.3 CLI regression observes 886 immutable-snapshot file-list
+queries before repair and one after it; every committed API report still matches.
+Scoped augmentation checks and deterministic ordered-global tests pass. This proves
+a work reduction, not a speed ratio or sole attribution of the earlier 280 s hang.
+Three README examples release their old owner before replacement, with a failing-
+before strict execution regression; real README/GPU validation remains pending.
+The loaded paired slow-send record does not close its gate: a 7.4 ms current
+outlier exceeds twice the unchanged 3.5 ms budget and remains unclassified.

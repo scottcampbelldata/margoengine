@@ -1853,3 +1853,12 @@ abort and disposal. Current-machine proof only; no cross-device byte guarantee.
 The box-only geometry consumer excludes the internal lattice helper used by
 other primitives. The existing strict 1,550 B gzip consumer check, primitive
 geometry/UV/group controls and full-package ratio check remain unchanged.
+
+
+
+Missing-items timing continuation (2026-11-09): the API report's repeated immutable
+snapshot query is repaired (886 file-list requests to one, unchanged reports). Its
+earlier 280 s child timeout still requires the full integration gate. Paired biome
+slow-send round minima do not show a regression beyond the spread, but a 7.4 ms
+current diagnostic frame exceeds twice the unchanged 3.5 ms gate and remains open,
+not accepted or busy-exempted. See whitepaper/results/biomes-slow-send-paired-20261109.json.

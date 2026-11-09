@@ -137,8 +137,7 @@ const TOOLS = {
     'writes the documented OFL font atlas under the GPU lock; text test:browser fetches and renders the committed atlas, generation is not a test',
   'packages/staging/scripts/rival-bench.mjs':
     'contact-shadow ray reference comparison, run directly under the GPU lock',
-  'packages/sky/scripts/rival-bench.mjs':
-    'external sunsky radiance comparison, run directly under the GPU lock',
+  'packages/sky/scripts/rival-bench.mjs': 'external sunsky radiance comparison, run directly under the GPU lock',
   'packages/biomes/tests/gpu-region-fields-check.mjs':
     'exact-head region-fields hardware proof pinned to the RTX A6000, run directly',
   'packages/biomes/tests/gpu-fixed-lerp-check.mjs':
@@ -224,7 +223,9 @@ export function unrunBrowserSuites(scripts, read, inChecks = ROOT, exempt = NOT_
  * (`covered`), not in LOOSE_CHECKS. unrunBrowserSuites sees npm scripts only, so a plain file is seen here.
  */
 export function unrunCheckFiles(files, commands, covered = [], exempt = LOOSE_CHECKS) {
-  return files.filter((file) => !(file in exempt) && !covered.includes(file) && !commands.some((text) => text.includes(file)));
+  return files.filter(
+    (file) => !(file in exempt) && !covered.includes(file) && !commands.some((text) => text.includes(file)),
+  );
 }
 
 /** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
@@ -291,7 +292,11 @@ export function plan() {
   const checkFiles = readdirSync(join(root, 'scripts'))
       .filter((file) => file.endsWith('-gpu-check.js'))
       .map((file) => `scripts/${file}`),
-    unnamed = unrunCheckFiles(checkFiles, tests.map((test) => (test.name ? scripts[test.name] : test.command)), STEPS);
+    unnamed = unrunCheckFiles(
+      checkFiles,
+      tests.map((test) => (test.name ? scripts[test.name] : test.command)),
+      STEPS,
+    );
   if (unnamed.length)
     throw new Error(
       `GPU check(s) ${unnamed.join(', ')} are in no check, so they rot unseen; name each in a package's test:gpu script or, with its reason, in LOOSE_CHECKS`,
@@ -810,7 +815,7 @@ Options:
 Example:
   node scripts/gpu-package-tests.mjs --no-build --select=sky/test:gpu,root/test:basic-scene`;
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   exitOnHelp(USAGE);
   const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
   const select = process.argv.find((a) => a.startsWith('--select='))?.slice(9);

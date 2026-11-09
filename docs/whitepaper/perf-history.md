@@ -2844,3 +2844,15 @@ are checked on real geographic input and stand-in random/3D grids. These are
 stencil reads including intermediate/centre reads, not total execution work;
 initialization, allocation, copies and compilation are excluded. No speed ratio,
 elapsed-time or SIMD gain is claimed.
+
+
+### Missing-items API metadata work and diagnostic flights (2026-11-09)
+
+The API CLI now performs one snapshot file-list RPC rather than one per export
+entry (886 in the failing-before regression), and one global-declaration walk per
+package rather than per entry. Full report bytes are unchanged. No elapsed-time
+speed ratio is published. The loaded biome paired record is diagnostic only:
+results/biomes-slow-send-paired-20261109.json retains all twelve flights, minimum
+maxima per round and CPU occupancy. It shows no minimum-time regression beyond
+round spread, but one 7.4 ms current frame exceeds twice the 3.5 ms gate and is
+still open. Neither the timing budget nor a rival comparison row changes.

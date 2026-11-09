@@ -1,0 +1,376 @@
+{
+  "parent": "bd41f02797959feca026a2cfd03a70eb1fd7d46d",
+  "current": "55b14193cde887c0a596afa3dd4e4173db018ea0",
+  "machine": "SCOTT-DEV",
+  "cpuBusy": 0.9491608237799677,
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "samples": [
+    {
+      "round": 0,
+      "turn": 0,
+      "kind": "parent",
+      "result": {
+        "frames": 790,
+        "max": 3.899999976158142,
+        "rawMax": 4.399999976158142,
+        "stalled": 11.300000107288348,
+        "stalls": 9,
+        "stalledMax": 2.5000000238418565,
+        "calls": {
+          "r32float": 2.300000011920929,
+          "rgba8unorm": 0.19999998807907104,
+          "r8unorm": 0.30000001192092896
+        },
+        "worst": {
+          "own": 3.899999976158142,
+          "total": 3.899999976158142,
+          "stalled": 0,
+          "sends": 0,
+          "writes": 4,
+          "kB": 64,
+          "calls": 2.300000011920929
+        },
+        "sends": 104,
+        "late": 0
+      }
+    },
+    {
+      "round": 0,
+      "turn": 0,
+      "kind": "current",
+      "result": {
+        "frames": 785,
+        "max": 3.300000011920929,
+        "rawMax": 4.699999988079071,
+        "stalled": 11.799999868869762,
+        "stalls": 14,
+        "stalledMax": 2.8999999999999986,
+        "calls": {
+          "r32float": 0.2999999523162842,
+          "rgba8unorm": 0.20000004768371582,
+          "r8unorm": 0.5
+        },
+        "worst": {
+          "own": 3.300000011920929,
+          "total": 3.300000011920929,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0
+        },
+        "sends": 109,
+        "late": 0
+      }
+    },
+    {
+      "round": 0,
+      "turn": 1,
+      "kind": "parent",
+      "result": {
+        "frames": 777,
+        "max": 3,
+        "rawMax": 6,
+        "stalled": 13.599999904632554,
+        "stalls": 10,
+        "stalledMax": 4.299999976158141,
+        "calls": {
+          "r32float": 0.6000000238418579,
+          "rgba8unorm": 0.19999998807907104,
+          "r8unorm": 0.10000002384185791
+        },
+        "worst": {
+          "own": 3,
+          "total": 3,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0.9000000357627869
+        },
+        "sends": 107,
+        "late": 0
+      }
+    },
+    {
+      "round": 0,
+      "turn": 1,
+      "kind": "current",
+      "result": {
+        "frames": 790,
+        "max": 2.5,
+        "rawMax": 4.100000023841858,
+        "stalled": 10.200000047683702,
+        "stalls": 10,
+        "stalledMax": 2.3999999999999986,
+        "calls": {
+          "r32float": 0.699999988079071,
+          "rgba8unorm": 0.10000002384185791,
+          "r8unorm": 0.40000003576278687
+        },
+        "worst": {
+          "own": 2.5,
+          "total": 2.5,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0
+        },
+        "sends": 110,
+        "late": 0
+      }
+    },
+    {
+      "round": 1,
+      "turn": 0,
+      "kind": "current",
+      "result": {
+        "frames": 783,
+        "max": 7.399999976158142,
+        "rawMax": 7.399999976158142,
+        "stalled": 1.6000000119209261,
+        "stalls": 2,
+        "stalledMax": 1.1000000476837144,
+        "calls": {
+          "r32float": 0.19999998807907104,
+          "rgba8unorm": 0.5,
+          "r8unorm": 0.3999999761581421
+        },
+        "worst": {
+          "own": 7.399999976158142,
+          "total": 7.399999976158142,
+          "stalled": 0,
+          "sends": 0,
+          "writes": 1,
+          "kB": 16,
+          "calls": 0.09999996423721313
+        },
+        "sends": 109,
+        "late": 0
+      }
+    },
+    {
+      "round": 1,
+      "turn": 0,
+      "kind": "parent",
+      "result": {
+        "frames": 787,
+        "max": 3.1000000000000014,
+        "rawMax": 5.300000011920929,
+        "stalled": 8.000000011920918,
+        "stalls": 8,
+        "stalledMax": 2.3999999999999986,
+        "calls": {
+          "r32float": 0.10000002384185791,
+          "rgba8unorm": 0.5999999642372131,
+          "r8unorm": 0.10000002384185791
+        },
+        "worst": {
+          "own": 3.1000000000000014,
+          "total": 5.300000011920929,
+          "stalled": 2.2000000119209275,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0.8999999761581421
+        },
+        "sends": 108,
+        "late": 0
+      }
+    },
+    {
+      "round": 1,
+      "turn": 1,
+      "kind": "current",
+      "result": {
+        "frames": 774,
+        "max": 2.800000011920929,
+        "rawMax": 9.800000011920929,
+        "stalled": 20.799999988079037,
+        "stalls": 24,
+        "stalledMax": 7.899999999999999,
+        "calls": {
+          "r32float": 0.20000004768371582,
+          "rgba8unorm": 0.19999998807907104,
+          "r8unorm": 0.19999998807907104
+        },
+        "worst": {
+          "own": 2.800000011920929,
+          "total": 2.800000011920929,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0.10000002384185791
+        },
+        "sends": 112,
+        "late": 0
+      }
+    },
+    {
+      "round": 1,
+      "turn": 1,
+      "kind": "parent",
+      "result": {
+        "frames": 777,
+        "max": 2.600000023841858,
+        "rawMax": 3.900000035762787,
+        "stalled": 5.199999868869774,
+        "stalls": 5,
+        "stalledMax": 2.1999999523162828,
+        "calls": {
+          "r32float": 0.699999988079071,
+          "rgba8unorm": 0.10000002384185791,
+          "r8unorm": 0.40000003576278687
+        },
+        "worst": {
+          "own": 2.600000023841858,
+          "total": 2.600000023841858,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0
+        },
+        "sends": 109,
+        "late": 0
+      }
+    },
+    {
+      "round": 2,
+      "turn": 0,
+      "kind": "parent",
+      "result": {
+        "frames": 784,
+        "max": 3,
+        "rawMax": 3.100000023841858,
+        "stalled": 1.4999999880790682,
+        "stalls": 2,
+        "stalledMax": 0.8999999999999986,
+        "calls": {
+          "r32float": 0.19999998807907104,
+          "rgba8unorm": 0.5,
+          "r8unorm": 0.3999999761581421
+        },
+        "worst": {
+          "own": 3,
+          "total": 3,
+          "stalled": 0,
+          "sends": 0,
+          "writes": 4,
+          "kB": 64,
+          "calls": 0.09999996423721313
+        },
+        "sends": 106,
+        "late": 0
+      }
+    },
+    {
+      "round": 2,
+      "turn": 0,
+      "kind": "current",
+      "result": {
+        "frames": 775,
+        "max": 3.5,
+        "rawMax": 3.800000011920929,
+        "stalled": 3.7999999403953524,
+        "stalls": 2,
+        "stalledMax": 2.0999999880790696,
+        "calls": {
+          "r32float": 0.10000002384185791,
+          "rgba8unorm": 1.9000000357627869,
+          "r8unorm": 0.10000002384185791
+        },
+        "worst": {
+          "own": 3.5,
+          "total": 3.5,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 1.199999988079071
+        },
+        "sends": 112,
+        "late": 0
+      }
+    },
+    {
+      "round": 2,
+      "turn": 1,
+      "kind": "parent",
+      "result": {
+        "frames": 804,
+        "max": 2.3999999523162856,
+        "rawMax": 10.899999976158142,
+        "stalled": 8.500000023841856,
+        "stalls": 1,
+        "stalledMax": 8.500000023841856,
+        "calls": {
+          "r32float": 0.10000002384185791,
+          "rgba8unorm": 0.19999998807907104,
+          "r8unorm": 0.20000004768371582
+        },
+        "worst": {
+          "own": 2.3999999523162856,
+          "total": 10.899999976158142,
+          "stalled": 8.500000023841856,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0.19999998807907104
+        },
+        "sends": 109,
+        "late": 0
+      }
+    },
+    {
+      "round": 2,
+      "turn": 1,
+      "kind": "current",
+      "result": {
+        "frames": 801,
+        "max": 2.5,
+        "rawMax": 2.599999964237213,
+        "stalled": 2.30000004768371,
+        "stalls": 4,
+        "stalledMax": 0.7000000119209275,
+        "calls": {
+          "r32float": 0.19999998807907104,
+          "rgba8unorm": 0.19999998807907104,
+          "r8unorm": 0.19999998807907104
+        },
+        "worst": {
+          "own": 2.5,
+          "total": 2.5,
+          "stalled": 0,
+          "sends": 1,
+          "writes": 0,
+          "kB": 0,
+          "calls": 0.10000002384185791
+        },
+        "sends": 103,
+        "late": 0
+      }
+    }
+  ],
+  "errors": [],
+  "interpretation": "Three interleaved rounds, two flights per version per round, unchanged slowSends(2, 0.02), full one-third default-world flight. No speed ratio. Per-round minima do not establish a regression beyond round-to-round spread. One current diagnostic maximum is 7.4 ms, above twice the 3.5 ms gate; its cause remains open and is not busy-exempted."
+}

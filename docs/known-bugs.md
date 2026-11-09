@@ -2231,3 +2231,53 @@ close, native exit and driver kill completed in 1.93 s; the stalled substep in t
 failures is not yet attributed. Do not retry these gates as a substitute for identifying and
 fixing that cause. Raw logs and tracing helpers are in this lane's test-results/missing-items.
 These are active landing blockers handed off for continued investigation, not accepted limits.
+
+
+### Missing-items continuation: repaired work and remaining timing blocker
+
+The full API report repeated the same immutable snapshot file-list RPC for every
+entry, then walked a package's global declarations again for every entry. This
+multiplied whole-program metadata transfer and declaration work with entry count.
+The script now lists the snapshot once and caches each package's ordered, deduplicated
+global report. The actual Windows short-path CLI regression failed before repair
+(886 requests instead of one) and passes after repair. All 886 reports / 8,631
+exports remain identical; the scoped/full augmentations checks also pass (9 tests).
+The query-count preload resolves the API from the actual CLI filename, since long
+and 8.3 module identities differ. No public API or deadline changed. This repairs
+proven repeated work; the original 280 s timeout is not attributed solely to it.
+The instrumented full verification remains the required integration evidence.
+
+Three effect ownership examples now release their previous owner before attaching
+its replacement: shadows' explicit camera, quality's explicit shadow resolution,
+and post's standalone-SMAA-to-stack sequence. The shadow replacement keeps both
+casters. A strict execution regression fails on all three original examples and
+passes with the repairs; 33 focused root tests pass. The known list removes those
+three obsolete IDs (45 to 42). Full real README execution and all registered GPU
+tests of shadows, quality and post are pending; no runtime pass is claimed yet.
+
+The slow-send comparison completes 12 interleaved parent/current flights, two per
+version in each of three rounds, using unchanged slowSends(2, 0.02) and the full
+one-third default-world route. Parent/current per-round minimum maxima in ms:
+3.0/2.5, 2.6/2.8, 2.4/2.5; parent round-to-round spread is 0.6 ms. These do not
+establish a regression beyond the spread. CPU occupancy was 94.9 percent overall.
+However, one current diagnostic maximum is 7.4 ms, over twice the 3.5 ms gate:
+zero sends, one 16 kB write, 0.1 ms inside the real write. The remaining time has
+not been attributed. Keep this open, not on the busy-exempt list, until its cause
+is established. No workload, budget or timing assertion changed. Complete records:
+whitepaper/results/biomes-slow-send-paired-20261109.json.
+
+
+The continuation's full verify now passes both API gates (one list query) and
+catalog teardown in this run, with 13,497 of 13,498 tests passing and zero skips.
+The single failure exposed the prefetch proof's missing standard test entry. It
+now uses tests/prefetch-check.mjs with runSuite/watchExit, exclusive acquisition
+and its unchanged 300 s child bound; the documented script is a forwarding entry.
+Chain, plan and exclusive-refusal regressions pass. The earlier browser teardown
+defect remains owned by batch 160; a single passing catalog run is not its repair.
+
+
+The GPU planner's exported plan() also failed when imported from eval: its CLI
+guard converted absent argv[1] to a file URL. It now checks for the argument
+before comparison. An actual eval-process regression fails before and passes
+after repair, without starting a GPU suite. The package-GPU request expired in
+the queue, not in a test; execution remains pending with per-test budgets intact.

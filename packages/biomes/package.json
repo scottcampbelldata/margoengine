@@ -190,6 +190,6 @@
     "test:gpu:objects-frame": "cd ../.. && node packages/biomes/tests/objects-frame-check.mjs",
     "test:gpu:backend": "cd ../.. && node packages/biomes/tests/gpu-backend-check.mjs",
     "test:gpu:backend-placement": "cd ../.. && node packages/biomes/tests/gpu-backend-placement-check.mjs",
-    "test:gpu:prefetch": "cd ../.. && node packages/biomes/scripts/prefetch-proof.mjs"
+    "test:gpu:prefetch": "cd ../.. && node packages/biomes/tests/prefetch-check.mjs"
   }
 }

@@ -252,3 +252,23 @@ test('a package sets a GPU test limit as one number or per script, and the biome
   assert.equal(limit('biomes test:gpu'), 600_000);
   assert.equal(limit('biomes test:gpu:objects'), 600_000);
 });
+
+test('GPU planner can be imported from an eval process without running its CLI', () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      "const {plan} = await import('./scripts/gpu-package-tests.mjs'); console.log(plan().length);",
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    },
+  );
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^\d+\r?\n$/);
+  assert.ok(Number(result.stdout) > 0, 'the actual GPU plan is available without launching a suite');
+});

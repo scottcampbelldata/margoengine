@@ -4414,3 +4414,67 @@ Final job-7 checks passed lint, hygiene, verify, staging tests, the complete sta
 Final gzip entry bytes: staging root 8,520 (ceiling 8,776), accumulate 9,655 (9,945), pathtrace 1,213 (1,469); reused reflector 11,104 (11,438), refractor 11,065 (11,397), cube-camera 5,680 (5,691). Core plus stage is 23,797 B, strictly below 25,000 B. Entry dependencies are separate downloads.
 
 The floor is a finite tinted opaque planar image reflection with box-filtered mip blur, no Fresnel, GGX floor BRDF or distance-dependent cone, and one bounce per frame for other mirrors. Native WebGL2 preview refuses with a code and help link; installed WebGL2 compatibility draws. The idle still retains the existing static, flat triangle/material limits and the documented ANGLE Direct3D compiler limit; its real compatibility proof uses ANGLE Vulkan. Ground and studio visual studies remain generated stand-ins, not photographic-quality proofs. No speed, cross-device pixel identity or general photographic-material claim is made. Closing validation is recorded in the closing result and this row is now done.
+
+
+### Continuation: API snapshot work and effect ownership (2026-11-09)
+
+The full API report repeated the same immutable snapshot file-list RPC for every
+entry, then walked a package's global declarations again for every entry. This
+multiplied whole-program metadata transfer and declaration work with entry count.
+The script now lists the snapshot once and caches each package's ordered, deduplicated
+global report. The actual Windows short-path CLI regression failed before repair
+(886 requests instead of one) and passes after repair. All 886 reports / 8,631
+exports remain identical; the scoped/full augmentations checks also pass (9 tests).
+The query-count preload resolves the API from the actual CLI filename, since long
+and 8.3 module identities differ. No public API or deadline changed. This repairs
+proven repeated work; the original 280 s timeout is not attributed solely to it.
+The instrumented full verification remains the required integration evidence.
+
+Three effect ownership examples now release their previous owner before attaching
+its replacement: shadows' explicit camera, quality's explicit shadow resolution,
+and post's standalone-SMAA-to-stack sequence. The shadow replacement keeps both
+casters. A strict execution regression fails on all three original examples and
+passes with the repairs; 33 focused root tests pass. The known list removes those
+three obsolete IDs (45 to 42). Full real README execution and all registered GPU
+tests of shadows, quality and post are pending; no runtime pass is claimed yet.
+
+The slow-send comparison completes 12 interleaved parent/current flights, two per
+version in each of three rounds, using unchanged slowSends(2, 0.02) and the full
+one-third default-world route. Parent/current per-round minimum maxima in ms:
+3.0/2.5, 2.6/2.8, 2.4/2.5; parent round-to-round spread is 0.6 ms. These do not
+establish a regression beyond the spread. CPU occupancy was 94.9 percent overall.
+However, one current diagnostic maximum is 7.4 ms, over twice the 3.5 ms gate:
+zero sends, one 16 kB write, 0.1 ms inside the real write. The remaining time has
+not been attributed. Keep this open, not on the busy-exempt list, until its cause
+is established. No workload, budget or timing assertion changed. Complete records:
+whitepaper/results/biomes-slow-send-paired-20261109.json.
+
+
+### Full integration and prefetch entry repair (2026-11-09)
+
+The instrumented full verify completed in 950.5 s: 13,498 tests, 13,497 passes,
+one failure, zero skips. Full API check and the actual short-path regression pass
+with one snapshot-list request; every README ownership regression passes. The only
+failure is the biome chain contract: test:gpu:prefetch named a script outside
+tests/ and lacked the required runSuite/watchExit entry. The proof now lives in
+tests/prefetch-check.mjs, retains its exclusive hold and 300 s child bound, and
+uses runSuite/watchExit. The documented scripts/prefetch-proof.mjs command forwards
+to that entry. Existing chain/plan/exclusive-lock regressions pass after repair.
+No gate was relaxed and the complete proof workload is unchanged. Batch 160's
+browser teardown repair is still absent from main, so the real prefetch rerun and
+dependent push still wait for it. The first real README request never acquired
+the GPU within its 10-minute queue limit; zero examples ran. A new request extends
+only its queue allowance to 20 minutes, retaining the same page and execution
+budgets. All 311 shadows/quality/post package CPU tests, lint and hygiene pass.
+
+
+The prefetch-plan follow-up also exposed an eval-import guard defect in the GPU
+planner: pathToFileURL(undefined) threw before exported plan() was usable. Its CLI
+guard now checks for argv[1], just as the llms guard does. The actual eval-process
+regression fails before repair and passes afterwards; all 12 chain/plan/lock/import
+tests pass. No scheduling or GPU logic changes. The full biomes CPU suite passes
+476 tests, zero failures/skips. The initial package-GPU request also expired in
+the queue without starting any test; it is rescheduled with a 20-minute queue
+allowance and separate shared/exclusive groups, preserving each registered test's
+budget. The stale ownership-gpu-package-results.json from the unsuccessful request
+is not evidence for this group; use the rescheduled logs/results only.

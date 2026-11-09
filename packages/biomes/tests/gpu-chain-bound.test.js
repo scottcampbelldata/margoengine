@@ -16,7 +16,13 @@ const root = join(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 /** Seconds measured on the RTX A6000 for each GPU script. Scripts not listed here have no recorded time yet. */
-const MEASURED = { 'test:gpu': 2.8 + 14.9, 'test:gpu:objects': 14.9, 'test:gpu:flythrough': 413.7 };
+const MEASURED = {
+  'test:gpu': 2.8 + 14.9,
+  'test:gpu:objects': 14.9,
+  'test:gpu:flythrough': 413.7,
+  // Full unchanged prefetch proof, including its queue wait (prefetch-final-gpu-proof.json, 2026-11-09).
+  'test:gpu:prefetch': 118.9,
+};
 /** The laptop is up to this many times slower on CPU-bound steps (the Arc ran a 13.1 s case in 61.3 s). */
 const SLOWEST_MACHINE = 1.4;
 

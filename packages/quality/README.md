@@ -197,6 +197,7 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 
 applyQualityTier();                                  // light tier: margoPreset.shadows = {resolution: 1024}
 const shadows = Shadows.attach(engine, {distance: 120});              // 1024 on light, 2048 on the full tier
+shadows.dispose(); // Release the current owner before trying the explicit resolution.
 const crisp = Shadows.attach(engine, {distance: 120, resolution: 2048}); // explicit: 2048 on every tier
 const particles = qualityPreset().vfx?.capacity ?? 1_000_000;          // read a value for your own UI
 ```

@@ -2911,3 +2911,38 @@ replacement while empty; all changed-package GPU scripts passed on 2026-11-09.
 The required README gate found a repeated whole-grid shader-brush reference
 inside a per-cell predicate; its work-count regression now requires one CPU
 reference with identical output. No timeout or size threshold was relaxed.
+
+
+### Missing-items API and README gate follow-up (2026-11-09)
+
+The actual short-path API CLI now asserts one snapshot file-list request for all
+entries; a package's global declarations are walked once and shared by its entries.
+The regression failed at 886 before repair; full/scoped unchanged-report checks
+pass after repair. Strict execution tests also enforce release before replacement
+in the shadows, quality and SMAA README examples. Real README/GPU gates are pending.
+The slow-send paired record has no minimum-time regression beyond its spread, but
+a 7.4 ms current diagnostic outlier exceeds twice the unchanged 3.5 ms budget and
+remains unclassified. Browser teardown is owned by batch 160; dependent pushes wait
+for its mainline repair and the catalog/prefetch confirmations.
+
+
+The full follow-up verify passes 13,497/13,498 tests, zero skips, including both
+API gates and all README ownership regressions. Its sole failure exposed prefetch
+registration outside the standard biome test-entry contract. The proof now lives
+in tests/prefetch-check.mjs and keeps runSuite/watchExit, an exclusive GPU hold and
+a 300 s subprocess deadline; the documented script forwards to it. Existing
+chain/plan/exclusive-refusal checks catch the original gap and pass after repair.
+The earlier catalog teardown failure remains pending batch 160 despite this run's
+passing catalog test. Real README validation is queued, not claimed passed.
+
+
+The prefetch-plan follow-up also exposed an eval-import guard defect in the GPU
+planner: pathToFileURL(undefined) threw before exported plan() was usable. Its CLI
+guard now checks for argv[1], just as the llms guard does. The actual eval-process
+regression fails before repair and passes afterwards; all 12 chain/plan/lock/import
+tests pass. No scheduling or GPU logic changes. The full biomes CPU suite passes
+476 tests, zero failures/skips. The initial package-GPU request also expired in
+the queue without starting any test; it is rescheduled with a 20-minute queue
+allowance and separate shared/exclusive groups, preserving each registered test's
+budget. The stale ownership-gpu-package-results.json from the unsuccessful request
+is not evidence for this group; use the rescheduled logs/results only.

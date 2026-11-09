@@ -29,10 +29,13 @@ Map size and an explicit shadow camera, as Crocotile's per-light Shadow Map Widt
 Near/Far/Left/Right/Top/Bottom:
 
 ```ts
+shadows.dispose(); // Release the current shadow effect before replacing its camera.
 const sun = Shadows.attach(engine, {
   resolution: [2048, 1024], // width, height: powers of two; one number keeps a square map
   frustum: { position: [0, 20, 10], left: -15, right: 15, bottom: -8, top: 8, near: 0.5, far: 60 },
 });
+sun.add(terrain, {static: true});
+sun.add(character);
 sun.options.frustum!.right = 20; // live: next frame
 sun.options.resolution = 1024;   // live: the maps are reallocated next frame (only when the size changes)
 sun.options.cascades = 2;        // live, the same way: fewer depth passes from the next frame

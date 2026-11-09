@@ -408,8 +408,9 @@ import {Glitch} from 'margoengine/post/glitch';
 import {Tonemap} from 'margoengine/tonemap';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-SMAA.attach(stage.engine, {quality: 'high'});   // alone: wraps the finished frame, like FXAA
-// or in a stack, after the display effect and before Glitch:
+const standalone = SMAA.attach(stage.engine, {quality: 'high'}); // wraps the finished frame, like FXAA
+standalone.dispose(); // Release the standalone owner before replacing it with the stack.
+// In a stack, after the display effect and before Glitch:
 PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: 'ultra'}), new Glitch()]);
 ```
 
