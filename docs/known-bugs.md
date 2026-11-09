@@ -108,9 +108,13 @@ literal help messages, now registered against the existing regression.
 
 Evidence: resume-webgl-native*.log, resume-webgl-parity-fixed.log (NaN failure),
 resume-webgl-checkpoint-native.log (pass), webgl2-pixels.json and webgl-sizes.json
-under test-results/sciviz-fixes. All 346 scoped CPU tests pass. Full package GPU,
-README and size-record gates must run on the final eligible tree before push.
-The old frozen records remain intact until a final coherent pair is regenerated.
+under test-results/sciviz-fixes. All 346 scoped CPU tests pass. The final browser
+gates pass 30 base, 13 bricks, 10 entry, 6 restoration/cancellation and 28 demo
+cases; the separate preview suite and all 32 sciviz/webgl2-compat README examples
+pass. The full 972-item quality size gate passes after the explicit optional
+ceiling revision. Final evidence: ruling-final-*.log/json and ruling-size-gate.log.
+Only the failed size prerequisites are rerun; prior full verify, lint and hygiene
+results are retained as requested. Paired entry/network records accompany closure.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 

@@ -1720,7 +1720,12 @@ Scott's optional-size ruling keeps the existing driver boundary and raises root/
 The extra bytes preserve missing-data parity and generation-safe disposal. Splitting the shared shader adds
 an artificial async loader/restore contract; splitting cleanup divides ownership of one resource generation.
 Only the repeated GL receiver alias survives the stopped size work; byte-only shader/message changes and the
-pipeline helper are dropped. Core + stage stays 23,924 B under 25,000. Full package GPU/README gates follow.
+pipeline helper are dropped. Core + stage stays 23,924 B under 25,000. Final browser gates pass 30 base,
+13 bricks, 10 entry, 6 restoration/cancellation and 28 demo cases; the separate preview suite passes too.
+All 32 sciviz/webgl2-compat README examples run under their unchanged budgets. The existing strict native
+eight-image parity pass and all 346 scoped CPU tests remain valid. Evidence: ruling-final-*.log/json and
+resume-webgl-checkpoint-native.log in test-results/sciviz-fixes. Only the failed size prerequisites are rerun;
+the earlier full verify, lint and hygiene results are retained as requested.
 Axes, points/lines, volumes/slices, integrated CPU isosurfaces and real native demos remain pending.
 No exclusive lock, benchmark, paired wall-clock measurement or timing assertion is part of this piece.
 
