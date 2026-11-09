@@ -2430,7 +2430,7 @@ are untouched. Every GPU proof runs on an RTX A6000 in Edge 157 (`npm run test:b
 | 3 | Textured primitives | DONE | `899354d1` | `/geometry`: `map` on `Box`, `Sphere`, `Plane` | LIM-450 |
 | 4 | Bindings for 2D, UI, audio and sciviz | DONE | `5b1319f9` | `/ui` (`GameUi`, `Sound`, `SpriteLayer`, `Sprite`, `Figure`, `ScatterPlot`, `LinePlot`, `SurfacePlot`) | LIM-451 |
 | 5 | Turbopack example | DONE | `7917b5c4` | `examples/next`: `build` is Turbopack, `build:webpack` stays | LIM-452 |
-| 6 | React Native | BLOCKED | | none | |
+| 6 | React Native | DROPPED | | none | LIM-615 |
 - **Built from:** React's public documentation of the automatic JSX runtime and `jsxImportSource` (job 1: React's own
   runtime, a known lowercase tag swapped for its component when the element is made, so no custom reconciler); the
   W3C UI Events and Pointer Events specifications for event order, bubbling, `pointerover` before `pointerenter`,
@@ -2464,9 +2464,9 @@ are untouched. Every GPU proof runs on an RTX A6000 in Edge 157 (`npm run test:b
   eight test files at once more than 60 ms passed between two steps, so the seat ran out. The suite now mocks
   `setTimeout`, a seat runs out only on `t.mock.timers.tick`, and a new test stalls the event loop 100 ms while a seat
   is held (it fails with the real timer). The room code was right.
-- **Blocked, job 6:** a React Native target needs a native WebGPU surface (a Dawn or wgpu binding inside the app),
-  which Margo does not ship and cannot write clean room in this batch, and no React Native device or toolchain is set
-  up to prove it. Nothing was built; a stand-in would prove nothing about a phone.
+- **Dropped, job 6:** React Native is not supported (LIM-615). Margo targets the web, including mobile browsers;
+  the planned native path is the Rust engine. A native WebGPU surface and phone toolchains would be needed to prove
+  a React Native target. Nothing was built; no phone support is claimed.
 - **Limits:** picking returns the nearest mesh only (no `intersections` list); a textured shape is WebGPU only, base
   colour only, PNG or JPEG, default scene only; `Figure` keeps the Canvas camera. Rows in docs/limits.md.
 - **Slips:** job 1 waited a day on `check:readme-run` failures in other packages on main (ragdoll, animator, usdz,

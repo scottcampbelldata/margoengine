@@ -27,7 +27,7 @@ For the third account. Starts when Scott is home and opens it.
 | I | sky and land | 65 | road | 6 | todo |
 | J | water, generation, audio | 66 | water | 8 | todo |
 | J | water, generation, audio | 67 | water | 3 | todo |
-| J | water, generation, audio | 68 | procedural | 8 | todo |
+| J | water, generation, audio | 68 | procedural | 8 | list 1 (dev PC) |
 | J | water, generation, audio | 69 | wfc | 5 | list 1 (dev PC) |
 | J | water, generation, audio | 110 | audio | 6 | done |
 | J | water, generation, audio | 111 | mixer | 5 | done |

@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-614). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-615). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3678,6 +3678,17 @@ whitepaper/results/batch-160-metallic-roughness.json. Native WebGL2 rejects PBR 
 This is an open image-quality loss, not proof of physically accurate materials or other devices. Frozen
 reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,
 while the GPU reproduction requires those outside files. No speed or bundle-size change is claimed.
+
+## React Native target dropped (LIM-615)
+
+React Native is not supported; batch 117 job 6 is dropped. Margo targets the web, including mobile browsers.
+The planned native path is the Rust engine. A React Native target would require a native WebGPU surface and
+Android/iOS toolchains and devices to prove rendering, loading and lifecycle behavior; this repository provides
+no such proof. Checked 2026-11-09: Hermes's current [language feature documentation](https://github.com/meta/hermes/blob/static_h/doc/Features.md)
+and [next stable release notes](https://github.com/meta/hermes/blob/static_h/doc/blog/2026-06-05-new-hermes-stable-release.md)
+do not document supported WebAssembly execution. The Hermes author's [WebAssembly preview](https://tmikov.blogspot.com/2026/02/webassembly-comes-to-hermes_01829874520.html)
+describes experimental execution, not production readiness. This is not a claim that Hermes cannot run Wasm;
+neither the preview nor compiling Hermes itself to Wasm establishes Margo phone compatibility.
 
 ## Wasm Content Security Policy
 
