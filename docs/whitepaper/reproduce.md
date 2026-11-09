@@ -424,3 +424,47 @@ The browser report includes orange pixel count and hidden orange pixel count for
 not a pass. CPU work has no benchmark here. Entry-size comparisons bundle the entry in isolation with Vite,
 ES2022 minification and `compactOutput` from `scripts/measure-size.js`, then zlib default gzip. Include the shared
 error helper on both sides; do not compare a standalone bundle to a split dist file.
+
+## Own 2D retained planner buffers (perf history entry 106)
+
+The [raw record](results/physics2d-planner-reuse-20261108.json) separates the cost of the preceding correctness
+fix, the rejected nested-capacity trial, the accepted flat-buffer work reduction, and the rejected point-normal
+replacement. Its browser rows are loaded-machine diagnostics. No benchmark source, scene, visit count, tolerance or
+current pin is changed to obtain a speed result.
+
+The committed native allocation probe includes the unchanged production `tests/support/bits_scenes.rs` scene.
+Run it through the existing process-tree wrapper, with cargo on PATH:
+
+~~~sh
+node --input-type=module -e "import {runLimited} from './scripts/support/run-limited.mjs'; const r=await runLimited('cargo run --locked --release --manifest-path packages/physics2d/kernel/Cargo.toml --example planner_allocations',{cwd:process.cwd(),limitMs:180000,label:'2D planner allocations'}); if(!r.ok)throw new Error(JSON.stringify(r));"
+~~~
+
+For the allocation control, archive own commit `0b12da14aea0bc8a4c66f6ede58e8d3443f52259` into a new uniquely
+named folder under this worktree's `.lane/`, preserving `packages/physics2d` and `packages/physics/kernel-common`.
+Copy only the current `planner_allocations.rs` example into its kernel examples directory, then run the identical
+bounded command with that archived manifest path. Both kernels retain their own opt-level 3, fat-LTO,
+codegen-units 1 release profile. Lane P's retained controls are under `.lane/p/speed-plan-reuse/control`.
+
+Only each single-threaded `World::step` is inside the enabled allocator interval. Frames 60 through 99 must each
+print `WORK_FRAME <frame> 14950 119600 8 0 5050`, and both final rounded pose/velocity fingerprints must be
+`a9134ec059727110`. Allocation/reallocation calls are 397,600 versus 200 across those 40 steps; requested bytes
+are 77,114,920 versus 44,673,280. A reallocation counts its entire new requested size and old freed layout, not
+copied bytes or peak/net resident memory. The allocation count is diagnostic, not a physical accuracy threshold.
+
+The native unit suite also checks current topology rebuilds, fresh-versus-retained full-world results, multiple
+component shrink/regrow, and fixed-V/E migrating hub/path storage. Run `npm run test:physics2d-kernel` and the
+full `npm run check:rust-kernels`; the shipped Wasm still checks the mandatory contact-stack predicates and all
+three current pins. No further pin changes accompany storage reuse.
+
+For paired timing, build both own source snapshots with shipped `-C target-feature=+simd128`. Instantiate both
+modules in one process, check each full explicit three-pin array, then alternate which runs first across 24
+rounds. Recreate the unchanged 100-row world for every sample, settle 60 steps and take the minimum of 40 steps;
+every settling/timed visit returns 5,050 awake bodies. Retain every round, order, difference, ratio, median, IQR
+and spread. The exact local driver and immutable modules are under `.lane/p/speed-plan-reuse-flat-ab-v1`.
+Do not overwrite the original evidence when reproducing it.
+
+Use `BOX2D_WASM` with the existing external black-box build and `REPLAY_FIREFOX` as documented above, then run
+`node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12` under the exclusive GPU lease
+and a hard 600-second process-tree limit. Preserve original scene and engine order. The before/after browser
+sessions have different load and do not establish a controlled speed gain. Firefox WebGPU without an adapter
+is unrun; owned-2D CCD remains separate T-11 / 127.y. Quiet release reruns are still required.

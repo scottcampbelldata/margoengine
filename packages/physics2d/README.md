@@ -163,3 +163,10 @@ All original physical bars remain required. The mixed-scene hash is deliberately
 pyramid and joint-grid hashes stay unchanged. The [proof and method domain](../../docs/architecture/physics2d-support-proof.md)
 distinguish axial support from the preserved soft model's [lateral bending limit](../../docs/architecture/physics2d-support-bending.md).
 This is a correctness change; Box2D browser speed parity remains unproven.
+
+The support planner rebuilds its current graph each frame and retains flat scratch buffers between steps.
+It preserves contact order, eligibility decisions and floating arithmetic. Retained planner capacity follows
+the largest body/contact counts seen by the world; changing component order cannot accumulate a separate
+high-water allocation for every component. Accepted components still allocate local solve buffers.
+The native `planner_allocations` example measures whole-step allocation requests on the unchanged 100-row
+scene; [reproduce.md](../../docs/whitepaper/reproduce.md) records its paired-control procedure and timing limits.

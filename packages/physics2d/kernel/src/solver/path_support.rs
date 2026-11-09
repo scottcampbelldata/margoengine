@@ -684,15 +684,34 @@ fn fixed_domain(world: &World, c: &Constraint, bounce: &Bounce) -> bool {
             .all(|v| v.is_finite() && *v <= 0.0)
 }
 
+#[derive(Default)]
 pub(super) struct Plan {
-    paths: Vec<Vec<(usize, usize, usize)>>,
+    paths: Vec<(usize, usize, usize)>,
+    ranges: Vec<core::ops::Range<usize>>,
     weights: Vec<[f64; 3]>,
-    gaps: Vec<Vec<[f32; 2]>>,
+    gaps: Vec<[f32; 2]>,
+}
+
+/// Frame contents are rebuilt in their original order; only allocation capacity is retained.
+#[derive(Default)]
+pub(super) struct Workspace {
+    plan: Plan,
+    edges: Vec<usize>,
+    offsets: Vec<usize>,
+    cursors: Vec<usize>,
+    dynamic: Vec<bool>,
+    visited: Vec<bool>,
+    jointed: Vec<bool>,
+    todo: Vec<usize>,
+    members: Vec<usize>,
+    terminals: Vec<(usize, usize, usize)>,
 }
 impl Plan {
     /// Only candidate path rows need a pre-substep recovery budget snapshot.
     pub(super) fn snapshot(&mut self, bodies: &[SolverBody], constraints: &[Constraint]) {
-        for (path, gaps) in self.paths.iter().zip(&mut self.gaps) {
+        for range in &self.ranges {
+            let path = &self.paths[range.clone()];
+            let gaps = &mut self.gaps[range.clone()];
             for (&(ci, _, _), value) in path.iter().zip(gaps) {
                 let c = &constraints[ci];
                 *value = [gap(bodies, c, &c.points[0]), gap(bodies, c, &c.points[1])];
@@ -702,55 +721,80 @@ impl Plan {
 }
 
 /// Graph ownership, restitution, joint topology and original approach are fixed for this whole frame.
-pub(super) fn plan(
+pub(super) fn plan<'a>(
     world: &World,
     ids: &[u32],
     constraints: &[Constraint],
     bounces: &[Bounce],
-) -> Option<Plan> {
+    workspace: &'a mut Workspace,
+) -> Option<&'a mut Plan> {
+    let Workspace { plan, edges, offsets, cursors, dynamic, visited, jointed, todo, members, terminals } = workspace;
+    plan.paths.clear();
+    plan.ranges.clear();
+    plan.gaps.clear();
     if !(world.settings.contact_max_push > 0.0 && world.settings.contact_max_push.is_finite()) {
         return None;
     }
-    let mut paths = Vec::new();
-    let mut edges = alloc::vec![Vec::new();ids.len()];
-    let dynamic: Vec<_> = ids
+    dynamic.clear();
+    dynamic.extend(ids
         .iter()
         .map(|&id| {
             world.bodies[id as usize].kind == Kind::Dynamic && world.bodies[id as usize].awake
         })
-        .collect();
-    for (ci, c) in constraints.iter().enumerate() {
+    );
+    offsets.clear();
+    offsets.resize(ids.len() + 1, 0);
+    for c in constraints {
         if dynamic[c.a as usize] {
-            edges[c.a as usize].push(ci);
+            offsets[c.a as usize + 1] += 1;
         }
         if dynamic[c.b as usize] {
-            edges[c.b as usize].push(ci);
+            offsets[c.b as usize + 1] += 1;
         }
     }
-    let mut visited = alloc::vec![false;ids.len()];
-    let mut jointed = alloc::vec![false;world.bodies.len()];
+    for i in 1..offsets.len() {
+        offsets[i] += offsets[i - 1];
+    }
+    edges.clear();
+    edges.resize(offsets[ids.len()], 0);
+    cursors.clear();
+    cursors.extend_from_slice(&offsets[..ids.len()]);
+    for (ci, c) in constraints.iter().enumerate() {
+        for body in [c.a as usize, c.b as usize] {
+            if dynamic[body] {
+                edges[cursors[body]] = ci;
+                cursors[body] += 1;
+            }
+        }
+    }
+    let adjacent = |body: usize| &edges[offsets[body]..offsets[body + 1]];
+    visited.resize(ids.len(), false);
+    visited.fill(false);
+    jointed.resize(world.bodies.len(), false);
+    jointed.fill(false);
     for j in &world.joints {
         jointed[j.def.a as usize] = true;
         jointed[j.def.b as usize] = true;
     }
     for seed in 0..ids.len() {
-        if visited[seed] || !dynamic[seed] || edges[seed].is_empty() {
+        if visited[seed] || !dynamic[seed] || adjacent(seed).is_empty() {
             continue;
         }
-        let mut todo = alloc::vec![seed];
-        let mut members = Vec::new();
-        let mut terminals = Vec::new();
+        todo.clear();
+        todo.push(seed);
+        members.clear();
+        terminals.clear();
         let mut valid = true;
         visited[seed] = true;
         while let Some(body) = todo.pop() {
             members.push(body);
-            valid &= edges[body].len() <= 2;
+            valid &= adjacent(body).len() <= 2;
             let id = ids[body];
             valid &= !jointed[id as usize];
-            valid &= edges[body]
+            valid &= adjacent(body)
                 .iter()
                 .all(|&ci| fixed_domain(world, &constraints[ci], &bounces[ci]));
-            for &ci in &edges[body] {
+            for &ci in adjacent(body) {
                 let c = &constraints[ci];
                 let other = if c.a as usize == body {
                     c.b as usize
@@ -770,10 +814,10 @@ pub(super) fn plan(
             continue;
         }
         let (mut ci, mut body, mut parent) = terminals[0];
-        let mut path = Vec::new();
+        let begin = plan.paths.len();
         loop {
-            path.push((ci, body, parent));
-            let next = edges[body].iter().copied().find(|&edge| edge != ci);
+            plan.paths.push((ci, body, parent));
+            let next = adjacent(body).iter().copied().find(|&edge| edge != ci);
             let Some(next) = next else {
                 break;
             };
@@ -786,19 +830,22 @@ pub(super) fn plan(
             parent = body;
             body = other;
             ci = next;
-            if path.len() > members.len() {
+            if plan.paths.len() - begin > members.len() {
                 valid = false;
                 break;
             }
         }
-        if valid && path.len() == members.len() {
-            paths.push(path);
+        if valid && plan.paths.len() - begin == members.len() {
+            plan.ranges.push(begin..plan.paths.len());
+        } else {
+            plan.paths.truncate(begin);
         }
     }
-    if paths.is_empty() {
+    if plan.ranges.is_empty() {
         return None;
     }
-    let weights: Vec<_> = ids
+    plan.weights.clear();
+    plan.weights.extend(ids
         .iter()
         .map(|&id| {
             let b = &world.bodies[id as usize];
@@ -808,17 +855,10 @@ pub(super) fn plan(
                 [0.0; 3]
             }
         })
-        .collect();
+    );
 
-    let gaps = paths
-        .iter()
-        .map(|path| alloc::vec![[0.0;2];path.len()])
-        .collect();
-    Some(Plan {
-        paths,
-        weights,
-        gaps,
-    })
+    plan.gaps.resize(plan.paths.len(), [0.0; 2]);
+    Some(plan)
 }
 
 pub(super) fn stabilize(
@@ -834,7 +874,9 @@ pub(super) fn stabilize(
     springs: &[Soft; 2],
     pose_distance: &mut [f32],
 ) {
-    for (path, gaps) in plan.paths.iter().zip(&plan.gaps) {
+    for range in &plan.ranges {
+        let path = &plan.paths[range.clone()];
+        let gaps = &plan.gaps[range.clone()];
         component(
             world,
             bounces,
@@ -856,6 +898,184 @@ pub(super) fn stabilize(
 #[cfg(test)]
 mod tests {
     use super::*;
+    include!("path_support_storage_tests.rs");
+    #[test]
+    fn retained_plan_rebuilds_after_growth_shrink_and_domain_changes() {
+        use crate::{math::v2, shape::Core, world::{BodyDef, Settings, ShapeDef}};
+        fn fixture(count: usize) -> World {
+            let mut w = World::new(Settings { sleep: false, ..Default::default() });
+            let ground = w.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+            w.create_shape(ground, Core::rect(10.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+            for i in 0..count {
+                let body = w.create_body(&BodyDef { position: v2(0.0, 0.5 + i as f32), ..Default::default() }).unwrap();
+                w.create_shape(body, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+            }
+            w.step(1.0 / 60.0).unwrap();
+            w
+        }
+        let mut retained = Workspace::default();
+        let mut accepted = 0;
+        let mut declined = 0;
+        for count in [0, 1, 4, 11, 2, 0, 7, 1] {
+            let mut w = fixture(count);
+            for domain in 0..4 {
+                w.settings.contact_max_push = if domain == 1 { 0.0 } else { 3.0 };
+                let s = &w.scratch;
+                let mut bounces = s.bounces.clone();
+                if domain == 2 {
+                    for bounce in &mut bounces { bounce.approach = [1.0; 2]; }
+                }
+                let mut fresh = Workspace::default();
+                let expected = plan(&w, &s.ids, &s.constraints, &bounces, &mut fresh);
+                let actual = plan(&w, &s.ids, &s.constraints, &bounces, &mut retained);
+                match (expected, actual) {
+                    (Some(expected), Some(actual)) => {
+                        accepted += 1;
+                        assert_eq!(actual.ranges, expected.ranges);
+                        assert_eq!(actual.paths, expected.paths);
+                        assert_eq!(actual.weights, expected.weights);
+                        assert_eq!(actual.gaps, expected.gaps);
+                        actual.snapshot(&s.bodies, &s.constraints);
+                        expected.snapshot(&s.bodies, &s.constraints);
+                        assert_eq!(actual.gaps, expected.gaps);
+                        // The next build must clear data even when capacity and topology are unchanged.
+                        actual.gaps.fill([f32::NAN; 2]);
+                    }
+                    (None, None) => { declined += 1; assert_eq!(retained.plan.ranges.len(), 0); }
+                    _ => panic!("retained graph changed eligibility: bodies={count}, domain={domain}"),
+                }
+            }
+        }
+        assert!(accepted > 0 && declined > 0);
+    }
+    #[test]
+    fn retained_plan_rebuilds_joint_body_kind_sleep_and_graph_topology() {
+        use crate::joint::{JointDef, JointKind};
+        fn compare(w: &World, retained: &mut Workspace, expected_eligible: bool) {
+            let s = &w.scratch;
+            // Eligibility uses immutable step-start approach, not the post-relaxation velocity.
+            let bounces = &s.bounces;
+            let mut fresh = Workspace::default();
+            let expected = plan(w, &s.ids, &s.constraints, bounces, &mut fresh);
+            let actual = plan(w, &s.ids, &s.constraints, bounces, retained);
+            assert_eq!(actual.is_some(), expected_eligible);
+            match (expected, actual) {
+                (Some(expected), Some(actual)) => {
+                    assert_eq!(actual.ranges, expected.ranges);
+                    assert_eq!(actual.paths, expected.paths);
+                    assert_eq!(actual.weights, expected.weights);
+                    assert_eq!(actual.gaps, expected.gaps);
+                }
+                (None, None) => assert_eq!(retained.plan.ranges.len(), 0),
+                _ => panic!("retained metadata changed current graph eligibility"),
+            }
+        }
+        let (mut w, ids) = column(1000.0, [0.0; 4], false);
+        w.step(1.0 / 60.0).unwrap();
+        let mut retained = Workspace::default();
+        compare(&w, &mut retained, true);
+        w.create_joint(&JointDef {
+            kind: JointKind::Rope { length: 10.0 }, a: ids[0], b: ids[3],
+            anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: true,
+        }).unwrap();
+        compare(&w, &mut retained, false);
+        w.joints.clear();
+        compare(&w, &mut retained, true);
+        w.bodies[ids[3] as usize].kind = Kind::Kinematic;
+        compare(&w, &mut retained, false);
+        w.bodies[ids[3] as usize].kind = Kind::Dynamic;
+        compare(&w, &mut retained, true);
+        w.bodies[ids[3] as usize].awake = false;
+        compare(&w, &mut retained, false);
+        w.bodies[ids[3] as usize].awake = true;
+        compare(&w, &mut retained, true);
+        // A current cyclic/branch edge must invalidate a previously accepted path.
+        let mut extra = w.scratch.constraints[0];
+        extra.a = w.scratch.ids.iter().position(|&id| id == ids[0]).unwrap() as u32;
+        extra.b = w.scratch.ids.iter().position(|&id| id == ids[3]).unwrap() as u32;
+        w.scratch.constraints.push(extra);
+        w.scratch.bounces.push(w.scratch.bounces[0]);
+        compare(&w, &mut retained, false);
+        w.scratch.constraints.pop();
+        w.scratch.bounces.pop();
+        compare(&w, &mut retained, true);
+        let contacts = core::mem::take(&mut w.scratch.constraints);
+        compare(&w, &mut retained, false);
+        w.scratch.constraints = contacts;
+        compare(&w, &mut retained, true);
+    }
+    #[test]
+    fn retained_multiple_paths_match_fresh_plans_and_functional_scratch_reset() {
+        use crate::{joint::{JointDef, JointKind}, math::v2, shape::Core, world::{BodyDef, ShapeDef}};
+        fn fixture() -> (World, u32, [[u32; 2]; 3]) {
+            let mut w = World::default();
+            let ground = w.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+            w.create_shape(ground, Core::rect(20.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+            let mut ids = [[0; 2]; 3];
+            for (column, bodies) in ids.iter_mut().enumerate() {
+                for (level, id) in bodies.iter_mut().enumerate() {
+                    *id = w.create_body(&BodyDef { position: v2(4.0 * column as f32, 0.5 + level as f32), ..Default::default() }).unwrap();
+                    w.create_shape(*id, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+                }
+            }
+            (w, ground, ids)
+        }
+        fn joint(w: &mut World, ground: u32, body: u32) {
+            w.create_joint(&JointDef { kind: JointKind::Rope { length: 20.0 }, a: ground, b: body, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: true }).unwrap();
+        }
+        let (mut w, ground, ids) = fixture();
+        w.step(1.0 / 60.0).unwrap();
+        let mut retained = Workspace::default();
+        for count in [3, 1, 0, 2] {
+            w.joints.clear();
+            for bodies in &ids[count..] { joint(&mut w, ground, bodies[1]); }
+            let s = &w.scratch;
+            let mut fresh = Workspace::default();
+            let expected = plan(&w, &s.ids, &s.constraints, &s.bounces, &mut fresh);
+            let actual = plan(&w, &s.ids, &s.constraints, &s.bounces, &mut retained);
+            if count == 0 {
+                assert!(expected.is_none() && actual.is_none());
+                assert_eq!(retained.plan.ranges.len(), 0);
+            } else {
+                let (expected, actual) = (expected.unwrap(), actual.unwrap());
+                assert_eq!(actual.ranges.len(), count);
+                assert_eq!(actual.paths, expected.paths);
+                assert_eq!(actual.weights, expected.weights);
+                assert_eq!(actual.gaps, expected.gaps);
+                expected.snapshot(&s.bodies, &s.constraints);
+                actual.snapshot(&s.bodies, &s.constraints);
+                assert_eq!(actual.gaps, expected.gaps);
+                actual.gaps.fill([f32::NAN; 2]);
+            }
+        }
+        // Reusing capacity must match throwing all planner storage away before every complete solve.
+        let (mut retained, ground, ids) = fixture();
+        let (mut fresh, _, _) = fixture();
+        for frame in 0..24 {
+            if frame == 2 || frame == 8 {
+                let body = ids[if frame == 2 { 0 } else { 1 }][1];
+                joint(&mut retained, ground, body);
+                joint(&mut fresh, ground, body);
+            }
+            if frame == 5 || frame == 12 {
+                retained.joints.clear();
+                fresh.joints.clear();
+            }
+            fresh.scratch.support = Workspace::default();
+            retained.step(1.0 / 60.0).unwrap();
+            fresh.step(1.0 / 60.0).unwrap();
+            assert_eq!(bits(&retained, &retained.scratch), bits(&fresh, &fresh.scratch), "frame={frame}");
+            assert_eq!(retained.contacts.len(), fresh.contacts.len());
+            for (a, b) in retained.contacts.iter().zip(&fresh.contacts) {
+                assert_eq!(a.normal_impulse.map(f32::to_bits), b.normal_impulse.map(f32::to_bits));
+                assert_eq!(a.tangent_impulse.map(f32::to_bits), b.tangent_impulse.map(f32::to_bits));
+            }
+            for (a, b) in retained.bodies.iter().zip(&fresh.bodies) {
+                assert_eq!(a.awake, b.awake);
+                assert_eq!(a.sleep_time.to_bits(), b.sleep_time.to_bits());
+            }
+        }
+    }
     fn test_bounces(w: &World, s: &super::super::Scratch) -> Vec<Bounce> {
         s.constraints
             .iter()
@@ -1241,7 +1461,7 @@ mod tests {
         let before = bits(&w, &s);
         let bounces = test_bounces(&w, &s);
         assert!(
-            plan(&w, &s.ids, &s.constraints, &bounces).is_none(),
+            plan(&w, &s.ids, &s.constraints, &bounces, &mut Workspace::default()).is_none(),
             "a branched component must not enter the substep path stage"
         );
         assert_eq!(bits(&w, &s), before);

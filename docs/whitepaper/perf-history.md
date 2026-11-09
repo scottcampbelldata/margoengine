@@ -2442,6 +2442,50 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
   Citation in clean-room.md. The grid is `packages/points/tests/points-10m.test.js`.
 
+### 106. Flat 2D support-planner buffers: fewer allocation requests, speed loss still open
+
+- **Accuracy baseline:** `0b12da14a`, after the separate input and sustained-support fixes. The input-fixed
+  `147c6d33a` and corrected baseline have the same benchmark-pyramid pin; only their unbenchmarked mixed pin
+  intentionally differs. Their 24-round alternating correctness-cost comparison gives per-round-minimum medians
+  4.1731 to 5.0303 ms, paired ratio median 1.1550 (IQR 1.0357 to 1.3991), corrected faster 4/24. This records a
+  correctness cost, not a whole-engine bit-identical speed comparison or a waived accuracy bar.
+- **Change:** retain flat adjacency, traversal, path and gap scratch buffers, rebuilding the same current graph
+  and preserving contact/component order, all floating expressions and all three current pins. A nested-buffer
+  trial was rejected before landing: moving high-degree hubs or long paths between ordinals accumulated
+  historical per-slot capacities. Fixed V=65/E=64 regressions fail that trial at 35,643/71,667 B and pass flat
+  storage at 3,379/7,531 B, against the representation-derived 20,238 B budget.
+- **Deterministic work proof:** the identical native whole-step allocator example on control/candidate, using
+  matching kernel release profiles and unchanged pyramid frames 60 through 99, records allocations plus
+  reallocations **397,600 to 200**, deallocations 202,480 to 200, and requested bytes 77,114,920 to 44,673,280.
+  Reallocation traffic includes the full new request, not copied bytes or peak/net heap. Every frame retains
+  14,950 constraints, 119,600 block visits, eight colours, zero overflow and 5,050 awake bodies; final rounded
+  pose/velocity fingerprint `a9134ec059727110` is equal. This proves fewer allocation requests, not zero
+  allocation or fewer total instructions. Accepted path components still allocate their local solves.
+- **Paired timing:** SCOTT-DEV, Ryzen 9 9950X, Node 26.12, busy machine; 24 balanced alternating rounds in one
+  process, fresh 100-row scenes, 60 settling steps and minimum of 40 timed steps. All three explicit pins and
+  every awake count match. Minimum 4.0233 to 3.9975 ms; medians 4.2877 to 4.3231 ms; paired ratio median
+  **0.9916**, IQR **0.9807 to 1.0010**, faster **18/24**. The small movement remains inside spread; no stable
+  timing gain is claimed. The earlier nested trial's ratio 0.9931 (14/24) is retained as superseded evidence.
+- **Browser before/after:** minimum milliseconds from 12 rounds each, unchanged scene and black-box rivals,
+  exclusive GPU lease. Separate sessions have changing load and are not a controlled before/after gain.
+
+  | Browser/backend | Before Margo / Box2D v3 / Rapier | After Margo / Box2D v3 / Rapier |
+  | --- | --- | --- |
+  | Edge 157 WebGPU | 4.155 / 1.535 / 9.830 | 4.090 / 1.490 / 8.400 |
+  | Firefox 157 WebGL2 | 4.420 / 1.440 / 8.400 | 4.400 / 1.440 / 9.780 |
+
+  Margo loses to Box2D in every round of both sessions/browsers and beats Rapier in all rounds. Edge
+  WebGPU/WebGL2 and Firefox WebGL2 pass current pins and Wasm stack bars; Firefox WebGPU has no adapter.
+- **Rejected solver follow-up:** existing point mode on corrected `0b12da14a` completes all 58 cases, block
+  29/29 versus point 26/29. Point mode fails 1:100 horizontal drift, 1:1000 sag/drift/creep and chain-box seam
+  speed. No count-contract failure, hash re-pin or timing follows those physical failures. The
+  [solver study](../architecture/physics2d-solver-study.md#point-normal-diagnostic-on-the-corrected-support-baseline)
+  gives metrics and the limited coupling interpretation.
+- **Evidence/reproduce:** [raw rounds, browser rows, allocations, provenance and physical matrix](results/physics2d-planner-reuse-20261108.json),
+  [bounded commands](reproduce.md#own-2d-retained-planner-buffers-perf-history-entry-106), native lifecycle/resource
+  units and full landing gates. No scene, physical tolerance, pass count or current pin changes. Box2D goal
+  remains unmet; quiet release reruns are required. Owned-2D CCD remains separate T-11 / 127.y.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2536,3 +2580,5 @@ These entries lack a recorded number, a named machine or a quiet run:
 26. Truck 7k prefix against GaussianSplats3D (entry 103): a quiet paired rerun. The loss and the picture error stay open.
 27. Quadtree screen-space error against 3DTilesRendererJS (entry 104): a quiet paired rerun of the frame time. The selected sets already match.
 28. 10 million points against potree-core (entry 105): a quiet paired rerun of the frame time. The loss stays open.
+
+29. Flat 2D planner storage (entry 106): quiet paired/browser reruns on the corrected accuracy baseline; allocation reduction is proven, browser speed parity remains open.

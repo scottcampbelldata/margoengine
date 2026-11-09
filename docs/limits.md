@@ -875,10 +875,12 @@ mass threshold was fitted to hide it. See the [support derivation](architecture/
 [bending analysis and executable probe](architecture/physics2d-support-bending.md), and
 [reproduction commands](whitepaper/reproduce.md#own-2d-sustained-support).
 
-The frame planner is linear in bodies, contacts and joints. General branching graphs skip the extra substep
-path work; accepted components still use local allocations and two banded factorizations each substep.
-No speed parity or allocation-free behavior is claimed. Browser speed must be remeasured on this accuracy
-baseline. CCD remains outside this correction.
+The frame planner is linear in bodies, contacts and joints. Its flat graph/path/gap buffers retain capacity
+bounded by historical maximum body/contact counts, rather than per-body or per-component capacity maxima.
+Current graph contents, eligibility and weights rebuild each frame. General branching graphs skip the extra
+substep path work; accepted components still use local allocations and two banded factorizations each substep.
+Retaining scratch memory trades its lifetime for fewer allocation calls; this is not an allocation-free world
+or a Box2D speed-parity claim. CCD remains outside this correction.
 
 ## 2D light textures and cookies (batch 55)
 

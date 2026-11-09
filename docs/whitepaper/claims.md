@@ -1169,3 +1169,12 @@ The mixed-scene pin intentionally changes from `9acb68471fbe6ba0` to `92db6847c4
 supported-path correction and actual-motion sleep observation. Pyramid/joint-grid pins remain unchanged.
 [Reproduce](reproduce.md#own-2d-sustained-support) separates physical checks, Wasm/browser parity and the static
 force probe. This correction makes no Box2D speed-parity claim and does not implement CCD.
+
+## Own 2D planner storage (2026-11-08)
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Retaining planner scratch removes repeated allocation requests without changing solver results | `kernel/examples/planner_allocations.rs`, all current native/Wasm hashes, full 29-case physical matrix and the [raw diagnostic record](results/physics2d-planner-reuse-20261108.json) | Native allocation counts on unchanged frames 60 through 99; no total-instruction or allocation-free-world claim |
+| Planner retained storage follows maximum body/contact counts, rather than sums of per-slot historical maxima | Flat adjacency offsets/cursors, flat path/gap ranges and fixed-V/E migrating-hub/path resource regressions in `solver/path_support_storage_tests.rs` | Planner backing buffers; local accepted-component solves still allocate |
+| Existing per-point normals become accuracy-eligible after the support fix | [Corrected-baseline diagnostic](../architecture/physics2d-solver-study.md#point-normal-diagnostic-on-the-corrected-support-baseline), complete 58-case comparison in the raw record | REJECTED: 1:100 drift, 1:1000 collapse and chain-box seam speed fail unchanged predicates |
+| This change establishes a stable browser speed gain or matches Box2D v3 Wasm | Paired rounds and browser/rival rows in the raw record and perf history entry 106 | UNPROVEN; loaded-machine diagnostics, loss remains open and quiet release rerun required |

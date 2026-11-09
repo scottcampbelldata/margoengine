@@ -867,6 +867,13 @@ Measured but not fixed. Their history, sources and rerun commands are in
   the 0.35 ms narrow target is still open. After: Edge 2.86 ms against Box2D 1.41, Firefox 3.16 against 1.50
   (diagnostic, changing load). Next: setup rows straight into coloured blocks; profile lane gathers, masked
   endpoint selection and scalar distance fallback before doing more narrow-phase work.
+  Latest corrected-baseline measurements (entry 106) still lose: Edge 4.090 ms against Box2D 1.490 and Rapier
+  8.400; Firefox 4.400 against 1.440 and 9.780 (busy, 12 rounds, unchanged scene). Retained flat planner buffers
+  remove 397,400 native allocation/reallocation requests across 40 steps with identical outputs, but paired
+  ratio median 0.9916 (IQR 0.9807 to 1.0010) establishes no stable timing gain. The correctness fixes' extra
+  cap certification and supported-path planning remain work to profile, not grounds to remove required bars.
+  Existing point normals still fail 1:100 drift, 1:1000 sag/drift/creep and chain-box seam speed after the support
+  fix, so replacing the block with that option is rejected. No faster solver is accepted from a partial matrix.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

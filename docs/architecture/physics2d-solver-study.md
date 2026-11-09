@@ -115,3 +115,21 @@ This result-changing fix intentionally changes only the mixed-scene pin. The ear
 and measurements above remain historical evidence, not accepted production variants or current speed claims.
 The [bending analysis](physics2d-support-bending.md) distinguishes constitutive lateral instability from axial
 support and from discrete solver defects. Browser Box2D parity remains unproven.
+
+## Point-normal diagnostic on the corrected support baseline
+
+The unchanged collector on `0b12da14a` completes all 58 cases: block control 29/29, existing point option
+26/29. The 1:100 stack's sag and 4.139011 mm creep pass, but its 6.846711 mm horizontal drift exceeds 0.1 mm.
+The 1:1000 stack collapses: sag 3.000086255 m against 0.518550736 m, horizontal drift 3.285881219 m and
+creep 3.9800901 m. Eventual sleep does not rescue these failed predicates. Chain-box vertical speeds are
+85.18784 and 85.249776 micrometres/s in the two creation orders, above the unchanged 74.4 limit; balls pass.
+No block-option/count contract fails. This diagnostic retains each fixture's original backend setting;
+it does not claim a separate complete scalar run. No hash re-pin or timing follows failed physical bars.
+
+For symmetric active rows with matrix `[[a+c,b],[b,a+c]]`, equal right-hand side and initial impulses,
+one sequential visit gives `delta2-delta1=-(b/(a+c))*delta1`. Thus finite-iteration coupling can produce
+unequal point impulses and torque even before rounding. The certified support correction has a limited
+domain, so it does not establish a universal replacement for the two-point block. A first-declined-certificate
+trace was not collected; the link from this local asymmetry to the observed collapse remains a hypothesis.
+This rejects the existing point replacement, not all possible per-point formulations. The original papers
+above remain design evidence, not a predicted half-millisecond saving or automatic accuracy acceptance.

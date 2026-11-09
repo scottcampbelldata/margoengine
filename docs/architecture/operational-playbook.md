@@ -1695,3 +1695,18 @@ validate audio times, durations and float32 values before state changes or cance
 active ducks on invalid release. mixer.test.js proves target/flag/envelope and complete automation
 trace preservation, plus unchanged valid/default fades. Root grows 6,670 to 6,901 B and snapshots
 1,700 to 1,810 B, within their existing budgets; no budget or accuracy/time bar is raised.
+
+### Own 2D planner storage (batch 127, section 5 evidence)
+
+The frame planner keeps flat adjacency, traversal, path and gap scratch buffers in its owning solver Scratch.
+It rebuilds current contents in the original contact/component order. Floating expressions, domain decisions,
+physical bars and all three corrected-baseline hashes remain unchanged. Retained capacity depends on maximum
+body/contact counts; it does not accumulate each component ordinal's or body slot's historical largest buffer.
+Lifecycle tests cover growth/shrink, multiple components, joint/kind/sleep/topology changes and a fresh-workspace
+full-world comparison. Fixed-V/E migrating-hub/path tests catch the rejected nested-capacity design.
+
+The native whole-step allocator example and committed raw diagnostic record prove fewer allocation requests
+on the unchanged pyramid, with identical work counts and final state. Paired/browser measurements accompany
+perf history entry 106; they establish neither a stable timing gain nor Box2D parity. The existing point-normal
+replacement is rejected again on the full corrected 29-case contract. Local accepted-component allocations and
+two banded factorizations remain, and owned-2D CCD remains separate T-11 / 127.y.

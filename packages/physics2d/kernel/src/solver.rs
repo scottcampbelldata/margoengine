@@ -160,6 +160,7 @@ struct SolverBody {
 #[derive(Default)]
 pub struct Scratch {
     pub(crate) pose_speed: Vec<f32>,
+    support: path_support::Workspace,
     constraints: Vec<Constraint>,
     bounces: Vec<Bounce>,
     /// The solver's bodies; `ids[i]` is the world body of `bodies[i]`, `slot[id]` the place of world body `id` plus 1
@@ -482,7 +483,8 @@ pub fn solve(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
     };
     let springs = [quarter, eighth];
     let max_push = settings.contact_max_push;
-    let mut support_plan = path_support::plan(world, &ids, &constraints, &bounces);
+    let mut support = core::mem::take(&mut world.scratch.support);
+    let mut support_plan = path_support::plan(world, &ids, &constraints, &bounces, &mut support);
     // Whether the bodies have moved since the four-lane solve last worked out its gaps (see wide::solve).
     let mut fresh = true;
     let mut substep_pose_speed = alloc::vec![0.0f32;world.bodies.len()];
@@ -684,6 +686,7 @@ pub fn solve(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
         world.bodies[id as usize].round_pose();
     }
     world.scratch.constraints = constraints;
+    world.scratch.support = support;
     world.scratch.pose_speed = pose_speed;
     world.scratch.bounces = bounces;
     world.scratch.bodies = bodies;
