@@ -1770,3 +1770,12 @@ Inputs are the pinned CC0 Poly Haven Small Empty Room 1 HDR and the existing
 licensed FlightHelmet model, plus a raised-box geometry control. No foreign
 implementation is required. Full package GPU suites and README runtime examples
 remain required, along with lint, hygiene, verify and the unchanged size ceilings.
+
+Batch 56 continuation: review56-browser.mjs also reads the linear capture texture
+for Reflector, Refractor and CubeCamera attached to a secondary scene: the red
+owner background and green owner mesh must appear, and no blue default-scene
+pixel may appear. Explicit disposal must preserve an unrelated same-name plugin
+and allow replacement. It also compares every GPU studio cube texel for
+[1, 1, 0], [MAX_VALUE, MAX_VALUE, 0] and [MIN_VALUE, MIN_VALUE, 0].
+Run the same entry with --compat for the independent compatibility proof.
+These checks require successful execution; their presence alone is not acceptance.

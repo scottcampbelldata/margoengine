@@ -1,7 +1,11 @@
 <!doctype html><html><meta charset="utf-8"><title>Environment view isolation</title><style>body{margin:0}canvas{width:128px;height:64px}</style><canvas></canvas><script type="module">
-import {Engine} from '/packages/core/dist/index.js';
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
 import {Reflector} from '/packages/environment/dist/reflector.js';
-import {ColorBackground,ImageBackground} from '/packages/environment/dist/index.js';
+import {Refractor} from '/packages/environment/dist/refractor.js';
+import {CubeCamera} from '/packages/environment/dist/cube-camera.js';
+import {studio} from '/packages/environment/dist/studio.js';
+import {readTexture} from './gpu-read.js';
+import {Environment,ColorBackground,ImageBackground} from '/packages/environment/dist/index.js';
 let engine,effect;const errors=[];
 window.check={
  async init(){
@@ -15,6 +19,33 @@ window.check={
   if(kind==='image')effect=ImageBackground.attach(engine,{shape:'sphere',images:[{width:1,height:1,data:new Uint8ClampedArray([255,0,0,255])}]});
   engine.render({views:[{camera:engine.camera,viewport:[0,0,64,64],pixels:true,clear:'#cccccc',...(scissor?{scissor:[0,0,32,64]}:{})}]});
   await engine.gpu.queue.onSubmittedWorkDone();return errors;
+ },
+ async owner(kind){
+  await this.init();engine.camera.position=[0,0,3];engine.camera.target=[0,0,0];
+  const owner=engine.createScene('product');
+  // Ambient-only colour IDs keep specular white out of the scene-identity assertion.
+  owner.lighting.direction.set([0,1,0,0]);owner.lighting.radiance.set([1,1,1,1]);owner.lighting.ambient.set([1,1,1]);
+  ColorBackground.attach(engine,{color:[0,0,1]});owner.use(new ColorBackground({color:[1,0,0]}));
+  const Type={Reflector,Refractor,CubeCamera}[kind], options={name:'owner-capture',autoUpdate:false,size:64,width:8,height:8};
+  const primary=new Type(options), secondary=new Type(options);engine.use(primary);owner.use(secondary);
+  owner.createMesh().setGeometry(box(.8,.8,.8)).setMaterial(new PbrMaterial({color:[0,1,0]})).setPosition([0,0,kind==='Reflector'?1:-2]);
+  const captured=secondary.update(), image=await readTexture(engine.gpu,secondary.texture);
+  let red=0,green=0,blue=0;
+  for(let i=0;i<image.data.length;i+=4){const [r,g,b]=image.data.subarray(i,i+3);if(r>0&&g===0&&b===0)red++;if(g>0&&r===0&&b===0)green++;if(b>0)blue++;}
+  secondary.dispose();secondary.dispose();
+  const detached=!owner.plugins.has(secondary.name)&&!engine.sceneOf(secondary), isolated=engine.scene.plugins.get(primary.name)===primary;
+  const replacement=new Type(options);owner.use(replacement);const replaced=owner.plugins.get(replacement.name)===replacement;replacement.dispose();
+  return {captured,red,green,blue,detached,isolated,replaced,errors};
+ },
+ async finiteStudio(){
+  await this.init();const outputs=[];
+  for(const direction of [[1,1,0],[Number.MAX_VALUE,Number.MAX_VALUE,0],[Number.MIN_VALUE,Number.MIN_VALUE,0]]){
+   const image=studio({width:16,floor:[0,0,0],walls:[0,0,0],ceiling:[0,0,0],lights:[{direction,width:1,height:1,intensity:1}]}),
+    env=await Environment.create(engine.gpu,image,{size:16,samples:16,brdfSize:8,brdfSamples:16,shSize:16}),
+    cube=await readTexture(engine.gpu,env.cubeTexture);
+   outputs.push(Array.from(cube.data));env.dispose();
+  }
+  return {outputs,errors};
  },
  dispose(){effect?.dispose();engine?.dispose();return errors;}
 };window.ready=true;
