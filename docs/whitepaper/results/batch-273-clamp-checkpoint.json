@@ -185,5 +185,37 @@
     "lint": "pass",
     "coreStageGzip": 23924,
     "receiptPrefix": "test-results/batch-273-clamp-video-zstd-"
+  },
+  "headlessIntegration": {
+    "base": "d5fa88847",
+    "build": "complete rebuild passes",
+    "units": "183/183 headless, browser teardown, shutdown, README runner, ViewCube and guide checks pass",
+    "api": "900 entries/8710 exports match",
+    "coreStageGzip": 23924,
+    "gpu": [
+      {
+        "label": "native",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 7.3
+      },
+      {
+        "label": "compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 7.5
+      },
+      {
+        "label": "readme",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 3.5
+      }
+    ],
+    "receipts": "test-results/batch-273-clamp-headless-*",
+    "note": "No teardown production changes made by this lane; tested the new upstream owner repair."
   }
 }
