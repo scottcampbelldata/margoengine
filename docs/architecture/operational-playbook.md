@@ -1,5 +1,21 @@
 # Engine architecture and quality reference
 
+## Owned Chromium process-list ordering (section 5 supplement, 2026-11-09)
+
+Client close must follow the owned browser's bounded CDP process-list read.
+Previously those operations raced, so a healthy session could be disconnected
+before its reply and cleanup entered the helper fallback. The retained process
+list is now passed to native termination; client cleanup and termination still
+run concurrently after that read. Deterministic coverage in
+`tests/browser-teardown.test.js` fails on the parent and checks one list request,
+list-before-disconnect and native-end-before-driver-kill. All 56 scoped browser
+selection, teardown and shutdown tests pass. All nine voxel GPU suites and the
+decoder browser, decoder Node/glTF and glTF GPU gates pass after the repair.
+The voxel README gate passes with its unchanged five known failures (18 of 23
+examples successful). No shutdown deadline, rendering assertion or performance
+budget was relaxed. The full verify run found only an excluded-workspace link
+in the GPU coordination report; its existing regression guards that repair.
+
 ## Build-phase speed deferral (section 5 supplement)
 
 Scott's 2026-11-10 ruling defers benchmarks, paired wall-clock A/B measurements

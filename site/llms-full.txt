@@ -2596,6 +2596,12 @@ Detached queue observers read immutable numbered status revisions. Older single-
 file records are still readable; observers need the new scripts for new revision
 records. Holder and waiter lock formats remain compatible with older clients.
 
+Owned Windows Chromium shutdown lists its processes before client disconnect,
+then retains concurrent native termination/client cleanup. A process-list read
+still has its five-second bound and shutdown retains the 30-second budget.
+The asynchronous-session regression in `tests/browser-teardown.test.js` proves
+ordering, not a GPU speed or universal driver-shutdown guarantee.
+
 Sciviz review validation records are regenerated as a pair from one built revision:
 `node examples/package-benchmarks/entry-sizes.mjs`, then
 `node scripts/basic-scene-network.mjs`. The latter captures a real GPU-backed
@@ -4659,6 +4665,17 @@ above. Missing triangles are completely rejected, with finite one-sided boundary
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Fixed 2026-11-09: owned Chromium process listing raced client close
+
+After the helper-program repair, voxel GI passed its rendering assertions but
+could still fail shutdown. `withBoundedClose` started client close concurrently
+with `stopOwned`'s CDP process-list read, allowing disconnect to invalidate that
+read and enter helper fallback. The bounded list now completes first and is
+retained for native termination. A deterministic asynchronous-session regression
+in `tests/browser-teardown.test.js` fails on the parent; all 56 scoped tests pass.
+All nine fresh voxel GPU suites and the README gate now pass, with the README
+gate retaining its existing five known failures and no new failure.
 
 ### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
 

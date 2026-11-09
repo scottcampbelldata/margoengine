@@ -17,6 +17,37 @@ actual context destruction, exact pixels and all GL-error assertions. No sleep,
 retry, timeout increase or production workaround is introduced. No foreign code
 was read or copied.
 
+## Owned Chromium process-list ordering (2026-11-09)
+
+Research before the teardown repair compared asynchronous lifetime ordering with
+process-handle and protocol contracts. Maurice Herlihy and Jeannette Wing,
+*Linearizability: A Correctness Condition for Concurrent Objects* (1990),
+https://www.cs.cmu.edu/~wing/publications/HerlihyWing90.pdf , abstract and
+section 1 opening reviewed; Leslie Lamport, *Time, Clocks, and the Ordering of
+Events in a Distributed System* (1978),
+https://lamport.azurewebsites.net/pubs/time-clocks.pdf , introduction and
+"The Partial Ordering" reviewed, not either whole paper. Node.js contributors,
+*Child process* (2026), https://nodejs.org/api/child_process.html#event-close ,
+close/exit and kill contracts reviewed. No companion implementation was read.
+
+The missing dependency was process-list completion before client disconnect.
+Concurrent client close could invalidate the CDP session and unnecessarily enter
+the helper fallback. The owned Windows launcher now lists once before starting
+native termination and client cleanup concurrently. The five-second list bound,
+30-second shutdown budget, native ownership and all existing failure checks stay
+unchanged. A deterministic asynchronous-session regression fails on the parent.
+
+The associated documentation repair removes an excluded-workspace link from the
+GPU report and retains generated API size data without changing exports. Wide
+reproducibility searches compared Roger D. Peng, *Reproducible Research in
+Computational Science* (2011), https://doi.org/10.1126/science.1213847 , abstract
+reviewed, with Greg Wilson, Jennifer Bryan, Karen Cranston, Justin Kitzes, Lex
+Nederbragt and Tracy Teal, *Good enough practices in scientific computing*
+(2017), https://doi.org/10.1371/journal.pcbi.1005510 , overview, summary and
+project-organization text reviewed, not the whole paper. References must identify
+available evidence and distinguish retained author material from clone contents;
+no research source or result is fabricated by rewording the pointer.
+
 ## Sciviz size-record repair (2026-11-10)
 
 The review revalidation also checked the retained implementation against these

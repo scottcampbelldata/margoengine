@@ -1,5 +1,11 @@
 # Claims and evidence
 
+Owned Windows Chromium teardown reads its process list before client disconnect
+can invalidate that read. The asynchronous-session regression in
+`tests/browser-teardown.test.js` fails on the prior ordering; all 56 scoped
+browser/shutdown tests and all nine voxel GPU suites pass. Existing process-list
+and shutdown deadlines remain unchanged. This is correctness evidence only.
+
 Test-page 36: mesh position, rotation and scale retain their refs and reject assignment
 with a coded TypeError before store writes. Proof: core/tests/transform-refs.test.js
 fails on the writable-field parent, passes with the guard, and preserves inspector

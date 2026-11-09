@@ -12,6 +12,13 @@ extraction only. For the separate native surface/rectangle piece, build sciviz a
 This checks both real engine backends, strict all-pixel bounds, actual context loss, live reboots and GL state.
 It does not establish axes, points/lines, volume/slice or integrated CPU-isosurface support.
 
+Owned Chromium shutdown ordering: run `node --test --test-timeout=120000
+tests/browser-teardown.test.js tests/browser-selection.test.js
+tests/shutdown.test.js`. The asynchronous-session regression must fail before
+the repair and pass afterward. Revalidate rendering with the voxel package's
+`test:gpu` and README gates in shared GPU slots. The existing five known voxel
+README failures remain recorded by that gate; 18 of 23 examples succeed.
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699

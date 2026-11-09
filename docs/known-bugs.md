@@ -1,5 +1,16 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: owned Chromium process listing raced client close
+
+After the helper-program repair, voxel GI passed its rendering assertions but
+could still fail shutdown. `withBoundedClose` started client close concurrently
+with `stopOwned`'s CDP process-list read, allowing disconnect to invalidate that
+read and enter helper fallback. The bounded list now completes first and is
+retained for native termination. A deterministic asynchronous-session regression
+in `tests/browser-teardown.test.js` fails on the parent; all 56 scoped tests pass.
+All nine fresh voxel GPU suites and the README gate now pass, with the README
+gate retaining its existing five known failures and no new failure.
+
 ### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
 
 GPU suites passed every check, then failed with `SHUTDOWN_TIMEOUT`, "still open:

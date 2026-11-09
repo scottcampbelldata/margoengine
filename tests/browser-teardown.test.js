@@ -331,6 +331,44 @@ test('stopOwned ends the browser through its handle and every process Chromium l
   assert.ok(polls > 2);
 });
 
+test('owned Chromium lists its processes before client close can disconnect the listing', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 10, exitCode: null, signalCode: null });
+  let disconnected = false, lists = 0;
+  const calls = [];
+  child.kill = (signal) => {
+    calls.push('native');
+    child.signalCode = signal;
+    setImmediate(() => child.emit('close', null, signal));
+    return true;
+  };
+  const browser = withBoundedClose({
+    newBrowserCDPSession: async () => ({
+      send: async () => {
+        lists++;
+        await new Promise((resolve) => setImmediate(resolve));
+        if (disconnected) throw new Error('client disconnected the process-list session');
+        calls.push('listed');
+        return { processInfo: [{ id: 10, type: 'browser' }] };
+      },
+    }),
+    close: async () => { disconnected = true; calls.push('client'); },
+  }, {
+    platform: 'win32',
+    server: { process: () => child, kill: async () => calls.push('driver') },
+    end: () => assert.fail('a healthy process-list session must not race into helper fallback'),
+  });
+  try {
+    await closeAll({ browser, budgetMs: 500 });
+    assert.equal(lists, 1);
+    assert.ok(calls.indexOf('listed') < calls.indexOf('client'));
+    assert.ok(calls.indexOf('native') < calls.indexOf('driver'));
+    assert.equal(disconnected, true);
+  } finally {
+    child.signalCode = 'SIGKILL';
+    child.emit('close', null, 'SIGKILL');
+  }
+});
+
 test('stopOwned falls back to the helper route only when Chromium does not list its processes, and still ends the browser', async () => {
   const child = Object.assign(new EventEmitter(), { pid: 10, exitCode: null, signalCode: null });
   child.kill = (signal) => (child.signalCode = signal);

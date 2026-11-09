@@ -9,6 +9,12 @@ Detached queue observers read immutable numbered status revisions. Older single-
 file records are still readable; observers need the new scripts for new revision
 records. Holder and waiter lock formats remain compatible with older clients.
 
+Owned Windows Chromium shutdown lists its processes before client disconnect,
+then retains concurrent native termination/client cleanup. A process-list read
+still has its five-second bound and shutdown retains the 30-second budget.
+The asynchronous-session regression in `tests/browser-teardown.test.js` proves
+ordering, not a GPU speed or universal driver-shutdown guarantee.
+
 Sciviz review validation records are regenerated as a pair from one built revision:
 `node examples/package-benchmarks/entry-sizes.mjs`, then
 `node scripts/basic-scene-network.mjs`. The latter captures a real GPU-backed

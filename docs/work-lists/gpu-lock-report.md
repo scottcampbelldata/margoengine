@@ -75,8 +75,8 @@ The exact owned file lists are reproducible with
 `git diff --name-status 7289abf3b b7af6646a` (job 4), excluding intervening
 work by other lanes. `git show --name-status HEAD` at this report commit lists
 the UTF-8 correction, encoding regression and report itself.
-Private helper instructions were updated outside tracked source in
-`private/handoffs/lane-helper-brief.md`. No engine/core/stage implementation changed.
+Private helper instructions were updated in the excluded author workspace;
+they are not part of a clone. No engine/core/stage implementation changed.
 Combined core + stage remains 23,924 bytes gzip, below the unchanged 25,000-byte
 ceiling. Job 6 (real GPU-use classification, one lane per slot, sampled activity,
 idle termination and status metrics) follows this report.

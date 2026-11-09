@@ -192,6 +192,16 @@ async function chromiumPids(browser) {
   return processInfo.map((process) => process.id);
 }
 
+async function listOwnedPids(browser, listMs) {
+  let timer;
+  const listed = await Promise.race([
+    typeof browser?.newBrowserCDPSession === 'function' ? chromiumPids(browser).catch(() => null) : null,
+    new Promise((resolve) => (timer = setTimeout(resolve, listMs, null))),
+  ]);
+  clearTimeout(timer);
+  return listed;
+}
+
 /**
  * Ends an owned Chromium and the processes it lists for itself, with no helper program: the browser process through
  * the handle Node holds (`TerminateProcess` on Windows), each listed child by its pid, then waits until the listed
@@ -201,19 +211,14 @@ async function chromiumPids(browser) {
  * which `kill()` raises synchronously) is thrown, never left as an unhandled event.
  * @param {import('node:child_process').ChildProcess} child
  * @param {{ newBrowserCDPSession?: () => Promise<{ send(method: string): Promise<any> }> }} browser
- * @param {{ end: (pid: number) => Promise<number[]>, listMs?: number, alive?: (pid: number) => boolean, kill?: (pid: number) => void }} options
+ * @param {{ end: (pid: number) => Promise<number[]>, listMs?: number, pids?: number[]|null, alive?: (pid: number) => boolean, kill?: (pid: number) => void }} options
  */
 export async function stopOwned(
   child,
   browser,
-  { end, listMs = LIST_PROCESSES_MS, alive = running, kill = (pid) => process.kill(pid, 'SIGKILL') },
+  { end, listMs = LIST_PROCESSES_MS, pids, alive = running, kill = (pid) => process.kill(pid, 'SIGKILL') },
 ) {
-  let timer;
-  const listed = await Promise.race([
-    typeof browser?.newBrowserCDPSession === 'function' ? chromiumPids(browser).catch(() => null) : null,
-    new Promise((resolve) => (timer = setTimeout(resolve, listMs, null))),
-  ]);
-  clearTimeout(timer);
+  const listed = pids === undefined ? await listOwnedPids(browser, listMs) : pids;
   let remaining = [];
   if (!listed) remaining = (await end(child.pid)) ?? [];
   let failure;
@@ -259,10 +264,14 @@ export function withBoundedClose(
       browser: {
         close: async () => {
           if (server) {
+            const child = server.process?.();
+            // Listing needs a connected client. Finish this read before close() can
+            // disconnect its CDP session, then terminate and clean up concurrently.
+            const pids = platform === 'win32' && child?.pid && child.exitCode === null && child.signalCode === null
+              ? await listOwnedPids(browser, LIST_PROCESSES_MS) : undefined;
             // Windows driver kill uses synchronous taskkill: calling it on a live process blocks even
             // the shutdown timer. End the owned process first, then finish driver cleanup.
             const terminate = async () => {
-              const child = server.process?.();
               if (platform === 'win32' && child?.pid) {
                 const running = child.exitCode === null && child.signalCode === null;
                 let onClose;
@@ -274,7 +283,7 @@ export function withBoundedClose(
                   // the process table through WMI and PowerShell needs a console, both of which stall or fail on
                   // this PC under load and around GPU driver resets. A helper that could not run reported nothing
                   // killed, the browser kept running, and the close waited the whole budget. See `stopOwned`.
-                  if (running) await stop(child, browser, { end });
+                  if (running) await stop(child, browser, { end, pids });
                   // ChildProcess 'exit' does not close its stdio. Playwright's kill API is safe only
                   // after 'close', which marks the driver process closed. Release every owned pipe,
                   // including Chromium's two CDP pipes, then wait for 'close' (the process handle signalled).
