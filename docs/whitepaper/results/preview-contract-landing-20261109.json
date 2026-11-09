@@ -14,7 +14,7 @@
     "repair": "docs/work-lists/gpu-lock-report.md reworded; tests/no-private-paths.test.js unchanged"
   },
   "finalFocused": {
-    "passed": 358,
+    "passed": 380,
     "failed": 0,
     "skipped": 0
   },
@@ -56,8 +56,9 @@
   },
   "timingMeasurementsAccepted": false,
   "finalFocusedDetail": {
-    "overlapSuite": 350,
+    "overlapSuite": 372,
     "pairedSizeNetwork": 8,
-    "includes": "latest voxel admission, sciviz flow and Rust gate regressions"
-  }
+    "includes": "current voxel/sciviz/Rust and GPU admission/activity regressions"
+  },
+  "landingBase": "44f75880e00ff741be783cf9565f6f1169db77c1"
 }
