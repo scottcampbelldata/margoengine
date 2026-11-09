@@ -2766,6 +2766,10 @@
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"
     },
+    "./staging/accumulate": {
+      "types": "./dist/staging/accumulate.d.ts",
+      "import": "./dist/staging/accumulate.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

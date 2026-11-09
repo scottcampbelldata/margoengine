@@ -1807,3 +1807,17 @@ failures, and a platform AbortError could replace the caller's cancellation reas
 now preserves linked/CSP faults and exact abort reasons, and wraps other failures with code failed,
 procedural help and the original cause. Seven loading regressions include four cases that fail on the
 parent. The missing-file fixture uses a unique absent Windows TEMP path without writing into the checkout.
+
+### Fixed in batch 56 job 2: contact-shadow scene ownership
+
+Repro: put new ContactShadows or AccumulatedShadows in a non-default scene, with a same-name effect
+in the default scene, then dispose the non-default effect. The old contact receiver called the engine's
+default-scene removePlugin(name), removing the wrong effect and leaving its own registration behind.
+Disposal now uses sceneOf(this).removePlugin(name). The accumulation unit test intercepts the wrong
+default remover; the GPU test checks empty owner registration and a live default effect on WebGPU
+and WebGL2 compatibility. This does not close the independent batch 168 physical contact-picture loss.
+
+Coexistence repro: attach contact and accumulated shadows in the same scene. Both inherited passes
+previously registered as contact-shadows, so the second attachment threw Invalid pass. Registration
+now uses the plugin's name. CPU and real-GPU regressions attach both, render both and remove the
+accumulator while retaining the contact effect.

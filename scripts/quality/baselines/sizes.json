@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11550886,
+  "total": 11560479,
   "history": [
     {
       "date": "2026-10-24",
@@ -4994,6 +4994,12 @@
       "commit": "1823a741e",
       "reason": "procedural/trees: new optional entry, measured entry plus standard allowance; no root change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "d1166649b",
+      "reason": "Batch 56: optional accumulated-shadow entry, measured 9314 B gzip including the receiver; retain its draft ceiling 9593 B. Root staging 8129 B stays below 8259 B; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5537,6 +5543,7 @@
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/poisson": 1525,
     "@margoengine/procedural/standin": 673,
+    "@margoengine/procedural/trees": 1796,
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 3942,
     "@margoengine/quality/features": 2412,
@@ -5691,6 +5698,7 @@
     "@margoengine/stage/viewer": 2480,
     "@margoengine/stage/xr": 2138,
     "@margoengine/staging": 8259,
+    "@margoengine/staging/accumulate": 9593,
     "@margoengine/stats": 4934,
     "@margoengine/stats/beacon": 1639,
     "@margoengine/stats/compile": 1882,
@@ -5952,7 +5960,6 @@
     "margoengine/transitions/live": 321,
     "margoengine/transitions/mask": 321,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/procedural/trees": 1796
+    "margoengine/web": 577
   }
 }

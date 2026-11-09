@@ -1827,3 +1827,16 @@ here from those published descriptions. Margo's bounded seeded crown and determi
 index with conservative cell-box pruning are new implementation choices. No linked implementation,
 engine or library source was read or adapted. Tests use generated stand-in clouds and an independent
 exhaustive JavaScript reference. Tree and root output is a skeleton, without a biological claim.
+
+## Batch 56 job 2: accumulated planar shadow textures
+
+Written from public descriptions and Margo's existing caster/receiver code only:
+- Heckbert and Herf, [Simulating Soft Shadows with Graphics Hardware](https://www.cs.cmu.edu/~ph/shadow.html), CMU-CS-97-104, 1997: project occluders onto a planar receiver from multiple light positions and combine their visibility.
+- Marschner, [Soft shadows](https://www.cs.cornell.edu/courses/cs569/2008sp/notes/09softshad-notes.pdf), 2008, pages 1-2: sum hard shadow textures, divide by the light count; a planar receiver and fixed-light sampling scope.
+- Cook, Porter and Carpenter, [Distributed Ray Tracing](https://www.cs.cmu.edu/~462/www/lectures/cook84.pdf), 1984: light-domain sampling and separation-dependent penumbrae.
+- Microsoft, [Direct3D 11.3 Functional Specification](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm), sections 3.4.1-3.4.2: raster coordinate snapping and top-left edge coverage for the independent Windows oracle.
+
+Margo chooses a base-2 radical-inverse radius, golden-angle azimuth, one sample each frame and exact
+bounded integer R16F sums divided once on the receiver. Equal visibility weights do not claim the
+full radiometric solution. No library, renderer or paper-linked implementation source was opened.
+All new geometry is generated stand-in test data; no third-party implementation or asset is added.

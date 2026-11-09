@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface ContactPrimitive extends CasterCutout {
     node: Mesh;
@@ -38,7 +38,7 @@ export interface ContactShadowOptions {
 
 export class ContactShadows implements EnginePlugin {
     readonly options: ContactShadowOptions;
-    readonly name = "contact-shadows";
+    readonly name: string;
     readonly stats: {
         updates: number;
         cacheHits: number;
@@ -53,6 +53,13 @@ export class ContactShadows implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    protected settings(): Settings;
+    protected changed(draws: readonly ContactPrimitive[], s: Settings): boolean;
+    protected projection(s: Settings): Float32Array;
+    protected update(c: ContactPassContext, draws: readonly ContactPrimitive[], s: Settings): GPUTextureView;
+    protected coverage(depth: string): string;
+    protected coverageScale(): number;
+    protected needsUpdate(s: Settings, changed: boolean): boolean;
 }
 
 export interface ContactSource {
@@ -95,4 +102,22 @@ type CasterDisplacement =
       readonly move?: readonly string[];
       readonly program?: { readonly next: number; readonly buffers: WeakMap<GPUDevice, { bytes: Uint8Array }> };
     };
+
+type ContactPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+interface Settings {
+    x: number;
+    ground: number;
+    z: number;
+    width: number;
+    depth: number;
+    height: number;
+    blur: number;
+    opacity: number;
+    color: readonly number[];
+    resolution: number;
+    cached: boolean;
+}
 ```

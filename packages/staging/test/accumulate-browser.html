@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Accumulated shadow GPU oracle</title>
+<style>body{margin:0}canvas{width:320px;height:240px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine, Geometry, PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {AccumulatedShadows} from '/packages/staging/dist/accumulate.js';
+import {ContactShadows} from '/packages/staging/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+import {createMesh,Material} from '/packages/materials/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+const engine = await Engine.create(document.querySelector('canvas'), {
+  backend:'webgpu',camera:{position:[0,4,5],target:[0,0,0]},clearColor:'#cccccc',
+});
+const errors=[];
+engine.onError=e=>errors.push(e.message);
+const watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+watch();
+const geometry = new Geometry([-0.5,0,-0.5,0.5,0,-0.5,-0.5,0,0.5,0.5,0,0.5],
+  [0,1,0,0,1,0,0,1,0,0,1,0],[0,2,1,1,2,3]);
+const model=engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({color:'#997755'}));
+const pbr=createMesh(engine,planeGeometry(1,1),new Material({color:'#997755'}));
+pbr.root.setRotation([-Math.PI/2,0,0]);pbr.root.visible=false;
+let effect,remove;
+const frame=()=>engine.render({delta:1/60});
+const pixels=async()=>{
+  const size=effect.options.resolution, texture=effect.history.textures[(effect.samples-1)&1];
+  const stride=Math.ceil(size*2/256)*256;
+  const buffer=engine.gpu.createBuffer({size:stride*size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const encoder=engine.gpu.createCommandEncoder();
+  encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:stride},[size,size]);
+  engine.gpu.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(GPUMapMode.READ);
+  const words=new Uint16Array(buffer.getMappedRange()),out=[];
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const h=words[y*stride/2+x];out.push(h===0?0:2**((h>>10)-15)*(1+(h&1023)/1024));
+  }
+  buffer.destroy();return out;
+};
+window.check={
+  async scene(height,frames=64,radius=2,usePBR=false){
+    effect?.dispose();
+    pbr.root.visible=usePBR;model.visible=!usePBR;
+    model.setPosition([0,height,0]);
+    pbr.root.setPosition([0,height,0]);
+    effect=AccumulatedShadows.attach(engine,{resolution:64,size:6,height:2,frames,lightRadius:radius,lightPosition:[1.2,8,-0.8],opacity:0.8});
+    remove=effect.add(usePBR?pbr:model);
+    engine.gpu.pushErrorScope('validation');
+    for(let i=0;i<frames;i++)frame();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    const error=await engine.gpu.popErrorScope();if(error)errors.push(error.message);
+    return {values:await pixels(),samples:effect.samples,errors};
+  },
+  async hold(){frame();await engine.gpu.queue.onSubmittedWorkDone();return {values:await pixels(),samples:effect.samples};},
+  async resize(){effect.options.resolution=32;frame();await engine.gpu.queue.onSubmittedWorkDone();return {samples:effect.samples,values:await pixels()};},
+  async remove(){remove();remove();frame();await engine.gpu.queue.onSubmittedWorkDone();return {samples:effect.samples,values:await pixels()};},
+  // fixed-wait: render all 1024 samples to test the exact maximum-frame sum, then await GPU completion.
+  async maximum(){effect.options.frames=1024;for(let i=0;i<1024;i++)frame();await engine.gpu.queue.onSubmittedWorkDone();return {samples:effect.samples,values:await pixels()};},
+  async restore(){const device=engine.gpu;device.destroy();await device.lost;await engineRuntime(engine).rebootDevice();watch();frame();await engine.gpu.queue.onSubmittedWorkDone();return {changed:engine.gpu!==device,samples:effect.samples,values:await pixels(),errors};},
+  async native(){
+    const canvas=document.createElement('canvas');document.body.append(canvas);
+    const fallback=await Engine.create(canvas,{backend:'webgl2',fallback:webglRenderer});
+    try{AccumulatedShadows.attach(fallback);return null;}
+    catch(e){return {code:e.code,message:e.message};}
+    finally{fallback.dispose();canvas.remove();}
+  },
+  owner(){
+    const scene=engine.createScene('accumulated-owner');
+    const child=new AccumulatedShadows({frames:1,resolution:16});
+    scene.use(child);child.dispose();child.dispose();
+    const result={empty:scene.plugins.size===0,detached:!engine.sceneOf(child),defaultAlive:engine.scene.plugins.get(effect.name)===effect};
+    scene.dispose();return result;
+  },
+  coexist(){
+    const contact=ContactShadows.attach(engine,{resolution:16});
+    try{frame();return {contact:contact.stats.updates,accumulated:effect.samples};}
+    finally{contact.dispose();}
+  },
+  dispose(){effect.dispose();effect.dispose();engine.dispose();return errors;},
+};
+window.ready=true;
+</script></body></html>

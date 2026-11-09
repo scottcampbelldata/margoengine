@@ -151,7 +151,7 @@ struct Draw {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? ',alphaUV0:
 // 80-byte casters: alpha cutout from TEXCOORD_0 or _1. The text keeps the shape the shared caster edits rewrite:
 // displacedDepth (shared/displacement.js), instancedDepth (shared/instances.js), opacityDepth, solidVertexDepth and
 // clippedDepth (shared/caster.js).
-const pbrOccluder = (transformed: boolean) => `${occluderBody(transformed)}
+const pbrOccluder = (transformed: boolean, coverage: string) => `${occluderBody(transformed)}
 @group(0) @binding(1) var mask:texture_2d<f32>;
 @group(0) @binding(2) var maskSampler:sampler;
 struct In {@location(0) position:vec4f,@location(3) uv:vec4f,@location(4) color:vec4f}
@@ -167,16 +167,16 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alp
 @fragment fn fragment(i:Out)->@location(0) vec4f {
  let coverage=textureSample(mask,maskSampler,i.uv).a*f.alpha.x*i.alpha;
  if (coverage<f.alpha.y) {discard;}
- return vec4f(1-i.clip.z,0,0,1);
+ return vec4f(${coverage},0,0,1);
 }`;
 
 // 24-byte core casters: position only.
-const coreOccluder = `${occluderBody()}
+const coreOccluder = (coverage: string) => `${occluderBody()}
 @vertex fn vertex(@location(0) position:vec3f)->@builtin(position) vec4f {
  return f.camera*f.model*vec4f(position,1);
 }
 @fragment fn fragment(@builtin(position) clip:vec4f)->@location(0) vec4f {
- return vec4f(1-clip.z,0,0,1);
+ return vec4f(${coverage},0,0,1);
 }`;
 
 // One axis of the separable Gaussian. axis.xy: uv step per unit offset, axis.z: filtered pairs per side,
@@ -211,7 +211,7 @@ struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
  return Varyings(plane.camera*vec4f(world,1),vec2f(t.x,1-t.y));
 }
 @fragment fn fragment(v:Varyings)->@location(0) vec4f {
- let a=clamp(textureSample(shade,bilinear,v.uv).r,0,1)*plane.tint.a;
+ let a=clamp(textureSample(shade,bilinear,v.uv).r*plane.extent.z,0,1)*plane.tint.a;
  return vec4f(plane.tint.rgb*a,a);
 }`;
 
@@ -254,7 +254,7 @@ function gaussianKernel(texels: number, axis: readonly [number, number], out: Fl
  * plane over whatever is already on the ground. No light direction and no shadow map. WebGPU only.
  */
 export class ContactShadows implements EnginePlugin {
-  readonly name = 'contact-shadows';
+  readonly name: string = 'contact-shadows';
   /** `updates`: frames that re-rendered the shadow texture; `cacheHits`: frames that reused it (`static`). */
   readonly stats = { updates: 0, cacheHits: 0 };
   private engine?: Engine;
@@ -271,6 +271,7 @@ export class ContactShadows implements EnginePlugin {
   private white?: GPUTexture;
   private whiteView?: GPUTextureView;
   private targets?: { size: number; textures: GPUTexture[]; views: GPUTextureView[] };
+  private lastShade?: GPUTextureView;
   private blurGroups?: GPUBindGroup[];
   private planeGroup?: { group: GPUBindGroup; view: GPUTextureView; pipeline: GPURenderPipeline };
   private kernels?: GPUBuffer[];
@@ -378,7 +379,7 @@ export class ContactShadows implements EnginePlugin {
 
   registerPasses(graph: FrameGraph): void {
     graph.add({
-      name: 'contact-shadows',
+      name: this.name,
       order: 0.5,
       execute: (c) => {
         if (c.backend === 'webgpu' && this.engine && !this.disposed) this.render(c);
@@ -397,7 +398,7 @@ export class ContactShadows implements EnginePlugin {
     this.disposed = true;
     this.entries.clear();
     this.release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
 
   declare [Symbol.dispose]: () => void;
@@ -412,7 +413,7 @@ export class ContactShadows implements EnginePlugin {
   }
 
   /** Validates the live options and fills in the defaults. */
-  private settings(): Settings {
+  protected settings(): Settings {
     const o = this.options;
     if (!o || typeof o !== 'object') throw optionError('pass an options object');
     const position = o.position === undefined ? [0, 0, 0] : triple(o.position, 'position');
@@ -539,7 +540,7 @@ export class ContactShadows implements EnginePlugin {
   }
 
   /** Whether the static texture is out of date for `draws` and `s`; records the new signature. */
-  private changed(draws: readonly ContactPrimitive[], s: Settings): boolean {
+  protected changed(draws: readonly ContactPrimitive[], s: Settings): boolean {
     const next = this.nextSignature;
     next.length = 0;
     next.push(s.x, s.ground, s.z, s.width, s.depth, s.height, s.blur, s.resolution, draws.length);
@@ -591,7 +592,7 @@ export class ContactShadows implements EnginePlugin {
       key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}|${p.displacement?.key ?? displaced}|${clipped}`;
     let pipeline = this.occluders.get(key);
     if (!pipeline) {
-      let code = stride === 24 ? coreOccluder : pbrOccluder(transformed);
+      let code = stride === 24 ? coreOccluder(this.coverage('clip.z')) : pbrOccluder(transformed, this.coverage('i.clip.z'));
       if (displaced) code = displacedDepth(code, 1, p.displacement);
       if (instanced) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
@@ -615,7 +616,7 @@ export class ContactShadows implements EnginePlugin {
   }
 
   /** Orthographic camera on the ground looking up: x -> clip x, z -> clip y, height above ground -> depth 0..1. */
-  private projection(s: Settings): Float32Array {
+  protected projection(s: Settings): Float32Array {
     const m = this.view;
     m.fill(0);
     m[0] = 2 / s.width;
@@ -629,7 +630,7 @@ export class ContactShadows implements EnginePlugin {
   }
 
   /** Renders the nearness texture of `draws` and blurs it; returns the view holding the result. */
-  private update(c: ContactPassContext, draws: readonly ContactPrimitive[], s: Settings): GPUTextureView {
+  protected update(c: ContactPassContext, draws: readonly ContactPrimitive[], s: Settings): GPUTextureView {
     const device = c.device,
       views = this.targets!.views,
       projection = this.projection(s);
@@ -734,11 +735,11 @@ export class ContactShadows implements EnginePlugin {
       views = this.ensureTargets(device, s.resolution).views;
     const draws = this.collect(engine),
       changed = this.changed(draws, s);
-    let shade = views[0];
-    if (this.dirty || !s.cached || changed) {
+    let shade = this.lastShade ?? views[0];
+    if (this.dirty || this.needsUpdate(s, changed)) {
       this.dirty = false;
       this.stats.updates++;
-      shade = this.update(c, draws, s);
+      shade = this.lastShade = this.update(c, draws, s);
     } else this.stats.cacheHits++;
     if (c.camera.position[1] <= s.ground) return;
     const depthFormat = c.descriptor.depthStencil?.format ?? 'depth32float',
@@ -777,6 +778,7 @@ export class ContactShadows implements EnginePlugin {
     p[22] = s.z - s.depth / 2;
     p[24] = s.width;
     p[25] = s.depth;
+    p[26] = this.coverageScale();
     device.queue.writeBuffer(this.planeUniform!, 0, p);
     const stencil = depthFormat.includes('stencil');
     const pass = c.encoder.beginRenderPass({
@@ -801,6 +803,22 @@ export class ContactShadows implements EnginePlugin {
   private releaseTargets(): void {
     for (const t of this.targets?.textures ?? []) t.destroy();
     this.targets = this.blurGroups = this.planeGroup = undefined;
+    this.lastShade = undefined;
+  }
+
+  /** Occluder coverage expression; optional receiver entries can accumulate binary visibility. */
+  protected coverage(depth: string): string {
+    return `1-${depth}`;
+  }
+
+  /** Scales stored coverage before clamping and tint; the contact texture is already normalised. */
+  protected coverageScale(): number {
+    return 1;
+  }
+
+  /** Whether a receiver needs a new texture; subclasses may converge progressively in world space. */
+  protected needsUpdate(s: Settings, changed: boolean): boolean {
+    return !s.cached || changed;
   }
 
   /** Destroys every buffer and texture and forgets cached pipelines (they belong to the old device). */

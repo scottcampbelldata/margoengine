@@ -51,7 +51,7 @@ Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
 only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
 
-Apache-2.0. Optional, tree-shakable package, about 6.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; measured sizes are in [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json). Core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.
 
@@ -95,3 +95,52 @@ on/off pixels using the licensed OpenEXR BrightRings image, checks the model rem
 the caster and replaces a real device. Run it with `--compat` for the WebGL2 compatibility layer;
 that path passes the same assertions. The native WebGL2 engine remains unsupported. The box is a
 generated stand-in, not a photographed product.
+
+## Accumulated soft shadows
+
+`@margoengine/staging/accumulate` samples a horizontal disk light once per rendered frame and averages
+its projected visibility on the ground. Contact edges stay sharp; raising geometry widens the penumbra.
+After `frames` samples, only the receiving plane draws. Camera motion keeps this world-space history.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {AccumulatedShadows} from 'margoengine/staging/accumulate';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 3, 5], target: [0, 0.5, 0]},
+});
+const product = engine.createMesh().setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({color: '#8090a0'})).setPosition([0, 0.5, 0]);
+const shadow = AccumulatedShadows.attach(engine, {
+  size: 6, height: 2, lightPosition: [1, 8, 1], lightRadius: 2, frames: 64,
+});
+shadow.add(product);
+engine.start();
+// shadow.samples counts the current history. Later: engine.dispose().
+```
+
+Options are copied on construction; edit `shadow.options` live afterward. Inherited `position`, `size`,
+`height`, `opacity`, `color` and `resolution` keep the contact receiver's defaults. Added defaults:
+`lightPosition: [0, 8, 0]` (world coordinates), `lightRadius: 2`, `frames: 64` (integer 1..1024),
+`blur: 0` and `static: false` (these last two values are required). Receiver dimensions are 1e-6..1e6,
+position and light components have magnitude at most 1e6, and radius is 0..1e6. The light's height above
+the receiver must exceed `height` after float32 rounding. Invalid live settings throw before rendering.
+
+Geometry/source/visibility/light/receiver changes restart accumulation. For in-place vertex or pose
+changes, call `shadow.invalidate()`. Continuously changing casters restart every frame and do not
+converge. GPU-only opacity/displacement/clipping changes retain the existing conservative invalidation.
+`fit(bounds)` keeps the inherited receiver fit; move the light above its resulting height when needed.
+`dispose()` / `using` releases all resources and detaches from the owning scene.
+
+Method: radical-inverse base-2 radius with golden-angle azimuth selects disk points. Each projection
+casts one binary shadow, unions overlapping casters with maximum blending, and sums it in ping-pong
+R16F textures. Integer sums through 1024 are exact; the receiving plane divides once by the sample count.
+Equal visibility weights do not integrate inverse-square falloff, cosine weights, HDR illumination or
+indirect light. Thin detail is limited by the receiver resolution and the hardware rasterizer's subpixel
+grid. The receiver remains Y-up; the light must be above the whole casting volume. No speed claim.
+
+WebGPU and the WebGL2 compatibility layer pass `test/accumulate-browser.mjs` (append `--compat` for the
+layer): exact projected sums at all 4096 texels for three heights, convergence, 1024 samples, empty scenes,
+an additional 4096-texel PBR caster case, resize, removal, actual device replacement, scene ownership
+and coexistence with ContactShadows. This Windows oracle includes Direct3D's
+specified eight-bit coordinate snapping; it is not an assertion of subpixel identity across other GPU
+backends. The geometry is a stand-in. Native WebGL2 throws coded `unsupported` with a help link.

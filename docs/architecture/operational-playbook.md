@@ -2368,3 +2368,24 @@ attenuation correction is used. The grazing test failed at radiance about 0.997 
 against a physical path value about 3.5.
 
 Batch 160 section 5 job 7 adds external constant-furnace IBL evidence for the full 123-primitive glTF scene, with Mitsuba direct/full transport references, unchanged display mapping and exact independent backend budgets. Raw/display hashes protect reference recapture; unit contracts cover ordering, finite radiance, source preservation and frozen counts/budgets. Native WebGL2 refuses the path; real compatibility renders it. Geometric IBL visibility/reflections and principled/glTF differences remain open. Constant radiance does not establish directional prefilter or nonuniform-sky accuracy; batch 168 evidence remains in force. No production renderer code changed.
+
+### Accumulated planar shadows: section 5 evidence (batch 56, job 2)
+
+staging/accumulate reuses the contact receiver, caster variants and lifecycle through protected projection,
+coverage, update and cache seams. One binary point-light projection and one ping-pong sum pass run per
+sample frame; converged frames draw only the receiver. R16F integer sums up to 1024 are divided once
+when composing. The constant-size matrix and bounded 11-bit disk sampler add no CPU geometry/image
+loop; GPU work holds visibility. Core and stage remain unchanged at 23,797 B gzip. The root receiver
+is 8,129 B, within its unchanged 8,259 B ceiling; the new entry is 9,314 B including the receiver, with
+the standard 9,593 B ceiling. No runtime speed was measured.
+
+Native WebGPU and the WebGL2 compatibility layer each match 16,384 exact stand-in texel sums,
+including Direct3D's specified subpixel snapping. Tests cover three heights, 1024-frame empty/opaque
+sums, a PBR caster, convergence, resize, removal, actual device replacement and native WebGL2 linked refusal.
+Ownership coverage found that ContactShadows.dispose removed by name from the default scene;
+it now removes its owning scene's registration by identity. CPU and actual-device owner regressions
+keep a same-name default-scene effect alive. This is single-machine raster evidence, not photographic
+quality, arbitrary-axis or full radiometric light integration evidence.
+
+The inherited receiver also registers its pass under the effect's own name, allowing contact and
+accumulated effects in one scene. CPU and real-GPU coexistence regressions cover both registrations.

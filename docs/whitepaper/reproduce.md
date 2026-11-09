@@ -890,3 +890,18 @@ device/context loss. All inputs are generated stand-ins (LIM-631).
 `node --test packages/procedural/test/loading.test.js` checks the shared loading failure and abort
 contract, including missing TEMP paths, malformed modules, simulated transport/CSP failures and exact
 caller cancellation reasons. Four cases fail without the owning loader correction.
+
+### Batch 56 job 2: accumulated shadows
+
+Build packages, then run `node --test --test-timeout=240000 packages/staging/test/*.test.js`.
+Run `node scripts/gpu-lock.mjs run --owner=codex-56 --max=10 --wait-max=40 -- node packages/staging/test/accumulate-browser.mjs`
+and append `--compat` for the WebGL2 compatibility layer. Both runs compare all texels against an
+independent ray-plane rectangle oracle on the Direct3D raster grid, test sharp contact and increasing
+penumbrae, exact maximum integer sums, stable completed history, empty scenes, resize/removal,
+actual device loss/replacement, linked native fallback refusal, scene-owned disposal, PBR casters and
+coexistence with the contact receiver.
+The first draft oracle omitted the mandated eight-bit vertex snapping and failed boundary sums;
+the corrected oracle retains exact equality at every texel and has independent snapping/tie regressions.
+The fallback fixture initially omitted its preview renderer, then imported it from the wrong entry;
+both setup errors were corrected before the successful complete runs. No failed step was ignored.
+No benchmark or physical-lighting comparison was performed.

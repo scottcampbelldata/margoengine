@@ -1,0 +1,78 @@
+{
+  "batch": 56,
+  "job": 2,
+  "test": "packages/staging/test/accumulate-browser.mjs",
+  "geometry": "Generated horizontal rectangle stand-in",
+  "runs": [
+    {
+      "backend": "WebGPU",
+      "exactTexels": 16384,
+      "heights": [
+        0,
+        0.25,
+        1.3
+      ],
+      "partialTexels": [
+        0,
+        65,
+        371
+      ],
+      "framesMax": 1024,
+      "checks": [
+        "all texels equal an independent ray-plane rectangle raster oracle",
+        "completed history stable",
+        "empty and opaque maximum-frame sums",
+        "resize and removal clear history",
+        "real device destruction and replacement",
+        "native WebGL2 linked unsupported",
+        "scene ownership and repeated disposal",
+        "PBR caster matches all 4096 oracle texels",
+        "contact and accumulated effects coexist"
+      ],
+      "passed": true
+    },
+    {
+      "backend": "WebGL2 compatibility",
+      "exactTexels": 16384,
+      "heights": [
+        0,
+        0.25,
+        1.3
+      ],
+      "partialTexels": [
+        0,
+        65,
+        371
+      ],
+      "framesMax": 1024,
+      "checks": [
+        "all texels equal an independent ray-plane rectangle raster oracle",
+        "completed history stable",
+        "empty and opaque maximum-frame sums",
+        "resize and removal clear history",
+        "real device destruction and replacement",
+        "native WebGL2 linked unsupported",
+        "scene ownership and repeated disposal",
+        "PBR caster matches all 4096 oracle texels",
+        "contact and accumulated effects coexist"
+      ],
+      "passed": true
+    }
+  ],
+  "oracle": "Direct3D 11.3 coordinate snapping (8 fractional bits) and top-left ties; no cross-hardware subpixel parity claim",
+  "sizes": {
+    "index": {
+      "raw": 22307,
+      "gzip": 8129
+    },
+    "accumulate": {
+      "raw": 26471,
+      "gzip": 9314
+    },
+    "coreStage": {
+      "raw": 58792,
+      "gzip": 23797
+    }
+  },
+  "scope": "Equal-weight disk-light visibility, not radiometric lighting or physical HDR shadows. No speed measurement."
+}

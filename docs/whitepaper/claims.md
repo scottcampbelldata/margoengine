@@ -1407,3 +1407,15 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 | --- | --- | --- |
 | Direct-only RGB-byte MAE 2.9175326029459634 / 2.9175211588541665 | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
 | Full-transport MAE 1.8851051330566406 / 1.8851038614908855 | Same result and contracts; GPU-locked environment.mjs | Mitsuba max depth 8, constant radiance, no sun, shared display transform. Geometric IBL occlusion/reflections and BSDF mismatch remain open; no path-tracing equivalence or nonuniform-sky claim. |
+
+## Batch 56 job 2: accumulated planar visibility
+
+The optional staging/accumulate entry samples one disk-light position per frame, sums binary
+projected visibility and divides once at the receiving plane. Native WebGPU and WebGL2 compatibility
+each match all 16,384 texel sums of an independent ray-plane rectangle oracle at heights 0, 0.25 and
+1.3, including a PBR caster case, with specified Direct3D coordinate snapping and top-left ties. Partial-coverage texels grow from
+0 to 65 to 371. Maximum 1024-sample empty and opaque sums, convergence, resize, removal, real
+device replacement, native fallback refusal, scene ownership and contact-effect coexistence pass. Evidence:
+[batch-56-accumulate.json](results/batch-56-accumulate.json), staging's accumulation unit/GPU tests.
+The geometry is a stand-in. Equal visibility weights establish penumbrae, not radiometric area/HDR
+lighting, photographed-product quality, other-device subpixel parity or measured speed.

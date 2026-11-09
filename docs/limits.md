@@ -1424,3 +1424,20 @@ Fixed seed 19 with influenceRadius 1.5: 218,405 complete distance tests versus 8
 identical 674-node skeleton. The count excludes grid lookup and bounding-box operations. Core plus
 stage remains 23,797 B gzip below its unchanged strict 25,000 B ceiling.
 Shared loading failures now have code failed, help and original cause; caller abort reasons and specific CSP/HTTP faults are preserved. Current Poisson JS 1,335 B and dungeon JS 1,277 B remain within their unchanged ceilings of 1,525 B and 1,479 B; all Wasm assets are unchanged.
+
+### Accumulated planar shadows (batch 56, job 2)
+
+The optional staging/accumulate entry averages equal-weight binary visibility from points on a
+horizontal disk. The Y-up receiver is finite; geometry outside its footprint or height is clipped.
+Light height above the plane must exceed the casting height after float32 rounding. Receiver sizes
+are 1e-6..1e6, world/light coordinate magnitudes at most 1e6, radius 0..1e6, frames integer 1..1024;
+blur must be 0 and static false. One sample per rendered frame, then held history; camera changes
+do not invalidate world-space shadows. In-place pose/vertex changes need invalidate(); constantly
+changing geometry cannot converge. Opacity/displacement/clipping GPU changes conservatively reset.
+
+No inverse-square or cosine weighting, HDR light sampling, indirect light, general receiver surface,
+or photographic-product quality claim. Raster resolution and hardware subpixel snapping bound thin
+detail. The exact GPU oracle is the Windows Direct3D eight-bit raster grid; other hardware can differ
+at subpixel boundaries. WebGPU and WebGL2 compatibility are tested; native WebGL2 refuses with
+linked unsupported. Generated geometry is a stand-in. Entry 9,314 B gzip (ceiling 9,593 B); inherited
+root 8,129 B (unchanged ceiling 8,259 B); core plus stage 23,797 B below 25,000 B. No speed claim.
