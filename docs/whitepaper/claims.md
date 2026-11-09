@@ -1207,3 +1207,10 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 | Claim | Evidence | Scope |
 | --- | --- | --- |
 | Default OIT is faster in the measured scene but loses picture accuracy | [Entry 109](perf-history.md), [raw rounds and errors](results/batch-168-oit.json), `packages/oit/test/oit-reference.test.js` | Five binary-colour coverage panes; MAE 1.567519 vs 0.048151, 2.000 vs 7.100 ms frame plus completion; busy machine, diagnostic; no physical dielectric or general quality parity |
+
+
+## Batch 168 sky reference
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Default Preetham has measured angular radiance error against external sunsky | [Entry 110](perf-history.md), [per-case result](results/batch-168-sky.json), `packages/sky/test/sunsky-reference.test.js` | Shipped WGSL, Mitsuba 3.9.1 scalar_rgb, 297 directions, per-sky zenith-Y normalization; MAE 1.439228; no absolute-unit, physical atmosphere or speed parity |

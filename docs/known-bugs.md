@@ -1317,3 +1317,12 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   nonzero single-layer error; it is not attributed to weighted depth approximation. Binary source channels in
   the published comparison bypass this confound without changing geometry or drawing less work. A linear
   composition/output contract across the owning optional packages is still needed; this remains open.
+
+
+- **Default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`, perf history 110):
+  297 directions across sun elevations 10/45/75 degrees and turbidity 2/3/6. Normalize each sky by its own
+  zenith Y. RGB MAE 1.439228, max 70.681783, per-case relative MAE 0.199319 to 0.765628 against Mitsuba
+  3.9.1 scalar_rgb Hosek-Wilkie sunsky with disk off and albedo 0. Cause: the default model is Preetham,
+  with Margo horizon/turbidity clamps and daylight-locus chromaticity adjustment, not the newer fitted
+  sunsky model. Absolute units are also not interchangeable. Repro under the shared GPU lock:
+  `node packages/sky/scripts/rival-bench.mjs`. The normalized model loss remains open.

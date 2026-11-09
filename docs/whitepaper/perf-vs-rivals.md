@@ -29,6 +29,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels | MAE 0.069543, relative 0.211475 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error |
 | `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
 | `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
+| `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -155,3 +156,18 @@ Busy machine, diagnostic, not isolated GPU pass costs. Weighted OIT approximates
 while depth peeling resolves these five layers; the quality loss stays open. Nonbinary colours introduce an
 additional display-domain blending limitation, which this binary-palette algorithm comparison does not cover.
 Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+
+
+The sky comparison evaluates the shipped Preetham WGSL directly on the GPU, before display mapping.
+Mitsuba 3.9.1 sunsky runs externally as scalar_rgb, ground albedo 0 and sun_scale 0. The sun is at
+10, 45 or 75 degrees elevation, turbidity 2, 3 or 6. Each of nine cases samples 33 directions:
+5, 15, 30 and 60 degrees at eight azimuths, plus zenith once (297 RGB samples total).
+Mitsuba's Z-up axes are mapped explicitly from Margo's Y-up axes. Every case divides each sky by its
+own zenith luminance: Margo's artistic luminance scale does not provide Mitsuba-compatible physical units.
+Thus this is an angular-radiance and colour comparison, not an absolute power calibration, hemisphere
+integral, display picture or measured atmosphere. Mean normalized RGB error 1.439228; relative MAE
+ranges from 0.199319 to 0.765628 by case. Largest channel error 70.681783 (sun 10 degrees, turbidity 6).
+Preetham and Hosek-Wilkie are different models; Margo also clamps turbidity/horizon and adjusts chromaticity.
+These differences explain the model loss, which remains open. No coefficients were copied or invented.
+[Per-case values](results/batch-168-sky.json). Rerun under the shared GPU lock:
+`node packages/sky/scripts/rival-bench.mjs`. No speed comparison is claimed.

@@ -1533,3 +1533,13 @@ Porter and Duff, "Compositing Digital Images" (1984), https://doi.org/10.1145/80
 Weighted-blending interpretation: McGuire and Bavoil (2013), https://jcgt.org/published/0002/02/09/.
 The public depth-peeling controls are documented at
 https://doc.babylonjs.com/typedoc/classes/babylon.depthpeelingrenderer . No refraction is claimed.
+
+
+### Batch 168 sunsky measurement
+
+The external Mitsuba 3.9.1 scalar_rgb environment is evaluated only through its public Python API,
+`load_dict`, `SurfaceInteraction3f.wi` and emitter `eval`. No library source or coefficient tables were read.
+Public model, axes, parameters and units: https://mitsuba.readthedocs.io/en/latest/src/generated/plugins_emitters.html#sun-and-sky-emitter-sunsky .
+Hosek and Wilkie (2012), "An Analytic Model for Full Spectral Sky-Dome Radiance", DOI
+https://doi.org/10.1145/2185520.2185591, identifies the rival model. The tested Margo shader remains
+Preetham, Shirley and Smits (1999), with the already documented Margo tuning. No coefficients are imported.

@@ -2549,6 +2549,17 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Reproduce:** `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
   Oracle tests: `node --test packages/oit/test/oit-reference.test.js`. Dependencies stay in engine-bench/batch-168.
 
+### 110. Preetham angular radiance against Mitsuba sunsky
+
+- **Measurement:** shipped Preetham WGSL, 9 sun/turbidity combinations, 33 directions each, versus external
+  Mitsuba 3.9.1 scalar_rgb sunsky. Sun disk off, ground albedo 0, axes explicitly mapped. Independent
+  zenith-luminance normalization per case because Margo has no shared absolute radiometric scale.
+- **Result:** loss. Normalized RGB MAE 1.439228, max 70.681783; per-case relative MAE 0.199319 to 0.765628.
+  [All cases](results/batch-168-sky.json). Different analytic models and Margo chromaticity/clamp tuning;
+  not a measured atmosphere or absolute-irradiance claim. Publishing does not close the loss. No speed row.
+- **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
+  External Mitsuba setup is in reproduce.md. Coordinate and metric oracle: `packages/sky/test/sunsky-reference.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

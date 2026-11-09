@@ -522,3 +522,16 @@ If absent, install with `npm install --prefix C:\Development\Projects\engine-ben
 `MARGO_ENGINE_BENCH` overrides the engine-bench parent. The rival stays external. Oracle:
 `node --test packages/oit/test/oit-reference.test.js`. Seven alternating rounds, per-round minimum;
 busy-machine frame-plus-completion timings, not GPU-only timings. [Raw result](results/batch-168-oit.json).
+
+
+### Batch 168 sky (perf history 110)
+
+Create an external Python 3.12 venv:
+`py -3.12 -m venv C:\Development\Projects\engine-bench\batch-168\mitsuba-venv`, then
+`C:\Development\Projects\engine-bench\batch-168\mitsuba-venv\Scripts\python.exe -m pip install mitsuba==3.9.1`.
+After building packages run
+`node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
+`MARGO_ENGINE_BENCH` overrides engine-bench; `MARGO_MITSUBA_PYTHON` overrides the interpreter.
+Inputs and outputs stay in external batch-168/data/sunsky. scalar_rgb needs no LLVM vectorization;
+this install reports an LLVM initialization warning but evaluates the scalar model successfully.
+No timing is measured. [Per-case result](results/batch-168-sky.json).

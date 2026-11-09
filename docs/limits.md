@@ -953,3 +953,11 @@ full-image MAE 1.567519, PSNR 35.388 dB, max byte miss 15. The external depth-pe
 MAE 0.048151. Binary source colours and a common output encoding isolate order approximation; general
 nonbinary display-domain material blending remains a separate open defect. Busy-machine frame-plus-completion
 2.000 versus 7.100 ms includes different completion mechanisms; no isolated pass-speed claim.
+
+
+## Batch 168 sky radiance reference
+
+The default Preetham sky does not match Mitsuba 3.9.1 sunsky (Hosek-Wilkie): zenith-Y-normalized RGB
+MAE 1.439228 over 297 directions, max 70.681783. Per-case relative MAE is 0.199319 to 0.765628.
+Sun elevations 10/45/75 degrees, turbidity 2/3/6, ground albedo 0, sun disk off. This is a sampled
+angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence. Loss open.

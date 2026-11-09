@@ -768,3 +768,13 @@ Build and unit tests: npm test --workspace @margoengine/sky
 
 GPU fog coverage and shader parity: node scripts/modern-sky-fog-tests.js
 
+
+
+## External radiance reference
+
+After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
+Install Mitsuba 3.9.1 in the external engine-bench/batch-168/mitsuba-venv; setup and overrides are in
+[reproduce](../../docs/whitepaper/reproduce.md). This evaluates the shipped Preetham WGSL against sunsky
+over 297 directions. Each sky is normalized by its own zenith luminance because their absolute units differ.
+Normalized RGB MAE is 1.439228; this remains an open model loss, not a physical radiance parity claim.
+[Per-case results](../../docs/whitepaper/results/batch-168-sky.json).

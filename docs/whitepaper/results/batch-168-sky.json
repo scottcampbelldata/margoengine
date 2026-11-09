@@ -1,0 +1,99 @@
+{
+  "version": "3.9.1",
+  "variant": "scalar_rgb",
+  "normalization": "each sky zenith luminance",
+  "rows": [
+    {
+      "elevation": 10,
+      "turbidity": 2,
+      "samples": 33,
+      "mae": 1.06198371657124,
+      "relative": 0.2348903986237593,
+      "max": 8.934742324846887,
+      "margoZenithY": 0.12288078321367502,
+      "mitsubaZenithY": 0.014422971620690075
+    },
+    {
+      "elevation": 10,
+      "turbidity": 3,
+      "samples": 33,
+      "mae": 2.8887148852795823,
+      "relative": 0.5763904283401535,
+      "max": 31.282632798101858,
+      "margoZenithY": 0.1414706019088626,
+      "mitsubaZenithY": 0.014995908759720622
+    },
+    {
+      "elevation": 10,
+      "turbidity": 6,
+      "samples": 33,
+      "mae": 4.209566871382467,
+      "relative": 0.7656275579174565,
+      "max": 70.6817830576387,
+      "margoZenithY": 0.190037402009964,
+      "mitsubaZenithY": 0.01864309076722711
+    },
+    {
+      "elevation": 45,
+      "turbidity": 2,
+      "samples": 33,
+      "mae": 0.6326493290278237,
+      "relative": 0.1993191284911343,
+      "max": 3.1086600429203095,
+      "margoZenithY": 0.22349043348431588,
+      "mitsubaZenithY": 0.02974252948090434
+    },
+    {
+      "elevation": 45,
+      "turbidity": 3,
+      "samples": 33,
+      "mae": 1.5637102402350318,
+      "relative": 0.5225290349540626,
+      "max": 6.2698170931211425,
+      "margoZenithY": 0.36603174481391904,
+      "mitsubaZenithY": 0.033997213200107214
+    },
+    {
+      "elevation": 45,
+      "turbidity": 6,
+      "samples": 33,
+      "mae": 1.5389487419493697,
+      "relative": 0.6250782222838898,
+      "max": 6.043180108261925,
+      "margoZenithY": 0.7446958123207092,
+      "mitsubaZenithY": 0.0536952164016664
+    },
+    {
+      "elevation": 75,
+      "turbidity": 2,
+      "samples": 33,
+      "mae": 0.4033139323256679,
+      "relative": 0.2441362601722163,
+      "max": 1.7004585469386297,
+      "margoZenithY": 0.42160828306078907,
+      "mitsubaZenithY": 0.055570394109934564
+    },
+    {
+      "elevation": 75,
+      "turbidity": 3,
+      "samples": 33,
+      "mae": 0.4710818524682667,
+      "relative": 0.4105174603187794,
+      "max": 1.8333638727115174,
+      "margoZenithY": 0.7892406146407127,
+      "mitsubaZenithY": 0.08384530858546495
+    },
+    {
+      "elevation": 75,
+      "turbidity": 6,
+      "samples": 33,
+      "mae": 0.18307805685301073,
+      "relative": 0.32434289419077517,
+      "max": 0.5478950152163844,
+      "margoZenithY": 1.6731072778701783,
+      "mitsubaZenithY": 0.2105531980007887
+    }
+  ],
+  "mae": 1.4392275140102735,
+  "max": 70.6817830576387
+}

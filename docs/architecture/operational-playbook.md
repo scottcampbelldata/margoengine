@@ -1758,3 +1758,11 @@ Background and single-layer error are zero. Default weighted blending has MAE 1.
 versus depth peeling 0.048151. A binary palette isolates ordering from material display encoding;
 the separate display-domain blending defect remains in known-bugs. No runtime/core/stage changes.
 Seven alternating frame-plus-completion rounds are diagnostic only, with the readback asymmetry documented.
+
+
+### Batch 168 sky: section 5 evidence
+
+The shipped Preetham WGSL is evaluated directly before the display transform and compared with external
+Mitsuba sunsky. Unit-direction, axis conversion, zenith normalization and error-metric tests accompany
+297 samples over nine cases. Normalized RGB MAE 1.439228 remains an open loss. Separate physical units,
+the sun disk and hemisphere integration are not covered. No rendering implementation/core/stage changes.
