@@ -31,6 +31,15 @@ Lifetime expiry compares the remaining interval before adding ages, preserving f
 times; the focused GPU recheck includes this case. The final flow and mobile demo rechecks and truthful
 paired size/network records pass without relaxed thresholds or replay/readback substitutions.
 
+After rebasing onto `b5822d106`, the complete sciviz matrix was repeated because main changed the compatibility
+backend. Base/bricks/entries/restoration and all 32 demo cases pass. The native drawing gate then encountered
+DXGI_ERROR_DEVICE_HUNG/REMOVED during fresh device creation. Windows confirmed nvlddmkm event 153 at
+2026-11-09T20:33:54.9468223Z; this establishes the reset, not which workload triggered it (existing bug 25).
+Following the repository's confirmed-reset procedure, one bounded rerun passes all eight strict native parity/
+context-loss/state cases. All 23 README examples pass on the rebased tree. The failed attempt, OS event and
+single rerun remain in `test-results/sciviz-fixes/moving-webgl.log`, `moving-confirmed-reset.json` and
+`moving-reset-closure.json`. No assertion, deadline, workload or GPU scheduling mode changes.
+
 ## Batch 160: separate browser shutdown prerequisite
 
 The Windows browser wrapper now closes all four owned stdio/CDP pipes after
