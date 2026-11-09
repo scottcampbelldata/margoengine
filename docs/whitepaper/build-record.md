@@ -3900,3 +3900,26 @@ The Slic3r sample exposed the proof harness's unplaced-bounds assumption. The in
 and regression repair that cause; no parser or tolerance changed. The README runner additionally passes real Brotli,
 PCX and the original FFmpeg example, shrinking the known list from 70 to 67. The six-package run passes 80/95,
 with 15 retained failures and zero fresh failures. Remaining source investigations and hardware boundaries stay open.
+
+## Batch 76: custom, mask and live transitions
+
+Optional transition entries use existing core scene/render APIs; core and stage are unchanged. Physics remains on hold.
+
+| Job | Result | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Custom WGSL shaders | DONE | 52b87b0a0 | transitions/custom; 402 generated-color GPU pixel checks at 1x/4x |
+| 2. Texture mask wipes | DONE | 0a1ba3e95 | transitions/mask; 1344 generated-mask GPU pixel checks at 1x/4x |
+| 3. Two live scenes | DONE | 836a92f41 | transitions/live; 374 current-scene GPU pixel checks at 1x/4x |
+| 4. Survive resize | SKIPPED | this commit (audit) | Already implemented in root capture; custom/mask GPU tests retain history and progress through odd-size resize |
+
+Separate root-cause repair 1823a741e fixes non-default-scene disposal in transitions: resolve the owner by plugin identity before removing its registration, preserving other scenes' same-named effects. scene-disposal.test.js fails against the previous code; gpu-browser.js renders both actual scenes after disposal. Core was not changed. Shared test-engine ownership lookup now models the real contract, and the package regression runs through check:merge.
+
+Job 1 validates the named WGSL function and fixed bindings before attachment, with AbortSignal cancellation. Restoration finishes unavailable frozen history. Job 2 snapshots ImageData or borrows an open ImageBitmap, with hard/soft red-channel thresholds and integer centre addressing through odd resizes. Draft addressing and bitmap usage errors were fixed without changing pixel tolerances. Job 3 renders two live scenes once each into RGBA8 images, then cross-fades them in an owned composite scene. Both source colors change at fixed progress. Resize and destroyed-device replacement retain progress; disposal, engine disposal and borrowed inputs are checked. Native WebGL2 is linked unsupported for all three optional entries.
+
+Job 4 audit searched all packages and read root capture allocation: during an active transition it retains the previous image while replacing size-dependent targets; elapsed/duration are unchanged. Existing custom and mask tests check exact progress plus every output pixel after resize at both sample counts. No duplicate optional entry was added. The live entry also proves resize continuity independently.
+
+Docs per job: (1) README, playbook, clean-room, claims LIM-625, limits, known-bugs, reproduce, API and GPU record results/batch-76-custom.json; (2) the same, LIM-627 and results/batch-76-mask.json; (3) the same, LIM-629 and results/batch-76-live.json; (4) this build record and list-2 completion, with existing README/limits/claims resize documentation retained. No speed was measured, so no performance comparison files changed.
+
+Final min+gzip entries: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B; each optional umbrella re-export 65 B. Budgets: root 4563 B, custom 5275 B, mask 5522 B, live 2757 B. The owner repair adds 7 B to the root; its documented budget restores 256 B headroom. Core plus stage remains 23797 B, below 25000 B. RGBA8 live cross-fade, nearest full-frame sampling, independent depths and one-device generated stand-in correctness are explicit limits; no HDR, artistic-quality, speed or rival-parity claim.
+
+Required lint, hygiene, full verify, transitions unit/GPU tests and executable README checks pass before each job push. API outputs accompany the live export. Rebase checks preserve both documentation sides and regenerate reports. Initial size-gate failure from the owner repair and draft GPU constant declaration errors were resolved before landing. No check, pixel tolerance or test budget was skipped or loosened.
