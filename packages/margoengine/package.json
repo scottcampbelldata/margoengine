@@ -2534,6 +2534,10 @@
       "types": "./dist/sciviz/flow.d.ts",
       "import": "./dist/sciviz/flow.js"
     },
+    "./sciviz/lic": {
+      "types": "./dist/sciviz/lic.d.ts",
+      "import": "./dist/sciviz/lic.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

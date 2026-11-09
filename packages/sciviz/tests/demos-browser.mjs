@@ -317,9 +317,12 @@ async function run(compat) {
           await page.check('#animate'); await settled(path);
           await input('phase', 1);
           assert.notEqual(await structure(path), gray, 'direction animation changes the convolution');
-          const before = await page.evaluate(async (path) => (await import(path)).layer.phase, path);
+          const before = await page.evaluate(async (path) => {
+            globalThis.licTestModule = await import(path);
+            return globalThis.licTestModule.layer.phase;
+          }, path);
           await page.click('#play');
-          await page.waitForFunction(async ({ path, before }) => (await import(path)).layer.phase !== before, { path, before });
+          await page.waitForFunction((before) => globalThis.licTestModule.layer.phase !== before, before);
           await page.click('#play');
           assert.equal(await page.locator('#play').textContent(), 'Play');
           await page.check('#colour'); await settled(path); await structure(path);
