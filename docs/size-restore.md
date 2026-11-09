@@ -131,6 +131,6 @@ eight browser). Lint and hygiene pass. One shared slot per worktree, wait-max
 rerun to obtain this evidence. Full verify has 13744 passing unit tests and two
 stale-record failures: the API size table and the network record paired with
 entry sizes. Regenerated both from the measured build; only those two failed
-test files were rerun, both pass (12 tests total). All other verify steps pass
+test files were rerun, both pass (9 tests total). All other verify steps pass
 and are retained. The network fixture makes five requests with no unused build
 files. API summary and paired size/network records are committed together.
