@@ -8971,6 +8971,15 @@ Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}
 
 Capture root-cause update from the coordinator: the red capture regression is owned by core lighting's uniform-only light-direction normalization under GPU load. The core repair waits for Scott's approval. The red regression and its package wiring stay off main; the exact-zero assertions remain unchanged.
 
+### Fixed: subset enumeration misclassified as a fixed frame wait
+
+The post-rebase fixed-wait scan flagged compose.html's 32 distinct feature
+subsets because it recognized list indexing but not bitmask input selection.
+The checker now traces the filter's outer counter and callback bit index to an
+assigned input passed to render. Its new regression fails before the repair;
+all ten tests pass afterward, including five negative forms. The actual browser
+fixture, case count, assertions and fixed-wait baseline are unchanged.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools

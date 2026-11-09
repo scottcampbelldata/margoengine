@@ -168,5 +168,112 @@
       "seconds": 3.225,
       "log": "test-results/56fix/stats-final-metadata.log"
     }
+  },
+  "integration": {
+    "base": "1aa76ee3863a1f6997fc0efdaf8f354ce62744b4",
+    "upstreamGate": "39fb88cf97a7f5d10aa809d91e72c4d532067339",
+    "note": "Rebase preserves upstream compute/test:gpu:owners and its regression. Removed the overlapping local manifest command; local guard pins the upstream rooted command and shared mode. Intermediate dispatch assertions remain strengthened. Stats/core source is unchanged by intervening main commits. Final affected checks recorded after completion.",
+    "checks": {
+      "stats-final-rebase-build": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 21.244,
+        "log": "test-results/56fix/stats-final-rebase-build.log"
+      },
+      "stats-rebased-api": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 11.533,
+        "log": "test-results/56fix/stats-rebased-api.log"
+      },
+      "stats-rebased-quality": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 24.106,
+        "log": "test-results/56fix/stats-rebased-quality.log"
+      },
+      "stats-rebased-lint": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 3.838,
+        "log": "test-results/56fix/stats-rebased-lint.log"
+      },
+      "stats-rebased-hygiene": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 12.269,
+        "log": "test-results/56fix/stats-rebased-hygiene.log"
+      },
+      "stats-rebased-affected": {
+        "code": 1,
+        "timedOut": false,
+        "seconds": 12.24,
+        "log": "test-results/56fix/stats-rebased-affected.log",
+        "note": "339 of 340 passed; sole fixed-wait subset classification failure repaired by 3599cc8a3. All ten tests in that file pass afterward, including the added regression and five negative forms. No second full verify claim."
+      },
+      "subset-wait-classification-guarded": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 0.635,
+        "log": "test-results/56fix/subset-wait-classification-guarded.log"
+      }
+    },
+    "inventory": {
+      "calls": 182,
+      "identity": 71,
+      "candidates": 107,
+      "stored": 1,
+      "core": 3,
+      "explicitClasses": 174,
+      "identityClasses": 61,
+      "activeShapedClasses": 84,
+      "inheritedCandidates": 23,
+      "structuralCandidates": 24,
+      "unresolvedBases": 35,
+      "namedSetupObjects": 18
+    },
+    "finalCpu": {
+      "stats-push-lint": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 4.039,
+        "log": "test-results/56fix/stats-push-lint.log"
+      },
+      "stats-push-hygiene": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 15.859,
+        "log": "test-results/56fix/stats-push-hygiene.log"
+      },
+      "stats-push-doclinks": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 2.049,
+        "log": "test-results/56fix/stats-push-doclinks.log"
+      },
+      "stats-push-readme-types": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.351,
+        "log": "test-results/56fix/stats-push-readme-types.log"
+      },
+      "stats-push-metadata": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 4.52,
+        "log": "test-results/56fix/stats-push-metadata.log"
+      }
+    },
+    "finalOwnerGpu": {
+      "state": "queued at checkpoint; no slot held by this lane",
+      "wrapperPid": 71388,
+      "lockPid": 110392,
+      "result": "test-results/56fix/owed-results-compute-owner-final-final-rebase.json",
+      "log": "test-results/56fix/owed-final-rebase-compute-owner-final.log",
+      "command": "npm.cmd run test:gpu:owners --workspace @margoengine/compute",
+      "maxMinutes": 0.5,
+      "waitMaxMinutes": 60,
+      "note": "Existing strengthened command passed before the alias consolidation. Collect this queued package-alias run before mutating its checkout or claiming fresh final GPU acceptance."
+    }
   }
 }

@@ -1,18 +1,18 @@
 # Batch 56 wider scene-owner audit
 
 Status: OPEN. Current syntactic snapshot includes the accepted stats repair
-and the current-main rebase onto 5ec86fe7c. This is a complete syntactic call inventory, not proof
+and the current-main rebase onto 1aa76ee38. This is a complete syntactic call inventory, not proof
 that every candidate is a bug or that every plugin has correct lifetime.
 
-The parser finds 181 actual removePlugin calls in package TypeScript sources:
+The parser finds 182 actual removePlugin calls in package TypeScript sources:
 71 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
-binding needs review, 3 are core scene-router implementation, and 106 require
+binding needs review, 3 are core scene-router implementation, and 107 require
 registration/receiver inspection. The old 187-line text scan included signatures
 and comments and came from older source. No calls or packages are silently
 waived by this recount. No core edit is proposed. Physics remains on hold.
 
-A second inventory finds 173 explicit EnginePlugin classes, all with dispose;
-61 contain sceneOf(this) in disposal and 83 contain an active-engine-shaped
+A second inventory finds 174 explicit EnginePlugin classes, all with dispose;
+61 contain sceneOf(this) in disposal and 84 contain an active-engine-shaped
 removal. These are syntactic categories, not exhaustive inheritance or dataflow
 proof. Missing detachment can exist without any removePlugin call, as ScenePass
 and RawShaders demonstrated. Existing schema does not statically encode scene
@@ -87,7 +87,7 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 | viewcube | 1 | [ViewCube](../../packages/viewcube/src/index.ts#L562) |
 | voxel | 2 | [VoxelStreamer](../../packages/voxel/src/stream.ts#L541), [VoxelRenderer](../../packages/voxel/src/render.ts#L1089) |
 | voxel-pathtracer | 1 | [VoxelPathTracer](../../packages/voxel-pathtracer/src/tracer.ts#L718) |
-| water | 1 | [Water](../../packages/water/src/index.ts#L1223) |
+| water | 2 | [Water](../../packages/water/src/index.ts#L1223), [FFTOcean](../../packages/water/src/fft.ts#L458) |
 | weather | 3 | [SurfaceHook](../../packages/weather/src/scene-patch.ts#L188), [Hail](../../packages/weather/src/hail.ts#L421), [WeatherDrive](../../packages/weather/src/drive.ts#L204) |
 | xr | 1 | [XR](../../packages/xr/src/index.ts#L487) |
 
@@ -97,6 +97,10 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 
 Stats continuation: all four classes are reproduced and repaired with eight real-engine cases and a class-wide source guard. Package plus guard passes 95 checks; complete GPU and all eight runtime README examples pass. The collected full verify has 17 gate failures; all failed suites and compute units pass 244 checks after the gate repairs. Other full verify steps pass; no second full-green run is claimed. See the [stats receipt](../whitepaper/results/batch-56-stats-owner-20261109.json).
 
-The expanded inheritance inventory identifies 23 locally resolved subclasses, 24 other setup-bearing classes, 34 unresolved bases (including unrelated non-plugins) and 18 named setup object expressions. These are additional syntactic candidates, not lifetime proof or a count of defects. Imported package bases, aliases, mixins and factory dataflow still require inspection. Lane-local owner-inheritance-inventory.json retains every candidate.
+The expanded inheritance inventory identifies 23 locally resolved subclasses, 24 other setup-bearing classes, 35 unresolved bases (including unrelated non-plugins) and 18 named setup object expressions. These are additional syntactic candidates, not lifetime proof or a count of defects. Imported package bases, aliases, mixins and factory dataflow still require inspection. Lane-local owner-inheritance-inventory.json retains every candidate.
 
 Save's stored scene removal is a proven bug: its factory attaches outside the target scene's setup scope. Three default controls pass and six secondary success/rollback cases fail before repair. The owning package fix is next; other owner groups remain unproved.
+
+The fresh rebase inventory adds the upstream FFTOcean active-shaped removal to
+the candidate list. Its registration/runtime ownership has not been accepted by
+this audit; no defect or waiver is inferred from the syntactic category.
