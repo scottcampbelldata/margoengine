@@ -23,6 +23,7 @@ async function runDispersion(compat) {
       failures = [],
       captures = [],
       focus = process.argv.find((arg) => arg.startsWith('--focus='))?.slice(8),
+      reportFile = `test-results/material-dispersion/${backend}${focus ? '-' + encodeURIComponent(focus) : ''}-gpu.json`,
       selected = (name) => !focus || name.includes(focus);
     page.on('pageerror', (error) => errors.push(error.message));
     await page.waitForFunction(() => window.dispersionFixture);
@@ -295,7 +296,7 @@ async function runDispersion(compat) {
     assert.deepEqual(await page.evaluate(() => window.dispersionFixture.errors), [], 'Unexpected GPU/engine errors');
     assert.ok(checks.length, 'The focus filter did not select a case');
     await writeFile(
-      `test-results/material-dispersion/${backend}-gpu.json`,
+      reportFile,
       JSON.stringify({ hardware: browser.hardware, checks, failures, captures }, null, 2) + '\n',
     );
     console.log(
@@ -306,7 +307,7 @@ async function runDispersion(compat) {
           checks: checks.length,
           captures: captures.length,
           failures,
-          report: `test-results/material-dispersion/${backend}-gpu.json`,
+          report: reportFile,
         },
         null,
         2,
