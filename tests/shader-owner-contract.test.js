@@ -1,29 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { parseSync } from 'rolldown/utils';
-
-function missing(source) {
-  const { program } = parseSync('owner.ts', source),
-    problems = [];
-  let checked = 0;
-  function visit(node) {
-    if (!node || typeof node !== 'object') return;
-    if (node.type === 'ClassDeclaration' && node.implements?.some((i) => i.expression?.name === 'EnginePlugin')) {
-      checked++;
-      const dispose = node.body.body.find((m) => m.key?.name === 'dispose');
-      const body = dispose && source.slice(dispose.start, dispose.end);
-      if (!body || !/\.sceneOf\(this\)/.test(body) || /\bengine\??\.removePlugin\(/.test(body))
-        problems.push(node.id.name);
-    }
-    for (const value of Object.values(node)) {
-      if (Array.isArray(value)) for (const child of value) visit(child);
-      else if (value && typeof value === 'object') visit(value);
-    }
-  }
-  visit(program);
-  return { checked, problems };
-}
+import { missing } from './support/plugin-owner-source.js';
 
 test('shader EnginePlugin cleanup removes actual scene ownership', () => {
   let checked = 0;

@@ -25,6 +25,7 @@ function rig(options = {}, weights = false, layers = 5) {
       lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) },
       stats: { drawCalls: 0 },
       removePlugin() {},
+      sceneOf: () => undefined,
     },
     terrain = new Terrain(terrainOptions(weights, layers)),
     deformation = new TerrainDeformation(terrain, options);
@@ -73,7 +74,10 @@ test('the lit shader is wrapped: the fragment shades the shifted ground, the lay
   const r = rig(),
     code = r.deformation.shader(r.lit, 1);
   assert.equal(code.split('@fragment fn fragment(i:Output)->@location(0) vec4f {').length, 2, 'one entry point');
-  assert.match(code, /@fragment fn fragment\(i:Output\)->@location\(0\) vec4f \{return terrainDeformInner\(terrainDeformShift\(i\)\);\}/);
+  assert.match(
+    code,
+    /@fragment fn fragment\(i:Output\)->@location\(0\) vec4f \{return terrainDeformInner\(terrainDeformShift\(i\)\);\}/,
+  );
   assert.match(code, /fn terrainDeformInner\(i:Output\)->vec4f \{/);
   assert.match(code, /return terrainColorUndeformed\(position,normal\)\*terrainDeformTint;/);
   assert.match(code, /@group\(1\) @binding\(99\) var<uniform> terrainDeform:TerrainDeformFrame;/);
@@ -84,17 +88,21 @@ test('the lit shader is wrapped: the fragment shades the shifted ground, the lay
   const painted = rig({ layers: [1, 0] }, true),
     paintedCode = painted.deformation.shader(painted.lit, 1);
   assert.match(paintedCode, /textureSampleLevel\(terrainWeights1,terrainSampler,uv,0\.0\)/);
-  assert.match(paintedCode, /soft\+=dot\(wv,terrainDeform\.softness\[1\]\);total\+=dot\(wv,terrainDeform\.layers\[1\]\);/);
+  assert.match(
+    paintedCode,
+    /soft\+=dot\(wv,terrainDeform\.softness\[1\]\);total\+=dot\(wv,terrainDeform\.layers\[1\]\);/,
+  );
 });
 
 test('the frame uniform holds the settings, per-layer softness and which layers exist', () => {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, removePlugin() {} },
+    engine = { gpu: gpu.device, removePlugin() {}, sceneOf: () => undefined },
     terrain = new Terrain(terrainOptions(true, 6)),
     deformation = new TerrainDeformation(terrain, { layers: [0, 0.5], softness: 0.75, rim: 0.5, depth: 0.2, steps: 8 });
   let frame;
   const log = gpu.record(() => deformation.setup(engine));
-  for (const bytes of writes(log)) if (bytes.length === 176) frame = new Float32Array(bytes.buffer, bytes.byteOffset, 44);
+  for (const bytes of writes(log))
+    if (bytes.length === 176) frame = new Float32Array(bytes.buffer, bytes.byteOffset, 44);
   assert.deepEqual([...frame.slice(2, 4)], [25.6, 1024].map(Math.fround));
   assert.deepEqual([...frame.slice(4, 8)], [40, 8, 0.25, 0.2].map(Math.fround));
   assert.deepEqual([...frame.slice(8, 10)], [0.1, 0.75].map(Math.fround), 'rim top and default softness');
@@ -126,7 +134,11 @@ test('frames: the first clears, a still frame without fade does nothing, a move 
   assert.deepEqual([...i2.slice(0, 4)], [-30, -32, -32, -32], 'new origin, previous origin');
   assert.equal(new Uint32Array(w2.buffer, w2.byteOffset, 12)[5], 0);
   const centre = writes(moved).find((b) => b.length === 8);
-  assert.deepEqual([...new Float32Array(centre.buffer.slice(centre.byteOffset, centre.byteOffset + 8))], [0.2, 0].map(Math.fround), 'the shader window centre follows');
+  assert.deepEqual(
+    [...new Float32Array(centre.buffer.slice(centre.byteOffset, centre.byteOffset + 8))],
+    [0.2, 0].map(Math.fround),
+    'the shader window centre follows',
+  );
   r.deformation.footprint(1, 2, { angle: Math.PI / 2, depth: 1 });
   r.deformation.track([0, 0], [3, 0]);
   assert.equal(r.deformation.pending, 2);
@@ -159,7 +171,11 @@ test('a long track is split into boxes no wider than a print box, fade runs ever
   const k = new Int32Array(stamps.buffer, stamps.byteOffset, stamps.length / 4);
   for (let i = 0; i < stamps.length / 64; i++) assert.ok(k[i * 16 + 14] <= 192 && k[i * 16 + 15] <= 192);
   const [window] = writes(log).filter((b) => b.length === 48);
-  assert.equal(new Float32Array(window.buffer, window.byteOffset, 12)[6], Math.fround((0.15 * 0.5) / 10), 'depth refilled');
+  assert.equal(
+    new Float32Array(window.buffer, window.byteOffset, 12)[6],
+    Math.fround((0.15 * 0.5) / 10),
+    'depth refilled',
+  );
   assert.equal(named(r.frame(), 'pass.dispatchWorkgroups').length, 2, 'fading frames age and resolve');
   r.deformation.clear();
   const cleared = r.frame(),

@@ -152,6 +152,57 @@ image order for both sums rather than change the established arithmetic or
 tolerance. Two regressions cover non-associative totals and missing/duplicate
 image identities. All 1,296 old payload/source controls and original aggregates
 then reproduce exactly. [Unaccepted evidence](whitepaper/results/batch-134-scalar-prototype.json).
+## Batch 56 remaining proof and owner audit (2026-11-09)
+
+Research comparison: David G. Clarke, John Potter and James Noble,
+Ownership Types for Flexible Alias Protection (1998),
+https://doi.org/10.1145/286936.286947, describes identity and access paths in an
+ownership graph. Chandrasekhar Boyapati, Barbara Liskov and Liuba Shrira,
+Ownership Types for Object Encapsulation (2003),
+https://doi.org/10.1145/604131.604156, permits module-local privileged access while
+preserving local ownership reasoning. Compared with Steve Freeman, Nat Pryce,
+Tim Mackinnon and Joe Walnes, Mock Roles, Not Objects (2004),
+https://jmock.org/oopsla2004.pdf, these support real-engine registration regressions
+and contract-complete GPU doubles rather than relying on a name in the active
+scene. This is our application of their descriptions, not a new ownership type
+system. Only papers and abstracts were consulted, never companion code.
+
+Kai Ninomiya, Brandon Jones and Jim Blandy (editors), WebGPU (2026),
+https://www.w3.org/TR/webgpu/#canvas-rendering, and its render-pass viewport and
+scissor rules distinguish a new canvas frame's initialization from subsequent
+surface drawing. The review56 fixture compared a full frame to a partial frame
+and supplied an invalid string view.clear; it now compares identical partial
+layouts with the documented clear object. Two negative controls remove only the
+actual surface pass's view state and must expose the original leak; the exact-zero
+outside-component bound remains. HDR proof initialization now assigns Camera.up
+through the existing mutable property; CameraOptions has no up option. A CPU
+regression executes the fixture's actual initialization and calls real Camera.update.
+No rendering algorithm, production camera, sample count or tolerance changes.
+
+The Painterly numerical GPU fixture likewise calls setup directly without
+registering a plugin. Its resource host now reports sceneOf as undefined instead
+of omitting the API. The separate real Engine/PostStack resize and replacement
+device checks remain intact, as do all numerical comparisons. The LUT README
+example stays first after rebase so its upstream executable regression continues
+to exercise the full identity LUT; the secondary-scene example follows it.
+
+The shader audit reproduces active-scene removal by ComputePass and retained
+registration in ScenePass and RawShaders. The local fix resolves the actual
+plugin owner by sceneOf, separates restoration from removal and frees its
+registration on explicit disposal. Core and stage are untouched.
+
+The same ownership comparison applies to four terrain lighting providers:
+TerrainMaterials, TerrainDisplacement, TerrainVirtualTexture and TerrainDeformation.
+Their public owner field stores an Engine, not a Scene. Disposal now asks that
+engine for sceneOf(this), rather than assuming the field name implies scene
+ownership. Real-engine regressions route public attach factories into a secondary
+scene, exercise restoration, direct disposal, owner removal, same-name isolation
+and replacement. Reverting just the four owner lookups in isolated built-module
+copies fails all four direct cases, with all four owner-removal controls passing.
+Current package tests pass 93/93. Numerical GPU hosts that directly call setup
+and register no plugin now return undefined from sceneOf. No terrain algorithm,
+map resolution, provider output or tolerance changes. The class source guard
+covers every EnginePlugin implementing TerrainLighting in verify/check:merge.
 
 The GPU mutex lookup repair's research comparison, reviewed scope and independent implementation are recorded
 in [gpu-mutex-target.md](quality/gpu-mutex-target.md): Bishop/Dilger 1996, Herlihy/Wing 1990 and Node/POSIX

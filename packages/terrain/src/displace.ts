@@ -382,7 +382,7 @@ export class TerrainDisplacement implements EnginePlugin, TerrainLighting {
     this.disposed = true;
     this.#remove?.();
     this.#remove = undefined;
-    this.owner?.removePlugin(this.name);
+    this.owner?.sceneOf(this)?.removePlugin(this.name);
     this.#release();
     this.#cache.clear();
     this.owner = undefined;

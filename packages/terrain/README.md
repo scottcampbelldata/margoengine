@@ -1,5 +1,12 @@
 # @margoengine/terrain
 
+`TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
+`TerrainDeformation` dispose their actual scene registration, preserving a
+same-name plugin in another scene. Device restoration keeps registration and
+one terrain-lighting provider; explicit disposal removes both. Their public
+`owner` field continues to identify the Engine, so use `engine.sceneOf(effect)`
+to inspect the scene. All existing options and examples below are unchanged.
+
 Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh

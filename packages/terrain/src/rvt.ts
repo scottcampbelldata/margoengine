@@ -669,7 +669,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     this.disposed = true;
     this.#remove?.();
     this.#remove = undefined;
-    this.owner?.removePlugin(this.name);
+    this.owner?.sceneOf(this)?.removePlugin(this.name);
     this.#release();
     this.#cacheCode.clear();
     this.#decals.clear();

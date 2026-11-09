@@ -13,7 +13,8 @@ test('a move bakes exactly the texels it exposes, once each, inside the target',
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32) * 22 - 11;
   for (let trial = 0; trial < 400; trial++) {
     const from = [Math.round(random()), Math.round(random())],
-      to = trial % 7 ? [from[0] + Math.round(random() / 2), from[1] + Math.round(random() / 2)] : [from[0] + 9, from[1]],
+      to =
+        trial % 7 ? [from[0] + Math.round(random() / 2), from[1] + Math.round(random() / 2)] : [from[0] + 9, from[1]],
       want = new Set();
     for (let x = to[0]; x < to[0] + n; x++)
       for (let z = to[1]; z < to[1] + n; z++) {
@@ -140,6 +141,7 @@ function rig(options) {
       lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) },
       stats: { drawCalls: 0 },
       removePlugin() {},
+      sceneOf: () => undefined,
     };
   const terrain = new Terrain(terrainOptions(() => ({}))),
     rvt = new TerrainVirtualTexture(terrain, options);
