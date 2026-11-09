@@ -5,6 +5,7 @@
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
 - Freeze = no new features; core bug fixes go in core (Scott, 2026-10-24). Fix a bug or unsafe API in core itself, with a test, within the size gate; never leave it because core is frozen. Details: `docs/conventions.md#core-freeze`.
 - Core is the last resort (Scott, 2026-10-31): change `@margoengine/core` only when no package can hold the change AND it fixes a bug or flaw that will cause an engine failure. Looks, quality, options and features go in packages. A core change states in its commit why no package can hold it and which failure it prevents; ask Scott first.
+- Zero-byte additions (Scott, 2026-11-10): a feature may go into core or the stage facade, freeze or not, when it adds 0 bytes to the core + stage root gzip (`npm run measure:size` unchanged), for example a lazy `import()` swap inside an existing feature entry. The commit states the measured before and after figures.
 - Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`; the `./cad` entry was removed on Scott's go, 2026-10-29), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
 - Exception (Scott, 2026-10-29, "do the core add i agree"): core gains ONE option, `EngineOptions.powerPreference` ('low-power' | 'high-performance'), passed to `requestAdapter` at creation and on device restore; unset keeps the old behaviour. The freeze applies again after this change.
 - The combined core + stage gzip size must stay below **25,000 bytes** (Scott, 2026-11-05). The build fails at 25,000 or above; `npm run measure:size` prints the figure. Anything below that is allowed.
@@ -63,6 +64,12 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
 - Every public feature ships with a short copy-paste example in its README that runs as written (the package test
   type-checks them).
 - When you see a place where Margo is harder to use than the tools people come from, fix it or list it in `docs/known-bugs.md`.
+- No partial packages (Scott, 2026-11-10): every package must at least match the best packages available today,
+  combining the features of all of them, and be better where possible. The rivals are web 3D engines and web
+  libraries (three.js and its ecosystem, Babylon.js, PlayCanvas, the best specialised web library); Godot, Unity,
+  Unreal and Blender are export targets only, never the bar. A feature that only partly does what the best
+  rival does is a gap to build, never a SKIPPED job; a skip needs the full match proven against the job text and the
+  rivals. Physics stays on hold until Scott resumes it.
 
 ## No boundary-representation kernel or paid packages in this repository
 
