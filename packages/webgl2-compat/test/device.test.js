@@ -4,7 +4,7 @@
 // per adapter, and requests the adapter cannot meet refused.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COMPAT_LIMITS } from '../dist/index.js';
+import { COMPAT_LIMITS, webgl2Capabilities } from '../dist/index.js';
 import { COMPAT_VENDOR, CompatCanvasContext, createCompatGPU, isCompatDevice } from '../dist/device.js';
 
 /** A stand-in context: just what webgl2Capabilities reads. */
@@ -295,6 +295,7 @@ test('install keeps native WebGPU with a coded warning and forcing installs the 
     assert.equal(warnings.length, 1);
     assert.equal(warnings[0].name, 'MargoError');
     assert.equal(warnings[0].code, 'state');
+    assert.match(warnings[0].message, /WebGPU kept/);
     assert.match(warnings[0].message, /force: true/);
     assert.match(warnings[0].message, /backend 'webgpu'/);
     assert.match(warnings[0].message, /https:\/\/margoengine.com\/errors#compatibility-layer/);
@@ -308,5 +309,56 @@ test('install keeps native WebGPU with a coded warning and forcing installs the 
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else delete globalThis[name];
     }
+  }
+});
+
+test('compact installer diagnostics retain unavailable APIs, missing capabilities and coded help', async () => {
+  const { installCompat, uninstallCompat } = await import('../dist/device.js');
+  const saved = ['navigator', 'OffscreenCanvas'].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  const set = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true });
+  try {
+    set('navigator', undefined);
+    await assert.rejects(installCompat(), (error) => error instanceof TypeError && /navigator/.test(error.message));
+    set('navigator', {});
+    set(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return null;
+        }
+      },
+    );
+    await assert.rejects(installCompat(), (error) => {
+      assert.equal(error.code, 'unsupported');
+      assert.match(error.message, /WebGPU/);
+      assert.match(error.message, /WebGL2/);
+      assert.match(error.message, /https:\/\/margoengine.com\/errors#compatibility-layer/);
+      return true;
+    });
+    const missing = webgl2Capabilities(fakeContext({ extensions: [] })).missing;
+    assert.ok(missing.length > 0);
+    set(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return fakeContext({ extensions: [] });
+        }
+      },
+    );
+    await assert.rejects(installCompat(), (error) => {
+      assert.equal(error.code, 'unsupported');
+      for (const capability of missing) assert.ok(error.message.includes(capability), capability);
+      assert.match(error.message, /https:\/\/margoengine.com\/errors#compatibility-layer/);
+      return true;
+    });
+    assert.equal(uninstallCompat(), false, 'preflight refusals install nothing');
+  } finally {
+    uninstallCompat();
+    for (const [name, own] of saved)
+      if (own) Object.defineProperty(globalThis, name, own);
+      else delete globalThis[name];
   }
 });

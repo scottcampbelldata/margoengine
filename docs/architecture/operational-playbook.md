@@ -1778,16 +1778,20 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
-Preview/compat continuation: the interrupted compatibility run preserved 22
-completed suites and three real failures, with its environment mirror unfinished.
+Preview/compat continuation: the first interrupted compatibility run preserved 22
+completed suites. The later run preserved 37 results before its process ended;
+the restart confirmed it was gone and ran only the remaining 54, never a duplicate.
 The repairs add inferred module-private WGSL types and give temporal DOF
 independent half-image/tile kernels. Each has a regression that fails on its previous implementation. The
 DOF comparison fixture explicitly chooses native startup before installing the
 full layer, so a forced-compatibility outer runner cannot corrupt its baseline.
 The culling discrepancy persists when dithering is disabled, so that speculative
-change was removed. DOF passes its compatibility lens bounds; culling and the
-unfinished compatibility suites remain pending. Prior completed suites are
-preserved. Research: `docs/whitepaper/compat-continuation-research.md`.
+change was removed. DOF passes its compatibility lens bounds. The complete
+115-suite correctness selection has 89 passes and 26 failures, including culling.
+The coordinator transferred those parity and forced-baseline failures to batch
+273; known-bugs.md retains their repros and causes or remaining attribution gaps.
+Prior completed suites are preserved. Research:
+`docs/whitepaper/compat-continuation-research.md`.
 No teardown work is included. Timing checks remain deferred, with the LOD
 correction recorded below.
 
@@ -3702,3 +3706,32 @@ The added Gemini cases 21, 22, 26, 29, 30, 31 and 33 are explicit attachment/esc
 Preview continuation research review: [module boundaries, conservative setup and graphics standards](../whitepaper/preview-contract-research.md). The 2026-11-10 restart keeps teardown with lane-T and defers timing suites; it does not relax correctness assertions.
 
 The required README gate exposed a video example awaiting gesture-gated AudioContext.resume during module setup. The example now starts from a Record button; packages/video/test/readme-record.test.js executes the exact snippet with held audio permission and checks initialization, activation and cleanup. The old snippet fails its state assertion. Recorder code, browser teardown and gate deadlines are unchanged. See the [recording example research review](../whitepaper/recording-example-research.md).
+
+
+Preview integration size gate: the unchanged optional compatibility ceilings
+rejected root/device entries at 102,906/103,008 B. Concise installer diagnostics
+retain the same code, help link, unavailable API names and all missing capabilities;
+rebuilt entries are 102,799/102,914 B, below 102,814/102,935 B. The installer
+control flow is unchanged. All 144 compatibility unit tests pass, including
+preflight refusal and retained-native warning contracts. This is a byte proof,
+not a timing claim; research is in compat-continuation-research.md.
+
+
+Preview landing evidence: the fresh canonical compatibility GPU command passes
+with its real native oracles and compatibility draws (314.1 s); the forced-shim
+failure remains separately indexed for batch 273. The updated LOD default browser
+check passes, and all 30 DOF/LOD/compatibility README programs execute with zero
+failures. The same default cutout-caster command covers the clustered, materials
+and shadows aliases: it passes once on each backend, shared, without --cost.
+Those three correctness aliases are additional to the 115-suite continuation
+count above; their cost path stays deferred. Native 118/118 prior package gates
+remain preserved. The 26 other parity/fixture/cleanup failures remain open.
+
+The integration verify exposed stale generated entry-size inputs in api-surface;
+regenerating entries also exposed the coupled network record's older commit in
+sizes-page.test.js. Both real measurements were regenerated, preserving the
+unchanged assertions: the basic scene fetches five files, 36,353 transferred
+bytes, and no unused built file. Its gate retains the real renderer and network
+assertions; a lane-local acquisition wrapper only tightens its shared GPU hold
+to one minute. API reports retain 887 entries and 8,638 exports. No exports,
+core/stage source, benchmark scene, error tolerance or size ceiling changed.

@@ -246,15 +246,23 @@ compatibility command reuse that corrected default check.
 ## Preview contract continuation, 2026-11-10 restart
 
 Scott forbids speed and timing tests during this continuation. No new timing
-result is claimed and no threshold is changed. The following planned GPU scripts
-contain timing assertions and remain unrun in this restart:
+result is claimed and no threshold is changed. Before the mainline speed split,
+the restart deferred these mixed GPU commands:
 
 - clustered/test:gpu
 - materials/test:gpu:cutout-casters
 - shadows/test:gpu:cutout-casters
 
-All three call packages/shadows/test/cutout-casters-browser.mjs. Their existing
-budgets and assertions remain intact. The quiet speed phase must run them on
-native WebGPU and full WebGL2 compatibility after Scott ends the restriction.
-Correctness GPU suites use the shared phase and shared lock. This entry records
-deferred checks, not a performance improvement or an accepted regression.
+All three call packages/shadows/test/cutout-casters-browser.mjs. Mainline now
+separates its optional `--cost` measurement from the default correctness route.
+Their default pixel checks can run shared during the build phase; the original
+cost workload remains deferred until Scott ends the restriction. This entry
+records the earlier boundary, not a performance improvement or an accepted
+regression. All other named speed budgets above remain in force.
+
+
+Preview landing follow-up: the default cutout-caster command now passes on native
+WebGPU and full compatibility, once per backend for all three identical package
+aliases above. Only the optional --cost route remains deferred. The LOD default
+browser check also passes with its original pixel/visibility assertions and no
+measurement clock. No timing result is claimed.

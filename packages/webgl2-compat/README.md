@@ -18,7 +18,7 @@ and examples below.
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer refuses the layer (MargoError `unsupported`); XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
+**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). Path-tracer route limits are documented in its package README; XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -51,6 +51,11 @@ a linked `MargoError` code `state`, explaining the choice) unless you pass
 `unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
 back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end
 load inside `install()`.
+
+Installer diagnostics keep the error code, help link and every missing capability
+name concise enough to fit the existing entry size ceilings. A full-tier probe
+checks capabilities; package parity failures remain tracked in
+[known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
 
 What it does:
 

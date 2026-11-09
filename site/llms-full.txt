@@ -2938,9 +2938,9 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | TAA reactive mask (`reactive` in `@margoengine/taa`, 2026-11-08) | By method: the caller draws the mask; particles, splats and blended glTF do not write it themselves. A reactive pixel shows that frame's own jittered sample, so it aliases until history builds again; the mask is read by nearest texel; history alpha holds the mask, so `taa.velocity.resolved` alpha is the mask, not 1; GPU cost not measured (LIM-515). | The effect packages each draw differently, and a mask is the one contract all of them can meet. | Edges of reactive effects shimmer a little more than opaque ones. | Keep mask values below 1 (0.5 to 0.8) where a soft trail is acceptable and less aliasing is wanted. |
 | TAA history rejection (`rejection: 'variance'`, `locks` in `@margoengine/taa`, 2026-11-08) | By method: variance clipping uses the same nine samples as the min/max box and only narrows it, so a neighbourhood split evenly between two colours keeps as wide a box (and as much ghost) as the clamp; a lock trusts history fully for eight frames, so a transparent effect without a reactive mask that crosses a locked thin feature ghosts there, and a thin feature that really disappears lingers up to eight frames at 0.9 decay; thin detection looks only along x and y, so a diagonal one-pixel line is not locked; GPU cost not measured (LIM-523). | The resolve keeps one pass and four extra loads; locks need one r32float pair. | Fewer ghosts next to bright specks; thin lines that stay visible. | Draw transparent effects into `reactive`, which drops locks. |
 | TAA sharpen (`Sharpen` in `@margoengine/taa/sharpen`, 2026-11-08) | By method: an unsharp mask on the four neighbours whose weight is at most -0.2 at `amount` 1 and falls with the pixel's headroom to black and white, clamped to the 5-tap range, so it never adds a halo or clips but cannot raise a feature above its brightest neighbour; it sharpens only the frame shown, never the history; GPU cost not measured (LIM-525). | The history must stay unsharpened, or each frame would sharpen the last one's sharpening. | Mild by design: at full strength the spread of soft 8 px stripes grows about 1%; dark and bright regions are left almost alone. | `TAAUpscale` keeps its own `sharpen` option, the same function. |
-| DOF on the WebGL2 layer (lens and autofocus, `@margoengine/dof` with `@margoengine/webgl2-compat`, 2026-11-08) | Measured (M6 Mac mini, Metal, Chromium): eight lens cases within the layer's parity rule, 0.02% to 0.09% of pixels more than 2 levels from native WebGPU, mean at most 0.018, the same bokeh extent within 1 px; a one-sample capture and the scene before the blur are byte for byte native. By method: the layer reads a multisampled depth as one sample, so the WebGL2 route's CoC takes the nearest depth of each pixel and its four neighbours, which puts silhouettes back on their object but cannot rebuild the four samples, so edge pixels of a blur differ; temporal DOF is WebGPU only (LIM-541). | WebGL2 cannot read one sample of a multisampled texture. | Up to about 0.1% of a blurred frame's pixels, along silhouettes, differ from WebGPU. | WebGPU, or a one-sample capture (`exactSize`), which matches it exactly. |
+| DOF on the WebGL2 layer (lens and autofocus, `@margoengine/dof` with `@margoengine/webgl2-compat`, 2026-11-08) | Measured (M6 Mac mini, Metal, Chromium): eight lens cases within the layer's parity rule, 0.02% to 0.09% of pixels more than 2 levels from native WebGPU, mean at most 0.018, the same bokeh extent within 1 px; a one-sample capture and the scene before the blur are byte for byte native. By method: the layer reads a multisampled depth as one sample, so the WebGL2 route's CoC takes the nearest depth of each pixel and its four neighbours, which puts silhouettes back on their object but cannot rebuild the four samples, so edge pixels of a blur differ; temporal DOF also runs through independent half-image and tile passes on the full layer (LIM-541). | WebGL2 cannot read one sample of a multisampled texture. | Up to about 0.1% of a blurred frame's pixels, along silhouettes, differ from WebGPU. | WebGPU, or a one-sample capture (`exactSize`), which matches it exactly. |
 | Cat's eye and anamorphic bokeh (`catEye`, `anamorphic` of `DOFLens` in `@margoengine/dof/lens`, 2026-11-08) | Enforced: `catEye` 0 to 1.5 bokeh radii, `anamorphic` 1 to 4. By method: the barrel circle has the bokeh's own radius and moves linearly with the pixel's place in the frame (a first-order model of mechanical vignetting, no exit-pupil geometry of a real lens); a bokeh takes the shape at the pixel it lands on, not at its source; the oval is vertical only; not with an `aperture` image; GPU cost not measured (LIM-538). | Real vignetting depends on each lens's barrel and pupil positions, which a scene does not know. | Corner bokeh lean and narrow like a real fast lens's, without matching a given lens. | Use an `aperture` image for one fixed shape. |
-| Temporal DOF (`temporal` of `@margoengine/dof`, 2026-11-08) | By method: the gather runs on a 2x2-averaged scene with the nearest of each block's four depths, so a silhouette inside a blur moves by up to a full-resolution pixel, and a half-resolution near disk is joined back bilinearly; on a real GPU (M6 Mac mini, Metal) the frame stays within 0.27 sRGB levels of the full gather on average, with or without TAA, and in-focus pixels are the scene byte for byte. The smoothing TAA brings is not measured beyond that, nor is the GPU time; an aperture image's far taps do not turn; WebGPU only (LIM-537). | Half the resolution is where the saving comes from; the turn only helps when something averages frames. | Without TAA a faint shimmer in large far disks. | Leave `temporal` off for still renders or without TAA. |
+| Temporal DOF (`temporal` of `@margoengine/dof`, 2026-11-08) | By method: the gather runs on a 2x2-averaged scene with the nearest of each block's four depths, so a silhouette inside a blur moves by up to a full-resolution pixel, and a half-resolution near disk is joined back bilinearly; on a real GPU (M6 Mac mini, Metal) the frame stays within 0.27 sRGB levels of the full gather on average, with or without TAA, and in-focus pixels are the scene byte for byte. The smoothing TAA brings is not measured beyond that, nor is the GPU time; an aperture image's far taps do not turn; native WebGPU and the full compatibility layer are supported (LIM-537). | Half the resolution is where the saving comes from; the turn only helps when something averages frames. | Without TAA a faint shimmer in large far disks. | Leave `temporal` off for still renders or without TAA. |
 | DOF focal length from the camera (`filmGauge` of `@margoengine/dof`, 2026-11-08) | Enforced: `filmGauge` above 0 mm; `focalDistance` beyond the focal length the camera gives, checked each frame. By method: the focal length is in metres, for a metre-based scene; with an orthographic camera it still comes from `camera.fov` (LIM-536). | A sensor size in millimetres needs a unit for the scene, and glTF's is the metre. | In a scene in other units the blur is that of a lens scaled by the unit. | Set `focalLength` yourself in the scene's units. |
 | Custom bokeh shapes (`aperture` of `DOFLens` in `@margoengine/dof/lens`, 2026-11-08) | By method: the image is baked into the kernels when the effect attaches, as a 32 x 32 transmission mask over its inscribed circle (luminance times alpha, softened by about one cell at its edges) and 16, 32 and 64 far-gather taps spread over the shape; finer detail than a cell, about 1/16 of the bokeh's diameter, is lost; near and far bokeh show the image the same way up, where a real lens flips one of them; not with `blades`; GPU cost not measured (LIM-535). | The gather reads a fixed number of taps per pixel, so the shape is as fine as its taps and mask. | A heart or star bokeh from any image; a large disk shows the tap pattern a little more than the round one, as the taps cover only the open part. | Draw the shape larger (a lower f-number) for more detail per tap. |
 | TAA in stereo and XR (`@margoengine/taa` with `@margoengine/xr`, 2026-11-08) | By method: each eye is an engine view with its own TAA history, jitter cycle and captures at the eye's size; no multiview (one pass into a texture array), as the engine has none; the proof uses stereo views drawn as `EyeViews` draws them, not a headset; GPU cost not measured (LIM-531). | The engine draws XR eyes as separate views, and history must not cross eyes. | Each eye pays a full TAA resolve and holds its own history (two rgba16float and two r32float textures per eye). | None: per-eye cost is the price of per-eye history. |
@@ -4809,11 +4809,14 @@ Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repa
 piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
 and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
 
-### Open: preview continuation full-layer validation
+
+### Open: full-layer validation transferred to parity batch 273
 
 Run the following package GPU scripts after building, with `MARGO_COMPAT=1` and
 one shared GPU slot. These are open gate failures, not accepted differences or
-passing results. The completed native evidence remains separate.
+passing results. The completed native evidence remains separate. The coordinator
+assigned these compatibility failures to parity batch 273; the preview lane
+finishes its own attachment, translator and DOF repairs without chasing them.
 
 - `culling/test:gpu`: `dynamic-check.mjs` reports 3 to 7 shadowed instance/core
   pixels differing by one channel level after moving boxes. The exact assertion
@@ -4854,8 +4857,53 @@ passing results. The completed native evidence remains separate.
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
   rasterization/orientation divergences still need numeric root-cause proof.
 
-The serial continuation is still collecting the other suites. Additional
-failures must be diagnosed and tracked before this work can be pushed as gated.
+- `react/test:browser`: `test-scene-browser.js:115` rejects the XR preparation
+  snapshot because neither `xrReady` nor an error containing `WebXR is unavailable`
+  is present. This is the full compatibility run, not the small preview.
+  Investigate the fixture's native-WebGPU XR assumptions and the actual
+  compatibility preparation error before changing its assertion or route.
+
+The serial continuation preserves each completed result and resumes only
+unfinished suites. Additional full-layer failures are evidence for batch 273,
+not passing results or permission to weaken a gate.
+
+The bounded continuation is now complete: 89 of 115 selected correctness suites
+pass, combining the preserved 22, repaired clustered lighting, and 66 later
+passes. The following additional failures remain with batch 273:
+
+- `scatter/test:browser:shadow-cull`: the fixture reads `.commands` from an
+  undefined native command record in `shadow-cull.html:81`. Inspect the fixture's
+  native instrumentation assumptions against compatibility command recording.
+- `scenery/test:gpu`: the noon scene reads black ground, then compares zero to
+  zero and reports `noon ground NaN of noon on screen`. Trace the presented scene
+  and capture readiness; the lighting preset checks before it pass.
+- `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
+  prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
+  The awaited operation after that marker remains unisolated.
+- `shader/test:gpu`: noise and earlier readback cases pass; the validation case
+  lacks the expected `failed` error. Its assertion's undefined message masks the
+  mismatch with `ERR_INVALID_ARG_TYPE` at `readback-check.mjs:67`.
+- `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
+  4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
+  those timing values are not accepted evidence during the build phase.
+- `splats/test:gpu`: all GPU checks print success, then the command does not exit
+  before its 62 s body bound. This is not a passing suite. Cleanup remains with
+  the dedicated teardown owner; no teardown repair is attempted in this lane.
+- `terrain/test:gpu`: its native/compatibility comparison receives vendor
+  `margo-webgl2` for the native baseline under the outer `MARGO_COMPAT=1` shim.
+  `webgl2-compat/test:gpu` similarly fails its plain-device full-level assertion.
+  Their dual-backend fixtures need native baselines independent of the outer
+  forced-backend runner; these failures do not establish a rendering difference.
+- `voxel/test:gpu`, `test:gpu:slow-compile` and `test:gpu:slow-mesh`: the bevel
+  fixture needs 2,048 texture array layers on an adapter advertising 256. Review
+  the fixture/device request and hardware route without dropping texture work.
+- `root/modern:test:xr:browser`: XR refuses the full layer until `installXR()`
+  supplies its route; the generic forced-backend fixture does not install it.
+  Review that setup together with the React XR preparation failure above.
+
+All process-tree bounds and numerical assertions remain unchanged. Logs are
+preserved in lane-S's `.lane/compat-*.log` and `.lane/scope-compat-*.log`; the
+private batch-273 handoff indexes each suite, failure and suspected cause.
 
 `oit/test:gpu` also reaches ExactOIT's setup refusal on the full layer: it needs
 fragment-stage storage buffers and recommends weighted OIT. The base OIT check
@@ -7832,7 +7880,7 @@ and examples below.
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer refuses the layer (MargoError `unsupported`); XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
+**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). Path-tracer route limits are documented in its package README; XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -7866,7 +7914,10 @@ a linked `MargoError` code `state`, explaining the choice) unless you pass
 back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end
 load inside `install()`.
 
-What it does:
+Installer diagnostics keep the error code, help link and every missing capability
+name concise enough to fit the existing entry size ceilings. A full-tier probe
+checks capabilities; package parity failures remain tracked in
+[known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
 
 [README continues: https://margoengine.com/llms/packages/webgl2-compat.md]
 

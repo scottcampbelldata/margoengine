@@ -52,3 +52,26 @@ economy-of-mechanism principle in Jerome H. Saltzer and Michael D. Schroeder,
 One common rendering loop preserves the same scene, frame count and image
 assertions; the default gate cannot read the measurement clock. This is test
 responsibility separation, with no rendering algorithm or speed improvement.
+
+## Installer diagnostic size gate
+
+The integrated entry exceeded its unchanged gzip ceilings (root 102,906 versus
+102,814 B; device 103,008 versus 102,935 B). The installer now uses shorter
+messages with the same API names, missing-capability list, error codes, help
+anchors and installation decisions. The actual rebuilt entries measure 102,799
+and 102,914 B. These are deterministic byte counts, not timing measurements.
+The core plus stage remains 23,924 B. No budget or numerical assertion changed.
+
+The review compared small-mechanism guidance from Jerome H. Saltzer and Michael
+D. Schroeder, *The Protection of Information in Computer Systems* (1975),
+[author publication](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html),
+with the semantics-preserving transformation approach of David Monniaux and
+Cyril Six, *Simple, Light, Yet Formally Verified, Global Common Subexpression
+Elimination and Loop-Invariant Code Motion* (2021),
+[paper](https://arxiv.org/abs/2105.01344). The final change only compacts diagnostic
+wording; it does not alter installer control flow or graphics algorithms.
+Ecma International, *ECMA-262, 16th edition* (2025),
+[Error objects](https://262.ecma-international.org/16.0/index.html#sec-error-objects),
+provides the message/object distinction: the existing code/name/help contract
+and every missing capability remain tested in device.test.js. No companion
+repository or external implementation source was read.

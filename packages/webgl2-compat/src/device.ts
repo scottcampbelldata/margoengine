@@ -138,14 +138,14 @@ let installed: { gpu: CompatGPU; restore: Restore[] } | null = null;
 export async function installCompat(options: InstallOptions = {}): Promise<InstallResult> {
   if (installed) return { installed: true, reason: 'already', gpu: installed.gpu };
   const nav = (globalThis as { navigator?: Navigator & { gpu?: GPU } }).navigator;
-  if (!nav) throw new TypeError('install() runs in a browser page: there is no navigator here');
+  if (!nav) throw new TypeError('install() needs navigator');
   if (!options.force && nav.gpu) {
     const adapter = await nav.gpu.requestAdapter().catch(() => null);
     if (adapter) {
       console.warn(
         fault(
           'state',
-          "install() kept native WebGPU; to test the full WebGL2 layer use install({ force: true }) then Engine.create() with backend 'webgpu', not 'webgl2'",
+          "WebGPU kept; use force: true, backend 'webgpu'",
           'compatibility-layer',
         ),
       );
@@ -153,11 +153,11 @@ export async function installCompat(options: InstallOptions = {}): Promise<Insta
     }
   }
   const caps = probeWebGL2();
-  if (!caps) throw fault('unsupported', 'This browser has neither WebGPU nor WebGL2', 'compatibility-layer');
+  if (!caps) throw fault('unsupported', 'WebGPU and WebGL2 unavailable', 'compatibility-layer');
   if (!caps.supported)
     throw fault(
       'unsupported',
-      `This browser's WebGL2 is below the compatibility minimum: missing ${caps.missing.join(', ')}`,
+      `WebGL2 lacks ${caps.missing.join(', ')}`,
       'compatibility-layer',
     );
   const gpu = new CompatGPU(options);

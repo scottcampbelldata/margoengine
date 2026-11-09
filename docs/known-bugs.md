@@ -65,11 +65,14 @@ Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repa
 piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
 and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
 
-### Open: preview continuation full-layer validation
+
+### Open: full-layer validation transferred to parity batch 273
 
 Run the following package GPU scripts after building, with `MARGO_COMPAT=1` and
 one shared GPU slot. These are open gate failures, not accepted differences or
-passing results. The completed native evidence remains separate.
+passing results. The completed native evidence remains separate. The coordinator
+assigned these compatibility failures to parity batch 273; the preview lane
+finishes its own attachment, translator and DOF repairs without chasing them.
 
 - `culling/test:gpu`: `dynamic-check.mjs` reports 3 to 7 shadowed instance/core
   pixels differing by one channel level after moving boxes. The exact assertion
@@ -110,8 +113,53 @@ passing results. The completed native evidence remains separate.
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
   rasterization/orientation divergences still need numeric root-cause proof.
 
-The serial continuation is still collecting the other suites. Additional
-failures must be diagnosed and tracked before this work can be pushed as gated.
+- `react/test:browser`: `test-scene-browser.js:115` rejects the XR preparation
+  snapshot because neither `xrReady` nor an error containing `WebXR is unavailable`
+  is present. This is the full compatibility run, not the small preview.
+  Investigate the fixture's native-WebGPU XR assumptions and the actual
+  compatibility preparation error before changing its assertion or route.
+
+The serial continuation preserves each completed result and resumes only
+unfinished suites. Additional full-layer failures are evidence for batch 273,
+not passing results or permission to weaken a gate.
+
+The bounded continuation is now complete: 89 of 115 selected correctness suites
+pass, combining the preserved 22, repaired clustered lighting, and 66 later
+passes. The following additional failures remain with batch 273:
+
+- `scatter/test:browser:shadow-cull`: the fixture reads `.commands` from an
+  undefined native command record in `shadow-cull.html:81`. Inspect the fixture's
+  native instrumentation assumptions against compatibility command recording.
+- `scenery/test:gpu`: the noon scene reads black ground, then compares zero to
+  zero and reports `noon ground NaN of noon on screen`. Trace the presented scene
+  and capture readiness; the lighting preset checks before it pass.
+- `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
+  prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
+  The awaited operation after that marker remains unisolated.
+- `shader/test:gpu`: noise and earlier readback cases pass; the validation case
+  lacks the expected `failed` error. Its assertion's undefined message masks the
+  mismatch with `ERR_INVALID_ARG_TYPE` at `readback-check.mjs:67`.
+- `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
+  4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
+  those timing values are not accepted evidence during the build phase.
+- `splats/test:gpu`: all GPU checks print success, then the command does not exit
+  before its 62 s body bound. This is not a passing suite. Cleanup remains with
+  the dedicated teardown owner; no teardown repair is attempted in this lane.
+- `terrain/test:gpu`: its native/compatibility comparison receives vendor
+  `margo-webgl2` for the native baseline under the outer `MARGO_COMPAT=1` shim.
+  `webgl2-compat/test:gpu` similarly fails its plain-device full-level assertion.
+  Their dual-backend fixtures need native baselines independent of the outer
+  forced-backend runner; these failures do not establish a rendering difference.
+- `voxel/test:gpu`, `test:gpu:slow-compile` and `test:gpu:slow-mesh`: the bevel
+  fixture needs 2,048 texture array layers on an adapter advertising 256. Review
+  the fixture/device request and hardware route without dropping texture work.
+- `root/modern:test:xr:browser`: XR refuses the full layer until `installXR()`
+  supplies its route; the generic forced-backend fixture does not install it.
+  Review that setup together with the React XR preparation failure above.
+
+All process-tree bounds and numerical assertions remain unchanged. Logs are
+preserved in lane-S's `.lane/compat-*.log` and `.lane/scope-compat-*.log`; the
+private batch-273 handoff indexes each suite, failure and suspected cause.
 
 `oit/test:gpu` also reaches ExactOIT's setup refusal on the full layer: it needs
 fragment-stage storage buffers and recommends weighted OIT. The base OIT check
