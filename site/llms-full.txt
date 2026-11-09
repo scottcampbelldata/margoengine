@@ -5732,8 +5732,13 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   must retain exact blocks and versions across partial writes, copies, mip/layer
   and alias views; post-filter sRGB conversion is not equivalent. This remains
   open; no texture or colour work may be removed. `materials/test:gpu:back-side` also reached the 60 s body
-  deadline without output and had its process tree killed; its awaited operation
-  has not yet been isolated.
+  deadline without output and had its process tree killed. A full-grid owned
+  diagnostic now completes the 4-sample work and enters the 1-sample transmission
+  cases before its 75 s process-tree limit: 116 render starts, 131 completed
+  reads and 38 returned pick calls. This is not a permanently stuck initial
+  await. The accumulated cost remains unisolated, and the final comparison
+  assertion was not reached, so no pixel pass or busy exemption is claimed.
+  Receipt: test-results/batch-273-back-side-probe.log.
 - `materials/test:gpu:dispersion`: the fixture's `JSON.stringify` reaches the
   compatibility device/queue/device cycle at `tests/material-dispersion-browser.ts`.
   Native GPU handles are opaque to that serialization, so the snapshot method's
