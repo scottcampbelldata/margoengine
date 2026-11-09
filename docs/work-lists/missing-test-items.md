@@ -115,7 +115,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P26 | limits MaterialX, LIM-331/205 | RealityKit material file and MaterialX rendered reference | Apple public sample-file grant; MaterialX standard examples Apache-2.0 to verify | Pending |
 | P27 | limits LAS/LAZ | compressor 0/1 v2 items, chunk size 0 from an outside writer | LASzip/laz-rs standard data, Apache-2.0 to verify | Pending; unsupported item-v1 is not a missing proof |
 | P28 | limits video/material and /360 | real movie and stereo panorama | Blender Foundation movies CC-BY; panorama-specific licence | Pending; headset proof needs device |
-| P29 | limits video/codecs, LIM-575 | real AVC movie with B-frames | Same, retain source codec metadata and licence | Pending |
+| P29 | limits video/codecs, LIM-575 | real AVC movie with B-frames | Same, retain source codec metadata and licence | Passed: CC0 MDN flower, 150 real AVC High frames with B-frame reorder depth 2; all edited timestamps and all decoded bytes match independent FFprobe-demuxed WebCodecs. Fixed fractional edit rounding with regressions |
 | P30 | private batch-110 report and known-bugs README 404 history | pointer-show.glb and the other missing example asset | Margo-authored pointer-show now exists; current README runner selects both examples | Scoped README command rerun: 62/94 ran, 32 allowed failures; further sample work remains; do not duplicate batch 160 fix |
 | P31 | loaders README VDB example | smoke.vdb with a density grid | OpenVDB website repository 3d8fd4d3f2d670464f4390e2775cfc87274233dc, explicit CC-BY-4.0 LICENSE.txt | Sphere and smoke downloaded; real files exposed empty-half-value-block alignment bug, fixed with sphere and synthetic regressions. README density example passed with the explicit smoke mapping; exception removed |
 | P32 | headless README image-sequences-and-video-37bcc7 | discoverable ffmpeg binary | FFmpeg official download links, LGPL/GPL build configuration to record | Passed: original headless FFmpeg example using publisher-hash-checked FFmpeg 8.1.2 GPL-3.0; optional fetch/install flag and child-only PATH wiring |
@@ -393,7 +393,7 @@ P25 remains open: 97 small public transform/instancing USDA scenes from OpenUSD 
 2d39590aac6dde875507d2a334ff6e5b9dc05fe1 were downloaded and inspected as standard data
 only. The only reset-stack scene found is the already identified Cone/Sphere scene, without
 a Mesh; it cannot prove the mesh reader's reset behaviour. No implementation source was read.
-P29 remains open: the official Sintel trailer and the retired GTV Big Buck Bunny endpoint
+At that stage P29 remained open: the official Sintel trailer and the retired GTV Big Buck Bunny endpoint
 both answer HTTP 403. No movie was saved, no B-frame decoder pass is claimed. The CC0
 Cloud Forest Zenodo download also returned 403; it was not substituted for the authored room.
 
@@ -405,3 +405,36 @@ hygiene, 45 focused regressions and the pinned E57 fetch passed; final verify fo
 Final README-group verification after the mask-wipe rebase passes 13,304 tests with zero
 failures/skips in 335.7 s. The 45 focused regressions, lint, hygiene and pinned full E57
 fetch pass. Original scoped README result remains 45/47, two retained other-cause failures.
+
+## P29 real B-frame proof and timestamp fix (2026-11-09)
+
+MDN's outside CC0 flower.mp4 is 1,128,375 bytes, SHA-256
+0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451.
+FFprobe 8.1.2 reports AVC High, 960x540, 150 frames, 30000/1001 fps and reorder depth 2.
+The browser proof decodes all 150 frames twice: independent FFprobe packet positions,
+AVCC and raw PTS drive the reference WebCodecs decoder; public openVideo drives Margo.
+Every copied decoded byte matches by SHA-256, and all 150 edited timestamps match FFprobe.
+This proves demux/frame access on one browser/GPU, not cross-decoder H.264 accuracy.
+
+The first outside run failed at edited frame 2: the reader rounded raw PTS to microseconds
+before subtracting its fractional media edit, losing one microsecond. The owning video
+reader now compares edit bounds and calculates movie time as exact rational native ticks,
+rounding only once. Regressions cover both fractional boundaries, seek selection and
+colliding raw timestamps outside an edit that could otherwise impersonate a visible frame.
+The original parent regression fails; the fixed package and all five GPU scripts pass.
+The real CPU oracle covers every packet's bytes/PTS/duration/key and all movie timestamps.
+
+The clip joins the required outside manifest (349 assets). Missing/changed bytes fail
+before verify or the direct video GPU check, using the same fetch command. FFprobe's
+metadata oracle and regeneration script are committed; no media or tool binary ships.
+A provenance typo introduced while updating the old asset count is also corrected: the
+physics sample commit remains 9dc61cb3474ff9a51f58d3592f79d5c9e572056a, as it always was
+in the downloader. A regression ties notices/audit text to the exact manifest commit.
+Physics and physics2d packages remain held. P28's actual material/stereo panorama proof
+is still separate; this decoded clip alone does not close it.
+
+P29 landing validation: full verify passes 13,312 tests, zero failures/skips, in 369.1 s;
+lint and standalone hygiene pass. All 22 video unit tests and the combined 51 focused
+regressions pass. All five video GPU checks pass, including all 150 real frames. The
+video README command passes all six original examples with no exceptions. Entry size
+is 3,458 B gzip under the unchanged 3,593 B ceiling. No public exports changed.

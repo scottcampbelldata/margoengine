@@ -2274,3 +2274,15 @@ loss remains open. No new core, stage, CPU geometry loop or shader is introduced
 ### Live transitions: section 5 evidence (batch 76 job 3)
 
 The optional entry uses existing core scenes and render views: two full-frame RGBA8 texture targets followed by a private composite scene's order-50 pass. No recursive render, core or stage modification. Scenes update once each, shared cameras once, with independent depths. Progress survives resize and replacement because no historical image is required. Owned images and the composite scene are removed on disposal; borrowed scenes/cameras survive. Actual WebGPU tests check 374 generated-background pixels at 1x/4x, both scenes changing at fixed progress, resize, destroyed-device recovery, canvas output and subsequent borrowed-scene rendering. Native WebGL2 refuses with a help link. Unit checks cover hostile values, foreign/same/disposed scenes, partial allocation cleanup and disposal. No performance, HDR or artistic-quality evidence is claimed.
+
+### Real B-frame edited timestamps (section 5, 2026-11-09)
+
+The video/codecs reader keeps exact rational native ticks through edit filtering and
+movie-time conversion, then rounds once to microseconds. An outside MDN CC0 AVC clip
+exposed the prior double rounding (one microsecond early). CPU regressions cover both
+sub-microsecond edit boundaries, seek selection and unsafe raw timestamp collisions.
+All 150 real frames match an independent FFprobe sample demux plus WebCodecs reference,
+byte for byte, with every edited timestamp exact. This shares the browser decoder; it
+is not independent H.264 decoder accuracy or other-device proof. The new required clip
+uses the existing digest/fetch/preflight mechanism, now 349 outside inputs. The optional
+entry is 3,458 B gzip within its unchanged 3,593 B gate; core/stage are unchanged.

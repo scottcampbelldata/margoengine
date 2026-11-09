@@ -22,7 +22,7 @@ gltf-pro importer tests only. Sources and licences are already recorded in the f
 | packages/splats/test/spz-sog.test.js | parseSpz reads the complete racoonfamily.spz sample | set MARGO_SPLAT_SAMPLES to a folder holding racoonfamily.spz to run this | Niantic complete capture at 11312e4ad836ed06e3da2f3d5b633688d17ebebb |
 | packages/splats/test/spz-sog.test.js | parseSpz reads the complete hornedlizard.spz sample | set MARGO_SPLAT_SAMPLES to a folder holding hornedlizard.spz to run this | Same Niantic commit |
 
-Physics sample commit: eoineoineoin/glTF_Physics 9dc61cb3484ff9a51f58d3592f79d5c9e572056a.
+Physics sample commit: eoineoineoin/glTF_Physics 9dc61cb3474ff9a51f58d3592f79d5c9e572056a.
 Those samples state no licence and stay outside the repository. Khronos interactivity is
 CC-BY-4.0; Niantic SPZ and samples are MIT. The complete suite retains its existing explicit
 one-subtest specification disagreement; downloading data does not change its assertions.

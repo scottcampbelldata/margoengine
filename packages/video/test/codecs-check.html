@@ -45,3 +45,8 @@ window.check=async()=>{
   }finally{video.dispose();}
 };
 </script>
+
+<script type="module">
+import {checkRealFrames} from './real-frames.js';
+window.checkReal = checkRealFrames;
+</script>

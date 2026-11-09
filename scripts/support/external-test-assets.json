@@ -2086,5 +2086,13 @@
     "url": "https://raw.githubusercontent.com/CesiumGS/cesium/main/Specs/Data/Cesium3DTiles/GaussianSplats/tower/0/0.glb",
     "sha256": "9ef9d8d0756d1f423cd6aa8bd99f7dd26957f96df03dcbcec6e37103e39350b4",
     "size": 7499156
+  },
+  {
+    "file": "video/flower.mp4",
+    "url": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "sha256": "0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451",
+    "size": 1128375,
+    "licence": "CC0-1.0",
+    "licenceUrl": "https://github.com/mdn/interactive-examples/blob/main/LICENSE"
   }
 ]

@@ -182,7 +182,7 @@ const ASSETS = [
   ],
   [
     'scripts/support/external-test-assets.json',
-    'Required outside verify assets, 348 URL/SHA-256/size records: Khronos interactivity f99d9b6 (CC-BY-4.0), Niantic SPZ 11312e4ad836ed06e3da2f3d5b633688d17ebebb (MIT), Cesium tower (Apache-2.0, digest pinned), and glTF_Physics 9dc61cb3484ff9a51f58d3592f79d5c9e572056a (no stated licence; outside-only existing importer tests). No implementation or asset bytes ship here.',
+    'Required outside verify assets, 349 URL/SHA-256/size records: Khronos interactivity f99d9b6 (CC-BY-4.0), Niantic SPZ 11312e4ad836ed06e3da2f3d5b633688d17ebebb (MIT), Cesium tower (Apache-2.0, digest pinned), and glTF_Physics 9dc61cb3474ff9a51f58d3592f79d5c9e572056a (no stated licence; outside-only existing importer tests). MDN flower.mp4 (CC0-1.0, interactive-examples LICENSE), SHA-256 0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451; FFprobe metadata and independent WebCodecs reference drive the real B-frame test. No implementation or asset bytes ship here.',
   ],
   [
     'examples/assets/3d-tiles/NOTICE.md',

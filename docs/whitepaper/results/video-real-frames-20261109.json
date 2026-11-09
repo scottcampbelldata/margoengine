@@ -1,0 +1,53 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "frames": 150,
+  "independentFrames": 150,
+  "bFrames": true,
+  "editedDuration": 5.005,
+  "width": 960,
+  "height": 540,
+  "comparison": "every copied decoded byte SHA-256 exact; all edited timestamps exact",
+  "errors": [],
+  "source": {
+    "url": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "licence": "CC0-1.0 (MDN cc0-videos)",
+    "bytes": 1128375,
+    "sha256": "0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451"
+  },
+  "oracle": "packages/video/test/flower-ffprobe.json",
+  "parentFailure": "Edited frame 2 loses 1 us because raw PTS was rounded before its fractional edit offset",
+  "entryGzip": 3458,
+  "unchangedBudget": 3593,
+  "validation": {
+    "verify": {
+      "pass": 13312,
+      "fail": 0,
+      "skip": 0,
+      "seconds": 369.1
+    },
+    "videoUnitTests": 22,
+    "focusedTests": 51,
+    "gpuScripts": 5,
+    "readme": {
+      "pass": 6,
+      "fail": 0
+    }
+  }
+}

@@ -197,7 +197,10 @@ export function readMP4(bytes: Uint8Array): Movie {
   if (index !== count) invalid();
   let mediaStart = 0,
     lead = 0,
-    duration = 0;
+    duration = 0,
+    movieScale = 1,
+    leadTicks = 0,
+    mediaLength: number | undefined;
   for (const s of samples) duration = Math.max(duration, (s.pts + s.duration) / scale);
   const edts = video.find((b) => b.type === 'edts');
   if (edts) {
@@ -206,7 +209,7 @@ export function readMP4(bytes: Uint8Array): Movie {
       width = v ? 20 : 12;
     const n = table(elst, width),
       mvhd = one(moov, 'mvhd');
-    const movieScale = uint(mvhd.start + (version(mvhd, [0, 1]) ? 20 : 12), mvhd.end);
+    movieScale = uint(mvhd.start + (version(mvhd, [0, 1]) ? 20 : 12), mvhd.end);
     if (!movieScale || n < 1 || n > 2) unsupported();
     for (let j = 0; j < n; j++) {
       const p = elst.start + 8 + j * width,
@@ -219,10 +222,12 @@ export function readMP4(bytes: Uint8Array): Movie {
       if (uint(p + width - 4, elst.end) !== 65536 || !length) unsupported();
       if (empty) {
         if (j !== 0 || n !== 2) unsupported();
+        leadTicks = length;
         lead = length / movieScale;
       } else {
         if (j !== n - 1) unsupported();
-        mediaStart = time / scale;
+        mediaStart = time;
+        mediaLength = length;
         duration = lead + length / movieScale;
       }
     }
@@ -231,16 +236,31 @@ export function readMP4(bytes: Uint8Array): Movie {
     const rounded = Math.round(value * 1000000);
     return Number.isSafeInteger(rounded) ? rounded : invalid();
   };
+  // Edit bounds and movie times use exact native ticks. Rounding the media PTS first can
+  // move a boundary sample across an edit and double-round an edited timestamp by 1 us.
+  const track = BigInt(scale),
+    movie = BigInt(movieScale),
+    start = BigInt(mediaStart),
+    denominator = track * movie,
+    limit = mediaLength === undefined ? undefined : BigInt(mediaLength) * track,
+    at = (i: number): bigint => {
+      if (!Number.isSafeInteger(samples[i]!.pts)) invalid();
+      return (BigInt(samples[i]!.pts) - start) * movie;
+    };
+  const order = samples.map((_, i) => i).filter((i) => at(i) >= 0n && (limit === undefined || at(i) < limit));
+  order.sort((a, b) => samples[a]!.pts - samples[b]!.pts);
+  if (!order.length) invalid();
+  const times = order.map((i) => {
+    const value = Number(((at(i) + BigInt(leadTicks) * track) * 1000000n + denominator / 2n) / denominator);
+    return Number.isSafeInteger(value) ? value / 1000000 : invalid();
+  });
   for (const s of samples) {
     s.pts = us(s.pts / scale);
     s.duration = us(s.duration / scale);
   }
-  const order = samples
-    .map((_, i) => i)
-    .filter((i) => samples[i]!.pts >= us(mediaStart) && samples[i]!.pts < us(mediaStart + duration - lead));
-  order.sort((a, b) => samples[a]!.pts - samples[b]!.pts);
-  if (!order.length) invalid();
-  const times = order.map((i) => us(samples[i]!.pts / 1000000 - mediaStart + lead) / 1000000);
+  // Decode timestamps must also be unique: an edit offset can separate rounded movie
+  // times while the underlying WebCodecs timestamps still collide.
+  if (new Set(samples.map((s) => s.pts)).size !== samples.length) unsupported();
   if (times.some((t, i) => i > 0 && t <= times[i - 1]!)) unsupported();
   return { config: { codec, description: bytes.slice(avcc.start, avcc.end) }, samples, order, times, duration };
 }

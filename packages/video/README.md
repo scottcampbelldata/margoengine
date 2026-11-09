@@ -250,8 +250,18 @@ is renderer independent and also runs beside WebGL2; the separate external-textu
 material still requires WebGPU. Node and browsers without VideoDecoder receive coded
 `unsupported`. Generated MP4 colours prove random seeks, stepping, exact timestamps,
 cancellation and WebGPU material integration on RTX A6000/Edge. Reordered samples,
-chunk layouts, edit boundaries and ownership use unit stand-ins. No third-party movie,
-real B-frame bitstream, other browser/GPU or speed measurement is claimed.
+chunk layouts and ownership also use unit stand-ins. The outside CC0 MDN flower clip
+(150 AVC High frames, two GOPs, B-frame reorder depth 2) passes every edited timestamp
+and every decoded-frame byte against an independent FFprobe demux plus WebCodecs
+reference on RTX A6000/Edge. This tests our demux and frame access with the same
+browser decoder, not cross-decoder accuracy. Other browsers/GPUs and speed are unmeasured.
+
+Edit bounds are compared in native time bases, before timestamp rounding. Movie
+timestamps are rounded once to microseconds; decode timestamp collisions also fail.
+Fetch the required outside clip with node scripts/reference-rendering/fetch-skip-assets.mjs
+before npm run test:gpu --workspace @margoengine/video. To regenerate its independent
+sample-table oracle, run node packages/video/scripts/flower-reference.mjs with the path
+to FFprobe 8.1.2 as its first argument. No movie bytes or FFprobe binary ship in Margo.
 
 ## Stacked alpha and chroma key
 

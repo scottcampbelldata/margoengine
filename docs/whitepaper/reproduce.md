@@ -827,3 +827,18 @@ No new projection or shadow algorithm, physical HDR-shadow claim or timing measu
 ### Batch 76 two live scenes
 
 Run transitions unit tests and the package GPU suite through gpu-lock as for jobs 1 and 2. live-browser.js uses two real Engine scenes, whose update plugins change generated backgrounds. It changes both colors at fixed progress and reads every output pixel, 374 total across 1x/4x, with exact endpoints and at most one UNORM code for blends. It resizes 8x4 to 7x3 and 5x7, destroys a real device, awaits engine recovery and proves progress continues. It also renders to canvas, disposes twice and renders a borrowed scene afterward. Native WebGL2 must give linked unsupported. Results are in results/batch-76-live.json, stand-in correctness, not performance.
+
+### Real AVC B-frame edited timestamps
+
+Run node scripts/reference-rendering/fetch-skip-assets.mjs, build the packages, then run
+npm test --workspace @margoengine/video for the complete independent packet/timestamp
+oracle and rounding regressions. Run node scripts/gpu-lock.mjs run --owner=codex-missing
+--max=10 -- npm run test:gpu --workspace @margoengine/video for all five browser checks,
+including every real frame. The CC0 MDN flower clip stays in the shared outside cache.
+Its URL/SHA-256/size are in scripts/support/external-test-assets.json. The committed
+packages/video/test/flower-ffprobe.json comes only from FFprobe 8.1.2 JSON output:
+node packages/video/scripts/flower-reference.mjs <path-to-ffprobe-8.1.2> regenerates it.
+This FFprobe binary was extracted from the already publisher-hash-checked outside GPL
+FFmpeg 8.1.2 archive. Neither movie nor tools ship. The reference feeds independent
+packet offsets/config/PTS to the same browser WebCodecs decoder; hashes are exact,
+not a perceptual tolerance or an independent decoder comparison.

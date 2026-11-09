@@ -2,61 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openVideo } from '../dist/codecs.js';
 import { mp4Fixture } from './mp4-fixture.js';
-
-function mocks(run) {
-  const before = { VideoDecoder: globalThis.VideoDecoder, EncodedVideoChunk: globalThis.EncodedVideoChunk };
-  const outputs = [],
-    decoders = [];
-  globalThis.EncodedVideoChunk = class {
-    constructor(init) {
-      Object.assign(this, init);
-    }
-  };
-  globalThis.VideoDecoder = class {
-    static supported = true;
-    static hold = false;
-    static isConfigSupported = async (config) => ({ config, supported: this.supported });
-    state = 'unconfigured';
-    chunks = [];
-    constructor(init) {
-      this.init = init;
-      decoders.push(this);
-    }
-    configure(c) {
-      this.config = c;
-      this.state = 'configured';
-    }
-    decode(c) {
-      this.chunks.push(c);
-    }
-    flush() {
-      if (this.constructor.hold)
-        return new Promise((resolve, reject) => {
-          this.reject = reject;
-        });
-      for (const c of [...this.chunks].sort((a, b) => a.timestamp - b.timestamp)) {
-        const f = {
-          timestamp: c.timestamp,
-          id: c.data[0],
-          closed: false,
-          close() {
-            this.closed = true;
-          },
-        };
-        outputs.push(f);
-        this.init.output(f);
-      }
-      return Promise.resolve();
-    }
-    close() {
-      this.state = 'closed';
-      this.reject?.(new Error('closed'));
-    }
-  };
-  return Promise.resolve()
-    .then(() => run({ outputs, decoders }))
-    .finally(() => Object.assign(globalThis, before));
-}
+import { mocks } from './codecs-mocks.js';
 
 test('presentation frame access decodes from sync, drains reordered GOP, closes only unselected frames', () =>
   mocks(async ({ outputs, decoders }) => {
@@ -169,4 +115,44 @@ test('invalid input fails with code and help link before decoding, missing codec
     await assert.rejects(openVideo(bytes), (e) => e.code === 'unsupported' && /https:/.test(e.message));
     globalThis.VideoDecoder = undefined;
     await assert.rejects(openVideo(bytes), (e) => e.code === 'unsupported');
+  }));
+
+test('fractional-microsecond edit offsets round once, and edit boundaries compare native ticks', () =>
+  mocks(async () => {
+    using video = await openVideo(
+      mp4Fixture({ signed: false, edit: true, timeScale: 30000, sampleDelta: 1001, editStart: 1001 }),
+    );
+    assert.deepEqual(
+      Array.from({ length: video.frameCount }, (_, i) => video.timestamp(i)),
+      [0.05, 0.083367, 0.116733, 0.1501, 0.183467],
+    );
+    const boundary = await video.seek(0.083366);
+    assert.equal(video.currentFrame, 0);
+    boundary.close();
+    using start = await openVideo(
+      mp4Fixture({ signed: false, edit: true, timeScale: 3000000, sampleDelta: 10001, editStart: 10002 }),
+    );
+    assert.equal(start.frameCount, 4, 'a sample one third of a microsecond before the edit stays outside');
+    using end = await openVideo(
+      mp4Fixture({
+        signed: false,
+        edit: true,
+        timeScale: 3000000,
+        sampleDelta: 10001,
+        movieScale: 3000000,
+        editStart: 0,
+        editLength: 10002,
+      }),
+    );
+    assert.equal(end.frameCount, 1, 'a sample one third of a microsecond before the edit end stays inside');
+  }));
+
+test('decode timestamp collisions outside an edit cannot impersonate its first visible frame', () =>
+  mocks(async () => {
+    await assert.rejects(
+      openVideo(
+        mp4Fixture({ signed: false, edit: true, timeScale: 3000000, editStart: 102, composition: [101, 2, 0, 0, 0] }),
+      ),
+      { code: 'unsupported' },
+    );
   }));
