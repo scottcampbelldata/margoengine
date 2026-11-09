@@ -1682,3 +1682,15 @@ measurements and method committed. No whole-facade, ornament or material claim.
 Source data CC BY-SA, publisher does not name a version; original images/XML stay
 outside shipped files. The small unmodified CityJSON tutorial sample is a credited,
 hash-checked test fixture, not shipped in npm.
+
+
+### Node Basis glTF example evidence (2026-11-09)
+
+All 17 decoder README examples execute. The full CC0 FlightHelmet Basis model
+uses Node webgpu 0.6.2 and the optional headless package with nodeKTX2. All 17 pinned
+files, 15 textures, 177 mip levels, 285,212,652 decoded bytes, 55,392 vertices and
+94,722 triangles are retained. The GPU check reads visible pixels with no validation
+errors. RGBA8 decoding needs the documented 512 MiB aggregate budget. This is one
+asset's integration evidence, without independent Basis pixel accuracy, production
+quality, cross-device image equality or performance claims. Required input hashes
+and missing-file failures apply in Node too. Record: whitepaper/results/readme-node-basis-20261109.json.

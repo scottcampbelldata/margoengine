@@ -301,21 +301,30 @@ export async function runInNode(example, samples, { timeout = NODE_LIMIT } = {})
   const { file, folder } = await writeNodeExample(example, samples);
   const launch = browserAutomation(example.code) ? chromiumLaunchOptions() : undefined;
   return new Promise((done) => {
-    const child = spawn(process.execPath, ['--unhandled-rejections=strict', file], {
-      cwd: folder,
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', 'ignore', 'pipe'],
-      env: launch
-        ? {
-            ...process.env,
-            BROWSER_ARGS: JSON.stringify(launch.args),
-            ...(launch.channel ? { BROWSER_CHANNEL: launch.channel } : {}),
-            ...(launch.executablePath ? { BROWSER_EXECUTABLE: launch.executablePath } : {}),
-          }
-        : example.code.includes('headless/ffmpeg')
-          ? readmeNodeEnv()
-          : process.env,
-    });
+    const child = spawn(
+      process.execPath,
+      [
+        '--unhandled-rejections=strict',
+        '--import',
+        new URL('./support/readme-node-assets.mjs', import.meta.url).href,
+        file,
+      ],
+      {
+        cwd: folder,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'ignore', 'pipe'],
+        env: launch
+          ? {
+              ...process.env,
+              BROWSER_ARGS: JSON.stringify(launch.args),
+              ...(launch.channel ? { BROWSER_CHANNEL: launch.channel } : {}),
+              ...(launch.executablePath ? { BROWSER_EXECUTABLE: launch.executablePath } : {}),
+            }
+          : example.code.includes('headless/ffmpeg')
+            ? readmeNodeEnv()
+            : process.env,
+      },
+    );
     let errors = '',
       limited = false,
       ending;
@@ -333,9 +342,12 @@ export async function runInNode(example, samples, { timeout = NODE_LIMIT } = {})
           place: 'node',
           reason: `Timed-out example left processes running: ${remaining.join(', ')}`,
         });
-      if (limited && browserAutomation(example.code))
-        done({ result: 'fail', place: 'node', reason: `Browser test did not finish within ${timeout / 1000} s` });
-      else if (limited) done({ result: 'pass', place: 'node', note: `ran to the ${timeout / 1000} s limit` });
+      if (limited)
+        done({
+          result: 'fail',
+          place: 'node',
+          reason: `${browserAutomation(example.code) ? 'Browser test' : 'Example'} did not finish within ${timeout / 1000} s`,
+        });
       else if (code === 0) done({ result: 'pass', place: 'node' });
       else done({ result: 'fail', place: 'node', reason: firstError(errors) });
     });
@@ -437,22 +449,17 @@ async function startPages(samples, examples) {
   return { server, browser, origin: `http://127.0.0.1:${server.httpServer.address().port}` };
 }
 
-async function runInPage(example, pages) {
+export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
   const file = await writePageExample(example);
   const page = await pages.browser.newPage(),
     url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
   try {
     await page.goto(url, { timeout: PAGE_LIMIT });
-    const ran = await page
-      .waitForFunction(() => window.__ran, undefined, { timeout: PAGE_LIMIT })
-      .then((handle) => handle.jsonValue())
-      .catch(() => 'waiting');
+    await page.waitForFunction(() => window.__ran, undefined, { timeout });
     await page.waitForTimeout(SETTLE);
     const errors = await page.evaluate(() => window.__errors);
     if (errors.length) return { result: 'fail', place: 'page', reason: errors[0] };
-    return ran === 'waiting'
-      ? { result: 'pass', place: 'page', note: `still waiting at the ${PAGE_LIMIT / 1000} s limit, no error` }
-      : { result: 'pass', place: 'page' };
+    return { result: 'pass', place: 'page' };
   } catch (error) {
     return { result: 'fail', place: 'page', reason: String(error.message).split('\n')[0].slice(0, 300) };
   } finally {

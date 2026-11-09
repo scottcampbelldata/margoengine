@@ -153,20 +153,25 @@ console.log(width, height, data.length); // 1 1 4
 
 A JPEG and AVIF are refused with code `unsupported`, as are native ETC, EAC and ASTC blocks. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
 
-In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install `webgpu` and `@margoengine/headless` for the Node GPU binding and canvas in this example. It loads Khronos's published StainedGlassLamp sample and transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too:
+In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install the `webgpu` binding (`npm install webgpu`, tested with 0.6.2) and `@margoengine/headless` alongside Margo. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too. This example loads the complete CC0 FlightHelmet by Gary Hsu and Microsoft from a pinned Khronos sample revision:
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {createHeadlessCanvas, installGPU} from '@margoengine/headless';
-import {create} from 'webgpu';
 import {nodeKTX2} from 'margoengine/decoders/image';
 import {loadGLTF} from 'margoengine/gltf-pro';
+import {createHeadlessCanvas, installGPU} from 'margoengine/headless';
+import {create} from 'webgpu';
+
 const gpu = create([]);
 using installed = installGPU({gpu});
-using engine = await Engine.create(createHeadlessCanvas({width: 640, height: 480}), {backend: 'webgpu'});
-
-const model = await loadGLTF(engine, 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/StainedGlassLamp/glTF-KTX-BasisU/StainedGlassLamp.gltf', {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29});
+using engine = await Engine.create(createHeadlessCanvas({width: 256, height: 256}), {backend: 'webgpu'});
+using model = await loadGLTF(engine,
+  'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet.gltf',
+  {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29, signal: AbortSignal.timeout(20_000)});
+console.log(model.primitives.length); // 6
 ```
+
+After building a clone and fetching its pinned inputs with `node scripts/reference-rendering/fetch-skip-assets.mjs`, run `node scripts/gpu-lock.mjs run --owner=readme-node -- node packages/decoders/scripts/test-node-gltf.mjs`. It executes this Node setup and glTF load, checks every decoded mip and the complete geometry counts, and reads back the rendered model without GPU validation errors. This is integration evidence for that asset; it does not compare decoded pixels against an independent Basis decoder or establish rendering quality or speed.
 
 ## Texture upload (`@margoengine/decoders/texture`)
 
@@ -486,7 +491,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 
-`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. `DracoDecoder` reads meshes; a point cloud goes through `@margoengine/decoders/draco-points`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
+`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. `DracoDecoder` reads meshes; a point cloud goes through `@margoengine/decoders/draco-points`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. The pro async loaders also load KTX2/Basis textures; supply `nodeKTX2` in Node as above. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 

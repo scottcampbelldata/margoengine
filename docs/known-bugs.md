@@ -2005,16 +2005,25 @@ fails before mapping and refuses an absent node; the package test independently
 compares all 341,989 coordinates and RGB values exactly across all 77 nodes.
 All 18 points examples pass. Missing, changed or LFS-only files fail, never skip.
 
-### Open: decoder Node glTF README example context and source
+### Closed: decoder Node glTF README context and missing source (2026-11-09)
 
-Reproduce with `npm run check:readme-run -- --packages=decoders`. The Node glTF
-example under Any image to pixels constructs Engine with document.querySelector,
-so the runner executes it in a page, then the example.com/helmet.gltf request fails.
-The advertised nodeKTX2 also dynamically imports Node's module/fs/url APIs, so a
-valid Basis texture would require the promised Node runtime instead. Correct repair
-needs a complete openly licensed Basis glTF input and a Node GPU/headless setup,
-retaining the loadGLTF integration. This is still a runtime known-list exception;
-no texture-only substitute, browser fallback or passing claim has been added.
+The Node example incorrectly constructed Engine with document.querySelector and
+requested a nonexistent example.com model. It now installs the reader's Node WebGPU
+binding on a headless canvas and loads the complete pinned CC0 FlightHelmet Basis
+model with nodeKTX2. All 17 decoder examples execute. The GPU regression runs the
+original setup/load in Node, checks all 15 textures and their 177 mip levels, all
+55,392 vertices and 94,722 triangles, and reads back a visible model with zero GPU
+validation errors. tests/readme-assets.test.js requires every resource's original
+digest and refuses missing/changed bytes. The package README regression fails on
+the old browser setup. Record: docs/whitepaper/results/readme-node-basis-20261109.json.
+
+### Closed: README runner counted unfinished examples as passing (2026-11-09)
+
+Both Node's killed-at-limit path and a page's unfinished import formerly returned
+pass when no error had arrived. Every deadline now fails and the process tree or
+page closes. Root regressions cover an unresolved Node program with live handles
+and an unfinished page import without a reported page error. These tests run in
+verify; no deadlines, test inputs or budgets were raised.
 
 ### Batch 65 job 5: Lane markings audit
 

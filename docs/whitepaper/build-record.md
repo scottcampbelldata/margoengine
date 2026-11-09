@@ -4098,3 +4098,32 @@ Limits: explicit topology for navigation; split roads and share junction IDs del
 Entry min+gzip bytes (bare package imports external, dependencies additional): index 1027, junctions 1114, banking 1041, terrain 887, repair 605, markings 887, graph 665. Core plus stage: 23797 B, below 25000 B.
 
 Docs for every job: package README and runnable example, operational playbook evidence, clean-room research, claims and limits, known-bugs audit; public API, umbrella and generated llms records were kept current. Perf-history and rival comparison files do not change because no speed result is claimed.
+
+
+### Node Basis glTF README evidence (2026-11-09)
+
+The last decoder runtime exception mixed Node-only nodeKTX2 with a browser canvas
+and a nonexistent example.com model. The original loadGLTF integration now uses
+the reader's webgpu 0.6.2 binding, installGPU and createHeadlessCanvas, with scoped
+disposal and a bounded load. It requests the complete CC0 FlightHelmet Basis
+sample by Gary Hsu and Microsoft at Khronos revision 8f492390. Main already pinned
+all 17 original resources; this change reuses that verified source/hash record.
+The required external manifest remains 457 files. No new model or encoder output
+was manufactured. Node example children serve exact pinned URL bytes from the
+outside cache and fail on missing, changed or LFS-only inputs.
+
+All 17 decoder examples execute, including the real Node load. Its additional GPU
+regression executes the README setup/load and checks all 15 textures, 177 mip levels
+and 285,212,652 decoded RGBA8 bytes, all 55,392 vertices and 284,166 indices (94,722
+triangles). A 256 x 256 readback contains 3,517 pixels different from the corner;
+there are zero validation errors. Pixel hashes are observations, not a cross-device
+equality requirement. This proves this complete-asset integration and visible draw;
+it does not prove independent Basis pixel accuracy, arbitrary model quality or speed.
+
+The runtime known list falls from 49 to 48. Package tests catch the old browser
+setup; root tests assert every companion digest and missing/changed-byte refusal.
+The new test:gpu:node-gltf package script joins the existing automatic GPU gate.
+The README runner also stops treating an unresolved Node program or page import
+as a pass at its deadline; both paths have regressions in verify. No deadline or
+budget was increased. No core, stage or held physics source changes.
+Record: docs/whitepaper/results/readme-node-basis-20261109.json.

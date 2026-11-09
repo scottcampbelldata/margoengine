@@ -11,6 +11,7 @@ import {
   pickExamples,
   placeOf,
   runInNode,
+  runInPage,
   assetFile,
   claimScratch,
   sampleFiles,
@@ -61,6 +62,42 @@ test('a browser assertion that never finishes fails instead of passing as an ong
   );
   assert.equal(result.result, 'fail');
   assert.match(result.reason, /Browser test did not finish/);
+});
+
+test('any unfinished Node example fails, including one with live handles and no error', async () => {
+  const result = await runInNode(
+    { id: 'runner-test/unfinished', code: 'await new Promise(() => setInterval(() => {}, 1000));' },
+    samples,
+    { timeout: 500 },
+  );
+  assert.equal(result.result, 'fail');
+  assert.match(result.reason, /Example did not finish/);
+});
+
+test('a page whose module never completes fails even with no page error', async () => {
+  let closed = false;
+  const result = await runInPage(
+    { id: 'runner-test/unfinished-page', code: 'await new Promise(() => {});' },
+    {
+      origin: 'http://example.test',
+      browser: {
+        newPage: async () => ({
+          goto: async () => {},
+          waitForFunction: async () => {
+            throw new Error('Example module did not finish');
+          },
+          waitForTimeout: async () => {},
+          evaluate: async () => [],
+          close: async () => {
+            closed = true;
+          },
+        }),
+      },
+    },
+  );
+  assert.equal(result.result, 'fail');
+  assert.match(result.reason, /did not finish/);
+  assert.equal(closed, true);
 });
 
 test('TypeScript runs as a reader would paste it', async () => {

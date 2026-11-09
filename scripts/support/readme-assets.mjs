@@ -3,7 +3,23 @@ import { createReadStream, readFileSync, statSync } from 'node:fs';
 import { delimiter, dirname, resolve } from 'node:path';
 import { requiredFixture } from './required-fixture.mjs';
 import { readmeCache, readmeExternalFiles } from '../fetch-readme-assets.mjs';
-import { externalAssetRoot, requireExternalAssets } from './external-test-assets.mjs';
+import { externalAssets, externalAssetRoot, requireExternalAssets } from './external-test-assets.mjs';
+
+/** Node examples request the published URL unchanged; serve its exact pinned bytes as the page harness does. */
+export function readmeNodeFetch(request = globalThis.fetch, root = externalAssetRoot()) {
+  const sources = new Map(externalAssets.map((asset) => [asset.url, asset.file]));
+  return async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const file = sources.get(url);
+    if (!file) return request(input, init);
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    signal?.throwIfAborted();
+    const path = requireExternalAssets(file, { root });
+    return new Response(readFileSync(path), {
+      headers: { 'content-type': file.endsWith('.gltf') ? 'model/gltf+json' : 'application/octet-stream' },
+    });
+  };
+}
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
@@ -77,7 +93,12 @@ for (const { file } of JSON.parse(readFileSync(new URL('./readme-companions.json
 }
 
 /** A selected required alias fails on absence/LFS; it never falls through to unrelated bytes or HTML. */
-export function readmeFixture(pathname, base = resolve(import.meta.dirname, '../..'), cache = readmeCache(), externalRoot = externalAssetRoot()) {
+export function readmeFixture(
+  pathname,
+  base = resolve(import.meta.dirname, '../..'),
+  cache = readmeCache(),
+  externalRoot = externalAssetRoot(),
+) {
   const external = readmeExternalFiles[pathname];
   if (external) return { path: requireExternalAssets(external, { root: externalRoot }) };
   const tracked = README_FILES[pathname],

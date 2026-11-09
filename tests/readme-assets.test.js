@@ -9,6 +9,7 @@ import {
   README_DOWNLOADS,
   readmeFixture,
   readmeNodeEnv,
+  readmeNodeFetch,
   sampleRange,
   serveSample,
 } from '../scripts/support/readme-assets.mjs';
@@ -18,6 +19,55 @@ import { createHash } from 'node:crypto';
 import { parsePly, parseSplat, parseSpz, parseSog, validateSplats } from '../packages/splats/dist/data.js';
 import { MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD } from '../packages/decoders/dist/meshopt-simd.js';
 import { externalAssets } from '../scripts/support/external-test-assets.mjs';
+
+test('Node README fetch serves every exact pinned FlightHelmet resource and refuses missing or changed bytes', async () => {
+  const family = externalAssets.filter(({ file }) => file.startsWith('helmet/'));
+  assert.equal(family.length, 17);
+  const neverNetwork = () => {
+    throw new Error('A required model resource escaped to the network');
+  };
+  const request = readmeNodeFetch(neverNetwork);
+  for (const item of family) {
+    const response = await request(new URL(item.url));
+    assert.equal(response.status, 200);
+    assert.equal(
+      createHash('sha256')
+        .update(new Uint8Array(await response.arrayBuffer()))
+        .digest('hex'),
+      item.sha256,
+    );
+  }
+  const doc = await (await request(family[0].url)).json();
+  assert.ok(doc.extensionsRequired.includes('KHR_texture_basisu'));
+  for (const resource of [...doc.buffers, ...doc.images]) {
+    const url = new URL(resource.uri, family[0].url).href;
+    assert.ok(
+      family.some((item) => item.url === url),
+      resource.uri,
+    );
+  }
+  const empty = mkdtempSync(join(tmpdir(), 'readme-node-'));
+  try {
+    const local = readmeNodeFetch(neverNetwork, empty);
+    await assert.rejects(local(family[0].url), /FlightHelmet\.gltf[\s\S]*fetch-skip-assets/);
+    mkdirSync(join(empty, 'helmet'));
+    writeFileSync(join(empty, family[0].file), '{}');
+    await assert.rejects(local(family[0].url), /Changed required test fixture[\s\S]*FlightHelmet\.gltf/);
+    const controller = new AbortController();
+    controller.abort(new Error('stop before serving the model'));
+    await assert.rejects(request(new Request(family[0].url, { signal: controller.signal })), /stop before serving/);
+    let forwarded;
+    const fallback = readmeNodeFetch((...args) => {
+      forwarded = args;
+      return new Response('outside');
+    });
+    const init = { headers: { test: 'forwarded' } };
+    assert.equal(await (await fallback('https://example.test/other', init)).text(), 'outside');
+    assert.deepEqual(forwarded, ['https://example.test/other', init]);
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
 
 test('Potree README aliases preserve the complete outside folder and refuse a missing node', () => {
   const family = externalAssets.filter(({ file }) => file.startsWith('potree-lion/'));

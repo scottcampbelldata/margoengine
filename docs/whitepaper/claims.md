@@ -1554,3 +1554,14 @@ A NVIDIA driver/device problem is implicated; its internal mechanism remains
 unproved. This establishes no package repair, cross-vendor byte equality, corrected
 material accuracy or speed. Jobs 4/5's original budgets still fail on affected
 captures, and batch 160 remains open.
+
+
+### Complete Node Basis glTF README integration (2026-11-09)
+
+The decoder README's Node example now executes in Node with a real WebGPU binding,
+headless canvas and the complete pinned CC0 Khronos FlightHelmet Basis asset. All
+17 resources, 15 textures and 177 mip levels load, and all 55,392 vertices and 94,722
+triangles draw visible pixels without validation errors. All 17 decoder snippets
+pass. This establishes complete-asset integration, not independent decoded-pixel
+accuracy, arbitrary production rendering quality or speed. Missing or changed
+required bytes fail. Evidence: results/readme-node-basis-20261109.json.

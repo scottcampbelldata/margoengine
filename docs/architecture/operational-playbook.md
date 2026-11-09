@@ -2662,3 +2662,17 @@ conversion initially changed its SHA-256 after checkout; publisher bytes were
 restored. tests/procedural-standard-assets.test.js guards both the Git attribute
 and exact length/hash in the root verification and check:merge test suite. No hash
 assertion was loosened, and the full verification is rerun after the correction.
+
+
+### Node README completion and Basis integration: section 5 evidence (2026-11-09)
+
+The Node README child now serves exact pinned external source URLs from the shared
+required cache, validating their digests and refusing missing/changed/LFS bytes.
+Root tests cover complete FlightHelmet dependency closure and explicit failure.
+The decoder's test:gpu:node-gltf script is discovered by the existing GPU gate and
+runs the actual README setup/load in Node on webgpu 0.6.2. All 15 textures/177 mips,
+complete geometry and visible readback pass with zero validation errors. There is
+no independent Basis pixel-accuracy, quality or speed claim. Both Node and browser
+README deadlines now fail unfinished examples; verify regressions cover each.
+No deadlines were raised; no core, stage or held physics source changed.
+Record: whitepaper/results/readme-node-basis-20261109.json.

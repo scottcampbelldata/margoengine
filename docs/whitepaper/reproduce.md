@@ -1126,3 +1126,18 @@ agrees within1.88928 pixels. The first equal-floor calibration missed at2.12608;
 using the measured unequal floors resolves its cause without changing the bar.
 This is calibrated layout reproduction of four windows, not inference/reconstruction
 of the whole facade. No original CMP photo or XML ships.
+
+
+### Complete Node Basis glTF README (2026-11-09)
+
+Build packages, then run node scripts/reference-rendering/fetch-skip-assets.mjs.
+The existing required manifest includes the complete CC0 FlightHelmet Basis model
+under helmet/ in the external cache. Run node --test tests/readme-assets.test.js
+tests/run-readme-examples.test.js packages/decoders/tests/readme-node.test.js.
+Through node scripts/gpu-lock.mjs run --owner=codex-missing --max=5 --, run
+node packages/decoders/scripts/test-node-gltf.mjs. It executes the README's original
+Node setup/load, checks texture/mip/geometry totals and GPU validation, then reads
+the rendered model. Raw result: packages/decoders/test-results/node-gltf/result.json.
+Run npm run check:readme-run -- --packages=decoders to execute all 17 examples.
+Use MARGO_RESULT_CACHE=off for the verification run. No browser substitute or
+independent Basis decoder is involved; the proof is complete-asset integration.

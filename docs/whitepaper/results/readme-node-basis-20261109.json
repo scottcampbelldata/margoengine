@@ -1,0 +1,142 @@
+{
+  "date": "2026-11-09",
+  "scope": "Complete Node/headless Basis glTF integration, not independent Basis accuracy or quality/speed",
+  "source": {
+    "revision": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
+    "model": "FlightHelmet/glTF-KTX-BasisU",
+    "authors": "Gary Hsu and Microsoft",
+    "licence": "CC0-1.0",
+    "reusedOriginMainSourceRecord": true,
+    "manifest": "scripts/support/external-test-assets.json",
+    "family": "helmet/",
+    "requiredFiles": 17
+  },
+  "runtime": {
+    "node": "v26.12.0",
+    "binding": "webgpu 0.6.2",
+    "noDocument": true,
+    "noWorker": true
+  },
+  "gpu": {
+    "requests": 17,
+    "textures": 15,
+    "mipLevels": 177,
+    "decodedBytes": 285212652,
+    "primitives": 6,
+    "vertices": 55392,
+    "indices": 284166,
+    "drawn": 3517,
+    "width": 256,
+    "height": 256,
+    "pixelSha256": "fab594ad1802f106452855ae1d99dcfd744411cf2edb1dba7a2ee304134cff8a",
+    "validationErrors": []
+  },
+  "readmeResults": [
+    {
+      "id": "decoders/readme-margoengine-decoders-4ae9a8",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-meshopt-on-wasm-simd-margoengine-4fc59d",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-jpeg-xl-margoengine-decoders-jxl-2c0973",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-pvr-margoengine-decoders-pvr-44fd95",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-draco-point-clouds-margoengine-d-5f1327",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-webp-margoengine-decoders-webp-0035ab",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "decoders/readme-any-image-to-pixels-margoengine-91c6d3",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "decoders/readme-any-image-to-pixels-margoengine-e22417",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "decoders/readme-brotli-margoengine-decoders-brot-f9820a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-bzip2-and-xz-margoengine-decoder-b38bfe",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-png-margoengine-decoders-png-5cf12b",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-tga-tiff-dds-and-ktx-1-margoengi-d480af",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-pcx-margoengine-decoders-pcx-150025",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-ktx2-cube-maps-and-arrays-margoe-d255e4",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-hdr-ktx2-margoengine-decoders-kt-cbfebd",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-streaming-ktx2-mips-margoengine-d0b4d7",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-basis-on-the-gpu-margoengine-dec-8314b0",
+      "result": "pass",
+      "place": "page"
+    }
+  ],
+  "removedException": "decoders/readme-any-image-to-pixels-margoengine-86f34e",
+  "knownRemaining": 48,
+  "regressions": [
+    "packages/decoders/tests/readme-node.test.js",
+    "tests/readme-assets.test.js",
+    "tests/run-readme-examples.test.js",
+    "packages/decoders/scripts/test-node-gltf.mjs"
+  ],
+  "validation": {
+    "lint": true,
+    "hygiene": true,
+    "verifyTests": 13400,
+    "verifyFailures": 0,
+    "verifySkips": 0,
+    "verifySeconds": 368.7,
+    "packageTests": 258,
+    "rootTests": 46,
+    "browserGPUChecks": 14,
+    "readmePassed": 17,
+    "readmeTotal": 17
+  }
+}

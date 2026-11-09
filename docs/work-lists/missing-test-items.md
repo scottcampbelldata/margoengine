@@ -152,7 +152,7 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | Stable example ID | Requested files | Original failure | Status |
 | --- | --- | --- | --- |
 | animation/readme-geometry-caches-margoengine-anim-dcf6c5 | /flag.mgc | sample: MargoError: Geometry cache request failed with status 404; check the URL | Pending file selection, provenance and rerun |
-| decoders/readme-any-image-to-pixels-margoengine-86f34e | See named example | sample: TypeError: Failed to fetch | Pending file selection, provenance and rerun |
+| decoders/readme-any-image-to-pixels-margoengine-86f34e | complete FlightHelmet glTF-KTX-BasisU and 16 companions | sample: TypeError: Failed to fetch | Passed in real Node/headless WebGPU with pinned CC0 inputs; exception removed |
 | decoders/readme-basis-on-the-gpu-margoengine-dec-8314b0 | /texture.ktx2 | sample: TypeError: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-brotli-margoengine-decoders-brot-f9820a | /node.br | sample: MargoError: Brotli stream is corrupt: a reserved bit is set | Passed with explicit licensed file/tool; exception removed |
 | decoders/readme-draco-point-clouds-margoengine-d-5f1327 | /points.drc | sample: Error: Draco: invalid header; pass an unmodified .drc buffer | Passed with explicit licensed sample; exception removed |
@@ -597,3 +597,34 @@ The ply-rs example list and python-plyfile tetrahedron supplied no big-endian mo
 No implementation was read or copied; no P20 closure, parser change or tolerance change.
 Potree pre-rebase landing validation: full verify passes 13,383 tests with zero failures/skips (398.6 s); lint and standalone hygiene pass. Both download contracts, all 192 scoped tests, 18 original README snippets and 1x/4x GPU suites pass. No exports changed. Current main adds 24 other required inputs; the final combined manifest will retain them.
 Potree post-rebase validation: the combined 457-file required manifest validates; rebuilt packages, lint and hygiene pass. All 201 focused tests (including generated documentation) and all 18 original points README examples pass with zero failures/skips. The original 1x/4x GPU suites remain passing. Both main and lane documentation additions are retained.
+
+
+### Node Basis glTF README evidence (2026-11-09)
+
+The last decoder runtime exception mixed Node-only nodeKTX2 with a browser canvas
+and a nonexistent example.com model. The original loadGLTF integration now uses
+the reader's webgpu 0.6.2 binding, installGPU and createHeadlessCanvas, with scoped
+disposal and a bounded load. It requests the complete CC0 FlightHelmet Basis
+sample by Gary Hsu and Microsoft at Khronos revision 8f492390. Main already pinned
+all 17 original resources; this change reuses that verified source/hash record.
+The required external manifest remains 457 files. No new model or encoder output
+was manufactured. Node example children serve exact pinned URL bytes from the
+outside cache and fail on missing, changed or LFS-only inputs.
+
+All 17 decoder examples execute, including the real Node load. Its additional GPU
+regression executes the README setup/load and checks all 15 textures, 177 mip levels
+and 285,212,652 decoded RGBA8 bytes, all 55,392 vertices and 284,166 indices (94,722
+triangles). A 256 x 256 readback contains 3,517 pixels different from the corner;
+there are zero validation errors. Pixel hashes are observations, not a cross-device
+equality requirement. This proves this complete-asset integration and visible draw;
+it does not prove independent Basis pixel accuracy, arbitrary model quality or speed.
+
+The runtime known list falls from 49 to 48. Package tests catch the old browser
+setup; root tests assert every companion digest and missing/changed-byte refusal.
+The new test:gpu:node-gltf package script joins the existing automatic GPU gate.
+The README runner also stops treating an unresolved Node program or page import
+as a pass at its deadline; both paths have regressions in verify. No deadline or
+budget was increased. No core, stage or held physics source changes.
+Record: docs/whitepaper/results/readme-node-basis-20261109.json.
+
+Node Basis group validation: lint/hygiene pass; verify passes 13,400 tests with zero failures/skips (368.7 s). All 258 decoder package tests, 46 focused root tests, 14 browser GPU checks, the full Node GPU integration and all 17 decoder snippets pass. No exports changed.
