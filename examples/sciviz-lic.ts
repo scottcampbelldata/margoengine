@@ -1,6 +1,6 @@
 import { Figure } from '@margoengine/sciviz';
 import { lic, type LicLayer } from '@margoengine/sciviz/lic';
-import { element, exportButton, fail, floats, signal } from './sciviz-demo.js';
+import { element, exportButton, fail, floats } from './sciviz-demo.js';
 
 const nx = 49, ny = 19, size = nx * ny;
 const km = Math.PI * 6371 / 180, cosine = Math.cos(42.5 * Math.PI / 180);
@@ -26,7 +26,7 @@ try {
     const next = await lic(figure, { dims: [nx, ny, 1], bounds, u, v: north }, {
       scalar, range: [0, 35], resolution: [256, 128], seed: 171, steps: 24,
       coloured: element<HTMLInputElement>('colour').checked, animated: animate.checked, phase: Number(phase.value),
-      signal: AbortSignal.any([signal, lifetime.signal]),
+      signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(120000)]),
     });
     if (layer) figure.replace(layer, next);
     layer = next; await figure.ready();

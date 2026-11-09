@@ -18,6 +18,13 @@ diagnostics without repeating transcodes. No source/channel/bar change.
 Public integration, complete expanded container fuzz, memory and new-Wasm GPU
 acceptance remain open. The prebuilt is retained.
 
+### Fixed: LIC demo reused an expired loader deadline
+
+The first draft combined every later layer update with the module's initial 120-second data-load signal.
+After that signal expired, all day/colour changes failed immediately. Updates now create a new 120-second
+deadline combined with the page lifetime. The real LIC demo test expires the original loader signal first,
+then exercises those controls; the old draft fails deterministically with TimeoutError.
+
 ### Fixed: scientific demo absent from production inputs
 
 Moving wind was linked from the sciviz README but missing from `scripts/build-site.js`'s explicit Vite inputs.

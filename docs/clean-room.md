@@ -99,6 +99,16 @@ Explicit build reachability and resolved navigation are distinct obligations. An
 now includes Moving wind and LIC, and the production builder consumes it. A class regression walks README
 scientific links and each page's scientific navigation targets; it fails against the prior builder.
 
+The LIC demo's first draft reused the initial data-load timeout for later interactive layer construction,
+so selecting a day after that deadline would reject immediately. Each update now owns a fresh deadline,
+combined with page lifetime cancellation. Research: WHATWG, *DOM Standard*, living edition (2026),
+[AbortSignal.timeout/any](https://dom.spec.whatwg.org/#dom-abortsignal-timeout); Alexey Kolesnichenko,
+Sebastian Nanz and Bertrand Meyer, *How to Cancel a Task*, 2013,
+[paper](https://se.inf.ethz.ch/old/people/meyer/publications/concurrency/task_cancellation.pdf).
+Task-scoped cooperative cancellation informs the ownership boundary, with the DOM standard defining exact
+signal semantics. The real-browser regression deterministically expires the initial loader deadline,
+then changes day/colour/animation; the first draft fails without waiting two wall-clock minutes.
+
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
 Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches

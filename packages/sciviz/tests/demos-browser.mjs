@@ -66,6 +66,18 @@ async function monitor(path) {
 async function run(compat) {
   const context = await openBrowser({ startPath: '/packages/sciviz/tests/sciviz.html', port: 5267, compat });
   const { page, hardware } = context;
+  // Deterministic deadline expiry: preserve real timers, but retain each timeout's controller in this test page.
+  await page.addInitScript(() => {
+    if (!location.pathname.endsWith('/sciviz-lic.html')) return;
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    globalThis.licDeadlineControllers = [];
+    AbortSignal.timeout = (ms) => {
+      const controller = new AbortController();
+      timeout(ms).addEventListener('abort', (event) => controller.abort(event.target.reason), { once: true });
+      globalThis.licDeadlineControllers.push(controller);
+      return controller.signal;
+    };
+  });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (msg) => {
@@ -292,8 +304,14 @@ async function run(compat) {
           await page.screenshot({ path: `test-results/sciviz-fixes/moving-flow-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png` });
         } else if (name === 'lic') {
           const first = await structure(path);
+          await page.evaluate(async () => {
+            const { signal } = await import('/examples/sciviz-demo.ts');
+            const timer = globalThis.licDeadlineControllers.find((c) => c.signal === signal);
+            if (!timer) throw new Error('initial data-load deadline was not captured');
+            timer.abort(new DOMException('Initial load deadline expired', 'TimeoutError'));
+          });
           await select('day', '3'); await settled(path);
-          assert.notEqual(await structure(path), first, 'different NOAA days change the dense LIC image');
+          assert.notEqual(await structure(path), first, 'later NOAA day changes remain usable after the initial load deadline expires');
           await page.uncheck('#colour'); await settled(path);
           const gray = await structure(path);
           await page.check('#animate'); await settled(path);
