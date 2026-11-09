@@ -5155,6 +5155,13 @@ zero differing pixels with input trimming disabled. This fixture-only repair
 changes no package runtime entry, precision limit or size ceiling, and closes
 only that indexed suite failure.
 
+The materials features leaf now also selects native and full compatibility
+explicitly. All 15 groups pass on both. Native clip distances retain rasterizer
+edge coverage (192 pixels differ from discard, none away from the cut); full
+compatibility advertises no clip distances and both discard images match
+exactly. Shadow, instancing, depth and live plane-change bars are unchanged.
+This test-only repair changes no runtime entry, size ceiling or precision limit.
+
 The separate compute scene-owner GPU leaf is registered in its package manifest,
 with an explicit native baseline before the full-layer case. Exactly four
 dispatches are the value oracle, not a readiness delay. No runtime size or
@@ -5660,9 +5667,11 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline; the process tree was killed. Native evidence for the complete suite
   was 113 s. No new timeout or speed claim is justified; isolate the await and
   determine actual compatibility work before changing a limit.
-- `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
-  which it does not. The feature expectation needs owning-package investigation,
-  preserving native feature coverage. The separate vertex-inputs fixture was
+- Resolved `materials/test:gpu:features`: the fixture assumed every adapter
+  advertises optional `clip-distances`. The canonical leaf now selects native
+  and full compatibility explicitly, preserving native rasterizer coverage and
+  requiring compatibility discard with the original plane/depth/shadow bars.
+  All 15 feature groups pass on both devices. Vertex-inputs was separately
   repaired by observing the engine's actual device (see batch 273 evidence below).
 - `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
   compressed texture because its view-copy path requires a renderable format.
