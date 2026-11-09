@@ -294,7 +294,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/real-files/manifest.json',
-    'real-file test: 104 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
+    "real-file test: 104 public sample files, downloaded by URL and never in the repository or a tarball; each one's source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)",
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
@@ -335,6 +335,10 @@ const ASSETS = [
   [
     'packages/weather/tests/fixtures/metar/NOTICE.md',
     'test fixtures: 798 METAR and SPECI reports of 50 aerodromes, the 12 hours before 2026-11-07 17:15 UTC, byte for byte from the NOAA Aviation Weather Center data service https://aviationweather.gov/api/data/metar (metar.txt 30,720 bytes, SHA-256 2ab25e4c497e3dec530ab26135ca3fe762ce0b0dae7f36f5db0bc69a5a6fdf79; metar2.txt 30,134 bytes, SHA-256 177e105cf7947f97ea84d344700b1956211f5683aee8da5a66c186b99e59c43d; downloaded 2026-11-07); a United States Government work, public domain in the United States; the observations of the issuing national weather services, exchanged under WMO Resolution 40',
+  ],
+  [
+    'scripts/reference-rendering/NOTICE.md',
+    'batch 160 outside reference data, never shipped: Khronos MetalRoughSpheresNoTextures (CC0-1.0, Krill Gavrilov, 2019), pinned source/scene/picture hashes and hosted Sample Viewer PNG provenance; original assets, legal notices and pictures stay in engine-bench/batch-160. Also records outside standard assets for the existing gltf-pro GPU checks',
   ],
 ];
 

@@ -3647,6 +3647,18 @@ entry measures 7,463 minified bytes / 3,318 B gzip with bare peers external. The
 overflow-safe distance maths. Those extra checks and ALU preserve finite extreme inputs; no speed is measured.
 Core plus stage remains 23,626 B gzip.
 
+
+## Batch 160 outside material pictures
+
+The metallic-roughness test covers the entire 123-primitive Khronos textureless sphere model with a
+fixed camera/sun, no IBL and 4x MSAA, at 512 x 512 on the RTX A6000 only. The full-frame RGB byte MAE
+ceiling is exactly the measured 1.837511698404948 on WebGPU and 1.837506612141927 on the WebGL2
+compatibility layer; max channel error is 254. Foreground errors and integer sum budgets are recorded in
+whitepaper/results/batch-160-metallic-roughness.json. Native WebGL2 rejects PBR explicitly.
+This is an open image-quality loss, not proof of physically accurate materials or other devices. Frozen
+reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,
+while the GPU reproduction requires those outside files. No speed or bundle-size change is claimed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5075,6 +5087,30 @@ No known open defect in tested zone selection, overlap, wet routing, tail preser
 
 No known open defect in tested first-order routing, quaternion/listener orientation, buffer playback and teardown paths. Initial browser fixture reused a plugin name for two independent contexts; unique fixture names now exercise both without changing assertions. Node fetch received HTTP 403 from the audio host; curl retrieved the published file and its MD5 matches Zenodo metadata. This was transport setup, not an engine error. Unsupported conventions/orders and the stereo-decoder/XR evidence limits are explicit in limits.md.
 
+
+### Batch 160 metallic-roughness picture loss (open)
+
+The README execution check also exposed a missing example asset: pointer-show.glb was not provided,
+so the generic replacement had no camera and viewGLTFCamera correctly rejected it. The package now
+includes a Margo-authored triangle/camera/sun pointer sample, linked from its README. Regression:
+packages/gltf-pro/tests/readme-pointer.test.js checks all three animated values at 0.5 seconds.
+
+Khronos MetalRoughSpheresNoTextures under a matched embedded camera and directional sun differs from the
+Sample Viewer: all-pixel RGB byte MAE 1.837511698404948, foreground MAE 11.58277025673087,
+RMSE 6.388144511474295, max 254, 40,875 differing pixels of 262,144. Compatibility WebGL2 MAE
+1.837506612141927. Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
+Repro: scripts/reference-rendering/run.mjs under the shared GPU lock (see whitepaper reproduction).
+
+Known Margo causes to isolate: gltf-pro/src/shader.ts clamps perceptual roughness to 0.045 even for the
+sample's authored zero-roughness column, and packages/shared/light-terms.js uses separable single-scatter
+Smith G, without height correlation or multiple-scattering compensation. Appendix B.3.6 describes why
+these model choices can lose energy. The Sample Viewer is treated strictly as a black box: its exact model
+is not inferred from source. These are known limitations of Margo's formulation, not a quantified attribution
+of this entire picture error. The residual including the thin model text and silhouettes is not yet isolated;
+sampling/display resolution and BRDF effects need separate controls. No shader change is justified by a
+guess about that residual, and recording a budget does not close the loss. No physical/path-traced parity
+is established by this first job; the environment/Cornell jobs remain outstanding.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -5934,13 +5970,14 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
-Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
+Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
-Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.
-For example, `model.primitives[0].material.side = 'back'` switches to back-only rendering next frame. Mirrored
-nodes and mixed mirrored instances retain local winding. Picking and beauty/auxiliary passes agree on sides;
-points and lines ignore triangle sides. Shadow casters retain their existing two-sided policy. `exportModel`
-in `@margoengine/exporters` bakes back-only winding and normals into glTF-compatible geometry.
+The outside-reference test renders all 123 primitives of Khronos MetalRoughSpheresNoTextures with a shared
+camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.837511698404948 on the recorded
+RTX A6000; the WebGL2 compatibility layer measures 1.837506612141927. Native WebGL2 rejects PBR with code
+`unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
+settings, source hashes and coverage are in [batch 160 reproduction](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
+From a built checkout, with the outside reference PNG already captured:
 
 [README continues: https://margoengine.com/llms/packages/gltf-pro.md]
 

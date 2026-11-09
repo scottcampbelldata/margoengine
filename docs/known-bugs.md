@@ -1423,3 +1423,27 @@ No known open defect in tested zone selection, overlap, wet routing, tail preser
 ### Ambisonic beds (batch 110)
 
 No known open defect in tested first-order routing, quaternion/listener orientation, buffer playback and teardown paths. Initial browser fixture reused a plugin name for two independent contexts; unique fixture names now exercise both without changing assertions. Node fetch received HTTP 403 from the audio host; curl retrieved the published file and its MD5 matches Zenodo metadata. This was transport setup, not an engine error. Unsupported conventions/orders and the stereo-decoder/XR evidence limits are explicit in limits.md.
+
+
+### Batch 160 metallic-roughness picture loss (open)
+
+The README execution check also exposed a missing example asset: pointer-show.glb was not provided,
+so the generic replacement had no camera and viewGLTFCamera correctly rejected it. The package now
+includes a Margo-authored triangle/camera/sun pointer sample, linked from its README. Regression:
+packages/gltf-pro/tests/readme-pointer.test.js checks all three animated values at 0.5 seconds.
+
+Khronos MetalRoughSpheresNoTextures under a matched embedded camera and directional sun differs from the
+Sample Viewer: all-pixel RGB byte MAE 1.837511698404948, foreground MAE 11.58277025673087,
+RMSE 6.388144511474295, max 254, 40,875 differing pixels of 262,144. Compatibility WebGL2 MAE
+1.837506612141927. Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
+Repro: scripts/reference-rendering/run.mjs under the shared GPU lock (see whitepaper reproduction).
+
+Known Margo causes to isolate: gltf-pro/src/shader.ts clamps perceptual roughness to 0.045 even for the
+sample's authored zero-roughness column, and packages/shared/light-terms.js uses separable single-scatter
+Smith G, without height correlation or multiple-scattering compensation. Appendix B.3.6 describes why
+these model choices can lose energy. The Sample Viewer is treated strictly as a black box: its exact model
+is not inferred from source. These are known limitations of Margo's formulation, not a quantified attribution
+of this entire picture error. The residual including the thin model text and silhouettes is not yet isolated;
+sampling/display resolution and BRDF effects need separate controls. No shader change is justified by a
+guess about that residual, and recording a budget does not close the loss. No physical/path-traced parity
+is established by this first job; the environment/Cornell jobs remain outstanding.

@@ -602,3 +602,36 @@ required. Box2D parity is open and owned-2D CCD stays T-11 / 127.y.
 Retained native/compatibility hardware and readback evidence: [pixel-review102.json](results/pixel-review102.json).
 
 After `npm run build:packages`, run `npm test --workspace @margoengine/pixel` for pipeline identity, scene/resource ownership, scissor intersections, huge cycle shifts, overflow errors and the architecture evidence check. Run `node scripts/gpu-lock.mjs run --owner=codex-pixel --max=12 --wait-max=2 -- npm run test:gpu --workspace @margoengine/pixel` for all five pixel GPU harnesses, including shared format/disposal/scissor regressions and the 154-size exact CRT/nearest sweep. Repeat with environment `MARGO_COMPAT=1` for the WebGL2 layer. Each CRT all-off sample is checked byte for byte against rational nearest and PixelScale, including exact boundaries; no sample is skipped. GPU result files are `test-results/pixel-browser.json`, `palette-browser.json`, `render3d-browser.json`, `pixel-scale-browser.json` and `pixel-crt-browser.json`; native and compatibility runs overwrite those local files, so retain copies between runs. No speed measurement is claimed.
+
+
+## Batch 160 metallic-roughness
+
+Build packages first. Set MARGO_ENGINE_BENCH to the outside engine-bench folder if it is not
+C:/Development/Projects/engine-bench. No third-party renderer source is read or imported into Margo.
+
+~~~sh
+node scripts/reference-rendering/fetch-assets.mjs
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs --capture-reference
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs --compat
+node --test --test-timeout=30000 tests/reference-rendering.test.js
+~~~
+
+The first GPU command operates the hosted Sample Viewer through its public controls, selects the embedded camera,
+turns IBL and environment background off, keeps punctual lighting on and exposure 1, selects Khronos PBR Neutral,
+sets black background, and downloads its PNG. This avoids including the UI toggle button in a canvas screenshot.
+Reference images, original asset/legal notice, matched GLB and viewer metadata stay under
+engine-bench/batch-160. The model is pinned at glTF-Sample-Assets commit
+8f492390ddc7a2ae221a1369ef560589cf8c70fb; source, scene and PNG hashes are in the raw result.
+The viewer's deployed JS resource identifier is recorded as provenance, never read as source. A changed viewer
+picture fails the reference hash check; do not replace its baseline to pass. Recover the frozen PNG from the
+recorded outside folder for the exact historical comparison. Remote deployment changes are not a Margo regression.
+
+The scene preserves all materials/geometry and original roots, adding a 1000x root scale, a 35-degree camera
+at [12,9,18] looking at [3,3,-1.5], and a white directional irradiance 3 from normalized [0.4,0.7,0.6].
+Both renderers use 512 x 512, DPR 1 and 4x MSAA. Error counts every RGB channel of every pixel including
+background, text and silhouettes, after the same display transform. No crop, registration, fitted exposure,
+per-material exclusion or path-tracer claim is made. Foreground is the union of all nonblack pixels.
+The compatibility run installs Margo's WebGL2 compatibility device; native WebGL2 is independently asserted
+to reject PBR with code unsupported. This job does not rerun batch 168 OIT, sky, staging or lightmap.
+--measure is for collecting a new scene before establishing its budget, not accepting a failed existing test.

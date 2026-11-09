@@ -1256,3 +1256,10 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 Retained evidence: [native WebGPU and WebGL2 layer results](results/pixel-review102.json).
 
 LIM-561 and LIM-562 additionally require format round trips (rgba8unorm, bgra8unorm and back), fitted/scissor intersections including empty clips, and direct disposal of same-name plugins in different scenes. `packages/pixel/tests/screen-regressions.js` runs in both existing scale/CRT GPU harnesses on native WebGPU and the WebGL2 compatibility layer. `screen-pass.test.js` checks pipeline auto-layout identity and exactly-once buffer/texture destruction, including PaletteQuantize and LayerCompositor ownership. LIM-567 additionally checks huge signed finite cycle shifts before small-index subtraction, and coded overflow rejection in both blend modes (`palette-cycle.test.js`). Exact all-off boundaries have zero skipped samples; curved-glass float32/float64 boundary exclusions remain scoped. Evidence is one RTX A6000/Edge, no timing or cross-vendor claim. Architecture maths and remaining gaps: operational-playbook sections 2 and 5.
+
+
+## Batch 160 metallic-roughness outside reference
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| All-pixel RGB MAE 1.837511698404948 against a Khronos Sample Viewer picture; compatibility WebGL2 1.837506612141927 | [Raw result](results/batch-160-metallic-roughness.json), `scripts/reference-rendering/run.mjs`, `tests/reference-rendering.test.js` | RTX A6000, Edge 157, 512 x 512, all 123 sample-model primitives, 4x MSAA, matched embedded camera/sun, no IBL; measured loss, not physical equivalence. Native WebGL2 explicitly rejects PBR. Integer absolute/squared/max budgets equal the recorded measurements. |

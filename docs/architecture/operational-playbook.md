@@ -1351,6 +1351,13 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 160 adds the first outside metallic-roughness picture budget: all 123 Khronos textureless sphere
+primitives, matched embedded camera/sun, neutral display transform and every pixel, against Sample Viewer
+PNG output. RTX A6000 RGB MAE 1.837511698404948 on WebGPU and 1.837506612141927 through WebGL2
+compatibility; native WebGL2 explicitly rejects PBR. See whitepaper/results/batch-160-metallic-roughness.json
+and scripts/reference-rendering/run.mjs. The remaining picture loss is open in known-bugs; other material
+families and the independent path-traced IBL/Cornell controls are still unmeasured. No core change.
+
 The following remain technical gaps, not permission to weaken a check:
 
 PixelScale, CRT and PaletteQuantize have CPU-reference/readback evidence on the RTX A6000 through native WebGPU and

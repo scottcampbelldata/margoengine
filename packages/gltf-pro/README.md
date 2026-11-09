@@ -44,7 +44,20 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
-Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
+Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
+
+The outside-reference test renders all 123 primitives of Khronos MetalRoughSpheresNoTextures with a shared
+camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.837511698404948 on the recorded
+RTX A6000; the WebGL2 compatibility layer measures 1.837506612141927. Native WebGL2 rejects PBR with code
+`unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
+settings, source hashes and coverage are in [batch 160 reproduction](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
+From a built checkout, with the outside reference PNG already captured:
+
+```sh
+node scripts/reference-rendering/fetch-assets.mjs
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 -- node scripts/reference-rendering/run.mjs
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 -- node scripts/reference-rendering/run.mjs --compat
+```
 
 Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.
 For example, `model.primitives[0].material.side = 'back'` switches to back-only rendering next frame. Mirrored
@@ -136,6 +149,9 @@ caller-owned clearcoat/transmission textures accept a glTF-style `transform` opt
 values (node transforms and weights, material factors and
 texture transforms, `model.lights`, `model.cameras`, node visibility) and lists the pointers it skips in
 `animation.warnings`. Lights and cameras are data: hand them on after each update.
+
+Copy the included [pointer-show.glb](tests/fixtures/pointer-show.glb) into your app's public folder to run
+this example. It contains a triangle, perspective camera and directional sun, all animated by pointers.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -603,8 +619,8 @@ engine.use(second);
 ```
 
 `shareImages()` counts the new holder at once: pass the images to `closeImages(images)` if no model ends up holding
-them.
-
+them.
+
 `second.adoptStaticBatches(first)`, called before `engine.use(second)`, takes `first`'s baked static batches so
 `second` skips baking and the engine-wide tick baking needs. `second` must be a fresh model of the same asset in the
 same local pose, and `first` must be set up and unparented. It returns false, changing nothing, when the batches do not

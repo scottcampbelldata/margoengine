@@ -3580,3 +3580,20 @@ Six optional audio capabilities, built in order, one commit and push per job. Be
 - **Checks:** each job runs lint, hygiene, full verify, audio tests, GPU-locked browser suite and audio README execution, with hard time limits. API reports are regenerated on every export change. Unrelated main moves use the prescribed rebuild/API/quality and focused package/claims/llms/GPU/README checks. Existing two /sounds/*.ogg README 404 examples remain on the known list; every new generated-PCM example runs.
 - **Final entry sizes (gzip B, bare optional peers external):** root 7638; occlusion 1516; doppler 1090; events 5491; music 1572; zones 1139; ambisonics 1919. Core plus stage 23,626 B, below 25,000 B. Music and zones require the optional mixer peer; root imports none of these feature entries.
 - **Limits:** sampled CPU obstruction, instantaneous subsonic Doppler, finite pooled event voices, fixed-tempo stem gain layering, authored fixed room zones, and first-order virtual-cardioid stereo AmbiX. No diffraction/sonic-boom propagation, time stretching/section sequencing, continuous room acoustics, HOA/FuMa conversion or HRTF. Recordings/listening quality remain unmeasured except the stated external-stimulus file path; physical XR headset, other browsers/devices and speed remain unmeasured.
+
+
+## Batch 160: outside rendering correctness
+
+Eight-job plan: [work list](../work-lists/batch-160-plan.md). Job 1 measures gltf-pro's base
+metallic-roughness family against Khronos Sample Viewer public-UI PNG output. It preserves all 123
+primitives, adds a shared camera/sun, and keeps every pixel in the score. RTX A6000 RGB MAE
+1.837511698404948 (WebGPU), 1.837506612141927 (WebGL2 compatibility); native WebGL2 explicitly
+rejects PBR. Measured integer error budgets are exact, with comparison-contract tests and a real-GPU
+runner. The known image loss remains open. No core or shader change; the package README's obsolete
+ACES statement is corrected to the already-implemented Khronos PBR Neutral transform.
+Jobs 2 through 8 and the final list-1 completion mark remain outstanding.
+
+The required README run found that pointer-show.glb was missing. Added a Margo-authored public-example
+fixture with animated camera, material and sun, a README download link and a regression test of the
+three values after seeking. Removed only the two now-runnable pointer-example entries from the
+README known-failure list (gltf-pro and animation use the same sample). No API behavior was loosened.

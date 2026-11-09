@@ -1608,3 +1608,25 @@ f32 inputs must remain finite, and positive divisors must survive permitted subn
 field-shift clamp, atomic interactor validation and maximum-component scaling of a vector norm are Margo's own
 numerical logic. Scaling bounds the squared components by 1; component subtraction that would exceed f32 is outside
 every supported finite radius. No external implementation was read.
+
+
+## Batch 160 outside rendering references
+
+Margo-owned scene preparation, UI automation and pixel comparison in scripts/reference-rendering are
+written from the glTF camera/GLB and KHR_lights_punctual specifications and public browser APIs.
+The Khronos viewer runs on its hosted site; only DOM controls, rendered PNGs, GL context attributes
+and resource identifiers are observed. No renderer/shader source or other engine implementation was read.
+Standard asset and legal notice stay outside this repository; provenance is in THIRD-PARTY-NOTICES.md.
+
+Research references for interpreting the measured loss, not a claim that a full paper audit or their
+improvements have been implemented:
+
+- [glTF 2.0 Appendix B](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#appendix-b-brdf-implementation),
+  especially B.3.6's masking, multiple-scattering and diffuse/specular-coupling discussion (read).
+- Brent Burley, [Physically-Based Shading at Disney](https://www.disneyanimation.com/publications/physically-based-shading-at-disney/), SIGGRAPH 2012, metal/dielectric model background; full PDF audit remains for batch 132.
+- Eric Heitz, [Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs](https://jcgt.org/published/0003/02/03/), JCGT 2014, separable versus height-correlated masking background; full PDF audit remains for batch 132.
+- Christopher Kulla and Alejandro Conty, [Revisiting Physically Based Shading at Imageworks](https://blog.selfshadow.com/publications/s2017-shading-course/), 2017; the energy-compensation method is described in the glTF discussion and Turquin's paper, not claimed as fully read here.
+- Emmanuel Turquin, [Practical multiple scattering compensation for microfacet models](https://blog.selfshadow.com/publications/turquin/ms_comp_final.pdf), 2019, single-scattering energy-loss discussion and compensation model (sections 1 and 2 read).
+
+The picture residual has not been attributed to one of those effects by a controlled ablation. The
+frozen measured budget records the loss and does not excuse it or prove physical equivalence.
