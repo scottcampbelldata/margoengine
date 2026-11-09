@@ -54,6 +54,10 @@
     "./zones": {
       "types": "./dist/zones.d.ts",
       "import": "./dist/zones.js"
+    },
+    "./ambisonics": {
+      "types": "./dist/ambisonics.d.ts",
+      "import": "./dist/ambisonics.js"
     }
   },
   "files": [

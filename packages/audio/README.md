@@ -418,3 +418,70 @@ immutable bounds, teardown and failure cleanup. Real browser PCM compares genera
 impulses to existing mixer responses across room entry/switch/exit, including dry
 sound and retained tails, on all three routes. Generated rooms/motion are stand-ins;
 recordings, listening quality, other browsers and performance remain unmeasured.
+
+## Ambisonic beds
+
+`@margoengine/audio/ambisonics` plays and rotates first-order AmbiX beds (four
+ACN/SN3D channels W,Y,Z,X). It uses Web Audio splitters, a rotation/decoder gain
+matrix and a stereo merger on WebGPU, native WebGL2 and compatibility WebGL2.
+
+```ts
+import {AudioListener} from 'margoengine/audio';
+import {AmbisonicAudio} from 'margoengine/audio/ambisonics';
+
+const context = new OfflineAudioContext(2, 24000, 48000);
+using listener = new AudioListener({context, smoothing: 0});
+const buffer = context.createBuffer(4, 24000, 48000);
+// A generated plane-wave tone from the recording's front: W = X, Y = Z = 0.
+for (let i = 0; i < buffer.length; i++) {
+  const sample = 0.1 * Math.sin(2 * Math.PI * 600 * i / 48000);
+  buffer.getChannelData(0)[i] = sample;
+  buffer.getChannelData(3)[i] = sample;
+}
+using bed = new AmbisonicAudio(listener, buffer, {volume: 0.5});
+bed.setRotation([0, Math.SQRT1_2, 0, Math.SQRT1_2]).play(); // 90-degree world Y rotation
+console.log((await context.startRendering()).length); // 24000 frames
+```
+
+For a file, use `await listener.load(url, {signal})`, then construct the bed from
+that decoded buffer. Four-channel PCM WAV is tested. Browser codec/container support
+controls loading; this entry does not parse CAF adaptor matrices, Opus mapping
+metadata or infer normalization from a buffer. Confirm ACN/SN3D before passing it.
+`format='ambix'` is the only supported convention. FuMa, N3D, A-format, higher orders,
+extra stereo channels and mixed-order layouts need conversion first; other formats
+or channel counts raise `unsupported` with a help link. Buffers have positive finite
+duration and are shared. No core/stage changes or additional peer dependencies.
+
+The decoder uses two virtual cardioid microphones at +/-30 degrees about listener
+forward: each output is `0.5 * (W + dot(direction, [X,Y,Z]))`, then output volume.
+This gives orientation-dependent stereo ambience. It is not an HRTF/binaural decoder,
+loudspeaker-layout decoder or a guarantee of headphone front/back/elevation localization.
+ACN axes are X front, Y left, Z up. Identity field orientation maps those to engine
+world -Z, -X, +Y respectively. `setRotation([x,y,z,w])` applies an active world-space
+field rotation, normalized and copied. Listener orientation applies the inverse head
+rotation to the bed. Translation is ignored for this infinitely distant ambience.
+
+`loop=true` loops the complete buffer; `volume=1` is linear gain in 0..1; `smoothing`
+defaults to `listener.smoothing` (0.02 s), a finite nonnegative time constant, with
+0 immediate. Independent channel gains interpolate during orientation changes;
+intermediate matrices during a fade are a blend, not an exact rigid rotation.
+Use aligned/seamless loops and manage headroom. Eight gain paths and one source per
+bed; no convolution, worklet, per-sample JavaScript or HRTF assets. Unchanged matrices
+schedule nothing. `volume` can be changed independently of field rotation.
+
+`play(at=context.currentTime)` starts from phase zero at/after now; a playing or
+scheduled bed must be stopped before restart. `isPlaying` includes scheduled starts.
+Natural end clears it for `loop=false`. `stop()` cuts and disconnects playback.
+`dispose()`, `using` and listener teardown release decoder nodes and preserve buffers.
+Disposed calls raise linked `disposed`; invalid values use linked `state` errors.
+
+The listener updates the matrix each frame. For XR, feed the headset's world forward
+and up vectors through `listener.follow(null).setPose(position, forward, up)` before
+`listener.update()`. Directions must be independent; a collinear pose raises `state`.
+This entry adds no XR session/headset driver. Physical headset tracking and subjective
+localization are unmeasured. CPU tests cover full quaternion yaw/pitch/roll basis
+changes; browser PCM covers channel routing, looping, listener yaw and field yaw on
+all three routes. Evidence uses generated independent tones and a licensed external
+rain stimulus excerpt: [source/changes](tests/fixtures/NOTICE.md). That file validates
+decoding/resampling and matrix output, not a microphone chain or recording provenance.
+Listening quality, other browsers/devices and performance remain unmeasured.

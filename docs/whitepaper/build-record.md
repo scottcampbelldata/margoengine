@@ -3559,3 +3559,24 @@ Wall-clock comparisons are alternating paired rounds, per-round minima, busy mac
   Core plus stage is 23,626 B gzip, below 25,000 B. No exports changed.
 - **Losses:** all image and timing losses remain in known-bugs.md. Publishing measurements does not close
   them. Busy-machine speed rows require quiet release reruns; no speed-budget waiver was used here.
+
+## Batch 110: audio
+
+Six optional audio capabilities, built in order, one commit and push per job. Before each job all package sources/READMEs were searched; none already supplied that feature. Existing BVH, voice pools and mixer buses/reflections were reused. Core and stage are untouched.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Occlusion/obstruction | DONE | 4068cec2f | audio/occlusion | occlusion.test.js, occlusion-browser.js, LIM-602 |
+| 2 | Doppler | DONE | 9c1b9febf | audio/doppler | doppler.test.js, doppler-browser.js, LIM-603 |
+| 3 | Sound event containers | DONE | c5d2a6fb8 | audio/events | events.test.js, events-browser.js, LIM-605 |
+| 4 | Adaptive music | DONE | 435c7d87c | audio/music | music.test.js, music-browser.js, LIM-607 |
+| 5 | Reverb zones | DONE | 540e5cb3a | audio/zones | zones.test.js, zones-browser.js, LIM-608 |
+| 6 | Ambisonic beds | DONE | this commit | audio/ambisonics | ambisonics.test.js, ambisonics-browser.js, LIM-610 |
+
+- **Sources and proof:** public Web Audio Recommendation, published propagation survey, AmbiX paper and RFC 8486; clean-room.md records them. Real Edge OfflineAudioContext PCM beside WebGPU, native WebGL2 and compatibility WebGL2, zero GPU validation errors. Jobs 1-5 use generated tones/geometry/motion and are explicitly stand-in claims. Job 6 also decodes a licensed external four-channel rain-stimulus excerpt with source/changes/hashes registered through supply-chain.mjs and THIRD-PARTY-NOTICES.md; no microphone-chain claim. Evidence JSON files are whitepaper/results/audio-{occlusion,doppler,events,music,zones,ambisonics}-20261108.json.
+- **Owning bug fixes:** initial text/extrude readonly classifyLoops API baseline repair a4c0a9179 has its regression. Event review found sparse-array holes skipped by Array.every and AudioVoicePool stopped an existing voice before validating new play inputs. Explicit finite checks and validation-before-stealing fix the cause; audio.test.js/events.test.js fail before and pass after. No core workaround.
+- **Slips:** occlusion fixture initially confused compatibility API/backend labels; it now checks the compatibility device. Doppler's invalid error code and missing pose arguments were corrected. Events received claim 605 after a main rebase collision. Music tests initially inspected a bus pre-tap instead of its fader, and two interface comments were missing; corrected traversal/comments pass unchanged expectations. Music's new size item needed a documented initial budget and its helper needed structured reason arguments. Music rebase kept both sides and moved its claim to 607; a helper's git-show buffer was enlarged for generated llms text. Ambisonic fixture plugin names and host HTTP transport were corrected as recorded above. No assertions, tolerances, test skips or time budgets were loosened; no timing exception or published speed claim.
+- **Docs per job:** 1: README, limits, claims, clean-room, known-bugs, playbook, API/llms and evidence. 2: same. 3: same plus owning pool regression record. 4: same plus mixer peer/lock metadata. 5: same. 6: same plus licensed fixture provenance/supply-chain, this build record and list-3 row 110 done. Perf-history/reproduce/perf comparisons do not change because no speed was measured or claimed.
+- **Checks:** each job runs lint, hygiene, full verify, audio tests, GPU-locked browser suite and audio README execution, with hard time limits. API reports are regenerated on every export change. Unrelated main moves use the prescribed rebuild/API/quality and focused package/claims/llms/GPU/README checks. Existing two /sounds/*.ogg README 404 examples remain on the known list; every new generated-PCM example runs.
+- **Final entry sizes (gzip B, bare optional peers external):** root 7638; occlusion 1516; doppler 1090; events 5491; music 1572; zones 1139; ambisonics 1919. Core plus stage 23,626 B, below 25,000 B. Music and zones require the optional mixer peer; root imports none of these feature entries.
+- **Limits:** sampled CPU obstruction, instantaneous subsonic Doppler, finite pooled event voices, fixed-tempo stem gain layering, authored fixed room zones, and first-order virtual-cardioid stereo AmbiX. No diffraction/sonic-boom propagation, time stretching/section sequencing, continuous room acoustics, HOA/FuMa conversion or HRTF. Recordings/listening quality remain unmeasured except the stated external-stimulus file path; physical XR headset, other browsers/devices and speed remain unmeasured.

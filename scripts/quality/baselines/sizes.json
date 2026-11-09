@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11486561,
+  "total": 11488736,
   "history": [
     {
       "date": "2026-10-24",
@@ -4838,6 +4838,12 @@
       "commit": "3bcd29297",
       "reason": "voxel-net gains the ./chat entry, client sendApp and server onApp",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "540e5cb3a",
+      "reason": "New optional audio/ambisonics entry, documented in limits, core and stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -4864,6 +4870,7 @@
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
+    "@margoengine/audio/ambisonics": 2175,
     "@margoengine/audio/doppler": 1346,
     "@margoengine/audio/events": 5687,
     "@margoengine/audio/music": 1828,

@@ -150,6 +150,10 @@
       "types": "./dist/audio/zones.d.ts",
       "import": "./dist/audio/zones.js"
     },
+    "./audio/ambisonics": {
+      "types": "./dist/audio/ambisonics.d.ts",
+      "import": "./dist/audio/ambisonics.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"

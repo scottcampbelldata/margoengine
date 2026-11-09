@@ -4,6 +4,7 @@ import { runDopplerTests } from './doppler-browser.js';
 import { runEventTests } from './events-browser.js';
 import { runMusicTests } from './music-browser.js';
 import { runZoneTests } from './zones-browser.js';
+import { runAmbisonicTests } from './ambisonics-browser.js';
 import {
   AudioListener,
   Audio,
@@ -443,3 +444,4 @@ window.runDopplerTests = runDopplerTests;
 window.runEventTests = runEventTests;
 window.runMusicTests = runMusicTests;
 window.runZoneTests = runZoneTests;
+window.runAmbisonicTests = runAmbisonicTests;

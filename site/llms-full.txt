@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-609). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-610). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3618,6 +3618,14 @@ One room response and convolution per zone, memory/work proportional to zone cou
 ### Pixel batch 102 review limits (2026-11-08)
 
 Flat CRT mapping uses the same integer centre-coordinate quotient as PixelScale nearest; all-off includes exact source boundaries with no excluded samples. Curved CRT reference comparisons exclude points within 0.001 texel of an edge, where float32 and float64 can choose different texels. Scale/CRT scissor clipping applies to canvas views; an explicit output texture still covers its own fitted rectangle. Palette cycling uses the represented finite product `rate * seconds` modulo the run length; multiplication can already round away fractional steps at large magnitudes, and overflow is rejected with coded `state` and a help link. Tests cover native WebGPU and the WebGL2 compatibility layer on one RTX A6000/Edge only; other hardware, physical CRT fidelity and performance remain unmeasured.
+
+## Ambisonic beds (batch 110)
+
+Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 23,626 B. First-order four-channel ACN/SN3D W,Y,Z,X buffers only, positive finite duration, explicit convention assumption. Default format ambix; other conventions/channel counts produce linked unsupported. No FuMa/N3D/A-format conversion, higher/mixed orders, appended stereo, CAF adaptor or Opus metadata parser. Loading delegates to existing listener.load with AbortSignal and browser codec support; four-channel 24-bit PCM WAV with 44.1-to-48 kHz resampling is tested.
+
+Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Directions must be independent. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
+
+LIM-610: Node full yaw/elevation/roll basis and lifecycle checks, and real browser PCM on all three routes for generated independent-channel tones/loops and a licensed external rain-stimulus excerpt, each within 1e-6 of float64 channel matrices with zero GPU errors. First four channels of the CC BY 4.0 external 64-channel file are interpreted as ACN/SN3D; this proves file decoding and matrix routing, not a microphone chain or verified acoustic capture. XR apps feed headset world forward/up through existing listener.setPose; physical headset tracking, subjective localization, other browsers/devices and performance unmeasured.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5010,6 +5018,10 @@ No known open defect in tested layering, beat/bar scheduling, validation and lif
 ### Reverb zones (batch 110)
 
 No known open defect in tested zone selection, overlap, wet routing, tail preservation or lifecycle paths. Invalid bounds/levels reject before graph allocation; an invalid later room response disposes already created effects. Sparse coordinates reject explicitly. Node stand-ins and real browser generated-impulse PCM cover the stated scope; limits.md records model/resource limits.
+
+### Ambisonic beds (batch 110)
+
+No known open defect in tested first-order routing, quaternion/listener orientation, buffer playback and teardown paths. Initial browser fixture reused a plugin name for two independent contexts; unique fixture names now exercise both without changing assertions. Node fetch received HTTP 403 from the audio host; curl retrieved the published file and its MD5 matches Zenodo metadata. This was transport setup, not an engine error. Unsupported conventions/orders and the stereo-decoder/XR evidence limits are explicit in limits.md.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

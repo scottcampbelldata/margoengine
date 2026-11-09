@@ -1876,3 +1876,7 @@ Audio/music owns one source per stem and one mixer bus per source; mixer schedul
 ### Reverb-zone evidence (batch 110, section 5)
 
 Audio/zones routes additional wet sends to existing mixer/reflections effects and fades their inputs, so previous convolution tails remain intact while dry paths stay independent. Listener frame updates select copied AABBs; convolution topology is prepared once. LIM-608 and whitepaper/results/audio-zones-20261108.json record generated-impulse PCM against existing response sums beside WebGPU, native WebGL2 and compatibility WebGL2, within 1e-6 and zero GPU errors. No core/stage changes or speed claim. Real room recordings, listening quality and other browsers remain unmeasured.
+
+### Ambisonic-bed evidence (batch 110, section 5)
+
+Audio/ambisonics keeps four components discrete through a splitter and eight gain paths into two virtual cardioids, rotating decoder directions by listener pose and inverse field quaternion. No renderer/core/stage changes, worklet or convolution. LIM-610 and whitepaper/results/audio-ambisonics-20261108.json record real browser sample-reference PCM beside WebGPU, native WebGL2 and compatibility WebGL2, including generated looping components plus decoding/resampling of a licensed external rain stimulus. CPU tests additionally cover full orientation bases and lifecycle. Real headset tracking, HRTF localization, subjective quality and speed remain unmeasured.

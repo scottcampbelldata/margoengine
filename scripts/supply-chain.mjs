@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/audio/tests/fixtures/NOTICE.md',
+    'Ambisonic test audio: first-second, first-four-channel excerpt of RainSceneO7.wav by Stefan Riedel, Ambisonic Stimuli Files and Binaural Renders, Zenodo 10.5281/zenodo.10227483 (CC BY 4.0). Original samples unchanged; WAV header rewritten and higher orders/metadata omitted. rain-foa.json pins source and excerpt hashes. Test-only, never shipped in package tarballs',
+  ],
+  [
     'packages/text/tests/fixtures/fonts/NOTICE.md',
     'test fonts: Source Sans 3 Regular 3.052R TTF and name-keyed CFF1 OTF, unmodified binary assets from https://github.com/adobe-fonts/source-sans/tree/3.052R (TTF/SourceSans3-Regular.ttf and OTF/SourceSans3-Regular.otf), downloaded 2026-11-08; Copyright 2010-2022 Adobe, Reserved Font Name Source, SIL Open Font License 1.1 (full text in packages/text/tests/fixtures/fonts/OFL.txt, from that release LICENSE.md). The linked notice and outline-reference.json record provenance and SHA-256. Our independent native-outline reference data and its generator are test-only, never shipped',
   ],

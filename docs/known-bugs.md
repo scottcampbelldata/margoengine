@@ -1387,3 +1387,7 @@ No known open defect in tested layering, beat/bar scheduling, validation and lif
 ### Reverb zones (batch 110)
 
 No known open defect in tested zone selection, overlap, wet routing, tail preservation or lifecycle paths. Invalid bounds/levels reject before graph allocation; an invalid later room response disposes already created effects. Sparse coordinates reject explicitly. Node stand-ins and real browser generated-impulse PCM cover the stated scope; limits.md records model/resource limits.
+
+### Ambisonic beds (batch 110)
+
+No known open defect in tested first-order routing, quaternion/listener orientation, buffer playback and teardown paths. Initial browser fixture reused a plugin name for two independent contexts; unique fixture names now exercise both without changing assertions. Node fetch received HTTP 403 from the audio host; curl retrieved the published file and its MD5 matches Zenodo metadata. This was transport setup, not an engine error. Unsupported conventions/orders and the stereo-decoder/XR evidence limits are explicit in limits.md.

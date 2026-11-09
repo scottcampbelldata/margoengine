@@ -1,0 +1,26 @@
+{
+  "source": "https://zenodo.org/records/10227483",
+  "url": "https://zenodo.org/api/records/10227483/files/RainSceneO7.wav/content",
+  "creator": "Stefan Riedel",
+  "title": "Ambisonic Stimuli Files and Binaural Renders",
+  "license": "CC-BY-4.0",
+  "downloaded": "2026-11-09",
+  "original": {
+    "bytes": 84672690,
+    "md5": "6cda8a8572a851353e11cfc80f37c025",
+    "sha256": "005304142bea572d5b69f1b58e3eddcbf75843982c8d20423cf078911b106486",
+    "channels": 64,
+    "rate": 44100,
+    "bits": 24
+  },
+  "excerpt": {
+    "file": "rain-foa.wav",
+    "bytes": 529244,
+    "sha256": "7c039c29f4cb746139a7064ab197df42fe7b82e8cc205f389256fc685acbeb3e",
+    "frames": 44100,
+    "channels": 4,
+    "rate": 44100,
+    "bits": 24,
+    "changes": "First second, first four ACN channels only; unchanged 24-bit samples, standard PCM WAV header. Higher orders and original metadata omitted; no normalization."
+  }
+}

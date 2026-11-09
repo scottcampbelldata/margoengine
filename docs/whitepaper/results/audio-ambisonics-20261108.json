@@ -1,0 +1,60 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated independent-channel tones (stand-in) and first-order prefix excerpt of Stefan Riedel RainSceneO7.wav (CC BY 4.0)",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "tones": {
+        "maxError": 1.8398210593906228e-9,
+        "rms": 0.012493738200592587,
+        "channels": 4,
+        "sourceFrames": 24000,
+        "sourceRate": 48000
+      },
+      "recording": {
+        "maxError": 4.151357535508993e-9,
+        "rms": 0.01203419249640163,
+        "channels": 4,
+        "sourceFrames": 48000,
+        "sourceRate": 48000
+      },
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "tones": {
+        "maxError": 1.7641984713379077e-9,
+        "rms": 0.01249373826815193,
+        "channels": 4,
+        "sourceFrames": 24000,
+        "sourceRate": 48000
+      },
+      "recording": {
+        "maxError": 3.4974118462427484e-9,
+        "rms": 0.012034192499425346,
+        "channels": 4,
+        "sourceFrames": 48000,
+        "sourceRate": 48000
+      },
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "tones": {
+        "maxError": 1.7641984713379077e-9,
+        "rms": 0.01249373826815193,
+        "channels": 4,
+        "sourceFrames": 24000,
+        "sourceRate": 48000
+      },
+      "recording": {
+        "maxError": 4.151357535508993e-9,
+        "rms": 0.01203419249640163,
+        "channels": 4,
+        "sourceFrames": 48000,
+        "sourceRate": 48000
+      },
+      "gpuErrors": []
+    }
+  ]
+}
