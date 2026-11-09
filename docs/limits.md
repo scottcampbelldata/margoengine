@@ -2668,3 +2668,34 @@ speed phase. Correctness continues to use all original sizes and tolerances,
 with exact full-output checks at each SAXPY/grid candidate. Deferred timings
 are reported as absent, never as a replacement passing speed number. No compute
 algorithm, public feature, core/stage or size ceiling changes in this gate repair.
+
+### Batch 56 continuation acceptance snapshot (2026-11-09)
+
+All 11 terrain owner repairs pass 107 units, all 15 package GPU commands and
+16 runtime README examples. ComputeFrame passes 111 compute units, the focused
+native/compatibility dispatch/owner proof and the complete 132-check browser
+suite (413 shader modules, no errors). All 21 compute README examples run.
+Throughput/calibration measurements are deferred; correctness candidates remain
+live. The 24 focused metadata/source/policy tests pass, as do lint (120 existing
+warnings), hygiene, all five quality gates/974 entry ceilings, 1,134 README type
+examples and API update (891 entries/8,651 exports). Core plus stage remains
+23,924 B; no new ceiling is raised. These are local results, not landing or
+combined hunter acceptance. Full verify remains the inherited result recorded
+in the [gate receipt](whitepaper/results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
+Current changed-owner entries, min+gzip B (other packages external; unchanged ceilings):
+
+| Entry | Bytes |
+| --- | ---: |
+| `@margoengine/terrain` | 12868 |
+| `@margoengine/terrain/query` | 3347 |
+| `@margoengine/terrain/layers-pbr` | 2580 |
+| `@margoengine/terrain/stream` | 12009 |
+| `@margoengine/terrain/sculpt` | 4626 |
+| `@margoengine/terrain/holes` | 1283 |
+| `@margoengine/terrain/rvt` | 5303 |
+| `@margoengine/terrain/displace` | 4095 |
+| `@margoengine/terrain/deform` | 4967 |
+| `@margoengine/terrain/blend` | 3452 |
+| `@margoengine/terrain/planet` | 6403 |
+| `@margoengine/compute/frame` | 31513 |

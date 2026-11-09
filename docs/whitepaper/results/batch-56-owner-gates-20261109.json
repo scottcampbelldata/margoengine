@@ -13,16 +13,19 @@
     "environment": 16,
     "stagingTaaRoot": 20,
     "postPeers": 84,
-    "unexpectedFailures": 0
+    "unexpectedFailures": 0,
+    "terrain": 16,
+    "compute": 21
   },
   "caveats": [
     "Fog-all: 87 analytic checks pass; old-build unfogged baselines absent.",
     "Initial partial-frame and HDR camera fixtures were invalid and repaired without changing numerical bars.",
     "Painterly numerical GPU host lacked sceneOf; host contract repaired, all 20528 comparisons retained.",
     "DOF first compatibility attempt failed requestDevice after confirmed NVIDIA reset, then passed once after recovery.",
-    "Wider owner audit remains open: 118 active-engine/delegated-owner calls in 46 packages, plus one stored-scene binding.",
-    "Terrain provider fixes have 93 passing units and four failing direct-disposal mutations with four passing controls; extra GPU/README sequence is pending.",
-    "Capture-stability is assigned to capture-msaa-hunt. This continuation did not edit or run its regression."
+    "Wider owner audit remains open: 110 active-engine/delegated-owner calls in 44 packages, plus one stored-scene binding.",
+    "Capture-stability is assigned to capture-msaa-hunt. This continuation did not edit or run its regression.",
+    "Historical full verify remains 13704/13705 with its sole no-private-paths defect fixed on main and focused recheck passing; no new full-verify run or combined acceptance is claimed.",
+    "An unintended whole GPU corpus recorder was terminated while its first WGSL gate was queued. No corpus GPU suite ran; no fresh GPU corpus is claimed. The committed corpus is unchanged."
   ],
   "coreStageGzip": 23924,
   "taaUpscale": {
@@ -781,5 +784,479 @@
       "log": "test-results/56fix/owed-terrain-terrain-gpu-2.log",
       "receipt": "test-results/56fix/owed-results-terrain-gpu-0-terrain.json"
     }
-  ]
+  ],
+  "continuation": {
+    "sourceCommit": "1d9021a50d04ba2b623d18b9116cfb1be09afeba",
+    "uncommittedChanges": "documentation and receipts only",
+    "rebasedOnto": "dedf3bbfb",
+    "terrainRepair": "7255b0572",
+    "computeRepair": "4b0476da8",
+    "computeGateRepair": "1d9021a50",
+    "terrainInherited": [
+      {
+        "id": "terrain-gpu-0",
+        "words": [
+          "node",
+          "packages/terrain/test/wetness.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 241.325,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-0.log"
+      },
+      {
+        "id": "terrain-gpu-1",
+        "words": [
+          "node",
+          "packages/terrain/test/edge.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 28.743,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-1.log"
+      },
+      {
+        "id": "terrain-gpu-2",
+        "words": [
+          "node",
+          "packages/terrain/test/bump.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 12.374,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-2.log"
+      },
+      {
+        "id": "terrain-gpu-3",
+        "words": [
+          "node",
+          "packages/terrain/test/crest.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 97.655,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-3.log"
+      },
+      {
+        "id": "terrain-gpu-4",
+        "words": [
+          "node",
+          "packages/terrain/test/query.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 144.666,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-4.log"
+      },
+      {
+        "id": "terrain-gpu-5",
+        "words": [
+          "node",
+          "packages/terrain/test/layers-pbr.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 32.939,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-5.log"
+      },
+      {
+        "id": "terrain-gpu-6",
+        "words": [
+          "node",
+          "packages/terrain/test/stream.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 12.558,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-6.log"
+      },
+      {
+        "id": "terrain-gpu-7",
+        "words": [
+          "node",
+          "packages/terrain/test/sculpt.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 4.649,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-7.log"
+      },
+      {
+        "id": "terrain-gpu-8",
+        "words": [
+          "node",
+          "packages/terrain/test/holes.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 10.893,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-8.log"
+      },
+      {
+        "id": "terrain-gpu-9",
+        "words": [
+          "node",
+          "packages/terrain/test/rvt.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.877,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-9.log"
+      },
+      {
+        "id": "terrain-gpu-10",
+        "words": [
+          "node",
+          "packages/terrain/test/displace.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 51.825,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-10.log"
+      },
+      {
+        "id": "terrain-gpu-11",
+        "words": [
+          "node",
+          "packages/terrain/test/deform.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 38.095,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-11.log"
+      },
+      {
+        "id": "terrain-gpu-12",
+        "words": [
+          "node",
+          "packages/terrain/test/blend.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 51.908,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-12.log"
+      },
+      {
+        "id": "terrain-gpu-13",
+        "words": [
+          "node",
+          "packages/terrain/test/compat.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 49.063,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-13.log"
+      },
+      {
+        "id": "terrain-gpu-14",
+        "words": [
+          "node",
+          "packages/terrain/test/planet.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 8.835,
+        "log": "test-results/56fix/owed-terrain-terrain-gpu-14.log"
+      },
+      {
+        "id": "terrain-readme",
+        "words": [
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=terrain"
+        ],
+        "max": 2,
+        "code": 1,
+        "timedOut": false,
+        "seconds": 19.616,
+        "log": "test-results/56fix/owed-terrain-terrain-readme.log"
+      }
+    ],
+    "terrainCurrent": [
+      {
+        "id": "terrain-gpu-0",
+        "words": [
+          "node",
+          "packages/terrain/test/wetness.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 136.022,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-0.log"
+      },
+      {
+        "id": "terrain-gpu-1",
+        "words": [
+          "node",
+          "packages/terrain/test/edge.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.138,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-1.log"
+      },
+      {
+        "id": "terrain-gpu-2",
+        "words": [
+          "node",
+          "packages/terrain/test/bump.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.173,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-2.log"
+      },
+      {
+        "id": "terrain-gpu-3",
+        "words": [
+          "node",
+          "packages/terrain/test/crest.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.293,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-3.log"
+      },
+      {
+        "id": "terrain-gpu-4",
+        "words": [
+          "node",
+          "packages/terrain/test/query.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.97,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-4.log"
+      },
+      {
+        "id": "terrain-gpu-5",
+        "words": [
+          "node",
+          "packages/terrain/test/layers-pbr.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 29.215,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-5.log"
+      },
+      {
+        "id": "terrain-gpu-6",
+        "words": [
+          "node",
+          "packages/terrain/test/stream.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 22.243,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-6.log"
+      },
+      {
+        "id": "terrain-gpu-7",
+        "words": [
+          "node",
+          "packages/terrain/test/sculpt.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 3.587,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-7.log"
+      },
+      {
+        "id": "terrain-gpu-8",
+        "words": [
+          "node",
+          "packages/terrain/test/holes.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 7.266,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-8.log"
+      },
+      {
+        "id": "terrain-gpu-9",
+        "words": [
+          "node",
+          "packages/terrain/test/rvt.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 4.55,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-9.log"
+      },
+      {
+        "id": "terrain-gpu-10",
+        "words": [
+          "node",
+          "packages/terrain/test/displace.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 7.122,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-10.log"
+      },
+      {
+        "id": "terrain-gpu-11",
+        "words": [
+          "node",
+          "packages/terrain/test/deform.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.233,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-11.log"
+      },
+      {
+        "id": "terrain-gpu-12",
+        "words": [
+          "node",
+          "packages/terrain/test/blend.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 2.866,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-12.log"
+      },
+      {
+        "id": "terrain-gpu-13",
+        "words": [
+          "node",
+          "packages/terrain/test/compat.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.5,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-13.log"
+      },
+      {
+        "id": "terrain-gpu-14",
+        "words": [
+          "node",
+          "packages/terrain/test/planet.browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.38,
+        "log": "test-results/56fix/owed-owner-extra-terrain-gpu-14.log"
+      },
+      {
+        "id": "terrain-readme",
+        "words": [
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=terrain"
+        ],
+        "max": 2,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 19.631,
+        "log": "test-results/56fix/owed-owner-extra-terrain-readme.log"
+      }
+    ],
+    "computeCurrent": [
+      {
+        "id": "compute-owner",
+        "words": [
+          "node",
+          "packages/compute/tests/scene-owner-browser.mjs"
+        ],
+        "max": 1.5,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 186.978,
+        "log": "test-results/56fix/owed-compute-compute-owner.log"
+      },
+      {
+        "id": "compute-browser",
+        "words": [
+          "node",
+          "packages/compute/tests/compute-browser.mjs"
+        ],
+        "max": 4,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 96.134,
+        "log": "test-results/56fix/owed-compute-compute-browser.log"
+      },
+      {
+        "id": "compute-readme",
+        "words": [
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=compute"
+        ],
+        "max": 2,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 65.588,
+        "log": "test-results/56fix/owed-compute-compute-readme.log"
+      }
+    ],
+    "terrainUnits": 107,
+    "computeUnits": 111,
+    "computeBrowserChecks": 132,
+    "computeShaderModules": 413,
+    "guardsAndMetadata": 24,
+    "readmeTypeExamples": 1134,
+    "quality": "974 entry ceilings and all five gates pass; no new ceiling raised",
+    "entryBytes": {
+      "sourceCommit": "4b0476da813655a41840726e61ac5c97b12bb758",
+      "items": {
+        "@margoengine/terrain": 12868,
+        "@margoengine/terrain/query": 3347,
+        "@margoengine/terrain/layers-pbr": 2580,
+        "@margoengine/terrain/stream": 12009,
+        "@margoengine/terrain/sculpt": 4626,
+        "@margoengine/terrain/holes": 1283,
+        "@margoengine/terrain/rvt": 5303,
+        "@margoengine/terrain/displace": 4095,
+        "@margoengine/terrain/deform": 4967,
+        "@margoengine/terrain/blend": 3452,
+        "@margoengine/terrain/planet": 6403,
+        "@margoengine/compute/frame": 31513
+      },
+      "packageTreeDirty": true
+    },
+    "lint": "pass, 120 pre-existing warnings",
+    "hygiene": "pass",
+    "retainedFailures": [
+      "owner-extra-red.log: 7 direct terrain failures / 7 removal controls pass",
+      "owner-extra-green.log: six direct-setup fixture contracts lacked sceneOf; fixed in hosts",
+      "owner-extra-proof.log: launched alongside build, missing transient core dist; ordered proof passes unchanged",
+      "compute-owner-red.log: direct disposal fails / owner removal passes",
+      "compute-owner-gpu.log: first new GPU view omitted required viewport; corrected proof passes both backends",
+      "compute-speed-parent-all-red.log: old unconditional throughput/driver phase regressions fail",
+      "compute-close-readme-types.log: requested nonexistent npm alias; direct check-readme-types.mjs passes",
+      "compute-close-corpus.log: unintended recorder terminated while queued; use build-llms.mjs for text corpus"
+    ]
+  }
 }

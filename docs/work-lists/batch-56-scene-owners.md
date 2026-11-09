@@ -5,24 +5,32 @@ shader owner repair. This is a complete syntactic call inventory, not proof
 that every candidate is a bug or that every plugin has correct lifetime.
 
 The parser finds 181 actual removePlugin calls in package TypeScript sources:
-66 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
-binding needs review, 3 are core scene-router implementation, and 111 require
+67 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
+binding needs review, 3 are core scene-router implementation, and 110 require
 registration/receiver inspection. The old 187-line text scan included signatures
 and comments and came from older source. No calls or packages are silently
 waived by this recount. No core edit is proposed. Physics remains on hold.
 
 A second inventory finds 173 explicit EnginePlugin classes, all with dispose;
-56 contain sceneOf(this) in disposal and 88 contain an active-engine-shaped
+57 contain sceneOf(this) in disposal and 87 contain an active-engine-shaped
 removal. These are syntactic categories, not exhaustive inheritance or dataflow
 proof. Missing detachment can exist without any removePlugin call, as ScenePass
 and RawShaders demonstrated. Existing schema does not statically encode scene
 ownership. Research comparison and method: [clean-room record](../clean-room.md#batch-56-remaining-proof-and-owner-audit-2026-11-09).
 
-Proven and repaired in this continuation: ComputePass, ScenePass, RawShaders and all 11 terrain plugins.
-Their real-engine unit regression has three direct-disposal failures on the
-original implementation, with owner-removal controls passing. Shader six cases pass; terrain has 22 real-engine cases across all 11 classes. tests/shader-owner-contract.test.js adds the whole shader plugin class to
-verify/check:merge and tests missing/active-scene detachment mutations. Terrain package units pass 107/107 and terrain/SSR keeps 6,458 GPU calls. GPU
-and README acceptance must be recorded separately; inventory is not acceptance.
+Proven and repaired in this continuation: ComputePass, ScenePass, RawShaders,
+all 11 terrain plugins and ComputeFrame. The real-engine suites cover direct
+and owner removal, restoration, same-name isolation and replacement. Terrain's
+new seven direct cases fail on the parent, with seven passing removal controls;
+ComputeFrame's new direct case fails, with its removal control passing.
+
+Terrain passes 107 units, all 15 package GPU commands and all 16 runtime README
+examples. Compute passes 111 units, its native/compatibility owner dispatch
+regression, all 132 browser checks (413 shader modules) and 21 README examples.
+Shader acceptance is retained from the prior continuation. Five source guards
+cover shader, compute frame and all terrain EnginePlugin classes. Three new
+speed-policy guards protect deferred throughput without deferring correctness.
+The wider audit remains OPEN. These results do not prove the remaining candidates.
 
 For each candidate below, inspect setup/attach, bind the actual EnginePlugin
 identity (including wrapper plugins), reproduce direct disposal and owner removal
@@ -44,7 +52,6 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 | biomes | 1 | [BiomeView](../../packages/biomes/src/view.ts#L1584) |
 | cinematic | 2 | [Cinematic](../../packages/cinematic/src/index.ts#L293), [CameraBrain](../../packages/cinematic/src/brain.ts#L575) |
 | clustered | 6 | [LocalShadows](../../packages/clustered/src/shadows.ts#L1138), [ProjectorLights](../../packages/clustered/src/projector.ts#L258), [Clustered](../../packages/clustered/src/index.ts#L644), [IESLights](../../packages/clustered/src/ies.ts#L436), [DirectionalLights](../../packages/clustered/src/directional.ts#L237), [AreaLights](../../packages/clustered/src/area.ts#L262) |
-| compute | 1 | [ComputeFrame](../../packages/compute/src/frame.ts#L145) |
 | controls | 4 | [TransformControls](../../packages/controls/src/transform.ts#L569), [<function>](../../packages/controls/src/orbit.ts#L859), [Controls](../../packages/controls/src/controls.ts#L187), [ArcballGizmo](../../packages/controls/src/arcball-gizmo.ts#L200) |
 | creative | 2 | [Planet](../../packages/creative/src/planet.ts#L372), [GrassField](../../packages/creative/src/grass.ts#L475) |
 | culling | 5 | [CulledModels](../../packages/culling/src/models.ts#L634), [CulledMeshes](../../packages/culling/src/meshes.ts#L443), [LodInstances](../../packages/culling/src/lod.ts#L369), [CulledInstances](../../packages/culling/src/index.ts#L669), [DynamicInstances](../../packages/culling/src/dynamic.ts#L815) |
@@ -73,7 +80,7 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 | splats | 6 | [SplatLod](../../packages/splats/src/lod.ts#L467), [SplatLighting](../../packages/splats/src/lighting.ts#L271), [Splats](../../packages/splats/src/index.ts#L611), [SplatDepth](../../packages/splats/src/depth.ts#L168), [SplatBrush](../../packages/splats/src/brush.ts#L310), [Player](../../packages/splats/src/animate.ts#L137) |
 | sprites | 3 | [SkeletalLayer](../../packages/sprites/src/skeletal.ts#L483), [SpriteLayer](../../packages/sprites/src/index.ts#L443), [BillboardLayer](../../packages/sprites/src/billboard.ts#L399) |
 | stats | 4 | [FramePhases](../../packages/stats/src/phases.ts#L215), [Stats](../../packages/stats/src/index.ts#L440), [PipelineCompiles](../../packages/stats/src/compile.ts#L314), [FrameBeacon](../../packages/stats/src/beacon.ts#L196) |
-| tilemap | 2 | [GridTileMap](../../packages/tilemap/src/iso.ts#L287), [TileMap](../../packages/tilemap/src/renderer.ts#L362) |
+| tilemap | 2 | [TileMap](../../packages/tilemap/src/renderer.ts#L362), [GridTileMap](../../packages/tilemap/src/iso.ts#L287) |
 | tiles | 2 | [TilesRenderer](../../packages/tiles/src/renderer.ts#L449), [TilesRenderer](../../packages/tiles/src/renderer.ts#L450) |
 | toon | 3 | [ModelOutlines](../../packages/toon/src/models.ts#L444), [Toon](../../packages/toon/src/index.ts#L110), [Hatching](../../packages/toon/src/hatch.ts#L212) |
 | vfx | 1 | [VFX](../../packages/vfx/src/base.ts#L1212) |

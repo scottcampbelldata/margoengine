@@ -5233,6 +5233,63 @@ WideAngle, WideAngleCube and NodePass explicitly detach their own registration;
 the cube effect preserves borrowed cubes. Device restoration keeps registration.
 No rendering work or entry ceilings change; physical GPU/README gates are pending.
 
+### Batch 56 terrain lifecycle scope
+
+All 11 explicit terrain EnginePlugin classes now detach by actual identity.
+The new seven-owner regressions use a real engine with inert GPU resources;
+they prove registration, restoration and disposal, not pixel output. Existing
+numerical bars and shaders are unchanged. The terrain/SSR deterministic proof
+retains 6,458 recorded GPU calls. Full GPU/README acceptance is recorded
+separately. No core/stage change or timing measurement is introduced.
+
+### Batch 56 ComputeFrame lifecycle scope
+
+ComputeFrame disposal removes the registered scene identity and its compute
+context/arrays, while the engine device remains borrowed. Restoration clears
+jobs and replaces the context without detaching registration. Unit evidence
+uses a real engine and inert device; the focused GPU fixture checks 1,024 exact
+four-step values on each backend. GPU/README results are recorded separately;
+no new compute capability, kernel, core/stage or speed claim is introduced.
+
+### Compute browser gate phase
+
+Compute throughput and hardware winner measurements run only in the active
+speed phase. Correctness continues to use all original sizes and tolerances,
+with exact full-output checks at each SAXPY/grid candidate. Deferred timings
+are reported as absent, never as a replacement passing speed number. No compute
+algorithm, public feature, core/stage or size ceiling changes in this gate repair.
+
+### Batch 56 continuation acceptance snapshot (2026-11-09)
+
+All 11 terrain owner repairs pass 107 units, all 15 package GPU commands and
+16 runtime README examples. ComputeFrame passes 111 compute units, the focused
+native/compatibility dispatch/owner proof and the complete 132-check browser
+suite (413 shader modules, no errors). All 21 compute README examples run.
+Throughput/calibration measurements are deferred; correctness candidates remain
+live. The 24 focused metadata/source/policy tests pass, as do lint (120 existing
+warnings), hygiene, all five quality gates/974 entry ceilings, 1,134 README type
+examples and API update (891 entries/8,651 exports). Core plus stage remains
+23,924 B; no new ceiling is raised. These are local results, not landing or
+combined hunter acceptance. Full verify remains the inherited result recorded
+in the [gate receipt](whitepaper/results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
+Current changed-owner entries, min+gzip B (other packages external; unchanged ceilings):
+
+| Entry | Bytes |
+| --- | ---: |
+| `@margoengine/terrain` | 12868 |
+| `@margoengine/terrain/query` | 3347 |
+| `@margoengine/terrain/layers-pbr` | 2580 |
+| `@margoengine/terrain/stream` | 12009 |
+| `@margoengine/terrain/sculpt` | 4626 |
+| `@margoengine/terrain/holes` | 1283 |
+| `@margoengine/terrain/rvt` | 5303 |
+| `@margoengine/terrain/displace` | 4095 |
+| `@margoengine/terrain/deform` | 4967 |
+| `@margoengine/terrain/blend` | 3452 |
+| `@margoengine/terrain/planet` | 6403 |
+| `@margoengine/compute/frame` | 31513 |
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -8576,6 +8633,101 @@ in test-results/56fix/mirror-repeat/capture.json, with durable per-pair progress
 and the failing process result in resume-bounded-repeat.log/.json. This is a
 measured value failure (1/12), not an acceptance run or a retry to green.
 
+
+After rebasing onto 854a90ac4, the readback-isolation experiment again completes
+12 pairs with exactly the same 24 components differing in pair 0 (1/12).
+Each image is downloaded twice without rendering between downloads: every
+component agrees between those two reads. At the differing coordinates, raw
+GL FLOAT values already equal the differing binary16 values; CPU conversion
+does not introduce this mismatch. All camera and mesh buffer uploads for the
+two captures are byte-identical. Evidence is
+test-results/56fix/mirror-readback-isolation/result.json and
+resume-readback-isolation-pre.log/.json (86.218 seconds, failed exact assertion).
+A reduced glass-only sequence produces the same 24-component failure without
+the mirror, TAA, orthographic or roughness prefix. Its report completed, but
+cleanup exceeded the 45-second shared-lock limit and the tree was killed;
+resume-minimal-isolation.log/.json is not a completed acceptance run. Heavier
+GL-call instrumentation produces equality and does not close this defect.
+The owner is still being narrowed between rasterization and resolve state;
+neither a race nor an uninitialized read has been established as the cause.
+
+The inherited full verify completed with 13,704/13,705 passing, zero skips,
+and only tests/no-private-paths.test.js failing on the GPU-lock report's
+excluded-folder pointer. That pointer was already repaired on current main.
+After rebasing, the unchanged focused regression passes; the previous full
+verify result is retained and reused, not represented as an all-green run.
+Post-rebase build, lint, hygiene and API generation pass. No capture fix is
+accepted or pushed while the value failure and remaining GPU gates are open.
+
+Permanent regression: packages/environment/tests/capture-stability-browser.mjs,
+wired into test:gpu:mirror for both backends. Its first compatibility run on
+the full repair stack fails in 1/12 pairs at the same 24 coordinates; the
+original clipping pair remains exact and the negative control remains
+0.2783203125. The process completes with the exact assertion failure
+(resume-capture-regression.log/.json, 49.935 seconds including shared admission).
+A separate 1x-sampling comparison completes 12/12 pairs with no differences
+(resume-capture-1x.log/.json, 26.102 seconds including admission), so the current
+reproduction requires multisampling. This does not attribute it to resolution
+rather than multisampled rasterization. A two-pair clip-state diagnostic also
+fails: every earlier capture equals the later stable image; only the first
+capture after restoring the clip plane differs. Its report and input bytes are
+in test-results/56fix/mirror-clip-state/result.json (23.181 seconds, exit 1).
+An additional pre-main-copy diagnostic produced no report before its 60-second
+limit and was killed; resume-before-main.log/.json cannot establish an engine
+hang or any raster/resolve cause. No timeout is waived or assertion changed.
+
+### Batch 56 remaining terrain disposal repair
+
+The seven remaining terrain EnginePlugin classes retained their secondary
+scene registrations on direct disposal and could remove default-scene names.
+Each now detaches through sceneOf(this). The 14-case real-engine regression
+fails seven direct cases on the prior build; all 14 pass after repair. Stream
+owns and disposes its terrain; blend and sculpt retain their borrowed inputs.
+The expanded class guard covers all 11 terrain plugins. Package units pass
+107/107 and the four terrain/shader source guards pass. GPU/README acceptance
+is pending in one shared queue. Wider owners and hunter acceptance stay open.
+
+The inherited terrain sequence completed all 15 GPU commands successfully.
+Its README gate passed 14/15, failing WebGPU acquisition during confirmed
+NVIDIA event 153, not a numerical assertion. Logs and event XML remain in
+ test-results/56fix (terrain-readme-reset-event.xml). No repeat of a passed
+step was started before the new source change; the changed package requires
+its own complete GPU/README sequence.
+
+### Batch 56 ComputeFrame registration repair
+
+Repro: register a new ComputeFrame in a secondary scene, register a same-name
+default sentinel, then call frame.dispose(). Its arrays were freed but its
+registration remained; the default sentinel was removed. The frame entry now
+resolves sceneOf(this). Its direct-disposal regression fails before repair and
+both direct and owner-removal cases pass after repair. Package units pass
+111/111. GPU/README acceptance and the wider audit remain pending.
+
+### Compute correctness gate ran deferred benchmarks
+
+Cause: the core, extras, CPU-parity and autotune browser modules embedded
+throughput/calibration blocks without reading scripts/speed-phase.json. The
+runner now forwards the central phase and every benchmark clock/calibration
+is gated. All original speed cases and assertions remain in the named release
+suite. Every correctness callback remains live, with full-output direct GPU
+checks for all original SAXPY/grid candidates and unchanged own-kernel cases.
+The new source/policy regression fails on the parent; current regressions pass.
+No benchmark was executed to diagnose or prove this repair.
+
+### Batch 56 continuation acceptance snapshot (2026-11-09)
+
+All 11 terrain owner repairs pass 107 units, all 15 package GPU commands and
+16 runtime README examples. ComputeFrame passes 111 compute units, the focused
+native/compatibility dispatch/owner proof and the complete 132-check browser
+suite (413 shader modules, no errors). All 21 compute README examples run.
+Throughput/calibration measurements are deferred; correctness candidates remain
+live. The 24 focused metadata/source/policy tests pass, as do lint (120 existing
+warnings), hygiene, all five quality gates/974 entry ceilings, 1,134 README type
+examples and API update (891 entries/8,651 exports). Core plus stage remains
+23,924 B; no new ceiling is raised. These are local results, not landing or
+combined hunter acceptance. Full verify remains the inherited result recorded
+in the [gate receipt](whitepaper/results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -11845,12 +11997,23 @@ User code shares the wrapper's WGSL module. It can read the supplied captures an
 
 # @margoengine/terrain
 
-`TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
-`TerrainDeformation` dispose their actual scene registration, preserving a
-same-name plugin in another scene. Device restoration keeps registration and
-one terrain-lighting provider; explicit disposal removes both. Their public
-`owner` field continues to identify the Engine, so use `engine.sceneOf(effect)`
-to inspect the scene. All existing options and examples below are unchanged.
+All terrain plugins remove their actual scene registration on `dispose()`,
+preserving a same-name plugin in another scene. Device restoration retains
+registration. Stream disposal also removes its owned terrain; blend and sculpt
+leave their borrowed terrain and virtual texture attached. The public `owner`
+fields of `TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
+`TerrainDeformation` identify the Engine; use `engine.sceneOf(effect)` for the scene.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainHeightmap} from 'margoengine/terrain';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const product = engine.createScene('product');
+const heightmap = new TerrainHeightmap(() => 0, {size: [4, 4], resolution: 16});
+product.use(heightmap);
+console.assert(engine.sceneOf(heightmap) === product);
+heightmap.dispose(); // Frees its texture and registration; product can register a replacement.
+```
 
 Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
@@ -11899,14 +12062,6 @@ strata; the geometric normal still drives shadow bias. Stone brightness follows
 the bumps (±30%), sand grain the fine noise (±10%). Fine detail fades out between
 20 and 60 m. `detail: 0` removes all of it from the shader and keeps smooth
 per-pixel bands; values in between scale it.
-
-Cost: one flat compare on every core-mesh pixel. On terrain pixels about 40 ALU
-operations for the bands; with `variation` or `detail`, about 60 per noise
-octave: two octaves everywhere (one beyond 60 m) and three more triplanar ones
-where stone shows within 60 m, plus about 30 for the blends and the bump. That is
-roughly 200 operations on meadow and sand and 380 on near stone (counted from the
-WGSL, not timed). There are no texture fetches and no derivatives, so it runs
-inside the mesh-ID branch without uniformity limits.
 
 [README continues: https://margoengine.com/llms/packages/terrain.md]
 
