@@ -1511,6 +1511,8 @@ the nearest depth, takes its first search read at the receiver's texel and compa
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
 
+**clustered-area-lights, clustered-light-hooks, clustered-local-shadows, color-output, deformed-shadows, environment-hemisphere, environment-volumetric, gltf-pro-lighting-hooks, materials-uv-transform, oit-detached, post-ssr, post-ssr-models, post-stack, quality-presets, taa-velocity, terrain-ssr and water-ssr, advanced to `da12bd07e` on 2026-11-09 (capture stability):** core and every package frame now upload the unit light direction and no shader normalizes a light or sun uniform, because ANGLE D3D11 on NVIDIA evaluated that uniform-only normalize an ulp apart under GPU load (docs/known-bugs.md). The shader texts lose the `normalize` and the frame uploads carry the unit vector, so the outputs differ from the earlier references; the goldens were recaptured at the fix commit.
+
 **environment-hemisphere, advanced to `39c3bfe36` on 2026-11-05:** the physical and transmissive shaders' sun lobes take `margoDirectVisible` and gain `margoLit`, so their text differs; the standard and extended shaders, the hooks and the GPU calls are as before.
 
 **environment-hemisphere, advanced to `a1f778bdc` on 2026-11-05:** the transmissive shader gains the surface tint functions, so its text differs; the lit draw is as before.

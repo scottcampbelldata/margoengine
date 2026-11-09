@@ -10,7 +10,7 @@ import { refs, versions, ignoreAgx, golden, fact, readOnly, coreAt } from './com
 import { mockGPU, context } from './gpu-recorder.js';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '57250a49'),
+  { ref, pin } = refs(before, '5b1fe66', 'da12bd07e'),
   { wgsl } = await coreAt(pin);
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),

@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 
-const { ref, pin } = refs('6c20076d', '49f3e971', 'ba7a0fc89');
+const { ref, pin } = refs('6c20076d', '49f3e971', 'da12bd07e');
 await coreAt(pin); // terrain imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('terrain', ref, undefined, pin);
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };

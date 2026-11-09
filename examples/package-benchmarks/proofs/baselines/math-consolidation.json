@@ -2,7 +2,7 @@
  "proof": "math-consolidation",
  "ref": "2484971",
  "revision": "2484971448620c82563057d3b467f879433a1634",
- "capturedAt": "00fba4072d11ce4d966de1bd128fe4c68dad8b8f",
+ "capturedAt": "210ceff1f1d99eddb10d30c3f816fafbce5fa89c",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
   "textual: mat4 multiply copies share bvh's loop": true,

@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7c47a09', '366ebff', '2cd81c1'),
+const { ref, pin } = refs('7c47a09', '366ebff', 'da12bd07e'),
   { wgsl } = await coreAt(pin);
 // 1. Root entry at ref vs the candidate (the pin, or the working tree).
 const { baseline, candidate } = await versions('environment', ref, undefined, pin);
