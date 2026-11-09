@@ -2105,3 +2105,7 @@ was copied, and no general photographic-material fidelity is claimed.
 The pre-attachment array lifetime across lazy loading was repaired before landing, with an
 independent mutation regression including non-cloneable content-key identity. Planner fixture
 assumptions were updated for the new real dependency, with stronger downstream/full-plan assertions.
+
+### Batch 56 job 6 review
+
+The contact receiver's native preview refusal lacked its help link; the new regression failed before repair and now checks the unsupported code and link. Malformed up directions also use linked argument errors. No open defect remains from the oriented receiver review. The first new GPU screenshot assertion exposed an invalid clearColor test option: the harness now uses scene.background, then proves the unchanged darkness assertion on white. No production threshold or tolerance was relaxed.

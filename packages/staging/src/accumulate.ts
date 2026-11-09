@@ -11,7 +11,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Accumulated planar shadow settings; the inherited receiver options keep their defaults. */
 export interface AccumulatedShadowOptions extends ContactShadowOptions {
-  /** World centre of a horizontal disk light, above all casting geometry. Default [0, 8, 0]. */
+  /** World centre of a disk light parallel to the receiver, above all casters along `up`. Default 8 * normalized up. */
   lightPosition?: Vec3;
   /** Disk radius in world units; 0 gives one hard-shadow projection. Default 2. */
   lightRadius?: number;
@@ -113,29 +113,28 @@ export class AccumulatedShadows extends ContactShadows {
   protected override changed(draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): boolean {
     this.validate();
     const changed = super.changed(draws, s);
-    const key = [...(this.options.lightPosition ?? [0,8,0]), this.options.lightRadius ?? 2, this.options.frames ?? 64].join('|');
+    const key = [...this.light(s), this.options.lightRadius ?? 2, this.options.frames ?? 64].join('|');
     if (changed || key !== this.lightKey) this.count = 0;
     this.lightKey = key;
     return changed;
   }
 
   protected override projection(s: ReturnType<AccumulatedShadows['settings']>): Float32Array {
-    const light = this.options.lightPosition ?? [0,8,0], H = light[1] - s.ground;
+    const light = this.light(s), center = [s.x,s.ground,s.z];
+    const local = (axis: readonly number[]) => axis.reduce((sum, v, i) => sum + v*(light[i]-center[i]), 0);
+    const H = local(s.normal);
     const r = (this.options.lightRadius ?? 2) * Math.sqrt(radicalInverse(this.count + 1));
     const angle = (this.count + 1) * Math.PI * (3 - Math.sqrt(5));
-    const x = light[0] - s.x + r * Math.cos(angle), z = light[2] - s.z + r * Math.sin(angle);
+    const x = local(s.u) + r * Math.cos(angle), z = local(s.v) + r * Math.sin(angle);
     const m = this.matrix;
     m.fill(0);
-    m[0] = 2*H/s.width;
-    m[4] = -2*x/s.width;
-    m[12] = -m[0]*s.x-m[4]*s.ground;
-    m[9] = 2*H/s.depth;
-    m[5] = -2*z/s.depth;
-    m[13] = -m[9]*s.z-m[5]*s.ground;
-    m[6] = (H-s.height)/s.height;
-    m[14] = -m[6]*s.ground;
-    m[7] = -1;
-    m[15] = H+s.ground;
+    for (let i=0;i<3;i++) {
+      m[4*i] = 2*(H*s.u[i]-x*s.normal[i])/s.width;
+      m[4*i+1] = 2*(H*s.v[i]-z*s.normal[i])/s.depth;
+      m[4*i+2] = (H-s.height)*s.normal[i]/s.height;
+      m[4*i+3] = -s.normal[i];
+    }
+    for (let row=0;row<4;row++) m[12+row] = (row===3?H:0)-center.reduce((sum,v,i)=>sum+m[4*i+row]*v,0);
     return m;
   }
 
@@ -164,15 +163,19 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   private validate(): void {
-    const s = this.settings(), o = this.options, light = o.lightPosition ?? [0,8,0];
+    const s = this.settings(), o = this.options, light = this.light(s);
     if (!Array.isArray(light) || light.length !== 3 || ![0,1,2].every(i => Number.isFinite(light[i]) && Math.abs(light[i]) <= 1e6) ||
-      !(Math.fround(light[1]-s.ground) > Math.fround(s.height)) ||
+      !(Math.fround(s.normal.reduce((sum,v,i)=>sum+v*(light[i]-[s.x,s.ground,s.z][i]),0)) > Math.fround(s.height)) ||
       !Number.isFinite(o.lightRadius ?? 2) || (o.lightRadius ?? 2) < 0 || (o.lightRadius ?? 2) > 1e6 ||
       !Number.isInteger(o.frames ?? 64) || (o.frames ?? 64) < 1 || (o.frames ?? 64) > 1024 ||
       s.blur !== 0 || Boolean(o.static) ||
       ![s.x,s.ground,s.z,s.width,s.depth,s.height].every(v => Math.abs(v) <= 1e6) ||
       Math.min(s.width,s.depth,s.height) < 1e-6)
       throw rangeError('Invalid accumulated shadow options; use frames 1..1024, blur 0, static false, receiver sizes 1e-6..1e6 and a finite disk light above the caster height', 'arguments');
+  }
+
+  private light(s: ReturnType<AccumulatedShadows['settings']>): readonly number[] {
+    return this.options.lightPosition ?? s.normal.map(v => 8*v);
   }
 
   private releaseHistory(): void {

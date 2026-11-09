@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Receiver orientation oracle</title>
+<style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {ContactShadows} from '/packages/staging/dist/index.js';
+import {AccumulatedShadows} from '/packages/staging/dist/accumulate.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+const engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[0,4,5],target:[0,0,0]}});
+engine.scene.background='#ffffff';
+const errors=[];engine.onError=e=>errors.push(e.message);
+const watch=()=>{
+  const device=engine.gpu,create=device.createTexture.bind(device);
+  device.createTexture=d=>create(d.format==='r16float'?{...d,usage:d.usage|GPUTextureUsage.COPY_SRC}:d);
+  device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+};watch();
+let effect,model,remove,world;
+const render=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+const pixels=async()=>{
+  const t=effect instanceof AccumulatedShadows?effect.history.textures[(effect.samples-1)&1]:effect.targets.textures[0];
+  const buffer=engine.gpu.createBuffer({size:256*64,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const encoder=engine.gpu.createCommandEncoder();encoder.copyTextureToBuffer({texture:t},{buffer,bytesPerRow:256},[64,64]);
+  engine.gpu.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
+  const data=new Uint16Array(buffer.getMappedRange()),out=[];
+  for(let y=0;y<64;y++)for(let x=0;x<64;x++)out.push(data[y*128+x]);
+  buffer.destroy();return out;
+};
+window.check={
+  async scene({u,n,v,kind}){
+    effect?.dispose();model?.dispose();
+    const p=[1,-2,3];world=([x,y,z])=>p.map((a,i)=>a+x*u[i]+y*n[i]+z*v[i]);
+    engine.camera.position=world([0,4,5]);engine.camera.target=p;engine.camera.up=n;
+    const positions=[[-.4,1.3,-.6],[.4,1.3,-.6],[-.4,1.3,.6],[.4,1.3,.6]].flatMap(world);
+    const normals=Array.from({length:4},()=>n).flat();
+    model=engine.createMesh().setGeometry(new Geometry(positions,normals,[0,2,1,1,2,3])).setMaterial(new PbrMaterial({color:'#000000'}));
+    const options={up:n,position:p,size:[4,6],height:2,blur:0,resolution:64,opacity:.8,static:true};
+    effect=kind==='contact'?ContactShadows.attach(engine,options):AccumulatedShadows.attach(engine,{...options,static:false,lightPosition:world([.7,8,-.5]),lightRadius:1.4,frames:16});
+    remove=effect.add(model);
+    engine.gpu.pushErrorScope('validation');
+    for(let i=0;i<(kind==='contact'?1:16);i++)await render();
+    const e=await engine.gpu.popErrorScope();if(e)errors.push(e.message);
+    return {values:await pixels(),errors};
+  },
+  async opacity(v){effect.options.opacity=v;await render();return errors;},
+  async below(){engine.camera.position=world([0,-4,5]);await render();},
+  async restore(){const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();for(let i=0;i<16;i++)await render();return {changed:old!==engine.gpu,values:await pixels(),errors};},
+  async turn(){effect.options.up=[0,1,0];effect.options.lightPosition=[1,10,3];await render();return effect.samples;},
+  async empty(){remove();remove();await render();return {values:await pixels(),samples:effect.samples,errors};},
+  async product(){
+    effect.dispose();model.dispose();
+    model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb',{signal:AbortSignal.timeout(30000)});
+    model.root.setRotation([Math.PI/2,0,0]);
+    const b=model.bounds, bounds=[b[0],-b[5],b[1],b[3],-b[2],b[4]];
+    engine.camera.position=[0,-.85,.35];engine.camera.target=[0,0,.25];engine.camera.up=[0,0,1];
+    effect=ContactShadows.attach(engine,{up:[0,0,1],blur:.025,resolution:64,opacity:.8});
+    effect.fit(bounds);remove=effect.add(model);await render();return {errors,bounds};
+  },
+  async native(){
+    const fallback=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});
+    try{ContactShadows.attach(fallback,{up:[0,0,1]});return null;}
+    catch(e){return {code:e.code,message:e.message};}finally{fallback.dispose();}
+  },
+  dispose(){effect.dispose();effect.dispose();engine.dispose();return errors;},
+};window.ready=true;
+</script></body></html>

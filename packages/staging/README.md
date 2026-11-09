@@ -23,7 +23,7 @@ contact.options.opacity = 0.4; // options are live
 contact.dispose();           // or engine.removePlugin('contact-shadows')
 ```
 
-Options (all optional): `position` (ground centre; the ground is the plane y = position[1], default `[0, 0, 0]`),
+Options (all optional): `position` (world ground centre, default `[0, 0, 0]`), `up` (receiver normal, default `[0, 1, 0]`),
 `size` (plane width × depth in world units, or one number, default 4), `height` (geometry up to this far above the ground
 casts, fading linearly to nothing at it, default 1), `blur` (world units, default 1.5% of the larger side), `opacity`
 (default 0.6), `color` (default black, written as-is to the scene target), `resolution` (texels per side, default
@@ -47,14 +47,52 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
   `opacity`, `displacement` or `clip` caster changes on the GPU alone, so a `static` shadow redraws every frame while one is added. Instanced primitives (gltf-pro `PBRInstances`) draw every instance in one occluder draw. Hidden meshes and
   disposed sources drop out.
 
-Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer with height
+Limits: the blur is uniform, so the shadow does not get softer with height
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
-only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
+and the WebGL2 compatibility layer (the native preview throws linked `unsupported`); the plane is not in SSAO's G-buffer or picking.
 
 Apache-2.0. Optional, tree-shakable package; measured sizes are in [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json). Core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.
 
+
+## Any up axis and WebGL2
+
+Both receivers accept `up`, a finite nonzero world direction. It is normalized internally, including
+subnormal and near-maximum finite components. `position` is a point on the plane; `height` and the
+small anti-z-fighting lift run along the normal. Width runs along world X projected onto the plane
+(world Z instead when the normalized X component has magnitude at least 0.9); depth is width cross
+normal. Changing `up` live invalidates contact caching and restarts accumulation. The tangent frame
+can switch at that threshold; it is deterministic, not a continuously transported rotation.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {ContactShadows} from 'margoengine/staging';
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install();
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, -4, 3], target: [0, 0, 0.5]},
+});
+engine.camera.up = [0, 0, 1];
+const product = engine.createMesh().setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({color: '#8090a0'})).setPosition([0, 0, 0.5]);
+ContactShadows.attach(engine, {up: [0, 0, 1], size: 4, height: 2}).add(product);
+engine.start();
+// Later: engine.dispose().
+```
+
+`fit(bounds, spread = 2)` projects the eight corners of the world-axis-aligned bounds analytically
+onto the receiver frame, puts the plane at the lowest support point along `up`, and covers the
+projected footprint. This is conservative for a rotated product's world AABB. It does not orient
+the product, camera, HDR backdrop or light automatically. For accumulated shadows, set a world
+`lightPosition` whose signed height above the receiver exceeds `height` after float32 rounding.
+
+WebGPU and the installed WebGL2 compatibility layer draw the same receiver code. The older native
+WebGL2 preview lacks the required programmable passes and throws `unsupported` with a help link.
+`test/orientation-browser.mjs` (also with `--compat`) compares all 4096 shadow texels through six
+cardinal and two sloped orientations for contact and accumulation, asserts visible floor pixels
+and backside rejection, replaces the real device, clears removed geometry and disposes twice.
+The rectangle is a generated geometry oracle, not a real product quality claim. No speed claim.
 
 ## Ray-traced reference
 
@@ -90,7 +128,7 @@ engine.start();
 
 Keep the catcher position at the background's `center` (both default to the origin). This is a contact
 cue over the photographed floor; it does not infer light directions or reproduce the HDR's physical
-shadows. The existing Y-up and native WebGL2 limitations above apply. `test/ground-browser.mjs` compares
+shadows. The HDR backdrop remains Y-up; the receiver's `up` option does not rotate it. `test/ground-browser.mjs` compares
 on/off pixels using the licensed OpenEXR BrightRings image, checks the model remains visible, removes
 the caster and replaces a real device. Run it with `--compat` for the WebGL2 compatibility layer;
 that path passes the same assertions. The native WebGL2 engine remains unsupported. The box is a
@@ -98,7 +136,7 @@ generated stand-in, not a photographed product.
 
 ## Accumulated soft shadows
 
-`@margoengine/staging/accumulate` samples a horizontal disk light once per rendered frame and averages
+`@margoengine/staging/accumulate` samples a disk light parallel to the receiver once per rendered frame and averages
 its projected visibility on the ground. Contact edges stay sharp; raising geometry widens the penumbra.
 After `frames` samples, only the receiving plane draws. Camera motion keeps this world-space history.
 
@@ -120,7 +158,7 @@ engine.start();
 
 Options are copied on construction; edit `shadow.options` live afterward. Inherited `position`, `size`,
 `height`, `opacity`, `color` and `resolution` keep the contact receiver's defaults. Added defaults:
-`lightPosition: [0, 8, 0]` (world coordinates), `lightRadius: 2`, `frames: 64` (integer 1..1024),
+`lightPosition: 8 * normalized up` (world coordinates, `[0, 8, 0]` for Y-up), `lightRadius: 2`, `frames: 64` (integer 1..1024),
 `blur: 0` and `static: false` (these last two values are required). Receiver dimensions are 1e-6..1e6,
 position and light components have magnitude at most 1e6, and radius is 0..1e6. The light's height above
 the receiver must exceed `height` after float32 rounding. Invalid live settings throw before rendering.
@@ -136,7 +174,7 @@ casts one binary shadow, unions overlapping casters with maximum blending, and s
 R16F textures. Integer sums through 1024 are exact; the receiving plane divides once by the sample count.
 Equal visibility weights do not integrate inverse-square falloff, cosine weights, HDR illumination or
 indirect light. Thin detail is limited by the receiver resolution and the hardware rasterizer's subpixel
-grid. The receiver remains Y-up; the light must be above the whole casting volume. No speed claim.
+grid. The light must be above the whole casting volume along `up`. No speed claim.
 
 WebGPU and the WebGL2 compatibility layer pass `test/accumulate-browser.mjs` (append `--compat` for the
 layer): exact projected sums at all 4096 texels for three heights, convergence, 1024 samples, empty scenes,

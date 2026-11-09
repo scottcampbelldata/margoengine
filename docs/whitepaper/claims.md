@@ -1606,3 +1606,7 @@ devices. Both native WebGPU and ANGLE Vulkan compatibility pass. The model is a 
 study with explicit replacement palette material, not its authored textured appearance. No general
 photographic-quality, outside-renderer equality or speed claim. The flat static triangle limits and
 ANGLE Direct3D compilation limit remain the existing integrator's.
+
+## Batch 56 job 6: arbitrary-up staging receivers
+
+DONE: both optional staging receivers use the up direction for projection, fit, drawing and cache/history invalidation. [Native evidence](../../examples/package-benchmarks/results/batch-56-axis.json) and [WebGL2 compatibility evidence](../../examples/package-benchmarks/results/batch-56-axis-compat.json) record all 4096 identical shadow texels through eight rigidly transformed receiver scenes for each effect, visible on/off pixels, backside rejection, empty geometry, actual replacement devices and disposal. The analytic rectangle is a stand-in geometric oracle; the real licensed FlightHelmet separately proves a fitted Z-up contact shadow. CPU tests independently solve ray-plane intersections and AABB support extrema, and reject zero/NaN/malformed directions while accepting extreme finite nonzero magnitudes. Native preview refusal is linked and regression tested. No speed or general photographic-quality claim.

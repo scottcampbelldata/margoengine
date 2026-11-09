@@ -31,7 +31,7 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { fullscreen, group, render as fullscreenPipeline } from '../../shared/gpu.js';
 import { applyView } from '../../shared/view-rect.js';
-import { margoError } from '../../shared/errors.js';
+import { margoError, rangeError, fault } from '../../shared/errors.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -39,9 +39,11 @@ type ContactPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Options of {@link ContactShadows}. The object is kept and read every frame, so changes apply live. */
 export interface ContactShadowOptions {
-  /** Centre of the shadow on the ground; the ground is the horizontal plane y = position[1]. Default [0, 0, 0]. */
+  /** Centre of the receiving plane in world coordinates. Default [0, 0, 0]. */
   position?: Vec3;
-  /** Width (world x) and depth (world z) of the shadow plane; one number gives a square. Default 4. */
+  /** Direction away from the receiving plane; any finite nonzero vector, normalized internally. Default [0, 1, 0]. */
+  up?: Vec3;
+  /** Width and depth in the receiver's tangent frame; one number gives a square. Default 4. */
   size?: number | readonly [number, number];
   /**
    * Geometry from the ground up to this height casts. Darkness falls linearly from full at the ground to none at this
@@ -106,6 +108,9 @@ export interface ContactSource {
 
 /** Validated, defaulted options of one frame. */
 interface Settings {
+  normal: readonly number[];
+  u: readonly number[];
+  v: readonly number[];
   x: number;
   ground: number;
   z: number;
@@ -200,14 +205,14 @@ struct Kernel {axis:vec4f,taps:array<vec4f,${MAX_PAIRS / 2}>}
 
 // The shadow catcher: a 4-vertex strip over the plane rectangle, premultiplied colour x coverage.
 const planeShader = `
-struct Plane {camera:mat4x4f,tint:vec4f,origin:vec4f,extent:vec4f}
+struct Plane {camera:mat4x4f,tint:vec4f,origin:vec4f,extent:vec4f,u:vec4f,v:vec4f}
 @group(0) @binding(0) var<uniform> plane:Plane;
 @group(0) @binding(1) var shade:texture_2d<f32>;
 @group(0) @binding(2) var bilinear:sampler;
 struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) corner:u32)->Varyings {
  let t=vec2f(f32(corner&1u),f32(corner>>1u));
- let world=vec3f(plane.origin.x+t.x*plane.extent.x,plane.origin.y,plane.origin.z+t.y*plane.extent.y);
+ let world=plane.origin.xyz+t.x*plane.u.xyz+t.y*plane.v.xyz;
  return Varyings(plane.camera*vec4f(world,1),vec2f(t.x,1-t.y));
 }
 @fragment fn fragment(v:Varyings)->@location(0) vec4f {
@@ -215,7 +220,7 @@ struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
  return vec4f(plane.tint.rgb*a,a);
 }`;
 
-const optionError = (what: string) => new RangeError(`Invalid contact shadow options: ${what}`);
+const optionError = (what: string) => rangeError(`Invalid contact shadow options: ${what}`, 'arguments');
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 function triple(value: unknown, name: string): readonly number[] {
   const v = value as ArrayLike<unknown> | null;
@@ -251,7 +256,7 @@ function gaussianKernel(texels: number, axis: readonly [number, number], out: Fl
 /**
  * Soft contact shadow under added objects: the ground darkens where an object is close above it, strongest where it
  * touches and fading to nothing at `height`, blurred by `blur` world units and drawn as a transparent shadow-catcher
- * plane over whatever is already on the ground. No light direction and no shadow map. WebGPU only.
+ * plane over whatever is already on the ground. No light direction and no shadow map. WebGPU and WebGL2 compatibility.
  */
 export class ContactShadows implements EnginePlugin {
   readonly name: string = 'contact-shadows';
@@ -277,7 +282,7 @@ export class ContactShadows implements EnginePlugin {
   private kernels?: GPUBuffer[];
   private readonly kernelValues = [new Float32Array(KERNEL_FLOATS), new Float32Array(KERNEL_FLOATS)];
   private planeUniform?: GPUBuffer;
-  private readonly planeValues = new Float32Array(28);
+  private readonly planeValues = new Float32Array(40);
   private readonly view = new Float32Array(16);
 
   /** `options` is kept (not copied) and validated now and every frame; throws RangeError for invalid values. */
@@ -293,8 +298,8 @@ export class ContactShadows implements EnginePlugin {
   }
 
   /**
-   * Centres the plane under `bounds` ([minX, minY, minZ, maxX, maxY, maxZ], as `model.bounds`): ground at minY,
-   * a square `spread` times the larger footprint side, height the bounds height. Writes `position`, `size` and
+   * Centres the plane under world-axis-aligned `bounds` ([minX, minY, minZ, maxX, maxY, maxZ], as `model.bounds`),
+   * measured along `up`, with a square `spread` times the larger projected footprint side. Writes `position`, `size` and
    * `height` into `options`.
    */
   fit(bounds: ArrayLike<number>, spread = 2): this {
@@ -310,9 +315,12 @@ export class ContactShadows implements EnginePlugin {
       throw new RangeError(
         'Invalid contact shadow bounds; pass [minX, minY, minZ, maxX, maxY, maxZ] with min <= max and a spread >= 1',
       );
-    this.options.position = [(bounds[0] + bounds[3]) / 2, bounds[1], (bounds[2] + bounds[5]) / 2];
-    this.options.size = Math.max(bounds[3] - bounds[0], bounds[5] - bounds[2], 1e-6) * spread;
-    this.options.height = Math.max(bounds[4] - bounds[1], 1e-6);
+    const s = this.settings(), half = [0, 1, 2].map(i => bounds[i + 3] / 2 - bounds[i] / 2);
+    const extent = (axis: readonly number[]) => axis.reduce((sum, v, i) => sum + Math.abs(v) * half[i], 0);
+    const h = extent(s.normal);
+    this.options.position = [0, 1, 2].map(i => bounds[i] / 2 + bounds[i + 3] / 2 - s.normal[i] * h) as unknown as Vec3;
+    this.options.size = Math.max(2 * extent(s.u), 2 * extent(s.v), 1e-6) * spread;
+    this.options.height = Math.max(2 * h, 1e-6);
     this.settings();
     return this;
   }
@@ -358,7 +366,7 @@ export class ContactShadows implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'ContactShadows is disposed; create a new one');
     if (!engine.gpu)
-      throw margoError('unsupported', 'ContactShadows needs WebGPU; it does not run on the WebGL2 fallback');
+      throw fault('unsupported', 'ContactShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends');
     for (const entry of this.entries.values()) if ('mesh' in entry) this.owned(entry.mesh, engine);
     this.engine = engine;
     const device = engine.gpu;
@@ -417,6 +425,18 @@ export class ContactShadows implements EnginePlugin {
     const o = this.options;
     if (!o || typeof o !== 'object') throw optionError('pass an options object');
     const position = o.position === undefined ? [0, 0, 0] : triple(o.position, 'position');
+    const up = o.up === undefined ? [0, 1, 0] : triple(o.up, 'up');
+    // Scale first: both subnormal and near-MAX_VALUE directions normalize without under/overflow.
+    const scale = Math.max(...up.map(Math.abs));
+    if (!(scale > 0)) throw rangeError('Invalid contact shadow up; pass a finite nonzero direction', 'arguments');
+    const scaled = up.map(v => v / scale), length = Math.hypot(...scaled);
+    const normal = scaled.map(v => v / length);
+    // Project X unless nearly parallel, then Z. This keeps the original X/Z frame for Y-up.
+    const axis = Math.abs(normal[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+    const dot = axis.reduce((sum, v, i) => sum + v * normal[i], 0);
+    const tangent = axis.map((v, i) => v - dot * normal[i]), tl = Math.hypot(...tangent);
+    const u = tangent.map(v => v / tl);
+    const v = [u[1]*normal[2]-u[2]*normal[1], u[2]*normal[0]-u[0]*normal[2], u[0]*normal[1]-u[1]*normal[0]];
     const color = o.color === undefined ? [0, 0, 0] : triple(o.color, 'color');
     let width = 4,
       depth = 4;
@@ -440,6 +460,7 @@ export class ContactShadows implements EnginePlugin {
       throw optionError('resolution must be an integer in 16..4096');
     if (o.static !== undefined && typeof o.static !== 'boolean') throw optionError('static must be a boolean');
     return {
+      normal, u, v,
       x: position[0],
       ground: position[1],
       z: position[2],
@@ -544,6 +565,7 @@ export class ContactShadows implements EnginePlugin {
     const next = this.nextSignature;
     next.length = 0;
     next.push(s.x, s.ground, s.z, s.width, s.depth, s.height, s.blur, s.resolution, draws.length);
+    next.push(...s.normal);
     for (const p of draws) {
       next.push(
         p.node,
@@ -619,12 +641,15 @@ export class ContactShadows implements EnginePlugin {
   protected projection(s: Settings): Float32Array {
     const m = this.view;
     m.fill(0);
-    m[0] = 2 / s.width;
-    m[6] = 1 / s.height;
-    m[9] = 2 / s.depth;
-    m[12] = -1 - (2 * (s.x - s.width / 2)) / s.width;
-    m[13] = -1 - (2 * (s.z - s.depth / 2)) / s.depth;
-    m[14] = -s.ground / s.height;
+    const p = [s.x, s.ground, s.z];
+    for (let i = 0; i < 3; i++) {
+      m[4*i] = 2*s.u[i]/s.width;
+      m[4*i+1] = 2*s.v[i]/s.depth;
+      m[4*i+2] = s.normal[i]/s.height;
+    }
+    m[12] = -2*s.u.reduce((sum, v, i) => sum + v*p[i], 0)/s.width;
+    m[13] = -2*s.v.reduce((sum, v, i) => sum + v*p[i], 0)/s.depth;
+    m[14] = -s.normal.reduce((sum, v, i) => sum + v*p[i], 0)/s.height;
     m[15] = 1;
     return m;
   }
@@ -741,7 +766,8 @@ export class ContactShadows implements EnginePlugin {
       this.stats.updates++;
       shade = this.lastShade = this.update(c, draws, s);
     } else this.stats.cacheHits++;
-    if (c.camera.position[1] <= s.ground) return;
+    const center = [s.x, s.ground, s.z];
+    if (s.normal.reduce((sum, v, i) => sum + v * (c.camera.position[i] - center[i]), 0) <= 0) return;
     const depthFormat = c.descriptor.depthStencil?.format ?? 'depth32float',
       multisample = c.descriptor.multisample ?? {},
       key = `${c.format}|${multisample.count ?? 1}|${depthFormat}`;
@@ -773,9 +799,11 @@ export class ContactShadows implements EnginePlugin {
     p.set(c.camera.matrix);
     p.set(s.color, 16);
     p[19] = s.opacity;
-    p[20] = s.x - s.width / 2;
-    p[21] = s.ground + PLANE_LIFT * Math.max(s.width, s.depth);
-    p[22] = s.z - s.depth / 2;
+    for (let i = 0; i < 3; i++) {
+      p[20+i] = center[i] - s.u[i]*s.width/2 - s.v[i]*s.depth/2 + s.normal[i]*PLANE_LIFT*Math.max(s.width,s.depth);
+      p[28+i] = s.u[i]*s.width;
+      p[32+i] = s.v[i]*s.depth;
+    }
     p[24] = s.width;
     p[25] = s.depth;
     p[26] = this.coverageScale();

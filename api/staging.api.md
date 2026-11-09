@@ -27,6 +27,7 @@ export interface ContactPrimitive extends CasterCutout {
 
 export interface ContactShadowOptions {
     position?: Vec3;
+    up?: Vec3;
     size?: number | readonly [number, number];
     height?: number;
     blur?: number;
@@ -108,6 +109,9 @@ type ContactPassContext = Extract<PassContext, {
 }>;
 
 interface Settings {
+    normal: readonly number[];
+    u: readonly number[];
+    v: readonly number[];
     x: number;
     ground: number;
     z: number;

@@ -2151,3 +2151,7 @@ search then found newly landed Margo voxel-pathtracer/mesh (f48effca1). The unus
 draft was removed; only a camera-idle controller was built, reusing that owned integrator and
 its Rust/Wasm BVH. No new BSDF, traversal, packing loop or Wasm is needed here. Tests use the
 existing licensed Khronos FlightHelmet as a neutral material study.
+
+### Batch 56 job 6: oriented receivers
+
+Research survey: Duff et al., [Building an Orthonormal Basis, Revisited](https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf) (2017), abstract and section 1 on perpendicular vectors and cross products; Thorsten Thormaehlen's [planar shadows lecture](https://www.mathematik.uni-marburg.de/~thormae/lectures/graphics1/graphics_11_1_eng_web.html), equations deriving Blinn's point-light projection; and the W3C [WebGPU coordinate systems](https://www.w3.org/TR/webgpu/#coordinate-systems). We independently project a safely selected world axis into the plane, normalize and cross it with the normal. The existing Margo local shadow projection is composed with that world frame. Scale-before-normalize handles all finite nonzero direction magnitudes. No paper listing or external implementation was copied, and no engine source was read. This constant-size frame calculation needs no new CPU geometry loop or Wasm.

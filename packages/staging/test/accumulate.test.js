@@ -56,7 +56,7 @@ test('accumulation uses binary visibility, a point-light projection and one samp
     assert.equal(s.h.counts.draws-draws,1,'only the receiver draws after convergence');
     assert.equal(s.value.stats.updates,3);
     assert.equal(s.value.stats.cacheHits,1);
-    const plane = new Float32Array(s.h.resources.find(r => r.size === 112).data);
+    const plane = new Float32Array(s.h.resources.find(r => r.size === 160).data);
     assert(Math.abs(plane[26]-1/3) < 1e-7,'sum divided once at receiver');
     s.value.invalidate(); s.frame();
     assert.equal(s.value.samples,1);

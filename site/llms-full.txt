@@ -4318,6 +4318,12 @@ The controller entry is 1213 B gzip (ceiling 1469); its dynamically loaded exist
 integrator and Wasm retain their separate budgets. Staging root 8131 B, accumulate
 9306 B; core plus stage 23797 B, strictly below 25,000 B.
 
+### Any-up staging receivers (batch 56, job 6)
+
+This supersedes the Y-up receiver restriction in earlier batch-56 entries. ContactShadows and AccumulatedShadows accept any finite nonzero up direction and normalize it before GPU upload. Width is projected X unless abs(normal.x) >= 0.9, when projected Z is used; depth is width cross normal. This fixed frame switches at the threshold. fit uses conservative world AABB supports, not an oriented mesh fit. Accumulation's default light is world 8 * normalized up; custom world light positions must clear the caster height along that normal. Existing dimensions, sample and raster precision bounds remain. The HDR ground backdrop stays Y-up.
+
+Both receivers draw on WebGPU and the installed WebGL2 compatibility layer. The older native preview throws linked unsupported. The analytic geometry oracle covers eight orientations, all 4096 texels per effect per orientation, display pixels and actual device replacement; the real FlightHelmet additionally proves a Z-up fit/contact composition. No speed, cross-hardware subpixel identity or photographic quality claim. Root staging is 8520 B gzip (ceiling 8776), accumulate 9655 (ceiling 9945), pathtrace unchanged 1213; core plus stage unchanged 23797 < 25000.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6427,6 +6433,10 @@ was copied, and no general photographic-material fidelity is claimed.
 The pre-attachment array lifetime across lazy loading was repaired before landing, with an
 independent mutation regression including non-cloneable content-key identity. Planner fixture
 assumptions were updated for the new real dependency, with stronger downstream/full-plan assertions.
+
+### Batch 56 job 6 review
+
+The contact receiver's native preview refusal lacked its help link; the new regression failed before repair and now checks the unsupported code and link. Malformed up directions also use linked argument errors. No open defect remains from the oriented receiver review. The first new GPU screenshot assertion exposed an invalid clearColor test option: the harness now uses scene.background, then proves the unchanged darkness assertion on white. No production threshold or tolerance was relaxed.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -9308,7 +9318,7 @@ contact.options.opacity = 0.4; // options are live
 contact.dispose();           // or engine.removePlugin('contact-shadows')
 ```
 
-Options (all optional): `position` (ground centre; the ground is the plane y = position[1], default `[0, 0, 0]`),
+Options (all optional): `position` (world ground centre, default `[0, 0, 0]`), `up` (receiver normal, default `[0, 1, 0]`),
 `size` (plane width × depth in world units, or one number, default 4), `height` (geometry up to this far above the ground
 casts, fading linearly to nothing at it, default 1), `blur` (world units, default 1.5% of the larger side), `opacity`
 (default 0.6), `color` (default black, written as-is to the scene target), `resolution` (texels per side, default
@@ -9332,16 +9342,16 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
   `opacity`, `displacement` or `clip` caster changes on the GPU alone, so a `static` shadow redraws every frame while one is added. Instanced primitives (gltf-pro `PBRInstances`) draw every instance in one occluder draw. Hidden meshes and
   disposed sources drop out.
 
-Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer with height
+Limits: the blur is uniform, so the shadow does not get softer with height
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
-only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
+and the WebGL2 compatibility layer (the native preview throws linked `unsupported`); the plane is not in SSAO's G-buffer or picking.
 
 Apache-2.0. Optional, tree-shakable package; measured sizes are in [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json). Core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.
 
 
-## Ray-traced reference
+## Any up axis and WebGL2
 
 [README continues: https://margoengine.com/llms/packages/staging.md]
 

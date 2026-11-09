@@ -1200,3 +1200,7 @@ failures and disposal. It also distinguishes single-slice dimensions from mismat
 The browser suite checks actual overlapping isosurfaces, bricked time steps and trace replacement on native
 WebGPU and forced WebGL2. Results are written to `test-results/sciviz-browser.json`,
 `test-results/bricks-browser.json` and `test-results/sciviz-entries.json`. No speed claim follows.
+
+## Batch 56 job 6: oriented staging receivers
+
+After build:packages, run node scripts/gpu-lock.mjs run --owner=codex-56 -- node packages/staging/test/orientation-browser.mjs, then the same command with --compat. --record writes the two committed evidence records under examples/package-benchmarks/results. npm test --workspace @margoengine/staging runs the independent CPU projection/fit/extreme-direction regressions. The real-product case loads the already licensed examples/assets/flight-helmet-mobile.glb; no generated model substitutes for it. Screenshots are compositor screenshots. Native preview refusal is also asserted on a real WebGL2 context.

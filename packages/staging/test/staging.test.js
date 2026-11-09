@@ -68,7 +68,7 @@ test('maps the plane footprint to the texture and the height range to depth 0..1
       [false, 'greater-equal', 4, 'bgra8unorm'],
     );
     // Plane uniform: colour + opacity, then the corner lifted a hair above the ground.
-    const p = new Float32Array(s.h.resources.find((r) => r.size === 112).data);
+    const p = new Float32Array(s.h.resources.find((r) => r.size === 160).data);
     assert.ok(p[21] > 2 && p[21] < 2.001);
     assert.deepEqual(
       [...p.subarray(16, 20)].map((v) => +v.toFixed(4)),

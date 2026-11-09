@@ -1,0 +1,187 @@
+{
+  "backend": "WebGL2 compatibility",
+  "orientations": 8,
+  "texelsPerCase": 4096,
+  "rows": [
+    {
+      "kind": "contact",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        0,
+        -1,
+        0
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        0,
+        0.6,
+        0.8
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "contact",
+      "up": [
+        0.6,
+        0.8,
+        0
+      ],
+      "off": 255,
+      "on": 184
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0,
+        -1,
+        0
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0,
+        0.6,
+        0.8
+      ],
+      "off": 255,
+      "on": 51
+    },
+    {
+      "kind": "accumulated",
+      "up": [
+        0.6,
+        0.8,
+        0
+      ],
+      "off": 255,
+      "on": 51
+    }
+  ],
+  "deviceReplacement": true,
+  "empty": true,
+  "disposal": true,
+  "realProduct": {
+    "asset": "FlightHelmet mobile glb",
+    "up": "Z",
+    "darkenedPixels": 3147,
+    "bounds": [
+      -0.20360524952411652,
+      -0.7160004377365112,
+      -0.2000291645526886,
+      0.1629406362771988,
+      -0.000011730194273695815,
+      0.17154578864574432
+    ]
+  },
+  "native": {
+    "code": "unsupported",
+    "message": "ContactShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends; see https://margoengine.com/errors#unsupported"
+  }
+}

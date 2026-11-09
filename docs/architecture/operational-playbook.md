@@ -2752,3 +2752,9 @@ adds staging/stage downstream GPU coverage. Planner tests retain standalone/runn
 with WFC and additionally assert every affected tracer/staging/stage suite, lifecycle, and the
 exact full plan for combined voxel/tracer changes above the unchanged 12-package safety threshold.
 No GPU scope, test tolerance or safety threshold was reduced.
+
+### Oriented staging receivers: section 5 evidence (batch 56, job 6)
+
+ContactShadows and AccumulatedShadows share one normalized receiver frame. Projection, plane corners, normal lift, camera-side rejection, fit and accumulation disk sampling all use it. The up option belongs to optional staging; core and stage are untouched. The root and accumulated entries measure 8520/9655 B gzip; ceilings 8776/9945 include normal headroom.
+
+The real-GPU orientation suite checks every texel of contact and accumulated histories under six cardinal and two sloped orientations, with translation, visible receiver pixels, backside rejection, live history reset, empty scenes, double disposal and real device replacement. Native WebGPU and WebGL2 compatibility both pass. A real FlightHelmet rotated to Z-up casts a fitted contact shadow; analytic rectangles separately prove the orientation invariant. CPU tests cover world ray-plane projection, AABB support extents and extreme direction magnitudes. The unsupported native preview now links its coded error; its regression failed before repair. Records: batch-56-axis.json and batch-56-axis-compat.json under examples/package-benchmarks/results. No HDR backdrop orientation or continuous tangent-frame transport is claimed.

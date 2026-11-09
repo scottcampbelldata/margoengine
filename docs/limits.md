@@ -1730,3 +1730,9 @@ and raster frame. No arbitrary photographic fidelity, outside-renderer equality 
 The controller entry is 1213 B gzip (ceiling 1469); its dynamically loaded existing
 integrator and Wasm retain their separate budgets. Staging root 8131 B, accumulate
 9306 B; core plus stage 23797 B, strictly below 25,000 B.
+
+### Any-up staging receivers (batch 56, job 6)
+
+This supersedes the Y-up receiver restriction in earlier batch-56 entries. ContactShadows and AccumulatedShadows accept any finite nonzero up direction and normalize it before GPU upload. Width is projected X unless abs(normal.x) >= 0.9, when projected Z is used; depth is width cross normal. This fixed frame switches at the threshold. fit uses conservative world AABB supports, not an oriented mesh fit. Accumulation's default light is world 8 * normalized up; custom world light positions must clear the caster height along that normal. Existing dimensions, sample and raster precision bounds remain. The HDR ground backdrop stays Y-up.
+
+Both receivers draw on WebGPU and the installed WebGL2 compatibility layer. The older native preview throws linked unsupported. The analytic geometry oracle covers eight orientations, all 4096 texels per effect per orientation, display pixels and actual device replacement; the real FlightHelmet additionally proves a Z-up fit/contact composition. No speed, cross-hardware subpixel identity or photographic quality claim. Root staging is 8520 B gzip (ceiling 8776), accumulate 9655 (ceiling 9945), pathtrace unchanged 1213; core plus stage unchanged 23797 < 25000.

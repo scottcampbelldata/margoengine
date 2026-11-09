@@ -1,0 +1,31 @@
+{
+  "batch": 56,
+  "job": 6,
+  "status": "DONE",
+  "sizes": {
+    "entries": {
+      "index": {
+        "raw": 23223,
+        "gzip": 8520
+      },
+      "accumulate": {
+        "raw": 27433,
+        "gzip": 9655
+      },
+      "pathtrace": {
+        "raw": 2783,
+        "gzip": 1213
+      }
+    },
+    "coreStage": {
+      "raw": 58792,
+      "gzip": 23797
+    }
+  },
+  "tests": [
+    "packages/staging/test/orientation.test.js",
+    "packages/staging/test/orientation-browser.mjs"
+  ],
+  "proof": "examples/package-benchmarks/results/batch-56-axis.json and batch-56-axis-compat.json",
+  "regressionsBefore": "axis-before: 3/3 fail against previous build; axis-links-before: unsupported link regression fails before repair"
+}
