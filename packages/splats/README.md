@@ -369,7 +369,7 @@ engine.createMesh().setGeometry(box());
 const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
 const picking = Picking.attach(engine);
 const splatPicking = SplatPicking.attach(picking, cloud); // {threshold: 0.1} by default
-const hit = await picking.pick(128, 96); // canvas CSS pixels
+const hit = await picking.pick(128, 96); // PickHit, in canvas CSS pixels
 if (hit && splatPicking.splatsOf(hit.mesh)) console.log('splat', hit.splat, 'of', hit.splats);
 else if (hit) console.log('mesh', hit.mesh);
 const hits = await picking.pickMany([[10, 20], [64, 64]]); // one readback for both
@@ -383,7 +383,9 @@ engine.start();
 - A splat hits where its Gaussian times its opacity at the pixel, capped at 0.99 as drawn, reaches `threshold`
   (default 0.1, as `SplatBrush.pick`; settable). Among those the nearest splat centre wins, and it then competes with
   the meshes at that depth.
-- `hit.mesh` is an empty stand-in mesh, as `engine.pick` answers meshes; `splatsOf(mesh)` maps it back to the cloud.
+- `picking.pick` returns `PickHit | null`, with the mesh and splat metadata used above. `engine.pick` returns only
+  `Mesh | null`, without those hit fields. On a splat hit, `hit.mesh` is an empty stand-in mesh; `splatsOf(mesh)` maps
+  it back to the cloud.
   `hit.splat` is the splat's index in the cloud (a pool index under `SplatSet` and `SplatLod`). `dispose()` leaves
   Picking and frees the stand-in; the cloud stays.
 - A pick's cost grows with the cloud: four vertices of projection per splat, every pick. Picking takes up to 8 overlays.
