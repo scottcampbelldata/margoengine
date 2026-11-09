@@ -1,5 +1,17 @@
 # Performance history: losses, causes and fixes
 
+### Batch 134 rational-source experiment, no speed acceptance
+
+The [negative source-estimation checkpoint](results/batch-134-scalar-rational.json)
+uses the same one optional Wasm, 184,335 B raw / 69,278 B gzip9.
+Its 7,284 extra gzip bytes test rational interpolation/endpoint estimates
+and complete destination fitting. Current code performs the byte fit as its
+seed, then the rational fit, with fixed stack scratch and one output allocation;
+there is additional work and no speed claim. The source-quality campaign fails
+21 pairs; no result is accepted on reconstructed error alone. No benchmark,
+timing A/B or timing-only assertion ran. Final memory/entry and every timing
+target in the deferred speed-phase list remain owed.
+
 ### Batch 134 complete scalar search and valid extents
 
 The [private checkpoint](results/batch-134-scalar-exact-edge.json) scores all

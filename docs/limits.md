@@ -1,5 +1,14 @@
 # Design envelope
 
+Batch 134 rational scalar-source experiment: 184,335 B raw /
+69,278 B gzip9, versus the byte-objective draft's 169,084 / 61,994 B.
+The 7,284 extra gzip bytes test rational source estimates with complete
+discrete fitting in the same optional private Wasm. The experiment remains
+unaccepted: 77/98 pairs pass, 21 fail, with both original-source bars and
+all controls unchanged. This is no final entry, peak-memory, speed or public
+package result. Core/stage and the shipped prebuilt are unchanged.
+[Full evidence](whitepaper/results/batch-134-scalar-rational.json).
+
 Batch 134 complete scalar fitting and valid-extent checkpoint: the private
 draft is 169,084 B raw / 61,994 B gzip9, versus report 15's 168,906 / 60,673 B.
 The additional 1,321 gzip bytes provide complete endpoint candidate rejection

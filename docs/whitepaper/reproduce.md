@@ -1,5 +1,18 @@
 # Reproducing Margo's numbers
 
+The [rational scalar experiment](results/batch-134-scalar-rational.json) is an
+unaccepted negative research checkpoint. Retained author-workspace identifiers:
+`planner/scalar-research-report17.md` records the chosen method before code;
+`transcoder/tests/scalar_latent.rs` independently enumerates all 65,536 pairs
+for 128 rational cases; `measure/report17-campaign.mjs` pins sources, Wasm and
+adapter and runs `measure/scalar-quality-report17.mjs` under a hard limit.
+The quality command intentionally fails: 77/98 pairs pass, 21 fail.
+All old controls and both bars are unchanged. During that same pass it retains
+output/RGBA payloads and source-interaction sums; `measure/report17-analyze.mjs`
+groups these by base/mip and full/partial extent without retranscoding.
+These are separately retained development-workspace identifiers, not shipped
+clone commands. No public integration or timing acceptance is claimed.
+
 The [complete scalar search and extent checkpoint](results/batch-134-scalar-exact-edge.json)
 records every image, original reference, old control and source/adapter/Wasm pin.
 Retained author-workspace identifiers are `transcoder/tests/scalar_exact.rs`,

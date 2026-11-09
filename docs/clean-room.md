@@ -1,5 +1,42 @@
 # Clean room
 
+## Batch 134 rational scalar-source experiment (2026-11-09)
+
+Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches
+compared least-squares endpoint refinement, sorted cluster fitting, exhaustive
+eight-value and six-value fitting, and indirect quantization. Primary readings:
+Ignacio Castano, [High Quality DXT Compression using CUDA (2007)](https://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/dxtc/doc/cuda_dxtc.pdf),
+abstract, cluster-fit discussion and normal equations, PDF pages 2-6;
+Per Wennersten and Jacob Strom, [Table-based Alpha Compression (2009)](https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf),
+retained sections 4.1-4.3; Shin Fujieda and Takahiro Harada,
+[Neural Texture Block Compression (2024)](https://arxiv.org/html/2407.09543v1),
+sections 2-3.2; and Ariel Doubchak, Tal Philosof, Uri Erez and Amit Berman,
+[Design of Threshold-Constrained Indirect Quantizers (2024)](https://arxiv.org/html/2409.06839v1),
+abstract and introduction through I-C.2. Castano's web opening also exposed
+the paper's CUDA sorting pseudocode; it is not used. No companion code or
+implementation repository was opened or used.
+
+Reread Khronos Group, [Data Format Specification 1.4 (2025)](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.inline.html),
+chapter 19 introduction, 19.1/Table 121 and 19.3; Richard Geldreich/Binomial,
+[UASTC LDR 4x4 specification](https://github.com/BinomialLLC/basis_universal/wiki/UASTC-LDR-4x4-Texture-Specification),
+retained mode/channel and interpolation definitions; and its
+[ETC1S specification 1.03](https://github.com/BinomialLLC/basis_universal/wiki/.basis-File-Format-and-ETC1S-Texture-Video-Specification),
+retained endpoint, selector and alpha definitions. These are partial rereads
+of the specifications reviewed during job 1, not new full-document claims.
+
+The previous reconstructed-byte objective already has a complete search.
+The new private experiment instead retains rational palette samples: UASTC
+endpoint interpolation before byte truncation, and ETC1S uniform normalized
+five-bit endpoint expansion plus its modifier. This tests a symmetric-residual
+source model; it is not a normative decode change or a proven real-texture
+conditional mean. Integer arithmetic scores actual rounded destination
+palettes, enumerates both endpoint orders completely and keeps the original
+visible-texel byte error bound, R/alpha mapping and every acceptance control.
+Independent 65,536-pair oracles check 128 rational cases, in addition to the
+unchanged 4,096 byte-objective oracles. No original, filename, old endpoint or
+per-file parameter enters the runtime. Source-interaction diagnostics retain
+both source mappings without replacing either bar. Results remain unaccepted.
+
 ## Batch 134 finite scalar fitting and image extents (2026-11-09)
 
 Before implementation, wide searches compared scalar endpoint fitting,

@@ -75,24 +75,22 @@ reuse guidance and a complete alternate-name example, before construction.
 `packages/labels/tests/testpage-attach.test.js` rejects the old error and covers
 default and custom collisions without replacing existing labels or DOM.
 
-### Open: batch 134 scalar prototype fails source-quality acceptance
+### Open: batch 134 scalar source-quality acceptance
 
-The initial min/max BC4/BC5 prototype failed 40 of 98 pairs. Both-mode endpoint
-fitting and exterior-endpoint seeds passed 86 pairs with 12 failures. Complete
-endpoint search and valid-rectangle fitting now pass 84 pairs with 14 failures
-across the same 46 primary and three supplementary files. The original 12 remain;
-the FlightHelmet MetalPartsMat BaseColor pair adds two losses. All 1,296 old
-controls and frozen totals remain exact. The complete search closes a proven
-1455-versus-903 reconstruction-score miss; the extent fix prevents outside-image
-padding competing with visible values. Both have failing-before tests, but
-neither establishes original-source acceptance. New losses remain failures;
-no case is waived or classified impossible. BC5 must satisfy both conventional
-RG and mapped R/alpha checks. Reproduce with retained author-workspace identifier
-`measure/scalar-quality-report16-final.mjs`. The private draft is not integrated
-into the public package and the prebuilt remains in use.
-[Current failures](whitepaper/results/batch-134-scalar-exact-edge.json),
-[previous refinement](whitepaper/results/batch-134-scalar-refinement.json) and
-[initial prototype](whitepaper/results/batch-134-scalar-prototype.json).
+The original min/max, refined and complete byte-objective drafts failed 40,
+12 and 14 of the same 98 source-quality pairs, respectively. The rational
+source-estimation experiment now fails 21; 7 previously passing pairs become
+losses and 0 previous losses pass. This rejects the tested symmetric-residual
+model. Complete optimization of an estimated source does not establish either
+original-source bar. Every failure remains open; no case is waived or declared
+impossible. Both conventional RG and mapped R/alpha bars, the byte-domain
+bound, all 1,296 old controls and frozen totals stay unchanged. Normative RGBA
+controls are also exact. Reproduce with retained author-workspace identifiers
+`measure/scalar-quality-report17.mjs` and `measure/report17-analyze.mjs`;
+the latter uses captured payloads/sums without another transcode. The private
+experiment is not integrated and the public prebuilt remains in use.
+[Current negative evidence](whitepaper/results/batch-134-scalar-rational.json),
+[previous byte-objective evidence](whitepaper/results/batch-134-scalar-exact-edge.json).
 
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 

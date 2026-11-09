@@ -1,5 +1,19 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: batch 134 rejected rational-source hypothesis
+
+The private scalar experiment completely optimizes rational source estimates
+while enforcing the original visible-byte bound. Native 59 and scalar Node 4
+tests pass, including 128 independent rational endpoint oracles alongside the
+unchanged 4,096 byte-objective oracles. The corpus rejects the source model:
+77/98 pairs pass, 21 fail. All 1,296 old controls and both bars remain
+unchanged. New payloads, unchanged RGBA reconstructions and per-channel
+source-interaction terms are retained in the same campaign so follow-up
+diagnostics need no repeated transcode. [Evidence](../whitepaper/results/batch-134-scalar-rational.json).
+This is a negative research checkpoint, not a shipped quality improvement.
+Public integration, all-target/fuzz/new-Wasm GPU/peak-memory/entry acceptance
+and deferred timing remain open.
+
 ## README live-link lifecycle (section 5 evidence, 2026-11-10)
 
 The runner supplies Blender's documented continuing example with native SSE

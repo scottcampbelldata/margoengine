@@ -9,6 +9,17 @@ and mutable infinite spread is rejected before GPU work. This does not change
 the colour model or make a speed claim. Method, sources and shader-text
 minifier evaluation: [size restoration](../size-restore.md).
 
+The [rational scalar-source experiment](results/batch-134-scalar-rational.json)
+remains unaccepted: 77/98 pairs pass and 21 fail across the same 49 files
+and 1,296 images. All old payload/source controls, frozen totals, both
+original-source bars and the visible-byte bound remain exact. There are also
+1,296 unchanged RGBA control comparisons covering 648 distinct images.
+Native 59, scalar Wasm Node 4 and diagnostic 2 tests pass; 128 independent
+65,536-pair rational oracles supplement the unchanged byte-objective tests.
+The symmetric-residual source estimate is a hypothesis rejected by the corpus,
+not a normative decode correction or a quality improvement. No loss is waived.
+No public integration, completed job 2/3, new-Wasm GPU or timing claim.
+
 Lighting2d validation names failing scalar fields, mask constraints and allowed
 enum values directly in linked RangeErrors. Evidence:
 `packages/lighting2d/tests/diagnostics.test.js` fails on the shortened diagnostics

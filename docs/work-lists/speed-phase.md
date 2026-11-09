@@ -279,6 +279,11 @@ No elapsed speed win or accepted slowdown is claimed from these work counts.
 
 ## Batch 134 retained timing proof
 
+The rational-source experiment adds a second complete fitting objective after
+the byte fit and retains fixed block scratch, with no speed acceptance. Its
+negative source-quality evidence does not discharge any timing or memory debt.
+No benchmark, timing A/B or timing-only assertion ran for this experiment.
+
 Scott's 2026-11-10 build-phase ruling defers benchmarks, paired wall-clock A/Bs and timing-only assertions until
 he starts the speed phase. Correctness evidence and deterministic work counts continue; correctness GPU gates use
 shared locks. Retain historical timing records, without treating them as fresh acceptance evidence.
