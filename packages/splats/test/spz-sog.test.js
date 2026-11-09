@@ -1,10 +1,10 @@
 // SPZ and SOG readers (@margoengine/splats/data) against real captures. The fixtures are slices of Niantic's sample
 // splats (test/fixtures/NOTICE.md); the reference PLY files are PlayCanvas splat-transform's decodes of the same data.
 import test from 'node:test';
+import { requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
-import { join } from 'node:path';
 import { parsePly, parseSog, parseSpz } from '../dist/data.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
@@ -218,15 +218,12 @@ test('parseSog rejects what it cannot read with the fix in the message', async (
 });
 
 // The complete captures are 18-24 MB, so they stay outside the repository (test/fixtures/NOTICE.md).
-const samples = process.env.MARGO_SPLAT_SAMPLES;
-const full = (name) => (samples && existsSync(join(samples, name)) ? join(samples, name) : undefined);
+const full = (name) => requireExternalAssets(name);
 for (const [name, count, slab] of [
   ['racoonfamily.spz', 932_560, 'raccoon-v2.ply'],
   ['hornedlizard.spz', 786_233, undefined],
 ]) {
-  test(`parseSpz reads the complete ${name} sample`, {
-    skip: full(name) ? false : `set MARGO_SPLAT_SAMPLES to a folder holding ${name} to run this`,
-  }, async () => {
+  test(`parseSpz reads the complete ${name} sample`, async () => {
     const splats = await parseSpz(readFileSync(full(name)));
     assert.equal(splats.positions.length / 3, count);
     assert.equal(splats.sphericalHarmonics.length / count / 3, 16);

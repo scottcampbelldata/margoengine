@@ -1,7 +1,7 @@
 import test from 'node:test';
+import { requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { GLTFAsset } from '../dist/index.js';
 import { gaussianSplats, readGaussianSplats } from '../dist/splats.js';
 import { parseSpz } from '../../splats/dist/data.js';
@@ -96,11 +96,8 @@ test('a real uncompressed glTF from the godot-gsplat sample reads opacity and li
   assert.equal(data.colors[3], attribute('OPACITY')[0]);
 });
 
-test('the real tower capture reads whole when the sample is present', async (t) => {
-  const folder = process.env.MARGO_SPLAT_SAMPLES;
-  if (!folder) return t.skip('set MARGO_SPLAT_SAMPLES to a folder holding tower.glb (fixtures/splats/NOTICE.md)');
-  const path = join(folder, 'tower.glb');
-  assert.ok(existsSync(path), path);
+test('the real tower capture reads whole', async () => {
+  const path = requireExternalAssets('tower.glb');
   const a = asset(glb(path)),
     data = await readGaussianSplats(a, a.doc.meshes[0].primitives[0]);
   assert.equal(data.positions.length / 3, 286868);

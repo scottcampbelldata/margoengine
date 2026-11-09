@@ -1,7 +1,8 @@
 // KHR_interactivity end to end: the published conformance files against their oracle, then the graph on a loaded model.
 import test from 'node:test';
+import { requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf-pro';
@@ -12,7 +13,7 @@ import { glbChunks } from '../../shared/glb.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
 const fixtures = fileURLToPath(new URL('../../gltf-pro/tests/fixtures/interactivity/', import.meta.url));
-const samples = process.env.MARGO_SPLAT_SAMPLES && join(process.env.MARGO_SPLAT_SAMPLES, 'interactivity');
+const samples = requireExternalAssets('interactivity/');
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
 function glb(file) {
@@ -81,7 +82,7 @@ test('the committed conformance files pass every sub-test, and the committed inv
 // the specification, so the sub-test stays failed; see docs/limits.md.
 const knownFailure = 'pointer/CoreReadOnlyPointers_GetTests :: /scene isValid';
 
-test('the whole conformance suite: 1,155 of 1,156 sub-tests and 187 of 187 invalid graphs', { skip: !(samples && existsSync(samples)) }, () => {
+test('the whole conformance suite: 1,155 of 1,156 sub-tests and 187 of 187 invalid graphs', () => {
   const failed = [];
   let total = 0;
   for (const index of ['test-index.json', 'mathtests-index.json'])

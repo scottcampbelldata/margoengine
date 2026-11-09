@@ -337,3 +337,29 @@ Follow-up landing checks: lint and hygiene passed; full verify passed 13,276 tes
 executed 80/95 with 15 retained failures, zero fresh. The 34 focused regressions and all three real AMF rows
 also passed. No public exports changed. The first group's duplicate queued GPU request was deliberately
 cancelled before it started tests; its earlier identical-code scoped run remains the recorded evidence.
+
+## Cross-worktree skip investigation (2026-11-09)
+
+The reviewers' 14 skips are the batch-160 rows, not additional missing-file cases. The
+previous zero-skip verify explicitly exported MARGO_SPLAT_SAMPLES; other shells did not.
+Their tests still used optional environment-only selection and were excluded from the AST
+gate for ownership. Shared downloaded files alone could not prevent skips. The cache was
+shadow-only, with no serving. On Scott's follow-up instruction, those four test files now
+use the shared default cache and required digest-checked families, and their gate exclusions
+are removed. Verify preflights all 348 pinned outside inputs before build; direct package
+tests require their own families. No physics or physics2d implementation or test changed.
+See batch-160-skips.md for sources/licences and the exact failure/recovery contract.
+
+The original four files at 110b47288 were reproduced without the environment variable: 49 pass,
+14 skip, zero failures. New direct package suites pass 201 animation, 394 gltf-pro and 73 splats
+tests without the export. All nine package GPU suites pass. Their README run executes 45/52
+examples, seven existing exceptions, zero fresh failures. A genuinely empty cache downloaded
+and digest-checked all 348 files successfully in 16.1 s. The initial full verify ran 13,285 tests
+with zero skips and one stale generated THIRD-PARTY-NOTICES.md failure; the source registry
+change required regeneration, now performed. Final post-rebase checks are recorded below.
+
+Final skip-enforcement checks on 2ef2fc7c0: lint and standalone hygiene pass. Full verify passes
+13,282 tests, zero failures/skips, in 307.6 s with MARGO_RESULT_CACHE=off and no sample export.
+All nine affected package GPU suites pass after the WebGL workspace removal rebase, and the
+README run remains 45/52 with seven existing exceptions and zero fresh failures. The three
+package-specific test suites passed all 668 tests. No core/stage/physics package changed.

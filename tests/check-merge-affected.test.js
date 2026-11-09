@@ -543,9 +543,9 @@ test('the bundler matrix does not take the GPU lock, and a render in a browser i
   );
 });
 
-test('verify runs the same checks as before plus the parity count and the XR device-run gate, hygiene first, the build second, the rest after the build', () => {
+test('verify runs the same checks as before plus the parity count and the XR device-run gate, hygiene and required assets first, then the build, the rest after the build', () => {
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
-  assert.deepEqual(SERIAL, ['node scripts/hygiene.js --verify', 'npm run build:packages']);
+  assert.deepEqual(SERIAL, ['node scripts/hygiene.js --verify', 'node scripts/support/external-test-assets.mjs', 'npm run build:packages']);
   assert.deepEqual(
     PARALLEL.flat().sort(),
     [

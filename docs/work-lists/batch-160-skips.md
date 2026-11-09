@@ -22,7 +22,7 @@ gltf-pro importer tests only. Sources and licences are already recorded in the f
 | packages/splats/test/spz-sog.test.js | parseSpz reads the complete racoonfamily.spz sample | set MARGO_SPLAT_SAMPLES to a folder holding racoonfamily.spz to run this | Niantic complete capture at 11312e4ad836ed06e3da2f3d5b633688d17ebebb |
 | packages/splats/test/spz-sog.test.js | parseSpz reads the complete hornedlizard.spz sample | set MARGO_SPLAT_SAMPLES to a folder holding hornedlizard.spz to run this | Same Niantic commit |
 
-Physics sample commit: eoineoineoin/glTF_Physics 9dc61cb3474ff9a51f58d3592f79d5c9e572056a.
+Physics sample commit: eoineoineoin/glTF_Physics 9dc61cb3484ff9a51f58d3592f79d5c9e572056a.
 Those samples state no licence and stay outside the repository. Khronos interactivity is
 CC-BY-4.0; Niantic SPZ and samples are MIT. The complete suite retains its existing explicit
 one-subtest specification disagreement; downloading data does not change its assertions.
@@ -36,3 +36,23 @@ test-results/batch-160. No test was weakened or changed to pass this audit.
 Final job 2 full verify: 13,064 pass, zero failures, zero skipped, 2026-11-09.
 The four audited files separately pass all 63 tests with zero skips. Every skip in the original
 run is accounted for above; no unavailable hardware is required by any of these 14 tests.
+
+## Cross-worktree enforcement (2026-11-09)
+
+The zero-skip run depended on a shell-local MARGO_SPLAT_SAMPLES export. Without it,
+the same commit still skipped exactly these 14 tests, even when the shared files existed.
+The result cache did not serve results (shadow mode only); this was environment-dependent
+fixture selection. Current origin/main 110b47288 had no subsequent fix at investigation.
+
+The four importer/conformance/capture test files now resolve the same default shared cache
+as the downloader, relative to the worktree parent. MARGO_SPLAT_SAMPLES overrides the whole
+path; MARGO_ENGINE_BENCH overrides its parent. No physics or physics2d package changes.
+All 348 inputs, including conformance indexes and companions, have tracked URL, size and
+SHA-256 records in scripts/support/external-test-assets.json. Fetch is incremental and checks
+existing bytes; missing/changed files are downloaded with pinned digests and a 15-minute
+hard acquisition deadline. Individual tests validate their entire family before enumeration.
+Verify validates every input before building. A missing, partial, changed or LFS-only cache
+fails with its exact path and node scripts/reference-rendering/fetch-skip-assets.mjs.
+No environment export is necessary. The missing-fixture syntax gate now covers these four
+files too. A subprocess regression exercises verify with an empty override cache and requires
+a failure before build, never a passing or skipped run.

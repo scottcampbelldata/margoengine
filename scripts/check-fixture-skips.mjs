@@ -6,13 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { parseSync } from 'rolldown/utils';
 
 const evidence = /fixture|sample|asset|validator|sharp|venv|python|\.exr\b|\.hdr\b|\.bin\b/i;
-// Batch 160 owns these exact files; physics is on hold. These are ownership exclusions, not passing evidence.
-export const deferredFiles = new Set([
-  'packages/animation/tests/interactivity.test.js',
-  'packages/gltf-pro/tests/physics.test.js',
-  'packages/gltf-pro/tests/splats.test.js',
-  'packages/splats/test/spz-sog.test.js',
-]);
+// Only the held physics packages are excluded below. All external asset tests are audited.
 
 /** Finds fixture-dependent skips and successful early exits in executable syntax, ignoring comments and strings. */
 export function fixtureSkips(source, file = 'test.js') {
@@ -111,8 +105,7 @@ export function checkFixtureSkips(root = resolve(import.meta.dirname, '..')) {
       (file) =>
         /\.(m?js|ts)$/.test(file) &&
         /(^tests\/|\/tests?\/|^scripts\/.*(?:test|proof)|\/proofs\/)/.test(file) &&
-        !/^packages\/physics(?:2d)?\//.test(file) &&
-        !deferredFiles.has(file),
+        !/^packages\/physics(?:2d)?\//.test(file),
     )
     .flatMap((file) => fixtureSkips(readFileSync(resolve(root, file), 'utf8'), file));
 }
@@ -121,5 +114,5 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   const problems = checkFixtureSkips();
   for (const problem of problems) console.error(problem);
   if (problems.length) process.exitCode = 1;
-  else console.log('Required-fixture gate passed (batch 160 and held physics listed separately).');
+  else console.log('Required-fixture gate passed (held physics listed separately).');
 }

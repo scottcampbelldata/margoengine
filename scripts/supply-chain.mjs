@@ -181,6 +181,10 @@ const ASSETS = [
     'Collada, KHR_animation_pointer and transparency test models: AnimatedColorsCube, GlassVaseFlowers, TransmissionTest (CC0 1.0, Khronos glTF-Sample-Assets), DiffuseTransmissionPlant (CC BY 4.0 and CC0 1.0, same source), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there',
   ],
   [
+    'scripts/support/external-test-assets.json',
+    'Required outside verify assets, 348 URL/SHA-256/size records: Khronos interactivity f99d9b6 (CC-BY-4.0), Niantic SPZ 11312e4ad836ed06e3da2f3d5b633688d17ebebb (MIT), Cesium tower (Apache-2.0, digest pinned), and glTF_Physics 9dc61cb3484ff9a51f58d3592f79d5c9e572056a (no stated licence; outside-only existing importer tests). No implementation or asset bytes ship here.',
+  ],
+  [
     'examples/assets/3d-tiles/NOTICE.md',
     '3D Tiles test tilesets: TilesetWithTreeBillboards (i3dm, CC0 1.0), the city of TilesetWithRequestVolume (b3dm, CC BY 3.0, Cesium) and two EXT_structural_metadata glTF samples (CC0 1.0) from https://github.com/CesiumGS/3d-tiles-samples; commit and sha256 there',
   ],

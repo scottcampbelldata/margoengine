@@ -29,7 +29,11 @@ export function plantStale(dir = root) {
 }
 
 /** Stage 1: in order. */
-export const SERIAL = ['node scripts/hygiene.js --verify', 'npm run build:packages'];
+export const SERIAL = [
+  'node scripts/hygiene.js --verify',
+  'node scripts/support/external-test-assets.mjs',
+  'npm run build:packages',
+];
 
 /** Half the machine's threads for the unit tests (the no-burn rule), at least the 4 they always had and at most 8. */
 export const TEST_CONCURRENCY = Math.min(8, Math.max(4, availableParallelism() >> 1));

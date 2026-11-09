@@ -1,0 +1,2090 @@
+[
+  {
+    "file": "interactivity/Extras/Loop_in_Loop_Tests/test-Json/Loop_in_Loop_Tests.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Loop_in_Loop_Tests/test-Json/Loop_in_Loop_Tests.json",
+    "sha256": "61e32981568f1d0426d8867fdbdb18b0cf3f0acd6c92b9d5db73434015895705",
+    "size": 1848
+  },
+  {
+    "file": "interactivity/Extras/Matrix_Updates/test-Json/Matrix_Updates.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Matrix_Updates/test-Json/Matrix_Updates.json",
+    "sha256": "f5ae985c1ac0b58936ad75aa3dc7692b048fe32e0b1806e0bdd2f6a857537cce",
+    "size": 3413
+  },
+  {
+    "file": "interactivity/Extras/Float_Precision/test-Json/Float_Precision.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Float_Precision/test-Json/Float_Precision.json",
+    "sha256": "730275d6620d77fd5ea8463cbd8343f8724ccd3f9ff53d5f6ca13bb97734ce40",
+    "size": 19263
+  },
+  {
+    "file": "interactivity/Extras/Loop_in_Loop_Tests/glTF-Binary/Loop_in_Loop_Tests.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Loop_in_Loop_Tests/glTF-Binary/Loop_in_Loop_Tests.glb",
+    "sha256": "72ed6de5d6eb17ff4531d2a429d2b98d553e3e1678ec0fa5a37b6a2f8d6c93b0",
+    "size": 170572
+  },
+  {
+    "file": "interactivity/Extras/Matrix_Updates/glTF-Binary/Matrix_Updates.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Matrix_Updates/glTF-Binary/Matrix_Updates.glb",
+    "sha256": "d00b07e4d4be5ffce89efcca9611b3fd24a6baff7b0c48cac105f13735363730",
+    "size": 188964
+  },
+  {
+    "file": "interactivity/Extras/Float_Precision/glTF-Binary/Float_Precision.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Extras/Float_Precision/glTF-Binary/Float_Precision.glb",
+    "sha256": "324a5bef86d2d0362f5857ad9591980977fa36a2b6476b03051fada8f0d1d132",
+    "size": 516776
+  },
+  {
+    "file": "interactivity/InterGlb/RefEcho_FileA/test-Json/RefEcho_FileA.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/InterGlb/RefEcho_FileA/test-Json/RefEcho_FileA.json",
+    "sha256": "2706fbc663eaa207601349cf1eefca7a0b3b150fda0dcb9c1ad59ee47a2bf8b0",
+    "size": 1969
+  },
+  {
+    "file": "interactivity/InterGlb/RefEcho_FileB/test-Json/RefEcho_FileB.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/InterGlb/RefEcho_FileB/test-Json/RefEcho_FileB.json",
+    "sha256": "d22bff57f8a087481cb7080c8a1c1324d95f441af09c734907cabf18af912580",
+    "size": 1347
+  },
+  {
+    "file": "interactivity/InterGlb/RefEcho_FileB/glTF-Binary/RefEcho_FileB.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/InterGlb/RefEcho_FileB/glTF-Binary/RefEcho_FileB.glb",
+    "sha256": "d83863fbe921d5196a5813e53d60f2ddc6baad0499291abb0ae230b770fbcb5c",
+    "size": 148060
+  },
+  {
+    "file": "interactivity/InterGlb/RefEcho_FileA/glTF-Binary/RefEcho_FileA.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/InterGlb/RefEcho_FileA/glTF-Binary/RefEcho_FileA.glb",
+    "sha256": "fb30a9e18aba1cfbbc1759071033f2ddfbfd6bd337883a59d983799c23ecc2bb",
+    "size": 164616
+  },
+  {
+    "file": "interactivity/Overview.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Overview.json",
+    "sha256": "aa9b38cfcc5fd242e10af03f89b02cbe692d938ff4ce7bad36c0686e6041a4d3",
+    "size": 330397
+  },
+  {
+    "file": "interactivity/Overview.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/Overview.glb",
+    "sha256": "889912cb90b5096703df1e8575a0f11120f603ce3c3c7c8f9f8b3de92380fed5",
+    "size": 8556984
+  },
+  {
+    "file": "interactivity/animation/start/test-Json/start.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/start/test-Json/start.json",
+    "sha256": "6b3cdb87572827a655ece15c1c3cd00e90e7e8010d7c6d98cd811f63411f0d24",
+    "size": 6746
+  },
+  {
+    "file": "interactivity/UserInteractions/eventOnSelect/test-Json/eventOnSelect.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/UserInteractions/eventOnSelect/test-Json/eventOnSelect.json",
+    "sha256": "d7d874c7bd9cb16274f9b8a974edb8ad6d9336deb6af7f99d078b08e1be70545",
+    "size": 6713
+  },
+  {
+    "file": "interactivity/UserInteractions/eventOnHover/test-Json/eventOnHover.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/UserInteractions/eventOnHover/test-Json/eventOnHover.json",
+    "sha256": "ed43c8065085ad199e286c816f116dc641c25f22f27fbf5e88a26c35ab58fd2e",
+    "size": 6343
+  },
+  {
+    "file": "interactivity/UserInteractions/eventOnHover/glTF-Binary/eventOnHover.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/UserInteractions/eventOnHover/glTF-Binary/eventOnHover.glb",
+    "sha256": "397f533ad932de44f9965caedb246bb359926f9a4ef0e9d84ba2cac2f1fa43de",
+    "size": 278908
+  },
+  {
+    "file": "interactivity/UserInteractions/eventOnSelect/glTF-Binary/eventOnSelect.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/UserInteractions/eventOnSelect/glTF-Binary/eventOnSelect.glb",
+    "sha256": "046a609e582437613034b83cc2300d99dda6449b27b292af231861b0bb468b92",
+    "size": 294408
+  },
+  {
+    "file": "interactivity/animation/start/glTF-Binary/start.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/start/glTF-Binary/start.glb",
+    "sha256": "acba25e7ccf972fa2b6c76302af8dbfc36bf1e24c6a544668ca57d2fa53d3df9",
+    "size": 252568
+  },
+  {
+    "file": "interactivity/animation/stop/test-Json/stop.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stop/test-Json/stop.json",
+    "sha256": "b8bbaac9f1104443d5920b8908d54bb23c182e44751089c7893b6836ada2c20e",
+    "size": 2788
+  },
+  {
+    "file": "interactivity/animation/start_playback_modes/test-Json/start_playback_modes.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/start_playback_modes/test-Json/start_playback_modes.json",
+    "sha256": "d375ec09ae4f0088ef59bb4b45a79ebeab500105e41785700c4f70c21dbc4068",
+    "size": 10625
+  },
+  {
+    "file": "interactivity/animation/state/test-Json/state.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/state/test-Json/state.json",
+    "sha256": "7e98d482517055dba7d764658129239a1fcde4563d8b16418ff8806a2f800111",
+    "size": 7786
+  },
+  {
+    "file": "interactivity/animation/stop/glTF-Binary/stop.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stop/glTF-Binary/stop.glb",
+    "sha256": "1b91358490b0ef343dba53ecc001094337ba84d96d35613c4bfafcf63c2af907",
+    "size": 172988
+  },
+  {
+    "file": "interactivity/animation/start_playback_modes/glTF-Binary/start_playback_modes.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/start_playback_modes/glTF-Binary/start_playback_modes.glb",
+    "sha256": "1f509c0ee2d60e437dfe49c0f689de2c2e27aa88e4be8484e0444f9e6800d07f",
+    "size": 393088
+  },
+  {
+    "file": "interactivity/animation/state/glTF-Binary/state.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/state/glTF-Binary/state.glb",
+    "sha256": "d432dc679bc3c1f3702a8b271caffcedb4bdae5466ee0513d758a0cad2b8fe75",
+    "size": 316128
+  },
+  {
+    "file": "interactivity/animation/stopAt/test-Json/stopAt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stopAt/test-Json/stopAt.json",
+    "sha256": "90b9c9a6eb0c08c625b431c68176863204da23db0e778d8f0deeb08dd000591a",
+    "size": 3681
+  },
+  {
+    "file": "interactivity/event/Event_Refs/test-Json/Event_Refs.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/Event_Refs/test-Json/Event_Refs.json",
+    "sha256": "e028811e45febb0fbd94e69da780006a657e6b1f3fe83810045af3817e1434b3",
+    "size": 5699
+  },
+  {
+    "file": "interactivity/animation/stop_and_stopAt_edge_cases/test-Json/stop_and_stopAt_edge_cases.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stop_and_stopAt_edge_cases/test-Json/stop_and_stopAt_edge_cases.json",
+    "sha256": "04fdc556f6f6dcb27466c3ec792c3f5a1da14144e73deabe1b4547758482efc8",
+    "size": 10125
+  },
+  {
+    "file": "interactivity/animation/stopAt/glTF-Binary/stopAt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stopAt/glTF-Binary/stopAt.glb",
+    "sha256": "353de24b22320853898cb88dd86452e35dce2a00cf4bf3e492f62d7137c44bd3",
+    "size": 190176
+  },
+  {
+    "file": "interactivity/event/Event_Refs/glTF-Binary/Event_Refs.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/Event_Refs/glTF-Binary/Event_Refs.glb",
+    "sha256": "1d375e132457d34c24e5dc134131d762a344344f9989ce3c69cf6cdb1a29b2c3",
+    "size": 248248
+  },
+  {
+    "file": "interactivity/animation/stop_and_stopAt_edge_cases/glTF-Binary/stop_and_stopAt_edge_cases.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/animation/stop_and_stopAt_edge_cases/glTF-Binary/stop_and_stopAt_edge_cases.glb",
+    "sha256": "2275ea850ed41bcdb49a2d7d37293cf3c220c48a47e9733440c759d3ef2be835",
+    "size": 357408
+  },
+  {
+    "file": "interactivity/event/stopPropagation/test-Json/stopPropagation.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/stopPropagation/test-Json/stopPropagation.json",
+    "sha256": "a73dd6828d9492610f2c5795264cdc714129f0e23882e7810fe6d1484fd1bf3f",
+    "size": 3748
+  },
+  {
+    "file": "interactivity/event/activation_order_and_onTick/test-Json/activation_order_and_onTick.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/activation_order_and_onTick/test-Json/activation_order_and_onTick.json",
+    "sha256": "7b13fc581516e0e8fc44203c7f3e4ab15d4ea85606f50c4bc2230c20cee85cdf",
+    "size": 5578
+  },
+  {
+    "file": "interactivity/event/send_and_receive/test-Json/send_and_receive.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/send_and_receive/test-Json/send_and_receive.json",
+    "sha256": "1c57f1173302abaad038d8051888db74ccae87f2e4d4be7bef403719e76d7539",
+    "size": 4388
+  },
+  {
+    "file": "interactivity/event/activation_order_and_onTick/glTF-Binary/activation_order_and_onTick.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/activation_order_and_onTick/glTF-Binary/activation_order_and_onTick.glb",
+    "sha256": "3608a2730b150f4950aa6d7bc17e261e4dffbb68a64b695a42f97d54c1043511",
+    "size": 246568
+  },
+  {
+    "file": "interactivity/event/send_and_receive/glTF-Binary/send_and_receive.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/send_and_receive/glTF-Binary/send_and_receive.glb",
+    "sha256": "f9c2f519378f3986b3ef6a7a032a54a0361fa36e963005d58af2bbec78e7bfb1",
+    "size": 219760
+  },
+  {
+    "file": "interactivity/event/stopPropagation/glTF-Binary/stopPropagation.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/event/stopPropagation/glTF-Binary/stopPropagation.glb",
+    "sha256": "c64de38c556638504b6e9a731ba2f58b66c8ed7283131031012d9900877adcb5",
+    "size": 216628
+  },
+  {
+    "file": "interactivity/flow/doN/test-Json/doN.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/doN/test-Json/doN.json",
+    "sha256": "e4938fb979391056503953785cb62337413eb99e454cc207ee6f7b73e11487e3",
+    "size": 3873
+  },
+  {
+    "file": "interactivity/flow/branch/test-Json/branch.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/branch/test-Json/branch.json",
+    "sha256": "a5a759088261c36e8df4b31730861ba415052c8d79aeb5368cb49b1bcbc33b45",
+    "size": 2310
+  },
+  {
+    "file": "interactivity/flow/for/test-Json/for.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/for/test-Json/for.json",
+    "sha256": "1ab6ebc9f30f8f7ad2d5a66387499371687c1aec6d206af4ec959d921ceae217",
+    "size": 7717
+  },
+  {
+    "file": "interactivity/flow/branch/glTF-Binary/branch.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/branch/glTF-Binary/branch.glb",
+    "sha256": "6602f9c96b78c1422e99cb023233588b3b7f61cdbc20c171561d14a22daa3a9a",
+    "size": 174288
+  },
+  {
+    "file": "interactivity/flow/doN/glTF-Binary/doN.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/doN/glTF-Binary/doN.glb",
+    "sha256": "92b1ef4ed927c278e84ec58dd216c725657e107968215c47054f30b75140244b",
+    "size": 208400
+  },
+  {
+    "file": "interactivity/flow/for/glTF-Binary/for.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/for/glTF-Binary/for.glb",
+    "sha256": "f8f8299e249d5cc340d1c1d5f8c43d94719c21ac2fa3bd404c540e17663df7ab",
+    "size": 318912
+  },
+  {
+    "file": "interactivity/flow/sequence/test-Json/sequence.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/sequence/test-Json/sequence.json",
+    "sha256": "a691ee2a45c77886c78b8e2c5f3d8035613750d2c47d44e356dbc23ce880738c",
+    "size": 2286
+  },
+  {
+    "file": "interactivity/flow/setDelay_and_cancelDelay/test-Json/setDelay_and_cancelDelay.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/setDelay_and_cancelDelay/test-Json/setDelay_and_cancelDelay.json",
+    "sha256": "c7aa051ab2371838948ad81847d4ce472ed8bd78cc1ee3e5bc280e8b6ed0cfee",
+    "size": 9697
+  },
+  {
+    "file": "interactivity/flow/multiGate/test-Json/multiGate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/multiGate/test-Json/multiGate.json",
+    "sha256": "8e3c20199d4e1cf1de5e05c268ac2064ffc17a2dc1014f9ba59aaab6a146325b",
+    "size": 5633
+  },
+  {
+    "file": "interactivity/flow/multiGate/glTF-Binary/multiGate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/multiGate/glTF-Binary/multiGate.glb",
+    "sha256": "c55bf6698adebfb03df6332e628674bbd8ee4206eab025c0db4a4f45dfb7cd6c",
+    "size": 273496
+  },
+  {
+    "file": "interactivity/flow/sequence/glTF-Binary/sequence.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/sequence/glTF-Binary/sequence.glb",
+    "sha256": "f13f610c0f5a9f2f6eb0650f3184cc64dd39b7dd835f9b73608705b9b48216ac",
+    "size": 180280
+  },
+  {
+    "file": "interactivity/flow/setDelay_and_cancelDelay/glTF-Binary/setDelay_and_cancelDelay.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/setDelay_and_cancelDelay/glTF-Binary/setDelay_and_cancelDelay.glb",
+    "sha256": "41129d0b85e33d6fb8f25ae243a47e9ee333d7afb2a53b3167fe84e412c95447",
+    "size": 306728
+  },
+  {
+    "file": "interactivity/flow/throttle/test-Json/throttle.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/throttle/test-Json/throttle.json",
+    "sha256": "c8fa04ef7bdaa684721b90ba765db976fa45df79e08f558886e2b5aa0bd5d46e",
+    "size": 6572
+  },
+  {
+    "file": "interactivity/flow/switch/test-Json/switch.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/switch/test-Json/switch.json",
+    "sha256": "c9a5b8ba8b8c05821ab0957f0f80d8765525c5d482cf1f995ad74af8ed449f0a",
+    "size": 6628
+  },
+  {
+    "file": "interactivity/flow/waitAll/test-Json/waitAll.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/waitAll/test-Json/waitAll.json",
+    "sha256": "6a68f67c72cf2218dc864314341377cdcd2dfa465806e4cf2a5e4d3e82805458",
+    "size": 5023
+  },
+  {
+    "file": "interactivity/flow/switch/glTF-Binary/switch.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/switch/glTF-Binary/switch.glb",
+    "sha256": "7294c6dfd64132219933642d93b35205c5952e78f86ad27b434265e281c79208",
+    "size": 281504
+  },
+  {
+    "file": "interactivity/flow/throttle/glTF-Binary/throttle.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/throttle/glTF-Binary/throttle.glb",
+    "sha256": "14d973b37851ce3d7565584c50c20650e587ee8b940138d41412f718fbb065fc",
+    "size": 258852
+  },
+  {
+    "file": "interactivity/flow/waitAll/glTF-Binary/waitAll.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/waitAll/glTF-Binary/waitAll.glb",
+    "sha256": "25b780b7c30bbb9ae7da5bb55f4491b72d80dafb40ab3df7c70ff455c6710d3d",
+    "size": 239004
+  },
+  {
+    "file": "interactivity/flow/while/test-Json/while.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/while/test-Json/while.json",
+    "sha256": "03f92d2cb041df3d7907bb3a449fe298f4707850d249e2524786fa4f047a59d0",
+    "size": 2764
+  },
+  {
+    "file": "interactivity/graph/extra_and_unknown_sockets/test-Json/extra_and_unknown_sockets.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/extra_and_unknown_sockets/test-Json/extra_and_unknown_sockets.json",
+    "sha256": "8f09753c692923d9268a4de3c7d920942e66bd7984c7ce0f4d7330bf009d420e",
+    "size": 4650
+  },
+  {
+    "file": "interactivity/graph/declaration_equality/test-Json/declaration_equality.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/declaration_equality/test-Json/declaration_equality.json",
+    "sha256": "b0595247de4d05ed23296f6a918854f37d8292346b5faf1fbee1ac6fb1375e96",
+    "size": 1947
+  },
+  {
+    "file": "interactivity/graph/extra_and_unknown_sockets/glTF-Binary/extra_and_unknown_sockets.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/extra_and_unknown_sockets/glTF-Binary/extra_and_unknown_sockets.glb",
+    "sha256": "1560519f321f78f3d601934fd808b07834ac59830de146d87288c1873dd39999",
+    "size": 224368
+  },
+  {
+    "file": "interactivity/graph/declaration_equality/glTF-Binary/declaration_equality.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/declaration_equality/glTF-Binary/declaration_equality.glb",
+    "sha256": "aeea24559bf9bbee137736865628e6c44c1d19a3e2d7f541a6b9e43ab9098b12",
+    "size": 149304
+  },
+  {
+    "file": "interactivity/flow/while/glTF-Binary/while.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/flow/while/glTF-Binary/while.glb",
+    "sha256": "0ea88be730e891c31d0e7b9ae99af5691579ce5f6c286c6f17ca5f1dbb7b71de",
+    "size": 175816
+  },
+  {
+    "file": "interactivity/graph/json_syntax/test-Json/json_syntax.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/json_syntax/test-Json/json_syntax.json",
+    "sha256": "e799e5f2522a33aca8d311a5f1148bdec45c505d9971e8f2cf90409b3307f646",
+    "size": 4585
+  },
+  {
+    "file": "interactivity/graph/ignored_configuration/test-Json/ignored_configuration.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/ignored_configuration/test-Json/ignored_configuration.json",
+    "sha256": "baed4525e04c73672994e927d1a4b751b45f710fc4006667bdafc274d3ceea5d",
+    "size": 3022
+  },
+  {
+    "file": "interactivity/graph/unsupported_operations_and_graphs/test-Json/unsupported_operations_and_graphs.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/unsupported_operations_and_graphs/test-Json/unsupported_operations_and_graphs.json",
+    "sha256": "c4050c35534625372dce1874261861d52781d9b6237de2e1a18efc97d58d007d",
+    "size": 3251
+  },
+  {
+    "file": "interactivity/graph/ignored_configuration/glTF-Binary/ignored_configuration.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/ignored_configuration/glTF-Binary/ignored_configuration.glb",
+    "sha256": "8400e25e39041a1b619f296710f1c9a07c13762c906f3f83986f49d858a8f3b2",
+    "size": 189988
+  },
+  {
+    "file": "interactivity/graph/unsupported_operations_and_graphs/glTF-Binary/unsupported_operations_and_graphs.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/unsupported_operations_and_graphs/glTF-Binary/unsupported_operations_and_graphs.glb",
+    "sha256": "78356fb8047a62a9115c1960910e63eb66235294242fe89b0161b313b8bd5a49",
+    "size": 176272
+  },
+  {
+    "file": "interactivity/graph/json_syntax/glTF-Binary/json_syntax.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/graph/json_syntax/glTF-Binary/json_syntax.glb",
+    "sha256": "63769abbf53aa0c71088b94f686465e6321993ddc995fffac3d71e22f9553b8c",
+    "size": 222544
+  },
+  {
+    "file": "interactivity/math/E/test-Json/E.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/E/test-Json/E.json",
+    "sha256": "7ccf2ef3a6f73248a249598bc46ea50ad5a9e6abd16b7e0b87e156bf0e4cfe7f",
+    "size": 1119
+  },
+  {
+    "file": "interactivity/math/E/glTF-Binary/E.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/E/glTF-Binary/E.glb",
+    "sha256": "db93c74d1e52190f09a07419a33fd94f7f8fb83ef7067abbd24ac614fe2f5736",
+    "size": 137744
+  },
+  {
+    "file": "interactivity/math/NaN/glTF-Binary/NaN.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/NaN/glTF-Binary/NaN.glb",
+    "sha256": "78d414f44b152aa6cafe0a0a7f5a704468c66469477ce57ef8a1bd0658cb626c",
+    "size": 136012
+  },
+  {
+    "file": "interactivity/math/Inf/test-Json/Inf.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Inf/test-Json/Inf.json",
+    "sha256": "86758b5118f0bd82db5dbcec14d1a1c734f0da50659ccc2f6f11f76b58596c7c",
+    "size": 1053
+  },
+  {
+    "file": "interactivity/invalid/invalid-index.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/invalid-index.json",
+    "sha256": "e7cb5493efe73251c6abcb52e6b268cec2cba14e9fe232df8f344e57a4f61574",
+    "size": 94739
+  },
+  {
+    "file": "interactivity/math/Inf/glTF-Binary/Inf.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Inf/glTF-Binary/Inf.glb",
+    "sha256": "af932a80b80c5e82d7bb8885d9753e2071054d70c2d3ff8a40854d144ee8113d",
+    "size": 137556
+  },
+  {
+    "file": "interactivity/math/Pi/test-Json/Pi.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Pi/test-Json/Pi.json",
+    "sha256": "11ef365aaab4aff2a82fa2ce544239c7feb7dfb862f74afc7bd303ef0485739e",
+    "size": 1126
+  },
+  {
+    "file": "interactivity/math/NaN/test-Json/NaN.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/NaN/test-Json/NaN.json",
+    "sha256": "57ce0810aeed116758f90410d5f0d8a4b3ddc63a2cf0d33a55ea6017243f958e",
+    "size": 1034
+  },
+  {
+    "file": "interactivity/math/Pi/glTF-Binary/Pi.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Pi/glTF-Binary/Pi.glb",
+    "sha256": "4bed1b5a8dc9dfa72231dc06b91a59cf5c1bbbc98718b2e94790ef4dd59119de",
+    "size": 138044
+  },
+  {
+    "file": "interactivity/math/Tau/test-Json/Tau.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Tau/test-Json/Tau.json",
+    "sha256": "8b4d7f82ddf17b4453991c227d05ef47b2ed50877d5310a09c0baa81d4489c11",
+    "size": 1133
+  },
+  {
+    "file": "interactivity/math/Tau/glTF-Binary/Tau.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Tau/glTF-Binary/Tau.glb",
+    "sha256": "6356e29a8e151f2bed2aac156c84dde6450fa9aeb595d429608118b3d25e6c81",
+    "size": 138352
+  },
+  {
+    "file": "interactivity/math/abs/glTF-Binary/abs.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/abs/glTF-Binary/abs.glb",
+    "sha256": "3bddc213af0f500fa4402459e7a6f1a08bb969fb6e1f6de589f1e5584b371276",
+    "size": 168160
+  },
+  {
+    "file": "interactivity/math/abs/test-Json/abs.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/abs/test-Json/abs.json",
+    "sha256": "c6d178d96e01c1b547ef583e0787a1b980b45ee048e3a223589e62a7394bd2e5",
+    "size": 2845
+  },
+  {
+    "file": "interactivity/math/acosh/test-Json/acosh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/acosh/test-Json/acosh.json",
+    "sha256": "9b7a56af9abeaa967aad566b2fdf78e62c685884e1ab3fd9af9d083bb7d74a91",
+    "size": 4820
+  },
+  {
+    "file": "interactivity/math/acosh/glTF-Binary/acosh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/acosh/glTF-Binary/acosh.glb",
+    "sha256": "a555debca7db62ff401c96f8e9be176ace9908b49ad8947e782225d90800b87f",
+    "size": 222340
+  },
+  {
+    "file": "interactivity/math/acos/test-Json/acos.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/acos/test-Json/acos.json",
+    "sha256": "b15ad1c7f384c6c4a3c6dda3cb08812b5fe1ca52f597577386b91bc614bb31f6",
+    "size": 5255
+  },
+  {
+    "file": "interactivity/math/add/glTF-Binary/add.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/add/glTF-Binary/add.glb",
+    "sha256": "9b6a92956260dae2e13c18fb9f35b18a8f8778c983775bb28f899a3b44d421e8",
+    "size": 158544
+  },
+  {
+    "file": "interactivity/math/acos/glTF-Binary/acos.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/acos/glTF-Binary/acos.glb",
+    "sha256": "58ed41241e44f981c80ffee3f6bec643bbfa0afd4c9bfcc5640b6e248d397d91",
+    "size": 231884
+  },
+  {
+    "file": "interactivity/math/add/test-Json/add.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/add/test-Json/add.json",
+    "sha256": "ef832074d2731ef0e5cd113dccc3e81d7bf2d8b8b5513fe47d58a8258c8bc894",
+    "size": 2048
+  },
+  {
+    "file": "interactivity/math/asinh/glTF-Binary/asinh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asinh/glTF-Binary/asinh.glb",
+    "sha256": "b80d3951e37b0f8a1e42081194040ba083e27d392432ec43408d5bd4375356f4",
+    "size": 198332
+  },
+  {
+    "file": "interactivity/math/asin/glTF-Binary/asin.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asin/glTF-Binary/asin.glb",
+    "sha256": "3209a69371234a388bf2678bc25c8a14a88a9a4e04ca275f9f3a305587495a96",
+    "size": 231492
+  },
+  {
+    "file": "interactivity/math/asin/test-Json/asin.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asin/test-Json/asin.json",
+    "sha256": "a332f2a3428d0148f485a41da7cd159c837403a137339fa4a9eb696be3d31878",
+    "size": 5253
+  },
+  {
+    "file": "interactivity/math/and/test-Json/and.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/and/test-Json/and.json",
+    "sha256": "ba40dc75b49b2aa52c3fe9c01fe1b56acd3b6509f47aa71dfd97fc6e53fd3da4",
+    "size": 3194
+  },
+  {
+    "file": "interactivity/math/and/glTF-Binary/and.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/and/glTF-Binary/and.glb",
+    "sha256": "7b1fb880f55d99ee9de9ba74f2e202f11046c69ea32263c886361f21df91d11a",
+    "size": 190904
+  },
+  {
+    "file": "interactivity/math/atan/glTF-Binary/atan.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atan/glTF-Binary/atan.glb",
+    "sha256": "4964f79d3e26f659444b6a31dbb20ce3a49641395a3b49559ef7446742687aea",
+    "size": 220940
+  },
+  {
+    "file": "interactivity/math/asr/test-Json/asr.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asr/test-Json/asr.json",
+    "sha256": "1f9c657b582afde3cf418ebeb542f88e3962aba0e681790cde74dd340465e5e8",
+    "size": 3914
+  },
+  {
+    "file": "interactivity/math/asinh/test-Json/asinh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asinh/test-Json/asinh.json",
+    "sha256": "95a9f647eb925a970647a665e54fea2c19dbbf44df0eb579b536bb3c2ad10221",
+    "size": 3371
+  },
+  {
+    "file": "interactivity/math/atan/test-Json/atan.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atan/test-Json/atan.json",
+    "sha256": "ff23e9f05bab97711d738e96427539d218af735961db500fdc56783015392c62",
+    "size": 4367
+  },
+  {
+    "file": "interactivity/math/atan2/glTF-Binary/atan2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atan2/glTF-Binary/atan2.glb",
+    "sha256": "058238aef64849c401e62f971e530c0fd9649b9ea088f39578cbc40bc69a2ba5",
+    "size": 299536
+  },
+  {
+    "file": "interactivity/math/asr/glTF-Binary/asr.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/asr/glTF-Binary/asr.glb",
+    "sha256": "97f05b41b0703df31f9b235cc8e878ddb12b08196b599be56036a8258db30129",
+    "size": 194036
+  },
+  {
+    "file": "interactivity/math/atan2/test-Json/atan2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atan2/test-Json/atan2.json",
+    "sha256": "2d9f8eea94f2021b83f2ee4561ba510ab80630dd7230e5af959123ce2c0df70e",
+    "size": 7647
+  },
+  {
+    "file": "interactivity/math/atanh/test-Json/atanh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atanh/test-Json/atanh.json",
+    "sha256": "0a636fde54daa2e465d11561474c67b6e4ef95be67e88d4e40086d32b3a5f4a2",
+    "size": 4936
+  },
+  {
+    "file": "interactivity/math/cbrt/test-Json/cbrt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cbrt/test-Json/cbrt.json",
+    "sha256": "912ba17e2449298a19312f317918e6d26c188763ee66e9f54c021a43919e6ee6",
+    "size": 4049
+  },
+  {
+    "file": "interactivity/math/atanh/glTF-Binary/atanh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/atanh/glTF-Binary/atanh.glb",
+    "sha256": "5142d02f86626481fed47458b67933d0f28a3847280eeb39246741c1916c937f",
+    "size": 229364
+  },
+  {
+    "file": "interactivity/math/ceil/glTF-Binary/ceil.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ceil/glTF-Binary/ceil.glb",
+    "sha256": "72db3d4c4aea0f5554577ddd570f52fc8703d944a3231e9f394faf9b14632d87",
+    "size": 259972
+  },
+  {
+    "file": "interactivity/math/cbrt/glTF-Binary/cbrt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cbrt/glTF-Binary/cbrt.glb",
+    "sha256": "6cb4820c945d950384240022042f5e043ac1363cf1b36d729c140dc0b0bded7d",
+    "size": 224140
+  },
+  {
+    "file": "interactivity/math/ceil/test-Json/ceil.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ceil/test-Json/ceil.json",
+    "sha256": "19a3c61b0c0541c4c66c86e7a53279d112d4e60f3b6ef29ec78125b315c656d1",
+    "size": 4768
+  },
+  {
+    "file": "interactivity/math/clz/test-Json/clz.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/clz/test-Json/clz.json",
+    "sha256": "b0c8b2642b476047b8524aee0eaf87d791acee30f0497294d84b246b0dc3c65d",
+    "size": 2789
+  },
+  {
+    "file": "interactivity/math/clamp/test-Json/clamp.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/clamp/test-Json/clamp.json",
+    "sha256": "f0f78c985701cc3ec2596992921b1ba838df7b94027ca10164dcc80745c916ba",
+    "size": 3082
+  },
+  {
+    "file": "interactivity/math/clamp/glTF-Binary/clamp.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/clamp/glTF-Binary/clamp.glb",
+    "sha256": "0ba7ab9e24705df5f8345d1813ab42371c718e4fe108c2727b1d929f066bf1c8",
+    "size": 175244
+  },
+  {
+    "file": "interactivity/math/clz/glTF-Binary/clz.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/clz/glTF-Binary/clz.glb",
+    "sha256": "ab33b87face6952253e0a3775d1b79ca9a068f45ea9b8c8f7e765bc51d606884",
+    "size": 165400
+  },
+  {
+    "file": "interactivity/math/combine2/glTF-Binary/combine2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine2/glTF-Binary/combine2.glb",
+    "sha256": "f9fe96cc331f034a79b36bcf7ab3a5645b41bdab4cfb8cead9dc76caacf04514",
+    "size": 140664
+  },
+  {
+    "file": "interactivity/math/combine2/test-Json/combine2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine2/test-Json/combine2.json",
+    "sha256": "070453e00cb5090dd9d30efb968c35364887498ea7efa57c9acbeb7be85fa738",
+    "size": 1139
+  },
+  {
+    "file": "interactivity/math/combine3/test-Json/combine3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine3/test-Json/combine3.json",
+    "sha256": "d62814599fc59e9ae68e7bad5decd25586745a05e159d27633298755ec201e73",
+    "size": 1192
+  },
+  {
+    "file": "interactivity/math/combine3/glTF-Binary/combine3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine3/glTF-Binary/combine3.glb",
+    "sha256": "7476947c4287913f309b6850599719c611918cb6ca74d181127cee746d00e1d2",
+    "size": 142508
+  },
+  {
+    "file": "interactivity/math/combine2x2/glTF-Binary/combine2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine2x2/glTF-Binary/combine2x2.glb",
+    "sha256": "62a42e08deeb202d2dc58dd66de7943b3c1de28816d7751280cf88321a13a44c",
+    "size": 168860
+  },
+  {
+    "file": "interactivity/math/combine2x2/test-Json/combine2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine2x2/test-Json/combine2x2.json",
+    "sha256": "a6aefebefccb39edee6906f6ed14ce12dd3a41dd1ce6ccfd075d65060b799a3d",
+    "size": 2423
+  },
+  {
+    "file": "interactivity/math/combine3x3/glTF-Binary/combine3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine3x3/glTF-Binary/combine3x3.glb",
+    "sha256": "07bcbc0e7e8cd76f61366be965539bcfb96092fe87644363b3e5436c967010e8",
+    "size": 213736
+  },
+  {
+    "file": "interactivity/math/combine4/test-Json/combine4.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine4/test-Json/combine4.json",
+    "sha256": "2f0e5c021c402047c428eea4848f1fe1b8c2eaa1b66ebb2eff5bac6df402ba23",
+    "size": 1245
+  },
+  {
+    "file": "interactivity/math/combine4x4/test-Json/combine4x4.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine4x4/test-Json/combine4x4.json",
+    "sha256": "ae952b50ffb7be63c13595abc5d4c508dde973ec333f5e6b8a39967f08786b68",
+    "size": 1359
+  },
+  {
+    "file": "interactivity/math/combine3x3/test-Json/combine3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine3x3/test-Json/combine3x3.json",
+    "sha256": "943a376e320c3cddb12411d47b12e21a8223c5e96c00d370b349cd900c026419",
+    "size": 4391
+  },
+  {
+    "file": "interactivity/math/cos/glTF-Binary/cos.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cos/glTF-Binary/cos.glb",
+    "sha256": "08c546c626b33ea2b1a26dce779a567d170c97b56656609f362c23e86785fb4f",
+    "size": 204148
+  },
+  {
+    "file": "interactivity/math/combine4/glTF-Binary/combine4.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine4/glTF-Binary/combine4.glb",
+    "sha256": "b1d28680d8618b22a3d7b04d10f9c770bd0710e447cb6e508d0dba6990667502",
+    "size": 144400
+  },
+  {
+    "file": "interactivity/math/combine4x4/glTF-Binary/combine4x4.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/combine4x4/glTF-Binary/combine4x4.glb",
+    "sha256": "1aa731a5ba96f2c6f4dd1d8dbd09da4b1861adcf93fded69d159e14b5be51e7b",
+    "size": 140620
+  },
+  {
+    "file": "interactivity/math/cos/test-Json/cos.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cos/test-Json/cos.json",
+    "sha256": "e0d6904e94f3875f87d6b2d1aa2f4775e5164c463513541a1b41514917505f69",
+    "size": 3425
+  },
+  {
+    "file": "interactivity/math/cross/test-Json/cross.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cross/test-Json/cross.json",
+    "sha256": "a453b239406bedadce1e80875ce9033263fb481c410cd59160bcd8c7674adbbb",
+    "size": 2587
+  },
+  {
+    "file": "interactivity/math/cosh/glTF-Binary/cosh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cosh/glTF-Binary/cosh.glb",
+    "sha256": "e9a5214f6afe6a1d70a805beba675f0a5779d2c16ac6cdbe40e1b5c2ad417572",
+    "size": 201404
+  },
+  {
+    "file": "interactivity/math/cosh/test-Json/cosh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cosh/test-Json/cosh.json",
+    "sha256": "b2e0daba1112f535dc3634ee27acd301ce4781078c1aef8dc3bea9d8538d563e",
+    "size": 3388
+  },
+  {
+    "file": "interactivity/math/ctz/glTF-Binary/ctz.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ctz/glTF-Binary/ctz.glb",
+    "sha256": "29f25d07f24c63a2701f46d857adff7f340415a0716ca6717ac28ab4d4a59911",
+    "size": 164796
+  },
+  {
+    "file": "interactivity/math/cross/glTF-Binary/cross.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/cross/glTF-Binary/cross.glb",
+    "sha256": "567673dbb7d0b7fb6babe701985513a1aed16687446091a0d168028658b66195",
+    "size": 171240
+  },
+  {
+    "file": "interactivity/math/deg/test-Json/deg.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/deg/test-Json/deg.json",
+    "sha256": "65aa951ad79c9e98ec6cb437f29abd4924307259bf631f3f687c38e566d6e0c7",
+    "size": 2769
+  },
+  {
+    "file": "interactivity/math/ctz/test-Json/ctz.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ctz/test-Json/ctz.json",
+    "sha256": "35a7e75a3c0a30784d2d297aab3b2ba1777b2465fb8521dbc2c83b137f59a4b8",
+    "size": 2780
+  },
+  {
+    "file": "interactivity/math/determinant/test-Json/determinant.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant/test-Json/determinant.json",
+    "sha256": "7ba257ae99db558b1daa7933e48248e26841d00a35ef1fac005b20cd069ab4c4",
+    "size": 1298
+  },
+  {
+    "file": "interactivity/math/determinant2x2/glTF-Binary/determinant2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant2x2/glTF-Binary/determinant2x2.glb",
+    "sha256": "de2d0d08a60d5d83e2e2dca859aa42c2c290e62b6bafbf165465aa767bbb11e5",
+    "size": 154360
+  },
+  {
+    "file": "interactivity/math/deg/glTF-Binary/deg.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/deg/glTF-Binary/deg.glb",
+    "sha256": "c068c76632fcbb67de67b51aab4d0ad1e3be4186d6528a9f4d4bed5e219633ef",
+    "size": 187296
+  },
+  {
+    "file": "interactivity/math/determinant/glTF-Binary/determinant.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant/glTF-Binary/determinant.glb",
+    "sha256": "d1e04299570b51b3a9283eae11cfb20ec9a4eb8886c78dfcadb810b73462659a",
+    "size": 144008
+  },
+  {
+    "file": "interactivity/math/determinant3x3/test-Json/determinant3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant3x3/test-Json/determinant3x3.json",
+    "sha256": "cc9ec442e9878a4dc0bc411497c914811bef812852d11c9beb5c9bedf8f19ddf",
+    "size": 1637
+  },
+  {
+    "file": "interactivity/math/div/test-Json/div.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/div/test-Json/div.json",
+    "sha256": "3472350a337bbbb25dc6ba32a551a12d233efb4a2f7760ae61152e172f4a8f99",
+    "size": 4184
+  },
+  {
+    "file": "interactivity/math/determinant2x2/test-Json/determinant2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant2x2/test-Json/determinant2x2.json",
+    "sha256": "437fc35d2fdc499383607f491a071a19b192c32ab08bd6cc195d60c4ce46661f",
+    "size": 1638
+  },
+  {
+    "file": "interactivity/math/determinant3x3/glTF-Binary/determinant3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/determinant3x3/glTF-Binary/determinant3x3.glb",
+    "sha256": "45324481b514ae08e93f86952a85a4f3646598acde200df72715823ff38e1b7f",
+    "size": 154396
+  },
+  {
+    "file": "interactivity/math/dot/glTF-Binary/dot.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/dot/glTF-Binary/dot.glb",
+    "sha256": "306f7d7482817bffbe584d52a881e59577fa5c19253e8970011dcfd8c0aaaff1",
+    "size": 165008
+  },
+  {
+    "file": "interactivity/math/div/glTF-Binary/div.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/div/glTF-Binary/div.glb",
+    "sha256": "7e656f4b52059c990435862fcc13df630699f4b881239ba571636c84b0f816cc",
+    "size": 201248
+  },
+  {
+    "file": "interactivity/math/dot/test-Json/dot.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/dot/test-Json/dot.json",
+    "sha256": "94408191c2a42bf0329f2a1188b4ef6d63008331d34d68a330d37d7bbb26428e",
+    "size": 2245
+  },
+  {
+    "file": "interactivity/math/eq/test-Json/eq.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/eq/test-Json/eq.json",
+    "sha256": "1229d2132945e5cb1c80499d48efda7ff48006736f00f97c4e181f76d8a69a85",
+    "size": 5722
+  },
+  {
+    "file": "interactivity/math/exp/test-Json/exp.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/exp/test-Json/exp.json",
+    "sha256": "fcc23d659029e6dd701e3580e5eb5607959b671df0511157587a66c2ba81956d",
+    "size": 4398
+  },
+  {
+    "file": "interactivity/math/extract2/glTF-Binary/extract2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract2/glTF-Binary/extract2.glb",
+    "sha256": "241c9c34689bfe2fd5ca639c3bf7f2f9ee3fdced89b001f0c1aa66e9cac44879",
+    "size": 141140
+  },
+  {
+    "file": "interactivity/math/exp/glTF-Binary/exp.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/exp/glTF-Binary/exp.glb",
+    "sha256": "aead8b81380183c98ba3d2101d5cccfce2258630c760725470f813e1a11c0523",
+    "size": 223112
+  },
+  {
+    "file": "interactivity/math/eq/glTF-Binary/eq.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/eq/glTF-Binary/eq.glb",
+    "sha256": "3f3e53048a9f3cb38aa20b2e0cde42d10fb8e9410f835720412561450646b4df",
+    "size": 241948
+  },
+  {
+    "file": "interactivity/math/extract3/test-Json/extract3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract3/test-Json/extract3.json",
+    "sha256": "4b6861ae919d3585a12f8f3264ff39d9974222d34110c14d4e4e02e10d4b6b14",
+    "size": 1731
+  },
+  {
+    "file": "interactivity/math/extract2x2/test-Json/extract2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract2x2/test-Json/extract2x2.json",
+    "sha256": "0d99bcd18a10993ddbc376c37f1a3bded588d670d5ccb0ce53b985016708ea60",
+    "size": 2096
+  },
+  {
+    "file": "interactivity/math/extract2/test-Json/extract2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract2/test-Json/extract2.json",
+    "sha256": "f46ef6b2dc37acf485da69ba96a5476b9623212f8f7e953c7d3472f33fbf1d9f",
+    "size": 1394
+  },
+  {
+    "file": "interactivity/math/extract2x2/glTF-Binary/extract2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract2x2/glTF-Binary/extract2x2.glb",
+    "sha256": "5ebc466c7fe3bdf0c7af177fe3534bfbcdbf913b141ccf091500d044a43eb9ee",
+    "size": 150584
+  },
+  {
+    "file": "interactivity/math/extract3/glTF-Binary/extract3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract3/glTF-Binary/extract3.glb",
+    "sha256": "f9fb739b4981e9a8985e553140e34b2889e38b809b930815c591513f06ae1727",
+    "size": 145520
+  },
+  {
+    "file": "interactivity/math/extract3x3/glTF-Binary/extract3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract3x3/glTF-Binary/extract3x3.glb",
+    "sha256": "4d390c4ba453328b332650ddee2ac7ac6f6f79a2edf2458d12cd31c55d92393a",
+    "size": 172688
+  },
+  {
+    "file": "interactivity/math/extract4/test-Json/extract4.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract4/test-Json/extract4.json",
+    "sha256": "277614174693a5e29da5766418b6ef046ece52399ba2f8f550218cc20f945720",
+    "size": 2068
+  },
+  {
+    "file": "interactivity/math/extract4x4/test-Json/extract4x4.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract4x4/test-Json/extract4x4.json",
+    "sha256": "d3414c0c03f35d9baa330e2152e4f425dbc04e416ffc1f3f8f0634dfa74d597f",
+    "size": 6234
+  },
+  {
+    "file": "interactivity/math/extract3x3/test-Json/extract3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract3x3/test-Json/extract3x3.json",
+    "sha256": "321ad8e4cc48ba28f3e635051e21caf78699438904be6f4bb0d2acaf2c1b7d59",
+    "size": 3809
+  },
+  {
+    "file": "interactivity/math/extract4/glTF-Binary/extract4.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract4/glTF-Binary/extract4.glb",
+    "sha256": "fd3d8df853599cfe3732eb16941579b84a298a6b45abd2534afd0ffddd99ee19",
+    "size": 149944
+  },
+  {
+    "file": "interactivity/math/floor/glTF-Binary/floor.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/floor/glTF-Binary/floor.glb",
+    "sha256": "f7683a6b024697bcf24a019b89fa49e2136a17fd2e06cf5fe38d270999bae5ae",
+    "size": 288992
+  },
+  {
+    "file": "interactivity/math/extract4x4/glTF-Binary/extract4x4.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/extract4x4/glTF-Binary/extract4x4.glb",
+    "sha256": "09d639bc4d61c986132065b111cfecbe1bb5bc5c762e2c13df46ac1982c1939a",
+    "size": 205716
+  },
+  {
+    "file": "interactivity/math/floor/test-Json/floor.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/floor/test-Json/floor.json",
+    "sha256": "27adda6eb0100c26b7331223e35c0a55e310bd5d42308b29c94891840c35f7f1",
+    "size": 5147
+  },
+  {
+    "file": "interactivity/math/fract/test-Json/fract.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/fract/test-Json/fract.json",
+    "sha256": "77e7fd5451036309becfd198c032371d924991d9625971b274e56010bb572af6",
+    "size": 6183
+  },
+  {
+    "file": "interactivity/math/ge/test-Json/ge.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ge/test-Json/ge.json",
+    "sha256": "27a4e029cd8e7273f1917580d9fffd015461fd9fe7bd209a0a29068e467796a3",
+    "size": 3452
+  },
+  {
+    "file": "interactivity/math/fract/glTF-Binary/fract.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/fract/glTF-Binary/fract.glb",
+    "sha256": "17a6169c8261b83fe49820285e537f4542e04c3fd5b73895096ee6a0a2e073b4",
+    "size": 316324
+  },
+  {
+    "file": "interactivity/math/ge/glTF-Binary/ge.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/ge/glTF-Binary/ge.glb",
+    "sha256": "bd09ecbc4a5d1f3ae5a2f1009e397e218924a875f56676df7b9e5969e162d0e1",
+    "size": 185316
+  },
+  {
+    "file": "interactivity/math/gt/glTF-Binary/gt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/gt/glTF-Binary/gt.glb",
+    "sha256": "92d6cc3481623805cfedd1ba662613ef5852a28279984e91f4c0bcedddec4378",
+    "size": 164664
+  },
+  {
+    "file": "interactivity/math/gt/test-Json/gt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/gt/test-Json/gt.json",
+    "sha256": "fb3a0020e969078886c0b09f58090593ed6e6ab9a212593aeb161f450cd86b0e",
+    "size": 2482
+  },
+  {
+    "file": "interactivity/math/inverse2x2/test-Json/inverse2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse2x2/test-Json/inverse2x2.json",
+    "sha256": "3b6892e2604621834d31f640f6441fd6698bdaace24ee60d55d0d871b1a75e8a",
+    "size": 3224
+  },
+  {
+    "file": "interactivity/math/inverse/test-Json/inverse.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse/test-Json/inverse.json",
+    "sha256": "54c7ab8ce575b5dbd0069818254ffa704ae592644793d4533f3f84bbcf336b91",
+    "size": 3955
+  },
+  {
+    "file": "interactivity/math/inverse2x2/glTF-Binary/inverse2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse2x2/glTF-Binary/inverse2x2.glb",
+    "sha256": "ffab9e988c5106da1e5072a2b5034e96fad8a3e2e0648635f2e021136fd8d21c",
+    "size": 188704
+  },
+  {
+    "file": "interactivity/math/inverse3x3/glTF-Binary/inverse3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse3x3/glTF-Binary/inverse3x3.glb",
+    "sha256": "0f517bbb1325ab29612b6ddb01158f30f8d2eacab82457c04305f6afb657fa55",
+    "size": 230008
+  },
+  {
+    "file": "interactivity/math/inverse/glTF-Binary/inverse.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse/glTF-Binary/inverse.glb",
+    "sha256": "c648c59b138c1f11ab0241a0d4593d3122ec635592544c6d6b16b70bcff747cb",
+    "size": 211412
+  },
+  {
+    "file": "interactivity/math/isInf/test-Json/isInf.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/isInf/test-Json/isInf.json",
+    "sha256": "93d6027d0c272dff7e05c00015cedebfdf13723e7303a1be1d23d6e7252983b6",
+    "size": 2471
+  },
+  {
+    "file": "interactivity/math/isNaN/test-Json/isNaN.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/isNaN/test-Json/isNaN.json",
+    "sha256": "ff41810dcc22a0071fdb63d5227094041013a17cceb07ff4d451d04bc8f1f012",
+    "size": 1997
+  },
+  {
+    "file": "interactivity/math/inverse3x3/test-Json/inverse3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/inverse3x3/test-Json/inverse3x3.json",
+    "sha256": "87f4550203df95d7e3bb11cc6ad511bbd9bb59d538b319b0516e9674b24f7386",
+    "size": 5192
+  },
+  {
+    "file": "interactivity/math/le/glTF-Binary/le.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/le/glTF-Binary/le.glb",
+    "sha256": "4b9dde833a8d4491de0018830513e633e00aa6270e43dfdc4948437ec281fe57",
+    "size": 175556
+  },
+  {
+    "file": "interactivity/math/isInf/glTF-Binary/isInf.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/isInf/glTF-Binary/isInf.glb",
+    "sha256": "073486b0519bc5f70deab9582532a847955543e68963b5fc76ef542a24742b15",
+    "size": 165012
+  },
+  {
+    "file": "interactivity/math/isNaN/glTF-Binary/isNaN.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/isNaN/glTF-Binary/isNaN.glb",
+    "sha256": "1127e250f62400ad9b3fec40dbc4e8d727c93e2d2cab5e9431d358c9c60687fa",
+    "size": 155524
+  },
+  {
+    "file": "interactivity/math/log/test-Json/log.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log/test-Json/log.json",
+    "sha256": "edbbba7eeff8aec1e4ee2b28dee72627fc86a3338e88d066ebf31266c397bad8",
+    "size": 5085
+  },
+  {
+    "file": "interactivity/math/length/test-Json/length.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/length/test-Json/length.json",
+    "sha256": "d294eb257d3da06c25f3c1111b6180e44a84add2464e5bdffd390f46d6548c7b",
+    "size": 3335
+  },
+  {
+    "file": "interactivity/math/le/test-Json/le.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/le/test-Json/le.json",
+    "sha256": "b26cf56565ecb7b9a520037a5ab35660b7b32e445fbad2c139c27c9323c8cf9c",
+    "size": 2969
+  },
+  {
+    "file": "interactivity/math/log10/glTF-Binary/log10.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log10/glTF-Binary/log10.glb",
+    "sha256": "a38b5d216578270ae10eefd792e43e19548aad2bedbaffbc59e0e9414a19f891",
+    "size": 214252
+  },
+  {
+    "file": "interactivity/math/length/glTF-Binary/length.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/length/glTF-Binary/length.glb",
+    "sha256": "ae888f2acee6a78f9501e64c78a67cd081e82a3bd2306440a3a5422620e29034",
+    "size": 187748
+  },
+  {
+    "file": "interactivity/math/log/glTF-Binary/log.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log/glTF-Binary/log.glb",
+    "sha256": "6438373684c1c2bd9a8ef0b55a487910bdde17e333db28f83b4d8c1639511062",
+    "size": 244780
+  },
+  {
+    "file": "interactivity/math/log2/test-Json/log2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log2/test-Json/log2.json",
+    "sha256": "36fd878423aff7258eff910b2fc937977c7f56dcb58a3d6514dbd19a4db4e621",
+    "size": 3608
+  },
+  {
+    "file": "interactivity/math/lsl/test-Json/lsl.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/lsl/test-Json/lsl.json",
+    "sha256": "da696c2f97529043b3230db933f84ba11a44039e20c26c12044cd9f4dd2abd06",
+    "size": 3921
+  },
+  {
+    "file": "interactivity/math/lsl/glTF-Binary/lsl.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/lsl/glTF-Binary/lsl.glb",
+    "sha256": "a767b17308d2809174f586317892907f8abdb4bf55aca33ead0965c85be3ef7f",
+    "size": 193456
+  },
+  {
+    "file": "interactivity/math/lt/glTF-Binary/lt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/lt/glTF-Binary/lt.glb",
+    "sha256": "f8762f606171cff7962226029ba038619fe41fb8de61f96e07596d07f3809757",
+    "size": 173492
+  },
+  {
+    "file": "interactivity/math/log10/test-Json/log10.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log10/test-Json/log10.json",
+    "sha256": "5e1146ca40ee0587b29e533cdfc9ab319bd9e875b751b29fa2705ba02e9a75e4",
+    "size": 3581
+  },
+  {
+    "file": "interactivity/math/log2/glTF-Binary/log2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/log2/glTF-Binary/log2.glb",
+    "sha256": "bcbd7bf7b1e0d1198a2e89825c788f24b63fc0dce9d9fc51aa1748ff814ceedb",
+    "size": 216992
+  },
+  {
+    "file": "interactivity/math/lt/test-Json/lt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/lt/test-Json/lt.json",
+    "sha256": "64def7711179a40756ec23e6f98c561dfd46f9510a8377a3198af90a949f6973",
+    "size": 2950
+  },
+  {
+    "file": "interactivity/math/matComp-Dec-Comp/test-Json/matComp-Dec-Comp.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matComp-Dec-Comp/test-Json/matComp-Dec-Comp.json",
+    "sha256": "fa950a6d5a6d03aa74ddb80464c7a2f9669aa3e6b69559e9ed3de7fd09ee5abe",
+    "size": 1787
+  },
+  {
+    "file": "interactivity/math/matCompose/test-Json/matCompose.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matCompose/test-Json/matCompose.json",
+    "sha256": "f92dfe751c34fd03d982cbbdfc7a19ec17096b19c51159236577899175fb7ad4",
+    "size": 1875
+  },
+  {
+    "file": "interactivity/math/matDecomp-Shear/glTF-Binary/matDecomp-Shear.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matDecomp-Shear/glTF-Binary/matDecomp-Shear.glb",
+    "sha256": "3943db91b198efbc64d39962aa85cae6741d924e2b61201a891d8b04ff283670",
+    "size": 157204
+  },
+  {
+    "file": "interactivity/math/matComp-Dec-Comp/glTF-Binary/matComp-Dec-Comp.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matComp-Dec-Comp/glTF-Binary/matComp-Dec-Comp.glb",
+    "sha256": "472a563fa04cacc32a67158bbcd9100b2284eb7ee814feb9c24b21c249f83df4",
+    "size": 157900
+  },
+  {
+    "file": "interactivity/math/matCompose/glTF-Binary/matCompose.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matCompose/glTF-Binary/matCompose.glb",
+    "sha256": "f3d3cbac5ba8a525f4918ee7644297e56ff2c5606853c4f99a1beb6f4525c8df",
+    "size": 164252
+  },
+  {
+    "file": "interactivity/math/matMul-nonCommutative/test-Json/matMul-nonCommutative.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul-nonCommutative/test-Json/matMul-nonCommutative.json",
+    "sha256": "941e106044ad09159b07883f1244262ba5ba26366392036f668e43fb206ce393",
+    "size": 1194
+  },
+  {
+    "file": "interactivity/math/matDecompose/test-Json/matDecompose.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matDecompose/test-Json/matDecompose.json",
+    "sha256": "254c283f05937512030466542bb7f5f3c8fe747db0f847da3506e5bb0c91d7d4",
+    "size": 6226
+  },
+  {
+    "file": "interactivity/math/matDecomp-Shear/test-Json/matDecomp-Shear.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matDecomp-Shear/test-Json/matDecomp-Shear.json",
+    "sha256": "534efed16171c0e4ac2f6d00dd9472752aec5f2660f00e071ae1c0b0399df072",
+    "size": 1517
+  },
+  {
+    "file": "interactivity/math/matMul-nonCommutative/glTF-Binary/matMul-nonCommutative.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul-nonCommutative/glTF-Binary/matMul-nonCommutative.glb",
+    "sha256": "da83c2a215e8cdbca1836257af820eceff98efbff3a432c48452921a81b20888",
+    "size": 143012
+  },
+  {
+    "file": "interactivity/math/matMul/glTF-Binary/matMul.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul/glTF-Binary/matMul.glb",
+    "sha256": "869b78dab65b6dea2216a689e7135b4e745ca4b52b6fa88b9ce9f90384e875ba",
+    "size": 214748
+  },
+  {
+    "file": "interactivity/math/matDecompose/glTF-Binary/matDecompose.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matDecompose/glTF-Binary/matDecompose.glb",
+    "sha256": "7c12871d3a97c2b93659c15f04eb9b53c4364651266bb889b909efa4bbab5dae",
+    "size": 230292
+  },
+  {
+    "file": "interactivity/math/matMul2x2/test-Json/matMul2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul2x2/test-Json/matMul2x2.json",
+    "sha256": "c2816dbd36ee0c99d1967984dc20c1472c211ab0cb191a4fb153ce4cdc708f61",
+    "size": 2391
+  },
+  {
+    "file": "interactivity/math/matMul/test-Json/matMul.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul/test-Json/matMul.json",
+    "sha256": "56f71adff20f83885c910f624ee55e36722da9fa5149f18e5df45a6d1deed069",
+    "size": 3705
+  },
+  {
+    "file": "interactivity/math/matMul3x3/test-Json/matMul3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul3x3/test-Json/matMul3x3.json",
+    "sha256": "d999ade9d5b33619ae8ded6f6b66dcfb34a01eac62c62c7b0bf6d18430145d3f",
+    "size": 4259
+  },
+  {
+    "file": "interactivity/math/max/glTF-Binary/max.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/max/glTF-Binary/max.glb",
+    "sha256": "5009c23caff0baf9cc5eed00feca4c8b6197e464f6f83d2425cc8008eb8a09c8",
+    "size": 163124
+  },
+  {
+    "file": "interactivity/math/matMul3x3/glTF-Binary/matMul3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul3x3/glTF-Binary/matMul3x3.glb",
+    "sha256": "f3b467b52c326f8232e7614e0271050143136cefca63d6f8cd1a265fde259cd7",
+    "size": 204020
+  },
+  {
+    "file": "interactivity/math/matMul2x2/glTF-Binary/matMul2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/matMul2x2/glTF-Binary/matMul2x2.glb",
+    "sha256": "61af5d242ab5137354c548c1ff6c2b3da7ea7424ad6a20ced93d352d6c3cefd0",
+    "size": 164416
+  },
+  {
+    "file": "interactivity/math/min/test-Json/min.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/min/test-Json/min.json",
+    "sha256": "94223dce90dd5f2928cffc15a2953734fd550f4fada87c166326afbc0da81b06",
+    "size": 2109
+  },
+  {
+    "file": "interactivity/math/max/test-Json/max.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/max/test-Json/max.json",
+    "sha256": "098aca4929fd8aaffbcc89ad78be66a838a01f348b99c06045e9bfc0762ad271",
+    "size": 2154
+  },
+  {
+    "file": "interactivity/math/mix/test-Json/mix.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/mix/test-Json/mix.json",
+    "sha256": "ff0eb4a0a038e88ca5f65a0472efcfbab0fe6e1bd2b0ff12137a1c0837a5f5fb",
+    "size": 5275
+  },
+  {
+    "file": "interactivity/math/mul/glTF-Binary/mul.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/mul/glTF-Binary/mul.glb",
+    "sha256": "ec768735171877319148f279b0e53f57e00f8ab1c74b5f3a25e67b9ff1c51039",
+    "size": 201248
+  },
+  {
+    "file": "interactivity/math/min/glTF-Binary/min.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/min/glTF-Binary/min.glb",
+    "sha256": "9d1240a91d1c1aff407a8b4776848fee6360cd2845a2faa97b9539f38cb7ce2e",
+    "size": 160108
+  },
+  {
+    "file": "interactivity/math/mix/glTF-Binary/mix.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/mix/glTF-Binary/mix.glb",
+    "sha256": "959a658ae3ee86ff3dc2d4a273ec6beec9444827e0f5fb33121c97cb3503f254",
+    "size": 234468
+  },
+  {
+    "file": "interactivity/math/normalize/test-Json/normalize.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/normalize/test-Json/normalize.json",
+    "sha256": "52cbc842df0bbd1481ddcea4254c101f5a5c6ed5c1aa603408c522d8b55c9a1d",
+    "size": 4298
+  },
+  {
+    "file": "interactivity/math/mul/test-Json/mul.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/mul/test-Json/mul.json",
+    "sha256": "c1efb6d68dbf809525faffee24854de7cd542103dbb7aeb23158f2c790c37dfc",
+    "size": 3818
+  },
+  {
+    "file": "interactivity/math/neg/test-Json/neg.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/neg/test-Json/neg.json",
+    "sha256": "aa0625ee8231e611a893bd36cc9face7f7b23f8a621eaeae907cc32d7c64dd96",
+    "size": 6008
+  },
+  {
+    "file": "interactivity/math/normalize/glTF-Binary/normalize.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/normalize/glTF-Binary/normalize.glb",
+    "sha256": "4b2a99cf5451289258208225508c94333102454a9ac6400772be34299417ab8a",
+    "size": 219492
+  },
+  {
+    "file": "interactivity/math/neg/glTF-Binary/neg.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/neg/glTF-Binary/neg.glb",
+    "sha256": "c72cb2c4809a67d916f94c1aeb63283e97fe12be8357001b77336365373b224b",
+    "size": 303776
+  },
+  {
+    "file": "interactivity/math/not/glTF-Binary/not.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/not/glTF-Binary/not.glb",
+    "sha256": "853d421a954fb534ef2b4d21168099b5d2d0c7298caa885b0a61acc528f9d5b9",
+    "size": 171444
+  },
+  {
+    "file": "interactivity/math/or/test-Json/or.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/or/test-Json/or.json",
+    "sha256": "65913003e9e64baa6698d8f71b1be9241abbd52ea74a5874b5e90dd02c3e34cf",
+    "size": 3058
+  },
+  {
+    "file": "interactivity/math/not/test-Json/not.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/not/test-Json/not.json",
+    "sha256": "7009da2dd481d67da2faa77c704e43dc150c85fcf6ccb87fc2634cad00bf44c5",
+    "size": 2885
+  },
+  {
+    "file": "interactivity/math/popcnt/test-Json/popcnt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/popcnt/test-Json/popcnt.json",
+    "sha256": "28c9bdd50e4df48434afd8dc14cab3bb34b1518a54e48936dd49e11b79460033",
+    "size": 2396
+  },
+  {
+    "file": "interactivity/math/pow/glTF-Binary/pow.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/pow/glTF-Binary/pow.glb",
+    "sha256": "cd553068b33444239b5da3f52b469f8a7ae1a753593566c40ab4198e8c587e5b",
+    "size": 291116
+  },
+  {
+    "file": "interactivity/math/popcnt/glTF-Binary/popcnt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/popcnt/glTF-Binary/popcnt.glb",
+    "sha256": "100193c91f21cc26f10be073706160ba6da01975121f05bb31ee58bb67f3206b",
+    "size": 159700
+  },
+  {
+    "file": "interactivity/math/or/glTF-Binary/or.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/or/glTF-Binary/or.glb",
+    "sha256": "a430b68ca4f687f164143462fc9dd0de5b41a41034a5f76c0b856a1890214513",
+    "size": 182748
+  },
+  {
+    "file": "interactivity/math/quatConjugate/test-Json/quatConjugate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatConjugate/test-Json/quatConjugate.json",
+    "sha256": "4166405b87a2db558aa9cbadd4930a967c05859040aa44c1b683c51984727eb7",
+    "size": 1527
+  },
+  {
+    "file": "interactivity/math/pow/test-Json/pow.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/pow/test-Json/pow.json",
+    "sha256": "09a87e4e27aa47f728f8597135f6447ab5114781c75a5b4897145bdcc810fb37",
+    "size": 7193
+  },
+  {
+    "file": "interactivity/math/quatAngleBetween/test-Json/quatAngleBetween.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatAngleBetween/test-Json/quatAngleBetween.json",
+    "sha256": "9709bd782cee140a7f434c7ff8ae24bd81bf3afb610ce287834c451ce6c597b9",
+    "size": 1488
+  },
+  {
+    "file": "interactivity/math/quatFromAngles/glTF-Binary/quatFromAngles.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromAngles/glTF-Binary/quatFromAngles.glb",
+    "sha256": "8be96bdb9bce60901793043acc7b605489e364275927ffe175f8ad6c8dc3fc21",
+    "size": 239740
+  },
+  {
+    "file": "interactivity/math/quatAngleBetween/glTF-Binary/quatAngleBetween.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatAngleBetween/glTF-Binary/quatAngleBetween.glb",
+    "sha256": "0df86108cb96e4edd541fa0fdd9a2995e9a5169092ce2c1d965fe556d234836e",
+    "size": 159720
+  },
+  {
+    "file": "interactivity/math/quatConjugate/glTF-Binary/quatConjugate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatConjugate/glTF-Binary/quatConjugate.glb",
+    "sha256": "4e71364b20bf72f5b9c5f8f446c45ebc38abd988b9e700ac273a3d0a9ce8896a",
+    "size": 152688
+  },
+  {
+    "file": "interactivity/math/quatFromAngles/test-Json/quatFromAngles.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromAngles/test-Json/quatFromAngles.json",
+    "sha256": "b74b559a2e864081fddd7297e7e86fd78e0964f8ac0d710a3d9c85762d317455",
+    "size": 7781
+  },
+  {
+    "file": "interactivity/math/quatFromDirections-edge/test-Json/quatFromDirections-edge.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromDirections-edge/test-Json/quatFromDirections-edge.json",
+    "sha256": "66b27e4e1580b33d607054eb3226c73aea8edd18cee612c4f62035e2caab93d5",
+    "size": 2041
+  },
+  {
+    "file": "interactivity/math/quatFromAxisAngle/test-Json/quatFromAxisAngle.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromAxisAngle/test-Json/quatFromAxisAngle.json",
+    "sha256": "2dc51749f24299b8e98cc825725a084915179c49f3ad6f9a941d3fcc1339f888",
+    "size": 1402
+  },
+  {
+    "file": "interactivity/math/quatFromDirections-edge/glTF-Binary/quatFromDirections-edge.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromDirections-edge/glTF-Binary/quatFromDirections-edge.glb",
+    "sha256": "6961e9cfa6c315049670977ff44b6ac51e6a88bdf6c53248c2f46f0731cb4f65",
+    "size": 160692
+  },
+  {
+    "file": "interactivity/math/quatFromDirections/glTF-Binary/quatFromDirections.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromDirections/glTF-Binary/quatFromDirections.glb",
+    "sha256": "d82b89d80270e2ee8f539461a48b00b431bf32307c09601d610e973d91bec494",
+    "size": 153948
+  },
+  {
+    "file": "interactivity/math/quatFromAxisAngle/glTF-Binary/quatFromAxisAngle.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromAxisAngle/glTF-Binary/quatFromAxisAngle.glb",
+    "sha256": "08164c59fe041b27c60b897b39343f2c6762aa5f0fcf39a3e2312312a18dbd3a",
+    "size": 144872
+  },
+  {
+    "file": "interactivity/math/quatFromUpForward-degenerate/test-Json/quatFromUpForward-degenerate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromUpForward-degenerate/test-Json/quatFromUpForward-degenerate.json",
+    "sha256": "1ed9e833a45bb95eee24edc842ae8e29f075a5a16760034aca1c5d4001359f61",
+    "size": 1564
+  },
+  {
+    "file": "interactivity/math/quatFromUpForward/test-Json/quatFromUpForward.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromUpForward/test-Json/quatFromUpForward.json",
+    "sha256": "384f09889ce209472825b158655e9c5a36199ffd12db317e73788e7fb67c5368",
+    "size": 3237
+  },
+  {
+    "file": "interactivity/math/quatFromDirections/test-Json/quatFromDirections.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromDirections/test-Json/quatFromDirections.json",
+    "sha256": "270e78a3654dc0b0d4bfc4d169b23986f887e909572050c7c654ee41e3362ae2",
+    "size": 1569
+  },
+  {
+    "file": "interactivity/math/quatFromUpForward-degenerate/glTF-Binary/quatFromUpForward-degenerate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromUpForward-degenerate/glTF-Binary/quatFromUpForward-degenerate.glb",
+    "sha256": "b2e1959d640e780d2534997f00da65a02a985eb7345465f06e646b238a03540f",
+    "size": 154924
+  },
+  {
+    "file": "interactivity/math/quatMul/glTF-Binary/quatMul.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatMul/glTF-Binary/quatMul.glb",
+    "sha256": "7cdbab48682e57c7a74df602a960df5213f31ce188afe3aa367ae0236d095f96",
+    "size": 162260
+  },
+  {
+    "file": "interactivity/math/quatFromUpForward/glTF-Binary/quatFromUpForward.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatFromUpForward/glTF-Binary/quatFromUpForward.glb",
+    "sha256": "3ca3b29dd32bfaef3059f5c2c933371f98c2a121ee76fe7e5d6c81c9ffcf1b9e",
+    "size": 211148
+  },
+  {
+    "file": "interactivity/math/quatToAxisAngle-identity/test-Json/quatToAxisAngle-identity.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatToAxisAngle-identity/test-Json/quatToAxisAngle-identity.json",
+    "sha256": "44103874dcd0f5ca4420334e3ebb7cb62cad5f5f97db34c6e6eab5991d15fdf4",
+    "size": 1293
+  },
+  {
+    "file": "interactivity/math/quatMul/test-Json/quatMul.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatMul/test-Json/quatMul.json",
+    "sha256": "02fa3193e8f674c313fbe993928bfd70665cf1531648d5f9aeef1f4a7768c37f",
+    "size": 1649
+  },
+  {
+    "file": "interactivity/math/quatSlerp/test-Json/quatSlerp.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatSlerp/test-Json/quatSlerp.json",
+    "sha256": "6275567a7508381fe7a535b47c4984b3fba5b9f465e7af4245dd209a9d612c02",
+    "size": 3281
+  },
+  {
+    "file": "interactivity/math/quatToAxisAngle-identity/glTF-Binary/quatToAxisAngle-identity.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatToAxisAngle-identity/glTF-Binary/quatToAxisAngle-identity.glb",
+    "sha256": "6ef3717dd77a556dbe092215bacd35ac85782afbd7d1206b3883761dc4b3f8d4",
+    "size": 146296
+  },
+  {
+    "file": "interactivity/math/quatToAxisAngle/glTF-Binary/quatToAxisAngle.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatToAxisAngle/glTF-Binary/quatToAxisAngle.glb",
+    "sha256": "de0e514edf4df985f28de48b7755f0926aa8af4579b8df67bb32bec4d34ea351",
+    "size": 146320
+  },
+  {
+    "file": "interactivity/math/quatSlerp/glTF-Binary/quatSlerp.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatSlerp/glTF-Binary/quatSlerp.glb",
+    "sha256": "3c5406fc6fe52464fffa7000dc6d7b59eae1cf5ba4b05cb5831781b96b350d6c",
+    "size": 215100
+  },
+  {
+    "file": "interactivity/math/random/test-Json/random.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/random/test-Json/random.json",
+    "sha256": "231881441b5728bac84714d8fd53a8a4f50f3f81b10eb9f2370f3bed22368d09",
+    "size": 3779
+  },
+  {
+    "file": "interactivity/math/quatToAxisAngle/test-Json/quatToAxisAngle.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/quatToAxisAngle/test-Json/quatToAxisAngle.json",
+    "sha256": "ba06ba337128f7d164dce18fb1f132745f2128ed25796fca3d19c1d98191cfbc",
+    "size": 1811
+  },
+  {
+    "file": "interactivity/math/rad/test-Json/rad.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rad/test-Json/rad.json",
+    "sha256": "e402d1bb6a24c9c19940e6cde1a47dbd02dd3a703f7c36feae80037c8b367d58",
+    "size": 3355
+  },
+  {
+    "file": "interactivity/math/rem/glTF-Binary/rem.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rem/glTF-Binary/rem.glb",
+    "sha256": "1844f5ecb77de0cc5aa4c048f55b7379fb9a3e39458be981f6339759cf36f3b0",
+    "size": 195628
+  },
+  {
+    "file": "interactivity/math/random/glTF-Binary/random.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/random/glTF-Binary/random.glb",
+    "sha256": "73c6ba363648b208c369bb92a3db2cd76cac77bcb67691bc3555402116f06be5",
+    "size": 211468
+  },
+  {
+    "file": "interactivity/math/rad/glTF-Binary/rad.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rad/glTF-Binary/rad.glb",
+    "sha256": "effcc684e110921e24df8eebbfb2bca5475717c9416f279ead42c14c8b368a56",
+    "size": 197712
+  },
+  {
+    "file": "interactivity/math/rem/test-Json/rem.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rem/test-Json/rem.json",
+    "sha256": "90c5265b9aaea92fea600f7909bffa4caa4d192ea1d4ffb52174c87646ebb52f",
+    "size": 4096
+  },
+  {
+    "file": "interactivity/math/rgbFromOkLCh/test-Json/rgbFromOkLCh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rgbFromOkLCh/test-Json/rgbFromOkLCh.json",
+    "sha256": "04de07a4087139f2e970a84b82fadff63ed6da6007228d924d6d09c09b637fc1",
+    "size": 4438
+  },
+  {
+    "file": "interactivity/math/rgbToOkLCh/test-Json/rgbToOkLCh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rgbToOkLCh/test-Json/rgbToOkLCh.json",
+    "sha256": "5f88bfddd07a3aa698fe444917bbbcad37c8f4d3d7433a4e8ed7683e40f6ae4d",
+    "size": 3583
+  },
+  {
+    "file": "interactivity/math/rotate2D/glTF-Binary/rotate2D.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rotate2D/glTF-Binary/rotate2D.glb",
+    "sha256": "ebffa526d4744fbf6ee16c0f528122aee4e0546bdbaa8050d2cecdecef2b08e2",
+    "size": 184524
+  },
+  {
+    "file": "interactivity/math/rgbFromOkLCh/glTF-Binary/rgbFromOkLCh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rgbFromOkLCh/glTF-Binary/rgbFromOkLCh.glb",
+    "sha256": "833c3b44a679d4ae3d4eb6d1351c3b45ba5560254dd12c36d5c59de03709f5da",
+    "size": 231884
+  },
+  {
+    "file": "interactivity/math/rgbToOkLCh/glTF-Binary/rgbToOkLCh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rgbToOkLCh/glTF-Binary/rgbToOkLCh.glb",
+    "sha256": "558c68413bba0761f3699ef4730eeaeca357e6c27c690c5f0e3744e6330fa66f",
+    "size": 212324
+  },
+  {
+    "file": "interactivity/math/rotate2D/test-Json/rotate2D.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rotate2D/test-Json/rotate2D.json",
+    "sha256": "834f73dbf6d31d729185fccc6c4133e49eaaa89b1eda2975e229f4dd5afb6f53",
+    "size": 2686
+  },
+  {
+    "file": "interactivity/math/rotate3D/test-Json/rotate3D.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rotate3D/test-Json/rotate3D.json",
+    "sha256": "a91d8459496ffd0c021d5d1502cafff2005723ea09cd44f4fb052a481ad0f4a4",
+    "size": 2171
+  },
+  {
+    "file": "interactivity/math/round/test-Json/round.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/round/test-Json/round.json",
+    "sha256": "62902c3cfadcc9c3a2258371680595c15efa68489b788efd1b3df7c897de5a5c",
+    "size": 9985
+  },
+  {
+    "file": "interactivity/math/rotate3D/glTF-Binary/rotate3D.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/rotate3D/glTF-Binary/rotate3D.glb",
+    "sha256": "7d17f349e26af6ac4ba078565fdb933f24251961248a050ed21ac60e324fcb0a",
+    "size": 171428
+  },
+  {
+    "file": "interactivity/math/round/glTF-Binary/round.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/round/glTF-Binary/round.glb",
+    "sha256": "fe103da17952f46609977b5ed838a2cc565bdec373e37f6d84a13f51f343d5cd",
+    "size": 330020
+  },
+  {
+    "file": "interactivity/math/saturate/glTF-Binary/saturate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/saturate/glTF-Binary/saturate.glb",
+    "sha256": "0ca6292e133ebc3b6aec9704638f260de99685250355b6ea269049451a3993cb",
+    "size": 221080
+  },
+  {
+    "file": "interactivity/math/sign/test-Json/sign.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sign/test-Json/sign.json",
+    "sha256": "3695fd5259cf1143c26a412a8e7488757b76370fb0756bec1fad8a39893f8e57",
+    "size": 4634
+  },
+  {
+    "file": "interactivity/math/select/test-Json/select.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/select/test-Json/select.json",
+    "sha256": "174772e5ff391adbb9642140236de9b69fd5a361397478333bff1a393a7245bc",
+    "size": 1499
+  },
+  {
+    "file": "interactivity/math/saturate/test-Json/saturate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/saturate/test-Json/saturate.json",
+    "sha256": "a9bea805a035a905c5c4b0641e5e621073076020f4393cb134092bef1ce96fa0",
+    "size": 4886
+  },
+  {
+    "file": "interactivity/math/select/glTF-Binary/select.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/select/glTF-Binary/select.glb",
+    "sha256": "0b60603541064f2379f72225911b2b5e3433701e3481728c03951e25971699db",
+    "size": 145280
+  },
+  {
+    "file": "interactivity/math/sign/glTF-Binary/sign.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sign/glTF-Binary/sign.glb",
+    "sha256": "6dd8b3cbd1b2ae4f48d9a38c4407e06c7f0cbfeabd130c76e0e878f50eba8e4b",
+    "size": 193012
+  },
+  {
+    "file": "interactivity/math/sin/glTF-Binary/sin.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sin/glTF-Binary/sin.glb",
+    "sha256": "fe24831bfa23e6966b4efd8062ff8da161b55de02bff123ed6c0affd49f221c6",
+    "size": 207176
+  },
+  {
+    "file": "interactivity/math/sin/test-Json/sin.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sin/test-Json/sin.json",
+    "sha256": "7680cd692761125a0c53f409a1adad8ae442f16da2da109b37daf772d8b9759d",
+    "size": 3475
+  },
+  {
+    "file": "interactivity/math/sinh/test-Json/sinh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sinh/test-Json/sinh.json",
+    "sha256": "7624bb3ba4e52e0c67e690759854a9a1a96b7e778c5d1316360b9b498ee9972d",
+    "size": 3488
+  },
+  {
+    "file": "interactivity/math/slerp/test-Json/slerp.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/slerp/test-Json/slerp.json",
+    "sha256": "e537c44e15f3cfdebd109d8fa630d7fb98d9ba1f2a474abc409516933070ec7c",
+    "size": 4098
+  },
+  {
+    "file": "interactivity/math/sinh/glTF-Binary/sinh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sinh/glTF-Binary/sinh.glb",
+    "sha256": "c1f5bc8a8f0c8730e51084837e07f44a92509b2eb67423eccd098dc833fcfe37",
+    "size": 207480
+  },
+  {
+    "file": "interactivity/math/slerp/glTF-Binary/slerp.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/slerp/glTF-Binary/slerp.glb",
+    "sha256": "8e1a3e4cac51facc6d0c0c704a14ba3121913309e8d3fbdb458e29c1f6158d25",
+    "size": 222468
+  },
+  {
+    "file": "interactivity/math/smoothStep/glTF-Binary/smoothStep.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/smoothStep/glTF-Binary/smoothStep.glb",
+    "sha256": "e0c638de10551a942be5a9440d444857dea5bb0f4207d82c7ee3b7d56f3595a4",
+    "size": 262612
+  },
+  {
+    "file": "interactivity/math/sub/test-Json/sub.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sub/test-Json/sub.json",
+    "sha256": "f750a5d4560cf4d5c3d7af4b23f312ab7d0076eb7de827c044c2de26e1500d72",
+    "size": 2608
+  },
+  {
+    "file": "interactivity/math/smoothStep/test-Json/smoothStep.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/smoothStep/test-Json/smoothStep.json",
+    "sha256": "09cb27372cc1e1a29f6dcb66ac799f833c2a116b3aea0d5c8f178bbcce26557b",
+    "size": 6254
+  },
+  {
+    "file": "interactivity/math/sqrt/test-Json/sqrt.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sqrt/test-Json/sqrt.json",
+    "sha256": "d52a6da2d752503bff95da8c87cd207fd4e7c8734dc39c7e8f59b25637210417",
+    "size": 4947
+  },
+  {
+    "file": "interactivity/math/sub/glTF-Binary/sub.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sub/glTF-Binary/sub.glb",
+    "sha256": "4cccb8b263a2bda93f34574f681a2d56fd627f1e8ff48249bfcc8cc51a258746",
+    "size": 171056
+  },
+  {
+    "file": "interactivity/math/switch/glTF-Binary/switch.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/switch/glTF-Binary/switch.glb",
+    "sha256": "32327c01374d2a3b1e1d6d1c56912c1fb2d4bb16bc226f4388bce6c221eb8a6f",
+    "size": 203116
+  },
+  {
+    "file": "interactivity/math/sqrt/glTF-Binary/sqrt.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/sqrt/glTF-Binary/sqrt.glb",
+    "sha256": "32d7bc432eeca1f2a6a7504742cb630a69ae08ed91102381902009c84af74e46",
+    "size": 234216
+  },
+  {
+    "file": "interactivity/math/tan/test-Json/tan.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/tan/test-Json/tan.json",
+    "sha256": "e69e4a746d7d1f3bb8451996c84a3c98c8d07c1c2e98afe719b365167d01203f",
+    "size": 4449
+  },
+  {
+    "file": "interactivity/math/switch/test-Json/switch.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/switch/test-Json/switch.json",
+    "sha256": "8c02d4fee70867da135cc9405069f2db23e2de4ef16046c268c82fe51b98b547",
+    "size": 3687
+  },
+  {
+    "file": "interactivity/math/tanh/test-Json/tanh.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/tanh/test-Json/tanh.json",
+    "sha256": "6f716c3c4494c9ef7e02efe69cc02c16bf49eb45a3ccd2fca2ade57a0ef7ce71",
+    "size": 3438
+  },
+  {
+    "file": "interactivity/math/tanh/glTF-Binary/tanh.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/tanh/glTF-Binary/tanh.glb",
+    "sha256": "778ad3eaeadda0064c5e62f215886701f6475b0823f6b01cfcbbc508484cc524",
+    "size": 204452
+  },
+  {
+    "file": "interactivity/math/transform/glTF-Binary/transform.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transform/glTF-Binary/transform.glb",
+    "sha256": "e6f558ddfd793c8f70a8e2ae9fdf4d533fe7aa9ea42d9a4ec7c3e73eca0cdce7",
+    "size": 149892
+  },
+  {
+    "file": "interactivity/math/tan/glTF-Binary/tan.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/tan/glTF-Binary/tan.glb",
+    "sha256": "ea41177b717dba9b9c51ee6ebf5ff22e1d7bd3c7f2d88457baff127a87700b3d",
+    "size": 225208
+  },
+  {
+    "file": "interactivity/math/transpose/test-Json/transpose.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose/test-Json/transpose.json",
+    "sha256": "6435317f05ae4e3977c22b521f8582271e43966be414c4283e6e74926e2a7fdf",
+    "size": 1756
+  },
+  {
+    "file": "interactivity/math/transform/test-Json/transform.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transform/test-Json/transform.json",
+    "sha256": "76068861fa85bbaf89476821249fb30979da2579d1f5812aec282662fe233591",
+    "size": 1538
+  },
+  {
+    "file": "interactivity/math/transpose2x2/test-Json/transpose2x2.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose2x2/test-Json/transpose2x2.json",
+    "sha256": "f38cb774099d69e341e4ded2297e89b03f4f8fbd8accfa362f608d577ed77a6c",
+    "size": 2457
+  },
+  {
+    "file": "interactivity/math/transpose/glTF-Binary/transpose.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose/glTF-Binary/transpose.glb",
+    "sha256": "0b928d82f45bfeffbe054830c631d34a794f0b6b21edbf1cdbd83b22353a583a",
+    "size": 153296
+  },
+  {
+    "file": "interactivity/math/transpose3x3/glTF-Binary/transpose3x3.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose3x3/glTF-Binary/transpose3x3.glb",
+    "sha256": "68f4270600ea75f8bb1fe5c9605919aeff9840d13237ae1f2b63ac6662832a22",
+    "size": 213096
+  },
+  {
+    "file": "interactivity/math/transpose2x2/glTF-Binary/transpose2x2.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose2x2/glTF-Binary/transpose2x2.glb",
+    "sha256": "981609eac60a1143b78de28bede68781a4c9566632d820bfce89ad2fe7f7b817",
+    "size": 168932
+  },
+  {
+    "file": "interactivity/math/transpose3x3/test-Json/transpose3x3.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/transpose3x3/test-Json/transpose3x3.json",
+    "sha256": "e5530b732e1548aeeb79b13a7210707375489d5c433bf9ddd8d5145c5162b0f7",
+    "size": 4400
+  },
+  {
+    "file": "interactivity/math/xor/test-Json/xor.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/xor/test-Json/xor.json",
+    "sha256": "be1b4a0dcf0e42c19963df81d26413017eaac079bbd406e7419fd1721680ec74",
+    "size": 3086
+  },
+  {
+    "file": "interactivity/mathtests-index.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/mathtests-index.json",
+    "sha256": "963056fd8da272219ac67fb2466d876f870927189a14d38f015c89f850338af3",
+    "size": 50156
+  },
+  {
+    "file": "interactivity/math/trunc/glTF-Binary/trunc.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/trunc/glTF-Binary/trunc.glb",
+    "sha256": "cb9c86716d75615e802d76dcef3286aa4c3362aedfab793765de16a52eca8ae5",
+    "size": 228152
+  },
+  {
+    "file": "interactivity/math/trunc/test-Json/trunc.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/trunc/test-Json/trunc.json",
+    "sha256": "7c220a3a8816ff5cad6f47142f041ecdf7ee2379fb5ebe023e75cfb15edc10ba",
+    "size": 4315
+  },
+  {
+    "file": "interactivity/math/xor/glTF-Binary/xor.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/xor/glTF-Binary/xor.glb",
+    "sha256": "b1d172629d2dd52ede1526603e6404b96048a68e89ce2c3b4984b8e5636dc40d",
+    "size": 183388
+  },
+  {
+    "file": "interactivity/pointer/AssetCapabilities_GetTests/test-Json/AssetCapabilities_GetTests.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/AssetCapabilities_GetTests/test-Json/AssetCapabilities_GetTests.json",
+    "sha256": "7596f6f386d838f6e486578e3da7ca2144cff4067c9e942b01af318eed741efd",
+    "size": 10702
+  },
+  {
+    "file": "interactivity/pointer/CoreReadOnlyPointers_GetTests/test-Json/CoreReadOnlyPointers_GetTests.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/CoreReadOnlyPointers_GetTests/test-Json/CoreReadOnlyPointers_GetTests.json",
+    "sha256": "28f0aec1ee659115be55128ceaa8ae3985a5c4a0c7eed0578e96f3030f99d991",
+    "size": 23420
+  },
+  {
+    "file": "interactivity/mathtests.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/mathtests.json",
+    "sha256": "90024eed3111dab9178bb517bfd742c4a5f91ca5ec16538a92186436959cec6b",
+    "size": 342848
+  },
+  {
+    "file": "interactivity/pointer/CoreReadOnlyPointers_GetTests/glTF-Binary/CoreReadOnlyPointers_GetTests.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/CoreReadOnlyPointers_GetTests/glTF-Binary/CoreReadOnlyPointers_GetTests.glb",
+    "sha256": "8d496196947392f50a57a2d74ba3ff0c6ff8b50433ec6cc8f2a558c89c115c8d",
+    "size": 652360
+  },
+  {
+    "file": "interactivity/pointer/AssetCapabilities_GetTests/glTF-Binary/AssetCapabilities_GetTests.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/AssetCapabilities_GetTests/glTF-Binary/AssetCapabilities_GetTests.glb",
+    "sha256": "4ed3b377495fbabbee0c5ffb63cdbc0d00c4faa2667f5fe6f345cb7d9a3128ff",
+    "size": 430184
+  },
+  {
+    "file": "interactivity/mathtests.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/mathtests.glb",
+    "sha256": "bc6840cf8e65e2ff4b0cd2a049558091b0f5c74b9316f461987e90e73690a2d9",
+    "size": 7935744
+  },
+  {
+    "file": "interactivity/pointer/activeCamera/test-Json/activeCamera.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/activeCamera/test-Json/activeCamera.json",
+    "sha256": "2b564fda6a551b788123a78300be8736c64fb590cfd1b28b483ebb900b4c1585",
+    "size": 24365
+  },
+  {
+    "file": "interactivity/pointer/get_set_morphtargets/test-Json/get_set_morphtargets.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/get_set_morphtargets/test-Json/get_set_morphtargets.json",
+    "sha256": "24b585f1f72bce5b4c0dedbfdcd26d3ff41f9656d5bc47c903b10372362a9813",
+    "size": 10344
+  },
+  {
+    "file": "interactivity/pointer/get_light_type_pointers/test-Json/get_light_type_pointers.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/get_light_type_pointers/test-Json/get_light_type_pointers.json",
+    "sha256": "6ff4623e3a3339aaf4a01c01a0967e0cae1b9d97b611aad37ad5b713c2950d3f",
+    "size": 8309
+  },
+  {
+    "file": "interactivity/pointer/get_light_type_pointers/glTF-Binary/get_light_type_pointers.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/get_light_type_pointers/glTF-Binary/get_light_type_pointers.glb",
+    "sha256": "820d11a267fbe1984c40b40c8bcdc20856dd0b75424709994b1450850113afee",
+    "size": 329460
+  },
+  {
+    "file": "interactivity/pointer/activeCamera/glTF-Binary/activeCamera.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/activeCamera/glTF-Binary/activeCamera.glb",
+    "sha256": "c3dc6e19bd28f6eefb0b9c2c98abb95650385b8ce02aa80d30961632b20504cd",
+    "size": 777220
+  },
+  {
+    "file": "interactivity/pointer/get_set_morphtargets/glTF-Binary/get_set_morphtargets.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/get_set_morphtargets/glTF-Binary/get_set_morphtargets.glb",
+    "sha256": "5275342a4dd25bc47dda66697304fcd2b0bc09e533640c85a8f48206cf659ab9",
+    "size": 445888
+  },
+  {
+    "file": "interactivity/pointer/set_edge_cases/test-Json/set_edge_cases.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/set_edge_cases/test-Json/set_edge_cases.json",
+    "sha256": "cfc2877c2c1960b64c3e213c3c33f246928208e2c04486e105f9af9c8fb7102c",
+    "size": 7516
+  },
+  {
+    "file": "interactivity/pointer/interpolate/test-Json/interpolate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/interpolate/test-Json/interpolate.json",
+    "sha256": "cedb9a5927870ddd39889387a07fe04fce7c300f641583c34e07d1e56ccf3b48",
+    "size": 12186
+  },
+  {
+    "file": "interactivity/pointer/set_and_get/test-Json/set_and_get.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/set_and_get/test-Json/set_and_get.json",
+    "sha256": "373a7d58da2236a155e145cad8eae9e7e8886ace783e508659ce06041f6722bf",
+    "size": 51042
+  },
+  {
+    "file": "interactivity/pointer/set_edge_cases/glTF-Binary/set_edge_cases.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/set_edge_cases/glTF-Binary/set_edge_cases.glb",
+    "sha256": "cf81b500615d9ed25afce2b746c2543a65f55d6a7d24948cdb9696a618b2759a",
+    "size": 288432
+  },
+  {
+    "file": "interactivity/pointer/interpolate/glTF-Binary/interpolate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/interpolate/glTF-Binary/interpolate.glb",
+    "sha256": "94f544e31cf116558cc593bcbe2c4a979d82b94f4fae25db503982e888db5c63",
+    "size": 376092
+  },
+  {
+    "file": "interactivity/pointer/set_and_get/glTF-Binary/set_and_get.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/pointer/set_and_get/glTF-Binary/set_and_get.glb",
+    "sha256": "a0f79d6390f0efbea668b496446406ccdd1fe1c67bd7cc989594f2c3b7bb1174",
+    "size": 1692364
+  },
+  {
+    "file": "interactivity/prerequisites/Tests_required_operations/test-Json/Tests_required_operations.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/prerequisites/Tests_required_operations/test-Json/Tests_required_operations.json",
+    "sha256": "85880c473798aa23505ef19b474d606e6ab2546ffa8126a2e338e3e93acb9d90",
+    "size": 3770
+  },
+  {
+    "file": "interactivity/ref/eq/test-Json/eq.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/ref/eq/test-Json/eq.json",
+    "sha256": "d82113952e32abef47e12e1b0f314cbcd96e0c59972225d8f4557464d94c1c62",
+    "size": 4218
+  },
+  {
+    "file": "interactivity/test-index.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/test-index.json",
+    "sha256": "06815b0fce074bc92206c1e5035079574c4ee3df8694a582c704fcec24d22b43",
+    "size": 20615
+  },
+  {
+    "file": "interactivity/type/conversions/glTF-Binary/conversions.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/type/conversions/glTF-Binary/conversions.glb",
+    "sha256": "1a97c84d5b69207e77da468295993a3ad1f0e0180024029b27445c999c7e835d",
+    "size": 280024
+  },
+  {
+    "file": "interactivity/ref/eq/glTF-Binary/eq.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/ref/eq/glTF-Binary/eq.glb",
+    "sha256": "b56eaa7a2b6daec57bc115f3aae58aefe230776cab20c910902b0f76dcb12808",
+    "size": 210896
+  },
+  {
+    "file": "interactivity/prerequisites/Tests_required_operations/glTF-Binary/Tests_required_operations.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/prerequisites/Tests_required_operations/glTF-Binary/Tests_required_operations.glb",
+    "sha256": "b0c672a1a8890bcc3df94396966f1493320ccb71c4a03b619c36279905c8126b",
+    "size": 190032
+  },
+  {
+    "file": "interactivity/variable/interpolate/test-Json/interpolate.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/interpolate/test-Json/interpolate.json",
+    "sha256": "cca6b5be44686a584116ea36a791f200d146af09f585e26931fc927fd1899926",
+    "size": 11980
+  },
+  {
+    "file": "interactivity/variable/setMultiple/glTF-Binary/setMultiple.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/setMultiple/glTF-Binary/setMultiple.glb",
+    "sha256": "e13d3a9fa052726ff637d5eeee4ce059c93065522aecbfa66979a7bd236c36ad",
+    "size": 164876
+  },
+  {
+    "file": "interactivity/variable/setMultiple/test-Json/setMultiple.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/setMultiple/test-Json/setMultiple.json",
+    "sha256": "b3e9fcac38f5a36b4d39d14598e8ee046c2bd85383f6a000362527226f489643",
+    "size": 2319
+  },
+  {
+    "file": "interactivity/type/conversions/test-Json/conversions.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/type/conversions/test-Json/conversions.json",
+    "sha256": "a3fd21a8dfd84ba59a061e7bad75da14260941606e30bd20fd3916a35299075f",
+    "size": 7943
+  },
+  {
+    "file": "interactivity/variable/set_and_get/glTF-Binary/set_and_get.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/set_and_get/glTF-Binary/set_and_get.glb",
+    "sha256": "8afc9c026a0ef8fc3e20ec36e618e93addd89b88b3969dc919c97eb69cd34b83",
+    "size": 282892
+  },
+  {
+    "file": "interactivity/variable/interpolate/glTF-Binary/interpolate.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/interpolate/glTF-Binary/interpolate.glb",
+    "sha256": "69224ba313fcb0d89c5077c726b20266ea149f7e80aa35b2ef787807a21f6ea5",
+    "size": 375640
+  },
+  {
+    "file": "interactivity/variable/set_and_get/test-Json/set_and_get.json",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/variable/set_and_get/test-Json/set_and_get.json",
+    "sha256": "55d3522006d93f7f18b819db259065019cffdde8dd50097addb2f7199043ecda",
+    "size": 9667
+  },
+  {
+    "file": "physics/JointTypes.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/JointTypes/JointTypes.gltf",
+    "sha256": "7ab462a9d11f76787ced5f684ae85e8b8e6c7f9d266ca9c495ede41cf38f0e4f",
+    "size": 38352
+  },
+  {
+    "file": "physics/JointTypes.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/JointTypes/JointTypes.bin",
+    "sha256": "6a648e71aa473f800eaa2f038e9da5c08199e4da52753d699bc634056acbe424",
+    "size": 15432
+  },
+  {
+    "file": "physics/ShapeTypes.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/ShapeTypes/ShapeTypes.gltf",
+    "sha256": "bf6015a17059e6da0d1a58ef246af8f1ecf44e44bca1d93eef882a75019ab925",
+    "size": 26322
+  },
+  {
+    "file": "physics/ShapeTypes.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/ShapeTypes/ShapeTypes.bin",
+    "sha256": "dc52df461a11f3eefaf2dd3f414b703eea6d7022ce5b722dd25305410d2d0f43",
+    "size": 186556
+  },
+  {
+    "file": "physics/Filtering.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Filtering/Filtering.gltf",
+    "sha256": "7f12aaef90597ad637ab0f44e399b8eba2b1a13994aac930ed17458f154d4b1a",
+    "size": 19759
+  },
+  {
+    "file": "physics/Filtering.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Filtering/Filtering.bin",
+    "sha256": "1073e50e7493d6fa18db13fba15102429334df77a0672261a283b29b637d1736",
+    "size": 14136
+  },
+  {
+    "file": "physics/Triggers.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Triggers/Triggers.gltf",
+    "sha256": "2eca85025803361a6cfa8cf61fdddb1f65abd14c2391d4753b8a56e74727250b",
+    "size": 9732
+  },
+  {
+    "file": "physics/Triggers.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Triggers/Triggers.bin",
+    "sha256": "a50932b91ac0ce285290cb79fdaa92aae9792938242719ffdf5492257c71c24c",
+    "size": 3984
+  },
+  {
+    "file": "physics/MotionProperties.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/MotionProperties/MotionProperties.gltf",
+    "sha256": "0719a3ddcad60b8a50fa9d26201881fcd4a5ec6c14b3c251a3ba3b8c3db34984",
+    "size": 20357
+  },
+  {
+    "file": "physics/MotionProperties.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/MotionProperties/MotionProperties.bin",
+    "sha256": "06876e634575361c864b510a7c1ad2da7b60a60b922463aacece821cd89c07d7",
+    "size": 1209588
+  },
+  {
+    "file": "physics/Materials_Friction.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Materials_Friction/Materials_Friction.gltf",
+    "sha256": "d751c934aca2ba4c5efb1382c145559851c1d9281aba87b6e261176a93969880",
+    "size": 10393
+  },
+  {
+    "file": "physics/Materials_Friction.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Materials_Friction/Materials_Friction.bin",
+    "sha256": "6baa9267d4e30882491e5b27a278b4b102123c10049a910b1ec708b6ba84f9f2",
+    "size": 254672
+  },
+  {
+    "file": "physics/Materials_Restitution.gltf",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Materials_Restitution/Materials_Restitution.gltf",
+    "sha256": "745bbe1e43650282c0c736fd0fea828fa59bc99660a2a9755c37316f1951104b",
+    "size": 8279
+  },
+  {
+    "file": "physics/Materials_Restitution.bin",
+    "url": "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/9dc61cb3474ff9a51f58d3592f79d5c9e572056a/samples/Materials_Restitution/Materials_Restitution.bin",
+    "sha256": "af83f1d1b5ee39621fbc6719d46575f33ff5f0e941483b6e080d6bcb1450afb2",
+    "size": 124728
+  },
+  {
+    "file": "racoonfamily.spz",
+    "url": "https://raw.githubusercontent.com/nianticlabs/spz/11312e4ad836ed06e3da2f3d5b633688d17ebebb/samples/racoonfamily.spz",
+    "sha256": "2e068d893730955c09aee324ff170c559f71c0e8758c1b14c3811a5969333cfe",
+    "size": 24202962
+  },
+  {
+    "file": "hornedlizard.spz",
+    "url": "https://raw.githubusercontent.com/nianticlabs/spz/11312e4ad836ed06e3da2f3d5b633688d17ebebb/samples/hornedlizard.spz",
+    "sha256": "a076ca6aeb9f1a8fe52526f4a7c381fe8fffec60c0d7eb64b45532189b64bc6a",
+    "size": 18143098
+  },
+  {
+    "file": "tower.glb",
+    "url": "https://raw.githubusercontent.com/CesiumGS/cesium/main/Specs/Data/Cesium3DTiles/GaussianSplats/tower/0/0.glb",
+    "sha256": "9ef9d8d0756d1f423cd6aa8bd99f7dd26957f96df03dcbcec6e37103e39350b4",
+    "size": 7499156
+  }
+]

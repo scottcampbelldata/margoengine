@@ -1,8 +1,9 @@
 // KHR_physics_rigid_bodies and KHR_implicit_shapes against the real solver: the published sample files, and what they do when
 // simulated, held to the mechanics they describe. Samples without a licence are read through MARGO_SPLAT_SAMPLES.
 import test from 'node:test';
+import { requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Physics, collisionGroups } from '../../physics/dist/index.js';
@@ -17,8 +18,7 @@ console.warn = warn;
 const vectorOf = ([x, y, z]) => ({ x, y, z });
 const quatOf = ({ rotation: [x, y, z, w] }) => ({ x, y, z, w });
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/physics/${name}`, import.meta.url));
-const samples = process.env.MARGO_SPLAT_SAMPLES ? join(process.env.MARGO_SPLAT_SAMPLES, 'physics') : undefined;
-const unlicensed = samples && existsSync(join(samples, 'JointTypes.gltf')) ? false : 'set MARGO_SPLAT_SAMPLES to the samples folder';
+const samples = requireExternalAssets('physics/');
 
 /** A model of the file as far as physics reads one; `nodes` holds live stand-ins for the nodes under test. */
 function modelOf(path, nodes = [], edit = (doc) => doc) {
@@ -515,7 +515,7 @@ for (const [name, joints] of [
   ['Materials_Friction', 0],
   ['Materials_Restitution', 0],
 ])
-  test(`the real ${name} builds and simulates without a broken pose`, { skip: unlicensed }, async () => {
+  test(`the real ${name} builds and simulates without a broken pose`, async () => {
     const { physics, gltf } = await load(modelOf(join(samples, name + '.gltf')));
     assert.equal(gltf.joints.size, joints);
     assert.ok(gltf.bodies.size > 0);
@@ -526,7 +526,7 @@ for (const [name, joints] of [
     }
   });
 
-test('the real Materials_Restitution orders its bounces by coefficient', { skip: unlicensed }, async () => {
+test('the real Materials_Restitution orders its bounces by coefficient', async () => {
   const { physics, gltf } = await load(modelOf(join(samples, 'Materials_Restitution.gltf')));
   const movers = [...gltf.bodies].filter(([, made]) => made.type === 'dynamic');
   assert.equal(movers.length, 2);
@@ -544,14 +544,14 @@ test('the real Materials_Restitution orders its bounces by coefficient', { skip:
   assert.ok(peaks.get(high) > peaks.get(low), `${peaks.get(high)} over ${peaks.get(low)}`);
 });
 
-test('the real Filtering keeps the pairs its filters refuse apart', { skip: unlicensed }, async () => {
+test('the real Filtering keeps the pairs its filters refuse apart', async () => {
   const { gltf } = await load(modelOf(join(samples, 'Filtering.gltf')));
   const groups = new Set([...gltf.bodies.values()].flatMap((made) => made.colliders.map((c) => c.collisionGroups())));
   assert.ok(groups.size >= 3, 'three filters give three masks: ' + groups.size);
   assert.ok(collisionGroups(1, 1));
 });
 
-test('the real JointTypes keeps every closed anchor together while the bodies fall and swing', { skip: unlicensed }, async () => {
+test('the real JointTypes keeps every closed anchor together while the bodies fall and swing', async () => {
   const model = modelOf(join(samples, 'JointTypes.gltf')),
     { physics, gltf } = await load(model),
     defs = model.asset.doc.extensions.KHR_physics_rigid_bodies.physicsJoints,

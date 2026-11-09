@@ -2228,3 +2228,15 @@ boundaries could upload as zero or equal f32 values. The constructor now validat
 including sparse lists, before any GPU setup. packages/scatter/test/tiles-budget.test.js regresses zero/subnormal
 and collapsed near/middle/far boundaries and accepts the smallest normal f32 boundary. Existing exact-endpoint,
 conservative-distance and explicit-cap tests remain in verify/check:merge and grass-tiles.browser.mjs.
+
+### Required outside assets in every worktree (section 5, 2026-11-09)
+
+Four batch-160 test files previously selected data only through a shell-local environment
+variable. That explained the differing 14-skip and zero-skip reports on identical main code;
+result-cache shadow mode never served tests. Verify now preflights all 348 pinned outside
+assets before build, and direct tests validate their complete input family. Missing, partial,
+LFS-only and changed caches fail with the file path and fetch command. The syntax gate
+no longer exempts those four files. Regression evidence includes empty-cache verify in a
+subprocess, digest corruption, a missing companion and override/default path resolution.
+Existing glTF importer mechanics tests remain unchanged apart from input enforcement;
+physics and physics2d packages remain held. No hardware or performance claim is added.
