@@ -1,0 +1,6 @@
+START cargo build --locked --release --target wasm32-unknown-unknown --manifest-path C:\Development\Projects\margoengine-lane-P\.lane\p\current-step-profile-v1\source\packages\physics2d\kernel\wasm-check\Cargo.toml --features lane-profile
+   Compiling margoengine-physics-kernel-common v0.1.0 (C:\Development\Projects\margoengine-lane-P\.lane\p\current-step-profile-v1\source\packages\physics\kernel-common)
+   Compiling margoengine-physics2d-kernel v0.1.0 (C:\Development\Projects\margoengine-lane-P\.lane\p\current-step-profile-v1\source\packages\physics2d\kernel)
+   Compiling margoengine-physics2d-wasm-check v0.1.0 (C:\Development\Projects\margoengine-lane-P\.lane\p\current-step-profile-v1\source\packages\physics2d\kernel\wasm-check)
+    Finished `release` profile [optimized] target(s) in 11.97s
+END code=0 timeout=false elapsed=12093ms

@@ -887,6 +887,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   (IQR 0.9254 to 1.0686, 12/24 faster) proves no timing gain. Latest separate browser sessions still lose:
   Edge Margo/Box2D/Rapier 4.065/1.500/8.855 ms; Firefox 4.420/1.420/10.460 ms. Profile the complete corrected
   hot path before another redesign; the required block-coupled accuracy remains intact.
+  Entry 112 avoids repeated bounds validation and rejected-component predicates without changing results.
+  Its loaded paired ratio median 0.8705 (IQR 0.7735 to 0.9236, 20/24 faster) favors the combined change;
+  the current browser/rival table in that entry still loses to Box2D. The complete checked-step profile now
+  identifies setup and support-planner preparation as material phases. No physical work or accuracy bar is removed.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

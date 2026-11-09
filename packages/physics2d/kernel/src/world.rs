@@ -345,6 +345,12 @@ impl Default for World {
 pub fn bounds_of(core: &Core, xf: Xf) -> Result<Bounds<2>, PhysicsError> {
     validate_collision_core(core)?;
     validate_collision_pose(xf)?;
+    bounds_from_validated(core, xf)
+}
+
+/// The caller has checked the same current core/pose on this call stack, without an intervening mutation.
+/// Broad-phase refits follow World::step's complete current-data preflight; public/creation calls use bounds_of.
+fn bounds_from_validated(core: &Core, xf: Xf) -> Result<Bounds<2>, PhysicsError> {
     let first = xf.apply(core.vertices[0]);
     let (mut lo, mut hi) = (first, first);
     for i in 1..core.count {
@@ -640,7 +646,7 @@ impl World {
         for s in 0..self.shapes.len() {
             let body = &self.bodies[self.shapes[s].body as usize];
             if body.kind != Kind::Static && body.awake {
-                let tight = bounds_of(&self.shapes[s].core, body.xf)?;
+                let tight = bounds_from_validated(&self.shapes[s].core, body.xf)?;
                 self.broad.place(s as u32, &tight, BOX_MARGIN);
             }
         }
@@ -927,3 +933,7 @@ fn validate_joint_def(def: &JointDef) -> Result<(), PhysicsError> {
 pub(crate) fn gravity_length(settings: &Settings) -> f32 {
     sqrt(settings.gravity.length_squared())
 }
+
+#[cfg(test)]
+#[path = "world_bounds_tests.rs"]
+mod bounds_tests;

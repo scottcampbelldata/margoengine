@@ -1,0 +1,3 @@
+START node .lane/p/current-step-profile-v1/prepare-v2.mjs
+All3 directed signed/unsigned hash representation assertions pass; created corrected unique driver.
+END code=0 timeout=false elapsed=110ms

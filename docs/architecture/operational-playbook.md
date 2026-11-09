@@ -1793,3 +1793,19 @@ loss, with no runtime changes or added timing claim. Root scripts reproduce the 
 Optional audio/events layers selection and variation over existing AudioVoicePool. Listener-owned teardown releases every pool; the container has no frame work or timers. LIM-605 and whitepaper/results/audio-events-20261108.json record real browser PCM generated-tone evidence beside WebGPU, native WebGL2 and compatibility WebGL2. Pitch, gain, sequence/random selection and silent cooldown gaps are measured with zero GPU errors. No renderer/core changes; recordings, listening quality, other browsers and speed remain unmeasured.
 
 The event job also repairs AudioVoicePool input ordering: invalid per-play input is rejected before a free or stolen voice changes. Sparse position/range arrays are checked by explicit components, since Array.every skips holes. Focused before/after regressions in audio.test.js and events.test.js prove preserved sounding sources and rejected missing values.
+
+### Own 2D frame preparation (batch 127, section 5 evidence)
+
+Broad refits use a private derived-bounds helper only after complete current body/shape ownership and
+numeric preflight in the same step. Public/creation bounds keep core-then-pose validation; transformed
+or expanded bounds still refuse overflow. No validity certificate crosses a mutation or frame.
+Support eligibility now uses lazy conjunctions after component invalidity, with every DFS/visited/member/
+terminal operation retained. Eager-control traces and accepted Plan bits, malformed-input regressions,
+all 29 physical bars and current native/Wasm/browser pins remain required.
+
+The [proof](physics2d-frame-preparation.md) separates actual predicate-call counts, uninstrumented release
+control flow and branch-inclusive compiler inventories. The matched 17-phase profile includes exact
+per-step state/work fingerprints, 39-clock calibration/residuals, original harness failure and a portable
+source-only reproducer. At 99.29% aggregate CPU busy its phase shares guide investigation; absolute times
+are not substituted for the separate rival benchmark. Entry 112 records the combined bounded paired/browser
+session; neither constituent receives an independently measured timing claim. No core/stage change or CCD.

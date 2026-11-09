@@ -1,0 +1,31 @@
+START node .lane/p/current-step-profile-v1/validate-bundle.mjs
+node:internal/modules/esm/module_job:702
+    return this.module.evaluateSync();
+                       ^
+
+AssertionError [ERR_ASSERTION]: Patch versus generator: packages/physics2d/kernel/Cargo.toml
++ actual - expected
+
++ 'ae4faecab79ca2d725bbc4f54205cd94f9b22e77b827c00f1ec17e43f2845fa7'
+- '50bc0c353801e6a8c7e73b8070869bd61cf832906d34400b32e529a914cc573d'
+
+    at file:///C:/Development/Projects/margoengine-lane-P/.lane/p/current-step-profile-v1/validate-bundle.mjs:36:10
+    at Array.map (<anonymous>)
+    at file:///C:/Development/Projects/margoengine-lane-P/.lane/p/current-step-profile-v1/validate-bundle.mjs:31:113
+    at #evaluateSync (node:internal/modules/esm/module_job:702:24)
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:717:43)
+    at node:internal/modules/esm/loader:383:11
+    at TracingChannel.traceSync (node:diagnostics_channel:557:14)
+    at ModuleLoader.importForEntryPoint (node:internal/modules/esm/loader:372:21)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:184:34)
+    at node:internal/main/run_main_module:33:47 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'ae4faecab79ca2d725bbc4f54205cd94f9b22e77b827c00f1ec17e43f2845fa7',
+  expected: '50bc0c353801e6a8c7e73b8070869bd61cf832906d34400b32e529a914cc573d',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.12.0
+END code=1 timeout=false elapsed=2328ms

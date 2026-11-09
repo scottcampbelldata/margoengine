@@ -1,0 +1,354 @@
+{
+  "sourceHead": "05108aaf0a846cb94c1b1612830545e25207bc6b",
+  "copiedBeforeEdits": [
+    {
+      "path": "packages/physics2d/kernel/Cargo.lock",
+      "sha256": "bad6d9884201427b2058e830e02e8322b4436a8c2f836551aa6dfc43ea7413d6"
+    },
+    {
+      "path": "packages/physics2d/kernel/Cargo.toml",
+      "sha256": "562c7521ad0c8831c1ceca3905fe6d6f2412be7c32d66241f80866233bfa796d"
+    },
+    {
+      "path": "packages/physics2d/kernel/examples/planner_allocations.rs",
+      "sha256": "c5a3021647f856bc84620676fec3783a695035061873f395e2557cf2545654b1"
+    },
+    {
+      "path": "packages/physics2d/kernel/examples/support_bending.rs",
+      "sha256": "b0aa6b25c3591914057beb4de588a245004bf0aa8803e3ddcdcc631967f0d31c"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/error.rs",
+      "sha256": "c4cfaf325ebfcc102347fc102e218e5bf3ff454aafbfd2b2690b7e69b9c40435"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/joint.rs",
+      "sha256": "55713c1fdc800f0b533eb356051c73b3df204febe2bd0eae373a94b1f04033f3"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/lib.rs",
+      "sha256": "4ba969a8ab79b366e9893c6c8c174b111f419497b1f426c2bd53e95d3e9b53ca"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold/face_distance.rs",
+      "sha256": "49b62ff428aba07606e8ce2162beb4567b667a6b1914177c480b11b18819d9a3"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold/four.rs",
+      "sha256": "214d118297dbdf6248fb6f2329185a6f1ca00977910da11be9f3861757ca9f35"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold.rs",
+      "sha256": "4ea162b7350595d9262c15935e3c966d18d7bbdf37043cf14e728b0832add6ef"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/mass.rs",
+      "sha256": "54495427375d864ed5456f4e6732bcc3b46966301b256e9e53551177c3ab8bc7"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/math.rs",
+      "sha256": "1bb1505b4227a52a43d77bd2ea4176d1bd683c1fff3e2fc82477509b6a080139"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/shape.rs",
+      "sha256": "eba6e4deea36450fc950c45f37aada030ab103db1d81d29104665a0d4d552a70"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/smooth.rs",
+      "sha256": "69bd4bb931a1d46d43e0490fab33c5c1e63e92e9ffb75bf97e9b80b561ba5472"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/path_support.rs",
+      "sha256": "f46f0c482b9be5cd44571d7e14d297eae7ce221b0162b1979d6284a3441b75d5"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/path_support_storage_tests.rs",
+      "sha256": "c4494cd80eb03a0a83bfc2c37b6f69f9c42c881c1416148cadda6b16db682c20"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide.rs",
+      "sha256": "4f2db19c3024e74760e5c6f0ec8924ef52d977f59c465985eb666cca0ce51558"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide_certificate_tests.rs",
+      "sha256": "0cc44dc37f1b129d2ec8db8cbed36d9fb4edc62b4b869446b8db072b244d0677"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide_tests.rs",
+      "sha256": "e3e8f5a4172f831ec4e9dfbb91098ea0dc95e33bb7628ad68ce3ba243c0f3d97"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver.rs",
+      "sha256": "5afbc858695e3997e839a81bd02cda0f6eb359673f7114e3936ccd979bc22c68"
+    },
+    {
+      "path": "packages/physics2d/kernel/src/world.rs",
+      "sha256": "89a9943eedefe3867ab46ac737a8ea62afad2cade28d54cafbe246cbaebb24f0"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/bits.rs",
+      "sha256": "9c3562a8442e19e45704634bebc89bfc3753dfcee8880286c0b7936b4e90bf39"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/broad.rs",
+      "sha256": "2984332c423a2cf52454e0631cdb1176d0d706c2fb1230af02d3fbc5515decfe"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/chain.rs",
+      "sha256": "9884336ce090674e784ab704a2ef0b4536470e88de0ee9f8cade76c437d8b46f"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/common.rs",
+      "sha256": "4574b18fff558006e257621f8a898f665147f95b897156c0b8e628162714dd54"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/contact_metric_input.rs",
+      "sha256": "394dbc804faca72c4b0c42081debc264ed85b15792456fa4ed64ac4e55b214de"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/heap.rs",
+      "sha256": "c8cfba403296f1ca5e0d60a75b394b09dd47556bab397ab714d22f163c6b2cd1"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/input.rs",
+      "sha256": "872c20bcdec2a4c67196f5e45e72f07308e8bcb265591ee62779734719d02be4"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/joints.rs",
+      "sha256": "ef6438446c70109f127c176b98aafabda85862022767fca2af38d231722b30bf"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/manifold.rs",
+      "sha256": "c21c4aea5cb22dd5f5cc08ceaa020fd0998877fde5121157ceff2fe6ac75b77d"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/manifold_exact.rs",
+      "sha256": "02c3e141ad79e627059d598f106d7a3a796f5e259bc8a56940f565ec3216ffd6"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/point_velocity_input.rs",
+      "sha256": "24b3360f4d2bd3d4fdfb457056345c4a97772957ab85acd92e5a6bb53bf8f6ef"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/rotation_input.rs",
+      "sha256": "1673eb0c9dbb2ba9993fb3560188952609789c882c9e0a53d5a1f9ecf8a6f303"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/shapes.rs",
+      "sha256": "7012232663e71197ee460fdc0243e54e47c7f82d05c26ea0628af211cace2af3"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support/bits_scenes.rs",
+      "sha256": "1e858c967399ee949ba6287ad41654c90f60ec2a2ac3be93832566fbad25a4b2"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support/manifold_ref.rs",
+      "sha256": "e7745224139794d8af1407bad40206024f9d5b82762ce3935e1faf71fb73ee48"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_domains.rs",
+      "sha256": "8d29c3f02c7582899503263066669b54148ffb5f486742b9f706ac7423a6ae75"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_joint_interaction.rs",
+      "sha256": "39fce976a5db1720b6aaad78ca5bd1c86e0197e0c8703483252fbfaebc878e25"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_numeric.rs",
+      "sha256": "c582377c9dba2c3b9a0449c08038b127e81b2d1933bd236481aa8480367ae438"
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/world.rs",
+      "sha256": "33d33c11ede2c80566b982e1dce77b98182997aaea7c061619fc65a44e82633b"
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/Cargo.lock",
+      "sha256": "ba128efdba2981739f57783e3092339699ebcb1d473fc80568afe2827c9f5a9a"
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/Cargo.toml",
+      "sha256": "c1952eb7f21977e4995a091874d1bebd642e39739810fff721b64aace6dfada1"
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/src/lib.rs",
+      "sha256": "37b23cfe760c7b4646b3aa427851fa9bc8549068e7f7015c1f6a5899141f3b1a"
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/src/support_bars.rs",
+      "sha256": "44e8835835461c3147b006121d44dbbdd1295ee60c3812ef02928a89f6572928"
+    },
+    {
+      "path": "packages/physics/kernel-common/Cargo.toml",
+      "sha256": "06af130d9262b9fe330d2306c70916cf5d9702386d26a0c7b1df4f948e93f93b"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/broad.rs",
+      "sha256": "787b326ce825801d704f107a64d984e1cf1143274793f9e7c020da9fb9b54a95"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/colour.rs",
+      "sha256": "90a84452e4ba538179c588f48c96d0b964678d76e4a25553eeb2d9b58057b94a"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/heap.rs",
+      "sha256": "6d8e809a31d3247297bf7260e19e6779bdc524c0f5144aa4afe09e4bfa04266d"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/island.rs",
+      "sha256": "d11a59a63c41416f71646151edfd4804fea7e637fc4e8a75d485baf3638c3343"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/lanes.rs",
+      "sha256": "f5702b54886a9e5fad0d699d54f5703c2c1ff0cdbaee8c64ed16f4cd21213db6"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/lib.rs",
+      "sha256": "e1b5e27185bdf554af1435c4342fb585e4eff99f89ad6734a2e01e131be49710"
+    },
+    {
+      "path": "packages/physics/kernel-common/src/tree.rs",
+      "sha256": "f85a9b2171ec1bdcb34b571232fde9ba31e4fede7d08b931fe11f950ca41e036"
+    },
+    {
+      "path": "packages/physics2d/README.md",
+      "sha256": "ca0830ab153c3df71679f94ced276b118e8d2078243eb15d479898e927e3c1f9"
+    }
+  ],
+  "edits": [
+    {
+      "file": "packages/physics2d/kernel/Cargo.toml",
+      "beforeSha256": "562c7521ad0c8831c1ceca3905fe6d6f2412be7c32d66241f80866233bfa796d",
+      "afterSha256": "ae4faecab79ca2d725bbc4f54205cd94f9b22e77b827c00f1ec17e43f2845fa7"
+    },
+    {
+      "file": "packages/physics2d/kernel/wasm-check/Cargo.toml",
+      "beforeSha256": "c1952eb7f21977e4995a091874d1bebd642e39739810fff721b64aace6dfada1",
+      "afterSha256": "05e57ae16010cbc8bc637899832faf657044c3172f4d91bd2b469190c246cc8b"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/lib.rs",
+      "beforeSha256": "4ba969a8ab79b366e9893c6c8c174b111f419497b1f426c2bd53e95d3e9b53ca",
+      "afterSha256": "e7cfdc08a896abd57b8e78134f86fccbcec19c0d3a8457ba42eebecec4d11f34"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/world.rs",
+      "beforeSha256": "89a9943eedefe3867ab46ac737a8ea62afad2cade28d54cafbe246cbaebb24f0",
+      "afterSha256": "d193ccc4d43adb12aeff0ee09c19f82ef09bb0b61cf0b36a3a9c30d4c82295d3"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/solver.rs",
+      "beforeSha256": "5afbc858695e3997e839a81bd02cda0f6eb359673f7114e3936ccd979bc22c68",
+      "afterSha256": "eaf568f5876ec033a29118062d8db6bf5406ed80c7daccea78dc466f5c4f33d5"
+    },
+    {
+      "file": "packages/physics2d/kernel/wasm-check/src/lib.rs",
+      "beforeSha256": "37b23cfe760c7b4646b3aa427851fa9bc8549068e7f7015c1f6a5899141f3b1a",
+      "afterSha256": "03e5fe818fb62157223b2461650a62e8da35a03ed446514918a1e810a3518f3c"
+    }
+  ],
+  "phases": [
+    "preflight",
+    "broad",
+    "narrow",
+    "islands",
+    "solver-setup",
+    "support-planner",
+    "substep-preparation",
+    "warm-start",
+    "biased-solve",
+    "support-correction",
+    "pose-integration",
+    "relax-solve",
+    "substep-observer",
+    "solver-finalization",
+    "post-solve-validation",
+    "sleep",
+    "post-sleep-validation"
+  ],
+  "counts": [
+    "substeps",
+    "passes-per-substep",
+    "moving-bodies",
+    "constraints",
+    "simd-blocks",
+    "colours",
+    "planner-calls",
+    "eligible-plan",
+    "snapshot-calls",
+    "correction-calls",
+    "wide-biased-calls",
+    "scalar-biased-contact-visits",
+    "wide-relax-calls",
+    "scalar-relax-contact-visits",
+    "warm-start-calls"
+  ],
+  "publicCounts": [
+    "compared",
+    "pairs",
+    "manifolds",
+    "cold-points",
+    "constraints",
+    "block",
+    "sequential",
+    "colours",
+    "overflow",
+    "islands",
+    "awake-bodies"
+  ],
+  "expected": [
+    "9ffefc83c3a99be4",
+    "95a47530df180011",
+    "92db6847c4e919d4"
+  ],
+  "profileReleaseRequired": true,
+  "buildJobs": [
+    {
+      "cmd": "cargo",
+      "args": [
+        "build",
+        "--locked",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--manifest-path",
+        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\source\\packages\\physics2d\\kernel\\wasm-check\\Cargo.toml"
+      ],
+      "timeout": 600000,
+      "env": {
+        "RUSTFLAGS": "-C target-feature=+simd128",
+        "CARGO_TARGET_DIR": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control"
+      },
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\control-build.log"
+    },
+    {
+      "cmd": "cargo",
+      "args": [
+        "build",
+        "--locked",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--manifest-path",
+        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\source\\packages\\physics2d\\kernel\\wasm-check\\Cargo.toml",
+        "--features",
+        "lane-profile"
+      ],
+      "timeout": 600000,
+      "env": {
+        "RUSTFLAGS": "-C target-feature=+simd128",
+        "CARGO_TARGET_DIR": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented"
+      },
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\instrumented-build.log"
+    }
+  ],
+  "artifactPaths": [
+    {
+      "name": "control",
+      "file": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm"
+    },
+    {
+      "name": "instrumented",
+      "file": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm"
+    }
+  ]
+}

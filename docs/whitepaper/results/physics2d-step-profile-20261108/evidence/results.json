@@ -1,0 +1,96 @@
+{
+  "started": "2026-11-09T03:08:41.667Z",
+  "host": "SCOTT-DEV",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+  "logicalCpus": 32,
+  "node": "v26.12.0",
+  "busyDiagnostic": true,
+  "artifacts": [
+    {
+      "name": "control",
+      "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+      "file": ".lane/p/current-step-profile-v1/measured-control.wasm",
+      "sha256": "80334704f8039982cddb90bbf8ff9427e2297ad0daf1830cf4825f33b426f6b5",
+      "bytes": 271846
+    },
+    {
+      "name": "instrumented",
+      "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+      "file": ".lane/p/current-step-profile-v1/measured-instrumented.wasm",
+      "sha256": "12ebcc557bd82dc5ee27af8df4f4f1221c53b316fb883f4e3e673f352bb6d689",
+      "bytes": 273730
+    }
+  ],
+  "expectedHashes": [
+    "9ffefc83c3a99be4",
+    "95a47530df180011",
+    "92db6847c4e919d4"
+  ],
+  "phases": [
+    "preflight",
+    "broad",
+    "narrow",
+    "islands",
+    "solver-setup",
+    "support-planner",
+    "substep-preparation",
+    "warm-start",
+    "biased-solve",
+    "support-correction",
+    "pose-integration",
+    "relax-solve",
+    "substep-observer",
+    "solver-finalization",
+    "post-solve-validation",
+    "sleep",
+    "post-sleep-validation"
+  ],
+  "countNames": [
+    "substeps",
+    "passes-per-substep",
+    "moving-bodies",
+    "constraints",
+    "simd-blocks",
+    "colours",
+    "planner-calls",
+    "eligible-plan",
+    "snapshot-calls",
+    "correction-calls",
+    "wide-biased-calls",
+    "scalar-biased-contact-visits",
+    "wide-relax-calls",
+    "scalar-relax-contact-visits",
+    "warm-start-calls"
+  ],
+  "publicCountNames": [
+    "compared",
+    "pairs",
+    "manifolds",
+    "cold-points",
+    "constraints",
+    "block",
+    "sequential",
+    "colours",
+    "overflow",
+    "islands",
+    "awake-bodies"
+  ],
+  "method": {
+    "rows": 100,
+    "settleSteps": 60,
+    "measuredSteps": 40,
+    "rounds": 8,
+    "alternatingOrder": true,
+    "fingerprintReadsOutsideTimer": true,
+    "emptyLoopObservedInWat": true,
+    "phaseExtremaAreNonAdditive": true
+  },
+  "nodePrecheck": [],
+  "browsers": [],
+  "failure": {
+    "message": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n+   '-6001037c3c56641c',\n+   '-6a5b8acf20e7ffef',\n+   '-6d2497b83b16e62c'\n-   '9ffefc83c3a99be4',\n-   '95a47530df180011',\n-   '92db6847c4e919d4'\n  ]\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n+   '-6001037c3c56641c',\n+   '-6a5b8acf20e7ffef',\n+   '-6d2497b83b16e62c'\n-   '9ffefc83c3a99be4',\n-   '95a47530df180011',\n-   '92db6847c4e919d4'\n  ]\n\n    at file:///C:/Development/Projects/margoengine-lane-P/.lane/p/current-step-profile-v1/run.mjs:38:12"
+  },
+  "finished": "2026-11-09T03:08:45.010Z",
+  "aggregateCpuBusyPercent": 96.03545765651087
+}

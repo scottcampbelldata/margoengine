@@ -1,0 +1,6 @@
+START node .lane/p/current-step-profile-v1/run-v2.mjs
+control: all3 explicit hashes/shipped checks and100 complete-step state/work fingerprints pass
+instrumented: all3 explicit hashes/shipped checks and100 complete-step state/work fingerprints pass
+default: matched8 rounds complete; all measured states/work and39 clock calls accounted
+firefox: matched8 rounds complete; all measured states/work and39 clock calls accounted
+END code=0 timeout=false elapsed=101587ms

@@ -2577,6 +2577,47 @@ Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner
 - **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
   Oracle: `node --test packages/staging/test/contact-reference.test.js`.
 
+### 112. Exact 2D frame preparation: checked bounds and lazy rejected components
+
+- **Cause/change:** current-step body/shape preflight was repeated by broad-phase public bounds; the
+  support planner eagerly checked pure eligibility after a component was already invalid. Reuse checked
+  inputs only within that same call stack, retain derived-overflow refusal and all public errors, and
+  short-circuit only three pure conjuncts while retaining every DFS/member/terminal operation.
+- **Proof/work:** [same-stack and monotone-conjunction proof](../architecture/physics2d-frame-preparation.md).
+  Actual unchanged 40-step planner calls fall **382,554 to zero**, with **1,192,000 identical edge traversals**.
+  Separate uninstrumented release CFG establishes this work survives in the original binary. Native
+  bounds-callee static fabs/fcmp/branch totals **37/38/42 to 1/1/12** are branch-inclusive, not per-contact
+  instructions; shipped Wasm physical bounds add/mul/sub totals remain **26/32/10**. Public checks remain.
+- **Accuracy:** combined 78 native unit/shadow cases, input/domain/manifold suites, all 29 physical bars
+  and shipped/browser current pins pass unchanged. No setting, tolerance, scene or pin redefinition; CCD
+  remains separate T-11 / 127.y. The portable 17-phase profile motivated this work and includes original
+  harness failure, exact per-step state/work, clock residuals and source-only archive reproduction.
+- **Paired/browser diagnostic:** SCOTT-DEV Ryzen 9 9950X, Node 26.12; measurements apply to the combination.
+
+One process alternates 24 fresh unchanged 100-row scenes per artifact, preserving 60 settling and 40
+sampled steps, all three explicit pins and 5,050 awake bodies on every visit. At 73.01% aggregate host
+CPU busy, old/new minima are 4.8228/4.6899 ms. The paired candidate/control ratio median is
+0.870453 (IQR 0.77345 to 0.92358), with 20/24 faster; paired difference median
+-0.8156 ms. This favors the combination in this session, without assigning a timing gain
+to either constituent or establishing quiet release speed. Source paths, compiler and layout can affect timings.
+
+Twelve-round browser minima, in milliseconds, follow. Before and after are separate changing-load sessions;
+their difference is not a controlled speed claim. Rivals remain external black boxes and scenes are unchanged.
+
+| Browser/backend | Before Margo / Box2D v3 / Rapier | After Margo / Box2D v3 / Rapier |
+| --- | --- | --- |
+| Edge 157 WebGPU | 4.065 / 1.500 / 8.855 | 4.730 / 1.635 / 12.700 |
+| Firefox 157 WebGL2 | 4.420 / 1.420 / 10.460 | 4.140 / 1.440 / 8.280 |
+
+Available Edge WebGPU/WebGL2 and Firefox WebGL2 retain the current pins; Firefox WebGPU has no adapter.
+The Box2D browser goal remains unmet. Quiet release reruns remain required; no accuracy bar is reduced.
+
+- **Evidence/reproduce:** [raw compiler/source/acceptance/round record](results/physics2d-frame-preparation-20261108.json),
+  [portable profile bundle](results/physics2d-step-profile-20261108/README.md),
+  [bounded commands](reproduce.md#own-2d-frame-preparation-perf-history-entry-112). The existing per-point
+  replacement remains rejected for drift, collapse and seam failures. Profile setup/gather/materialization
+  before another formulation change; no forecast substitutes for the full accuracy and work contract.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2682,3 +2723,5 @@ These entries lack a recorded number, a named machine or a quiet run:
 
 31. Cornell box irradiance against Cycles (entry 108): the picture error stays open. Not a frame time. A repeat
     only checks the Cycles noise at 128 samples.
+
+32. Exact 2D frame preparation (entry 112): quiet paired/browser reruns; deterministic work reduction and loaded paired advantage do not establish release speed or Box2D parity.

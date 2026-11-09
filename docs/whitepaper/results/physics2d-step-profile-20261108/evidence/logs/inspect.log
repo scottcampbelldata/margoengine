@@ -1,0 +1,20 @@
+START node .lane/p/current-step-profile-v1/inspect.mjs
+[
+  {
+    "name": "control",
+    "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+    "file": ".lane/p/current-step-profile-v1/measured-control.wasm",
+    "sha256": "80334704f8039982cddb90bbf8ff9427e2297ad0daf1830cf4825f33b426f6b5",
+    "bytes": 271846,
+    "calibrationLoops": 0
+  },
+  {
+    "name": "instrumented",
+    "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+    "file": ".lane/p/current-step-profile-v1/measured-instrumented.wasm",
+    "sha256": "12ebcc557bd82dc5ee27af8df4f4f1221c53b316fb883f4e3e673f352bb6d689",
+    "bytes": 273730,
+    "calibrationLoops": 3
+  }
+]
+END code=0 timeout=false elapsed=526ms

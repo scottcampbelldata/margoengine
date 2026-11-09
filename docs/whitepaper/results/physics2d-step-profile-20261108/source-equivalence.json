@@ -1,0 +1,432 @@
+{
+  "commit": "fc88da4205dd62f7f4ea33cab624fc51e55cd108",
+  "sourceHeadAtFreeze": "05108aaf0a846cb94c1b1612830545e25207bc6b",
+  "method": "Compare each pre-instrumentation snapshot hash against the exact pushed commit blob and its uniform LF/CRLF representations; normalize CRLF to LF only, with no whitespace or token edits.",
+  "files": [
+    {
+      "path": "packages/physics2d/kernel/Cargo.lock",
+      "frozenPreInstrumentationSha256": "bad6d9884201427b2058e830e02e8322b4436a8c2f836551aa6dfc43ea7413d6",
+      "archivedBlobSha256": "08a70b480949f3adcfae2e6f7c20e337cc0ce5eadbeb5a2ac6a0f4c813eba6e2",
+      "normalizedLfSha256": "08a70b480949f3adcfae2e6f7c20e337cc0ce5eadbeb5a2ac6a0f4c813eba6e2",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/Cargo.toml",
+      "frozenPreInstrumentationSha256": "562c7521ad0c8831c1ceca3905fe6d6f2412be7c32d66241f80866233bfa796d",
+      "archivedBlobSha256": "50bc0c353801e6a8c7e73b8070869bd61cf832906d34400b32e529a914cc573d",
+      "normalizedLfSha256": "50bc0c353801e6a8c7e73b8070869bd61cf832906d34400b32e529a914cc573d",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/examples/planner_allocations.rs",
+      "frozenPreInstrumentationSha256": "c5a3021647f856bc84620676fec3783a695035061873f395e2557cf2545654b1",
+      "archivedBlobSha256": "80499aa39a706992fc4f9483990077ec5e2d18c7e26c99868d1e8c70e08a5f6e",
+      "normalizedLfSha256": "80499aa39a706992fc4f9483990077ec5e2d18c7e26c99868d1e8c70e08a5f6e",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/examples/support_bending.rs",
+      "frozenPreInstrumentationSha256": "b0aa6b25c3591914057beb4de588a245004bf0aa8803e3ddcdcc631967f0d31c",
+      "archivedBlobSha256": "7c73255d0de2ca10d4f250236d98a8284a53f3e702e62168d77379a42f5ac7c3",
+      "normalizedLfSha256": "7c73255d0de2ca10d4f250236d98a8284a53f3e702e62168d77379a42f5ac7c3",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/error.rs",
+      "frozenPreInstrumentationSha256": "c4cfaf325ebfcc102347fc102e218e5bf3ff454aafbfd2b2690b7e69b9c40435",
+      "archivedBlobSha256": "0dcebd00bae8f0ea39932e4ec34762bbd438c78f37aafdcf2e3d69bee4e91f6d",
+      "normalizedLfSha256": "0dcebd00bae8f0ea39932e4ec34762bbd438c78f37aafdcf2e3d69bee4e91f6d",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/joint.rs",
+      "frozenPreInstrumentationSha256": "55713c1fdc800f0b533eb356051c73b3df204febe2bd0eae373a94b1f04033f3",
+      "archivedBlobSha256": "9fb44c13c1ea465573131492837d33fcbce6570cafba4abc47b5fa21a6fc5a4b",
+      "normalizedLfSha256": "9fb44c13c1ea465573131492837d33fcbce6570cafba4abc47b5fa21a6fc5a4b",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/lib.rs",
+      "frozenPreInstrumentationSha256": "4ba969a8ab79b366e9893c6c8c174b111f419497b1f426c2bd53e95d3e9b53ca",
+      "archivedBlobSha256": "549ca4a05597b9ec8c9a450fdca9641dfa1b0b5f253b605a4499bc48ac9c62f9",
+      "normalizedLfSha256": "549ca4a05597b9ec8c9a450fdca9641dfa1b0b5f253b605a4499bc48ac9c62f9",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold/face_distance.rs",
+      "frozenPreInstrumentationSha256": "49b62ff428aba07606e8ce2162beb4567b667a6b1914177c480b11b18819d9a3",
+      "archivedBlobSha256": "aa0fbf82eaf35fed410377745c7642ea1479ce41137ef85cc19a30c726cf784a",
+      "normalizedLfSha256": "aa0fbf82eaf35fed410377745c7642ea1479ce41137ef85cc19a30c726cf784a",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold/four.rs",
+      "frozenPreInstrumentationSha256": "214d118297dbdf6248fb6f2329185a6f1ca00977910da11be9f3861757ca9f35",
+      "archivedBlobSha256": "3426f1e0d0aae67d1c3957ccecd20749fd552a55769255ba8b7ba523131e2868",
+      "normalizedLfSha256": "3426f1e0d0aae67d1c3957ccecd20749fd552a55769255ba8b7ba523131e2868",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/manifold.rs",
+      "frozenPreInstrumentationSha256": "4ea162b7350595d9262c15935e3c966d18d7bbdf37043cf14e728b0832add6ef",
+      "archivedBlobSha256": "3b5ebc02f4b0fa7ec4c8a6662e59333206da04f6dc8d5b9d1b70571318609fec",
+      "normalizedLfSha256": "3b5ebc02f4b0fa7ec4c8a6662e59333206da04f6dc8d5b9d1b70571318609fec",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/mass.rs",
+      "frozenPreInstrumentationSha256": "54495427375d864ed5456f4e6732bcc3b46966301b256e9e53551177c3ab8bc7",
+      "archivedBlobSha256": "36b80db99b77bf05553f6ff68b504dfd86f3476956bc261b0c10a2e0dd78f288",
+      "normalizedLfSha256": "36b80db99b77bf05553f6ff68b504dfd86f3476956bc261b0c10a2e0dd78f288",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/math.rs",
+      "frozenPreInstrumentationSha256": "1bb1505b4227a52a43d77bd2ea4176d1bd683c1fff3e2fc82477509b6a080139",
+      "archivedBlobSha256": "8ce6b3bbc05697db5452fcfe7419290d7a6487126d48abb739a0031c383248be",
+      "normalizedLfSha256": "8ce6b3bbc05697db5452fcfe7419290d7a6487126d48abb739a0031c383248be",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/shape.rs",
+      "frozenPreInstrumentationSha256": "eba6e4deea36450fc950c45f37aada030ab103db1d81d29104665a0d4d552a70",
+      "archivedBlobSha256": "d80418dd19ab304708e5275508944f9189e95bb0e972bcc3ab444a7cdaeb6cef",
+      "normalizedLfSha256": "d80418dd19ab304708e5275508944f9189e95bb0e972bcc3ab444a7cdaeb6cef",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/smooth.rs",
+      "frozenPreInstrumentationSha256": "69bd4bb931a1d46d43e0490fab33c5c1e63e92e9ffb75bf97e9b80b561ba5472",
+      "archivedBlobSha256": "eb5b0ea3a6b2a4c2abb2547abda0ed2996ce3cea2f1aca7781e02d56386dddb3",
+      "normalizedLfSha256": "eb5b0ea3a6b2a4c2abb2547abda0ed2996ce3cea2f1aca7781e02d56386dddb3",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/path_support.rs",
+      "frozenPreInstrumentationSha256": "f46f0c482b9be5cd44571d7e14d297eae7ce221b0162b1979d6284a3441b75d5",
+      "archivedBlobSha256": "08e8ef755e03f8e84d82ab7cd99c02bce546754ac8ff8fb9aa8b00e417f59ac7",
+      "normalizedLfSha256": "08e8ef755e03f8e84d82ab7cd99c02bce546754ac8ff8fb9aa8b00e417f59ac7",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/path_support_storage_tests.rs",
+      "frozenPreInstrumentationSha256": "c4494cd80eb03a0a83bfc2c37b6f69f9c42c881c1416148cadda6b16db682c20",
+      "archivedBlobSha256": "e1b7273c22418d5e86222abe4e6eaaeb54a5259e7d0a3ebb1107dac609b49c02",
+      "normalizedLfSha256": "e1b7273c22418d5e86222abe4e6eaaeb54a5259e7d0a3ebb1107dac609b49c02",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide.rs",
+      "frozenPreInstrumentationSha256": "4f2db19c3024e74760e5c6f0ec8924ef52d977f59c465985eb666cca0ce51558",
+      "archivedBlobSha256": "52a493b0080e32b60908cc1007eabdaf90bc9449d3fff7e9391dced7ab06a9c7",
+      "normalizedLfSha256": "52a493b0080e32b60908cc1007eabdaf90bc9449d3fff7e9391dced7ab06a9c7",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide_certificate_tests.rs",
+      "frozenPreInstrumentationSha256": "0cc44dc37f1b129d2ec8db8cbed36d9fb4edc62b4b869446b8db072b244d0677",
+      "archivedBlobSha256": "0cc44dc37f1b129d2ec8db8cbed36d9fb4edc62b4b869446b8db072b244d0677",
+      "normalizedLfSha256": "0cc44dc37f1b129d2ec8db8cbed36d9fb4edc62b4b869446b8db072b244d0677",
+      "matchingRepresentation": "git-blob",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver/wide_tests.rs",
+      "frozenPreInstrumentationSha256": "e3e8f5a4172f831ec4e9dfbb91098ea0dc95e33bb7628ad68ce3ba243c0f3d97",
+      "archivedBlobSha256": "9d49efdfc077eba9ee509e5208594b984ed58d2ca7db33ae8ceb5e8509fb8f3b",
+      "normalizedLfSha256": "9d49efdfc077eba9ee509e5208594b984ed58d2ca7db33ae8ceb5e8509fb8f3b",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/solver.rs",
+      "frozenPreInstrumentationSha256": "5afbc858695e3997e839a81bd02cda0f6eb359673f7114e3936ccd979bc22c68",
+      "archivedBlobSha256": "e13b11e1247b157401f0f68e33c56dceac1f84747f4666e422a2da3a4a94651b",
+      "normalizedLfSha256": "e13b11e1247b157401f0f68e33c56dceac1f84747f4666e422a2da3a4a94651b",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/src/world.rs",
+      "frozenPreInstrumentationSha256": "89a9943eedefe3867ab46ac737a8ea62afad2cade28d54cafbe246cbaebb24f0",
+      "archivedBlobSha256": "af737f60bb41d1eef18d0f6e2242c3687a96ec034e7b3fa8ac14161aed4c5471",
+      "normalizedLfSha256": "af737f60bb41d1eef18d0f6e2242c3687a96ec034e7b3fa8ac14161aed4c5471",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/bits.rs",
+      "frozenPreInstrumentationSha256": "9c3562a8442e19e45704634bebc89bfc3753dfcee8880286c0b7936b4e90bf39",
+      "archivedBlobSha256": "2fa4d73d64f6803c7751a8fcb270072b8d4673b42ed4c3bb3bca9ca40392fd18",
+      "normalizedLfSha256": "2fa4d73d64f6803c7751a8fcb270072b8d4673b42ed4c3bb3bca9ca40392fd18",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/broad.rs",
+      "frozenPreInstrumentationSha256": "2984332c423a2cf52454e0631cdb1176d0d706c2fb1230af02d3fbc5515decfe",
+      "archivedBlobSha256": "ac7229889405ce63928d969cbc6770d2d94e389fdf371477b873eb7a549473b2",
+      "normalizedLfSha256": "ac7229889405ce63928d969cbc6770d2d94e389fdf371477b873eb7a549473b2",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/chain.rs",
+      "frozenPreInstrumentationSha256": "9884336ce090674e784ab704a2ef0b4536470e88de0ee9f8cade76c437d8b46f",
+      "archivedBlobSha256": "a2a8ba563987b642b46e2128f6e979b790eb56431c3fefdf613c2eb8efc26214",
+      "normalizedLfSha256": "a2a8ba563987b642b46e2128f6e979b790eb56431c3fefdf613c2eb8efc26214",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/common.rs",
+      "frozenPreInstrumentationSha256": "4574b18fff558006e257621f8a898f665147f95b897156c0b8e628162714dd54",
+      "archivedBlobSha256": "96911455cfad0f86485db132fd7de08c59d9140b6ea699fe0113df29dd4e42ea",
+      "normalizedLfSha256": "96911455cfad0f86485db132fd7de08c59d9140b6ea699fe0113df29dd4e42ea",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/contact_metric_input.rs",
+      "frozenPreInstrumentationSha256": "394dbc804faca72c4b0c42081debc264ed85b15792456fa4ed64ac4e55b214de",
+      "archivedBlobSha256": "a86e76199812cb29420a141718029fe395a23af8c38b2e669ae0fcdad3c4f863",
+      "normalizedLfSha256": "a86e76199812cb29420a141718029fe395a23af8c38b2e669ae0fcdad3c4f863",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/heap.rs",
+      "frozenPreInstrumentationSha256": "c8cfba403296f1ca5e0d60a75b394b09dd47556bab397ab714d22f163c6b2cd1",
+      "archivedBlobSha256": "5076a4ec0f0b9a871f409589d72c9ccaed849afd4e39634357eaa34c2172f784",
+      "normalizedLfSha256": "5076a4ec0f0b9a871f409589d72c9ccaed849afd4e39634357eaa34c2172f784",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/input.rs",
+      "frozenPreInstrumentationSha256": "872c20bcdec2a4c67196f5e45e72f07308e8bcb265591ee62779734719d02be4",
+      "archivedBlobSha256": "62697cc871efdf16b83865371786f6b5c75e88eb006b6ddab34f1859718d09cb",
+      "normalizedLfSha256": "62697cc871efdf16b83865371786f6b5c75e88eb006b6ddab34f1859718d09cb",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/joints.rs",
+      "frozenPreInstrumentationSha256": "ef6438446c70109f127c176b98aafabda85862022767fca2af38d231722b30bf",
+      "archivedBlobSha256": "89edb5390c66c9dc948fe2fc0381ac8c1c5497710bc4da76166f4092cb0fabd7",
+      "normalizedLfSha256": "89edb5390c66c9dc948fe2fc0381ac8c1c5497710bc4da76166f4092cb0fabd7",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/manifold.rs",
+      "frozenPreInstrumentationSha256": "c21c4aea5cb22dd5f5cc08ceaa020fd0998877fde5121157ceff2fe6ac75b77d",
+      "archivedBlobSha256": "0581e279cae870adec00853416d82f9e5c6bdaf86c9dc38a82a261ec87681f2e",
+      "normalizedLfSha256": "0581e279cae870adec00853416d82f9e5c6bdaf86c9dc38a82a261ec87681f2e",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/manifold_exact.rs",
+      "frozenPreInstrumentationSha256": "02c3e141ad79e627059d598f106d7a3a796f5e259bc8a56940f565ec3216ffd6",
+      "archivedBlobSha256": "6c903ff18bc039d78104f8a1139efce1750c7b7f4e09e86f8d5a2883ed4b5ec5",
+      "normalizedLfSha256": "6c903ff18bc039d78104f8a1139efce1750c7b7f4e09e86f8d5a2883ed4b5ec5",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/point_velocity_input.rs",
+      "frozenPreInstrumentationSha256": "24b3360f4d2bd3d4fdfb457056345c4a97772957ab85acd92e5a6bb53bf8f6ef",
+      "archivedBlobSha256": "ff76cb0402d40807b41c494a161c8cc40d5a72a26c592192f8d13a923de032c7",
+      "normalizedLfSha256": "ff76cb0402d40807b41c494a161c8cc40d5a72a26c592192f8d13a923de032c7",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/rotation_input.rs",
+      "frozenPreInstrumentationSha256": "1673eb0c9dbb2ba9993fb3560188952609789c882c9e0a53d5a1f9ecf8a6f303",
+      "archivedBlobSha256": "3b3a11137f201ee406da0a79010c6c0462521d8999868e0ef9dc418db8c1cc9e",
+      "normalizedLfSha256": "3b3a11137f201ee406da0a79010c6c0462521d8999868e0ef9dc418db8c1cc9e",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/shapes.rs",
+      "frozenPreInstrumentationSha256": "7012232663e71197ee460fdc0243e54e47c7f82d05c26ea0628af211cace2af3",
+      "archivedBlobSha256": "82ab895fe49dd49901a0c9b30dd703d3336d1263b623107785d407792d1c6cbc",
+      "normalizedLfSha256": "82ab895fe49dd49901a0c9b30dd703d3336d1263b623107785d407792d1c6cbc",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support/bits_scenes.rs",
+      "frozenPreInstrumentationSha256": "1e858c967399ee949ba6287ad41654c90f60ec2a2ac3be93832566fbad25a4b2",
+      "archivedBlobSha256": "a38f4719bad10a577fdb635b07ac926d04e14e25305f42a14377136276726a9a",
+      "normalizedLfSha256": "a38f4719bad10a577fdb635b07ac926d04e14e25305f42a14377136276726a9a",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support/manifold_ref.rs",
+      "frozenPreInstrumentationSha256": "e7745224139794d8af1407bad40206024f9d5b82762ce3935e1faf71fb73ee48",
+      "archivedBlobSha256": "7367a647f158a7bcb778489d69a02d0b814a5310e6ffc0f478a53a534c3c9c44",
+      "normalizedLfSha256": "7367a647f158a7bcb778489d69a02d0b814a5310e6ffc0f478a53a534c3c9c44",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_domains.rs",
+      "frozenPreInstrumentationSha256": "8d29c3f02c7582899503263066669b54148ffb5f486742b9f706ac7423a6ae75",
+      "archivedBlobSha256": "adb6cf2bae35753ac75f91df477af36859fa8e100060f74da52f90d4125c51ac",
+      "normalizedLfSha256": "adb6cf2bae35753ac75f91df477af36859fa8e100060f74da52f90d4125c51ac",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_joint_interaction.rs",
+      "frozenPreInstrumentationSha256": "39fce976a5db1720b6aaad78ca5bd1c86e0197e0c8703483252fbfaebc878e25",
+      "archivedBlobSha256": "a6423f53c37b1c0e772c6def6ebea4052b687c7d840eb1155424daf5b7ddee1d",
+      "normalizedLfSha256": "a6423f53c37b1c0e772c6def6ebea4052b687c7d840eb1155424daf5b7ddee1d",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/support_numeric.rs",
+      "frozenPreInstrumentationSha256": "c582377c9dba2c3b9a0449c08038b127e81b2d1933bd236481aa8480367ae438",
+      "archivedBlobSha256": "3d538f24d72c55fc441ccfe363a5b2e96b91abd2ef2aae8f965cbe8ccfbb748c",
+      "normalizedLfSha256": "3d538f24d72c55fc441ccfe363a5b2e96b91abd2ef2aae8f965cbe8ccfbb748c",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/tests/world.rs",
+      "frozenPreInstrumentationSha256": "33d33c11ede2c80566b982e1dce77b98182997aaea7c061619fc65a44e82633b",
+      "archivedBlobSha256": "23269b053196bca88a2e9c16f11586f6c762c578e0cdc92628d3ff3371f586bd",
+      "normalizedLfSha256": "23269b053196bca88a2e9c16f11586f6c762c578e0cdc92628d3ff3371f586bd",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/Cargo.lock",
+      "frozenPreInstrumentationSha256": "ba128efdba2981739f57783e3092339699ebcb1d473fc80568afe2827c9f5a9a",
+      "archivedBlobSha256": "bcfb86627a570b6b0295b62152d1dc18b57aa76f3d90556b1b8ba7c081e84fa3",
+      "normalizedLfSha256": "bcfb86627a570b6b0295b62152d1dc18b57aa76f3d90556b1b8ba7c081e84fa3",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/Cargo.toml",
+      "frozenPreInstrumentationSha256": "c1952eb7f21977e4995a091874d1bebd642e39739810fff721b64aace6dfada1",
+      "archivedBlobSha256": "11638c382257e48bc8567ff5eae803d85f023c65ae7055e1d036ded6f3ce3068",
+      "normalizedLfSha256": "11638c382257e48bc8567ff5eae803d85f023c65ae7055e1d036ded6f3ce3068",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/src/lib.rs",
+      "frozenPreInstrumentationSha256": "37b23cfe760c7b4646b3aa427851fa9bc8549068e7f7015c1f6a5899141f3b1a",
+      "archivedBlobSha256": "f9a93b190eb940282d35b39d7805d8f67d1d4454cec9039ca117c56d51bffb84",
+      "normalizedLfSha256": "f9a93b190eb940282d35b39d7805d8f67d1d4454cec9039ca117c56d51bffb84",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/src/support_bars.rs",
+      "frozenPreInstrumentationSha256": "44e8835835461c3147b006121d44dbbdd1295ee60c3812ef02928a89f6572928",
+      "archivedBlobSha256": "f177cf384d153e1df7d8c28f7d6b75e2e27fb8209f02a23e25daff5d476ef4eb",
+      "normalizedLfSha256": "f177cf384d153e1df7d8c28f7d6b75e2e27fb8209f02a23e25daff5d476ef4eb",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/Cargo.toml",
+      "frozenPreInstrumentationSha256": "06af130d9262b9fe330d2306c70916cf5d9702386d26a0c7b1df4f948e93f93b",
+      "archivedBlobSha256": "468e1ddad76fb9bbc7c3b409ee40eb97bf5789fa51bd5606ef62fde088ca425d",
+      "normalizedLfSha256": "468e1ddad76fb9bbc7c3b409ee40eb97bf5789fa51bd5606ef62fde088ca425d",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/broad.rs",
+      "frozenPreInstrumentationSha256": "787b326ce825801d704f107a64d984e1cf1143274793f9e7c020da9fb9b54a95",
+      "archivedBlobSha256": "c544e8dbf7051e98ac49ecf2a859bbe12a26b4670f70ceead7a4726ca682a5a8",
+      "normalizedLfSha256": "c544e8dbf7051e98ac49ecf2a859bbe12a26b4670f70ceead7a4726ca682a5a8",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/colour.rs",
+      "frozenPreInstrumentationSha256": "90a84452e4ba538179c588f48c96d0b964678d76e4a25553eeb2d9b58057b94a",
+      "archivedBlobSha256": "09613bb5e674b386bde0b3bb3b10e3899898ddefa5796976c7b52cb51393e05f",
+      "normalizedLfSha256": "09613bb5e674b386bde0b3bb3b10e3899898ddefa5796976c7b52cb51393e05f",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/heap.rs",
+      "frozenPreInstrumentationSha256": "6d8e809a31d3247297bf7260e19e6779bdc524c0f5144aa4afe09e4bfa04266d",
+      "archivedBlobSha256": "39eab538d18f040fda38d97f001222efe0c3d59cdbd54849414067bef405bf5e",
+      "normalizedLfSha256": "39eab538d18f040fda38d97f001222efe0c3d59cdbd54849414067bef405bf5e",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/island.rs",
+      "frozenPreInstrumentationSha256": "d11a59a63c41416f71646151edfd4804fea7e637fc4e8a75d485baf3638c3343",
+      "archivedBlobSha256": "54b43eaff0124a2b65dbec6555d289b665f1b8c3f7779e96e1d31231493478c6",
+      "normalizedLfSha256": "54b43eaff0124a2b65dbec6555d289b665f1b8c3f7779e96e1d31231493478c6",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/lanes.rs",
+      "frozenPreInstrumentationSha256": "f5702b54886a9e5fad0d699d54f5703c2c1ff0cdbaee8c64ed16f4cd21213db6",
+      "archivedBlobSha256": "ac1a5433c606dd293738473e556252b85fe89dd836252407bd778956a85467e1",
+      "normalizedLfSha256": "ac1a5433c606dd293738473e556252b85fe89dd836252407bd778956a85467e1",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/lib.rs",
+      "frozenPreInstrumentationSha256": "e1b5e27185bdf554af1435c4342fb585e4eff99f89ad6734a2e01e131be49710",
+      "archivedBlobSha256": "1c2cd175f7dceb2ce711d23a4f385bb734ab2a63e3a4fd304e0f4c701bb1c39e",
+      "normalizedLfSha256": "1c2cd175f7dceb2ce711d23a4f385bb734ab2a63e3a4fd304e0f4c701bb1c39e",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics/kernel-common/src/tree.rs",
+      "frozenPreInstrumentationSha256": "f85a9b2171ec1bdcb34b571232fde9ba31e4fede7d08b931fe11f950ca41e036",
+      "archivedBlobSha256": "ed823f1f6d7cc0d465869b94cec3ec3ea01089726f6d59a68a7d5660b8e25d37",
+      "normalizedLfSha256": "ed823f1f6d7cc0d465869b94cec3ec3ea01089726f6d59a68a7d5660b8e25d37",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    },
+    {
+      "path": "packages/physics2d/README.md",
+      "frozenPreInstrumentationSha256": "ca0830ab153c3df71679f94ced276b118e8d2078243eb15d479898e927e3c1f9",
+      "archivedBlobSha256": "e0902247ad43375fe3012ee7f6f538027e3f7e144e0fc22aa9e377754a962a02",
+      "normalizedLfSha256": "e0902247ad43375fe3012ee7f6f538027e3f7e144e0fc22aa9e377754a962a02",
+      "matchingRepresentation": "CRLF",
+      "equivalent": true
+    }
+  ],
+  "equivalent": true
+}

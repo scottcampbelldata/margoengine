@@ -1,0 +1,3 @@
+START node .lane/p/current-step-profile-v1/validate-bundle-v2.mjs
+Portable source-only archive smoke PASS; exact patch/generator/frozen equivalence on9 files; no builds or timings.
+END code=0 timeout=false elapsed=4412ms

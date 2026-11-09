@@ -175,3 +175,8 @@ The four-lane normal solver also omits finite predicates already implied by its 
 Its [IEEE proof](../../docs/architecture/physics2d-finite-certificates.md) states that contract and the checks
 retained for mutable arithmetic, cap membership and scalar fallback. The compiled finite-predicate count
 falls while all current hashes and physical bars remain unchanged; a browser speed gain is unproven.
+
+Private broad-phase refits reuse the same call-stack input preflight while public bounds and every step
+remain checked. The planner also skips pure eligibility predicates after rejecting a component, retaining
+its entire traversal. The [frame-preparation proof](../../docs/architecture/physics2d-frame-preparation.md)
+records exact work, accuracy and measurement limits; the Box2D browser loss remains open.

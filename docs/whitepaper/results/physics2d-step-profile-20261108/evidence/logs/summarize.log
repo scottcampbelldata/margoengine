@@ -1,0 +1,194 @@
+START node .lane/p/current-step-profile-v1/summarize.mjs
+[
+  {
+    "browser": "edge",
+    "controlMin": 6.639999985694885,
+    "instrumentedMin": 7.209999978542328,
+    "perturbationMedian": 1.0284435618764323,
+    "approximateClockCostMs": 0.005974799985587596,
+    "residualMedianMs": 0.009999990463256836,
+    "phases": [
+      {
+        "name": "preflight",
+        "share": 2.3893538146378868,
+        "meanMs": 0.22260937485843896
+      },
+      {
+        "name": "broad",
+        "share": 6.161470478371046,
+        "meanMs": 0.5740468753501773
+      },
+      {
+        "name": "narrow",
+        "share": 14.277927782393943,
+        "meanMs": 1.3302343748509884
+      },
+      {
+        "name": "islands",
+        "share": 1.6086672197499081,
+        "meanMs": 0.14987500049173832
+      },
+      {
+        "name": "solver-setup",
+        "share": 22.131584685930335,
+        "meanMs": 2.061937500163913
+      },
+      {
+        "name": "support-planner",
+        "share": 10.937830176258352,
+        "meanMs": 1.0190468749031425
+      },
+      {
+        "name": "substep-preparation",
+        "share": 0.6872725746065679,
+        "meanMs": 0.06403125282377005
+      },
+      {
+        "name": "warm-start",
+        "share": 4.664162144528882,
+        "meanMs": 0.4345468690618873
+      },
+      {
+        "name": "biased-solve",
+        "share": 13.977895971862752,
+        "meanMs": 1.302281254902482
+      },
+      {
+        "name": "support-correction",
+        "share": 0.0219699040016388,
+        "meanMs": 0.002046874165534973
+      },
+      {
+        "name": "pose-integration",
+        "share": 1.2965602601055477,
+        "meanMs": 0.12079687286168336
+      },
+      {
+        "name": "relax-solve",
+        "share": 13.622519972637743,
+        "meanMs": 1.269171872548759
+      },
+      {
+        "name": "substep-observer",
+        "share": 0.31244238583992817,
+        "meanMs": 0.029109378345310688
+      },
+      {
+        "name": "solver-finalization",
+        "share": 6.398108233379076,
+        "meanMs": 0.5960937494412064
+      },
+      {
+        "name": "post-solve-validation",
+        "share": 0.6713401621926319,
+        "meanMs": 0.06254687476903201
+      },
+      {
+        "name": "sleep",
+        "share": 0.47327552800930917,
+        "meanMs": 0.04409374985843897
+      },
+      {
+        "name": "post-sleep-validation",
+        "share": 0.27521090382223723,
+        "meanMs": 0.02564062587916851
+      }
+    ]
+  },
+  {
+    "browser": "firefox",
+    "controlMin": 9.37999999999738,
+    "instrumentedMin": 9,
+    "perturbationMedian": 0.966695377547985,
+    "approximateClockCostMs": 0.0029678999999998724,
+    "residualMedianMs": 0.020000000000436557,
+    "phases": [
+      {
+        "name": "preflight",
+        "share": 2.4917928897514177,
+        "meanMs": 0.4226875000001996
+      },
+      {
+        "name": "broad",
+        "share": 7.370003426536123,
+        "meanMs": 1.2501874999997427
+      },
+      {
+        "name": "narrow",
+        "share": 10.421832571267187,
+        "meanMs": 1.7678750000001173
+      },
+      {
+        "name": "islands",
+        "share": 2.1594555858096087,
+        "meanMs": 0.36631250000010596
+      },
+      {
+        "name": "solver-setup",
+        "share": 24.0561362656632,
+        "meanMs": 4.0806874999999305
+      },
+      {
+        "name": "support-planner",
+        "share": 15.318096908378328,
+        "meanMs": 2.598437499999909
+      },
+      {
+        "name": "substep-preparation",
+        "share": 1.3492452406138509,
+        "meanMs": 0.2288750000001528
+      },
+      {
+        "name": "warm-start",
+        "share": 5.896592253077825,
+        "meanMs": 1.0002500000000623
+      },
+      {
+        "name": "biased-solve",
+        "share": 11.15945927025723,
+        "meanMs": 1.8929999999998586
+      },
+      {
+        "name": "support-correction",
+        "share": 0.027633367843602284,
+        "meanMs": 0.0046874999998749445
+      },
+      {
+        "name": "pose-integration",
+        "share": 1.5010445413041116,
+        "meanMs": 0.25462499999993043
+      },
+      {
+        "name": "relax-solve",
+        "share": 9.91006259879031,
+        "meanMs": 1.6810625000001664
+      },
+      {
+        "name": "substep-observer",
+        "share": 0.26196432716476203,
+        "meanMs": 0.04443750000007185
+      },
+      {
+        "name": "solver-finalization",
+        "share": 6.490156994373389,
+        "meanMs": 1.1009374999999182
+      },
+      {
+        "name": "post-solve-validation",
+        "share": 0.8452126111333557,
+        "meanMs": 0.14337500000019646
+      },
+      {
+        "name": "sleep",
+        "share": 0.4038156154303743,
+        "meanMs": 0.06849999999973307
+      },
+      {
+        "name": "post-sleep-validation",
+        "share": 0.23580473893841736,
+        "meanMs": 0.0400000000000091
+      }
+    ]
+  }
+]
+END code=0 timeout=false elapsed=118ms

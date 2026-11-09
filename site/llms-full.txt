@@ -3579,6 +3579,16 @@ LIM-605: Node stand-in tests and real browser PCM beside all three rendering rou
 
 Audio root size growth in this job includes pool input validation before voice stealing, fixing an existing failure that cut valid playback when new arguments were invalid. The new entry remains optional; the root gains only the owning pool bug fix. Current audio/doppler size with rebuilt shared chunks: 1,090 B gzip.
 
+## Own 2D frame-preparation certificates
+
+Private checked-bounds reuse is valid only within the same current-step preflight and with no intervening
+core/pose mutation. Public bounds and creation remain checked; derived overflow is still refused. Lazy
+planner eligibility skips only pure conjuncts after rejection, retaining complete component traversal.
+The [proof](architecture/physics2d-frame-preparation.md) and perf history entry 112 distinguish dynamic
+predicate calls from static compiler counts and loaded-machine timing. The profile's adjacent setup,
+clock, optimizer/layout and post-timer cache effects prevent an exact production-phase deconvolution.
+All original accuracy predicates and three corrected pins remain; no Box2D parity or owned-2D CCD claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -4470,6 +4480,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   (IQR 0.9254 to 1.0686, 12/24 faster) proves no timing gain. Latest separate browser sessions still lose:
   Edge Margo/Box2D/Rapier 4.065/1.500/8.855 ms; Firefox 4.420/1.420/10.460 ms. Profile the complete corrected
   hot path before another redesign; the required block-coupled accuracy remains intact.
+  Entry 112 avoids repeated bounds validation and rejected-component predicates without changing results.
+  Its loaded paired ratio median 0.8705 (IQR 0.7735 to 0.9236, 20/24 faster) favors the combined change;
+  the current browser/rival table in that entry still loses to Box2D. The complete checked-step profile now
+  identifies setup and support-planner preparation as material phases. No physical work or accuracy bar is removed.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

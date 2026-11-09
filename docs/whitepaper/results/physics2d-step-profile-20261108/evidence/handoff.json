@@ -1,0 +1,23 @@
+{
+  "status": "complete",
+  "liveFilesChanged": [],
+  "sourceHeadAtFreeze": "05108aaf0a846cb94c1b1612830545e25207bc6b",
+  "sourceManifest": ".lane/p/current-step-profile-v1/manifest.json",
+  "design": ".lane/p/current-step-profile-v1/design.md",
+  "raw": ".lane/p/current-step-profile-v1/results-v2.json",
+  "rawSha256": "a72e8042ca61ebd28b35fecb0c5984054de1849c16331741f91c53c765a41549",
+  "summary": ".lane/p/current-step-profile-v1/summary.json",
+  "summarySha256": "885f83977075d477d96c0d34db27613b994f4237c37450db740620c66f40cd4f",
+  "readableSummary": ".lane/p/current-step-profile-v1/summary.md",
+  "artifactManifest": ".lane/p/current-step-profile-v1/artifacts.json",
+  "artifactSha256": {
+    "control": "80334704f8039982cddb90bbf8ff9427e2297ad0daf1830cf4825f33b426f6b5",
+    "instrumented": "12ebcc557bd82dc5ee27af8df4f4f1221c53b316fb883f4e3e673f352bb6d689"
+  },
+  "checks": "Both artifacts pass all3 explicit current u64 pins and shipped check0/1/2. Both100-step Node traces and all1280 measured browser module-step visits match control public body/contact/cache state and work fingerprints. Every measured step returns5050awake.",
+  "run": { "roundsPerBrowser": 8, "measuredStepsPerRoundPerModule": 40, "clockImportsPerInstrumentedStep": 39, "elapsedMs": 101587, "hardTimeoutMs": 900000, "exitCode": 0, "timedOut": false, "gpuLeaseReleased": true },
+  "aggregateCpuBusyPercent": 99.29171080834709,
+  "limitation": "Busy diagnostics with post-timer state/cache reads and instrumentation/layout perturbation. Absolute whole-step minima6.64/9.38ms must not replace unchanged-browser benchmark rows. Calibration difference is approximate; no exact subtraction or deconvolution is claimed.",
+  "findings": "Solver setup22.132/24.056 percent and support planner10.938/15.318 percent of aggregate outer Edge/Firefox time. The pyramid produces no eligible support Plan and no correction attempts; planner still called once per frame. Counts14950constraints119600blocksolves8colours5050awake match exactly.",
+  "firstAttempt": { "log": ".lane/p/current-step-profile-v1/run.log", "results": ".lane/p/current-step-profile-v1/results.json", "failure": "Signed Wasm i64 BigInt formatted as signed hex, stopped before timed samples", "directedRegression": ".lane/p/current-step-profile-v1/harness-u64-regression.json", "correction": "BigInt.asUintN(64) representation only; frozen physics modules, hashes, fixtures and all predicates unchanged" }
+}

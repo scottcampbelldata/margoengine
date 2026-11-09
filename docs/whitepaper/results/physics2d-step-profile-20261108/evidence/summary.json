@@ -1,0 +1,1834 @@
+{
+  "source": ".lane/p/current-step-profile-v1/results-v2.json",
+  "sourceSha256": "a72e8042ca61ebd28b35fecb0c5984054de1849c16331741f91c53c765a41549",
+  "sourceManifest": ".lane/p/current-step-profile-v1/manifest.json",
+  "artifacts": [
+    {
+      "name": "control",
+      "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+      "file": ".lane/p/current-step-profile-v1/measured-control.wasm",
+      "sha256": "80334704f8039982cddb90bbf8ff9427e2297ad0daf1830cf4825f33b426f6b5",
+      "bytes": 271846
+    },
+    {
+      "name": "instrumented",
+      "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+      "file": ".lane/p/current-step-profile-v1/measured-instrumented.wasm",
+      "sha256": "12ebcc557bd82dc5ee27af8df4f4f1221c53b316fb883f4e3e673f352bb6d689",
+      "bytes": 273730
+    }
+  ],
+  "scope": "Matched complete-step profile of current finite-trim physics. Busy diagnostic; instrumentation and export reads can alter optimizer/layout/cache behavior. Absolute instrumented phase costs are not an unmodified production-step speed claim.",
+  "method": {
+    "rows": 100,
+    "settleSteps": 60,
+    "measuredSteps": 40,
+    "rounds": 8,
+    "alternatingOrder": true,
+    "fingerprintReadsOutsideTimer": true,
+    "emptyLoopObservedInWat": true,
+    "phaseExtremaAreNonAdditive": true
+  },
+  "aggregateCpuBusyPercent": 99.29171080834709,
+  "accuracy": "Both artifacts pass shipped checks0/1/2 and full3 explicit u64 pins. Node100-step and every measured browser-step full public body/contact/cache state and public work fingerprint match. All measured visits retain5050awake.",
+  "originalFailedAttempt": {
+    "file": ".lane/p/current-step-profile-v1/results.json",
+    "correction": ".lane/p/current-step-profile-v1/harness-u64-regression.json",
+    "cause": "Wasm i64 signed BigInt was formatted without u64 normalization; failure occurred before timed samples. Modules and physical assertions were unchanged."
+  },
+  "clockCaveat": "Clock-loop minus empty-loop cost is approximate. The black_box empty loop includes int-to-f64/checksum work that differs from the imported-clock loop; neither subtraction nor adjacent-phase attribution isolates import cost. Raw phases and raw calibration samples are retained, no exact deconvolution is claimed.",
+  "browsers": [
+    {
+      "browser": "edge",
+      "version": "157.0.4341.42",
+      "crossOriginIsolated": true,
+      "checks": [
+        {
+          "name": "control",
+          "checks": [
+            0,
+            0,
+            0
+          ],
+          "hashes": [
+            "9ffefc83c3a99be4",
+            "95a47530df180011",
+            "92db6847c4e919d4"
+          ]
+        },
+        {
+          "name": "instrumented",
+          "checks": [
+            0,
+            0,
+            0
+          ],
+          "hashes": [
+            "9ffefc83c3a99be4",
+            "95a47530df180011",
+            "92db6847c4e919d4"
+          ]
+        }
+      ],
+      "wholeStep": {
+        "controlAllSamples": {
+          "n": 320,
+          "min": 6.639999985694885,
+          "q1": 8.223749965429306,
+          "median": 8.749999970197678,
+          "q3": 9.646249994635582,
+          "iqr": 1.422500029206276,
+          "max": 17.235000014305115,
+          "range": 10.59500002861023,
+          "mean": 9.179859374091029
+        },
+        "instrumentedAllSamples": {
+          "n": 320,
+          "min": 7.209999978542328,
+          "q1": 8.5,
+          "median": 9.042499989271164,
+          "q3": 9.716249972581863,
+          "iqr": 1.2162499725818634,
+          "max": 17.384999990463257,
+          "range": 10.175000011920929,
+          "mean": 9.31671875026077
+        },
+        "controlRoundMinima": {
+          "n": 8,
+          "min": 6.639999985694885,
+          "q1": 7.118749991059303,
+          "median": 7.5625,
+          "q3": 7.75374998152256,
+          "iqr": 0.6349999904632568,
+          "max": 8.415000021457672,
+          "range": 1.7750000357627869,
+          "mean": 7.513749994337559
+        },
+        "instrumentedRoundMinima": {
+          "n": 8,
+          "min": 7.209999978542328,
+          "q1": 7.526250049471855,
+          "median": 7.762499988079071,
+          "q3": 7.85124996304512,
+          "iqr": 0.3249999135732651,
+          "max": 8.149999976158142,
+          "range": 0.9399999976158142,
+          "mean": 7.708124995231628
+        },
+        "instrumentedOverControlRoundMinima": {
+          "n": 8,
+          "min": 0.9169249897975547,
+          "q1": 0.9504159204558043,
+          "median": 1.0284435618764323,
+          "q3": 1.0838627091215252,
+          "iqr": 0.1334467886657209,
+          "max": 1.169427711208386,
+          "range": 0.2525027214108313,
+          "mean": 1.0313515190842208
+        },
+        "pairedRoundMinima": [
+          {
+            "round": 0,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 8.415000021457672,
+            "instrumentedMin": 8.019999980926514
+          },
+          {
+            "round": 1,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 7.524999976158142,
+            "instrumentedMin": 7.759999990463257
+          },
+          {
+            "round": 2,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 8.064999997615814,
+            "instrumentedMin": 7.3950000405311584
+          },
+          {
+            "round": 3,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 7.600000023841858,
+            "instrumentedMin": 7.794999957084656
+          },
+          {
+            "round": 4,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 7.649999976158142,
+            "instrumentedMin": 7.209999978542328
+          },
+          {
+            "round": 5,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 7.084999978542328,
+            "instrumentedMin": 8.149999976158142
+          },
+          {
+            "round": 6,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 7.129999995231628,
+            "instrumentedMin": 7.570000052452087
+          },
+          {
+            "round": 7,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 6.639999985694885,
+            "instrumentedMin": 7.764999985694885
+          }
+        ]
+      },
+      "calibration": {
+        "importedLoopMs": {
+          "n": 12,
+          "min": 13.0450000166893,
+          "q1": 14.98999997973442,
+          "median": 15.377499967813492,
+          "q3": 15.712500020861626,
+          "iqr": 0.7225000411272049,
+          "max": 16.6700000166893,
+          "range": 3.625,
+          "mean": 15.214166661103567
+        },
+        "emptyLoopMs": {
+          "n": 12,
+          "min": 0.050000011920928955,
+          "q1": 0.050000011920928955,
+          "median": 0.05500000715255737,
+          "q3": 0.05625000596046448,
+          "iqr": 0.0062499940395355225,
+          "max": 0.09999996423721313,
+          "range": 0.04999995231628418,
+          "mean": 0.05791666607062022
+        },
+        "rawDifferencePerCallMs": {
+          "n": 12,
+          "min": 0.00012985000014305114,
+          "q1": 0.00014934999987483024,
+          "median": 0.0001531999996304512,
+          "q3": 0.00015625000044703483,
+          "iqr": 0.000006900000572204588,
+          "max": 0.00016615000009536743,
+          "range": 0.00003629999995231629,
+          "mean": 0.00015156249995032945
+        },
+        "clampedApproximateDifferencePerCallMs": {
+          "n": 12,
+          "min": 0.00012985000014305114,
+          "q1": 0.00014934999987483024,
+          "median": 0.0001531999996304512,
+          "q3": 0.00015625000044703483,
+          "iqr": 0.000006900000572204588,
+          "max": 0.00016615000009536743,
+          "range": 0.00003629999995231629,
+          "mean": 0.00015156249995032945
+        },
+        "directImportedLoopPerCallMs": {
+          "n": 12,
+          "min": 0.000130450000166893,
+          "q1": 0.0001498999997973442,
+          "median": 0.00015377499967813492,
+          "q3": 0.00015712500020861626,
+          "iqr": 0.000007225000411272063,
+          "max": 0.00016670000016689302,
+          "range": 0.000036250000000000014,
+          "mean": 0.00015214166661103566
+        }
+      },
+      "clockCallsSeen": [
+        39
+      ],
+      "estimatedAllClockImportsMs": {
+        "n": 320,
+        "min": 0.005974799985587596,
+        "q1": 0.005974799985587596,
+        "median": 0.005974799985587596,
+        "q3": 0.005974799985587596,
+        "iqr": 0,
+        "max": 0.005974799985587596,
+        "range": 0,
+        "mean": 0.00597479998558764
+      },
+      "estimatedClosedIntervalClockCostMs": {
+        "n": 320,
+        "min": 0.005821599985957145,
+        "q1": 0.005821599985957145,
+        "median": 0.005821599985957145,
+        "q3": 0.005821599985957145,
+        "iqr": 0,
+        "max": 0.005821599985957145,
+        "range": 0,
+        "mean": 0.0058215999859571686
+      },
+      "residualMs": {
+        "n": 320,
+        "min": 0,
+        "q1": 0.004999995231628418,
+        "median": 0.009999990463256836,
+        "q3": 0.009999990463256836,
+        "iqr": 0.004999995231628418,
+        "max": 0.02500009536743164,
+        "range": 0.02500009536743164,
+        "mean": 0.008609374985098839
+      },
+      "phaseSumMs": {
+        "n": 320,
+        "min": 7.199999988079071,
+        "q1": 8.495000004768372,
+        "median": 9.034999966621399,
+        "q3": 9.7049999833107,
+        "iqr": 1.2099999785423279,
+        "max": 17.360000014305115,
+        "range": 10.160000026226044,
+        "mean": 9.308109375275672
+      },
+      "outerElapsedSumMs": 2981.3500000834465,
+      "rawPhaseSumOfAllSamplesMs": 2978.595000088215,
+      "phases": [
+        {
+          "name": "preflight",
+          "rawMs": {
+            "n": 320,
+            "min": 0.1499999761581421,
+            "q1": 0.1899999976158142,
+            "median": 0.19999998807907104,
+            "q3": 0.21500003337860107,
+            "iqr": 0.025000035762786865,
+            "max": 5.4549999833106995,
+            "range": 5.305000007152557,
+            "mean": 0.22260937485843896
+          },
+          "elapsedSum": 71.23499995470047,
+          "shareOfOuterTotalPercent": 2.3893538146378868,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.17500001192092896
+        },
+        {
+          "name": "broad",
+          "rawMs": {
+            "n": 320,
+            "min": 0.2749999761581421,
+            "q1": 0.32374998927116394,
+            "median": 0.49000000953674316,
+            "q3": 0.7599999904632568,
+            "iqr": 0.4362500011920929,
+            "max": 1.7350000143051147,
+            "range": 1.4600000381469727,
+            "mean": 0.5740468753501773
+          },
+          "elapsedSum": 183.69500011205673,
+          "shareOfOuterTotalPercent": 6.161470478371046,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.2749999761581421
+        },
+        {
+          "name": "narrow",
+          "rawMs": {
+            "n": 320,
+            "min": 1.074999988079071,
+            "q1": 1.2600000500679016,
+            "median": 1.3100000023841858,
+            "q3": 1.3700000047683716,
+            "iqr": 0.10999995470046997,
+            "max": 2.314999997615814,
+            "range": 1.2400000095367432,
+            "mean": 1.3302343748509884
+          },
+          "elapsedSum": 425.6749999523163,
+          "shareOfOuterTotalPercent": 14.277927782393943,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 1.175000011920929
+        },
+        {
+          "name": "islands",
+          "rawMs": {
+            "n": 320,
+            "min": 0.11000001430511475,
+            "q1": 0.1300000548362732,
+            "median": 0.13999998569488525,
+            "q3": 0.15000003576278687,
+            "iqr": 0.019999980926513672,
+            "max": 0.6299999952316284,
+            "range": 0.5199999809265137,
+            "mean": 0.14987500049173832
+          },
+          "elapsedSum": 47.96000015735626,
+          "shareOfOuterTotalPercent": 1.6086672197499081,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.11000001430511475
+        },
+        {
+          "name": "solver-setup",
+          "rawMs": {
+            "n": 320,
+            "min": 1.2950000166893005,
+            "q1": 1.8399999737739563,
+            "median": 1.9824999868869781,
+            "q3": 2.1800000071525574,
+            "iqr": 0.3400000333786011,
+            "max": 5.939999997615814,
+            "range": 4.644999980926514,
+            "mean": 2.061937500163913
+          },
+          "elapsedSum": 659.8200000524521,
+          "shareOfOuterTotalPercent": 22.131584685930335,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 1.5
+        },
+        {
+          "name": "support-planner",
+          "rawMs": {
+            "n": 320,
+            "min": 0.42000001668930054,
+            "q1": 0.783749982714653,
+            "median": 0.949999988079071,
+            "q3": 1.126249998807907,
+            "iqr": 0.3425000160932541,
+            "max": 5.949999988079071,
+            "range": 5.5299999713897705,
+            "mean": 1.0190468749031425
+          },
+          "elapsedSum": 326.0949999690056,
+          "shareOfOuterTotalPercent": 10.937830176258352,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.6200000047683716
+        },
+        {
+          "name": "substep-preparation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.034999966621398926,
+            "q1": 0.050000011920928955,
+            "median": 0.059999942779541016,
+            "q3": 0.06625007092952728,
+            "iqr": 0.016250059008598328,
+            "max": 0.42000001668930054,
+            "range": 0.3850000500679016,
+            "mean": 0.06403125282377005
+          },
+          "elapsedSum": 20.490000903606415,
+          "shareOfOuterTotalPercent": 0.6872725746065679,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.04000002145767212
+        },
+        {
+          "name": "warm-start",
+          "rawMs": {
+            "n": 320,
+            "min": 0.2549999952316284,
+            "q1": 0.3649999499320984,
+            "median": 0.4099999666213989,
+            "q3": 0.4649999886751175,
+            "iqr": 0.1000000387430191,
+            "max": 1.1800000071525574,
+            "range": 0.925000011920929,
+            "mean": 0.4345468690618873
+          },
+          "elapsedSum": 139.05499809980392,
+          "shareOfOuterTotalPercent": 4.664162144528882,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.2999999523162842
+        },
+        {
+          "name": "biased-solve",
+          "rawMs": {
+            "n": 320,
+            "min": 1.0849999785423279,
+            "q1": 1.205000028014183,
+            "median": 1.2600000500679016,
+            "q3": 1.3349999338388443,
+            "iqr": 0.12999990582466125,
+            "max": 2.350000023841858,
+            "range": 1.26500004529953,
+            "mean": 1.302281254902482
+          },
+          "elapsedSum": 416.73000156879425,
+          "shareOfOuterTotalPercent": 13.977895971862752,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 1.1650000214576721
+        },
+        {
+          "name": "support-correction",
+          "rawMs": {
+            "n": 320,
+            "min": 0,
+            "q1": 0,
+            "median": 0,
+            "q3": 0.004999995231628418,
+            "iqr": 0.004999995231628418,
+            "max": 0.014999985694885254,
+            "range": 0.014999985694885254,
+            "mean": 0.002046874165534973
+          },
+          "elapsedSum": 0.6549997329711914,
+          "shareOfOuterTotalPercent": 0.0219699040016388,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0
+        },
+        {
+          "name": "pose-integration",
+          "rawMs": {
+            "n": 320,
+            "min": 0.09500002861022949,
+            "q1": 0.11000001430511475,
+            "median": 0.11500000953674316,
+            "q3": 0.125,
+            "iqr": 0.014999985694885254,
+            "max": 0.25499993562698364,
+            "range": 0.15999990701675415,
+            "mean": 0.12079687286168336
+          },
+          "elapsedSum": 38.65499931573868,
+          "shareOfOuterTotalPercent": 1.2965602601055477,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.12000000476837158
+        },
+        {
+          "name": "relax-solve",
+          "rawMs": {
+            "n": 320,
+            "min": 1.0950000286102295,
+            "q1": 1.199999988079071,
+            "median": 1.2299999594688416,
+            "q3": 1.2800000309944153,
+            "iqr": 0.08000004291534424,
+            "max": 5.580000042915344,
+            "range": 4.485000014305115,
+            "mean": 1.269171872548759
+          },
+          "elapsedSum": 406.1349992156029,
+          "shareOfOuterTotalPercent": 13.622519972637743,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 1.1800000071525574
+        },
+        {
+          "name": "substep-observer",
+          "rawMs": {
+            "n": 320,
+            "min": 0.009999990463256836,
+            "q1": 0.02499997615814209,
+            "median": 0.029999971389770508,
+            "q3": 0.034999966621398926,
+            "iqr": 0.009999990463256836,
+            "max": 0.1400001049041748,
+            "range": 0.13000011444091797,
+            "mean": 0.029109378345310688
+          },
+          "elapsedSum": 9.31500107049942,
+          "shareOfOuterTotalPercent": 0.31244238583992817,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.02499997615814209
+        },
+        {
+          "name": "solver-finalization",
+          "rawMs": {
+            "n": 320,
+            "min": 0.38499999046325684,
+            "q1": 0.5099999904632568,
+            "median": 0.574999988079071,
+            "q3": 0.6449999809265137,
+            "iqr": 0.13499999046325684,
+            "max": 1.4600000381469727,
+            "range": 1.0750000476837158,
+            "mean": 0.5960937494412064
+          },
+          "elapsedSum": 190.74999982118607,
+          "shareOfOuterTotalPercent": 6.398108233379076,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.38999998569488525
+        },
+        {
+          "name": "post-solve-validation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.04000002145767212,
+            "q1": 0.0549999475479126,
+            "median": 0.0599999725818634,
+            "q3": 0.06499999761581421,
+            "iqr": 0.010000050067901611,
+            "max": 0.34999996423721313,
+            "range": 0.309999942779541,
+            "mean": 0.06254687476903201
+          },
+          "elapsedSum": 20.01499992609024,
+          "shareOfOuterTotalPercent": 0.6713401621926319,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.05500000715255737
+        },
+        {
+          "name": "sleep",
+          "rawMs": {
+            "n": 320,
+            "min": 0.029999971389770508,
+            "q1": 0.04000002145767212,
+            "median": 0.04499995708465576,
+            "q3": 0.04500001668930054,
+            "iqr": 0.004999995231628418,
+            "max": 0.11500000953674316,
+            "range": 0.08500003814697266,
+            "mean": 0.04409374985843897
+          },
+          "elapsedSum": 14.10999995470047,
+          "shareOfOuterTotalPercent": 0.47327552800930917,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.04500001668930054
+        },
+        {
+          "name": "post-sleep-validation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.014999985694885254,
+            "q1": 0.02499997615814209,
+            "median": 0.02499997615814209,
+            "q3": 0.026250019669532776,
+            "iqr": 0.001250043511390686,
+            "max": 0.05500000715255737,
+            "range": 0.04000002145767212,
+            "mean": 0.02564062587916851
+          },
+          "elapsedSum": 8.205000281333923,
+          "shareOfOuterTotalPercent": 0.27521090382223723,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.02499997615814209
+        }
+      ],
+      "selectedMinimumWholeStep": {
+        "round": 4,
+        "sample": 23,
+        "worldStep": 84,
+        "elapsed": 7.209999978542328,
+        "phases": [
+          0.17500001192092896,
+          0.2749999761581421,
+          1.175000011920929,
+          0.11000001430511475,
+          1.5,
+          0.6200000047683716,
+          0.04000002145767212,
+          0.2999999523162842,
+          1.1650000214576721,
+          0,
+          0.12000000476837158,
+          1.1800000071525574,
+          0.02499997615814209,
+          0.38999998569488525,
+          0.05500000715255737,
+          0.04500001668930054,
+          0.02499997615814209
+        ],
+        "phaseSum": 7.199999988079071,
+        "outerMinusPhaseSum": 0.009999990463256836,
+        "entries": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          1,
+          1,
+          1,
+          1
+        ],
+        "counts": [
+          4,
+          1,
+          5050,
+          14950,
+          3740,
+          8,
+          1,
+          0,
+          0,
+          0,
+          4,
+          0,
+          4,
+          0,
+          4
+        ],
+        "publicCounts": [
+          "0",
+          "14950",
+          "14950",
+          "0",
+          "14950",
+          "119600",
+          "0",
+          "8",
+          "0",
+          "2",
+          "5050"
+        ],
+        "awake": 5050,
+        "state": "1685abbe48a04aa5",
+        "clockCalls": 39,
+        "hostClockCalls": 39
+      },
+      "runtimeCounts": [
+        {
+          "name": "substeps",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "passes-per-substep",
+          "valuesSeen": [
+            1
+          ]
+        },
+        {
+          "name": "moving-bodies",
+          "valuesSeen": [
+            5050
+          ]
+        },
+        {
+          "name": "constraints",
+          "valuesSeen": [
+            14950
+          ]
+        },
+        {
+          "name": "simd-blocks",
+          "valuesSeen": [
+            3740,
+            3742,
+            3739,
+            3741
+          ]
+        },
+        {
+          "name": "colours",
+          "valuesSeen": [
+            8
+          ]
+        },
+        {
+          "name": "planner-calls",
+          "valuesSeen": [
+            1
+          ]
+        },
+        {
+          "name": "eligible-plan",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "snapshot-calls",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "correction-calls",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "wide-biased-calls",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "scalar-biased-contact-visits",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "wide-relax-calls",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "scalar-relax-contact-visits",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "warm-start-calls",
+          "valuesSeen": [
+            4
+          ]
+        }
+      ],
+      "publicCounts": [
+        {
+          "name": "compared",
+          "valuesSeen": [
+            "12562",
+            "29458",
+            "22791",
+            "11193",
+            "10170",
+            "8911",
+            "8039",
+            "15875",
+            "9106",
+            "12488",
+            "4878",
+            "13066",
+            "7776",
+            "7409",
+            "5188",
+            "4453",
+            "3356",
+            "2151",
+            "1137",
+            "697",
+            "249",
+            "88",
+            "47",
+            "0"
+          ]
+        },
+        {
+          "name": "pairs",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "manifolds",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "cold-points",
+          "valuesSeen": [
+            "0",
+            "2"
+          ]
+        },
+        {
+          "name": "constraints",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "block",
+          "valuesSeen": [
+            "119600"
+          ]
+        },
+        {
+          "name": "sequential",
+          "valuesSeen": [
+            "0"
+          ]
+        },
+        {
+          "name": "colours",
+          "valuesSeen": [
+            "8"
+          ]
+        },
+        {
+          "name": "overflow",
+          "valuesSeen": [
+            "0"
+          ]
+        },
+        {
+          "name": "islands",
+          "valuesSeen": [
+            "2"
+          ]
+        },
+        {
+          "name": "awake-bodies",
+          "valuesSeen": [
+            "5050"
+          ]
+        }
+      ]
+    },
+    {
+      "browser": "firefox",
+      "version": "157.0",
+      "crossOriginIsolated": true,
+      "checks": [
+        {
+          "name": "control",
+          "checks": [
+            0,
+            0,
+            0
+          ],
+          "hashes": [
+            "9ffefc83c3a99be4",
+            "95a47530df180011",
+            "92db6847c4e919d4"
+          ]
+        },
+        {
+          "name": "instrumented",
+          "checks": [
+            0,
+            0,
+            0
+          ],
+          "hashes": [
+            "9ffefc83c3a99be4",
+            "95a47530df180011",
+            "92db6847c4e919d4"
+          ]
+        }
+      ],
+      "wholeStep": {
+        "controlAllSamples": {
+          "n": 320,
+          "min": 9.37999999999738,
+          "q1": 13.535000000000764,
+          "median": 16.200000000002547,
+          "q3": 19.709999999998217,
+          "iqr": 6.174999999997453,
+          "max": 40.54000000000087,
+          "range": 31.160000000003492,
+          "mean": 17.35156249999997
+        },
+        "instrumentedAllSamples": {
+          "n": 320,
+          "min": 9,
+          "q1": 13.240000000000691,
+          "median": 15.600000000000364,
+          "q3": 19.524999999999636,
+          "iqr": 6.284999999998945,
+          "max": 42.81999999999971,
+          "range": 33.81999999999971,
+          "mean": 16.963187499999936
+        },
+        "controlRoundMinima": {
+          "n": 8,
+          "min": 9.37999999999738,
+          "q1": 9.579999999999927,
+          "median": 10.019999999999527,
+          "q3": 10.854999999997744,
+          "iqr": 1.2749999999978172,
+          "max": 12.80000000000291,
+          "range": 3.4200000000055297,
+          "mean": 10.434999999999263
+        },
+        "instrumentedRoundMinima": {
+          "n": 8,
+          "min": 9,
+          "q1": 9.554999999998472,
+          "median": 9.679999999998472,
+          "q3": 10.234999999996944,
+          "iqr": 0.679999999998472,
+          "max": 11.479999999999563,
+          "range": 2.4799999999995634,
+          "mean": 9.934999999998581
+        },
+        "instrumentedOverControlRoundMinima": {
+          "n": 8,
+          "min": 0.7031249999998401,
+          "q1": 0.8988763680056577,
+          "median": 0.966695377547985,
+          "q3": 1.0273159985492681,
+          "iqr": 0.1284396305436104,
+          "max": 1.2212765957444454,
+          "range": 0.5181515957446052,
+          "mean": 0.9655841366951231
+        },
+        "pairedRoundMinima": [
+          {
+            "round": 0,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 9.719999999999345,
+            "instrumentedMin": 9.599999999998545
+          },
+          {
+            "round": 1,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 10.599999999998545,
+            "instrumentedMin": 9.559999999997672
+          },
+          {
+            "round": 2,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 10.319999999999709,
+            "instrumentedMin": 9.7599999999984
+          },
+          {
+            "round": 3,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 9.37999999999738,
+            "instrumentedMin": 9.540000000000873
+          },
+          {
+            "round": 4,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 9.400000000001455,
+            "instrumentedMin": 11.479999999999563
+          },
+          {
+            "round": 5,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 9.639999999999418,
+            "instrumentedMin": 10.19999999999709
+          },
+          {
+            "round": 6,
+            "order": [
+              "control",
+              "instrumented"
+            ],
+            "controlMin": 11.619999999995343,
+            "instrumentedMin": 10.339999999996508
+          },
+          {
+            "round": 7,
+            "order": [
+              "instrumented",
+              "control"
+            ],
+            "controlMin": 12.80000000000291,
+            "instrumentedMin": 9
+          }
+        ]
+      },
+      "calibration": {
+        "importedLoopMs": {
+          "n": 12,
+          "min": 6.619999999998981,
+          "q1": 7.230000000000018,
+          "median": 7.670000000000073,
+          "q3": 10.484999999999218,
+          "iqr": 3.2549999999991996,
+          "max": 10.8799999999992,
+          "range": 4.260000000000218,
+          "mean": 8.513333333333472
+        },
+        "emptyLoopMs": {
+          "n": 12,
+          "min": 0.039999999999054126,
+          "q1": 0.05499999999983629,
+          "median": 0.06000000000040018,
+          "q3": 0.10500000000001819,
+          "iqr": 0.0500000000001819,
+          "max": 2.139999999999418,
+          "range": 2.100000000000364,
+          "mean": 0.2633333333334728
+        },
+        "rawDifferencePerCallMs": {
+          "n": 12,
+          "min": 0.000052600000000020374,
+          "q1": 0.00007014999999998963,
+          "median": 0.00007609999999999673,
+          "q3": 0.0001043999999999869,
+          "iqr": 0.00003424999999999727,
+          "max": 0.00010700000000000728,
+          "range": 0.0000543999999999869,
+          "mean": 0.0000825
+        },
+        "clampedApproximateDifferencePerCallMs": {
+          "n": 12,
+          "min": 0.000052600000000020374,
+          "q1": 0.00007014999999998963,
+          "median": 0.00007609999999999673,
+          "q3": 0.0001043999999999869,
+          "iqr": 0.00003424999999999727,
+          "max": 0.00010700000000000728,
+          "range": 0.0000543999999999869,
+          "mean": 0.0000825
+        },
+        "directImportedLoopPerCallMs": {
+          "n": 12,
+          "min": 0.00006619999999998982,
+          "q1": 0.00007230000000000019,
+          "median": 0.00007670000000000073,
+          "q3": 0.00010484999999999217,
+          "iqr": 0.00003254999999999198,
+          "max": 0.00010879999999999199,
+          "range": 0.000042600000000002174,
+          "mean": 0.00008513333333333472
+        }
+      },
+      "clockCallsSeen": [
+        39
+      ],
+      "estimatedAllClockImportsMs": {
+        "n": 320,
+        "min": 0.0029678999999998724,
+        "q1": 0.0029678999999998724,
+        "median": 0.0029678999999998724,
+        "q3": 0.0029678999999998724,
+        "iqr": 0,
+        "max": 0.0029678999999998724,
+        "range": 0,
+        "mean": 0.002967899999999889
+      },
+      "estimatedClosedIntervalClockCostMs": {
+        "n": 320,
+        "min": 0.0028917999999998755,
+        "q1": 0.0028917999999998755,
+        "median": 0.0028917999999998755,
+        "q3": 0.0028917999999998755,
+        "iqr": 0,
+        "max": 0.0028917999999998755,
+        "range": 0,
+        "mean": 0.0028917999999998867
+      },
+      "residualMs": {
+        "n": 320,
+        "min": 0,
+        "q1": 0,
+        "median": 0.020000000000436557,
+        "q3": 0.020000000000436557,
+        "iqr": 0.020000000000436557,
+        "max": 0.5400000000008731,
+        "range": 0.5400000000008731,
+        "mean": 0.01724999999995589
+      },
+      "phaseSumMs": {
+        "n": 320,
+        "min": 8.959999999999127,
+        "q1": 13.220000000001164,
+        "median": 15.589999999998327,
+        "q3": 19.50999999999931,
+        "iqr": 6.289999999998145,
+        "max": 42.81999999999971,
+        "range": 33.86000000000058,
+        "mean": 16.945937499999978
+      },
+      "outerElapsedSumMs": 5428.219999999979,
+      "rawPhaseSumOfAllSamplesMs": 5422.699999999993,
+      "phases": [
+        {
+          "name": "preflight",
+          "rawMs": {
+            "n": 320,
+            "min": 0.22000000000116415,
+            "q1": 0.31999999999970896,
+            "median": 0.37999999999738066,
+            "q3": 0.465000000001055,
+            "iqr": 0.14500000000134605,
+            "max": 2,
+            "range": 1.7799999999988358,
+            "mean": 0.4226875000001996
+          },
+          "elapsedSum": 135.26000000006388,
+          "shareOfOuterTotalPercent": 2.4917928897514177,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.27999999999883585
+        },
+        {
+          "name": "broad",
+          "rawMs": {
+            "n": 320,
+            "min": 0.4599999999991269,
+            "q1": 0.7600000000011278,
+            "median": 1.0799999999999272,
+            "q3": 1.4449999999987995,
+            "iqr": 0.6849999999976717,
+            "max": 6.319999999999709,
+            "range": 5.860000000000582,
+            "mean": 1.2501874999997427
+          },
+          "elapsedSum": 400.05999999991764,
+          "shareOfOuterTotalPercent": 7.370003426536123,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.5400000000008731
+        },
+        {
+          "name": "narrow",
+          "rawMs": {
+            "n": 320,
+            "min": 1.180000000000291,
+            "q1": 1.360000000000582,
+            "median": 1.5,
+            "q3": 1.8400000000001455,
+            "iqr": 0.47999999999956344,
+            "max": 8.020000000004075,
+            "range": 6.8400000000037835,
+            "mean": 1.7678750000001173
+          },
+          "elapsedSum": 565.7200000000375,
+          "shareOfOuterTotalPercent": 10.421832571267187,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 1.2799999999988358
+        },
+        {
+          "name": "islands",
+          "rawMs": {
+            "n": 320,
+            "min": 0.13999999999941792,
+            "q1": 0.18000000000029104,
+            "median": 0.250000000001819,
+            "q3": 0.43999999999687134,
+            "iqr": 0.2599999999965803,
+            "max": 2.4799999999995634,
+            "range": 2.3400000000001455,
+            "mean": 0.36631250000010596
+          },
+          "elapsedSum": 117.2200000000339,
+          "shareOfOuterTotalPercent": 2.1594555858096087,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.13999999999941792
+        },
+        {
+          "name": "solver-setup",
+          "rawMs": {
+            "n": 320,
+            "min": 1.8399999999965075,
+            "q1": 3.1000000000012733,
+            "median": 3.680000000000291,
+            "q3": 4.559999999999491,
+            "iqr": 1.4599999999982174,
+            "max": 14.060000000004948,
+            "range": 12.22000000000844,
+            "mean": 4.0806874999999305
+          },
+          "elapsedSum": 1305.8199999999779,
+          "shareOfOuterTotalPercent": 24.0561362656632,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 1.9000000000014552
+        },
+        {
+          "name": "support-planner",
+          "rawMs": {
+            "n": 320,
+            "min": 0.6999999999970896,
+            "q1": 1.6799999999993815,
+            "median": 2.210000000000946,
+            "q3": 2.839999999997417,
+            "iqr": 1.1599999999980355,
+            "max": 15.80000000000291,
+            "range": 15.10000000000582,
+            "mean": 2.598437499999909
+          },
+          "elapsedSum": 831.4999999999709,
+          "shareOfOuterTotalPercent": 15.318096908378328,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.9800000000032014
+        },
+        {
+          "name": "substep-preparation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.020000000004074536,
+            "q1": 0.12000000000261934,
+            "median": 0.19999999999708962,
+            "q3": 0.2800000000024738,
+            "iqr": 0.15999999999985448,
+            "max": 1.0400000000008731,
+            "range": 1.0199999999967986,
+            "mean": 0.2288750000001528
+          },
+          "elapsedSum": 73.2400000000489,
+          "shareOfOuterTotalPercent": 1.3492452406138509,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.040000000000873115
+        },
+        {
+          "name": "warm-start",
+          "rawMs": {
+            "n": 320,
+            "min": 0.3600000000005821,
+            "q1": 0.6600000000034925,
+            "median": 0.8400000000019645,
+            "q3": 1.139999999999418,
+            "iqr": 0.47999999999592546,
+            "max": 6.240000000001601,
+            "range": 5.880000000001019,
+            "mean": 1.0002500000000623
+          },
+          "elapsedSum": 320.08000000001994,
+          "shareOfOuterTotalPercent": 5.896592253077825,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.39999999999417923
+        },
+        {
+          "name": "biased-solve",
+          "rawMs": {
+            "n": 320,
+            "min": 1.1000000000021828,
+            "q1": 1.3800000000010186,
+            "median": 1.6300000000010186,
+            "q3": 1.9849999999996726,
+            "iqr": 0.604999999998654,
+            "max": 10.419999999998254,
+            "range": 9.319999999996071,
+            "mean": 1.8929999999998586
+          },
+          "elapsedSum": 605.7599999999547,
+          "shareOfOuterTotalPercent": 11.15945927025723,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 1.2200000000011642
+        },
+        {
+          "name": "support-correction",
+          "rawMs": {
+            "n": 320,
+            "min": 0,
+            "q1": 0,
+            "median": 0,
+            "q3": 0,
+            "iqr": 0,
+            "max": 0.09999999999854481,
+            "range": 0.09999999999854481,
+            "mean": 0.0046874999998749445
+          },
+          "elapsedSum": 1.4999999999599822,
+          "shareOfOuterTotalPercent": 0.027633367843602284,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0
+        },
+        {
+          "name": "pose-integration",
+          "rawMs": {
+            "n": 320,
+            "min": 0.09999999999126885,
+            "q1": 0.159999999998945,
+            "median": 0.2000000000007276,
+            "q3": 0.27999999999883585,
+            "iqr": 0.11999999999989086,
+            "max": 2.1999999999970896,
+            "range": 2.1000000000058208,
+            "mean": 0.25462499999993043
+          },
+          "elapsedSum": 81.47999999997774,
+          "shareOfOuterTotalPercent": 1.5010445413041116,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.11999999999534339
+        },
+        {
+          "name": "relax-solve",
+          "rawMs": {
+            "n": 320,
+            "min": 1.0600000000013097,
+            "q1": 1.2600000000020373,
+            "median": 1.4200000000000728,
+            "q3": 1.7800000000006548,
+            "iqr": 0.5199999999986176,
+            "max": 6.820000000006985,
+            "range": 5.760000000005675,
+            "mean": 1.6810625000001664
+          },
+          "elapsedSum": 537.9400000000533,
+          "shareOfOuterTotalPercent": 9.91006259879031,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 1.2199999999938882
+        },
+        {
+          "name": "substep-observer",
+          "rawMs": {
+            "n": 320,
+            "min": 0,
+            "q1": 0.020000000000436557,
+            "median": 0.040000000000873115,
+            "q3": 0.059999999997671694,
+            "iqr": 0.039999999997235136,
+            "max": 0.46000000000276486,
+            "range": 0.46000000000276486,
+            "mean": 0.04443750000007185
+          },
+          "elapsedSum": 14.220000000022992,
+          "shareOfOuterTotalPercent": 0.26196432716476203,
+          "meanEntries": 4,
+          "entriesSeen": [
+            4
+          ],
+          "selectedMinimumWholeStepMs": 0.06000000001222361
+        },
+        {
+          "name": "solver-finalization",
+          "rawMs": {
+            "n": 320,
+            "min": 0.5,
+            "q1": 0.7949999999964348,
+            "median": 0.9599999999991269,
+            "q3": 1.2000000000007276,
+            "iqr": 0.4050000000042928,
+            "max": 5.3399999999965075,
+            "range": 4.8399999999965075,
+            "mean": 1.1009374999999182
+          },
+          "elapsedSum": 352.2999999999738,
+          "shareOfOuterTotalPercent": 6.490156994373389,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.6599999999962165
+        },
+        {
+          "name": "post-solve-validation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.039999999997235136,
+            "q1": 0.07999999999810825,
+            "median": 0.10000000000218279,
+            "q3": 0.16000000000349246,
+            "iqr": 0.08000000000538421,
+            "max": 0.9799999999995634,
+            "range": 0.9400000000023283,
+            "mean": 0.14337500000019646
+          },
+          "elapsedSum": 45.880000000062864,
+          "shareOfOuterTotalPercent": 0.8452126111333557,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.06000000000494765
+        },
+        {
+          "name": "sleep",
+          "rawMs": {
+            "n": 320,
+            "min": 0.03999999999359716,
+            "q1": 0.040000000000873115,
+            "median": 0.059999999997671694,
+            "q3": 0.06000000000130967,
+            "iqr": 0.020000000000436557,
+            "max": 1.360000000000582,
+            "range": 1.320000000006985,
+            "mean": 0.06849999999973307
+          },
+          "elapsedSum": 21.91999999991458,
+          "shareOfOuterTotalPercent": 0.4038156154303743,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.040000000000873115
+        },
+        {
+          "name": "post-sleep-validation",
+          "rawMs": {
+            "n": 320,
+            "min": 0.01999999999679858,
+            "q1": 0.020000000000436557,
+            "median": 0.020000000000436557,
+            "q3": 0.040000000000873115,
+            "iqr": 0.020000000000436557,
+            "max": 2.7999999999956344,
+            "range": 2.779999999998836,
+            "mean": 0.0400000000000091
+          },
+          "elapsedSum": 12.80000000000291,
+          "shareOfOuterTotalPercent": 0.23580473893841736,
+          "meanEntries": 1,
+          "entriesSeen": [
+            1
+          ],
+          "selectedMinimumWholeStepMs": 0.01999999999679858
+        }
+      ],
+      "selectedMinimumWholeStep": {
+        "round": 7,
+        "sample": 38,
+        "worldStep": 99,
+        "elapsed": 9,
+        "phases": [
+          0.27999999999883585,
+          0.5400000000008731,
+          1.2799999999988358,
+          0.13999999999941792,
+          1.9000000000014552,
+          0.9800000000032014,
+          0.040000000000873115,
+          0.39999999999417923,
+          1.2200000000011642,
+          0,
+          0.11999999999534339,
+          1.2199999999938882,
+          0.06000000001222361,
+          0.6599999999962165,
+          0.06000000000494765,
+          0.040000000000873115,
+          0.01999999999679858
+        ],
+        "phaseSum": 8.959999999999127,
+        "outerMinusPhaseSum": 0.040000000000873115,
+        "entries": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          1,
+          1,
+          1,
+          1
+        ],
+        "counts": [
+          4,
+          1,
+          5050,
+          14950,
+          3741,
+          8,
+          1,
+          0,
+          0,
+          0,
+          4,
+          0,
+          4,
+          0,
+          4
+        ],
+        "publicCounts": [
+          "0",
+          "14950",
+          "14950",
+          "2",
+          "14950",
+          "119600",
+          "0",
+          "8",
+          "0",
+          "2",
+          "5050"
+        ],
+        "awake": 5050,
+        "state": "74f47c04aa0c23f0",
+        "clockCalls": 39,
+        "hostClockCalls": 39
+      },
+      "runtimeCounts": [
+        {
+          "name": "substeps",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "passes-per-substep",
+          "valuesSeen": [
+            1
+          ]
+        },
+        {
+          "name": "moving-bodies",
+          "valuesSeen": [
+            5050
+          ]
+        },
+        {
+          "name": "constraints",
+          "valuesSeen": [
+            14950
+          ]
+        },
+        {
+          "name": "simd-blocks",
+          "valuesSeen": [
+            3740,
+            3742,
+            3739,
+            3741
+          ]
+        },
+        {
+          "name": "colours",
+          "valuesSeen": [
+            8
+          ]
+        },
+        {
+          "name": "planner-calls",
+          "valuesSeen": [
+            1
+          ]
+        },
+        {
+          "name": "eligible-plan",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "snapshot-calls",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "correction-calls",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "wide-biased-calls",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "scalar-biased-contact-visits",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "wide-relax-calls",
+          "valuesSeen": [
+            4
+          ]
+        },
+        {
+          "name": "scalar-relax-contact-visits",
+          "valuesSeen": [
+            0
+          ]
+        },
+        {
+          "name": "warm-start-calls",
+          "valuesSeen": [
+            4
+          ]
+        }
+      ],
+      "publicCounts": [
+        {
+          "name": "compared",
+          "valuesSeen": [
+            "12562",
+            "29458",
+            "22791",
+            "11193",
+            "10170",
+            "8911",
+            "8039",
+            "15875",
+            "9106",
+            "12488",
+            "4878",
+            "13066",
+            "7776",
+            "7409",
+            "5188",
+            "4453",
+            "3356",
+            "2151",
+            "1137",
+            "697",
+            "249",
+            "88",
+            "47",
+            "0"
+          ]
+        },
+        {
+          "name": "pairs",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "manifolds",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "cold-points",
+          "valuesSeen": [
+            "0",
+            "2"
+          ]
+        },
+        {
+          "name": "constraints",
+          "valuesSeen": [
+            "14950"
+          ]
+        },
+        {
+          "name": "block",
+          "valuesSeen": [
+            "119600"
+          ]
+        },
+        {
+          "name": "sequential",
+          "valuesSeen": [
+            "0"
+          ]
+        },
+        {
+          "name": "colours",
+          "valuesSeen": [
+            "8"
+          ]
+        },
+        {
+          "name": "overflow",
+          "valuesSeen": [
+            "0"
+          ]
+        },
+        {
+          "name": "islands",
+          "valuesSeen": [
+            "2"
+          ]
+        },
+        {
+          "name": "awake-bodies",
+          "valuesSeen": [
+            "5050"
+          ]
+        }
+      ]
+    }
+  ]
+}

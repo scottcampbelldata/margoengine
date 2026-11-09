@@ -1,0 +1,41 @@
+[
+  {
+    "cmd": "git",
+    "args": [
+      "apply",
+      "--check",
+      "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\bundle\\production-instrumentation.patch"
+    ],
+    "cwd": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\portable-validation\\patched",
+    "timeout": 15000,
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": "git",
+    "args": [
+      "apply",
+      "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\bundle\\production-instrumentation.patch"
+    ],
+    "cwd": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\portable-validation\\patched",
+    "timeout": 15000,
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": "C:\\Program Files\\nodejs\\node.exe",
+    "args": [
+      "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\bundle\\reproduce.mjs",
+      "--repo=C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\portable-validation\\archive",
+      "--tag=portable-stage-check",
+      "--stage-only"
+    ],
+    "cwd": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\portable-validation\\archive",
+    "timeout": 180000,
+    "code": 0,
+    "stdout": "C:\\Program Files\\nodejs\\node.exe: 0, timeout=false\nC:\\Program Files\\nodejs\\node.exe: 0, timeout=false\nSource-equivalent diagnostic staged; no build or timing requested.\n",
+    "stderr": ""
+  }
+]

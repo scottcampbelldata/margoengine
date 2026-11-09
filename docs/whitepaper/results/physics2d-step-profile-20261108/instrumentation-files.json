@@ -1,0 +1,47 @@
+{
+  "baseCommit": "fc88da4205dd62f7f4ea33cab624fc51e55cd108",
+  "modifiedExistingFiles": [
+    {
+      "file": "packages/physics2d/kernel/Cargo.toml",
+      "beforeSha256": "562c7521ad0c8831c1ceca3905fe6d6f2412be7c32d66241f80866233bfa796d",
+      "afterSha256": "ae4faecab79ca2d725bbc4f54205cd94f9b22e77b827c00f1ec17e43f2845fa7"
+    },
+    {
+      "file": "packages/physics2d/kernel/wasm-check/Cargo.toml",
+      "beforeSha256": "c1952eb7f21977e4995a091874d1bebd642e39739810fff721b64aace6dfada1",
+      "afterSha256": "05e57ae16010cbc8bc637899832faf657044c3172f4d91bd2b469190c246cc8b"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/lib.rs",
+      "beforeSha256": "4ba969a8ab79b366e9893c6c8c174b111f419497b1f426c2bd53e95d3e9b53ca",
+      "afterSha256": "e7cfdc08a896abd57b8e78134f86fccbcec19c0d3a8457ba42eebecec4d11f34"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/world.rs",
+      "beforeSha256": "89a9943eedefe3867ab46ac737a8ea62afad2cade28d54cafbe246cbaebb24f0",
+      "afterSha256": "d193ccc4d43adb12aeff0ee09c19f82ef09bb0b61cf0b36a3a9c30d4c82295d3"
+    },
+    {
+      "file": "packages/physics2d/kernel/src/solver.rs",
+      "beforeSha256": "5afbc858695e3997e839a81bd02cda0f6eb359673f7114e3936ccd979bc22c68",
+      "afterSha256": "eaf568f5876ec033a29118062d8db6bf5406ed80c7daccea78dc466f5c4f33d5"
+    },
+    {
+      "file": "packages/physics2d/kernel/wasm-check/src/lib.rs",
+      "beforeSha256": "37b23cfe760c7b4646b3aa427851fa9bc8549068e7f7015c1f6a5899141f3b1a",
+      "afterSha256": "03e5fe818fb62157223b2461650a62e8da35a03ed446514918a1e810a3518f3c"
+    }
+  ],
+  "newDiagnosticFiles": [
+    {
+      "path": "packages/physics2d/kernel/src/lane_profile.rs",
+      "bundleFile": "diagnostics/packages/physics2d/kernel/src/lane_profile.rs",
+      "sha256": "28a7feff553e22bd9323fb66e019db2850544a614486ceb28257fc39fe9e382b"
+    },
+    {
+      "path": "packages/physics2d/kernel/wasm-check/src/lane_profile_exports.rs",
+      "bundleFile": "diagnostics/packages/physics2d/kernel/wasm-check/src/lane_profile_exports.rs",
+      "sha256": "22402b504a456a0939915e6a4c4321eb254a920b879b15446c474daa15a568e3"
+    }
+  ]
+}

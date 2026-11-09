@@ -786,15 +786,21 @@ pub(super) fn plan<'a>(
         terminals.clear();
         let mut valid = true;
         visited[seed] = true;
+        #[cfg(test)] planner_laziness_tests::record_event(0, seed, 0);
         while let Some(body) = todo.pop() {
             members.push(body);
-            valid &= adjacent(body).len() <= 2;
+            #[cfg(test)] planner_laziness_tests::record_event(1, body, 0);
+            valid = valid && adjacent(body).len() <= 2;
             let id = ids[body];
-            valid &= !jointed[id as usize];
-            valid &= adjacent(body)
+            valid = valid && !jointed[id as usize];
+            valid = valid && adjacent(body)
                 .iter()
-                .all(|&ci| fixed_domain(world, &constraints[ci], &bounces[ci]));
+                .all(|&ci| {
+                    #[cfg(test)] planner_laziness_tests::record_domain(body, ci);
+                    fixed_domain(world, &constraints[ci], &bounces[ci])
+                });
             for &ci in adjacent(body) {
+                #[cfg(test)] planner_laziness_tests::record_event(2, body, ci);
                 let c = &constraints[ci];
                 let other = if c.a as usize == body {
                     c.b as usize
@@ -804,6 +810,7 @@ pub(super) fn plan<'a>(
                 if !dynamic[other] {
                     valid &= world.bodies[ids[other] as usize].kind == Kind::Static;
                     terminals.push((ci, body, other));
+                    #[cfg(test)] planner_laziness_tests::record_event(3, body, ci);
                 } else if !visited[other] {
                     visited[other] = true;
                     todo.push(other);
@@ -1499,3 +1506,7 @@ mod tests {
         assert!((final_drop - initial * 0.5).abs() < initial * 0.03);
     }
 }
+
+#[cfg(test)]
+#[path = "planner_laziness_tests.rs"]
+mod planner_laziness_tests;

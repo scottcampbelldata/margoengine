@@ -555,3 +555,38 @@ uses Blender 5.3.0 Beta at `C:\blender\blender.exe` (`MARGO_BLENDER` overrides),
 both engine images stay under external engine-bench/batch-168/data/oit-cycles; `MARGO_ENGINE_BENCH`
 overrides the parent folder. Hard Blender limit 240 s. The page is used for pictures; its extra timing
 values are not collected or published here. [Retained result](results/batch-168-oit-cycles.json).
+
+## Own 2D frame preparation (perf history entry 112)
+
+The [proof](../architecture/physics2d-frame-preparation.md) states the same-stack bounds and monotone
+eligibility contracts. The [raw record](results/physics2d-frame-preparation-20261108.json) retains the
+compiler inventories/CFG excerpts, constituent and combined source identities, full acceptance and
+all paired/browser rounds. Archive own baseline fc88da420 and the implementation into new own worktree
+subdirectories, preserving physics2d kernel/README and shared kernel-common paths. Do not overwrite the
+original evidence. Build matched shipped Wasm with unchanged Cargo release profiles, rustc 1.99.0 /
+LLVM 23.1.1 and -C target-feature=+simd128 in separate target directories, hard 180-second process-tree
+limits. Native LLVM/assembly uses cargo rustc --locked --release --lib -- --emit=asm,llvm-ir with the
+same bounded wrapper. Static callee inventories and release control flow are distinct from test counters.
+
+Run the existing native/package/full Rust gates with their hard deadlines. The private world_bounds_tests
+compares checked/helper/original bounds and preserves malformed public/mutable input plus derived overflow.
+The private planner_laziness_tests compares a verbatim eager reference, full traversal/workspace/Plan bits,
+disconnected and retained transitions, and the unchanged 100-row frames 60 through 99. The actual
+382,554-to-zero calls retain 1,192,000 edge traversals; no dynamic instruction ratio is inferred.
+
+The complete-step [portable profile bundle](results/physics2d-step-profile-20261108/README.md) needs no
+existing ignored lane files or Git metadata. Its README gives stage-only, matched-build and bounded
+exclusive-profile commands against a source archive of fc88da420. All 51 original inputs are checked
+modulo EOL; exact instrumentation and own harness/diagnostic sources, original failure and raw real-step
+vectors are included. It uses 17 non-overlapping phases, 39 verified clock calls, raw outer/inner
+residuals and approximate calibration. Phase shares include adjacent setup and cannot be converted
+into a sum of marginal minima; 99.29%-busy absolute profile times do not replace rival benchmark rows.
+
+For performance use the entry-106 unchanged-scene protocol: one process, 24 alternating rounds, explicit
+three-pin arrays, 60 settling steps and minima of 40 steps, checking 5,050 awake after every visit. The
+frozen driver/modules are .lane/p/frame-preparation-v2-ab-v1; use a new output path when reproducing.
+Browser/rival rows use the original scene and black-box engines under an exclusive lease, 12 rounds,
+hard 600-second process-tree deadline, with current full hash and awake assertions outside each timer.
+The copied harness/provenance is .lane/p/frame-preparation-v2-browser-v1. Separate browser sessions
+have changing load; the paired advantage belongs to the combination. Quiet release reruns remain
+required. Box2D parity is open and owned-2D CCD stays T-11 / 127.y.

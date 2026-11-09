@@ -991,3 +991,13 @@ Optional audio/events: 5,491 B gzip with shared audio implementation; audio root
 LIM-605: Node stand-in tests and real browser PCM beside all three rendering routes prove order, random selection, volume/pitch and silent cooldown gaps. Generated 1/1.5 kHz tones at +1200 cents give 2/3 kHz within 0.1 Hz, RMS 0.0625 within 1e-6 for 0.5 volume, and zero GPU validation errors. Shared buffers stay usable on disposal. Recordings, listening quality, other browsers, random-generator statistical quality and performance remain unmeasured.
 
 Audio root size growth in this job includes pool input validation before voice stealing, fixing an existing failure that cut valid playback when new arguments were invalid. The new entry remains optional; the root gains only the owning pool bug fix. Current audio/doppler size with rebuilt shared chunks: 1,090 B gzip.
+
+## Own 2D frame-preparation certificates
+
+Private checked-bounds reuse is valid only within the same current-step preflight and with no intervening
+core/pose mutation. Public bounds and creation remain checked; derived overflow is still refused. Lazy
+planner eligibility skips only pure conjuncts after rejection, retaining complete component traversal.
+The [proof](architecture/physics2d-frame-preparation.md) and perf history entry 112 distinguish dynamic
+predicate calls from static compiler counts and loaded-machine timing. The profile's adjacent setup,
+clock, optimizer/layout and post-timer cache effects prevent an exact production-phase deconvolution.
+All original accuracy predicates and three corrected pins remain; no Box2D parity or owned-2D CCD claim.

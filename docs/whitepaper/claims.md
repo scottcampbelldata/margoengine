@@ -1231,3 +1231,13 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 | Claim | Evidence | Scope |
 | --- | --- | --- |
 | Cycles independently confirms the weighted OIT image loss | [Path-traced result](results/batch-168-oit-cycles.json), `scripts/rival-oit-cycles.mjs` | 1024-sample emission/transparent mixtures, MAE 1.632960 vs 0.132651; oracle/Cycles MAE 0.094812; reference noise and silhouette differences included, no new speed or dielectric claim |
+
+## Own 2D frame preparation (2026-11-08)
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Bounds refits avoid duplicate input validation while preserving public errors and derived overflow refusal | [Same-stack proof](../architecture/physics2d-frame-preparation.md), exact public/private/original bounds controls and mutable-input regressions | Complete current-step preflight only; no cached or public unchecked API |
+| Rejected-component predicates can be skipped without changing traversal or accepted plans | Immutable eager reference, exact DFS/workspace/Plan comparisons; 382,554 to zero actual fixed-domain calls with 1,192,000 unchanged edge traversals | Original pyramid frames 60 through 99; predicate calls, not dynamic instructions |
+| The skipped eligibility work survives optimization in the original production binary | Uninstrumented release control-flow excerpts and bounds-callee inventories in the [raw record](results/physics2d-frame-preparation-20261108.json) | Named compiler/builds; test counters alone are not compiler evidence |
+| Setup and support planning are material current diagnostic phases | [Portable complete-step profile](results/physics2d-step-profile-20261108/README.md), all corresponding state/work fingerprints | Busy 99.29% host load, aggregate phase shares with adjacent setup; no substituted benchmark time |
+| This change establishes published speed or Box2D parity | Combined paired/browser rows in perf history entry 112 | Release speed and Box2D parity remain UNPROVEN; accuracy and current pins are unchanged |
