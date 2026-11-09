@@ -656,6 +656,7 @@ interface GLSLTexture {
     readonly name: string;
     readonly levels?: string;
     readonly size?: string;
+    readonly mipFilter?: string;
     readonly gather?: {
         readonly name: string;
         readonly group: number;
@@ -1086,6 +1087,7 @@ interface TextureSlot {
     readonly type: TextureType;
     readonly levels: WebGLUniformLocation[];
     readonly sizes: WebGLUniformLocation[];
+    readonly mipFilters: WebGLUniformLocation[];
     readonly modes: {
         readonly location: WebGLUniformLocation;
         readonly group: number;

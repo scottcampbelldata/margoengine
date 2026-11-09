@@ -219,6 +219,16 @@ sampler pair, plus one per texture read by `textureLoad` or its size queries), v
 location) and fragment `outputs`. A shader the layer cannot run yet throws MargoError code `unsupported`; WGSL that
 does not check throws `WGSLError`.
 
+For isotropic samplers whose minification and magnification filters match and whose
+LOD clamps are integers (the default clamps are 0 and 32), linear mip filtering
+blends two integer-level hardware samples in the shader. This preserves small mip
+weights that some WebGL drivers compress away. It covers 1D, 2D, array and 3D
+sampling, and explicit-LOD cube sampling. Other sampler states and implicit cube
+sampling retain hardware filtering. The translated texture's optional `mipFilter`
+uniform is a `vec3` containing the enable flag and the sampler's minimum/maximum
+LOD; the compatibility device supplies it automatically, along with `levels` and
+`size`. No additional texture unit is used.
+
 ### Probing WebGL2
 
 ```ts

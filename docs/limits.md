@@ -1914,3 +1914,10 @@ Open/nonmanifold edges still return owned unchanged geometry with a diagnostic;
 inconsistent winding or disconnected vertex fans throw a linked TypeError.
 The twelve test-page 44 regressions cover cube/wedge/cylinder edits, not arbitrary
 self-intersecting outlines or a new equal-width bevel guarantee.
+
+Batch 160 mip correction: shader interpolation applies to isotropic samplers
+with matching min/mag filters and integer LOD clamps (defaults 0 and 32), for
+1D, 2D, 2D-array and 3D sampling and explicit-LOD cubes. Other states, including
+implicit cube sampling, retain hardware filtering. No additional texture unit,
+core/stage change or larger picture-error budget. WebGPU filtered samples do
+not promise exact f32 weights; the native regression oracle uses unfiltered loads.

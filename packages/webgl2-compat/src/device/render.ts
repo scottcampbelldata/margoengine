@@ -92,6 +92,7 @@ interface TextureSlot {
   readonly levels: WebGLUniformLocation[];
   /** Size uniforms (the view's first level: width, height, depth or layers; see GLSLTexture.size). */
   readonly sizes: WebGLUniformLocation[];
+  readonly mipFilters: WebGLUniformLocation[];
   /** textureGather's address modes and comparison uniforms, each read from its sampler (see CompatSampler.modes). */
   readonly modes: { readonly location: WebGLUniformLocation; readonly group: number; readonly binding: number }[];
 }
@@ -354,8 +355,9 @@ export class CompatRenderPipeline {
         // bound view) but takes no texture unit: the compiler drops its unused sampler.
         const location = gl.getUniformLocation(program, t.name),
           levels = t.levels ? gl.getUniformLocation(program, t.levels) : null,
-          size = t.size ? gl.getUniformLocation(program, t.size) : null;
-        if (!location && !levels && !size) continue;
+          size = t.size ? gl.getUniformLocation(program, t.size) : null,
+          mipFilter = t.mipFilter ? gl.getUniformLocation(program, t.mipFilter) : null;
+        if (!location && !levels && !size && !mipFilter) continue;
         const key = `${t.group}:${t.binding}|${t.sampler ? `${t.sampler.group}:${t.sampler.binding}` : ''}|${t.gather ? `${t.gather.group}:${t.gather.binding}` : ''}`;
         let slot = units.get(key);
         if (!slot) {
@@ -367,6 +369,7 @@ export class CompatRenderPipeline {
             type: t.type,
             levels: [],
             sizes: [],
+            mipFilters: [],
             modes: [],
           };
           units.set(key, slot);
@@ -377,6 +380,7 @@ export class CompatRenderPipeline {
         }
         if (levels) slot.levels.push(levels);
         if (size) slot.sizes.push(size);
+        if (mipFilter) slot.mipFilters.push(mipFilter);
         const modes = t.gather ? gl.getUniformLocation(program, t.gather.name) : null;
         if (modes && t.gather) slot.modes.push({ location: modes, group: t.gather.group, binding: t.gather.binding });
       }
@@ -1530,6 +1534,26 @@ export class Replayer {
         const unfilterable =
           (hasDepth(tex.info) && !samp.comparison) || tex.info.kind === 'uint' || tex.info.kind === 'sint';
         sampler = unfilterable ? samp.nearest() : samp.sampler;
+        if (t.mipFilters.length) {
+          const d = samp.d,
+            low = d.lodMinClamp ?? 0,
+            high = d.lodMaxClamp ?? 32,
+            enabled =
+              !unfilterable &&
+              d.mipmapFilter === 'linear' &&
+              (d.minFilter === 'linear') === (d.magFilter === 'linear') &&
+              (d.maxAnisotropy ?? 1) === 1 &&
+              Number.isInteger(low) &&
+              Number.isInteger(high),
+            values = [+enabled, low, high],
+            key = values.join();
+          for (const loc of t.mipFilters)
+            if (p.cache.modes.get(loc) !== key) {
+              s.useProgram(p.program);
+              gl.uniform3fv(loc, values);
+              p.cache.modes.set(loc, key);
+            }
+        }
       }
       for (const m of t.modes) {
         const samp = samplerAt(m);

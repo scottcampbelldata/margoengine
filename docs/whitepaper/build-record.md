@@ -4531,3 +4531,24 @@ land these validated repairs before diagnosing the separate 7.4 ms slow-send
 outlier. That frame remains open, above twice the 3.5 ms gate, without a busy
 exemption or speed claim. The remaining 42 README exceptions and P01-P29 proof
 boundaries remain unchanged.
+
+
+### Batch 160 isolated mip correction
+
+The coordinator's small-push order isolates mip accuracy from the remaining AMD
+proof cleanup and watchdog work. Correct the over-precise native filtered-sampler
+oracle using W3C-specified unfiltered loads and f32 arithmetic, retaining every
+exact compatibility assertion. Fix repeated argument effects at the emitter's
+root with a helper accepting values once; CPU red-before/green-after evidence
+covers all four sampling operations, lazy evaluation and discard hoists. GPU
+and final landing gates passed as recorded below. Jobs 4 and 5 remain open.
+
+
+Batch 160 mip landing evidence after rebase onto teardown fixes cf699846f and
+20375ea56: lint and hygiene pass; full verify passes 13,570 tests, zero failures
+or skips (418.2 s). The package passes 140 unit tests, the complete browser
+corpus (558 pipelines, 1,238 entries, 733 draws), the full GPU suite (327.1 s),
+and all 12 runtime README examples. Removing fractional weights fails the
+unchanged native/compatibility comparison (0.875 versus 1), with its mutation
+marker retained. Core plus stage remains 23,924 B; compatibility entry remains
+within its unchanged 102,814 B ceiling. No benchmark or exclusive hold ran.

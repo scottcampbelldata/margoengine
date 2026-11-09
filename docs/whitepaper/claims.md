@@ -1760,3 +1760,11 @@ Eight cases fail on the parent; the split-only intermediate fails opposite edge
 incidence on the twice-extruded cylinder. Connectivity-based winding plus planar
 splitting passes every case with retained source UVs and full face provenance.
 No speed, equal-width bevel or arbitrary self-intersection support claim.
+
+
+Batch 160 mip follow-up: the optional compatibility emitter preserves fractional
+mip weights by blending integer-level samples on eligible isotropic samplers.
+The regression's native oracle uses textureLoad and exactly representable f32
+arithmetic, not implementation-dependent hardware mip filtering. CPU tests prove
+single argument evaluation and retain lazy/discard behavior; real GPU validation
+is pending. No new driver-defect or completed job 4/5 proof is claimed here.

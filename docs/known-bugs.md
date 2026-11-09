@@ -2369,3 +2369,19 @@ research index, full verification without an outer GPU lock passes all 13,562
 tests with zero failures or skips (721.2 s). The coordinator ended the preceding
 run because it incorrectly held a GPU slot around verification; that ended run
 is not a failed disposal repro. Browser teardown stays with its dedicated owner.
+
+
+### Fixed: batch 160 mip argument duplication and sampler oracle
+
+The draft mip interpolation expanded coordinate/gradient expressions in its LOD
+formula, repeating private side effects; revisiting an argument could also consume
+a discard hoist twice. The emitter now passes already-emitted argument values
+into a sampling helper, where derivatives, hardware fallback and interpolation
+read parameters. glsl.test.js fails before repair and checks implicit, bias,
+explicit-level and gradient sampling, short-circuiting and discard hoists.
+The mipArguments GPU fixture checks exact private call counts for both mip filters.
+The native mip oracle now uses unfiltered loads and f32 arithmetic: the WebGPU
+sampler spec permits implementation-dependent filtering, so NVIDIA's filtered
+0.87499809265 was not an exact 0.875 oracle. All previous exact compatibility
+assertions remain. GPU validation and the deliberately broken-weight control
+remain pending; this entry does not close job 4 or the AMD cleanup/watchdog work.

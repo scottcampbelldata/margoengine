@@ -1,6 +1,8 @@
 // Milestone M3 feature check (run by `npm run test:gpu`, part of check:merge): each case of features.html runs on the
 // browser's own WebGPU and on the WebGL2 layer in the same page, on the same GPU, and the two must return the same
-// numbers. Integers and bytes must be equal; floats equal within 1e-6 (both paths read the same stored values, so
+// numbers. mipFiltering uses native textureLoad plus f32 interpolation as its oracle: WebGPU 7.1.1 does not
+// guarantee exact hardware-filter weights (see the spec citations in features.html). Its analytic assertions stay exact.
+// Integers and bytes must be equal; floats equal within 1e-6 (both paths read the same stored values, so
 // in practice they are bit-identical). Neither side may report a validation error, throw, or (the layer) a GL error.
 // The cases: sRGB views of a unorm texture, 2D views of array layers, cube views of 6- and 12-layer textures and an
 // array view of a cube, copyTextureToBuffer of depth, stencil, packed and snorm formats, occlusion queries, render
@@ -55,9 +57,22 @@ try {
     }
     const diff = differences(native.result, compat.result);
     assert.deepEqual(diff, [], `${name}: compat differs from native`);
-    lines.push(`${name}: same as native`);
+    lines.push(`${name}: same as native${name === 'mipFiltering' ? ' unfiltered interpolation oracle' : ''}`);
     // Each case must test something: a few known values, so an empty or all-zero result on both sides fails.
     const r = compat.result;
+    if (name === 'mipArguments') {
+      for (const filter of ['nearest', 'linear'])
+        for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard'])
+          assert.deepEqual(r[`${filter}/${mode}`], [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1], `${filter}/${mode}: each argument evaluated once`);
+    }
+    if (name === 'mipFiltering') {
+      for (const filter of ['nearest', 'linear'])
+        for (const mode of ['level', 'bias'])
+          assert.deepEqual(r[`${filter}/${mode}`], Array.from({ length: 72 }, (_, i) => 1 - (Math.floor(i / 4) % 9) * 0.125), `${filter}/${mode}: exact linear mip weights`);
+      for (const filter of ['nearest', 'linear'])
+        assert.ok(r[`${filter}/grad`].every((x, i) => Math.abs(x - (1 - (Math.floor(i / 4) % 9) * 0.125)) < 1e-6), 'explicit gradients, float arithmetic');
+      assert.ok(r['linear/implicit'].every(x => Math.abs(x - 0.5) < 1e-6), 'implicit isotropic footprint');
+    }
     // Bug 66: these sanity values are near, not equal to, the ideal bytes: GPUs round a half differently (an Intel Arc
     // 140V gives 192 and 128 where this NVIDIA GPU gives 191 and 127, natively and on the layer alike). The exact
     // check is the comparison with native WebGPU on the same adapter above.

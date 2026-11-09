@@ -103,6 +103,8 @@ export interface GLSLTexture {
    * it (bug 52), so a view of a later mip level read a quarter of its size.
    */
   readonly size?: string;
+  /** Isotropic mip interpolation state (enabled, minimum LOD, maximum LOD), from the bound sampler. */
+  readonly mipFilter?: string;
   /**
    * textureGather reads texels by hand: the `ivec4` uniform of this name holds the address modes and comparison of
    * the sampler at this binding (u, v, w: 0 clamp-to-edge, 1 repeat, 2 mirror-repeat; then 0 or the compare function).
@@ -1880,6 +1882,7 @@ export class StageEmitter {
     levels = false,
     gatherArg?: IRExpr,
     size = false,
+    mipFilter = false,
   ): GLSLTexture {
     const tex = this.handleGlobal(textureArg),
       samp = samplerArg ? this.handleGlobal(samplerArg) : undefined,
@@ -1925,6 +1928,11 @@ export class StageEmitter {
       entry = { ...entry, size: `${entry.name}z` };
       this.textures.set(key, entry);
       this.globals.push(`uniform highp ivec4 ${entry.size};`);
+    }
+    if (mipFilter && !entry.mipFilter) {
+      entry = { ...entry, mipFilter: `${entry.name}f` };
+      this.textures.set(key, entry);
+      this.globals.push(`uniform highp vec3 ${entry.mipFilter};`);
     }
     return entry;
   }
@@ -1991,22 +1999,38 @@ export class StageEmitter {
       case 'textureSampleBias':
       case 'textureSampleLevel':
       case 'textureSampleGrad': {
-        const t = this.combined(texArg, rest[0]);
+        // GL implementations may compress the transition between mip levels (Radeon/ANGLE D3D11 returns
+        // 0.8125, not 0.75, between white and black at LOD 2.25). Keep spatial filtering in the hardware,
+        // but interpolate isotropic, matching-min/mag filters at integer levels ourselves. Other sampler
+        // states keep their hardware path; the device tells us which state is bound, without another unit.
+        const exactMip = tt.shape === 'sampled' && (tt.dimension !== 'cube' || name === 'textureSampleLevel');
+        const t = this.combined(texArg, rest[0], exactMip, undefined, exactMip, exactMip);
+        const n = Math.max(2, coordDims);
         let i = 1;
         let coord = coords1d(v(rest[i++]));
         if (arrayed) coord = `vec3(${coord}, float(${v(rest[i++])}))`;
         let extra = '';
+        let parameterExtra = '';
+        let localExtra = '';
         let fn = 'texture';
-        if (name === 'textureSampleBias') extra = `, ${v(rest[i++])}`;
+        if (name === 'textureSampleBias') {
+          extra = `, ${v(rest[i++])}`;
+          parameterExtra = ', float b';
+          localExtra = ', b';
+        }
         if (name === 'textureSampleLevel') {
           fn = 'textureLod';
           extra = `, float(${v(rest[i++])})`;
+          parameterExtra = ', float l';
+          localExtra = ', l';
         }
         if (name === 'textureSampleGrad') {
           fn = 'textureGrad';
           const dx = v(rest[i++]),
             dy = v(rest[i++]);
           extra = tt.dimension === '1d' ? `, vec2(${dx}, 0.0), vec2(${dy}, 0.0)` : `, ${dx}, ${dy}`;
+          parameterExtra = `, vec${n} dx, vec${n} dy`;
+          localExtra = ', dx, dy';
         }
         const offset = rest[i] ? (tt.dimension === '1d' ? `ivec2(${v(rest[i])}, 0)` : v(rest[i])) : undefined;
         let call: string;
@@ -2014,6 +2038,32 @@ export class StageEmitter {
           if (name === 'textureSampleBias') call = `textureOffset(${t.name}, ${coord}, ${offset}${extra})`;
           else call = `${fn}Offset(${t.name}, ${coord}${extra}, ${offset})`;
         } else call = `${fn}(${t.name}, ${coord}${extra})`;
+        if (exactMip) {
+          const spatial = arrayed ? 'p.xy' : 'p';
+          const scale = `vec${n}(s.${n === 3 ? 'xyz' : 'xy'})`;
+          const dx = fn === 'textureGrad' ? 'dx' : `dFdx(${spatial})`;
+          const dy = fn === 'textureGrad' ? 'dy' : `dFdy(${spatial})`;
+          const lod =
+            fn === 'textureLod'
+              ? ''
+              : `vec${n} x = ${dx} * ${scale}; vec${n} y = ${dy} * ${scale}; float l = 0.5 * log2(max(max(dot(x, x), dot(y, y)), 1e-30))${name === 'textureSampleBias' ? ' + b' : ''}; `;
+          const coordType = arrayed ? 'vec3' : `vec${n}`;
+          const sample = (level: string) =>
+            offset ? `textureLodOffset(t, p, ${level}, ${offset})` : `textureLod(t, p, ${level})`;
+          const hardware = offset
+            ? name === 'textureSampleBias'
+              ? `textureOffset(t, p, ${offset}${localExtra})`
+              : `${fn}Offset(t, p${localExtra}, ${offset})`
+            : `${fn}(t, p${localExtra})`;
+          // Pass already-emitted argument values once. Re-emitting IR can consume a discard hoist twice;
+          // expanding coordinates in derivatives duplicates effects. The helper also stays inside lazy operands.
+          const blend = this.generated(
+            `mip:${name}:${t.glslType}:${offset ?? ''}`,
+            (fname) =>
+              `vec4 ${fname}(highp ${t.glslType} t, ${coordType} p${parameterExtra}, vec3 f, int n, ivec4 s) { if (f.x < 0.5) return ${hardware}; ${lod}float last = float(n - 1); float z = clamp(clamp(l, f.y, f.z), 0.0, last); float a = floor(z); return mix(${sample('a')}, ${sample('min(a + 1.0, last)')}, z - a); }`,
+          );
+          call = `${blend}(${t.name}, ${coord}${extra}, ${t.mipFilter}, ${t.levels}, ${t.size})`;
+        }
         if (tt.shape === 'depth') return `${call}.x`;
         return call;
       }

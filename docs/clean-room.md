@@ -2189,3 +2189,17 @@ centres. Scalar CA parity on that real mask proves rules, not coastal realism.
 Existing Margo Reflector supplies the feature; no outside renderer implementation was read. The W3C [WebGPU coordinate and attachment rules](https://www.w3.org/TR/webgpu/) and [WGSL floating-point rounding rules](https://www.w3.org/TR/WGSL/#floating-point-rounding-and-overflow) inform the repair. The shader derives a 2x2 arithmetic mean with explicit loads, then rounds the binary32 mantissa to the binary16 grid using discarded-bit arithmetic; subnormals round on the 2^-24 grid. No listing was copied. The independent CPU oracle reads every stored mip and also uses Margo's separately tested CPU binary16 conversion for boundary expectations. No new geometry processing, CPU-heavy production loop or Wasm is introduced.
 
 The mirror fixture's canvas readback follows W3C [GPUCanvasContext texture lifetime](https://www.w3.org/TR/webgpu/#canvas-context) and [copyTextureToBuffer](https://www.w3.org/TR/webgpu/#dom-gpucommandencoder-copytexturetobuffer): configure COPY_SRC, enqueue before expiration, map after completion. This test-only change was derived from the specification and Margo's own queue implementation. No external implementation was read or copied.
+
+
+Batch 160 mip follow-up uses only W3C WebGPU section 7.1.1 (precise sampler
+filtering is implementation-dependent), WGSL function-call expressions
+(argument evaluation), textureLoad and floating-point accuracy for f32 +,-,*.
+Sources: https://www.w3.org/TR/webgpu/#dictdef-gpusamplerdescriptor,
+https://www.w3.org/TR/WGSL/#function-call-expression,
+https://www.w3.org/TR/WGSL/#textureload and
+https://www.w3.org/TR/WGSL/#floating-point-accuracy. No renderer source was read.
+The lazy-evaluation fixtures also follow W3C GPU for the Web Working Group,
+WebGPU Shading Language (6 November 2026), section 16.2 Reserved Words:
+https://www.w3.org/TR/2026/CRD-WGSL-20261106/#reserved-words.
+The identifier `active` is reserved; `sampled` keeps both short-circuit probes
+valid WGSL without changing their invocation-count assertions.

@@ -1366,3 +1366,13 @@ For test-page 44, build packages then run
 The parent fails eight planar-face cases; the fix passes all twelve including
 closed winding, provenance and subsequent edits. The package browser script and
 `npm run check:readme-run -- --packages=mesh-edit` exercise its rendering and docs.
+
+
+Batch 160 isolated mip correction: build packages, then run node --test
+packages/webgl2-compat/test/*.test.js. Under the shared GPU lock run both
+webgl2-compat/test:browser and webgl2-compat/test:gpu through
+scripts/gpu-package-tests.mjs --no-build --select=webgl2-compat/test:browser,webgl2-compat/test:gpu.
+features-browser.mjs compares all original cases plus unfiltered native mip
+interpolation and exact private argument counts, including short-circuit and
+discard cases. A negative control replacing the emitted fractional weight with
+zero must fail the unchanged exact mip assertions. No tolerance is raised.

@@ -3127,3 +3127,23 @@ including the tiles spatial and lifecycle oracles, with zero shader errors.
 All 56 six-package README programs execute without failures/exceptions. These
 are current-host correctness results, with no new timing claim. The approved
 core reference guard for 32/36 and new reports 42-45 remain outside this landing.
+
+### Batch 160 mip interpolation and argument evaluation
+
+The optional WebGL2 emitter interpolates integer-level hardware samples for
+isotropic linear mip filters with matching min/mag filters and integer LOD
+clamps. Other sampler states retain hardware filtering. No extra texture unit
+is used, and core/stage are unchanged. The helper accepts argument values once;
+derivatives and LOD calculation use its parameters, preserving private effects,
+discard hoists and short-circuit evaluation. The CPU regression fails before
+repair. GPU validation is pending; no reference-picture budget changed.
+
+
+Batch 160 mip landing evidence after rebase onto teardown fixes cf699846f and
+20375ea56: lint and hygiene pass; full verify passes 13,570 tests, zero failures
+or skips (418.2 s). The package passes 140 unit tests, the complete browser
+corpus (558 pipelines, 1,238 entries, 733 draws), the full GPU suite (327.1 s),
+and all 12 runtime README examples. Removing fractional weights fails the
+unchanged native/compatibility comparison (0.875 versus 1), with its mutation
+marker retained. Core plus stage remains 23,924 B; compatibility entry remains
+within its unchanged 102,814 B ceiling. No benchmark or exclusive hold ran.

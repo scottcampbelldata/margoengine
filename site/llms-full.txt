@@ -4502,6 +4502,13 @@ inconsistent winding or disconnected vertex fans throw a linked TypeError.
 The twelve test-page 44 regressions cover cube/wedge/cylinder edits, not arbitrary
 self-intersecting outlines or a new equal-width bevel guarantee.
 
+Batch 160 mip correction: shader interpolation applies to isotropic samplers
+with matching min/mag filters and integer LOD clamps (defaults 0 and 32), for
+1D, 2D, 2D-array and 3D sampling and explicit-LOD cubes. Other states, including
+implicit cube sampling, retain hardware filtering. No additional texture unit,
+core/stage change or larger picture-error budget. WebGPU filtered samples do
+not promise exact f32 weights; the native regression oracle uses unfiltered loads.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6875,6 +6882,22 @@ research index, full verification without an outer GPU lock passes all 13,562
 tests with zero failures or skips (721.2 s). The coordinator ended the preceding
 run because it incorrectly held a GPU slot around verification; that ended run
 is not a failed disposal repro. Browser teardown stays with its dedicated owner.
+
+
+### Fixed: batch 160 mip argument duplication and sampler oracle
+
+The draft mip interpolation expanded coordinate/gradient expressions in its LOD
+formula, repeating private side effects; revisiting an argument could also consume
+a discard hoist twice. The emitter now passes already-emitted argument values
+into a sampling helper, where derivatives, hardware fallback and interpolation
+read parameters. glsl.test.js fails before repair and checks implicit, bias,
+explicit-level and gradient sampling, short-circuiting and discard hoists.
+The mipArguments GPU fixture checks exact private call counts for both mip filters.
+The native mip oracle now uses unfiltered loads and f32 arithmetic: the WebGPU
+sampler spec permits implementation-dependent filtering, so NVIDIA's filtered
+0.87499809265 was not an exact 0.875 oracle. All previous exact compatibility
+assertions remain. GPU validation and the deliberately broken-weight control
+remain pending; this entry does not close job 4 or the AMD cleanup/watchdog work.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

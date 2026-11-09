@@ -7,6 +7,46 @@ import { glslFloat, glslName, translateStage, translateWGSL } from '../dist/glsl
 
 const V =
   '@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i), 0.0, 0.0, 1.0); }';
+
+test('isotropic sampling carries the live sampler mip state and blends integer-level samples', () => {
+  const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+    @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(t,s,p.xy,2.125);}`;
+  const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  assert.equal(f.textures.length, 1, 'no extra texture unit');
+  assert.ok(f.textures[0].mipFilter);
+  assert.ok(f.textures[0].levels);
+  assert.match(f.source, /float a = floor\(z\)/);
+  assert.match(f.source, /mix\(textureLod\(t, p, a\), textureLod\(t, p, min\(a \+ 1\.0/);
+  assert.match(f.source, /clamp\(clamp\(l, f\.y, f\.z\)/);
+});
+
+test('mip LOD calculation consumes each argument once and keeps sampling lazy', () => {
+  // WGSL 9.3: argument values are evaluated once before control enters the called function.
+  // https://www.w3.org/TR/WGSL/#function-call-expression
+  for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazy', 'discard']) {
+    const call =
+      mode === 'implicit'
+        ? 'textureSample(t,s,coords())'
+        : mode === 'bias'
+          ? 'textureSampleBias(t,s,coords(),level())'
+          : mode === 'grad'
+            ? 'textureSampleGrad(t,s,coords(),dx(),dy())'
+            : 'textureSampleLevel(t,s,coords(),level())';
+    const source = `${V}
+      @group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+      var<private> count:u32;
+      fn coords()->vec2f {${mode === 'discard' ? 'if(count==100u){discard;}' : ''}count++;return vec2f(0.5);}
+      fn level()->f32 {count+=10u;return 2.125;}
+      fn dx()->vec2f {count+=100u;return vec2f(0.25,0);}
+      fn dy()->vec2f {count+=1000u;return vec2f(0,0.25);}
+      @fragment fn f()->@location(0) vec4f {${mode === 'lazy' ? `let color=false && ${call}.r>0.0;return vec4f(f32(count));` : `let color=${call};return vec4f(color.r,f32(count),0,1);`}}`;
+    const glsl = translateWGSL({ vertex: { source }, fragment: { source } }).fragment.source;
+    const body = glsl.match(/vec4 qf\([^)]*\) \{([\s\S]*?)\n\}/)[1];
+    for (const fn of ['coords', ...(mode === 'implicit' ? [] : mode === 'grad' ? ['dx', 'dy'] : ['level'])])
+      assert.equal(body.match(new RegExp(`q${fn}\\(`, 'g'))?.length, 1, `${mode}: ${fn} evaluated once`);
+    if (mode === 'lazy') assert.match(body, /false && [^;]*qcoords\(/, 'argument stays in the lazy operand');
+  }
+});
 /** The fragment shader GLSL of `body` inside `@fragment fn f(...) -> @location(0) vec4u`. */
 function frag(prelude, body, params = '@builtin(position) p: vec4f') {
   const source = `${prelude}\n${V}\n@fragment fn f(${params}) -> @location(0) vec4u { ${body} }`;
