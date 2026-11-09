@@ -80,3 +80,16 @@ for (const bounces of [0, 2, 4]) {
   const sealed = rcCases.find((c) => c.name.startsWith('F5'));
   rcCases.push({ ...sealed, name: `F5 sealed source at order ${bounces}`, options: { ...sealed.options, bounces } });
 }
+
+// A uniform enclosing source is an exact oracle for integer dispatch coverage at every direction.
+// A narrow source at 45 degrees is not such an oracle: an eight-direction quadrature can miss it.
+for (const angularRatio of [2, 3, 5, 7, 8]) {
+  rcCases.push({
+    name: `F6 integer angular branching ${angularRatio}`,
+    point: [0.5, 0.5],
+    options: { cascades: 4, baseRays: 4, angularRatio, baseDistance: 16, bounces: 0 },
+    scene: { emitters: [{ x: 0, y: 0, radius: 1e9 }] },
+    exact: [1, 1, 1],
+    coverage: true,
+  });
+}

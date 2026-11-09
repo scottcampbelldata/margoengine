@@ -1271,3 +1271,8 @@ LIM-561 and LIM-562 additionally require format round trips (rgba8unorm, bgra8un
 Measured with `npm run measure:size` after the CSP diagnostic: core plus stage is 23,797 B gzip (58,792 B raw), below the unchanged 25,000 B gate. This is a size measurement, with no speed claim.
 
 Height sub-byte accumulation: `packages/lighting2d/tests/frame-regressions.js` asserts 100 directional .001 lights against the CPU .1 total on an unorm target. Owned HDR intermediate, single presentation; no float32 precision claim.
+
+Lighting2d uniform-field preservation: `gi-scenes.js` and `gi-regressions.js` test angular branching 2,3,5,7,8 with an
+opaque unit source enclosing every interval. The GPU test reads every float32 cascade sample and requires RGB exactly
+one and transmission zero, and checks allocation sizes for every requested direction. Integer direction counts and
+constant-preserving bilinear/mean arithmetic provide this fixture invariant; no arbitrary-scene exactness claim.

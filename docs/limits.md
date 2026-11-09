@@ -931,7 +931,8 @@ interval ratio >1, base distance >0, 0..4 finite diffuse bounce orders, albedo 0
 The far interval ends at baseDistance * intervalRatio ** (cascades - 1), which must fit float32.
 Radiance/transmittance merges trace each of four child connectors before interpolation (RASTI appendix A).
 Two-sided surface patches are at most baseDistance long; diffuse gathers use 32 normalized cosine samples and
-midpoint-constant patch radiance. Small sources and spatial detail below those samples can be missed. The analytic
+midpoint-constant patch radiance. Surface gathers offset origins by .001 world units and ignore ray/edge
+intersections at distances <= .0001 to avoid self-intersection. Small sources and spatial detail below those samples can be missed. The analytic
 radius-six circular-source test over eleven distances 8..60 is within 5% of asin(radius/distance)/pi on CPU and RTX A6000;
 this is a measured fixture bound, not an arbitrary-scene accuracy guarantee. No speed claim.
 Patch count is capped at 65,536. The CPU hierarchy has an 8,000,000 sample-evaluation ceiling per query/grid.
@@ -1110,9 +1111,9 @@ A policy that restricts scripts must permit Wasm compilation with `script-src 'w
   GPU evidence is one RTX A6000 only. Manually supplied command encoders must be submitted before pass disposal.
 
 Lighting2d repair candidate entry bytes (min+gzip, other packages external): root 5,394; soft 5,901; cookie 7,350;
-GI 8,457; height 6,832; emissive 4,087. Their unchanged budgets are 5,152/5,605/7,079/6,941/6,323/3,780 B.
+GI 8,589; height 6,832; emissive 4,087. Their unchanged budgets are 5,152/5,605/7,079/6,941/6,323/3,780 B.
 The 293 B shrink removes redundant stores/cache logic/validation code without removing features or tests. The remaining
-3,141 B total increase over the six budgets requires Scott's approval; no budget has been raised and no push is allowed
+3,273 B total increase over the six budgets requires Scott's approval; no budget has been raised and no push is allowed
 while verify fails. See known-bugs.md for the per-entry request and the work retained.
 
 Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.

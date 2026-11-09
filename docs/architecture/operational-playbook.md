@@ -1942,3 +1942,10 @@ and format/resize/removal/restore/dispose/reattach lifecycle. These suites exten
 check:merge GPU gate; there is no new bypass. Original GI fails 21 Node assertions and the GPU value checks.
 Missing evidence: other GPUs, general scene convergence and performance. Surface patches/32-direction quadrature
 are finite approximations, detailed in limits.md. Byte-budget approval is still needed before landing.
+
+The GI angular merge additionally uses integer multiplication for direction counts, bilinear difference interpolation
+and incremental angular means. This preserves a uniform unit field exactly for branching 2/3/5/7/8. Browser regressions
+read every intermediate float32 cascade sample and assert the configured allocation sizes, not just the final pixels.
+The first weighted-sum formulation failed these assertions (and the Node unit-field test at branching 7); no tolerance
+was changed. The exported CPU class documentation omission caught by verify was corrected in source and its API quality
+gate was checked again. Full verify was run once; its six byte ceilings remain unchanged and failing.

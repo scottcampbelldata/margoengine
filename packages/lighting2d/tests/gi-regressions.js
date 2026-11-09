@@ -6,6 +6,18 @@ export async function giRegressions({ instance, engine, texture, frame, checks, 
   engine.gpu.pushErrorScope('validation');
   const orders = [];
   for (const c of [...rcCases, ...radialCases]) {
+    const allocations = [],
+      device = engine.gpu,
+      create = device.createBuffer.bind(device);
+    if (c.coverage)
+      device.createBuffer = (descriptor) => {
+        const track = descriptor.label?.startsWith('gi cascade');
+        const buffer = create(
+          track ? { ...descriptor, usage: descriptor.usage | GPUBufferUsage.COPY_SRC } : descriptor,
+        );
+        if (track) allocations.push({ buffer, descriptor });
+        return buffer;
+      };
     const target = texture('rgba16float', 1, 1);
     const pass = GILighting2D.attach(instance, {
       target,
@@ -23,6 +35,23 @@ export async function giRegressions({ instance, engine, texture, frame, checks, 
     if (c.analytic !== undefined && Math.abs(values[0] - c.analytic) / c.analytic >= 0.05) wrong++;
     if (c.bounceOrder !== undefined) orders.push(values[0]);
     checks[`GI ${c.name}`] = { wrong, gpu: [...values.slice(0, 3)], cpu };
+    if (c.coverage) {
+      device.createBuffer = create;
+      let wrong = allocations.length !== 3 ? 1 : 0;
+      for (const { buffer, descriptor } of allocations) {
+        const level = Number(descriptor.label.slice('gi cascade'.length));
+        if (descriptor.size !== 4 * 4 * c.options.angularRatio ** level * 16) wrong++;
+        const copy = create({ size: buffer.size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const encoder = device.createCommandEncoder();
+        encoder.copyBufferToBuffer(buffer, 0, copy, 0, buffer.size);
+        device.queue.submit([encoder.finish()]);
+        await copy.mapAsync(GPUMapMode.READ);
+        const output = new Float32Array(copy.getMappedRange());
+        for (let i = 0; i < output.length; i++) if (output[i] !== (i % 4 === 3 ? 0 : 1)) wrong++;
+        copy.destroy();
+      }
+      checks[`GI every configured sample written branching ${c.options.angularRatio}`] = { wrong };
+    }
     pass.dispose();
     target.destroy();
   }
@@ -83,7 +112,7 @@ export async function giRegressions({ instance, engine, texture, frame, checks, 
       point = [0.5, 0.5],
       expected = rc.evaluateAt(point, undefined, { occluders: walls, lights, layer: 1 });
     frame();
-    let values = await readHDR(engine.gpu, target);
+    const values = await readHDR(engine.gpu, target);
     checks[`GI ${label}`] = {
       wrong:
         expected.some((v, i) => Math.abs(values[i] - v) > 0.001) ||

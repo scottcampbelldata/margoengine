@@ -68,12 +68,12 @@ mobile browser context; the existing pixel, interaction, device restoration and 
 ### Lighting2d repair candidate byte budgets
 
 The unlanded repaired root/soft/cookie/GI/height/emissive entries measure
-5,394/5,901/7,350/8,457/6,832/4,087 B min+gzip against unchanged
+5,394/5,901/7,350/8,589/6,832/4,087 B min+gzip against unchanged
 5,152/5,605/7,079/6,941/6,323/3,780 B budgets. No budget was raised and nothing is pushed.
 Compacting contiguous typed-array stores, eliminating redundant bind-group caches, sharing numeric validation and
 removing redundant public-field initializations saves 293 B against the fully repaired candidate, with identical work/results.
 An identifier-renaming experiment and broader store compaction were discarded when their savings/readability did not help.
-Remaining required increments: root +242, soft +296, cookie +271, GI +1,516, height +509, emissive +307 B.
+Remaining required increments: root +242, soft +296, cookie +271, GI +1,648, height +509, emissive +307 B.
 They buy polygon masks/validation, soft visibility correctness, cookie restoration/scalar gain, spatial interval grids and
 finite bounce orders, complete height-span shadows/HDR accumulation, and isolated HDR extraction/real Bloom respectively.
 The reviewable request is to use the measured sizes as ceilings (no added headroom); it requires Scott's decision.

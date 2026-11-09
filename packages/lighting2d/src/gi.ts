@@ -5,7 +5,7 @@ import { hexColor } from '@margoengine/math';
 import { MaskData, maskShader } from './masks.js';
 import { checkCamera, checkLayer, checkLight } from './validation.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { Light2D, type Light2DOptions, type Occluder2D, type Point2D, occluderEdges, lightAt } from './index.js';
+import { type Light2D, type Occluder2D, type Point2D, occluderEdges, lightAt } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number; COMPUTE: number };
@@ -259,6 +259,7 @@ function field(scene: Scene, rc: RadianceCascade2D, surfaces: Float32Array) {
     for (let child = 0; child < rc.angularRatio; child++) {
       const a = angle * rc.angularRatio + child,
         cd = direction(a, count * rc.angularRatio);
+      const rays: Interval[] = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
       for (let j = 0; j < 4; j++) {
         const ix = x + (j & 1),
           iy = y + (j >> 1),
@@ -280,7 +281,13 @@ function field(scene: Scene, rc: RadianceCascade2D, surfaces: Float32Array) {
           for (let c = 0; c < 3; c++) ray[c] += ray[3] * upper[c];
           ray[3] *= upper[3];
         }
-        for (let c = 0; c < 4; c++) sum[c] += ray[c] * weight;
+        rays[j] = ray;
+      }
+      for (let c = 0; c < 4; c++) {
+        const lo = rays[0][c] + (rays[1][c] - rays[0][c]) * fx;
+        const hi = rays[2][c] + (rays[3][c] - rays[2][c]) * fx;
+        const value = lo + (hi - lo) * fy;
+        sum[c] += (value - sum[c]) / (child + 1);
       }
     }
     return sum;
@@ -301,6 +308,7 @@ function field(scene: Scene, rc: RadianceCascade2D, surfaces: Float32Array) {
     return rgb;
   };
 }
+/** CPU spatial radiance-interval hierarchy with finite-order diffuse surface reflection. */
 export class RadianceCascade2D {
   declare readonly cascades: number;
   declare readonly baseRays: number;
@@ -428,6 +436,9 @@ struct Light { pos:vec4f,color:vec4f,geo:vec4f,flags:vec4u,bounds:vec4f,mask:vec
 @group(1)@binding(0)var<storage,read>upper:array<vec4f>;
 @group(1)@binding(1)var<storage,read>surfaces:array<vec4f>;
 @group(2)@binding(0)var<storage,read_write>output:array<vec4f>;
+fn rayCount(level:u32)->u32 {
+ var count=u32(u.config.y);for(var i=0u;i<level;i++){count*=u32(u.config.w);}return count;
+}
 fn direction(i:u32,count:u32)->vec2f {
  let a=6.28318530718*(f32(i)+.5)/f32(count);return vec2f(cos(a),sin(a));
 }
@@ -490,30 +501,32 @@ fn direct(p:vec2f,n:vec2f)->vec3f {
 }
 // Each child has its own visible connector. Composition precedes interpolation (RASTI appendix A).
 fn merge(p:vec2f,angle:u32)->vec4f{
- let level=u.misc.x;let count=u32(u.config.y*pow(u.config.w,level));let d=direction(angle,count);
+ let level=u.misc.x;let count=rayCount(u32(level));let d=direction(angle,count);
  var near=0.0;if(level>0){near=u.config.z*pow(u.material.z,level-1);}
  let far=u.config.z*pow(u.material.z,level);let start=p+d*near;
  if(level==u.config.x-1){return trace(start,d,far-near);}
- let scale=pow(2.0,level+1);let g=(p-vec2f(.5))/scale;let cell=floor(g);let f=fract(g);
+ let scale=f32(1u<<(u32(level)+1u));let g=(p-vec2f(.5))/scale;let cell=floor(g);let f=fract(g);
  let branch=u32(u.config.w);let upperCount=count*branch;var sum=vec4f(0);
  for(var child=0u;child<branch;child++){
-  let a=angle*branch+child;let cd=direction(a,upperCount);
+  let a=angle*branch+child;let cd=direction(a,upperCount);var rays:array<vec4f,4>;
   for(var j=0u;j<4u;j++){
    let offset=vec2f(f32(j&1u),f32(j>>1u));let xy=cell+offset;let q=xy*scale+vec2f(.5);
    let delta=q+cd*far-start;let length=length(delta);
    var ray=trace(start,delta/max(length,1e-20),length);
    let index=vec2u(xy-u.upper.xy);let sample=upper[(index.y*u32(u.upper.z)+index.x)*upperCount+a];
    ray=vec4f(ray.rgb+ray.w*sample.rgb,ray.w*sample.w);
-   let weights=mix(vec2f(1)-f,f,offset);sum+=ray*(weights.x*weights.y/f32(branch));
+   rays[j]=ray;
   }
+  let lo=rays[0]+(rays[1]-rays[0])*f.x;let hi=rays[2]+(rays[3]-rays[2])*f.x;
+  let value=lo+(hi-lo)*f.y;sum+=(value-sum)/f32(child+1u);
  }
  return sum;
 }
 @compute @workgroup_size(64)fn cascade(@builtin(global_invocation_id)id:vec3u){
- let count=u32(u.config.y*pow(u.config.w,u.misc.x));let total=u32(u.grid.z*u.grid.w)*count;
+ let count=rayCount(u32(u.misc.x));let total=u32(u.grid.z*u.grid.w)*count;
  let i=id.x;if(i>=total){return;}
  let probe=i/count;let xy=vec2f(f32(probe%u32(u.grid.z)),f32(probe/u32(u.grid.z)))+u.grid.xy;
- output[i]=merge(xy*pow(2.0,u.misc.x)+vec2f(.5),i%count);
+ output[i]=merge(xy*f32(1u<<u32(u.misc.x))+vec2f(.5),i%count);
 }
 @vertex fn wide(@builtin(vertex_index)i:u32)->@builtin(position)vec4f{
  let xy=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(xy*vec2f(2,-2)+vec2f(-1,1),0,1);
