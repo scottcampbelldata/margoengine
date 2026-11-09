@@ -25,6 +25,26 @@ reports a failed run as the root still running. Regressions in
 parent commit. Details and sources: operational playbook, "Owned Chromium ended
 without helper programs".
 
+### Batch 171 flow asset accounting
+
+The saved CPU foundation copied `flow.wasm` into dist without registering it in `scripts/lazy-files.js`.
+The existing sizes-page bidirectional asset regression fails before the registry correction, naming the
+unlisted flow binary (`test-results/sciviz-fixes/flow-lazy-before.log`). Flow now has its own measured file
+row and explicit load condition; the required-asset list also pins both sciviz Wasm files. Paired entry/network
+records must be regenerated from one coherent build before this piece lands. No provenance flag, lazy asset,
+pixel bound or time budget is waived. Earlier full verify failures for preview GL mocks and literal error help
+are already repaired and retain their passing regressions. Only the failed size prerequisite is rerun.
+
+### Sciviz moving flow in progress (batch 171 job 1)
+
+The source/exports audit found only steady CPU streamlines with normalised velocity in `/maths`; those cannot
+trace moving particles through time. `/flow` now supplies the CPU physical-time pathline reference with
+temporal interpolation, analytic/real-NOAA correctness tests, cancellation and bounded memory. GPU advection,
+fading trails, seeding/respawn, streaklines and an official moving-flow demo remain to be implemented and validated.
+Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repair and the native surface/rectangle
+piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
+and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
+
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
 ChildProcess `exit` does not establish that its stdio has closed. The shared

@@ -1,5 +1,14 @@
 # Reproducing Margo's numbers
 
+CPU pathline foundation (batch 171 job 1): run `npm run build:flow --workspace @margoengine/sciviz`,
+`npm run test:flow-kernel --workspace @margoengine/sciviz`, build the package, then
+`node --test --test-timeout=120000 packages/sciviz/tests/flow.test.js`. No device or GPU lock is requested.
+The NOAA daily-mean asset is the existing hash-pinned `examples/assets/sciviz/wind.bin`; tests convert its
+velocity components to projected km/s and trace two days in seconds. Analytic tests are the accuracy references;
+halving the NOAA time step is a convergence check only. GPU transport and official demo evidence remain pending.
+After building packages, run `node scripts/gpu-lock.mjs run --owner=flow-reference-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-pathline` for real-browser Wasm loading,
+analytic samples, existing-line pixels and device replacement on WebGPU and WebGL2 compatibility.
+
 CPU isosurface extraction (batch 181 job 1 foundation): run
 `npm run build:fallback --workspace @margoengine/sciviz`,
 `npm run test:fallback-kernel --workspace @margoengine/sciviz`, then

@@ -12,9 +12,11 @@ import { openBrowser } from '../../../scripts/browser.js';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const MAX_SHARE = 0.001,
   MAX_MEAN = 0.25;
+const only = process.argv.find((arg) => arg.startsWith('--only='))?.slice(7);
 
 async function run(compat) {
-  const context = await openBrowser({ startPath: `/packages/sciviz/tests/entries.html${compat ? '?compat=1' : ''}`, port: compat ? 5246 : 5245 });
+  const query = new URLSearchParams({ ...(compat ? { compat: '1' } : {}), ...(only ? { only } : {}) });
+  const context = await openBrowser({ startPath: `/packages/sciviz/tests/entries.html?${query}`, port: compat ? 5246 : 5245 });
   const { page, hardware } = context;
   const errors = [],
     missed = [];

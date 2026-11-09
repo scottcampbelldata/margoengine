@@ -21,6 +21,45 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+## CPU pathlines (batch 171 foundation)
+
+The optional `@margoengine/sciviz/flow` entry provides `tracePathline`: physical velocity on a regular 2D/3D grid,
+bilinear/trilinear spatial interpolation, linear interpolation between frames and classical RK4. Steps shorten
+at frame boundaries and the requested end. This is the CPU reference foundation of moving flow. GPU particles,
+trails, seeding/respawn, streaklines and the official moving-flow demo are pending.
+
+```ts
+import { tracePathline } from '@margoengine/sciviz/flow';
+
+const path = await tracePathline({
+  dims: [2, 2, 1], bounds: [-2, 2, -2, 2, 0, 0],
+  frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4) }],
+}, [0, 0, 0], { from: 0, to: 1, step: 0.25 });
+console.log(path.stop); // end
+console.log(Array.from(path.samples.slice(-4))); // [1, 0, 0, 1], packed x,y,z,time
+```
+
+Components are `Float32Array`s, x fastest; omitted `w` is zero. Output xyzt is float64 and owns its memory.
+Use consistent distance/time units. Frames share dimensions/bounds; one frame is steady at any finite time,
+while multiple frame times must strictly increase and cover the interval. A 2D seed lies on the grid's z plane.
+`from > to` traces backwards; `step` is always positive. Speed is never normalised. This fixed-step method has
+no adaptive error guarantee; reduce the step and check convergence for your field.
+
+`maxSteps` defaults to 10,000 (range 1 to 1,000,000), counting shortened steps. `stop` is `end`, `steps`, or
+`invalid` when a stage/endpoint leaves the grid or touches NaN data. Only accepted samples are returned, with
+no extrapolation or invented boundary point. Invalid seeds give no samples. Exact frame times ignore inactive
+frame NaNs; zero-weight spatial neighbours are ignored. Infinity is rejected. Input copies, output including
+the final copy, and scratch must together fit 128 MiB; caller input and module overhead are additional.
+There may be 1 to 4,096 frames; x/y dimensions are at least two, z at least one. Bounds ascend on sampled axes,
+with equal z bounds for 2D. Keep input unchanged until the call settles.
+
+An optional `signal` cancels loading/copying/tracing with its exact reason. Copies yield every 16,384 samples
+and integration every 128 steps. Each call owns a fresh, lazily loaded feature-local Wasm instance; it retains
+nothing after settling and needs no explicit disposal. Import requests no GPU. The root never loads this entry.
+Build the committed binary with `npm run build:flow --workspace @margoengine/sciviz`; normal builds need no Rust.
+Tests cover analytic solutions and two days of the frozen NOAA wind converted to projected km/s. These trajectories
+through daily means are numerical illustrations, not observed parcel tracks or forecasts. No speed claim is made.
+
 ## CPU isosurface extraction
 
 The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of

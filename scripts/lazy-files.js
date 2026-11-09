@@ -12,6 +12,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/sciviz',
+    file: 'packages/sciviz/dist/flow.wasm',
+    label: 'flow.wasm',
+    kind: 'Rust physical-time pathline integration',
+    measure: 'file',
+    when: '`tracePathline()`, only from the optional /flow entry; a fresh feature-local instance per call',
+  },
+  {
+    package: '@margoengine/sciviz',
     file: 'packages/sciviz/dist/fallback.wasm',
     label: 'fallback.wasm',
     kind: 'Rust SIMD marching cubes',

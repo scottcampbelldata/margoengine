@@ -1,6 +1,6 @@
 // Rust kernel tests of the workspace packages (`npm run check:rust-kernels`, part of check:merge; CPU only, no GPU
-// lock): `cargo test --locked` for every workspace package that holds a Rust kernel, `<dir>/kernel/Cargo.toml` or
-// `<dir>/Cargo.toml` (today packages/physics and packages/physics2d, the suites behind `test:physics-kernel` and
+// lock): `cargo test --locked` for every workspace package that holds a Rust kernel, `<dir>/kernel/Cargo.toml`,
+// `<dir>/*-kernel/Cargo.toml` or `<dir>/Cargo.toml` (including feature-local lazy Wasm crates, and the suites behind `test:physics-kernel` and
 // `test:physics2d-kernel`). The core kernel (packages/kernel, not a workspace) is `npm run test:kernel`. A crate that
 // reaches another package's folder by a `path =` dependency (the 2D kernel uses packages/physics/kernel-common) runs
 // when that package changes too, so a change to shared kernel code reaches every kernel built on it.
@@ -18,7 +18,7 @@
 // the native hashes. The Wasm run is a child process under the same hard limit.
 // cargo is started directly, not through a shell, so the command search is the operating system's and not cmd.exe's.
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
@@ -49,22 +49,43 @@ export const shipsWasm = (text) => /^\s*crate-type\s*=\s*\[[^\]]*"cdylib"/m.test
  * `wasmCheck` is the repo path of its `wasm-check/Cargo.toml`, or null. */
 export function rustKernels(workspaces, dir = root, exists = existsSync, read = (p) => readFileSync(p, 'utf8')) {
   return workspaces.flatMap((w) => {
-    const manifest = [`${w.dir}/kernel/Cargo.toml`, `${w.dir}/Cargo.toml`].find((m) => exists(join(dir, m)));
-    if (!manifest) return [];
-    const text = read(join(dir, manifest)),
-      check = posix.join(posix.dirname(manifest), 'wasm-check/Cargo.toml'),
-      wasm = shipsWasm(text);
-    const uses = pathDependencies(text, manifest, workspaces, w.name);
-    return [{ name: w.name, dir: w.dir, manifest, uses, wasm, wasmCheck: wasm && exists(join(dir, check)) ? check : null }];
+    const local = readdirSync(join(dir, w.dir), { withFileTypes: true })
+      .filter((d) => d.isDirectory() && (d.name === 'kernel' || d.name.endsWith('-kernel')))
+      .map((d) => `${w.dir}/${d.name}/Cargo.toml`);
+    return [...new Set([...local, `${w.dir}/Cargo.toml`])]
+      .sort()
+      .filter((m) => exists(join(dir, m)))
+      .map((manifest) => {
+        const text = read(join(dir, manifest)),
+          check = posix.join(posix.dirname(manifest), 'wasm-check/Cargo.toml'),
+          wasm = shipsWasm(text);
+        const uses = pathDependencies(text, manifest, workspaces, w.name);
+        return {
+          name: w.name,
+          dir: w.dir,
+          manifest,
+          uses,
+          wasm,
+          wasmCheck: wasm && exists(join(dir, check)) ? check : null,
+        };
+      });
   });
 }
 
 /** Package directories (after `packages/`) of the kernels whose package, or a package one of their path dependencies
  * lives in, is in `changed` (workspace names). */
 export function changedKernelDirs(kernels, changed) {
-  return kernels
-    .filter((k) => (changed.includes(k.name) || (k.uses ?? []).some((u) => changed.includes(u))) && k.dir.startsWith('packages/'))
-    .map((k) => k.dir.slice('packages/'.length));
+  return [
+    ...new Set(
+      kernels
+        .filter(
+          (k) =>
+            (changed.includes(k.name) || (k.uses ?? []).some((u) => changed.includes(u))) &&
+            k.dir.startsWith('packages/'),
+        )
+        .map((k) => k.dir.slice('packages/'.length)),
+    ),
+  ];
 }
 
 /** The cargo arguments for one kernel. */
@@ -79,7 +100,9 @@ export async function runWasmChecks(bytes) {
     const t0 = performance.now(),
       code = check(i);
     const got = code !== 0 && bits ? ` (bits ${BigInt.asUintN(64, bits(i)).toString(16)})` : '';
-    console.log(`  wasm check ${i}: ${code === 0 ? 'pass' : `FAIL code ${code}${got}`} in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    console.log(
+      `  wasm check ${i}: ${code === 0 ? 'pass' : `FAIL code ${code}${got}`} in ${((performance.now() - t0) / 1000).toFixed(1)} s`,
+    );
     if (code !== 0) failed.push(i);
   }
   return failed;
@@ -136,13 +159,20 @@ async function main(args) {
     return ok;
   };
   const wasmBuild = (manifest) =>
-    step(`RUSTFLAGS="${WASM_RUSTFLAGS}" cargo ${wasmBuildArgs(manifest).join(' ')}`, 'cargo', wasmBuildArgs(manifest), wasmEnv);
+    step(
+      `RUSTFLAGS="${WASM_RUSTFLAGS}" cargo ${wasmBuildArgs(manifest).join(' ')}`,
+      'cargo',
+      wasmBuildArgs(manifest),
+      wasmEnv,
+    );
   for (const { manifest, wasm, wasmCheck } of kernels) {
     let ok = await step(`cargo ${cargoArgs(manifest).join(' ')}`, 'cargo', cargoArgs(manifest));
     if (ok && wasm) ok = await wasmBuild(manifest);
     if (ok && wasmCheck) {
       const module = join(root, wasmModule(wasmCheck, readFileSync(join(root, wasmCheck), 'utf8')));
-      ok = (await wasmBuild(wasmCheck)) && (await step(`wasm checks of ${wasmCheck}`, process.execPath, [import.meta.filename, `--run-wasm=${module}`]));
+      ok =
+        (await wasmBuild(wasmCheck)) &&
+        (await step(`wasm checks of ${wasmCheck}`, process.execPath, [import.meta.filename, `--run-wasm=${module}`]));
     }
     console.log(`# ${manifest}: ${ok ? 'pass' : 'FAIL'}`);
     if (!ok) failed++;

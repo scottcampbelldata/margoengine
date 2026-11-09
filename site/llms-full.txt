@@ -2610,6 +2610,17 @@ basic scene. Both records retain their actual commit and packages-dirty flag;
 This measures byte counts only during the deferred speed phase. The core + stage
 ceiling remains 25,000 B; the reviewed build measures 23,924 B gzip.
 
+Sciviz `/flow` supplies CPU pathlines only: fixed-step RK4 on regular 2D/3D grids with linear temporal
+interpolation. Adaptive error control, extrapolation, GPU particles, trails, respawn, seeding and streaklines
+are pending. The default 10,000-step budget accepts 1 to 1,000,000; at most 4,096 frames. Input copies plus
+output/final-copy/scratch are capped at 128 MiB, excluding caller input and module overhead. Copy/integration
+chunks are 16,384 samples/128 steps. The feature-local Wasm is 7,916 bytes, capped below 16,000 raw and 8,000 gzip
+by CPU tests. It loads lazily per call; root/fallback do not load it. Samples are float32 and arithmetic/output
+float64; future GPU transport still owes a numeric parity bound. NOAA daily means do not establish observed tracks.
+The new `/flow` JavaScript entry measures 2,130 B gzip with a 2,386 B ceiling. The root remains exactly
+36,916 B; the existing root/driver ceilings from the native correction are unchanged by flow.
+No core/stage implementation change is part of this feature.
+
 Mesh position, rotation and scale refs cannot be replaced. Assignment throws TypeError
 with code `transform` and `Retained vector: use a transform setter` plus the help link.
 Use `.set()`, `.setAll()`, components or mesh setters; Camera tuples remain assignable.
@@ -4696,6 +4707,26 @@ reports a failed run as the root still running. Regressions in
 `tests/browser-teardown.test.js` reach the same "still open: browser" on the
 parent commit. Details and sources: operational playbook, "Owned Chromium ended
 without helper programs".
+
+### Batch 171 flow asset accounting
+
+The saved CPU foundation copied `flow.wasm` into dist without registering it in `scripts/lazy-files.js`.
+The existing sizes-page bidirectional asset regression fails before the registry correction, naming the
+unlisted flow binary (`test-results/sciviz-fixes/flow-lazy-before.log`). Flow now has its own measured file
+row and explicit load condition; the required-asset list also pins both sciviz Wasm files. Paired entry/network
+records must be regenerated from one coherent build before this piece lands. No provenance flag, lazy asset,
+pixel bound or time budget is waived. Earlier full verify failures for preview GL mocks and literal error help
+are already repaired and retain their passing regressions. Only the failed size prerequisite is rerun.
+
+### Sciviz moving flow in progress (batch 171 job 1)
+
+The source/exports audit found only steady CPU streamlines with normalised velocity in `/maths`; those cannot
+trace moving particles through time. `/flow` now supplies the CPU physical-time pathline reference with
+temporal interpolation, analytic/real-NOAA correctness tests, cancellation and bounded memory. GPU advection,
+fading trails, seeding/respawn, streaklines and an official moving-flow demo remain to be implemented and validated.
+Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repair and the native surface/rectangle
+piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
+and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
 
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
@@ -13850,6 +13881,45 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+## CPU pathlines (batch 171 foundation)
+
+The optional `@margoengine/sciviz/flow` entry provides `tracePathline`: physical velocity on a regular 2D/3D grid,
+bilinear/trilinear spatial interpolation, linear interpolation between frames and classical RK4. Steps shorten
+at frame boundaries and the requested end. This is the CPU reference foundation of moving flow. GPU particles,
+trails, seeding/respawn, streaklines and the official moving-flow demo are pending.
+
+```ts
+import { tracePathline } from '@margoengine/sciviz/flow';
+
+const path = await tracePathline({
+  dims: [2, 2, 1], bounds: [-2, 2, -2, 2, 0, 0],
+  frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4) }],
+}, [0, 0, 0], { from: 0, to: 1, step: 0.25 });
+console.log(path.stop); // end
+console.log(Array.from(path.samples.slice(-4))); // [1, 0, 0, 1], packed x,y,z,time
+```
+
+Components are `Float32Array`s, x fastest; omitted `w` is zero. Output xyzt is float64 and owns its memory.
+Use consistent distance/time units. Frames share dimensions/bounds; one frame is steady at any finite time,
+while multiple frame times must strictly increase and cover the interval. A 2D seed lies on the grid's z plane.
+`from > to` traces backwards; `step` is always positive. Speed is never normalised. This fixed-step method has
+no adaptive error guarantee; reduce the step and check convergence for your field.
+
+`maxSteps` defaults to 10,000 (range 1 to 1,000,000), counting shortened steps. `stop` is `end`, `steps`, or
+`invalid` when a stage/endpoint leaves the grid or touches NaN data. Only accepted samples are returned, with
+no extrapolation or invented boundary point. Invalid seeds give no samples. Exact frame times ignore inactive
+frame NaNs; zero-weight spatial neighbours are ignored. Infinity is rejected. Input copies, output including
+the final copy, and scratch must together fit 128 MiB; caller input and module overhead are additional.
+There may be 1 to 4,096 frames; x/y dimensions are at least two, z at least one. Bounds ascend on sampled axes,
+with equal z bounds for 2D. Keep input unchanged until the call settles.
+
+An optional `signal` cancels loading/copying/tracing with its exact reason. Copies yield every 16,384 samples
+and integration every 128 steps. Each call owns a fresh, lazily loaded feature-local Wasm instance; it retains
+nothing after settling and needs no explicit disposal. Import requests no GPU. The root never loads this entry.
+Build the committed binary with `npm run build:flow --workspace @margoengine/sciviz`; normal builds need no Rust.
+Tests cover analytic solutions and two days of the frozen NOAA wind converted to projected km/s. These trajectories
+through daily means are numerical illustrations, not observed parcel tracks or forecasts. No speed claim is made.
+
 ## CPU isosurface extraction
 
 The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
@@ -13858,41 +13928,7 @@ attaches the first native drawing paths; the complete WebGL2 job is still in pro
 
 ```ts
 import { marchingCubes } from '@margoengine/sciviz/fallback';
-
-const field = new Float32Array([1, -1, -1, -1, -1, -1, -1, -1]);
-const result = await marchingCubes(field, 0, { dims: [2, 2, 2] });
-console.log(result.triangles); // 1
-console.log(result.vertices.length); // 24 floats: three position/gradient pairs
 ```
-
-This entry loads one feature-local Rust/Wasm asset on extraction, without requesting a GPU or installing globals.
-It uses the same derived case table, strict `value > level` rule, triangle order and winding as the GPU extractor.
-Positions are in the grid's unit box. Each vertex is eight float32 words: position xyz and 1, then the outward,
-unnormalised gradient xyz and 0. Transform positions by the data bounds and gradients by the inverse transpose,
-including voxel counts, as the GPU layer does. The returned array owns its memory.
-
-Pass `signal` to cancel loading or extraction. Both passes yield after each chunk of at most 16,384 cells, and
-concurrent calls own separate Wasm instances. `maxTriangles` defaults to floor(128 MiB / 96) and rejects before
-allocating output that exceeds it. Input, case and vertex allocations together are capped at 2 GiB; the returned
-copy and Wasm allocator overhead are additional. Dimensions must be integers of at least two, their product must
-match the input length, and the level must be finite in float32. Scalar samples are converted to float32 as in the
-GPU path. NaN samples retain its comparison and interpolation behaviour.
-
-Build the committed Wasm with `npm run build:fallback --workspace @margoengine/sciviz`. The normal package build
-ships the committed asset and needs no Rust toolchain. Tests compare every case, SIMD row tails and chunk
-boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
-No end-to-end rendering or public speed claim is made for this entry yet.
-
-## Native WebGL2 drawing (batch 181, first drawing piece)
-
-`attachWebGL2(engine, options)` from `@margoengine/sciviz/webgl2` attaches the existing surface, bar,
-histogram and heatmap APIs to an engine with `backend: 'webgl2'`. It returns an ordinary `Figure`;
-the caller owns the engine, camera, controls and rendering loop. It installs no WebGPU compatibility shim.
-An optional `signal` cancels waiting for the Figure module and prevents attachment with the exact abort reason;
-module fetching itself may continue. The default is no signal.
-Pass `axes: false` explicitly. Axes, scatter, lines, volumes, slices and integrated CPU isosurfaces are
-still pending, and their Figure calls reject with a help-linked `unsupported` error before publishing a layer.
-The three real-data demos still need those paths. This is a committed piece of job 1, not its completion.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

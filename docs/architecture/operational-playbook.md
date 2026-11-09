@@ -66,6 +66,25 @@ or new speed claim is part of this change. The queue uses the common process
 limiter, so affected-step closure now selects views/depth when that limiter changes;
 the regression checks both the dependency and the selected checks.
 
+## CPU temporal flow reference (batch 171, section 5 supplement)
+
+Optional `/flow` loads its own `flow.wasm` from `sciviz/flow-kernel`. Spatial/temporal interpolation feeds
+classical RK4 with physical velocity and steps shortened at frame kinks. One reservation holds component copies,
+metadata and 128-step scratch; no kernel allocator or shared mutable instance. TypeScript owns validation, task
+yields, cancellation and output copies. Analytic constant/temporal/3D rotation tests, missing samples, backwards
+tracing, chunk boundaries and the existing NOAA daily means supply CPU evidence. GPU particles still owe parity,
+restore, trails/respawn and browser proof. No backend, speed or adaptive-error claim. Core/stage are untouched.
+The merge gate now discovers every immediate `kernel`/`*-kernel` crate in a workspace, rather than only the first
+conventional manifest. `tests/rust-kernel-tests.test.js` checks both sciviz feature crates and package deduplication.
+The focused `flow-pathline` entry case fetches the feature-local Wasm in a real browser, checks every xyzt sample
+against x(t)=t^2, y(t)=t, draws the path and preserves every pixel after device replacement, on WebGPU and
+WebGL2 compatibility. The existing all-pixel parity bounds pass with 1,517 lit pixels. This proves the CPU
+reference's browser/line integration, not GPU particle advection or the pending native WebGL2 line path.
+The new README example passes in Node. Both feature crates and 19 focused CPU/kernel-runner tests pass;
+lint, hygiene and all five quality gates pass. Only the failed size-page prerequisite is rerun, with both
+size/network records regenerated together after registering flow.wasm. No prior successful gate is retried
+without a changed dependency, and no core/stage implementation or assertion bound changes.
+
 ## Native WebGL2 current-program lifetime (batch 181, section 5 supplement)
 
 The native sciviz reboot diagnostic found a preview renderer ownership defect: deleting the current program
@@ -73,7 +92,8 @@ kept a flagged binding alive until a plugin switched programs, at which point it
 Preview restore and disposal now unbind their own current program before deletion, preserving foreign programs.
 `packages/webgl2-compat/test/preview-webgl.test.js` fails before the repair and checks both paths and foreign
 state preservation. `packages/sciviz/tests/webgl2-browser.js` checks NO_ERROR immediately after every reboot,
-upload and draw. The real-context gate now passes after main's teardown repair; entry byte ceilings still block landing.
+upload and draw. The real-context gate passes after main's teardown repair; the optional ceilings now follow
+Scott's ruling, and the native piece is on main through 6a09f480f.
 The CPU test models the specification's marked-object rebinding error and checks owned, foreign and null
 bindings after both operations. No core or stage implementation changes are needed.
 

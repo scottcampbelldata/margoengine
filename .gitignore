@@ -9,6 +9,7 @@ packages/physics/kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/
+packages/sciviz/flow-kernel/target/
 examples/next/.next/
 examples/next/next-env.d.ts
 *.tsbuildinfo

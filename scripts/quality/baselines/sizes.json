@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11619025,
+  "total": 11621411,
   "history": [
     {
       "date": "2026-10-24",
@@ -5108,6 +5108,12 @@
       "commit": "3815774cd",
       "grew": 2,
       "reason": "Scott optional-package ruling: sciviz root measured 36802 to 36916 B gzip (+114) for complete missing-triangle rejection and finite boundary normals; native /webgl2 measured 4288 to 4476 B (+188), with its ceiling 4442 to 4476 (+34), for the matching shader and safe resource-generation disposal. Preserve the sensible optional driver boundary. Splitting the shared SurfaceLayer would add an artificial shader/pipeline loader and async restoration contract; splitting driver cleanup would divide ownership of one GL resource generation. Keep readable shaders and actionable errors; drop byte-only pipeline extraction and bit tricks. Core + stage stays 23924 B under 25000; no speed claim."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "8af3a7c60",
+      "grew": 1,
+      "reason": "Batch 171 CPU pathline foundation: new optional sciviz/flow entry, 2130 B gzip with 2386 B ceiling; separate 7916 B Wasm capped by CPU tests. All existing entry ceilings unchanged."
     }
   ],
   "items": {
@@ -6084,6 +6090,7 @@
     "@margoengine/procedural/caves": 1680,
     "@margoengine/procedural/tree": 3400,
     "@margoengine/sciviz/fallback": 2258,
-    "@margoengine/sciviz/webgl2": 4476
+    "@margoengine/sciviz/webgl2": 4476,
+    "@margoengine/sciviz/flow": 2386
   }
 }

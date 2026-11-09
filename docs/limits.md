@@ -23,6 +23,17 @@ basic scene. Both records retain their actual commit and packages-dirty flag;
 This measures byte counts only during the deferred speed phase. The core + stage
 ceiling remains 25,000 B; the reviewed build measures 23,924 B gzip.
 
+Sciviz `/flow` supplies CPU pathlines only: fixed-step RK4 on regular 2D/3D grids with linear temporal
+interpolation. Adaptive error control, extrapolation, GPU particles, trails, respawn, seeding and streaklines
+are pending. The default 10,000-step budget accepts 1 to 1,000,000; at most 4,096 frames. Input copies plus
+output/final-copy/scratch are capped at 128 MiB, excluding caller input and module overhead. Copy/integration
+chunks are 16,384 samples/128 steps. The feature-local Wasm is 7,916 bytes, capped below 16,000 raw and 8,000 gzip
+by CPU tests. It loads lazily per call; root/fallback do not load it. Samples are float32 and arithmetic/output
+float64; future GPU transport still owes a numeric parity bound. NOAA daily means do not establish observed tracks.
+The new `/flow` JavaScript entry measures 2,130 B gzip with a 2,386 B ceiling. The root remains exactly
+36,916 B; the existing root/driver ceilings from the native correction are unchanged by flow.
+No core/stage implementation change is part of this feature.
+
 Mesh position, rotation and scale refs cannot be replaced. Assignment throws TypeError
 with code `transform` and `Retained vector: use a transform setter` plus the help link.
 Use `.set()`, `.setAll()`, components or mesh setters; Camera tuples remain assignable.

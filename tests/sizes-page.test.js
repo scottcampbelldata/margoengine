@@ -113,6 +113,8 @@ test('sizes page lists every file loaded later, with its measured bytes and the 
     'rapier3d-compat',
     'gltf.js',
     'decoder.worker.js',
+    'sciviz/dist/fallback.wasm',
+    'sciviz/dist/flow.wasm',
   ])
     assert.ok(
       LAZY_FILES.some((entry) => entry.file.includes(name)),

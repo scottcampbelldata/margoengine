@@ -52,7 +52,9 @@ window.runEntryChecks = async () => {
   const { Figure } = await import('@margoengine/sciviz');
   const canvas = document.querySelector('#view');
   const report = { checks: [], images: {} };
-  for (const { name, run, mode } of cases) {
+  const selected = cases.filter(({ name }) => !params.has('only') || name === params.get('only'));
+  assert(selected.length > 0, 'at least one drawing case selected');
+  for (const { name, run, mode } of selected) {
     const figure = await Figure.create(canvas, { mode, axes: false, controls: false });
     figure.renderer.device.addEventListener('uncapturederror', (event) =>
       errors.push(`${name}: ${event.error.message}`),

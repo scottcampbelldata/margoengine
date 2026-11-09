@@ -81,6 +81,31 @@ record, omit a lazy asset or change a size ceiling. Existing sizes-page tests
 are the regression gate and already participate in verify/check:merge. No code
 or file from another repository was read or copied; no speed measurement ran.
 
+## Batch 171 job 1: CPU temporal transport foundation (2026-11-10)
+
+The research-first survey compared Kenneth I. Joy,
+[Numerical Methods for Particle Tracing in Vector Fields](https://web.cs.ucdavis.edu/~ma/ECS177/papers/particle_tracing.pdf)
+(1999), interpolation and RK methods; N. Cuntz, A. Pritzkau and A. Kolb,
+[Time-Adaptive Lines for the Interactive Visualization of Unsteady Flow Data Sets](https://doi.org/10.1111/j.1467-8659.2009.01426.x)
+(2009), abstract and line/adaptivity definitions; and Haoyu Li, Tianyu Xiong and Han-Wei Shen,
+[Efficient Interpolation-based Pathline Tracing with B-spline Curves in Particle Dataset](https://arxiv.org/abs/2207.07224)
+(2022), abstract. Joy's regular-grid interpolation and classical RK4 fit the existing arrays. Cuntz et al.
+motivate physical time and an explicit absence of adaptive error control. Li et al.'s unconnected particle
+representation is not substituted for the existing Eulerian samples. No companion code, engine source or
+paper listing was read or copied.
+
+A separate Rust/Wasm flow crate and lazy `/flow` entry use planar float32 samples, float64 arithmetic, one
+fixed reservation per instance and no kernel allocator. Steps end at temporal interpolation kinks. Analytic
+constant, piecewise-linear-in-time and rotation/expansion fields check physical speed and RK4 stages. Domain,
+NaN, backward-trace, chunking and exact-reason cancellation tests accompany the real NOAA fixture, converted
+to projected km/s. Step refinement is not observational accuracy. GPU particles/trails, seeding, streaklines,
+respawn and an official moving-flow demo remain pending. No time, SIMD or throughput claim is made.
+
+The continuation reuses the artifact-provenance research cited in "Sciviz size-record repair" above:
+the lazy flow binary is registered and measured as a served file, with truthful paired build metadata.
+The pre-existing bidirectional sizes-page regression exposes its omission before correction. No numerical
+algorithm, foreign implementation or asset licence is changed by the registry repair.
+
 ## Batch 181 native GL reboot: current program lifetime (2026-11-10)
 
 Research-first search compared Alper Sarikaya and Michael Gleicher,

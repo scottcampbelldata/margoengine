@@ -3,10 +3,32 @@
 import { gridLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
 import { tileLayer } from '@margoengine/sciviz/geo';
+import { tracePathline } from '@margoengine/sciviz/flow';
 
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
 const addCase = (name, run, mode = '3d') => cases.push({ name, run, mode });
+
+addCase('flow-pathline', async (figure, { assert }) => {
+  figure.engine.stop();
+  const frames = [0, 1].map((time) => ({
+    time, u: new Float32Array(4).fill(2 * time), v: new Float32Array(4).fill(1),
+  }));
+  const path = await tracePathline({ dims: [2, 2, 1], bounds: [-1, 2, -1, 2, 0, 0], frames },
+    [0, 0, 0], { from: 0, to: 1, step: 1 / 32 });
+  assert(path.stop === 'end' && path.samples.length === 33 * 4, 'browser Wasm load and complete path');
+  const x = [], y = [];
+  for (let i = 0; i < path.samples.length; i += 4) {
+    const t = path.samples[i + 3];
+    assert(Math.abs(path.samples[i] - t * t) < 1e-12 && Math.abs(path.samples[i + 1] - t) < 1e-12,
+      'every browser pathline sample matches the physical-time analytic trajectory');
+    x.push(path.samples[i]);
+    y.push(path.samples[i + 1]);
+  }
+  figure.setLimits([-0.2, 1.2, -0.2, 1.2]);
+  await figure.line({ x, y }, { width: 6, color: '#ffffff' });
+  return { checked: 'feature-local Wasm fetch, all analytic xyzt samples, GPU line and device replacement' };
+}, '2d');
 
 for (const kind of ['scatter', 'quiver', 'streamlines', 'histogram']) {
   addCase(

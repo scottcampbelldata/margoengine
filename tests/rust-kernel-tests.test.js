@@ -36,6 +36,20 @@ test('every workspace package with a Rust kernel is found, physics and physics2d
   for (const k of kernels) assert.match(k.manifest, /(^|\/)Cargo\.toml$/);
 });
 
+test('feature-local crates all reach the merge gate once per owning package', () => {
+  const sciviz = kernels.filter((k) => k.dir === 'packages/sciviz');
+  assert.deepEqual(sciviz.map((k) => k.manifest).sort(), [
+    'packages/sciviz/flow-kernel/Cargo.toml',
+    'packages/sciviz/kernel/Cargo.toml',
+  ]);
+  assert.deepEqual(changedKernelDirs(sciviz, ['@margoengine/sciviz']), ['sciviz']);
+  assert.equal(selectKernels(kernels, 'sciviz').length, 2);
+  assert.equal(
+    step(['packages/sciviz/flow-kernel/src/lib.rs']).command,
+    'npm run check:rust-kernels -- --packages=sciviz',
+  );
+});
+
 test('the kernel npm scripts run the same cargo command check:rust-kernels runs, so a claim citing one is checked', () => {
   const byScript = { 'test:physics-kernel': 'packages/physics', 'test:physics2d-kernel': 'packages/physics2d' };
   for (const [script, dir] of Object.entries(byScript)) {
@@ -56,9 +70,13 @@ test('check:merge runs the kernel tests of a changed package, its kernel folder 
   assert.ok(step(['packages/dof/src/index.ts']).skip, 'a package without a kernel');
 });
 
-test('a kernel built on another package\'s crate runs when that package changes (the 2D kernel on kernel-common)', () => {
+test("a kernel built on another package's crate runs when that package changes (the 2D kernel on kernel-common)", () => {
   const twoD = kernels.find((k) => k.dir === 'packages/physics2d');
-  assert.deepEqual(twoD.uses, ['@margoengine/physics'], 'packages/physics2d/kernel/Cargo.toml uses ../../physics/kernel-common');
+  assert.deepEqual(
+    twoD.uses,
+    ['@margoengine/physics'],
+    'packages/physics2d/kernel/Cargo.toml uses ../../physics/kernel-common',
+  );
   assert.deepEqual(kernels.find((k) => k.dir === 'packages/physics').uses, []);
   const workspaces = [
     { name: '@x/a', dir: 'packages/a' },
@@ -66,7 +84,11 @@ test('a kernel built on another package\'s crate runs when that package changes 
     { name: '@x/ab', dir: 'packages/ab' },
   ];
   const text = '[dependencies]\nshared = { path = "../../a/kernel-common" }\nself = { path = "../own" }\n';
-  assert.deepEqual(pathDependencies(text, 'packages/b/kernel/Cargo.toml', workspaces, '@x/b'), ['@x/a'], 'a prefix of another folder name is not a match');
+  assert.deepEqual(
+    pathDependencies(text, 'packages/b/kernel/Cargo.toml', workspaces, '@x/b'),
+    ['@x/a'],
+    'a prefix of another folder name is not a match',
+  );
   const some = [
     { name: '@x/a', dir: 'packages/a', manifest: 'packages/a/kernel/Cargo.toml', uses: [] },
     { name: '@x/b', dir: 'packages/b', manifest: 'packages/b/kernel/Cargo.toml', uses: ['@x/a'] },
@@ -96,9 +118,18 @@ test('changedKernelDirs and selectKernels: changed names map to directories; an 
 });
 
 test('every kernel that ships as Wasm is built for wasm32 with the shipped flags, the 2D one checked in Wasm too', () => {
-  for (const dir of ['packages/physics', 'packages/physics2d']) assert.ok(kernels.find((k) => k.dir === dir).wasm, `${dir} ships as Wasm`);
+  for (const dir of ['packages/physics', 'packages/physics2d'])
+    assert.ok(kernels.find((k) => k.dir === dir).wasm, `${dir} ships as Wasm`);
   assert.equal(WASM_RUSTFLAGS, PHYSICS_RUSTFLAGS, 'the flags of the 3D kernel blueprint');
-  assert.deepEqual(wasmBuildArgs('k/Cargo.toml'), ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', 'k/Cargo.toml']);
+  assert.deepEqual(wasmBuildArgs('k/Cargo.toml'), [
+    'build',
+    '--locked',
+    '--release',
+    '--target',
+    'wasm32-unknown-unknown',
+    '--manifest-path',
+    'k/Cargo.toml',
+  ]);
   assert.ok(shipsWasm('[lib]\ncrate-type = ["cdylib", "rlib"]\n'));
   assert.ok(!shipsWasm('[lib]\ncrate-type = ["rlib"]\n'));
   const twoD = kernels.find((k) => k.dir === 'packages/physics2d');
@@ -112,15 +143,20 @@ test('every kernel that ships as Wasm is built for wasm32 with the shipped flags
   // The Wasm check and the native pinned-bits test step one scene file against one set of hashes.
   const scenes = '#[path = "support/bits_scenes.rs"]';
   assert.ok(readFileSync(resolve(root, 'packages/physics2d/kernel/tests/bits.rs'), 'utf8').includes(scenes));
-  assert.ok(readFileSync(resolve(root, 'packages/physics2d/kernel/wasm-check/src/lib.rs'), 'utf8').includes('#[path = "../../tests/support/bits_scenes.rs"]'));
+  assert.ok(
+    readFileSync(resolve(root, 'packages/physics2d/kernel/wasm-check/src/lib.rs'), 'utf8').includes(
+      '#[path = "../../tests/support/bits_scenes.rs"]',
+    ),
+  );
 });
 
 test('a Wasm check module fails on the checks that return nonzero', async () => {
   // (func checks (result i32) 2) (func check (param i32) (result i32) local.get 0): check 0 passes, check 1 fails.
   const module = Uint8Array.from([
-    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x02, 0x60, 0x00, 0x01, 0x7f, 0x60, 0x01, 0x7f, 0x01, 0x7f,
-    0x03, 0x03, 0x02, 0x00, 0x01, 0x07, 0x12, 0x02, 0x06, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x73, 0x00, 0x00, 0x05, 0x63, 0x68,
-    0x65, 0x63, 0x6b, 0x00, 0x01, 0x0a, 0x0b, 0x02, 0x04, 0x00, 0x41, 0x02, 0x0b, 0x04, 0x00, 0x20, 0x00, 0x0b,
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x02, 0x60, 0x00, 0x01, 0x7f, 0x60, 0x01, 0x7f, 0x01,
+    0x7f, 0x03, 0x03, 0x02, 0x00, 0x01, 0x07, 0x12, 0x02, 0x06, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x73, 0x00, 0x00, 0x05,
+    0x63, 0x68, 0x65, 0x63, 0x6b, 0x00, 0x01, 0x0a, 0x0b, 0x02, 0x04, 0x00, 0x41, 0x02, 0x0b, 0x04, 0x00, 0x20, 0x00,
+    0x0b,
   ]);
   assert.deepEqual(await runWasmChecks(module), [1]);
 });

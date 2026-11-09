@@ -211,11 +211,14 @@ Every build-phase exclusive request is refused and logged before queue/holder
 creation. Only the coordinator, with Scott's OK, may add an exact command, reason,
 approvedBy and future expiry to `scripts/gpu-exclusive-allow.json`; it is empty.
 
-# Deferred speed evidence
+## Sciviz deferred speed evidence
 
 Scott deferred all benchmarks, paired wall-clock A/Bs, timing-only assertions and exclusive GPU use during
 the build phase (2026-11-10). Correctness gates still run under the shared GPU lock.
 
+- Batch 171 flow foundation: CPU arithmetic is in one feature-local Rust/Wasm module, with one reservation,
+  no allocator calls during integration and chunks of at most 128 RK4 steps. No speed or SIMD gain is claimed;
+  comparison with an equivalent scalar reference and any SIMD throughput proof belong to the deferred speed phase.
 - Batch 181 CPU marching-cubes foundation: retain the existing scalar/SIMD output equality and case/triangle
   work evidence. A consistent end-to-end extraction gain still needs the quiet speed phase; no new A/B ran
   after deferral and no public ratio is claimed.

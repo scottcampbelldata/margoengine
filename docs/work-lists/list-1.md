@@ -6,7 +6,7 @@ Stays with the first account, the manager session. Listed so the other accounts 
 
 **Stream G, gaps:** the open gap list and the ragdoll items. Owns `packages/ragdoll` until they finish.
 
-**Stream C, game logic and links:** finish batch 88, then 89, 93, 94 (fsm, navmesh, behavior), 113, 114, 115 (net, netcode, save), 116 to 119 (xr, react, sciviz, mcp).
+**Stream C, game logic and links:** finish batch 88, then 89, 93, 94 (fsm, navmesh, behavior), 113, 114, 115 (net, netcode, save), 116 (xr), 117 (react), 118 (sciviz), 171 (sciviz flow and atmosphere, in progress on lane X; [progress](sciviz-progress.md)), then 119 (mcp).
 
 **Taken from list 2 (Scott, 2026-11-08):** batches 78 and 79 (vfx) and 100 to 103 (sprites, tilemap, pixel, text). Mark each `done` in `list-2.md` in the same push as its last job.
 

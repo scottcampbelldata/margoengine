@@ -611,6 +611,8 @@ export const entries = [
       'CPU isosurface level must be finite in float32',
       'CPU isosurface input and cases exceed the 2 GiB working-memory limit; use a coarser grid',
       'CPU isosurface vertices exceed the 2 GiB working-memory limit; use a coarser grid',
+      'Flow Wasm could not load; serve valid package assets',
+      'Flow memory could not grow; use a smaller grid or fewer frames',
       'Use WebGPU or webgl2-compat',
       'Use attachWebGL2 from sciviz/webgl2',
       'Attach SciRenderer first',
