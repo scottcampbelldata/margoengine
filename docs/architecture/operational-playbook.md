@@ -2876,6 +2876,14 @@ and camera-move disocclusion denoising remain open. An independently restarted c
 zero-error image corpus remains missing. No core/stage source or physics source changed.
 
 
+### Test-page follow-up: transition composition evidence (2026-11-09)
+
+Optional mask/custom transitions own distinct plugin/pass names and nested capture
+layers. Capture orders -80/-79/-78 reverse at composite orders 48/49/50, restoring
+the frame target in either attachment order. CPU tests use real Engine ownership;
+the spatial viewport oracle adds paired and three-kind compositions at 1x/4x.
+The expanded GPU gate is required before publishing the change. Core is unchanged.
+
 ### Test-page follow-up: environment lifetime evidence (2026-11-09)
 
 Environment direct disposal now removes its owning scene registration before

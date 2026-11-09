@@ -1824,6 +1824,14 @@ entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage re
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
 
+### Test-page transition coexistence (2026-11-09)
+
+Each scene supports one built-in, one mask and one custom frozen-frame transition.
+Names are transitions, transitions:mask and transitions:custom. Their independent
+capture targets nest in that order and unwind in reverse, including idle peers;
+overlapping active effects follow that fixed composition order. Each attached kind
+owns its own capture/history storage. Replace an existing kind by disposing it first.
+
 ### Test-page environment replacement (2026-11-09)
 
 Environment.dispose removes its owning scene registration and frees its resources;

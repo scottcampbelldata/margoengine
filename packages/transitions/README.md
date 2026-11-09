@@ -14,7 +14,14 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Built-in capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
+
+One built-in, one mask and one custom transition may coexist per scene, named
+`transitions`, `transitions:mask` and `transitions:custom`. Captures nest in that
+order (-80/-79/-78) and composites unwind in reverse (48/49/50), regardless of
+attachment order. Each keeps its own progress and outgoing image. An idle peer
+passes through its captured frame; overlapping active effects compose in that
+fixed nesting order. Dispose a particular kind before attaching its replacement.
 
 Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
 
@@ -49,11 +56,13 @@ Texture mask wipes use `@margoengine/transitions/mask` (or `margoengine/transiti
 ```ts
 import { Engine } from 'margoengine/core';
 import { createMaskTransition } from 'margoengine/transitions/mask';
+import { Transitions } from 'margoengine/transitions';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mask = new ImageData(new Uint8ClampedArray([
   0,0,0,255, 255,255,255,255,
   64,64,64,255, 192,192,192,255,
 ]), 2, 2);
+const builtIn = Transitions.attach(engine);
 const transition = createMaskTransition(engine, mask, { softness: 0.02 });
 engine.scene.background = '#0044ff';
 engine.render();
@@ -61,6 +70,7 @@ transition.start('wipe', 1);
 engine.scene.background = '#ff4400';
 engine.render({ delta: 0.5 });
 transition.dispose();
+builtIn.dispose();
 engine.dispose();
 ```
 

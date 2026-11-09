@@ -11,6 +11,8 @@ export interface CustomTransitionOptions {
 }
 
 class CustomTransition extends Transitions {
+  override readonly name = 'transitions:custom';
+  protected override readonly captureLayer = 2;
   constructor(code: string) {
     super();
     this.shaderCode = code;

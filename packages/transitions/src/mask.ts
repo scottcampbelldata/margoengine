@@ -12,6 +12,8 @@ export interface MaskTransitionOptions {
 }
 type Source = { width: number; height: number; data: Uint8ClampedArray } | ImageBitmap;
 class MaskTransition extends Transitions {
+  override readonly name = 'transitions:mask';
+  protected override readonly captureLayer = 1;
   private mask?: GPUTexture;
   private view?: GPUTextureView;
   constructor(

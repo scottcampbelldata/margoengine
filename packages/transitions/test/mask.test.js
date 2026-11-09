@@ -2,6 +2,8 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMaskTransition } from '../dist/mask.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { Transitions } from '../dist/index.js';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
 const original = globalThis.ImageData;
 globalThis.ImageData = class ImageData {
   constructor(data, width, height) {
@@ -18,6 +20,55 @@ const harness = () => {
   h.engine.gpu.limits.maxTextureDimension2D = 4096;
   return h;
 };
+
+test('test-page 24: built-in and mask transitions coexist and unwind captures in either attachment order', async () => {
+  for (const maskFirst of [false, true]) {
+    const h = harness();
+    const engine = new Engine(
+      { width: 16, height: 16 },
+      await TransformStore.create(4),
+      { backend: 'webgpu', gpu: h.engine.gpu, dispose() {} },
+      {},
+      null,
+    );
+    try {
+      let base, mask;
+      if (maskFirst) {
+        mask = createMaskTransition(engine, image());
+        base = Transitions.attach(engine);
+      } else {
+        base = Transitions.attach(engine);
+        mask = createMaskTransition(engine, image());
+      }
+      assert.equal(engine.plugins.get('transitions'), base);
+      assert.equal(engine.plugins.get('transitions:mask'), mask);
+      const frame = () => {
+        engine.frameGraph.execute(h.context);
+        assert.equal(h.context.color, h.originalColor, 'all capture targets unwind');
+        assert.equal(h.context.depth, h.originalDepth);
+      };
+      frame();
+      for (const effect of [base, mask]) {
+        effect.start('wipe', 0.2);
+        frame();
+        frame();
+        assert.equal(effect.progress, 1);
+      }
+      base.onDeviceRestored(engine);
+      mask.onDeviceRestored(engine);
+      frame();
+      base.dispose();
+      assert.equal(engine.plugins.get(mask.name), mask);
+      frame();
+      mask.dispose();
+      assert.equal(engine.plugins.size, 0);
+      assert.ok(h.resources.every(resource => resource.destroyed));
+    } finally {
+      engine.dispose();
+      h.cleanup();
+    }
+  }
+});
 test('mask bytes are owned, bound, restored and disposed, with hard and soft modes', async () => {
   for (const softness of [0, 0.000001, 0.02, 1]) {
     const h = harness();

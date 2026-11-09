@@ -59,6 +59,7 @@ export async function viewportChecks() {
       },
     });
     let effect;
+    let peers = [];
     let stacked = false;
     const frame = async (view, delta = 0) => {
       const views = stacked
@@ -99,28 +100,34 @@ export async function viewportChecks() {
               pixels++;
             }
         };
-        for (const kind of ['wipe', 'dissolve', 'radial', 'chromatic', 'custom', 'mask']) {
+        for (const kind of ['wipe', 'dissolve', 'radial', 'chromatic', 'custom', 'mask', 'mask-with-built-in', 'built-in-with-mask', 'custom-with-peers']) {
+          if (kind === 'mask-with-built-in' || kind === 'custom-with-peers') peers.push(Transitions.attach(engine));
+          if (kind === 'built-in-with-mask' || kind === 'custom-with-peers')
+            peers.push(createMaskTransition(engine, new ImageData(new Uint8ClampedArray([128, 128, 128, 255]), 1, 1)));
           effect =
-            kind === 'custom'
+            kind === 'custom' || kind === 'custom-with-peers'
               ? await createCustomTransition(
                   engine,
                   'fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return mix(sample(a,uv),sample(b,uv),p);}',
                 )
-              : kind === 'mask'
+              : kind === 'mask' || kind === 'mask-with-built-in'
                 ? createMaskTransition(engine, new ImageData(new Uint8ClampedArray([128, 128, 128, 255]), 1, 1))
                 : Transitions.attach(engine);
           await compare(`${kind} idle`);
-          effect.start(kind === 'custom' || kind === 'mask' ? 'wipe' : kind, 1, 0);
+          effect.start(['wipe', 'dissolve', 'radial', 'chromatic'].includes(kind) ? kind : 'wipe', 1, 0);
           await compare(`${kind} start`);
           await compare(`${kind} middle`, 0.5);
           await compare(`${kind} end`, 0.5);
           effect.dispose();
           effect = undefined;
+          for (const peer of peers) peer.dispose();
+          peers = [];
         }
       }
       if (errors.length) throw new Error(errors.join('\n'));
     } finally {
       effect?.dispose();
+      for (const peer of peers) peer.dispose();
       target.destroy();
       engine.dispose();
     }

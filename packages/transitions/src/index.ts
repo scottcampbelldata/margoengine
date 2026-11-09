@@ -44,7 +44,9 @@ fn dissolveThreshold(pixel:vec2u)->f32 {return f32(dissolvePcg(pixel.x+dissolveP
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class Transitions implements EnginePlugin {
-  readonly name = 'transitions';
+  readonly name: string = 'transitions';
+  /** Nest optional captures inside the built-in capture and composite them in reverse order. */
+  protected readonly captureLayer: number = 0;
   /** Shader source supplied by optional transition entries. */
   protected shaderCode: string = shader;
   /** Image bindings used by optional entries; images remain owned by the capture. */
@@ -105,8 +107,8 @@ export class Transitions implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
-      name: 'transitions:capture',
-      order: -80,
+      name: `${this.name}:capture`,
+      order: -80 + this.captureLayer,
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
         if (!floatOutput(c.format, c.descriptor.multisample?.count ?? 1))
@@ -170,8 +172,8 @@ export class Transitions implements EnginePlugin {
       },
     });
     graph.add({
-      name: 'transitions:blend',
-      order: 50,
+      name: `${this.name}:blend`,
+      order: 50 - this.captureLayer,
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
         this.elapsed = Math.min(this.duration, this.elapsed + c.delta);

@@ -183,3 +183,13 @@ transitions/test/scene-disposal.test.js passes without production changes: attac
 dispose twice, confirm ownership/registration removed, immediately reattach.
 The existing GPU test/gpu-browser.js also checks actual scene ownership. The
 reported premise that sceneOf is undefined for direct engine attachment is false.
+
+Entry 24 reproduces on main: attaching a mask after built-in Transitions gives
+Invalid plugin. Optional mask/custom entries now use distinct plugin and pass
+names. Captures nest built-in/mask/custom and composites unwind in reverse,
+independently of attachment order. Without that reverse ordering, merely renaming
+the passes would leave the final frame pointing at an intermediate target.
+transitions/test/mask.test.js fails on main and passes with the fix; it uses real
+Engine registration, both attachment orders, independent progress, device restore,
+capture restoration and independent disposal. The existing viewport GPU oracle
+now also covers all three kinds together; its gate remains required before push.
