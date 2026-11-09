@@ -1,3 +1,4 @@
+import { reportSpeedPhase, speedPhase } from '../../../scripts/support/speed-phase.mjs';
 // Real-GPU checks of @margoengine/compute (one GPU job at a time; from the repository root after building packages):
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/compute-browser.mjs
 // The page (compute-browser.js) checks map, reduce, scan, sort, argsort, sortByKey and histogram against CPU references
@@ -15,7 +16,11 @@ import { openBrowser } from '../../../scripts/browser.js';
 // The dev server serves the repository root, whichever folder `npm run test:browser` starts in.
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 
-const context = await openBrowser({ startPath: '/packages/compute/tests/compute.html', port: 5241 });
+reportSpeedPhase('compute browser');
+const context = await openBrowser({
+  startPath: `/packages/compute/tests/compute.html?speedPhase=${speedPhase()}`,
+  port: 5241,
+});
 const { page, hardware } = context;
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -44,10 +49,22 @@ try {
   const nn = await page.evaluate(() => window.runNnTests());
   const graph = await page.evaluate(() => window.runGraphTests());
   const autotune = await page.evaluate(() => window.runAutotuneTests());
-  console.log('autotune saxpy, 2M f32:', JSON.stringify(autotune.measured));
-  console.log('tuneCompute, 16M elements:', JSON.stringify(autotune.own));
+  if (speedPhase() === 'active') {
+    console.log('autotune saxpy, 2M f32:', JSON.stringify(autotune.measured));
+    console.log('tuneCompute, 16M elements:', JSON.stringify(autotune.own));
+  }
   const report = {
-    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks, ...subgroups.checks, ...nn.checks, ...graph.checks, ...autotune.checks],
+    speedPhase: speedPhase(),
+    checks: [
+      ...precise.checks,
+      ...core.checks,
+      ...extras.checks,
+      ...cpu.checks,
+      ...subgroups.checks,
+      ...nn.checks,
+      ...graph.checks,
+      ...autotune.checks,
+    ],
     timings: { ...core.timings, ...extras.timings, ...cpu.timings },
     adapter: core.adapter,
     preciseMath: precise.results,

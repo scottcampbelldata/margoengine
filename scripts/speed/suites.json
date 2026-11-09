@@ -205,6 +205,11 @@
     "limitMinutes": 20
   },
   {
+    "id": "packages/compute/tests/compute-browser.mjs",
+    "command": "node scripts/gpu-lock.mjs run --owner=compute-speed --max=4 --wait-max=60 --gpu=Compute_browser_real_kernels_and_deferred_throughput -- node packages/compute/tests/compute-browser.mjs",
+    "limitMinutes": 65
+  },
+  {
     "id": "packages/decoders/scripts/meshopt-simd-bench.mjs",
     "command": "node packages/decoders/scripts/meshopt-simd-bench.mjs",
     "limitMinutes": 20

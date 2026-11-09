@@ -1,3 +1,4 @@
+import { speedEnabled } from './speed-phase.mjs';
 // The CPU backend against the WebGPU backend on a real GPU: the same operations on the same inputs in both contexts,
 // compared element by element. Integer results, orders, counts and the Philox streams must match exactly; float
 // results to f32 rounding (WGSL lets GPU division and transcendental functions be off by a few ULP, and the GPU may
@@ -255,33 +256,35 @@ window.runCpuParityTests = async () => {
       `sparse ${name} converges on both backends: ${results.map((r) => r.iterations).join(' and ')} iterations`,
     );
   }
-  {
-    const A = laplacian(gpu, 256),
-      b = gpu.ones(256 * 256);
-    await cg(A, b, { maxIterations: 32 });
-    const t0 = performance.now(),
-      r = await cg(A, b, { tol: 1e-5 });
-    timings['cg 256^2 Poisson on webgpu, ms'] = +(performance.now() - t0).toFixed(1);
-    timings['cg 256^2 Poisson on webgpu, iterations'] = r.iterations;
-  }
+  if (speedEnabled()) {
+    {
+      const A = laplacian(gpu, 256),
+        b = gpu.ones(256 * 256);
+      await cg(A, b, { maxIterations: 32 });
+      const t0 = performance.now(),
+        r = await cg(A, b, { tol: 1e-5 });
+      timings['cg 256^2 Poisson on webgpu, ms'] = +(performance.now() - t0).toFixed(1);
+      timings['cg 256^2 Poisson on webgpu, iterations'] = r.iterations;
+    }
 
-  // The same jobs timed on both backends (wall clock, inputs already in place, GPU results waited for).
-  const time = async (label, ctx, run) => {
-    await run();
-    await ctx.done();
-    const t0 = performance.now();
-    for (let k = 0; k < 3; k++) {
+    // The same jobs timed on both backends (wall clock, inputs already in place, GPU results waited for).
+    const time = async (label, ctx, run) => {
       await run();
       await ctx.done();
+      const t0 = performance.now();
+      for (let k = 0; k < 3; k++) {
+        await run();
+        await ctx.done();
+      }
+      timings[label] = +((performance.now() - t0) / 3).toFixed(2);
+    };
+    for (const ctx of [gpu, cpu]) {
+      const x = ctx.array(floats(1 << 20, 3));
+      await time(`sort 1M f32 on ${ctx.backend}, ms`, ctx, () => ctx.sort(x).dispose());
+      await time(`sum 1M f32 on ${ctx.backend}, ms`, ctx, () => x.sum().dispose());
+      const a = ctx.array(floats(256 * 256, 4), { shape: [256, 256] });
+      await time(`matmul 256^3 on ${ctx.backend}, ms`, ctx, () => matmul(a, a).dispose());
     }
-    timings[label] = +((performance.now() - t0) / 3).toFixed(2);
-  };
-  for (const ctx of [gpu, cpu]) {
-    const x = ctx.array(floats(1 << 20, 3));
-    await time(`sort 1M f32 on ${ctx.backend}, ms`, ctx, () => ctx.sort(x).dispose());
-    await time(`sum 1M f32 on ${ctx.backend}, ms`, ctx, () => x.sum().dispose());
-    const a = ctx.array(floats(256 * 256, 4), { shape: [256, 256] });
-    await time(`matmul 256^3 on ${ctx.backend}, ms`, ctx, () => matmul(a, a).dispose());
   }
   gpu.dispose();
   cpu.dispose();

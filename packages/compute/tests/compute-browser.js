@@ -1,3 +1,4 @@
+import { speedEnabled } from './speed-phase.mjs';
 // Real-GPU checks of @margoengine/compute: every operation against a CPU reference written here, at sizes on both
 // sides of each block boundary (255/256/257, 1023/1024/1025, multi-level), plus views, broadcasting, kernels, errors,
 // abort, disposal, profiling and device sharing. Each check is named; the runner prints them.
@@ -756,28 +757,30 @@ window.runComputeTests = async () => {
     engine.dispose();
   });
 
-  // Timings at one million elements, after a warm-up; GPU pass times when timestamps are available.
-  const million = gpu.array(floats(1 << 20, 99, 1e6));
-  const time = async (label, run) => {
-    await run();
-    await gpu.done();
-    const t0 = performance.now();
-    for (let k = 0; k < 5; k++) {
+  if (speedEnabled()) {
+    // Timings at one million elements, after a warm-up; GPU pass times when timestamps are available.
+    const million = gpu.array(floats(1 << 20, 99, 1e6));
+    const time = async (label, run) => {
       await run();
       await gpu.done();
-    }
-    timings[label] = +((performance.now() - t0) / 5).toFixed(2);
-  };
-  await time('sum 1M f32, ms incl. readback', () => million.sum().item());
-  await time('fused (x-1)^2 mean 1M f32, ms incl. readback', () => million.sub(1).square().mean().item());
-  await time('cumsum 1M f32, ms', () => gpu.cumsum(million).dispose());
-  await time('sort 1M f32, ms', () => gpu.sort(million).dispose());
-  await time('argsort 1M f32, ms', () => gpu.argsort(million).dispose());
-  await time('histogram 1M f32 256 bins, ms', () => {
-    const h = gpu.histogram(million, { bins: 256 });
-    h.counts.dispose();
-    h.edges.dispose();
-  });
+      const t0 = performance.now();
+      for (let k = 0; k < 5; k++) {
+        await run();
+        await gpu.done();
+      }
+      timings[label] = +((performance.now() - t0) / 5).toFixed(2);
+    };
+    await time('sum 1M f32, ms incl. readback', () => million.sum().item());
+    await time('fused (x-1)^2 mean 1M f32, ms incl. readback', () => million.sub(1).square().mean().item());
+    await time('cumsum 1M f32, ms', () => gpu.cumsum(million).dispose());
+    await time('sort 1M f32, ms', () => gpu.sort(million).dispose());
+    await time('argsort 1M f32, ms', () => gpu.argsort(million).dispose());
+    await time('histogram 1M f32 256 bins, ms', () => {
+      const h = gpu.histogram(million, { bins: 256 });
+      h.counts.dispose();
+      h.edges.dispose();
+    });
+  }
   const info = gpu.device.adapterInfo ?? {};
   gpu.dispose();
   return { checks, timings, adapter: { vendor: info.vendor, architecture: info.architecture } };

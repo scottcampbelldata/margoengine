@@ -2239,3 +2239,13 @@ The direct-disposal parent regression is red and the owner-removal control is
 green; both pass after repair, including old/new context/array disposal and
 same-name isolation. All 111 compute units pass. Focused GPU and complete
 package GPU/README execution remain separate acceptance requirements.
+
+### Compute mixed gate evidence
+
+The browser runner's phase/source regression fails on the previous unconditional
+throughput blocks. In deferred mode no throughput clock or hardware calibration
+call executes; the source guard pins every call and the four deferred measurement
+callbacks. Value/error checks stay live. Every permitted SAXPY candidate now
+checks all 2M outputs exactly and every original two-dimensional candidate checks
+its whole 512-square grid. All original timing cases remain for the active named
+release suite. This is a test-policy claim, not a new compute speed result.

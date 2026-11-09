@@ -3408,3 +3408,14 @@ registration remained; the default sentinel was removed. The frame entry now
 resolves sceneOf(this). Its direct-disposal regression fails before repair and
 both direct and owner-removal cases pass after repair. Package units pass
 111/111. GPU/README acceptance and the wider audit remain pending.
+
+### Compute correctness gate ran deferred benchmarks
+
+Cause: the core, extras, CPU-parity and autotune browser modules embedded
+throughput/calibration blocks without reading scripts/speed-phase.json. The
+runner now forwards the central phase and every benchmark clock/calibration
+is gated. All original speed cases and assertions remain in the named release
+suite. Every correctness callback remains live, with full-output direct GPU
+checks for all original SAXPY/grid candidates and unchanged own-kernel cases.
+The new source/policy regression fails on the parent; current regressions pass.
+No benchmark was executed to diagnose or prove this repair.

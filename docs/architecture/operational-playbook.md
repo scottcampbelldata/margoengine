@@ -4424,3 +4424,15 @@ same-name default preservation, replacement and context/array release. Both
 cases and all 111 compute units pass. The shader/compute source guard covers
 this EnginePlugin in verify/check:merge. No shader arithmetic, core or stage
 change. Focused and complete GPU/README results are recorded separately.
+
+### Section 5 evidence: compute mixed speed gate
+
+The compute browser driver now forwards the central build/release phase into
+its page, records it in its receipt and defers embedded throughput and hardware
+calibration blocks. Original speed scenes and assertions remain in the named
+release suite. All value/error checks stay active, including exact direct
+SAXPY/grid outputs at every original candidate and unchanged 300,001-element
+integer kernels. Clock/cache semantics retain scripted-device unit coverage.
+The AST regression protects every timing call and the explicit set of deferred
+callbacks. It fails against the parent. Research, scope and retained measurements
+are in clean-room.md and work-lists/speed-phase.md. No speed work ran here.

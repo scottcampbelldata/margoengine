@@ -3147,3 +3147,32 @@ and compatibility backends. Its first attempt omitted the required viewport;
 the corrected view supplies [0,0,1,1], with the original failed log retained.
 GPU and runtime README results are recorded separately, without acceptance
 inferred from the unit regression.
+
+### Compute correctness runner and deferred throughput
+
+Before changing the mixed runner, searched benchmark-methodology literature and
+compared Torsten Hoefler and Roberto Belli,
+[Scientific Benchmarking of Parallel Computing Systems (2015)](https://htor.inf.ethz.ch/publications/index.php?pub=222)
+(abstract), Todd Mytkowicz, Amer Diwan, Matthias Hauswirth and Peter F. Sweeney,
+[Producing Wrong Data Without Doing Anything Obviously Wrong! (2009)](https://sape.inf.usi.ch/publications/asplos09.html)
+(abstract), and the W3C Web Performance Working Group,
+[High Resolution Time (2026)](https://www.w3.org/TR/hr-time-3/)
+(clock contract). Measurement variability and experimental design concern speed
+evidence; a monotonic clock does not make an uncontrolled run a speed proof.
+Our application follows Scott's explicit deferral: value/error/work-count tests
+run now, throughput and hardware winner measurements remain for the active phase.
+No companion code or foreign implementation was inspected.
+
+The compute browser gate previously executed throughput blocks unconditionally.
+It now inherits the central phase, records it in its JSON report and gates every
+throughput clock and hardware autotune call. All old timing scenes, sizes,
+warmups, repeats and assertions remain intact for the active phase, now listed
+in the named release suite. Clock/cache semantics still run in scripted-device
+unit tests. Live GPU correctness additionally computes all 2M SAXPY values at
+every permitted candidate and the complete original 512-square grid at all four
+original two-dimensional candidates. The original 300,001-element integer
+reduce/scan/sort/sortByKey checks at all five workgroup sizes remain live.
+No correctness callback or numeric tolerance is deferred or weakened. The source
+guard fails against the parent and rejects missing/constant/else guards; it also
+pins the complete set of phase-gated callbacks so unrelated correctness cannot
+silently move behind the flag. No benchmark or wall-clock A/B was run here.

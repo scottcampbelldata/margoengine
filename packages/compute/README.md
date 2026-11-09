@@ -664,3 +664,9 @@ const x = gpu.array([1e6, -2]);
 console.log(await x.sin().read(), await x.pow(3).read()); // the same on every GPU: [-0.34999, -0.90930], [1e18, -8]
 console.log(fast.fastMath, (await fast.array([1.5]).sin().read())[0]); // true, within 2^-11 of 0.99749
 ```
+
+The browser correctness gate reads the repository's speed phase. During the
+build phase it executes value/error checks and exact candidate-output checks,
+while throughput and hardware winner measurements are explicitly deferred.
+All original measurement scenes remain in the named release speed suite;
+public `autotune` and `tuneCompute` behavior is unchanged.

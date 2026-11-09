@@ -2660,3 +2660,11 @@ jobs and replaces the context without detaching registration. Unit evidence
 uses a real engine and inert device; the focused GPU fixture checks 1,024 exact
 four-step values on each backend. GPU/README results are recorded separately;
 no new compute capability, kernel, core/stage or speed claim is introduced.
+
+### Compute browser gate phase
+
+Compute throughput and hardware winner measurements run only in the active
+speed phase. Correctness continues to use all original sizes and tolerances,
+with exact full-output checks at each SAXPY/grid candidate. Deferred timings
+are reported as absent, never as a replacement passing speed number. No compute
+algorithm, public feature, core/stage or size ceiling changes in this gate repair.

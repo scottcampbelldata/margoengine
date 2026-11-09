@@ -1,3 +1,4 @@
+import { speedEnabled } from './speed-phase.mjs';
 // Real-GPU checks of the @margoengine/compute entries: linalg, fft, signal, random, stream and frame, each against a
 // CPU reference written here.
 import { Engine, box, PbrMaterial } from '@margoengine/core';
@@ -447,29 +448,31 @@ window.runExtrasTests = async () => {
     },
   );
 
-  // Throughput: a 1024 x 1024 matmul, a 2^20-point FFT and 2^24 normals.
-  const time = async (label, run) => {
-    await run();
-    await gpu.done();
-    const t0 = performance.now();
-    for (let k = 0; k < 5; k++) {
+  if (speedEnabled()) {
+    // Throughput: a 1024 x 1024 matmul, a 2^20-point FFT and 2^24 normals.
+    const time = async (label, run) => {
       await run();
       await gpu.done();
-    }
-    timings[label] = +((performance.now() - t0) / 5).toFixed(2);
-  };
-  const A = gpu.array(floats(1024 * 1024, 1), { shape: [1024, 1024] }),
-    B = gpu.array(floats(1024 * 1024, 2), { shape: [1024, 1024] });
-  await time('matmul 1024^3 f32, ms', () => matmul(A, B).dispose());
-  timings['matmul 1024^3 f32, GFLOP/s'] = +((2 * 1024 ** 3) / (timings['matmul 1024^3 f32, ms'] * 1e6)).toFixed(1);
-  const signal = gpu.array(floats(1 << 20, 3));
-  await time('fft 2^20 points, ms', () => {
-    const s = fft(signal);
-    s.re.dispose();
-    s.im.dispose();
-  });
-  const random = new Random(gpu, { seed: 9 });
-  await time('normal 2^24 samples, ms', () => random.normal(1 << 24).dispose());
+      const t0 = performance.now();
+      for (let k = 0; k < 5; k++) {
+        await run();
+        await gpu.done();
+      }
+      timings[label] = +((performance.now() - t0) / 5).toFixed(2);
+    };
+    const A = gpu.array(floats(1024 * 1024, 1), { shape: [1024, 1024] }),
+      B = gpu.array(floats(1024 * 1024, 2), { shape: [1024, 1024] });
+    await time('matmul 1024^3 f32, ms', () => matmul(A, B).dispose());
+    timings['matmul 1024^3 f32, GFLOP/s'] = +((2 * 1024 ** 3) / (timings['matmul 1024^3 f32, ms'] * 1e6)).toFixed(1);
+    const signal = gpu.array(floats(1 << 20, 3));
+    await time('fft 2^20 points, ms', () => {
+      const s = fft(signal);
+      s.re.dispose();
+      s.im.dispose();
+    });
+    const random = new Random(gpu, { seed: 9 });
+    await time('normal 2^24 samples, ms', () => random.normal(1 << 24).dispose());
+  }
   gpu.dispose();
   return { checks, timings };
 };

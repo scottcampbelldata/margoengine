@@ -333,3 +333,21 @@ regression threshold. Publish CPU/GPU/frame, memory, download bytes, draw/pass a
 allocation counts with output comparisons. Include every loss and accepted work
 difference, plus a like-for-like row, in the whitepaper perf files and reproduce.md.
 Only Scott can end deferral; no new speed number or rival-performance claim exists.
+
+## Compute mixed-browser throughput continuation
+
+`packages/compute/tests/compute-browser.mjs` is now a named release suite entry.
+The default correctness run prints deferral and reports empty throughput timings;
+it still executes every value/error check, all permitted 2M SAXPY candidates,
+all four 512-square grids and all five 300,001-element own-kernel settings.
+Scripted-device clock/cache tests remain enabled.
+
+Retained unchanged for the active phase: 1M-element sum, fused mean, scan,
+sort, argsort and 256-bin histogram (warmup plus five rounds); 1024-cubed
+matmul, 2^20 FFT and 2^24 normals (warmup plus five rounds); GPU/CPU 1M sort
+and sum and 256-cubed matmul (warmup plus three rounds); 256-square Poisson CG
+(warmup32 then tol1e-5); 2M SAXPY hardware autotuning and store/cache reuse;
+512-square grid autotuning with [[8,8],[16,16],[32,8],[64,1]] and three trials;
+16M-element tuning of reduce/scan/sort, chosen-minimum consistency and the final
+5,000-element sum. There is no new speed target or raised budget. Only Scott
+ends deferral; the full named suite remains required before release.
