@@ -15,8 +15,9 @@ for (const samples of [4, 1])
     });
     const v = written(log, 144),
       light = h.engine.lighting;
-    // Camera matrix, eye and half the far distance, sun direction and strength (w times intensity), size, colour.
-    assert.deepEqual([...v.subarray(20, 23)], [...light.direction.subarray(0, 3)]);
+    // Camera matrix, eye and half the far distance, unit sun direction and strength (w times intensity), size, colour.
+    const k = Math.hypot(...light.direction.subarray(0, 3));
+    assert.deepEqual([...v.subarray(20, 23)], [...light.direction.subarray(0, 3)].map((d) => Math.fround(d / k)));
     assert.equal(v[23], light.direction[3] * 0.5);
     assert.equal(v[19], 250, 'half of the 500 far distance');
     assert.deepEqual([...v.subarray(24, 28)], [1280, 720, 20, 1]);
@@ -46,7 +47,7 @@ test('LensFlare takes the sun from a callback (sky.lights[0].direction) and vali
     h.gpu.record(() => h.frame()),
     144,
   );
-  assert.deepEqual([...v.subarray(20, 24)], [0, 1, -1, Math.fround(2 * 0.1)]);
+  assert.deepEqual([...v.subarray(20, 24)], [0, Math.fround(Math.SQRT1_2), -Math.fround(Math.SQRT1_2), Math.fround(2 * 0.1)]);
   assert.deepEqual([...v.subarray(28, 31)], [1, 0.5, 0.25]);
   sun.fill(0);
   assert.throws(() => h.frame(), { name: 'MargoError', code: 'state', message: /nonzero direction/ });

@@ -33,7 +33,7 @@ struct F {camera:mat4x4f,eye:vec4f,sun:vec4f,size:vec4f,color:vec4f}
 @group(0) @binding(0) var<uniform> f:F;
 struct Sun {pixel:vec2f,depth:f32,valid:bool}
 fn sunPosition()->Sun {
-let clip=f.camera*vec4f(f.eye.xyz+normalize(f.sun.xyz)*f.eye.w,1.0);
+let clip=f.camera*vec4f(f.eye.xyz+f.sun.xyz*f.eye.w,1.0);
 if(clip.w<=0.0||f.sun.w<=0.0){return Sun(vec2f(0),0.0,false);}
 let n=clip.xyz/clip.w;
 return Sun(vec2f(n.x*0.5+0.5,0.5-n.y*0.5)*f.size.xy,n.z,n.z>=0.0&&n.z<=1.0);
@@ -171,9 +171,9 @@ export class LensFlare implements EnginePlugin {
     v.set(c.camera.position, 16);
     // The sun's point: halfway to the far plane along its direction (any point on that ray projects alike in perspective).
     v[19] = c.camera.far * 0.5;
-    v[20] = sun[0];
-    v[21] = sun[1];
-    v[22] = sun[2];
+    // The unit direction, normalized here: shaders never normalize a uniform-only light value (core's frame light).
+    const k = Math.hypot(sun[0], sun[1], sun[2]);
+    for (let i = 0; i < 3; i++) v[20 + i] = sun[i] / k;
     v[23] = (sun.length > 3 ? Math.max(0, sun[3]) : 1) * (o.intensity ?? 0.1);
     v[24] = c.width;
     v[25] = c.height;

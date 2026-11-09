@@ -739,7 +739,7 @@ test('capture hook (contract v1): lit and material-patched variants get a captur
   ]) {
     const code = capturePBR(source, declarations),
       k = source.includes('fn layers(')
-        ? 'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))'
+        ? 'layers(s,v,f.light.xyz,vec3f(1))-layers(s,v,f.light.xyz,vec3f(0))'
         : 'vec3f(1)';
     assert.ok(code.startsWith(declarations));
     assert.ok(!code.includes('@fragment fn fragment('));

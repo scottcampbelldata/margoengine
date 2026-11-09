@@ -30,6 +30,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { worldRadius } from '../../shared/sphere.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -595,7 +596,7 @@ export class LODSystem implements EnginePlugin {
     const f = this.frame;
     f.set(c.camera.matrix);
     f.set(c.camera.position, 16);
-    f.set(e.lighting.direction, 20);
+    unitLight(f, 20, e.lighting.direction);
     f.set(e.lighting.radiance, 24);
     f[28] = +(c.format === 'rgba16float');
     f[29] = +(samples > 1);
@@ -750,7 +751,7 @@ export class LODSystem implements EnginePlugin {
     this.sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear', mipmapFilter: 'linear' });
     const v = this.castValues;
     v.set(matrix);
-    v.set(this.engine!.lighting.direction, 16);
+    unitLight(v, 16, this.engine!.lighting.direction);
     device.queue.writeBuffer(this.castUniform!, cascade * 256, v);
     pass.setPipeline(this.castPipeline);
     for (const a of this.atlases) {

@@ -11,6 +11,7 @@ import { windShader, validateWind, type ScatterWind } from './wind.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -354,7 +355,7 @@ export class ScatterInstances implements EnginePlugin {
     }
     this.values.set(c.camera.matrix);
     this.values.set(c.camera.position, 16);
-    this.values.set(this.engine!.lighting.direction, 20);
+    unitLight(this.values, 20, this.engine!.lighting.direction);
     this.values.set(this.engine!.lighting.radiance, 24);
     this.values.fill(1, 28, 31);
     if (this.engine!.lighting.ambient) this.values.set(this.engine!.lighting.ambient, 28);

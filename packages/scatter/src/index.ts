@@ -36,6 +36,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { OrderedCull, candidateShader } from './order.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -901,7 +902,7 @@ export class Scatter implements EnginePlugin {
       }
       this.pbrValues.set(c.camera.matrix);
       this.pbrValues.set(c.camera.position, 16);
-      this.pbrValues.set(this.engine!.lighting.direction, 20);
+      unitLight(this.pbrValues, 20, this.engine!.lighting.direction);
       this.pbrValues.set(this.engine!.lighting.radiance, 24);
       this.pbrValues.fill(1, 28, 31);
       if (this.engine!.lighting.ambient) this.pbrValues.set(this.engine!.lighting.ambient, 28);

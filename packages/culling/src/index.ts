@@ -8,6 +8,7 @@ import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from '.
 import { OccluderList, type OccluderInput } from './occluders.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
+import { unitLight } from '../../shared/unit-light.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
 export type { OccluderContext, OccluderInput, OccluderMesh, OccluderPrimitive, OccluderSource } from './occluders.js';
@@ -528,7 +529,7 @@ export class CulledInstances implements EnginePlugin {
     const lighting = this.engine!.lighting;
     this.frame.set(c.camera.matrix);
     this.frame.set(c.camera.position, 16);
-    this.frame.set(lighting.direction, 20);
+    unitLight(this.frame, 20, lighting.direction);
     this.frame.set(lighting.radiance, 24);
     this.frame.fill(1, 28, 31);
     if (lighting.ambient) this.frame.set(lighting.ambient, 28);

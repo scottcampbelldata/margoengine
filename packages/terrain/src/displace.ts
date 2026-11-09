@@ -85,7 +85,7 @@ fn terrainDisplaceBound(lo:vec2f,hi:vec2f,reference:f32,top:i32)->f32 {
   return m;
 }
 fn terrainDisplaceSun(p:vec3f,normal:vec3f,depth:f32)->f32 {
-  let l=normalize(frame.light.xyz);let up=dot(l,normal);let t=l-normal*up;let run=length(t.xz);
+  let l=frame.light.xyz;let up=dot(l,normal);let t=l-normal*up;let run=length(t.xz);
   if(up<=0.0||run<0.0001){return 1.0;}
   let dir=t.xz/run;let side=f32(textureDimensions(terrainDisplaceMax).x);let top=i32(textureNumLevels(terrainDisplaceMax))-1;
   var reference=0.0;var first=0u;var root=0.0;

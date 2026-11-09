@@ -13,6 +13,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { viewSize } from '../../shared/view-rect.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type HailPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -180,7 +181,7 @@ fn place(start:vec2f,drift:f32)->vec3f {
   // Lit: the ball's normal from the place across the streak; Lambert diffuse from the sun plus the ambient light, so the
   // side away from the sun lies in the stone's own shadow, and a Blinn-Phong glint of the sun on the ice.
   let n=normalize(i.across*i.uv.x+i.view*sqrt(max(0.0,1.0-i.uv.x*i.uv.x)));
-  let l=normalize(h.light.xyz);
+  let l=h.light.xyz;
   let sun=h.radiance.rgb*h.light.w;
   let diffuse=max(dot(n,l),0.0);
   let glint=pow(max(dot(n,normalize(l+i.view)),0.0),40.0)*0.6;
@@ -393,7 +394,7 @@ export class Hail implements EnginePlugin {
     // Lit stones take the scene's light: core's sun direction and strength, its colour, the ambient strength and colour.
     const light = this.engine?.lighting,
       chips = o.splashes ?? 4;
-    v.set(light?.direction ?? [3, 5, 4, 3], 44);
+    unitLight(v, 44, light?.direction ?? [3, 5, 4, 3]);
     v.set(light?.radiance ?? [1, 1, 1, 0.15], 48);
     v.set(light?.ambient ?? [1, 1, 1], 52);
     v[55] = 0;

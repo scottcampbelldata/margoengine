@@ -87,7 +87,7 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), '6226aa463c11ff9e829728474e5f15f4f61954a8586c712d0c05a132704a4cec');
+  assert.equal(hash(h.context.shader), '49c89f8da658d3e313938342c907e7ff130284bae3d44d5c88a17a8073581882');
   assert.equal(hash(lights.pbr(2).declarations), 'b428afc965ca69c1611fc468a1b7c578a3e415a07e2ac04d8f5a47a5a6424307');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),

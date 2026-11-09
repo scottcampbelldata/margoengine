@@ -1052,6 +1052,18 @@ radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoe
 drawing through `VATCrowd`'s pipeline code. Its proof runs the stage's own `skinned` function from a compute shader, since a
 vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its frame cost.
 
+### Uniform-only inexact operations
+
+A shader result must not depend on how the driver evaluates an expression of uniforms only. On ANGLE D3D11 with
+an NVIDIA RTX A6000, core's `normalize(frame.light.xyz)` returned one of two values an ulp apart depending on GPU
+load, while per-pixel expressions with the same bytes stayed exact; captures then differed in 24 binary16
+components. Core now uploads the unit light direction (float64 normalize, one float32 rounding) and every shader
+reads `.light.xyz` without `normalize` or `length`; every package uniform that copies the light is
+written through `shared/unit-light.js`, and sun options are normalized on the CPU the same way. `packages/core/tests/unit-light.test.js` checks the upload and scans every package source for
+both patterns (a normalized light uniform, a raw `lighting.direction` write); `capture-stability-browser.mjs --compat --gpu-load=3000` reproduces the old failure. Evidence exists
+for this one GPU and driver; other vendors, and other uniform-only inexact builtins (division, sqrt, pow on uniforms
+alone), have no scan or GPU evidence yet.
+
 ### Particle shadow depth and node vectors
 
 `@margoengine/vfx/shadows` draws each live particle as a sphere impostor. WebGPU clips a primitive whose clip z is outside [0, w] (WebGPU specification, primitive clipping) before the fragment stage. The quad's clip z stays inside that interval when the sphere's depth interval meets [0, 1], so a centre past the cascade far plane still draws a front that is in range. The fragment writes the geometric depth, `centerZ - sqrt(max(0, 1 - x^2 - y^2)) * depthRadius`, clamped to [0, 1]. A sphere whose whole depth interval is past the far plane still clips.

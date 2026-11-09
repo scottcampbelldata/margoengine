@@ -3447,100 +3447,27 @@ subnormal input. No assertion or tolerance is weakened.
 
 Explicit TAA/TAAUpscale disposal called removePlugin on the active default scene after setup had returned. With matching names it disposed the unrelated default effect and left the secondary effect registered. Both classes now detach through sceneOf(this). The scene-owner regression uses real engine scene registries, asserts same-name isolation, and permits replacement after repeated disposal.
 
-### Open: batch 56 compatibility refractor capture value failure
+### Fixed 2026-11-09: uniform-only light normalize shaded identical frames differently
 
-On local batch-56-fixes 780782f3c (production tree dfd006c47, based on
-f13245ca3), run node scripts/env-mirror-gpu-check.js --compat under a shared
-GPU lock after building. The 4x-MSAA check that toggles the yellow box entirely
-in front of the refractor reported maxTexelDifference 0.000244140625, against
-its unchanged exact-zero requirement. The other 64 mirror assertions passed.
-Hardware: ANGLE Direct3D11, NVIDIA RTX A6000, Windows, Node 26.12.0.
-Evidence: test-results/56fix/resume-gpu-environment-test-gpu-mirror-12.log and
-test-results/env-mirror/gpu.json. This is a value failure, not a busy-time waiver.
-
-The root cause is not established. A fresh-scene diagnostic compares alternating
-box visibility plus identical repeated states at 1x and 4x: every component is
-identical. A separate full-prefix diagnostic (including orthographic, TAA,
-roughness and normal-map cases) also sees exact equality; its negative clipBias
-control changes capture values by 0.2783203125. Thus neither clipping failure
-nor prior-state contamination is yet proved. These diagnostics do not clear the
-failed gate. Retain its exact assertion and capture differing texel coordinates,
-raw values and backend state on a reproduction before changing the owner.
-No test, tolerance, timeout or production source was changed for this failure.
-
-Coordinator baseline and bisection (2026-11-09): plain origin/main 7289abf3b,
-rebuilt in this lane, passes all 65 unchanged compatibility mirror assertions
-in 106.893 seconds including teardown. The retained report is
-test-results/56fix/main-baseline-compat-mirror-report.json. Prefix fe38730b6
-(finite studio direction, temporal camera and view state repairs) passes all
-65 assertions, with zero differing raw glass components at both 4x and 1x.
-The exact original 4x capture assertion and its full preceding render sequence
-also pass at c8a6a45f5 and 5547d516e (all five original repairs). On full local
-061bd5e82, an instrumented version passes that same assertion and records 97 GL
-calls plus unchanged readback values. Evidence: bisect-prefix-compat-mirror,
-bisect-owning-compat-capture, bisect-five-compat-capture and
-bisect-head-state-capture logs/JSON in test-results/56fix.
-
-No tested checkpoint reproduces the earlier difference, so these observations
-do not establish a causal commit or close the defect. A new 64-pair diagnostic
-on 9043ebaee, rebased onto 9b62132bb, exceeded its 105-second shared-lock limit
-and its process tree was killed (coordinator-repeat-capture.log, exit 124).
-It persisted no completed comparison report or per-pair progress, so it proves
-neither completion nor a particular engine hang. Do not count it as passed or
-retry it as an acceptance gate. The capture diagnostics need progress evidence
-to distinguish finite readback work from a stalled operation.
-
-Bounded follow-up on 9043ebaee completed all 12 paired captures in 80.780
-seconds, without a timeout. One pair failed (pair 0, immediately after the
-negative clip-bias controls), with 24 changed components distributed across
-the image and a maximum difference of 2^-12. The other eleven pairs were
-identical. Both images, exact coordinates and component values are preserved
-in test-results/56fix/mirror-repeat/capture.json, with durable per-pair progress
-and the failing process result in resume-bounded-repeat.log/.json. This is a
-measured value failure (1/12), not an acceptance run or a retry to green.
-
-
-After rebasing onto 854a90ac4, the readback-isolation experiment again completes
-12 pairs with exactly the same 24 components differing in pair 0 (1/12).
-Each image is downloaded twice without rendering between downloads: every
-component agrees between those two reads. At the differing coordinates, raw
-GL FLOAT values already equal the differing binary16 values; CPU conversion
-does not introduce this mismatch. All camera and mesh buffer uploads for the
-two captures are byte-identical. Evidence is
-test-results/56fix/mirror-readback-isolation/result.json and
-resume-readback-isolation-pre.log/.json (86.218 seconds, failed exact assertion).
-A reduced glass-only sequence produces the same 24-component failure without
-the mirror, TAA, orthographic or roughness prefix. Its report completed, but
-cleanup exceeded the 45-second shared-lock limit and the tree was killed;
-resume-minimal-isolation.log/.json is not a completed acceptance run. Heavier
-GL-call instrumentation produces equality and does not close this defect.
-The owner is still being narrowed between rasterization and resolve state;
-neither a race nor an uninitialized read has been established as the cause.
-
-The inherited full verify completed with 13,704/13,705 passing, zero skips,
-and only tests/no-private-paths.test.js failing on the GPU-lock report's
-excluded-folder pointer. That pointer was already repaired on current main.
-After rebasing, the unchanged focused regression passes; the previous full
-verify result is retained and reused, not represented as an all-green run.
-Post-rebase build, lint, hygiene and API generation pass. No capture fix is
-accepted or pushed while the value failure and remaining GPU gates are open.
-
-Permanent regression: packages/environment/tests/capture-stability-browser.mjs,
-wired into test:gpu:mirror for both backends. Its first compatibility run on
-the full repair stack fails in 1/12 pairs at the same 24 coordinates; the
-original clipping pair remains exact and the negative control remains
-0.2783203125. The process completes with the exact assertion failure
-(resume-capture-regression.log/.json, 49.935 seconds including shared admission).
-A separate 1x-sampling comparison completes 12/12 pairs with no differences
-(resume-capture-1x.log/.json, 26.102 seconds including admission), so the current
-reproduction requires multisampling. This does not attribute it to resolution
-rather than multisampled rasterization. A two-pair clip-state diagnostic also
-fails: every earlier capture equals the later stable image; only the first
-capture after restoring the clip plane differs. Its report and input bytes are
-in test-results/56fix/mirror-clip-state/result.json (23.181 seconds, exit 1).
-An additional pre-main-copy diagnostic produced no report before its 60-second
-limit and was killed; resume-before-main.log/.json cannot establish an engine
-hang or any raster/resolve cause. No timeout is waived or assertion changed.
+Symptom: on the WebGL2 compatibility layer (ANGLE D3D11, NVIDIA RTX A6000) a refractor capture
+differed from an identical earlier capture in 24 components by 2^-12 (packages/environment/tests/
+capture-stability-browser.mjs). It appeared only while other work loaded the GPU, at 1x and 4x
+alike, unrelated to the clip plane or the resolve. Cause: core's lighting shader computed
+`normalize(frame.light.xyz)`, an expression of uniforms only. Under GPU load the driver path
+evaluated it to one of two values an ulp apart, so nl and the half vector moved by an ulp in
+every pixel and some components rounded to a different binary16 value. Probes showed the
+interpolated position, normal, colour, eye and raw light bytes stable, the uniform-only
+normalize flipping, and the same normalize made per-pixel stable. Fix: core writes the unit
+direction, normalized once on the CPU in float64 and rounded to float32, into frame.light, and
+no shader normalizes a light or sun uniform any more. Every package that writes the engine light
+into its own uniform (animation, creative, culling, environment probes, gltf-pro, lod, post,
+scatter, selection, terrain, voxel, water, weather, xr) goes through shared/unit-light.js; lens
+flare and creative god rays normalize their sun option the same way. Regressions:
+packages/core/tests/unit-light.test.js (upload values, and a scan that fails on a normalize or
+length of a light, sun or light-record direction uniform, or on a raw frame write of
+`lighting.direction`) and the capture test with `--compat --gpu-load=3000`, each capture in its
+own page task: the old shader fails it (pair 0, the same 24 components, 2^-12) and the fix
+passes 12 of 12 pairs at the exact-zero bar.
 
 ### Batch 56 remaining terrain disposal repair
 
@@ -3599,9 +3526,8 @@ in the [gate receipt](whitepaper/results/batch-56-owner-gates-20261109.json); no
 The coordinator lifted the push hold for the five review repairs and the proven
 owner/compute fixes. The intentionally failing capture-stability regression is
 retained as the final local commit on batch-56-fixes and is excluded from main,
-including its package-script wiring. The capture defect remains open with the
-independent capture-msaa-hunt owner; its branch was not changed. The permanent
-regression description above records local evidence, not mainline gate wiring.
+including its package-script wiring. The capture-msaa-hunt branch later landed
+that regression with the root-cause fix (see the fixed uniform-only light entry).
 The wider owner audit remains open. The post-rebase receipt records the checks
 affected by merged documentation, API metadata and GPU-lock tooling; the unchanged
 package execution proofs and historical full verify are retained honestly.

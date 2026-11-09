@@ -28,6 +28,7 @@ import {
 import { margoError } from '../../shared/errors.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 /**
  * Ground height in metres above `radius` at a unit direction from the planet's centre (float64). `detail` is the
@@ -247,7 +248,7 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
     base=mix(base,vec3f(0.33,0.31,0.29),max(smoothstep(0.3,0.5,slope),smoothstep(0.45,0.65,t)));
     base=mix(base,vec3f(0.85,0.87,0.9),smoothstep(0.68,0.75,t)*(1-smoothstep(0.35,0.55,slope)));
   }
-  let nl=clamp(dot(n,normalize(planet.light.xyz)),0.0,1.0);
+  let nl=clamp(dot(n,planet.light.xyz),0.0,1.0);
   let linear=base/3.14159265*nl*planet.radiance.xyz*planet.light.w+base*planet.radiance.w;
   if(planet.params.y>0.5){return vec4f(linear,1);}
   return vec4f(toDisplay(linear),1);
@@ -777,7 +778,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       l = this.#local();
     u.set(this.#viewProj);
     u.set([l[0] - eye[0], l[1] - eye[1], l[2] - eye[2], this.radius], 16);
-    u.set(e.lighting.direction, 20);
+    unitLight(u, 20, e.lighting.direction);
     u.set(e.lighting.radiance, 24);
     u.set(
       [

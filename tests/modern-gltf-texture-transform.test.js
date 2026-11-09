@@ -9,7 +9,7 @@ import { optionalGPU } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // GPU-verified derivative frame correction changes shader text while retaining the frame and group ABI.
-const baselineShader = '522dffb290fb1910a93a43e10fb3c1e508b95b02470f6e8e2deef9a937896bb4';
+const baselineShader = '20ea22e385536a54b32de541f69bfc9e75258364a0d1443de0975bacc6ca4297';
 async function scene(fixture = materialQuad(), image = true) {
   const harness = optionalGPU(),
     store = await TransformStore.create(16),

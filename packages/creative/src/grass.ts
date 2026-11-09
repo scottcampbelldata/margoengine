@@ -17,6 +17,7 @@ import grassShader from './shaders/grass.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass } from '../../shared/pass.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -325,7 +326,7 @@ export class GrassField implements EnginePlugin {
     f.set(camera.matrix);
     f.set(camera.planes, 16);
     f.set(camera.position, 40);
-    f.set(this.engine!.lighting.direction, 44);
+    unitLight(f, 44, this.engine!.lighting.direction);
     f.set(this.engine!.lighting.radiance, 48);
     f[59] = this.time;
     f[62] = +(c.format === 'rgba16float');

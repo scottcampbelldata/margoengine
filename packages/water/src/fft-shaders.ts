@@ -183,7 +183,7 @@ struct SurfaceVertex { @builtin(position) clip:vec4f, @location(0) world:vec3f, 
  let fresnel=0.02037+0.97963*pow(1.0-cosine,5.0);
  let reflected=reflect(-view,normal);
  let sky=mix(vec3f(0.38,0.53,0.67),vec3f(0.045,0.16,0.34),clamp(reflected.y,0.0,1.0));
- let direction=normalize(frame.light.xyz);
+ let direction=frame.light.xyz;
  let halfway=normalize(view+direction);
  let roughness=0.12;
  let alpha=roughness*roughness;

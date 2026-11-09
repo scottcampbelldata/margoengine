@@ -22,6 +22,7 @@ import {
   weightedFragment,
 } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
+import { unitLight } from '../../shared/unit-light.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
 export { heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
@@ -468,7 +469,7 @@ export class Terrain implements EnginePlugin {
       if (values[28] !== x || values[29] !== z) changed = true;
       values.set(c.camera.matrix);
       values.set(c.camera.position, 16);
-      values.set(this.engine!.lighting.direction, 20);
+      unitLight(values, 20, this.engine!.lighting.direction);
       values.set(this.engine!.lighting.radiance, 24);
       values[28] = x;
       values[29] = z;

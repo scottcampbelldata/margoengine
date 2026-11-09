@@ -10,6 +10,37 @@ try {
   browser = await openBrowser({ startPath: '/tests/env-mirror.html', port: 'free' });
   const { page } = browser;
   await page.waitForFunction(() => window.mirrorFixture);
+  // --gpu-load=<iterations>: a second WebGL2 canvas keeps the GPU busy with long full-screen draws. Under such load
+  // ANGLE D3D11 on NVIDIA evaluated a shader's uniform-only normalize on two paths an ulp apart; a quiet GPU hid it.
+  const load = Number(process.argv.find((a) => a.startsWith('--gpu-load='))?.slice(11) ?? 0);
+  if (load)
+    await page.evaluate((iterations) => {
+      const canvas = Object.assign(document.createElement('canvas'), { width: 2048, height: 2048 }),
+        gl = canvas.getContext('webgl2'),
+        program = gl.createProgram();
+      for (const [type, source] of [
+        [gl.VERTEX_SHADER, 'void main(){gl_Position=vec4(vec2(gl_VertexID&1,gl_VertexID>>1)*4.0-1.0,0,1);}'],
+        [
+          gl.FRAGMENT_SHADER,
+          `precision highp float;out vec4 o;void main(){float a=0.0;for(int i=0;i<${iterations};i++)a=fract(sin(a+gl_FragCoord.x*0.001+float(i))*43758.5);o=vec4(a);}`,
+        ],
+      ]) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, `#version 300 es
+${source}`);
+        gl.compileShader(shader);
+        gl.attachShader(program, shader);
+      }
+      gl.linkProgram(program);
+      gl.useProgram(program);
+      const draw = () => {
+        if (!window.mirrorFixture) return;
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.flush();
+        setTimeout(draw, 0);
+      };
+      draw();
+    }, load);
   const render = (state) => page.evaluate((s) => window.mirrorFixture.render(s), state);
   const capture = (state) => page.evaluate((s) => window.mirrorFixture.capture('glass', s), state);
   // Keep the original mirror gate's glass setup and its negative clipping control.
@@ -23,17 +54,21 @@ try {
   const maximum = (a, b) => a.data.reduce((max, value, i) => Math.max(max, Math.abs(value - b.data[i])), 0);
   const initialDifference = maximum(front, absent);
   const controlDifference = maximum(leaking, free);
-  // A fixed sample count measures failures; every pair runs even when an earlier one differs.
-  const repeat = await page.evaluate(async () => {
-    const rows = [],
-      mismatches = [];
-    for (let pair = 0; pair < 12; pair++) {
-      const a = await window.mirrorFixture.capture('glass', { scene: 'glass', yellow: true });
-      const b = await window.mirrorFixture.capture('glass', { scene: 'glass', yellow: false });
-      const differences = [];
+  // A fixed sample count measures failures; every pair runs even when an earlier one differs. Each capture is its own
+  // page task, as in an application frame loop: other GPU work then queues between captures.
+  const rows = [],
+    mismatches = [];
+  for (let pair = 0; pair < 12; pair++) {
+    await page.evaluate(async () => {
+      window.captureStabilityFront = await window.mirrorFixture.capture('glass', { scene: 'glass', yellow: true });
+    });
+    const differences = await page.evaluate(async () => {
+      const a = window.captureStabilityFront,
+        b = await window.mirrorFixture.capture('glass', { scene: 'glass', yellow: false }),
+        found = [];
       for (let i = 0; i < a.data.length; i++)
         if (a.data[i] !== b.data[i])
-          differences.push({
+          found.push({
             index: i,
             x: (i >> 2) % a.width,
             y: Math.floor((i >> 2) / a.width),
@@ -41,11 +76,12 @@ try {
             front: a.data[i],
             absent: b.data[i],
           });
-      rows.push({ pair, differences: differences.length });
-      if (differences.length) mismatches.push({ pair, differences });
-    }
-    return { rows, mismatches, errors: window.mirrorFixture.errors };
-  });
+      return found;
+    });
+    rows.push({ pair, differences: differences.length });
+    if (differences.length) mismatches.push({ pair, differences });
+  }
+  const repeat = { rows, mismatches, errors: await page.evaluate(() => window.mirrorFixture.errors) };
   const out = `test-results/env-capture-stability/${process.argv.includes('--compat') ? 'compat' : 'webgpu'}`;
   await mkdir(out, { recursive: true });
   await writeFile(

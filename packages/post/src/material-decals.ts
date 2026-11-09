@@ -18,6 +18,7 @@ import { fullscreen, group, render } from '../../shared/gpu.js';
 import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -97,7 +98,7 @@ fn read(t:texture_2d<f32>,p:vec2i,size:vec2f)->vec4f {
 }
 // Core's lit shader: the sun's direct light (Lambert plus GGX) and the ambient term, in linear light.
 fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
- let l=normalize(u.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+ let l=u.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=r*r;let a2=a*a;let d=${ggxDFloat};
  let g=${smithGFloat};
@@ -341,7 +342,7 @@ export class MaterialDecals implements EnginePlugin {
     if (!invertMatrixStable(c.camera.matrix, v.subarray(0, 16), this.workspace))
       throw new MargoError('state', 'Invalid MaterialDecals camera; give the camera a finite, invertible projection');
     v.set(c.camera.position, 16);
-    v.set(direction, 20);
+    unitLight(v, 20, direction);
     v.set(radiance, 24);
     v.set(ambient ?? [1, 1, 1], 28);
     v[32] = surface ? this.count : 0;

@@ -44,7 +44,9 @@ test('moon radiance drives wave glints, foam and the water ambient floor', async
   h.frame();
   const uniform = h.resources.find((r) => r.size === 528),
     values = new Float32Array(uniform.data);
-  assert.deepEqual(Array.from(values.subarray(104, 108)), Array.from(h.engine.lighting.direction));
+  const d = h.engine.lighting.direction,
+    k = Math.hypot(d[0], d[1], d[2]);
+  assert.deepEqual(Array.from(values.subarray(104, 108)), [...Array.from(d.subarray(0, 3), (x) => Math.fround(x / k)), d[3]]);
   assert.deepEqual(Array.from(values.subarray(108, 111)), Array.from(h.engine.lighting.radiance.subarray(0, 3)));
   assert.equal(values[19], Math.fround(0.09));
   assert.deepEqual(values.subarray(112, 116), values.subarray(104, 108));

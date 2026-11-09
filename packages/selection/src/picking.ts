@@ -34,6 +34,7 @@ import {
   type PickProxy,
 } from './models.js';
 import { retire } from '../../shared/frame-resources.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number; VERTEX: number; INDEX: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
@@ -780,7 +781,7 @@ export class Picking implements EnginePlugin {
     }
     this.frame.set(matrix);
     this.frame.set(camera.position, 16);
-    this.frame.set(e.lighting.direction, 20);
+    unitLight(this.frame, 20, e.lighting.direction);
     this.frame.set(e.lighting.radiance, 24);
     this.frame.fill(1, 28, 31);
     if (e.lighting.ambient) this.frame.set(e.lighting.ambient, 28);

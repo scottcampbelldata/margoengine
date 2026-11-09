@@ -2,6 +2,7 @@ import type { Engine, Geometry, PassContext } from '@margoengine/core/extension'
 import { MargoError } from '@margoengine/math/errors';
 import type { XRBinding, XRProjectionLayer, XRViewerPose } from './types.js';
 import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 
@@ -172,7 +173,7 @@ export class StereoRenderer {
       data[17] = position.y;
       data[18] = position.z;
       data[19] = 1;
-      data.set(engine.lighting.direction, 20);
+      unitLight(data, 20, engine.lighting.direction);
       data.set(engine.lighting.radiance, 24);
       data.fill(1, 28, 31);
       if (engine.lighting.ambient) data.set(engine.lighting.ambient, 28);

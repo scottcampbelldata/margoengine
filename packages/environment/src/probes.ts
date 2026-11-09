@@ -18,6 +18,7 @@ import { common } from './shader-common.js';
 import { captureDevice } from './capture-device.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
 import { invertMatrix } from '@margoengine/math/mat4';
+import { unitLight } from '../../shared/unit-light.js';
 
 // Visibility bins per volume probe: 6 faces x 4 quadrants (probeBin), each a (mean, mean square) distance pair.
 const VISIBILITY_BINS = 24;
@@ -1574,7 +1575,7 @@ export class LightProbes extends ShaderEffect {
     values.set(camera.matrix);
     values.set(position, 16);
     values[19] = 0;
-    values.set(lighting.direction, 20);
+    unitLight(values, 20, lighting.direction);
     values.set(lighting.radiance, 24);
     values.fill(1, 28, 31);
     if (lighting.ambient) values.set(lighting.ambient, 28);

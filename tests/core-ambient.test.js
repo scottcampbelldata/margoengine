@@ -47,7 +47,8 @@ test('core frame uploads colored ambient while legacy lighting and later omissio
   const uniform = h.resources.find((r) => r.usage === 72),
     frame = new Float32Array(uniform.data);
   assert.equal(uniform.size, 128, 'the canonical frame must hold the ambient tail');
-  assert.deepEqual([...frame.subarray(20, 28)], [3, 5, 4, 3, 1, 1, 1, 0.25]);
+  // The light direction goes up as a unit vector (renderer.ts): [3, 5, 4] / hypot, intensity 3 kept.
+  assert.deepEqual([...frame.subarray(20, 28)], [...[3, 5, 4].map((d) => Math.fround(d / Math.hypot(3, 5, 4))), 3, 1, 1, 1, 0.25]);
   assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0]);
   lighting.ambient = new Float32Array([2, 0.5, 0]);
   h.renderer.render(h.camera, lighting, [], graph, 0);

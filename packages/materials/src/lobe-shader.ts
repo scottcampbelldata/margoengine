@@ -145,7 +145,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
   let materialSheenActive=any(material.sheen.rgb>vec3f(0));
   // Do not even add zero: preserve the complete original operation order.
   if(!materialSpecularActive&&!materialFilmActive&&!materialSheenActive&&material.anisotropy<=0.0){return baseline;}
-  let materialV=normalize(f.eye.xyz-i.position);let materialL=normalize(f.light.xyz);let materialH=(materialV+materialL)/max(length(materialV+materialL),0.0001);
+  let materialV=normalize(f.eye.xyz-i.position);let materialL=f.light.xyz;let materialH=(materialV+materialL)/max(length(materialV+materialL),0.0001);
   let materialNL=clamp(dot(s.n,materialL),0.0,1.0);let materialNV=clamp(dot(s.n,materialV),0.0001,1.0);let materialNH=clamp(dot(s.n,materialH),0.0,1.0);let materialVH=clamp(dot(materialV,materialH),0.0,1.0);
   var materialResult=baseline;
   if(materialSpecularActive||materialFilmActive||material.anisotropy>0.0){

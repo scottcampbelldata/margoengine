@@ -43,7 +43,7 @@ fn bladeVertex(position: vec3f, uv: vec2f, id: u32) -> Output {
 }
 @fragment fn fragment(i: Output, @builtin(front_facing) front: bool) -> @location(0) vec4f {
   let n = normalize(i.normal) * select(-1.0, 1.0, front);
-  let lightDir = normalize(frame.light.xyz);
+  let lightDir = frame.light.xyz;
   let viewDir = normalize(frame.eye.xyz - i.world);
   // Interpolation can dip below zero; fractional powers would then poison bloom with NaNs.
   let height = clamp(i.uv.y, 0.0, 1.0);

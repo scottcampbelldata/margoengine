@@ -29,6 +29,7 @@ import type { VoxelLightmap } from './lightmap.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
 import { alphaBlend } from '../../shared/pass.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 export type { VoxelLightmap } from './lightmap.js';
 export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';
@@ -175,7 +176,7 @@ const SHADE = /* wgsl */ `
  let ao=0.4+0.2*lit.x;
  s.occlusion=ao*(0.03+skyLight*f.ambient.w);
  s.emissive=s.base.rgb*(bitcast<f32>(m.w)*eMap+brightness.y*ao*f.glow.rgb);
- let v=normalize(f.eye.xyz-i.position);let lightDirection=normalize(f.light.xyz);
+ let v=normalize(f.eye.xyz-i.position);let lightDirection=f.light.xyz;
  let direct=direct_light(s,v,lightDirection)*voxelSun(i.position,skyLight);
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=toDisplay(color);}
@@ -1213,7 +1214,7 @@ export class VoxelRenderer implements EnginePlugin {
     this.#planes.set(c.camera.planes);
     for (let i = 3; i < 24; i += 4) this.#planes[i] *= k;
     f.set(eye, 32);
-    f.set(lighting.direction, 36);
+    unitLight(f, 36, lighting.direction);
     f.set(lighting.radiance, 40);
     f.set(lighting.ambient ?? [1, 1, 1], 44);
     f[47] = this.#daylight;

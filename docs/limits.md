@@ -275,7 +275,7 @@ Sciviz review validation records are regenerated as a pair from one built revisi
 basic scene. Both records retain their actual commit and packages-dirty flag;
 `tests/sizes-page.test.js` rejects a mismatched pair or an unmeasured lazy file.
 This measures byte counts only during the deferred speed phase. The core + stage
-ceiling remains 25,000 B; the reviewed build measures 23,924 B gzip.
+ceiling remains 25,000 B; the reviewed build measures 23,950 B gzip.
 
 Sciviz `/flow` supplies fixed-step RK4 pathlines/streaklines and GPU particles/trails on regular 2D/3D grids
 with linear temporal interpolation. Adaptive error control and extrapolation are not supplied. The default
@@ -478,7 +478,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 23,924 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,553 B of its 21,587 B cap (2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 23,950 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,584 B of its 21,587 B cap (2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every

@@ -92,7 +92,7 @@ fn surface(i:Out,front:bool)->Surface {
   return s;
 }
 ${lightingTerms}@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
-  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz);
+  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=f.light.xyz;
   let direct=direct_light(s,v,l);
   var color=direct+ambient(s)+s.emissive;
   if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
@@ -173,7 +173,7 @@ fn surface(i:Out,front:bool)->Surface {
   return s;
 }
 ${lightingTerms}@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
-  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz);
+  let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=f.light.xyz;
   let direct=direct_light(s,v,l);
   var color=direct+ambient(s)+s.emissive;
   if(f.ext.x>0.5){color=s.base.rgb;}
@@ -346,7 +346,7 @@ export function capturePBR(code: string, declarations: string): string {
     );
   // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0).
   const k = code.includes('fn layers(')
-    ? 'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))'
+    ? 'layers(s,v,f.light.xyz,vec3f(1))-layers(s,v,f.light.xyz,vec3f(0))'
     : 'vec3f(1)';
   out =
     declarations +

@@ -19,6 +19,7 @@ export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
 import { queryStates } from './query-state.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -225,7 +226,7 @@ fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f)->vec2f 
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
 fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
  if(light.direction.w<=0.0){return vec3f(0);}
- let l=normalize(light.direction.xyz);let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
+ let l=light.direction.xyz;let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
  let h=(v+l)/max(0.0001,length(v+l));let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let alpha=rough*rough;let a2=alpha*alpha;let denominator=${/* @__PURE__ */ ggxDenominator()};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
  let g=nv/(nv*(1.0-k)+k)*nl/max(0.001,nl*(1.0-k)+k);
@@ -275,7 +276,7 @@ ${displayShader}
  let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-vec3f(0.38,0.10,0.045)*optical);
  var bottom=vec3f(0.28,0.25,0.17)*(frame.eye.w+frame.radiance.rgb*frame.sun.w*0.12);
  if(frame.radiance.w>0.5){let limit=vec2i(textureDimensions(opaque))-1;var q=clamp(pixel+vec2i(n.xz*min(6.0,gap*2.0)),vec2i(0),limit);let d=textureLoad(depth,q,0);if(d<=0||d>i.clip.z){q=pixel;}if(textureLoad(depth,q,0)>0){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}}
- let nl=clamp(dot(n,normalize(frame.sun.xyz)),0.0,1.0);let rough=clamp(0.12+normalWidth*0.6+footprint*0.025,0.12,0.4);
+ let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);let rough=clamp(0.12+normalWidth*0.6+footprint*0.025,0.12,0.4);
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
  var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}
@@ -970,7 +971,7 @@ export class Water implements EnginePlugin {
     const lighting = this.engine!.lighting;
     this.values[19] = lighting?.radiance[3] ?? 0.15;
     if (lighting) {
-      this.values.set(lighting.direction, 104);
+      unitLight(this.values, 104, lighting.direction);
       this.values[108] = lighting.radiance[0];
       this.values[109] = lighting.radiance[1];
       this.values[110] = lighting.radiance[2];

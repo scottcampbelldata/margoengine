@@ -515,7 +515,12 @@ export class GPURenderer implements Renderer {
       throw typeError('Invalid view depth: use the scene depth format and samples, or omit depth', 'views');
     this.frame.set(camera.matrix);
     this.frame.set(camera.position, 16);
+    // The light's unit direction, normalized once here: shaders read it as is. A normalize of this uniform-only value
+    // is evaluated by some drivers on two paths whose results differ by an ulp (ANGLE D3D11 on NVIDIA, depending on GPU
+    // load), so identical frames could shade differently.
     this.frame.set(lighting.direction, 20);
+    const k = Math.hypot(this.frame[20], this.frame[21], this.frame[22]);
+    for (let i = 20; i < 23; i++) this.frame[i] /= k;
     this.frame.set(lighting.radiance, 24);
     this.frame.fill(1, 28, 31);
     if (lighting.ambient) this.frame.set(lighting.ambient, 28);
@@ -855,6 +860,7 @@ export class GPURenderer implements Renderer {
       const frame = new Float32Array(32);
       frame.set(matrix);
       frame.set(camera.position, 16);
+      // The pick shader drops all shading, so the light is never read here.
       frame.set(lighting.direction, 20);
       frame.set(lighting.radiance, 24);
       frame.fill(1, 28, 31);

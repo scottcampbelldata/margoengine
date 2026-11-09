@@ -11,6 +11,7 @@ import { engineRuntime } from '@margoengine/core/extension';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import type { VoxelWorld } from './world.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; UNIFORM: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number };
@@ -91,7 +92,7 @@ fn trace(o: vec3f, d: vec3f, range: f32) -> Hit {
 
 // A direction within the sun's cone, uniformly over its cap.
 fn toSun(seed: ptr<function, u32>) -> vec3f {
-  let l = normalize(P.sun.xyz);
+  let l = P.sun.xyz;
   let up = select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(l.y) > 0.9);
   let a = normalize(cross(up, l)); let b = cross(l, a);
   let cosMax = cos(P.settings.y);
@@ -122,7 +123,7 @@ fn gather(@builtin(global_invocation_id) g: vec3u) {
       let d = vec3f(s * cos(phi), z, s * sin(phi));
       let h = trace(o, d, P.settings.z);
       if (!h.hit || !sunUp) { continue; }
-      let l = normalize(P.sun.xyz);
+      let l = P.sun.xyz;
       let cosine = dot(h.normal, l);
       if (cosine <= 0.0) { continue; }
       let front = vec3f(h.cell) + vec3f(0.5) + h.normal * 0.501;
@@ -308,7 +309,7 @@ export class VoxelGI {
       u = new Uint32Array(params),
       f = new Float32Array(params);
     i.set(origin, 0);
-    f.set(lighting.direction, 4);
+    unitLight(f, 4, lighting.direction);
     f.set(lighting.radiance, 8);
     // Passes walk the window in a stride coprime with its size, each starting where the last ended; the first sweep of a
     // window sets its cells outright, later ones blend in an eighth.

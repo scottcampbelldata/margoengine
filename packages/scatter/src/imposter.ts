@@ -13,6 +13,7 @@ import { typeError } from '../../shared/errors.js';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fadeCode, poseShader } from './pose.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -119,7 +120,7 @@ export class ImposterScatter extends Scatter {
       lighting = this.engine!.lighting;
     f.set(c.camera.matrix);
     f.set(c.camera.position, 16);
-    f.set(lighting.direction, 20);
+    unitLight(f, 20, lighting.direction);
     f.set(lighting.radiance, 24);
     f[28] = +(c.format === 'rgba16float');
     f[29] = +(samples > 1);

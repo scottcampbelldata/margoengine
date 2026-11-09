@@ -297,6 +297,7 @@ export type {
   GLTFSplatCloud,
   GLTFSplatReader,
 } from './asset.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** Narrow encoding hook for optional GPU deformation consumers. */
@@ -457,11 +458,12 @@ function sameView(
   const matrix = camera.matrix,
     position = camera.position,
     direction = lighting.direction,
-    radiance = lighting.radiance;
+    radiance = lighting.radiance,
+    k = Math.hypot(direction[0], direction[1], direction[2]);
   for (let i = 0; i < 16; i++) if (data[i] !== Math.fround(matrix[i])) return false;
   for (let i = 0; i < 3; i++) if (data[32 + i] !== Math.fround(position[i])) return false;
   for (let i = 0; i < 4; i++)
-    if (data[36 + i] !== Math.fround(direction[i]) || data[40 + i] !== Math.fround(radiance[i])) return false;
+    if (data[36 + i] !== Math.fround(i < 3 ? direction[i] / k : direction[i]) || data[40 + i] !== Math.fround(radiance[i])) return false;
   return true;
 }
 /** Draws of a run gathered into one instanced draw (draw-batch.ts). */
@@ -3429,7 +3431,7 @@ export class PBRModel implements EnginePlugin {
       else viewMatrix(scratch.view, camera), viewData.set(scratch.view, 16);
       viewData.set(scratch.eye, 32);
       viewData[35] = 0;
-      viewData.set(lighting.direction, 36);
+      unitLight(viewData, 36, lighting.direction);
       viewData.set(lighting.radiance, 40);
       viewData[44] = +(c.format === 'rgba16float');
     }

@@ -10,6 +10,7 @@ import { lightPBR } from '../../shared/pbr-hooks.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { applyView } from '../../shared/view-rect.js';
 import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -308,7 +309,7 @@ const unlitShader = (
 ) => `${neutralShader}${vertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
- let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+ let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
@@ -328,7 +329,7 @@ struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissiv
 fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  var s:Surface;s.base=f.base*textureSample(map,mapSampler,i.uv);s.n=normalize(i.normal)*select(-1.0,1.0,front);s.roughness=f.options.z;s.metal=f.options.w;s.occlusion=1.0;
- let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+ let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=s.roughness*s.roughness;let a2=a*a;let d=${ggxDFloat};let g=${smithGFloat};
  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
@@ -667,7 +668,7 @@ export class VATCrowd implements EnginePlugin {
     const f = this.frame;
     f.set(c.camera.matrix);
     f.set(c.camera.position, 16);
-    f.set(e.lighting.direction, 20);
+    unitLight(f, 20, e.lighting.direction);
     f.set(e.lighting.radiance, 24);
     f.set(this.color, 28);
     f[32] = this.time;

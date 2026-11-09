@@ -73,7 +73,7 @@ export function catcherLit(code: string): string {
     code,
     placeholder,
     `fn margoCatcher(i:Out,s:Surface)->f32 {
-  let w=vec3f(0.2126,0.7152,0.0722); let n=s.n; let sun=clamp(dot(n,normalize(f.light.xyz)),0.0,1.0)*dot(f.radiance.rgb,w)*f.light.w;
+  let w=vec3f(0.2126,0.7152,0.0722); let n=s.n; let sun=clamp(dot(n,f.light.xyz),0.0,1.0)*dot(f.radiance.rgb,w)*f.light.w;
   var lit=sun${sun}; var all=sun;${local}
   return f.base.a*select(0.0,clamp(1.0-lit/all,0.0,1.0),all>0.000001);
 }${shadowed ? `\n${unshadowed}` : ''}${areaShadowed ? `\n${openArea}` : ''}`,

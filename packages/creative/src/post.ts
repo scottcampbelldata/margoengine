@@ -44,7 +44,7 @@ fn grainPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u)
  let radius=min(8.0,abs(distance-f.lens.x)/max(distance,0.001)*f.lens.y);
  if(radius>0.5){var blurred=vec3f(0);var weights=0.0;for(var y=-2;y<=2;y++){for(var x=-2;x<=2;x++){let q=clamp(p+vec2i(round(vec2f(f32(x),f32(y))*radius*0.5)),vec2i(0),vec2i(size)-1);let neighbor=length(world((vec2f(q)+0.5)/vec2f(size),textureLoad(depth,q,0))-f.eye.xyz);let weight=exp(-f32(x*x+y*y)*0.25)*select(0.0,1.0,neighbor>=distance-radius);blurred+=textureLoad(scene,q,0).xyz*weight;weights+=weight;}}c=blurred/max(weights,0.001);}
  let density=f.fog.x*exp(clamp(-f.eye.y*f.fog.y,-20.0,20.0));let dy=(w.y-f.eye.y)*f.fog.y;let integral=select((1-exp(clamp(-dy,-20.0,20.0)))/select(dy,1.0,abs(dy)<0.001),1.0,abs(dy)<0.001);let visibility=exp(-max(0.0,density*distance*integral));c=mix(f.color.xyz,c,visibility);
- let sunWorld=f.eye.xyz+normalize(f.sun.xyz)*f.settings.y;let ray=normalize(sunWorld-f.eye.xyz);let farRay=normalize(w-f.eye.xyz);let alignment=pow(max(dot(ray,farRay),0.0),16.0);var shafts=0.0;
+ let sunWorld=f.eye.xyz+f.sun.xyz*f.settings.y;let ray=normalize(sunWorld-f.eye.xyz);let farRay=normalize(w-f.eye.xyz);let alignment=pow(max(dot(ray,farRay),0.0),16.0);var shafts=0.0;
  let sunClip=f.camera*vec4f(sunWorld,1);if(sunClip.w>0&&f.fog.z>0){let sunUV=sunClip.xy/sunClip.w*vec2f(0.5,-0.5)+0.5;for(var i=1;i<=16;i++){let q=clamp(vec2i(mix(uv,sunUV,f32(i)*0.05)*vec2f(size)),vec2i(0),vec2i(size)-1);shafts+=select(0.0,1.0,textureLoad(depth,q,0)<0.000001)*pow(0.95,f32(i))/16.0;}}c+=vec3f(1,0.8,0.5)*shafts*alignment*f.fog.z;
  c=max(vec3f(0),c*exp2(f.grade.x)*f.gain.xyz+f.lift.xyz);let luminance=dot(c,vec3f(0.2126,0.7152,0.0722));c=mix(vec3f(luminance),c,f.grade.z);c=max(vec3f(0),(c-0.18)*f.grade.y+0.18);
  c=toDisplay(c);let noise=f32(grainPcg(id.x+grainPcg(id.y+grainPcg(bitcast<u32>(f.lens.w))))>>8u)*5.9604645e-8-0.5;textureStore(output,p,vec4f(clamp(c+noise*f.lens.z,vec3f(0),vec3f(1)),1));}`;
@@ -300,7 +300,10 @@ export class PostProcessing implements EnginePlugin {
       throw new MargoError('state', 'Invalid post camera; give the camera a finite, invertible projection');
     this.time += c.delta;
     v.set(c.camera.position, 16);
-    v.set(a.sun ?? sun, 20);
+    // The unit direction, normalized here: shaders never normalize a uniform-only light value (core's frame light).
+    const toward = a.sun ?? sun,
+      k = Math.hypot(toward[0], toward[1], toward[2]);
+    for (let i = 0; i < 3; i++) v[20 + i] = toward[i] / k;
     v[24] = a.density ?? 0;
     v[25] = a.heightFalloff ?? 0;
     v[26] = a.godRays ?? 0;

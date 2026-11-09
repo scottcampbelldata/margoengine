@@ -85,7 +85,7 @@ ${normalShader}
   // Texture samples and derivative frames above must precede this varying branch.
   if(factor<=0.0){return vec3f(0);}
   let view=f.eye.xyz-i.position; let v=view/max(length(view),0.0001);
-  let l=f.light.xyz/max(length(f.light.xyz),0.0001); let h=(v+l)/max(length(v+l),0.0001);
+  let l=f.light.xyz; let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(coatNormal,l),0.0,1.0); let nv=clamp(dot(coatNormal,v),0.0001,1.0);
   let nh=clamp(dot(coatNormal,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=roughness*roughness; let a2=a*a;

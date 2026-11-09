@@ -14,6 +14,7 @@ import { applyView } from '../../shared/view-rect.js';
 import { resolveMSAA } from '../../shared/msaa.js';
 import { oceanCompute, oceanSurface } from './fft-shaders.js';
 import { queryStates } from './query-state.js';
+import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   COPY_DST: number;
@@ -387,7 +388,7 @@ export class FFTOcean implements EnginePlugin {
     const light = this.engine!.lighting;
     this.frame.set(c.camera.matrix, 0);
     this.frame.set(c.camera.position, 16);
-    this.frame.set(light.direction, 20);
+    unitLight(this.frame, 20, light.direction);
     this.frame.set(light.radiance, 24);
     this.frame.set([light.radiance[3], light.radiance[3], light.radiance[3], 0], 28);
     const cell = this.size / this.segments;

@@ -9,7 +9,7 @@ import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
-const baselineShader = '522dffb290fb1910a93a43e10fb3c1e508b95b02470f6e8e2deef9a937896bb4';
+const baselineShader = '20ea22e385536a54b32de541f69bfc9e75258364a0d1443de0975bacc6ca4297';
 // The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
 const baselineFrame = '611297c77674bf4a5642e187218a161e688e4b0cca3155598ff5768c34ecdba4';
 

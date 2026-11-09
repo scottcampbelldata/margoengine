@@ -742,7 +742,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let instance=instances[i.id];let m=instance.m;let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
  let albedo=acc.rgb/max(alpha,0.0001)*instance.color.rgb;let glow=emit/max(alpha,0.0001)+instance.emissive.rgb;let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
  let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
- let v=normalize(frame.eye.xyz-world);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
+ let v=normalize(frame.eye.xyz-world);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
