@@ -1796,3 +1796,18 @@ and allow replacement. It also compares every GPU studio cube texel for
 [1, 1, 0], [MAX_VALUE, MAX_VALUE, 0] and [MIN_VALUE, MIN_VALUE, 0].
 Run the same entry with --compat for the independent compatibility proof.
 These checks require successful execution; their presence alone is not acceptance.
+
+### Batch 56 remaining terrain owner regressions
+
+After building packages, run
+`node --test --test-timeout=30000 packages/terrain/test/scene-owner-extra.test.js`
+and `node --test --test-timeout=30000 tests/terrain-provider-owner-contract.test.js`.
+Run `node examples/package-benchmarks/proofs/terrain-ssr.proof.js --current`
+only after the build finishes; its 6,458-call proof is deterministic and does
+not run timings. The first attempted proof overlapped the core rebuild and
+failed module resolution; the ordered run passes without a source change.
+Then run each of terrain's 15 package GPU commands in one shared slot per
+command, with `--owner=codex-56fix --wait-max=60 --max=1.5`, followed by
+`node scripts/run-readme-examples.mjs --packages=terrain` with `--max=2`.
+The inherited sequence's original successful commands and reset-interrupted
+README are retained under test-results/56fix/owed-terrain-*.

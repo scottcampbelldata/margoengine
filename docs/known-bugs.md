@@ -3338,3 +3338,64 @@ identical. Both images, exact coordinates and component values are preserved
 in test-results/56fix/mirror-repeat/capture.json, with durable per-pair progress
 and the failing process result in resume-bounded-repeat.log/.json. This is a
 measured value failure (1/12), not an acceptance run or a retry to green.
+
+
+After rebasing onto 854a90ac4, the readback-isolation experiment again completes
+12 pairs with exactly the same 24 components differing in pair 0 (1/12).
+Each image is downloaded twice without rendering between downloads: every
+component agrees between those two reads. At the differing coordinates, raw
+GL FLOAT values already equal the differing binary16 values; CPU conversion
+does not introduce this mismatch. All camera and mesh buffer uploads for the
+two captures are byte-identical. Evidence is
+test-results/56fix/mirror-readback-isolation/result.json and
+resume-readback-isolation-pre.log/.json (86.218 seconds, failed exact assertion).
+A reduced glass-only sequence produces the same 24-component failure without
+the mirror, TAA, orthographic or roughness prefix. Its report completed, but
+cleanup exceeded the 45-second shared-lock limit and the tree was killed;
+resume-minimal-isolation.log/.json is not a completed acceptance run. Heavier
+GL-call instrumentation produces equality and does not close this defect.
+The owner is still being narrowed between rasterization and resolve state;
+neither a race nor an uninitialized read has been established as the cause.
+
+The inherited full verify completed with 13,704/13,705 passing, zero skips,
+and only tests/no-private-paths.test.js failing on the GPU-lock report's
+excluded-folder pointer. That pointer was already repaired on current main.
+After rebasing, the unchanged focused regression passes; the previous full
+verify result is retained and reused, not represented as an all-green run.
+Post-rebase build, lint, hygiene and API generation pass. No capture fix is
+accepted or pushed while the value failure and remaining GPU gates are open.
+
+Permanent regression: packages/environment/tests/capture-stability-browser.mjs,
+wired into test:gpu:mirror for both backends. Its first compatibility run on
+the full repair stack fails in 1/12 pairs at the same 24 coordinates; the
+original clipping pair remains exact and the negative control remains
+0.2783203125. The process completes with the exact assertion failure
+(resume-capture-regression.log/.json, 49.935 seconds including shared admission).
+A separate 1x-sampling comparison completes 12/12 pairs with no differences
+(resume-capture-1x.log/.json, 26.102 seconds including admission), so the current
+reproduction requires multisampling. This does not attribute it to resolution
+rather than multisampled rasterization. A two-pair clip-state diagnostic also
+fails: every earlier capture equals the later stable image; only the first
+capture after restoring the clip plane differs. Its report and input bytes are
+in test-results/56fix/mirror-clip-state/result.json (23.181 seconds, exit 1).
+An additional pre-main-copy diagnostic produced no report before its 60-second
+limit and was killed; resume-before-main.log/.json cannot establish an engine
+hang or any raster/resolve cause. No timeout is waived or assertion changed.
+
+### Batch 56 remaining terrain disposal repair
+
+The seven remaining terrain EnginePlugin classes retained their secondary
+scene registrations on direct disposal and could remove default-scene names.
+Each now detaches through sceneOf(this). The 14-case real-engine regression
+fails seven direct cases on the prior build; all 14 pass after repair. Stream
+owns and disposes its terrain; blend and sculpt retain their borrowed inputs.
+The expanded class guard covers all 11 terrain plugins. Package units pass
+107/107 and the four terrain/shader source guards pass. GPU/README acceptance
+is pending in one shared queue. Wider owners and hunter acceptance stay open.
+
+The inherited terrain sequence completed all 15 GPU commands successfully.
+Its README gate passed 14/15, failing WebGPU acquisition during confirmed
+NVIDIA event 153, not a numerical assertion. Logs and event XML remain in
+ test-results/56fix (terrain-readme-reset-event.xml). No repeat of a passed
+step was started before the new source change; the changed package requires
+its own complete GPU/README sequence.

@@ -13,7 +13,7 @@ function rig(layer = {}, { weights = false, count = 4 } = {}) {
       gpu: gpu.device,
       lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) },
       stats: { drawCalls: 0 },
-      removePlugin() {},
+      sceneOf: () => undefined,
     };
   const terrain = new Terrain({
     resolution: 8,

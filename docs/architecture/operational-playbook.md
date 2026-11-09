@@ -4391,3 +4391,27 @@ the slot. It has no completed result and cannot support acceptance. The limit
 is not a speed budget; no existing assertion, tolerance or gate was changed.
 Fresh post-rebase CPU checks and remaining package GPU/README gates are still
 required. No core/stage edit, exclusive hold or push is included.
+
+
+The bounded follow-up now reproduces the wrong value in 1/12 pairs, with raw
+coordinates retained. A second experiment also sees the same 24 components in
+1/12 pairs: identical camera/mesh uploads, identical repeated downloads of each
+image, and differing raw GPU FLOAT values before CPU half conversion. A reduced
+glass-only sequence reproduces it without the earlier mirror/TAA prefix; its
+comparison report survives, but cleanup hit its separate run limit. GL-call
+instrumentation suppressing the mismatch is diagnostic evidence, not a pass.
+The inherited verify has one excluded-path documentation failure, already fixed
+on main and checked by its original regression after rebase. Its other 13,704
+tests and prior chain results are reused; full green acceptance is not claimed.
+
+### Section 5 evidence: remaining terrain registration owners
+
+The remaining seven terrain plugins now resolve their registered scene by
+identity on explicit disposal. TerrainStream also disposes its owned terrain;
+TerrainBlend and TerrainSculpt keep borrowed registrations intact. All 11 terrain
+EnginePlugin classes have a source guard in verify/check:merge. The new real
+engine test has seven failing direct cases before repair, seven passing owner
+removal controls, and 14 passing cases after repair. The package passes all 107
+units; terrain/SSR keeps the same 6,458 recorded calls. GPU/README acceptance
+is pending. Core, stage and rendering algorithms are untouched. Research and
+retained fixture/infrastructure failures are documented in clean-room.md.

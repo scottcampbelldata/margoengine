@@ -3095,3 +3095,40 @@ its registration. Their per-package inert-GPU tests compare the default and
 secondary scene identities, restoration and replacements. A borrowed cube stays
 borrowed. Shader test hosts now implement the existing sceneOf contract and
 register before setup, like the real engine. No shader code or algorithm changes.
+
+### Batch 56 terrain registration continuation (2026-11-09)
+
+Before the remaining terrain repair, a broad ownership/lifecycle paper search
+compared David G. Clarke, John M. Potter and James Noble,
+[Ownership Types for Flexible Alias Protection (1998)](https://doi.org/10.1145/286936.286947)
+(abstract/introduction), Chandrasekhar Boyapati, Barbara Liskov and Liuba Shrira,
+[Ownership Types for Object Encapsulation (2003)](https://doi.org/10.1145/604131.604156)
+(the university abstract), and Steve Freeman, Nat Pryce, Tim Mackinnon and Joe
+Walnes, [Mock Roles, not Objects (2004)](https://jmock.org/oopsla2004.pdf)
+(abstract and sections 1-2). The first describes ownership access paths, the
+second local reasoning with shared module access, and the third collaborators'
+observable responsibilities. Our application uses the existing identity registry
+and real engine, with inert GPU collaborators only for resource operations. It
+is not a new ownership type system or a full-paper review. No companion code
+or foreign implementation was read or used.
+
+Terrain, TerrainHeightmap, TerrainColors, TerrainBlend, TerrainStream,
+TerrainSculpt and PlanetTerrain all stored an Engine but removed its active
+scene's name. Seven direct-disposal regressions fail on the prior build; seven
+owner-removal controls pass. Resolving sceneOf(this) in each optional owner
+repairs them. Fourteen cases now pass, including restoration, same-name default
+sentinels, borrowed dependencies, stream-owned terrain and stale disposal after
+replacement. Direct-setup numerical hosts have no registration and now explicitly
+report sceneOf as undefined. The terrain/SSR proof keeps all 6,458 recorded
+calls identical. No shaders, maps, output tolerances, core or stage change.
+
+The previous terrain README failure occurred at GPU acquisition alongside
+Windows nvlddmkm event 153 at 2026-11-09T20:38:15.4145292Z. The W3C GPU for the Web
+Working Group, [WebGPU (2026), requestAdapter and device loss](https://www.w3.org/TR/webgpu/),
+and Google Chrome Developers,
+[WebGPU troubleshooting tips (2023)](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips)
+allow a null adapter when unavailable; they do not establish which workload
+caused a driver reset. The original failure and event XML are retained. A fresh
+post-change package GPU/README sequence is queued once, shared, wait-max 60;
+its result is recorded separately. No engine retry, fallback, assertion change
+or unproven driver-cause claim is added.

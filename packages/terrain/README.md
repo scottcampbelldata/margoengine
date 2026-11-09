@@ -1,11 +1,22 @@
 # @margoengine/terrain
 
-`TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
-`TerrainDeformation` dispose their actual scene registration, preserving a
-same-name plugin in another scene. Device restoration keeps registration and
-one terrain-lighting provider; explicit disposal removes both. Their public
-`owner` field continues to identify the Engine, so use `engine.sceneOf(effect)`
-to inspect the scene. All existing options and examples below are unchanged.
+All terrain plugins remove their actual scene registration on `dispose()`,
+preserving a same-name plugin in another scene. Device restoration retains
+registration. Stream disposal also removes its owned terrain; blend and sculpt
+leave their borrowed terrain and virtual texture attached. The public `owner`
+fields of `TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
+`TerrainDeformation` identify the Engine; use `engine.sceneOf(effect)` for the scene.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainHeightmap} from 'margoengine/terrain';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const product = engine.createScene('product');
+const heightmap = new TerrainHeightmap(() => 0, {size: [4, 4], resolution: 16});
+product.use(heightmap);
+console.assert(engine.sceneOf(heightmap) === product);
+heightmap.dispose(); // Frees its texture and registration; product can register a replacement.
+```
 
 Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 

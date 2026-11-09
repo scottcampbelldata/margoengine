@@ -273,7 +273,7 @@ fn terrainBlendGround(p:vec3f,s:vec4f,footprint:f32)->TerrainBlendGround {
     this.rows.clear();
     const engine = this.engine;
     this.engine = undefined;
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

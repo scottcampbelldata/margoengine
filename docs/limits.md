@@ -2642,3 +2642,12 @@ claims currently have CPU evidence; physical GPU/README acceptance remains pendi
 WideAngle, WideAngleCube and NodePass explicitly detach their own registration;
 the cube effect preserves borrowed cubes. Device restoration keeps registration.
 No rendering work or entry ceilings change; physical GPU/README gates are pending.
+
+### Batch 56 terrain lifecycle scope
+
+All 11 explicit terrain EnginePlugin classes now detach by actual identity.
+The new seven-owner regressions use a real engine with inert GPU resources;
+they prove registration, restoration and disposal, not pixel output. Existing
+numerical bars and shaders are unchanged. The terrain/SSR deterministic proof
+retains 6,458 recorded GPU calls. Full GPU/README acceptance is recorded
+separately. No core/stage change or timing measurement is introduced.

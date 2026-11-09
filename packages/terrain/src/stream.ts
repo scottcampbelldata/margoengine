@@ -555,7 +555,7 @@ export class TerrainStream implements EnginePlugin {
     this.#settle();
     this.#slots.clear();
     this.#listeners.clear();
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.terrain.dispose();
     this.#release();
     this.#engine = this.#device = this.#height = undefined;

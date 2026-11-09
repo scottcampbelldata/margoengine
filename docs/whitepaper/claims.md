@@ -2220,3 +2220,14 @@ and packages/shader/test/post-owner.test.js use real engine registries with iner
 GPU resources, including restoration and replacement; preceding implementations
 fail their disposal assertions. Borrowed cube disposal is rejected by the camera
 fixture. Physical GPU/README acceptance remains pending.
+
+### Batch 56 remaining terrain ownership evidence
+
+Terrain's remaining seven disposal paths resolve sceneOf(this). The new
+scene-owner-extra.test.js fails seven direct-disposal cases on the prior
+build, with seven passing owner-removal controls; all 14 pass after repair.
+All 107 terrain package tests and four terrain/shader guards pass. Restoration,
+same-name scene isolation, borrowed providers, owned stream terrain and stale
+disposal after replacement are exercised. The terrain/SSR proof retains all
+6,458 calls. This is scoped lifecycle evidence, with GPU/README acceptance
+pending and no claim of general scene-owner safety.

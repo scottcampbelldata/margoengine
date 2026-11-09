@@ -805,7 +805,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.lighting.clear();
     this.capture = undefined;

@@ -42,7 +42,7 @@ test('height texture samples cell centers, restores and releases owned resources
           },
         },
       },
-      removePlugin() {},
+      sceneOf: () => undefined,
     };
   const options = { size: [4, 4], origin: [10, 20], resolution: 2 },
     map = new TerrainHeightmap((x, z) => x + z, options);

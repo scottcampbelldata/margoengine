@@ -604,7 +604,7 @@ export class TerrainSculpt implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.#stroke = undefined;
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     for (const texture of this.#scratch.values()) texture.destroy();
     this.#scratch.clear();
     this.#uniform?.destroy();

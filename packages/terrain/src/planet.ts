@@ -876,7 +876,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.#unfollow?.();
     this.#release();
     this.#pipelines.clear();
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = this.#device = undefined;
   }
 
