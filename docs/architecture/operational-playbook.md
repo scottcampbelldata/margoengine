@@ -20,6 +20,16 @@ materialized Zstd level plus Wasm copy is extra storage. The same-payload
 normalization control supports this diagnosis without modifying runtime
 policy. Final public API, other targets, full fuzz/GPU/memory/entry remain open.
 
+### Section 5 evidence: critical-point tracer and LIC dependency audit
+
+The new analytical sink and unchanged NOAA tests fail old fields.ts and pass the adaptive RK4 repair;
+all 190 current sciviz/site CPU cases pass. Independent circle/saddle invariants retain true orbits and
+near-critical passages. Existing check:merge unit discovery includes the regression. This is CPU numerical
+correctness, without changed GPU maths or new renderer. Numerical policies/limits: sciviz README and
+limits.md; research: clean-room.md. LIC dependency attribution proves exactly +13,032 B from required
+shared published-precision colour data/lookup, with identical bundler/gzip; no unrelated renderers retained.
+
+
 ### Section 5 evidence: batch 134 scalar reference ruling
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

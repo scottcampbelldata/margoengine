@@ -1,0 +1,74 @@
+{
+  "source": "deefe99a2118769cabc6d24b7527d0646013454e",
+  "method": "Unchanged canonical Vite ES2022 + compactOutput, bare imports external, zlib gzip default",
+  "lic": {
+    "raw": 53632,
+    "gzip": 23461
+  },
+  "modules": [
+    {
+      "id": "packages/sciviz/dist/errors-BaiKeIMi.js",
+      "renderedLength": 325,
+      "renderedExports": [
+        "t",
+        "n",
+        "r"
+      ]
+    },
+    {
+      "id": "packages/sciviz/dist/colormaps-Du5ra0QT.js",
+      "renderedLength": 62378,
+      "renderedExports": [
+        "s",
+        "i",
+        "n",
+        "c",
+        "o",
+        "t",
+        "r"
+      ]
+    },
+    {
+      "id": "packages/sciviz/dist/layer-CZotBtzA.js",
+      "renderedLength": 882,
+      "renderedExports": [
+        "a",
+        "o",
+        "l",
+        "t"
+      ]
+    },
+    {
+      "id": "packages/sciviz/dist/render-NquUsdwc.js",
+      "renderedLength": 914,
+      "renderedExports": [
+        "n",
+        "r"
+      ]
+    },
+    {
+      "id": "packages/sciviz/dist/lic.js",
+      "renderedLength": 17290,
+      "renderedExports": [
+        "lic",
+        "LicLayer"
+      ]
+    }
+  ],
+  "attribution": {
+    "method": "Same current LIC source and canonical bundler; only local pre-f33472ed6 colormaps.ts/tables.ts substituted through Vite load hook. No timings.",
+    "reports": [
+      {
+        "colourPrecision": "published precision",
+        "raw": 53632,
+        "gzip": 23461
+      },
+      {
+        "colourPrecision": "pre-restoration Margo code and data",
+        "raw": 26495,
+        "gzip": 10429
+      }
+    ],
+    "delta": 13032
+  }
+}

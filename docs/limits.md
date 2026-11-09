@@ -22,6 +22,21 @@ No forced GC, reduced work, discarded output, tolerance or timing excuse.
 The same-payload uncompressed diagnostic removes that control's RSS loss,
 with 12 exact old and 12 exact new hashes, but is not a shipped fix.
 
+## Batch 171 tracer numerical limits and size attribution
+
+The CPU streamline step is a maximum arc step, adaptively shortened. Local error estimate is the RK4
+step-doubling norm / 15, bounded by 1e-6 times current arc step; it is not a guaranteed global error bound.
+Unresolved stages/turns halve; progress stops at max(1e-6 min(step, grid spacing), 32 epsilon
+max(abs(position components), step)), as well as minSpeed/masks/boundaries/maxSteps. No critical-point
+location, global separatrix preservation or closed-orbit classification is claimed. True cycles are retained.
+/tubes remains 2,533 B gzip, /grids 23,735 B, LIC 23,461 B, flow 8,665 B. The tracer repair changes
+/maths 5,389 -> 5,703 B (ceiling 5,638 -> 5,959) and root 50,303 -> 50,599 B (within 51,813).
+Core/stage remains 23,924 B, below 25,000. The optional bytes buy error control and safe termination;
+splitting this existing solver would complicate the synchronous API and duplicate its sampling contract.
+LIC's exact 10,429 -> 23,461 B change is +13,032 B of required published-precision shared colormap
+lookup/data, proven by an isolated local-history substitution with the identical measurement method.
+
+
 ## Batch 134 scalar reference ruling (2026-11-09)
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

@@ -22,6 +22,17 @@ Zstd level storage between JS and Wasm. A same-payload uncompressed control
 preserves 12 old and 12 new hashes and removes the diagnosed RSS loss; it is
 not a runtime workaround or proof that every RSS loss is fixed. No timing A/B.
 
+## Batch 171 critical-point correctness
+
+The CPU streamline solver no longer publishes the analytical sink's zero-progress sequence or NOAA's
+false reversing cycles. The permanent analytical and real-data regressions fail the preserved old tracer
+and pass the repair; all 190 sciviz/site CPU cases pass. A small periodic orbit and near-saddle invariant
+check distinguish real curved motion from unresolved integration. The error estimate is local and the
+spatial termination floor is explicit, not a global topology claim. Existing tube/ribbon GPU checkpoint
+records retain their measured scope until final acceptance. LIC's +13,032 B attribution is independently
+reproduced with identical measurement settings and only old/current Margo colour lookup/data substituted.
+
+
 ## Batch 134 scalar ruling (Scott, 2026-11-09)
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

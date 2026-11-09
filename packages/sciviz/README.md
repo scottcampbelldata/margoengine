@@ -468,14 +468,19 @@ speed. By default the longest arrow is 6% of the data's extent; `scale` sets the
 length instead, and `head` sets the head size as a fraction of the arrow (default 0.3).
 
 `await fig.streamlines({ u, v, w?, dims, bounds? }, options)` traces a gridded field (x fastest) with fourth-order
-Runge-Kutta steps of even length on trilinearly interpolated velocities, coloured by speed:
+Runge-Kutta on trilinearly interpolated velocities, coloured by speed. Step doubling controls local error:
 
 - `seeds`: points `[x, y, z]`, or a count per axis on an even grid (default 8 in 2D, 4 in 3D);
-- `step`: step length (default a fifth of the grid spacing);
+- `step`: maximum arc step (default a fifth of the grid spacing); shortened for error or unresolved turns;
 - `maxSteps`: steps each way (default 2000);
 - `direction`: `'forward'`, `'backward'` or `'both'` (default).
 
-A line stops at the grid's edge, where the flow stops, or at a NaN sample. Both layers also take `colormap`, `range`,
+Each accepted step has RK4 step-doubling error estimate |two half steps - full step| / 15 <= 1e-6 times
+its arc step. Every stage and endpoint must remain in the starting tangent's forward half-space. Rejected
+steps halve before any point is published. A line stops at the grid's edge, a NaN sample, speed below
+`minSpeed` (default 1e-9), or when progress cannot be resolved at max(1e-6 min(step, grid spacing),
+32 epsilon max(|position components|, step)). This is a local estimate, not a global topology/error guarantee.
+True closed orbits continue to maxSteps; no visited-point filter or path trimming is used. Both layers also take `colormap`, `range`,
 `color`, `width` and `name`, and need linear axes. `streamline`, `sampleField` and `arrowSegments` from
 `@margoengine/sciviz/maths` do the same work without drawing.
 

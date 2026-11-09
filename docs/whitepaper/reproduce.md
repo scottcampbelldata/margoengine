@@ -16,6 +16,19 @@ absence on RTX A6000 WebGPU remains missing hardware evidence. No timing A/B.
 Memory losses and the same-payload normalized control are separate from
 acceptance: the runtime still receives the original source containers.
 
+## Batch 171 critical-point regression and LIC attribution
+
+Build sciviz, then run under a 4-minute process-tree deadline:
+node --test --test-timeout=120000 packages/sciviz/tests/streamline-stagnation.test.js
+The five cases cover analytical sink, 3D/backward/minSpeed, real orbits/saddle, boundaries/controls and
+all 96 unmodified NOAA day/seed combinations, including both mesh builders. The regular check:merge
+unit glob runs the same file. Canonical entry method: scripts/measure-size.js, bundleBytes, bare imports
+external, compactOutput, default gzip. The isolated attribution uses the current src/lic.ts twice, with only
+src/colormaps.ts and src/tables.ts loaded from f33472ed6^ for the historical variant, through Vite's load
+hook. No source checkout, timing run or GPU lease is needed. The durable JSON retains exact settings,
+module inventory and byte counts; both variants return exactly the historical/current recorded LIC sizes.
+
+
 ## Batch 134 scalar payload bar (2026-11-09)
 
 With the author-retained licensed corpus, control payloads, independent

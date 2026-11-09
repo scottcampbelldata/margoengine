@@ -1,24 +1,15 @@
 # Known bugs and unverified features
 
-### Open: normalized fixed-step streamlines stall or form a false two-cycle near critical points
+### Fixed: normalized fixed-step streamlines stalled near critical points
 
-Owner: packages/sciviz/src/fields.ts, streamline() / normalized RK4 trace. Repro without real data:
-u=-x, v=-y on a 2x2 grid over [-1,1]^2, seed [0.13,0,0], step 0.1, forward, minSpeed 1e-9.
-The analytical solution approaches the origin monotonically. RK4's normalized stage directions cancel after
-x=0.03, publishing the same point repeatedly until maxSteps, rather than terminating at stagnation.
-The new streamline-stagnation.test.js fails on repeated sample 2 and is intentionally retained failing on
-the private job 3 checkpoint; it is not skipped, loosened or landed on main.
-
-Real repro: examples/sciviz-tubes.html, January 4 (day index 3), seed [-3500,-1500,0], step 50 km,
-maxSteps 180, both directions. The last backward points alternate approximately
-[-4480.111354500266,578.2074515733773,0] and [-4486.832302341959,580.1225256829512,0].
-Their speeds remain 0.07889583252736707 and 0.02774742232056554, above the stop threshold.
-The scalar-size mesher properly refuses their reversing cusp; the demo gate fails when changing to this day.
-Cause: normalizing the velocity creates a discontinuity at a zero, and the fixed RK4 arc step has no local
-error control or critical-point event/zero-progress handling. Reducing the demo step or discarding its input
-would conceal the tracer defect. Proper integration/termination work in fields.ts with analytical and NOAA
-regressions remains pending. No other day, frame count, tolerance or assertion was changed to pass.
-
+fields.ts now refines normalized RK4 by step doubling and stage/endpoint direction checks before publishing
+points. The exact sink approaches zero monotonically; the unchanged NOAA day 3/seed [-3500,-1500,0]
+no longer produces a false reversing two-cycle. All 96 unchanged NOAA day/seed combinations build both
+shapes. The analytical and NOAA regressions independently fail the old tracer and pass the repair.
+Small periodic orbits continue and a near-saddle trajectory preserves xy through the close encounter.
+Physical boundary rounding, zero-speed/minSpeed=0 and invalid controls have permanent regressions too.
+Numerical floor and local-error limitations are documented in the package README and limits.md.
+GPU demo/final job acceptance is recorded separately; the earlier checkpoint remains historical.
 
 ### Fixed: scientific mesh failed construction/publication leaked resources
 

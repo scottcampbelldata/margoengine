@@ -3,6 +3,8 @@
 // fourth-order Runge-Kutta method (W. Kutta, 1901; as in E. Hairer, S. P. Norsett and G. Wanner, "Solving Ordinary
 // Differential Equations I", section II.1) on trilinearly interpolated velocities.
 
+import { rangeError } from '../../shared/errors.js';
+
 /** A vector field on a regular grid: components u, v (and w) at nx x ny (x nz) samples, x fastest. */
 export interface VectorGrid {
   readonly u: ArrayLike<number>;
@@ -20,7 +22,8 @@ export function sampleField(grid: VectorGrid, x: number, y: number, z: number): 
   const [nx, ny, nz] = grid.dims,
     b = grid.bounds;
   const coord = (p: number, lo: number, hi: number, n: number): number =>
-    n > 1 ? ((p - lo) / (hi - lo)) * (n - 1) : p === lo || hi === lo ? 0 : Number.NaN;
+    n > 1 ? (p < Math.min(lo, hi) || p > Math.max(lo, hi) ? Number.NaN : ((p - lo) / (hi - lo)) * (n - 1))
+      : p === lo || hi === lo ? 0 : Number.NaN;
   const fx = coord(x, b[0], b[1], nx),
     fy = coord(y, b[2], b[3], ny),
     fz = nz > 1 ? coord(z, b[4], b[5], nz) : 0;
@@ -53,7 +56,7 @@ export function sampleField(grid: VectorGrid, x: number, y: number, z: number): 
 
 /** Options for {@link streamline}. */
 export interface StreamlineOptions {
-  /** Step length in data units. Default a fifth of the smallest grid spacing. */
+  /** Maximum arc step in data units; shortened for local error and critical points. Default a fifth of the smallest grid spacing. */
   readonly step?: number;
   /** Most steps each way. Default 2000. */
   readonly maxSteps?: number;
@@ -73,8 +76,9 @@ export function gridSpacing(grid: VectorGrid): number {
 }
 
 /**
- * A streamline through `seed`: points (xyz) and the speed at each, traced with RK4 steps of fixed arc length (the
- * velocity normalised, so steps are even), stopping at the grid's edge, where the flow stops or after `maxSteps`.
+ * A streamline through `seed`: points (xyz) and the speed at each, traced with error-controlled, normalized RK4.
+ * Step doubling estimates local position error; unresolved turns/critical points shorten the step. Stops at
+ * minSpeed, the grid edge/mask, spatial resolution (1e-6 of min(step, grid spacing), or roundoff), or maxSteps.
  */
 export function streamline(
   grid: VectorGrid,
@@ -85,28 +89,65 @@ export function streamline(
     maxSteps = options.maxSteps ?? 2000,
     minSpeed = options.minSpeed ?? 1e-9,
     direction = options.direction ?? 'both';
-  // Unit direction of the flow, scaled by the trace sign.
-  const dir = (p: readonly number[], sign: number): [number, number, number] | null => {
+  if (!(h > 0) || !Number.isFinite(h) || !Number.isSafeInteger(maxSteps) || maxSteps < 0 ||
+    !Number.isFinite(minSpeed) || minSpeed < 0 || !['forward', 'backward', 'both'].includes(direction))
+    throw rangeError('Streamline needs a positive finite step, nonnegative integer maxSteps/minSpeed and a valid direction', 'sciviz');
+  // Normalization is singular at a zero. Do not let RK stages straddle that singularity or let their
+  // cancellation masquerade as an accurate step. Half-space tests also resolve sharp, nonzero curvature.
+  const resolution = Math.min(h, gridSpacing(grid)) * 1e-6;
+  const dir = (p: readonly number[], sign: number): number[] | null => {
     const v = sampleField(grid, p[0], p[1], p[2]);
     if (!v) return null;
     const speed = Math.hypot(v[0], v[1], v[2]);
-    return speed < minSpeed ? null : [(sign * v[0]) / speed, (sign * v[1]) / speed, (sign * v[2]) / speed];
+    return speed > 0 && speed >= minSpeed && Number.isFinite(speed)
+      ? v.map((c) => sign * c / speed) : null;
+  };
+  const dot = (a: number[], b: number[]) => a.reduce((sum, c, i) => sum + c * b[i], 0);
+  const advance = (p: number[], length: number, sign: number, reference: number[]): number[] | null => {
+    const stage = (q: number[]) => {
+      const k = dir(q, sign);
+      return k && dot(k, reference) > 0 ? k : null;
+    };
+    const offset = (k: number[], fraction: number) => p.map((c, i) => c + fraction * length * k[i]);
+    const k1 = stage(p);
+    if (!k1) return null;
+    const k2 = stage(offset(k1, 0.5));
+    if (!k2) return null;
+    const k3 = stage(offset(k2, 0.5));
+    if (!k3) return null;
+    const k4 = stage(offset(k3, 1));
+    if (!k4) return null;
+    const q = p.map((c, i) => c + length / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+    return stage(q) ? q : null;
   };
   const trace = (sign: number): number[][] => {
     const points: number[][] = [];
-    let p = [seed[0], seed[1], seed[2]];
+    let p = [seed[0], seed[1], seed[2]], length = h;
     for (let n = 0; n < maxSteps; n++) {
       const k1 = dir(p, sign);
       if (!k1) break;
-      const k2 = dir([p[0] + (h / 2) * k1[0], p[1] + (h / 2) * k1[1], p[2] + (h / 2) * k1[2]], sign);
-      if (!k2) break;
-      const k3 = dir([p[0] + (h / 2) * k2[0], p[1] + (h / 2) * k2[1], p[2] + (h / 2) * k2[2]], sign);
-      if (!k3) break;
-      const k4 = dir([p[0] + h * k3[0], p[1] + h * k3[1], p[2] + h * k3[2]], sign);
-      if (!k4) break;
-      p = [0, 1, 2].map((c) => p[c] + (h / 6) * (k1[c] + 2 * k2[c] + 2 * k3[c] + k4[c]));
-      if (!sampleField(grid, p[0], p[1], p[2])) break;
-      points.push(p);
+      const floor = Math.max(resolution, 32 * Number.EPSILON * Math.max(...p.map(Math.abs), h));
+      let next: number[] | null = null;
+      // Bounded refinement, never publication followed by path trimming. Each rejection halves length.
+      while (length >= floor) {
+        const full = advance(p, length, sign, k1),
+          half = advance(p, length / 2, sign, k1),
+          fine = half && advance(half, length / 2, sign, k1);
+        if (full && fine) {
+          const delta = fine.map((c, i) => c - p[i]),
+            error = Math.hypot(...fine.map((c, i) => c - full[i])) / 15;
+          if (dot(delta, k1) > floor && error <= length * 1e-6) {
+            next = fine;
+            // RK4's local error scales with length^5. Keep the requested step as the upper bound.
+            length = Math.min(h, length * Math.min(2, Math.max(0.5, 0.9 * (length * 1e-6 / (error || Number.MIN_VALUE)) ** 0.2)));
+            break;
+          }
+        }
+        length /= 2;
+      }
+      if (!next) break;
+      points.push(next);
+      p = next;
     }
     return points;
   };

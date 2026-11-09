@@ -30,6 +30,49 @@ no old endpoints, optimizer or implementation was inferred. No foreign
 implementation source, wrapper source, disassembly or companion code opened.
 [Full evidence and pending RSS losses](whitepaper/results/batch-134-corpus-uploads-memory.json).
 
+## Batch 171 critical-point tracer repair and LIC size attribution
+
+Research before repair compared:
+
+- Christoph Garth and Xavier Tricoche, *Topology- and Feature-based Flow Visualization: Methods and
+  Applications*, 2005, section 3.1, https://www.cs.purdue.edu/cgvlab/papers/xmt/siam-gdc05.pdf.
+  Critical points are asymptotic limit sets; cycles are a different kind of limit set. A normalized field is
+  singular at a zero, so cancellation of integration stages must not be published as a physical orbit.
+- Tor Nordam and Rodrigo Duran, *Numerical integrators for Lagrangian oceanography*, 2020, sections
+  2.1-2.4, https://gmd.copernicus.org/articles/13/5935/2020/ . Compared embedded RK error estimates,
+  step adaptation and derivative discontinuities from interpolated grids. Local control is not proof of
+  global topology or original-data accuracy. Keep physical velocity sampling separate from unit tangents.
+- Germund Dahlquist and Ake Bjorck, *Numerical Methods in Scientific Computing*, chapter 13 draft,
+  2007 course copy (draft itself undated), section 13.3.3,
+  https://user.it.uu.se/~perl/ODE_07/NumODEsbook.pdf . Step doubling gives the RK4 fine-solution
+  error estimate (fine - coarse)/(2^4 - 1). Compared with the embedded-pair approach above; retain Margo's
+  classical RK4 and accept the two-half-step solution without extrapolating across a singularity.
+
+Synthesis in fields.ts: RK4 step doubling, error estimate <= 1e-6 of current arc step, and stage/endpoint
+forward-half-space checks. Refine before publication. Terminate at minSpeed, missing/boundary samples,
+or unresolved spatial progress, floor max(1e-6 min(requested step, grid spacing), 32 epsilon
+max(abs(position components), requested step)). The angular/progress guard and floor are Margo's explicit
+numerical policy, not a claimed theorem from the papers. Shrinking steps permits actual curvature; the
+independent small-circle and near-saddle invariants rule out treating every turn as stagnation. No path
+trimming, seed filtering, reduced demo step, relaxed cusp test, global cycle removal or hidden exception.
+This uses additional field evaluations to correct the solver; no speed claim or timing comparison is made.
+The public sampler also checks physical bounds before converting to grid indices, preventing rounding
+from accepting a position just beyond a boundary. Zero speed stops even when minSpeed is zero; invalid
+integration controls reject rather than entering an unbounded refinement. Regression covers those paths.
+Both the unchanged analytical sink and all-NOAA-seed test fail against the preserved old Margo tracer;
+all 190 package/site CPU tests pass with the repair. Permanent tests are in check:merge's existing unit glob.
+Only papers, public specifications and Margo source/history were read; no companion or rival source.
+
+LIC attribution uses the same current LIC source, bundler settings, external-import rule and gzip method
+in both builds. Substituting only Margo's pre-f33472ed6 colormaps.ts/tables.ts yields exactly 10,429 B;
+current published-precision tables yield exactly 23,461 B: +13,032 B. This is shared colour data/lookup,
+not a measurement change. The five retained modules are LIC/shaders, linked errors, four layer helpers,
+two renderer capability helpers and synchronous colormap lookup with all twelve named maps. No figure,
+volume, flow, tube, geometry, label or renderer class is retained. All named maps remain supported; data
+precision and synchronous names make this shared code necessary. Removing tables or deferring their
+loading would lose current behaviour. Audit: whitepaper/results/batch-171-lic-size-attribution.json.
+
+
 ## Batch 134 scalar ruling and byte-fitter restoration (2026-11-09)
 
 Scott's written "Do recommend" ruling in the batch brief authorizes per-file
