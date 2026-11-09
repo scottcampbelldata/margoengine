@@ -23,6 +23,8 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/sciviz` | volume-64, 256 x 256, frame plus the pixel read | 1.500 ms | VTK.js 38.0.5, 1.300 ms | loss |
 | `@margoengine/splats` | truck 7k prefix, 699,050 degree-3 splats, one still frame | 10.765 ms | GaussianSplats3D 0.4.7, 4.500 ms | loss |
 | `@margoengine/splats` | same frame against the published photo `000001` | PSNR 12.226 dB, MAE 52.272 | GaussianSplats3D 0.4.7, PSNR 9.994 dB, MAE 60.646 | picture error |
+| `@margoengine/tiles` | quadtree, 5,461 tiles, screen-space error 16, selected set | 1,120 tiles, checksum 121586381 | 3DTilesRendererJS 0.4.21, same 1,120 tiles, same checksum | equal |
+| `@margoengine/tiles` | same view, one settled `update` | 0.300 ms | 3DTilesRendererJS 0.4.21, 2.300 ms | win |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -97,3 +99,15 @@ false, `sharedMemoryForWorkers` false, `integerBasedSort` false), antialiasing o
 RTX A6000, busy machine, diagnostic. The loss and the picture error stay open. Rerun:
 `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
 The fit count is `packages/splats/test/storage-fit.test.js`. The pose maths are `packages/splats/test/paper-camera.test.js`.
+
+The tiles rows are one explicit REPLACE quadtree, 7 levels, 5,461 tiles, 256 m on a side, y-up, no geodetic
+transform. `geometricError` is half the cell at every level except the leaves, which are 0. Every tile has a
+content URI and every URI serves the same small GLB; selection uses the JSON bounding volume. The camera sits at
+`[0, 80, 400]`, looks at the origin, up is +Y, the vertical field of view is 50 degrees, and the drawing buffer
+is 1080 x 1080. Both error budgets are 16 pixels (the rival's README default is 6; it is set to 16 here). The
+frustum passed to Margo matches the rival camera on five sample points. After every wanted tile has loaded, both
+select the same 1,120 tiles: 992 at level 5 and 128 at level 6, checksum 121586381. The clock is one settled
+`update`, not the load. Two warmups, then 7 paired rounds, per-round minimum. The rounds do not overlap (Margo
+0.300 to 0.900 ms, 3DTilesRendererJS 2.300 to 3.100). Busy machine, diagnostic. The selected set is locked by
+`packages/tiles/tests/sse-scene.test.js`. Rerun:
+`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.

@@ -2408,6 +2408,18 @@ gives commands. No accuracy assertion or timing budget was weakened.
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
   Citation in clean-room.md.
 
+### 104. quadtree screen-space error against 3DTilesRendererJS (diagnostic, win)
+
+- **Measurement:** an explicit REPLACE quadtree, 7 levels, 5,461 tiles, 256 m, y-up. Error budget 16 pixels on
+  both sides (the rival default of 6 is raised to 16). Camera `[0, 80, 400]`, target origin, fov 50, 1080 x 1080.
+  The clock is one settled `update` after the wanted tiles have loaded. Two warmups, then 7 paired rounds,
+  fastest round. 3DTilesRendererJS 0.4.21. Busy machine.
+- **Result:** the selected sets are equal, 1,120 tiles, checksum 121586381 (992 at level 5, 128 at level 6).
+  Frame time is a win. Margo 0.300 ms, 3DTilesRendererJS 2.300 ms. The rounds do not overlap (Margo 0.300 to
+  0.900, 3DTilesRendererJS 2.300 to 3.100). Diagnostic until a quiet rerun.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.
+  Citation in clean-room.md. The Margo set is `packages/tiles/tests/sse-scene.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2496,3 +2508,4 @@ These entries lack a recorded number, a named machine or a quiet run:
 24. Certified 2D faces and solver study (entry 101): quiet paired Wasm and browser reruns; the Box2D loss remains open.
 25. volume-64 against VTK.js (entry 102): a quiet paired rerun. The loss stays open.
 26. Truck 7k prefix against GaussianSplats3D (entry 103): a quiet paired rerun. The loss and the picture error stay open.
+27. Quadtree screen-space error against 3DTilesRendererJS (entry 104): a quiet paired rerun of the frame time. The selected sets already match.

@@ -1103,6 +1103,8 @@ Written clean room from the specifications and papers below. No source code of 3
 | S2 cell volumes (`tiles/s2`) | CesiumGS/3d-tiles, `3DTILES_bounding_volume_S2` README (cell IDs, tokens, quadratic projection, extrusion, implicit subdivision and its availability figure); the S2 cell hierarchy guide, s2geometry.io/devguide/s2cell_hierarchy (faces, Hilbert curve, odd faces mirrored); D. Hilbert, "Ueber die stetige Abbildung einer Linie auf ein Flaechenstueck", Math. Annalen 38, 1891. No S2 library source was read |
 | Hosted tileset sign-in and credits (`tiles/ion`) | Cesium ion REST API reference (GET /v1/assets/{id}/endpoint, bearer tokens, `attributions` with `collapsible`); Google Map Tiles API documentation for photorealistic 3D Tiles (`key` and `session` parameters, showing the visible tiles' copyright by frequency); Khronos glTF 2.0 `asset.copyright`; one refresh on HTTP 401 (RFC 6750) is Margo's own |
 
+The batch 168 timing drives `3d-tiles-renderer` 0.4.21 as a black box from its README (https://github.com/NASA-AMMOS/3DTilesRendererJS): `TilesRenderer`, `setCamera`, `setResolution`, `errorTarget`, then `update`. The library source was not opened. `errorTarget` is set to 16 so both sides use one pixel budget (the README default is 6). The tileset is an explicit quadtree written for the measurement. Screen-space error follows OGC 3D Tiles 1.1, "Geometric error".
+
 ## Point clouds: LAS, octree and colours in `@margoengine/points`
 
 Written clean room from the specifications and papers below. No source code of point-cloud libraries or viewers
