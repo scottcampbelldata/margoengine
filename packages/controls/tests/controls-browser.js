@@ -408,3 +408,80 @@ window.arcballFinish = async () => {
   return { before, after: listeners.size, pluginBefore, pluginAfter: plugins(), errors: state.arc.errors };
 };
 window.arcballDisposeEngine = () => state.arc.engine.dispose();
+
+window.sceneOwnerCheck = async () => {
+  const canvas = document.createElement('canvas');
+  document.body.append(canvas);
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [64, 64],
+    camera: { position: [0, 0, 3], target: [0, 0, 0] },
+  });
+  engine.stop();
+  const errors = [],
+    rows = [],
+    listeners = trackListeners(canvas);
+  engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  try {
+    for (const [name, make] of [
+      ['OrbitControls', () => new OrbitControls(engine)],
+      ['TransformControls', () => new TransformControls(engine)],
+      [
+        'ArcballGizmo',
+        () =>
+          new ArcballGizmo(
+            { engine, camera: engine.camera, element: canvas, state: 'none', rotate() {} },
+            { autoHide: false },
+          ),
+      ],
+    ])
+      for (const target of ['default', 'secondary']) {
+        const scene = target === 'default' ? engine.scene : engine.createScene('owner-target');
+        scene.background = '#000000';
+        const mesh = scene.createMesh().setGeometry(box());
+        mesh.material.set({ color: [1, 0, 0], unlit: true });
+        for (const mode of ['direct', 'owner']) {
+          let control, plugin;
+          const scope = {
+            name: 'scope',
+            setup() {
+              control = make();
+              if (name === 'TransformControls') control.attach(mesh);
+              plugin = [...scene.plugins.values()].find((value) => value !== scope);
+            },
+          };
+          scene.use(scope);
+          scene.removePlugin(scope.name);
+          const sentinel = { name: plugin.name, setup() {} };
+          if (target === 'secondary') engine.use(sentinel);
+          engine.render({ delta: 0, views: [{ scene, camera: engine.camera, viewport: [0, 0, 1, 1] }] });
+          const bitmap = await createImageBitmap(canvas);
+          const flat = new OffscreenCanvas(64, 64).getContext('2d');
+          flat.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          const pixels = flat.getImageData(0, 0, 64, 64).data;
+          let red = 0;
+          for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 100 && pixels[i + 1] < 20) red++;
+          if (mode === 'direct') control.dispose();
+          else scene.removePlugin(plugin.name);
+          const detached = engine.sceneOf(plugin) === undefined;
+          const isolated = target === 'default' || engine.scene.plugins.get(plugin.name) === sentinel;
+          const replacement = { name: plugin.name, setup() {} };
+          scene.use(replacement);
+          control.dispose();
+          const preserved = scene.plugins.get(plugin.name) === replacement;
+          scene.removePlugin(replacement.name);
+          if (target === 'secondary') engine.removePlugin(sentinel.name);
+          engine.render({ delta: 0, views: [{ scene, camera: engine.camera, viewport: [0, 0, 1, 1] }] });
+          rows.push({ name, target, mode, red, detached, isolated, preserved, listeners: listeners.size });
+        }
+        mesh.dispose();
+        if (target === 'secondary') scene.dispose();
+      }
+    await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+    return { rows, errors };
+  } finally {
+    engine.dispose();
+    canvas.remove();
+  }
+};

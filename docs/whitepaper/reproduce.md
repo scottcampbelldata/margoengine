@@ -2036,3 +2036,17 @@ The original 640x360 triangle overdrawn 400 times and its exact 7 ms p90 budget
 remain in scripts/speed/suites.json. Do not run that speed assertion or the
 old submit-to-done wall-clock diagnostic until Scott ends the build phase.
 Timestamp validity, tier storage/next-load and wrapper cleanup stay live.
+
+
+### Controls wrapper owner reproduction
+
+Build Controls, then run packages/controls/tests/*.test.js and
+tests/controls-owner-contract.test.js with --test-timeout=120000. The expanded
+scene-owner suite has 81 cases; eleven direct-secondary cases fail on parent
+40a1548cc. The two constructor-failure cases per scene are passing controls.
+The original 12-case probe independently has three failures and nine controls.
+
+The pending GPU proof extends the complete package browser leaf with twelve
+real-GPU owner cases and rendered pixels. Run that and the walk browser leaf
+separately, using the shared GPU lock, wait-max60 and measured time plus margin.
+Builds stay outside the GPU lock. Run the Controls runtime README examples next.

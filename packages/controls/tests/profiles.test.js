@@ -505,6 +505,9 @@ test('profiles: Blender numpad 5 toggles the engine projection (@margoengine/cam
       plugin.setup(engine);
     },
     hasPlugin: (n) => plugins.has(n),
+    sceneOf(plugin) {
+      return plugins.get(plugin.name) === plugin ? engine : undefined;
+    },
     removePlugin(n) {
       plugins.get(n)?.dispose?.();
       plugins.delete(n);

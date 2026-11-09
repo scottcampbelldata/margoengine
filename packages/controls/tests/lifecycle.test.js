@@ -37,6 +37,9 @@ function engine(canvas) {
     hasPlugin(name) {
       return this.plugins.has(name);
     },
+    sceneOf(plugin) {
+      return this.plugins.get(plugin.name) === plugin ? this : undefined;
+    },
     removePlugin(name) {
       const plugin = this.plugins.get(name);
       this.plugins.delete(name);

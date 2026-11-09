@@ -301,6 +301,19 @@ try {
     `Arcball dispose removes ${arcEnd.before} canvas listeners (${arcEnd.after} left) and its update plugin; a later drag moves nothing; zero WebGPU validation errors`,
   );
 
+  const owner = await page.evaluate(() => window.sceneOwnerCheck());
+  for (const row of owner.rows) {
+    assert.ok(row.red > 100, `${row.name} ${row.target}: actual owning scene rendered`);
+    assert.equal(row.detached, true);
+    assert.equal(row.isolated, true);
+    assert.equal(row.preserved, true);
+    assert.equal(row.listeners, 0);
+  }
+  assert.deepEqual(owner.errors, []);
+  report.owner = owner;
+  checks.push(
+    '12 real GPU wrapper owner/disposal cases render their scenes, detach, preserve identity and release input',
+  );
   await page.screenshot({ path: resolve(results, 'controls.png') });
   report.browser = browser.version();
   assert.deepEqual(errors, []);

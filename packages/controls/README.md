@@ -581,3 +581,15 @@ under the cursor, and Rhino right drag pans there; and the browser conflicts abo
 `npm run test:browser` (a real-GPU script, not in CI) starts a real engine in Chromium (or Edge, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`) and drives it with `page.mouse`: an orbit drag moves the rendered box to its newly projected position, the wheel enlarges it, the gizmo draws over the mesh, hover turns the X arrow yellow, dragging the X arrow 100 px moves the mesh and the rendered box by the expected amount while the camera stays still, dispose removes every canvas listener and the overlay pass, `occlude` hides the gizmo behind a wall on WebGPU and WebGL2, there are zero WebGPU validation errors, and the WebGL2 backend draws and removes the same overlay. `npm run size` prints the gzip size of the whole bundle and of each control tree-shaken on its own.
 
 Apache-2.0 licensed.
+
+### Scene ownership and disposal
+
+Camera controls and gizmos retain the actual update or overlay plugin they
+register. Creating them during a secondary scene's setup binds that wrapper to
+the scene. dispose() disconnects input and removes that exact registration;
+removing the owning plugin or scene also disposes the control. Repeated disposal
+preserves any replacement with the same name and plugins in other scenes.
+
+The ordinary attach/dispose example above uses the same lifecycle. The
+scene-owner suite covers all nine camera control classes and both gizmo wrappers,
+including initialization failures and scene/engine disposal.

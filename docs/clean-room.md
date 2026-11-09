@@ -3848,3 +3848,28 @@ positive query, uses FAST_GPU_MS to check storage and next-load tier, verifies
 wrapper restoration and reports validation errors. No speed budget is raised.
 The helper GPU proof renders the owning scene twice and checks red canvas pixels,
 then exercises cancellation before and between frames with same-name isolation.
+
+
+### Controls wrapper ownership (batch 56 continuation)
+
+Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with Algebraic
+Effects* (2017), https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+and Ecma International, *ECMAScript 2026 Language Specification* (2026),
+https://262.ecma-international.org/17.0/. Confinement motivates keeping the
+registration object rather than a globally meaningful name. Structured lifetime
+and explicit resource management motivate disposing listeners and wrappers
+together, including repeated disposal and failed setup. These are design
+inferences for the synchronous engine registration protocol, not a formal
+concurrency proof. No companion implementation or other repository source was read.
+
+Controls previously retained only wrapper names in its shared base, TransformControls
+and ArcballGizmo. Outside a secondary setup, direct disposal queried the default
+scene, potentially removing its same-name plugin while leaving the real wrapper
+registered. The optional package now retains the object and resolves sceneOf
+on that object. The parent passes 70 and fails 11 of the expanded 81 real-engine
+cases; the repair passes all 81. Complete package units plus a source guard pass
+302 checks. The guard scans every Controls source for anonymous/lost registrations
+and active-name cleanup when a source installs a wrapper. GPU/README acceptance
+is pending. No core or stage source changed.

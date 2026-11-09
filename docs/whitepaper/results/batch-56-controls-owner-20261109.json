@@ -1,0 +1,82 @@
+{
+  "status": "LOCAL_REPAIR_ACCEPTANCE_PENDING",
+  "base": "40a1548cc",
+  "initialProbe": {
+    "cases": 12,
+    "pass": 9,
+    "fail": 3
+  },
+  "expandedParent": {
+    "cases": 81,
+    "pass": 70,
+    "fail": 11
+  },
+  "fixed": {
+    "packageUnits": 301,
+    "guard": 1,
+    "pass": 302,
+    "fail": 0
+  },
+  "api": "10 unchanged selected entries",
+  "sizes": [
+    {
+      "name": "@margoengine/controls",
+      "gzip": 27268,
+      "ceiling": 27517
+    },
+    {
+      "name": "@margoengine/controls/orbit",
+      "gzip": 6151,
+      "ceiling": 6412
+    },
+    {
+      "name": "@margoengine/controls/fly",
+      "gzip": 2791,
+      "ceiling": 3051
+    },
+    {
+      "name": "@margoengine/controls/trackball",
+      "gzip": 4006,
+      "ceiling": 4269
+    },
+    {
+      "name": "@margoengine/controls/arcball",
+      "gzip": 8395,
+      "ceiling": 8637
+    },
+    {
+      "name": "@margoengine/controls/transform",
+      "gzip": 11877,
+      "ceiling": 12121
+    },
+    {
+      "name": "@margoengine/controls/drag",
+      "gzip": 3649,
+      "ceiling": 3905
+    },
+    {
+      "name": "@margoengine/controls/profiles",
+      "gzip": 704,
+      "ceiling": 960
+    },
+    {
+      "name": "@margoengine/controls/third-person",
+      "gzip": 3118,
+      "ceiling": 3378
+    },
+    {
+      "name": "@margoengine/controls/walk",
+      "gzip": 13930,
+      "ceiling": 14349
+    }
+  ],
+  "coreStageSourceChanged": false,
+  "hunterCaptureChanged": false,
+  "pending": [
+    "GPU browser including 12 owner cases",
+    "walk browser",
+    "runtime README",
+    "lint/hygiene/documentation checks",
+    "rebase and push"
+  ]
+}

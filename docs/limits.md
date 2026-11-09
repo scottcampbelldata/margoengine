@@ -2941,3 +2941,26 @@ Size restoration finding 10 restores actionable optional stage errors. Fit
 validation retains TypeError and arguments help; missing peers retain state
 and install help, with their npm command and restart advice. Entry growth:
 @margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517. Core plus stage root stays 23924 B.
+
+
+### Controls wrapper ownership continuation
+
+Three optional wrapper registrations retain identity and dispose from their actual
+scene. The 81-case runtime suite covers nine camera classes and two gizmos, both
+scenes, direct/plugin/scene/engine removal, restoration hooks, same-name isolation
+and replacement, plus failed initialization. Package and source-guard checks pass
+302. GPU and runtime README proof remain pending. No speed or formal ownership
+claim; no core/stage or export change and no size ceiling raised.
+
+| Controls entry | min+gzip bytes | Unchanged ceiling |
+| --- | ---: | ---: |
+| @margoengine/controls | 27268 | 27517 |
+| @margoengine/controls/orbit | 6151 | 6412 |
+| @margoengine/controls/fly | 2791 | 3051 |
+| @margoengine/controls/trackball | 4006 | 4269 |
+| @margoengine/controls/arcball | 8395 | 8637 |
+| @margoengine/controls/transform | 11877 | 12121 |
+| @margoengine/controls/drag | 3649 | 3905 |
+| @margoengine/controls/profiles | 704 | 960 |
+| @margoengine/controls/third-person | 3118 | 3378 |
+| @margoengine/controls/walk | 13930 | 14349 |

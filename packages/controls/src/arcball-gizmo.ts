@@ -1,6 +1,6 @@
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import type { FrameGraph, PassContext } from '@margoengine/core/extension';
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Prim, RGBA } from './gizmo.js';
 import { madd, type V3 } from './math.js';
 import { OverlayRenderer, tessellate } from './overlay.js';
@@ -63,6 +63,7 @@ export class ArcballGizmo {
   readonly controls: ArcballGizmoTarget;
   /** Name of the engine plugin that owns the overlay pass. */
   readonly pluginName: string;
+  private readonly plugin: EnginePlugin;
   private readonly engine: EngineKernel;
   private disposed = false;
   private grabbed: { axis: V3; radial: V3; x: number; y: number } | null = null;
@@ -81,7 +82,7 @@ export class ArcballGizmo {
     this.pluginName = `margoengine-controls:arcball-gizmo:${++counter}`;
     const order = options.order ?? 1000;
     if (controls.rotate) controls.handle = this.ringDrag;
-    engine.use({
+    const plugin = {
       name: this.pluginName,
       setup() {},
       registerPasses: (graph: FrameGraph) => {
@@ -89,7 +90,9 @@ export class ArcballGizmo {
       },
       onDeviceRestored: () => this.overlay.release(),
       dispose: () => this.dispose(),
-    } as Parameters<EngineKernel['use']>[0]);
+    };
+    this.plugin = plugin;
+    engine.use(plugin);
   }
   /** The ball's radius in world units at the target: half the smaller side of the element, as the pointer drag uses. */
   radius(): number {
@@ -197,7 +200,7 @@ export class ArcballGizmo {
     this.disposed = true;
     if (this.controls.handle === this.ringDrag) this.controls.handle = null;
     this.overlay.release();
-    if (!this.engine.disposed && this.engine.hasPlugin(this.pluginName)) this.engine.removePlugin(this.pluginName);
+    this.engine.sceneOf(this.plugin)?.removePlugin(this.pluginName);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

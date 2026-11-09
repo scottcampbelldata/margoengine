@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel, Mesh, RenderView } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin, Mesh, RenderView } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { EventDispatcher, type ControlElement } from './controls.js';
@@ -192,6 +192,7 @@ export class TransformControls extends EventDispatcher {
   private readonly flip: [number, number, number] = [1, 1, 1];
   /** Name of the engine plugin that owns the overlay pass. */
   readonly pluginName: string;
+  private readonly plugin: EnginePlugin;
   private disposed = false;
 
   /** Creates the TransformControls on `engine` (preferred over the constructor). */
@@ -218,7 +219,7 @@ export class TransformControls extends EventDispatcher {
     this.view = options.view ?? null;
     this.pluginName = `margoengine-controls:transform:${++counter}`;
     const order = options.order ?? 1000;
-    engine.use({
+    const plugin = {
       name: this.pluginName,
       setup() {},
       registerPasses: (graph: FrameGraph) => {
@@ -226,7 +227,9 @@ export class TransformControls extends EventDispatcher {
       },
       onDeviceRestored: () => this.overlay.release(),
       dispose: () => this.dispose(),
-    } as Parameters<EngineKernel['use']>[0]);
+    };
+    this.plugin = plugin;
+    engine.use(plugin);
     try {
       this.connect(options.element ?? (engine.canvas as unknown as ControlElement));
     } catch (error) {
@@ -534,7 +537,9 @@ export class TransformControls extends EventDispatcher {
     const { origin, direction } = ray(b, x, y, width, height),
       hit = this.occluder(origin, direction),
       centre = f.origin.map((value, i) => value - origin[i]);
-    return hit !== null && hit < centre[0] * direction[0] + centre[1] * direction[1] + centre[2] * direction[2] - f.size;
+    return (
+      hit !== null && hit < centre[0] * direction[0] + centre[1] * direction[1] + centre[2] * direction[2] - f.size
+    );
   }
   /** The camera basis and the view's rectangle on the element in CSS pixels (core viewports are fractions unless `pixels`). */
   private screen(): { b: Basis; x: number; y: number; width: number; height: number } | null {
@@ -566,7 +571,7 @@ export class TransformControls extends EventDispatcher {
     this.selection = [];
     this.savedSelection = [];
     this.overlay.release();
-    if (!this.engine.disposed && this.engine.hasPlugin(this.pluginName)) this.engine.removePlugin(this.pluginName);
+    this.engine.sceneOf(this.plugin)?.removePlugin(this.pluginName);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -859,8 +864,7 @@ export class TransformControls extends EventDispatcher {
       if (snap) next[i] = Math.round(next[i] / snap) * snap || snap;
       if (Math.abs(next[i]) < 1e-4) next[i] = Math.sign(next[i] || d.scale[i]) * 1e-4;
     }
-    if (d.members)
-      this.scaleMembers(d, [0, 1, 2].map((i) => (d.scale[i] ? next[i] / d.scale[i] : 1)) as unknown as V3);
+    if (d.members) this.scaleMembers(d, [0, 1, 2].map((i) => (d.scale[i] ? next[i] / d.scale[i] : 1)) as unknown as V3);
     else object.setScale(next);
   }
 
@@ -898,10 +902,7 @@ export class TransformControls extends EventDispatcher {
     for (const m of d.members!) {
       if (!this.live(m.mesh)) continue;
       const R = own
-          ? multiplyQuaternions(
-              multiplyQuaternions(m.worldQuaternion, inFrame),
-              conjugateQuaternion(m.worldQuaternion),
-            )
+          ? multiplyQuaternions(multiplyQuaternions(m.worldQuaternion, inFrame), conjugateQuaternion(m.worldQuaternion))
           : rotation,
         P = m.parentQuaternion;
       if (!inPlace)

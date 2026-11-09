@@ -3677,3 +3677,14 @@ both queued frames after stop or disposal. Ten parent failures are covered by
 the real-engine suite. All 95 Quality units, its five GPU commands and seven
 runtime README examples pass. The exact inherited 7 ms speed budget remains
 in the named deferred suite. See the [acceptance receipt](whitepaper/results/batch-56-quality-owner-20261109.json).
+
+
+### Controls secondary wrapper disposal: local repair awaiting acceptance
+
+Repro: construct OrbitControls, TransformControls or ArcballGizmo during a
+secondary scene setup, remove the temporary setup scope, then dispose outside
+setup with a same-name default plugin present. The default plugin is removed
+and the actual wrapper remains registered. Cause: only the name was retained.
+The shared base affects all nine camera controls. The local identity repair
+passes all 81 real-engine cases (parent 70 pass, 11 fail), with 302 total package
+and guard checks passing. Package GPU and runtime README acceptance remain open.

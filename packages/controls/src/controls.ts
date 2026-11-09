@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { Camera, EngineKernel } from '@margoengine/core';
+import type { Camera, EngineKernel, EnginePlugin } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 
 /** Native handlers may specialize the event type, as in the DOM listener overloads. */
@@ -85,7 +85,7 @@ export abstract class Controls extends EventDispatcher {
   element: ControlElement | null = null;
   enabled = true;
   private bindings: Binding[] = [];
-  private pluginName: string | null = null;
+  private plugin: EnginePlugin | null = null;
   private disposed = false;
 
   /**
@@ -117,18 +117,19 @@ export abstract class Controls extends EventDispatcher {
     }
     if (this.engine && autoUpdate) {
       const name = `margoengine-controls:${this.kind}:${++pluginCounter}`;
-      this.engine.use({
+      const plugin: EnginePlugin = {
         name,
         setup() {},
         onPreUpdate: (delta) => {
           if (this.enabled) this.update(delta);
         },
         dispose: () => {
-          this.pluginName = null;
+          this.plugin = null;
           this.dispose();
         },
-      });
-      this.pluginName = name;
+      };
+      this.engine.use(plugin);
+      this.plugin = plugin;
     }
     this.pending = element ?? null;
   }
@@ -182,9 +183,9 @@ export abstract class Controls extends EventDispatcher {
     if (this.disposed) return;
     this.disconnect();
     this.disposed = true;
-    const name = this.pluginName;
-    this.pluginName = null;
-    if (name && this.engine && !this.engine.disposed && this.engine.hasPlugin(name)) this.engine.removePlugin(name);
+    const plugin = this.plugin;
+    this.plugin = null;
+    if (plugin) this.engine?.sceneOf(plugin)?.removePlugin(plugin.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

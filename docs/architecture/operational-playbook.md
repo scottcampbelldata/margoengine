@@ -4755,3 +4755,14 @@ exact npm commands in optional entries. Regressions cover glTF/viewer/scene
 validation and four missing viewer peers, with error type/code/help and camera
 rollback. The old viewer and missing-peer diagnostics fail the strengthened
 checks. Sources and measured optional ceilings: [size restoration](../size-restore.md).
+
+
+### Section 5 pending evidence: Controls wrappers
+
+The shared controls base and the two GPU gizmos now retain their actual wrapper
+objects. Direct cleanup resolves sceneOf(wrapper) rather than the active scene.
+The expanded 81-case real-engine suite has 11 direct-secondary failures on its
+parent and passes after repair; all 302 package/guard checks pass. The class guard
+scans every Controls source and is part of the normal test/check:merge inventory.
+All ten entry sizes remain within their unchanged ceilings. Public API reports
+match all ten entries. GPU/browser and README runtime acceptance remain pending.

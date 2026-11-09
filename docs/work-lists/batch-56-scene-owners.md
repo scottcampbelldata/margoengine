@@ -119,3 +119,10 @@ covers default/secondary pixels and before/between-frame cancellation. The
 inherited 7 ms assertion remains in the deferred named speed suite. Only
 affected checks were rerun; no second full verify. See the [Quality receipt](../whitepaper/results/batch-56-quality-owner-20261109.json).
 The wider audit remains open. Controls wrappers are the next runtime candidates.
+
+Controls registration audit now proves eleven direct-secondary failures across
+nine inherited camera controls and two gizmos. The parent has 70 passing controls
+in the expanded 81-case suite. The optional identity repair passes all 302 package
+and source-guard checks. The deliberate cadControls replacement of the active
+stage controls is not disposal of its own wrapper; existing profile tests cover
+that operation. GPU/README acceptance remains pending; other groups remain open.
