@@ -4354,6 +4354,47 @@ This supersedes the Y-up receiver restriction in earlier batch-56 entries. Conta
 
 Both receivers draw on WebGPU and the installed WebGL2 compatibility layer. The older native preview throws linked unsupported. The analytic geometry oracle covers eight orientations, all 4096 texels per effect per orientation, display pixels and actual device replacement; the real FlightHelmet additionally proves a Z-up fit/contact composition. No speed, cross-hardware subpixel identity or photographic quality claim. Root staging is 8520 B gzip (ceiling 8776), accumulate 9655 (ceiling 9945), pathtrace unchanged 1213; core plus stage unchanged 23837 < 25000.
 
+### LIM-643: bounded cellular automata caves and islands
+
+Optional procedural/caves: 2D eight-neighbour or 3D 26-neighbour synchronous
+binary threshold automata. Width/height 3..1024; depth 1 or 3..256; at most
+1,048,576 cells, steps 0..64, cells*steps <= 16,777,216. Fixed one-cell rock
+(caves) or water (islands) boundary. Same seed/options, same owned X-fastest grid;
+zero is a distinct uint32 seed. No connectivity, route, nonempty component,
+minimum playable area, mesh or infinite/chunk-continuity guarantee. Arbitrary
+thresholds can remove either state. Synchronous AbortSignal precheck; workers
+are needed for mid-call interruption. No retained GPU resources; tests use actual
+WebGPU/WebGL2 contexts and loss plus disposal/recreation. Real Natural Earth
+Madagascar input has exact scalar parity. Synthetic random/3D grids are stand-ins.
+Separable sums reduce stencil input reads with exact output; tiny grids use the
+cheaper direct rule. Counts exclude initialization, copies and allocation. No
+elapsed-time, SIMD, geological realism, rival-speed or cross-device rendering claim.
+
+Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23837 B gzip, strictly below 25000 B.
+
+### Product-floor capture audit (batch 56)
+
+Environment scene captures own their target viewport, including MSAA depth copies, and restore the outer background view. Planar blur uses explicit clamped 2x2 texels and nearest-half storage rounding. The unchanged mip test bound is half a binary16 ULP plus 5e-7 for arithmetic; exact boundary probes cover even/odd ties, subnormals and maximum finite half radiance. These prove the tested real FlightHelmet and numeric cases, not arbitrary HDR cancellation accuracy or photographic material transport. Native preview refusal is linked; WebGL2 compatibility runs the same capture/blur path. Reflector11104 B gzip (ceiling11438), refractor11065 (ceiling11397), cube-camera5680 (unchanged ceiling5691); core plus stage23837 B <25000.
+
+### Reflective-floor reuse (batch 56, job 7)
+
+No staging/floor alias or duplicate renderer is added. Environment/reflector gives a finite tinted opaque mirror, transformed from local XY, with roughness 0..1 selecting a box-filtered mip among at most eight levels. Defaults: sharp roughness 0, width/height 1, resolution 1, autoUpdate true. It costs another scene capture, uses one bounce per frame for other mirrors and has no Fresnel, GGX or distance-dependent cone. Real FlightHelmet reflected pixels, all mip values, numeric boundaries and restored-frame equality are proved on WebGPU and WebGL2 compatibility; native preview returns linked unsupported. No speed claim. Gzip sizes: staging 8,520 B, accumulate 9,655 B, pathtrace 1,213 B, reused reflector 11,104 B; core plus stage 23,837 B remains below 25,000.
+
+### Batch 99 parity continuation: colour decoding evidence (2026-11-09)
+
+`magicaVoxelLinear(value, gamma?)` and `magicaVoxelMaterial(id, rgb, attributes?, gamma?)`
+accept finite film gamma 1..5, default 2.2. Pass the lighting result's `options.gamma`
+to material conversion. Light, ground, edge and grid colours use that film gamma automatically;
+raw fog and atmosphere coefficient colours keep their existing convention. Outside-tool values
+at gamma 1/1.8/5 and a coloured gamma-1 sky pass the native/compatibility GPU regression.
+The calibration fixtures are authored stand-ins run on a real external binary. They do not
+establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
+or a noise-free moving-camera denoiser. No speed claim is made.
+
+The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
+entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
+strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
+
 
 ### Test-page contract limits (2026-11-09)
 
@@ -4384,47 +4425,6 @@ abort and disposal. Current-machine proof only; no cross-device byte guarantee.
 The box-only geometry consumer excludes the internal lattice helper used by
 other primitives. The existing strict 1,550 B gzip consumer check, primitive
 geometry/UV/group controls and full-package ratio check remain unchanged.
-
-### LIM-643: bounded cellular automata caves and islands
-
-Optional procedural/caves: 2D eight-neighbour or 3D 26-neighbour synchronous
-binary threshold automata. Width/height 3..1024; depth 1 or 3..256; at most
-1,048,576 cells, steps 0..64, cells*steps <= 16,777,216. Fixed one-cell rock
-(caves) or water (islands) boundary. Same seed/options, same owned X-fastest grid;
-zero is a distinct uint32 seed. No connectivity, route, nonempty component,
-minimum playable area, mesh or infinite/chunk-continuity guarantee. Arbitrary
-thresholds can remove either state. Synchronous AbortSignal precheck; workers
-are needed for mid-call interruption. No retained GPU resources; tests use actual
-WebGPU/WebGL2 contexts and loss plus disposal/recreation. Real Natural Earth
-Madagascar input has exact scalar parity. Synthetic random/3D grids are stand-ins.
-Separable sums reduce stencil input reads with exact output; tiny grids use the
-cheaper direct rule. Counts exclude initialization, copies and allocation. No
-elapsed-time, SIMD, geological realism, rival-speed or cross-device rendering claim.
-
-Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23797 B gzip, strictly below 25000 B.
-
-### Product-floor capture audit (batch 56)
-
-Environment scene captures own their target viewport, including MSAA depth copies, and restore the outer background view. Planar blur uses explicit clamped 2x2 texels and nearest-half storage rounding. The unchanged mip test bound is half a binary16 ULP plus 5e-7 for arithmetic; exact boundary probes cover even/odd ties, subnormals and maximum finite half radiance. These prove the tested real FlightHelmet and numeric cases, not arbitrary HDR cancellation accuracy or photographic material transport. Native preview refusal is linked; WebGL2 compatibility runs the same capture/blur path. Reflector11104 B gzip (ceiling11438), refractor11065 (ceiling11397), cube-camera5680 (unchanged ceiling5691); core plus stage23797 B <25000.
-
-### Reflective-floor reuse (batch 56, job 7)
-
-No staging/floor alias or duplicate renderer is added. Environment/reflector gives a finite tinted opaque mirror, transformed from local XY, with roughness 0..1 selecting a box-filtered mip among at most eight levels. Defaults: sharp roughness 0, width/height 1, resolution 1, autoUpdate true. It costs another scene capture, uses one bounce per frame for other mirrors and has no Fresnel, GGX or distance-dependent cone. Real FlightHelmet reflected pixels, all mip values, numeric boundaries and restored-frame equality are proved on WebGPU and WebGL2 compatibility; native preview returns linked unsupported. No speed claim. Gzip sizes: staging 8,520 B, accumulate 9,655 B, pathtrace 1,213 B, reused reflector 11,104 B; core plus stage 23,797 B remains below 25,000.
-
-### Batch 99 parity continuation: colour decoding evidence (2026-11-09)
-
-`magicaVoxelLinear(value, gamma?)` and `magicaVoxelMaterial(id, rgb, attributes?, gamma?)`
-accept finite film gamma 1..5, default 2.2. Pass the lighting result's `options.gamma`
-to material conversion. Light, ground, edge and grid colours use that film gamma automatically;
-raw fog and atmosphere coefficient colours keep their existing convention. Outside-tool values
-at gamma 1/1.8/5 and a coloured gamma-1 sky pass the native/compatibility GPU regression.
-The calibration fixtures are authored stand-ins run on a real external binary. They do not
-establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
-or a noise-free moving-camera denoiser. No speed claim is made.
-
-The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
-entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
-strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
