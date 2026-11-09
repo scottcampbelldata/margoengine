@@ -63,11 +63,13 @@ match. Both wrappers use the same Wasm. The built wrapper is 58,516 bytes raw,
   only that target's full output. Maximum process peak is 128,276 KiB; maximum
   Wasm high-water size is 30,867,456 bytes. Both include startup; process RSS
   includes the Node runtime, input and output. Pair these with the replacement.
-- **Quality target, incomplete:** 186 pairs, from 31 matching PNG originals at
-  level/layer/face zero, measured in stored byte values. BC1 compares RGB,
-  BC3/BC7/RGBA8 compare RGBA, BC4 compares R and BC5 compares RG. Per-file SSE,
-  MSE, maximum absolute error and channel sums are retained. Other targets,
-  mips, arrays, cube faces, HDR and .basis source quality still need measurement.
+- **Quality target:** 685 of 699 pairs and 9,477 of 9,491 images now have
+  source metrics across all 21 served target readers, including mips, arrays,
+  cube faces and linear HDR. The original 186 base metrics are unchanged.
+  Fourteen AGI atlas pairs lack source pixels; 12 alpha3 pairs are provisional.
+  BC5/EAC RG additionally retain explicit source R/alpha metrics for 71 pairs.
+  Mips use exact-area integration of stored source values; HDR is unclamped.
+  The record preserves per-file SSE, MSE, maximum error and source contracts.
 - **Feature target:** opaque `isFormatSupported` probes and corpus calls confirm
   ETC1S/UASTC, all served LDR targets, HDR, mips, arrays, alpha and cube maps.
   EAC R/RG is UASTC-only. ATC, FXT1 and PVRTC2 are disabled in this shipped
@@ -80,7 +82,11 @@ paired follow-up, not release performance numbers. Cold here means first full
 transcode after a new module instance, not an operating-system cache flush.
 All harnesses and raw per-image/trial records remain in the lane-M private
 batch-134 measurement folder; no foreign implementation was inspected.
-Complete the missing baseline quality before freezing the comparison corpus.
+Manager decision (2026-11-09): 685/699 pairs is sufficient to start job 2.
+Replace AGI, Kodak and Memorial assets without proven image-use grants with
+openly licensed files covering the same formats and features. This snapshot
+retains historical evidence; missing/provisional measurements do not pass by
+waiver. The final active corpus must use the replacements.
 The replacement must meet every target, with bit identity for prescribed output
 and per-file quality no worse where the specifications leave encoding choices
 open. No missed replacement target may be accepted as a published loss.

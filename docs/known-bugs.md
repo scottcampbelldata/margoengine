@@ -41,13 +41,27 @@ objection is no longer a blocker. No new shipped decoder defect is claimed.
 The [prebuilt baseline](whitepaper/results/batch-134-prebuilt-baseline.json)
 contains 51 files and 699 successful file/target pairs, with all-image hashes,
 cold/warm control timings, startup phases and isolated memory measurements.
-Source-image quality is measured for only 186 level-zero pairs; remaining
-targets, mips, faces, layers, HDR and .basis original provenance remain open.
+Source-image quality now covers 685/699 pairs and 9,477/9,491 images across
+all 21 served target readers. Fourteen AGI pairs lack source pixels and 12
+alpha3 pairs remain provisional. The original 186 base metrics are unchanged.
+The manager accepts this baseline to start job 2; final replacement gates remain.
 Separate timing/startup/memory passes now cover vendor and built static-embind
 glue. Their 9,491 image hashes and 186 source-quality measurements match; shipped
 targets use built glue. The retained vendor pass is control evidence.
 There is no replacement implementation, replacement identity, paired speed,
 hostile-input fuzz or GPU proof. Keep the prebuilt until every gate passes.
+
+The baseline's source rights also remain open. The original uncompressed AGI HQ
+atlas and alpha3 alpha plane have not been located, and the image-use grants for
+AGI HQ, Kodak and Memorial Church have not been established. The HDR fixture
+NOTICE's OpenEXR/BSD attribution for Memorial Church is unsupported: the matching
+source is the EXR in the pinned Basis v1.50 asset set, not the current OpenEXR
+sample collection. The cause is missing original asset provenance and grant
+records; a codec repository's code licence does not establish those image rights.
+The manager directs replacement of these files with openly licensed assets
+exercising the same formats and features, without waiting for grants. Preserve
+this historical snapshot and record each replacement and its coverage. Missing
+or provisional source metrics are not passing replacement evidence.
 
 ### Fixed 2026-11-09: batch 76 transition review
 

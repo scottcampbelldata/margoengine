@@ -20,7 +20,13 @@ instrumented phases separate from natural per-target startup. Gzip assets
 at level 9. All current timing data is a loaded-machine diagnostic.
 Original harnesses, complete trial arrays and per-image hashes are retained
 in lane M's private `batch-134/measure` folder; a portable public runner and
-complete source-quality/licensing evidence remain work for the later jobs.
+final replacement source-quality/licensing evidence remain work for the later jobs.
+The committed continuation now records 685 quality pairs across 21 readers.
+Use original stored channels with exact-area source mip integration, retain
+linear HDR values and explicit BC5/EAC R/alpha contracts. Fourteen AGI pairs
+remain unmeasured and 12 alpha3 pairs provisional. The manager accepts this
+snapshot to start implementation, requiring openly licensed asset replacements
+with the same format/feature coverage before final acceptance.
 
 ## Real-data scientific demos (2026-11-10)
 

@@ -2606,8 +2606,12 @@ or wait between them. Serialize asynchronous changes with `Figure.timeline`; a d
 cancel user callback work. These guarantees are covered by the sciviz unit and browser suites; no speed claim.
 
 The [batch 134 Basis baseline](whitepaper/results/batch-134-prebuilt-baseline.json)
-is incomplete: source quality covers only 186 base-level file/target pairs,
-and three .basis source/derivative licenses remain unverified. The shipped
+is accepted by the manager to start job 2: source quality covers 685/699
+file/target pairs and 9,477/9,491 images, including 12 provisional alpha3 pairs.
+Fourteen AGI pairs lack source pixels. Three .basis image grants and Memorial
+Church's image grant are unproven; openly licensed replacements are required.
+This historical snapshot is retained; missing metrics do not count as passing.
+The shipped
 prebuilt remains. Its Wasm is 527,333 bytes raw and 247,535 bytes gzip level 9;
 the separately measured built wrapper is 58,516 bytes raw and 15,516 bytes
 gzip. These are optional decoder assets, outside core plus stage. There is no
@@ -4396,13 +4400,27 @@ objection is no longer a blocker. No new shipped decoder defect is claimed.
 The [prebuilt baseline](whitepaper/results/batch-134-prebuilt-baseline.json)
 contains 51 files and 699 successful file/target pairs, with all-image hashes,
 cold/warm control timings, startup phases and isolated memory measurements.
-Source-image quality is measured for only 186 level-zero pairs; remaining
-targets, mips, faces, layers, HDR and .basis original provenance remain open.
+Source-image quality now covers 685/699 pairs and 9,477/9,491 images across
+all 21 served target readers. Fourteen AGI pairs lack source pixels and 12
+alpha3 pairs remain provisional. The original 186 base metrics are unchanged.
+The manager accepts this baseline to start job 2; final replacement gates remain.
 Separate timing/startup/memory passes now cover vendor and built static-embind
 glue. Their 9,491 image hashes and 186 source-quality measurements match; shipped
 targets use built glue. The retained vendor pass is control evidence.
 There is no replacement implementation, replacement identity, paired speed,
 hostile-input fuzz or GPU proof. Keep the prebuilt until every gate passes.
+
+The baseline's source rights also remain open. The original uncompressed AGI HQ
+atlas and alpha3 alpha plane have not been located, and the image-use grants for
+AGI HQ, Kodak and Memorial Church have not been established. The HDR fixture
+NOTICE's OpenEXR/BSD attribution for Memorial Church is unsupported: the matching
+source is the EXR in the pinned Basis v1.50 asset set, not the current OpenEXR
+sample collection. The cause is missing original asset provenance and grant
+records; a codec repository's code licence does not establish those image rights.
+The manager directs replacement of these files with openly licensed assets
+exercising the same formats and features, without waiting for grants. Preserve
+this historical snapshot and record each replacement and its coverage. Missing
+or provisional source metrics are not passing replacement evidence.
 
 ### Fixed 2026-11-09: batch 76 transition review
 

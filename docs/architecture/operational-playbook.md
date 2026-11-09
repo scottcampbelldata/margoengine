@@ -1407,10 +1407,15 @@ records 51 files, 699 successful file/target pairs, cold/warm paired controls,
 per-image hashes, isolated per-target process/Wasm memory and startup phases.
 Both vendor and shipped static-embind wrappers were measured separately;
 their complete image signatures and existing source-quality measurements match.
-Shipped targets use the built wrapper. Only
-186 level-zero source-quality pairs are measured. Full source-quality
-coverage, a replacement, replacement identity, paired old/new speed, hostile
-input and GPU uploads remain unverified. Runtime feature probes show this
+Shipped targets use the built wrapper. All 21 served quality readers now
+cover 685/699 pairs and 9,477/9,491 images; 186 original base metrics remain
+unchanged. Fourteen AGI pairs lack source pixels and 12 alpha3 pairs are
+provisional. Manager approval (2026-11-09) permits job 2 now and requires
+openly licensed replacements for all four files with unproven image grants.
+The 21 reader/source tests pass; ASTC/UASTC cross-target comparisons match
+201,689,800 LDR and 409,444 HDR channel samples exactly, without codec inference.
+A replacement, replacement identity, paired old/new speed, hostile input and
+GPU uploads remain unverified. Runtime feature probes show this
 prebuilt disables ATC, FXT1 and PVRTC2; these are not missing replacement paths.
 Retain the prebuilt until all five job gates pass. Use one optional Rust/Wasm
 asset and the unchanged TypeScript API, including the existing HDR entry.

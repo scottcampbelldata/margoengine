@@ -32,8 +32,12 @@ records 51 attempted files, 699 successful file/target pairs and 9,491 image
 hashes. Built and vendor wrappers agree on those hashes and the 186 measured
 base-level source-quality pairs. The [performance entry](perf-history.md#batch-134-prebuilt-basis-targets-baseline-incomplete)
 separates loaded-machine same-prebuilt controls from replacement claims.
-All-target source quality and three .basis source/derivative licenses remain
-unverified. No replacement, new/old speed, fuzz or GPU proof is claimed.
+Extended source quality now covers 685/699 pairs and 9,477/9,491 images with
+all 21 served readers; 14 AGI pairs are unmeasured and 12 alpha3 pairs remain
+provisional. The manager accepts this baseline to start job 2, requiring openly
+licensed replacements for the three .basis files and Memorial HDR cube whose
+image grants are unproven. No missing metric is counted as passing.
+No replacement, new/old speed, fuzz or GPU proof is claimed.
 
 The lane-Q README repair (2026-11-09) runs all 40 examples in React, Stage, text and worker with zero failures.
 This closes five runtime exceptions: React CommonJS conversion, a self-hosted asynchronous picking test, Stage's

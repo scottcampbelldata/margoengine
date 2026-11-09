@@ -19,8 +19,12 @@ or wait between them. Serialize asynchronous changes with `Figure.timeline`; a d
 cancel user callback work. These guarantees are covered by the sciviz unit and browser suites; no speed claim.
 
 The [batch 134 Basis baseline](whitepaper/results/batch-134-prebuilt-baseline.json)
-is incomplete: source quality covers only 186 base-level file/target pairs,
-and three .basis source/derivative licenses remain unverified. The shipped
+is accepted by the manager to start job 2: source quality covers 685/699
+file/target pairs and 9,477/9,491 images, including 12 provisional alpha3 pairs.
+Fourteen AGI pairs lack source pixels. Three .basis image grants and Memorial
+Church's image grant are unproven; openly licensed replacements are required.
+This historical snapshot is retained; missing metrics do not count as passing.
+The shipped
 prebuilt remains. Its Wasm is 527,333 bytes raw and 247,535 bytes gzip level 9;
 the separately measured built wrapper is 58,516 bytes raw and 15,516 bytes
 gzip. These are optional decoder assets, outside core plus stage. There is no
