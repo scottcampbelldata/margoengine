@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // GPU image-based lighting for WebGPU: prefiltered environment cube, SH irradiance and BRDF LUT.
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
-import { engineRuntime } from '@margoengine/core/extension';
+import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import type { FloatImage } from './hdr.js';
 import { sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
@@ -626,6 +626,7 @@ function destroy(resources: Resources | undefined): void {
  */
 export class Environment implements EnginePlugin {
   readonly name: string;
+  private engine?: Engine;
   private resources?: Resources;
   private readonly settings: Settings;
   private source?: EnvironmentSource;
@@ -897,6 +898,7 @@ export class Environment implements EnginePlugin {
         'unsupported',
         'Environment requires the WebGPU backend; use an engine on the WebGPU backend',
       );
+    this.engine = engineRuntime(engine);
     if (device !== this.resources?.device) this.restore(device).catch((error) => engine.onError(error));
   }
   onDeviceRestored(engine: EngineKernel): void {
@@ -907,6 +909,8 @@ export class Environment implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.engine = undefined;
     destroy(this.resources);
     this.resources = undefined;
     this.source = undefined;

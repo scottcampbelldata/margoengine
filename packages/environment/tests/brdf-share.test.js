@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Environment } from '../dist/index.js';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
 
 Object.assign(globalThis, {
   GPUBufferUsage: { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, STORAGE: 128 },
@@ -141,4 +142,57 @@ test('restoring on another device moves the count there', async () => {
   assert.equal(lut.destroyed, 1);
   first.dispose();
   assert.equal(other.luts[0].destroyed, 1);
+});
+
+test('test-page 20: direct disposal detaches an attached environment and permits replacement', async () => {
+  const device = countingDevice();
+  const engine = new Engine(
+    { width: 16, height: 16 },
+    await TransformStore.create(4),
+    { backend: 'webgpu', gpu: device, dispose() {} },
+    {},
+    null,
+  );
+  try {
+    const first = await Environment.attach(engine, image, { size: 16 });
+    assert.equal(engine.plugins.get(first.name), first);
+    first.dispose();
+    first.dispose();
+    assert.equal(engine.plugins.has(first.name), false);
+    const replacement = await Environment.attach(engine, image, { size: 16 });
+    assert.equal(engine.plugins.get(replacement.name), replacement);
+    replacement.dispose();
+    assert.equal(engine.plugins.size, 0);
+    assert.ok(device.luts.every(lut => lut.destroyed === 1));
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('test-page 20: disposal removes the owning scene, preserving an identically named environment', async () => {
+  const device = countingDevice();
+  const engine = new Engine(
+    { width: 16, height: 16 },
+    await TransformStore.create(4),
+    { backend: 'webgpu', gpu: device, dispose() {} },
+    {},
+    null,
+  );
+  try {
+    const first = await Environment.attach(engine, image, { size: 16 });
+    const scene = engine.createScene('other');
+    const second = await make(device);
+    scene.use(second);
+    second.dispose();
+    assert.equal(scene.plugins.size, 0);
+    assert.equal(engine.plugins.get(first.name), first);
+    const replacement = await make(device);
+    scene.use(replacement);
+    scene.removePlugin(replacement.name);
+    assert.equal(replacement.disposed, true);
+    first.dispose();
+    assert.ok(device.luts.every(lut => lut.destroyed === 1));
+  } finally {
+    engine.dispose();
+  }
 });

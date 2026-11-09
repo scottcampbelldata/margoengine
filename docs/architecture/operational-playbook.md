@@ -2876,6 +2876,14 @@ and camera-move disocclusion denoising remain open. An independently restarted c
 zero-error image corpus remains missing. No core/stage source or physics source changed.
 
 
+### Test-page follow-up: environment lifetime evidence (2026-11-09)
+
+Environment direct disposal now removes its owning scene registration before
+freeing its GPU resources. Real-Engine default/secondary-scene replacement tests
+in environment/tests/brdf-share.test.js fail without the fix; shared LUT counts
+still reach exactly one destruction. Other identically named scene plugins stay
+attached. The renderer and core are unchanged; no new hardware or speed claim.
+
 ### Test-page contracts: section 5 evidence (2026-11-09)
 
 The test-page review is recorded in docs/testpage-bugs.md. Analytic SDF bounds

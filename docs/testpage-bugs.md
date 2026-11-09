@@ -157,3 +157,13 @@ if 36 requires core, stop and report for Scott's approval. The other assignments
 are burst-join counting (34), initial inspector ranges (37), relative tile URLs
 (39), and existing LabelRenderer attachment (41). No implementation for these
 entries has begun, preserving the required landing order.
+
+## Follow-up after the first landing
+
+The original 17 fix commits and their supporting changes landed at 1cc86b9a5.
+Entry 20 reproduces on that main: direct disposal leaves the environment registered
+in both the default and a secondary scene. Environment now retains its setup
+engine and removes itself through sceneOf before releasing resources. The two
+new real-Engine tests in environment/tests/brdf-share.test.js fail on main and
+pass with the fix (7/7 tests). Dependent backgrounds/lighting still borrow the
+original environment; replacement does not retarget them. No core change.

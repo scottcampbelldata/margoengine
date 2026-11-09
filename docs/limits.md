@@ -1824,6 +1824,13 @@ entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage re
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
 
+### Test-page environment replacement (2026-11-09)
+
+Environment.dispose removes its owning scene registration and frees its resources;
+it permits a replacement with the same name. Existing lighting/background objects
+keep their original borrowed environment and must be replaced separately. No new
+core option, format, backend or speed guarantee is introduced.
+
 ### Test-page contract limits (2026-11-09)
 
 Cabins return floorElevation plus parts, whose four values are geometry. Existing

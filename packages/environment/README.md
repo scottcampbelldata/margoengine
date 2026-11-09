@@ -26,6 +26,11 @@ engine.start();
 // On teardown: engine.dispose() disposes every plugin; lighting.dispose() also detaches it from models.
 ```
 
+`environment.dispose()` also removes its registration from the scene that owns it,
+so another `await Environment.attach(engine, image)` can use the same name. It is
+safe to dispose twice. Dispose dependent backgrounds and lighting before replacing
+their environment; they retain the environment object originally passed to them.
+
 A plain color (or vertical gradient) background and fog, without any environment map:
 
 ```ts
