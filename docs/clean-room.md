@@ -89,6 +89,16 @@ The real NOAA demo passes all four desktop/mobile/backend cases. Frozen evidence
 Full landing gates remain pending at this implementation checkpoint. New optional entry: 10,210 B gzip,
 10,517 B ceiling; core + stage remains 23,924 B. No quality or functionality was removed for optional size.
 
+Site-target audit found that the already documented Moving wind page was absent from the production build's
+explicit input list; adding a README link alone did not ship its HTML. LIC would have inherited that fault.
+Research: Andrey Mokhov, Neil Mitchell and Simon Peyton Jones, *Build Systems a la Carte*, 2018,
+[paper](https://simon.peytonjones.org/assets/pdfs/build-systems-original.pdf); Sarah Spall, Neil Mitchell and
+Sam Tobin-Hochstadt, *Forward Build Systems, Formally*, 2022, [paper](https://arxiv.org/abs/2202.05328);
+WHATWG, *HTML Standard*, living edition, [hyperlinks](https://html.spec.whatwg.org/multipage/links.html).
+Explicit build reachability and resolved navigation are distinct obligations. An owned scientific target list
+now includes Moving wind and LIC, and the production builder consumes it. A class regression walks README
+scientific links and each page's scientific navigation targets; it fails against the prior builder.
+
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
 Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches

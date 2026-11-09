@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 import { readSizesInputs, sizesPage } from './build-sizes.js';
 import { writeSitePages } from './build-llms.mjs';
 import { buildGallery, buildVoxel, site } from './site-gallery.mjs';
+import { scientificPages } from './support/sciviz-site-pages.mjs';
 
 const out = resolve('site/dist');
 await rm(out, { recursive: true, force: true });
@@ -52,12 +53,7 @@ const pages = [
   'animation-formats',
   'texture-formats',
   'compute-lab',
-  'sciviz-volume',
-  'sciviz-points',
-  'sciviz-surface',
-  'sciviz-head',
-  'sciviz-stars',
-  'sciviz-wind',
+  ...scientificPages,
   'ui-game',
   'weather',
   'dual-viewport',

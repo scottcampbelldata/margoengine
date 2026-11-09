@@ -5458,6 +5458,13 @@ diagnostics without repeating transcodes. No source/channel/bar change.
 Public integration, complete expanded container fuzz, memory and new-Wasm GPU
 acceptance remain open. The prebuilt is retained.
 
+### Fixed: scientific demo absent from production inputs
+
+Moving wind was linked from the sciviz README but missing from `scripts/build-site.js`'s explicit Vite inputs.
+It therefore ran in development but its HTML did not ship. The builder now uses the audited scientific-page
+list, including Moving wind and LIC. `tests/sciviz-site-pages.test.js` checks all README scientific links and
+their scientific navigation destinations against production targets, and fails against the old builder.
+
 ### LIC validation checkpoint
 
 The new optional LIC entry's input/lifecycle tests and real-GPU analytical, animation, mask, slice, exact
