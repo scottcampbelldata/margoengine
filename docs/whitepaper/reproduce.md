@@ -1989,6 +1989,24 @@ cover interpolation, reversal and sRGB/linear float32 tables. Research and
 original data container hashes: [size restoration](../size-restore.md), finding 8.
 No timing or new display perceptual claim is made.
 
+Batch 273 failure 9: after building packages, run the complete native and compat
+grids in separate shared holds:
+`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native`
+and
+`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat`.
+Omitting --backend runs both; --focus=caller isolates the original circular
+resource regression. The default canonical leaf retains both complete grids.
+The native full grid passes; full compatibility reaches 278 checks/254 captures
+and fails the unchanged exact 4x live-reset assertion by 0.000244140625 maximum
+over 10 channels. All caller references pass. The initial combined three-minute
+run was killed during compat 1x and is not a pass; the separate complete compat
+receipt is an assertion failure, not a timeout or busy exemption. Research,
+original error, detailed remaining defect and sizes are in clean-room.md,
+known-bugs.md and results/batch-273-dispersion-checkpoint.json. Total remains
+2/26 suites closed; continue from failure 10 after this checkpoint lands.
+Job 2's exact acquisition checklist and local browser receipts are in
+../work-lists/batch-273-browser-matrix.md. No speed run or Bug 45 work was done.
+
 Batch 273 failure 6: after building packages, run
 `node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/features-browser.mjs`.
 The canonical leaf explicitly opens native then full compatibility, even under

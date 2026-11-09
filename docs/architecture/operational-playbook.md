@@ -4684,6 +4684,23 @@ shared slot; elapsed time includes its FIFO wait. The earlier proof ran without
 an outer compatibility shim, so the explicit native opt-out retains its setup.
 No runtime stats/core/compute source changes in this last rebase.
 
+### Section 5 evidence: batch 273 dispersion fixture
+
+The canonical dispersion GPU leaf explicitly selects native and full compat,
+with distinct captures/reports and an optional backend diagnostic selector.
+Caller Fresnel reference editing compares shallow values/resource identities;
+it no longer serializes the device graph. Full native: 278 checks/254 captures,
+all passing. Full compat: same complete grid, one exact 4x live-reset failure
+(10 HDR channels, max 0.000244140625); original scalar-IOR, allocation, binding,
+restore and 1x/4x bars remain unchanged. Failure 9 is still open, total closed
+2/26. A killed combined run is retained separately from the completed assertion
+failure. No runtime/core/stage change or size-ceiling change; root gzip 23,924 B.
+Research, defect, reproduction and durable summary: clean-room.md,
+known-bugs.md, whitepaper/reproduce.md and
+whitepaper/results/batch-273-dispersion-checkpoint.json. The job 2 checklist in
+work-lists/batch-273-browser-matrix.md records real Windows browser availability,
+the Firefox spawn refusal and the exact external device/access needs.
+
 ### Section 5 evidence: recorded colour-map precision
 
 Size restoration finding 8 preserves all published decimal RGB rows for the

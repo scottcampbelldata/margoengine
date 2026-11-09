@@ -5295,6 +5295,19 @@ measurements remain separate outstanding evidence.
 Untested features of the scoped core, shadows, materials and culling packages
 also remain in T273-COVERAGE; a passing scene does not certify a whole package.
 
+### Batch 273 dispersion reference checkpoint
+
+Fixture-only change: no runtime entry, API, ceiling or shader math changes;
+core plus stage stays 23,924 B gzip. Native dispersion passes the full 278-check,
+254-capture grid. Full compatibility completes that grid with one remaining
+4x live-reset exact-equality failure (10 HDR channels, max 0.000244140625).
+The circular-resource caller fixture error is repaired, but failure 9 remains
+open and no error bound is relaxed. See the whitepaper checkpoint receipt.
+The job 2 browser/device acquisition list and actual local Chrome/Edge success
+and patched-Firefox launch refusal are in
+[the matrix checklist](work-lists/batch-273-browser-matrix.md); none is full
+cross-browser or physical lower-tier parity proof.
+
 ### Batch 56 review: finite studio directions
 ### Batch 56 review fixes: dominant HDR ground shadow
 

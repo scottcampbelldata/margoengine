@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-09",
+  "fixCommit": "a402245fa",
+  "scope": "Fixture serialization repaired; full compatibility suite still open",
+  "before": {
+    "command": "node scripts/material-dispersion-gpu-check.js --focus=caller with MARGO_COMPAT=1 before the fixture edit",
+    "result": "TypeError: Converting circular structure to JSON, device.queue.device",
+    "receipt": "test-results/batch-273-dispersion-before.log"
+  },
+  "native": {
+    "checks": 278,
+    "captures": 254,
+    "failures": [],
+    "receipt": "test-results/material-dispersion/native-gpu.json"
+  },
+  "compat": {
+    "checks": 278,
+    "captures": 254,
+    "failures": [
+      {
+        "case": "4x live positive to zero restores every old-path pixel",
+        "maxLinearChannelError": 0.000244140625,
+        "meanLinearChannelError": 2.765655517578125e-8,
+        "changedChannels": 10,
+        "tolerance": 0
+      }
+    ],
+    "callerReferences": "All original caller scalar-IOR, zero/inert and attenuation comparisons completed without failure",
+    "oneSampleLiveReset": "exactly equal",
+    "liveResourceAllocations": "zero for positive and reset, both sample counts",
+    "liveNewBindings": "zero for positive and reset, both sample counts",
+    "receipt": "test-results/material-dispersion/compat-gpu.json"
+  },
+  "incompleteCombinedRun": {
+    "result": "Killed by the three-minute orchestration limit during compatibility 1x cases; not counted as passing",
+    "receipt": "test-results/batch-273-dispersion-after.log"
+  },
+  "sizes": {
+    "corePlusStageGzipBefore": 23924,
+    "corePlusStageGzipAfter": 23924,
+    "runtimeChanges": false,
+    "entryCeilingChanges": false
+  },
+  "compatSuitesClosed": 2,
+  "compatSuitesTotal": 26,
+  "remainingCause": "4x reset divergence not isolated between uniform replay and multisample rendering; no driver attribution proven",
+  "nextFailure": 10,
+  "bug45Owner": "lane-U"
+}

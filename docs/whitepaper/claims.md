@@ -2443,6 +2443,19 @@ No speed or runtime-size change is claimed.
 
 Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
 
+### Batch 273 dispersion fixture checkpoint
+
+The caller-owned dispersion reference now compares shallow field values and
+GPU resource identity without JSON serialization. The original full-compat
+caller subset throws on device.queue.device before the edit; afterward all
+caller comparisons complete in the full native and compatibility grids.
+The complete native grid passes 278 checks/254 captures. Compatibility reaches
+the same complete grid but fails one exact 4x live-reset check (10 HDR channels,
+maximum 0.000244140625); failure 9 remains open. No cross-browser, lower-tier or
+complete compatibility-parity claim is made. Original bounds and shader math
+are retained. [Checkpoint receipt](results/batch-273-dispersion-checkpoint.json)
+and [research](../clean-room.md) record the scope and outstanding cause.
+
 ### Recorded colour-map fidelity (2026-11-10)
 
 sciviz preserves all published decimal values for viridis, magma, inferno,
