@@ -409,3 +409,13 @@ CPU at 45-100 %):
   for them, until [`TransparentDepth`](#depth-and-motion-for-glass-transparentdepth) adds them.
 - Cost: two 1x targets (10 bytes per pixel) plus 4x copies (40 bytes per pixel) under MSAA, and one full-screen
   composite whenever something transparent is visible: about twice the GPU time of sorted blending in the table above.
+
+
+## Reference measurement
+
+From the built repository run `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+The external depth-peeling install stays in engine-bench/batch-168 (setup and versions in
+[reproduce](../../docs/whitepaper/reproduce.md)). Five binary-colour panes are compared against exact
+ray-sorted emission/coverage transport, with common sRGB encoding after readback. The measured picture
+MAE is 1.567519 versus the reference; weighted blending remains an approximation. The diagnostic busy-machine
+frame-plus-completion minimum is 2.000 ms. See [all results and caveats](../../docs/whitepaper/perf-vs-rivals.md).

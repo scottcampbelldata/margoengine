@@ -382,3 +382,10 @@ is the newest run after the first, when there is one.
 | `p-wireframe` | margo 8.30 / 3.18 / 93 / 512; three-webgl-parity 0.64 / 0.70 / 1125 / 21 (`20261025-135606-d3fec42e-dev`) | slower | margo 0.33 / 0.51 / 1584 / 92; three-webgl-parity 0.66 / 0.71 / 1147 / 21 (`20261026-110621-fbc01bdc-dev`) | faster | 0.988, 0.9 | 172,084 / 1,607 |
 | `shadows-1000` | margo 0.86 / 0.69 / 872 / 76; three-webgl-parity 2.35 / 1.69 / 375 / 28 (`20261025-170145-d3fec42e-dev`) | faster |  |  | 0.97, 1.46 | 38,833 / 1,607 |
 | `shapes-10000-batched` | margo 0.12 / 0.08 / 2775 / 81; three-webgl-parity 1.16 / 0.46 / 681 / 40 (`20261025-170145-d3fec42e-dev`) | faster |  |  | 0.977, 1.34 | 173,652 / 1,607 |
+
+
+### Other transparency rival (batch 168)
+
+OIT has a separate Babylon.js 8.33.0 row in [the rival matrix](perf-vs-rivals.md): five unlit binary-colour
+panes, 2.000 versus 7.100 ms frame plus completion, busy machine, diagnostic. This is not a three.js row
+or an isolated GPU-pass comparison. Image accuracy is a loss: MAE 1.567519 versus 0.048151. Entry 109.

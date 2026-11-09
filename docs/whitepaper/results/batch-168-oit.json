@@ -1,0 +1,150 @@
+{
+  "passCount": 5,
+  "minA": 2,
+  "minB": 7.099999964237213,
+  "roundsA": [
+    3.200000047683716,
+    5,
+    3.599999964237213,
+    3.099999964237213,
+    4.100000023841858,
+    2,
+    3.600000023841858
+  ],
+  "roundsB": [
+    7.799999952316284,
+    7.400000035762787,
+    9.300000011920929,
+    8.900000035762787,
+    8.800000011920929,
+    7.599999964237213,
+    7.099999964237213
+  ],
+  "margo": {
+    "mae": 1.5675188078703703,
+    "psnr": 35.387605,
+    "max": 15,
+    "samples": 921600,
+    "byLayers": [
+      {
+        "layers": 0,
+        "mae": 0,
+        "samples": 738416
+      },
+      {
+        "layers": 1,
+        "mae": 0,
+        "samples": 47760
+      },
+      {
+        "layers": 2,
+        "mae": 7.333333333333333,
+        "samples": 31740
+      },
+      {
+        "layers": 3,
+        "mae": 12,
+        "samples": 21888
+      },
+      {
+        "layers": 4,
+        "mae": 11.333333333333334,
+        "samples": 15232
+      },
+      {
+        "layers": 5,
+        "mae": 11.666666666666666,
+        "samples": 66564
+      }
+    ],
+    "overlapMae": 10.667424779458097
+  },
+  "rival": {
+    "mae": 0.048151041666666665,
+    "psnr": 61.304747,
+    "max": 1,
+    "samples": 921600,
+    "byLayers": [
+      {
+        "layers": 0,
+        "mae": 0,
+        "samples": 738416
+      },
+      {
+        "layers": 1,
+        "mae": 0,
+        "samples": 47760
+      },
+      {
+        "layers": 2,
+        "mae": 0,
+        "samples": 31740
+      },
+      {
+        "layers": 3,
+        "mae": 0,
+        "samples": 21888
+      },
+      {
+        "layers": 4,
+        "mae": 0,
+        "samples": 15232
+      },
+      {
+        "layers": 5,
+        "mae": 0.6666666666666666,
+        "samples": 66564
+      }
+    ],
+    "overlapMae": 0.3276819470699433
+  },
+  "centerRef": [
+    198,
+    163,
+    103
+  ],
+  "centerMargo": [
+    207,
+    148,
+    92
+  ],
+  "centerRival": [
+    199,
+    163,
+    104
+  ],
+  "cornerMargo": [
+    0,
+    0,
+    0
+  ],
+  "cornerRival": [
+    0,
+    0,
+    0
+  ],
+  "margoLayer1": {
+    "layers": 1,
+    "mae": 0,
+    "samples": 47760
+  },
+  "rivalLayer1": {
+    "layers": 1,
+    "mae": 0,
+    "samples": 47760
+  },
+  "margoBackground": {
+    "layers": 0,
+    "mae": 0,
+    "samples": 738416
+  },
+  "rivalBackground": {
+    "layers": 0,
+    "mae": 0,
+    "samples": 738416
+  },
+  "palette": "binary RGB",
+  "display": "common sRGB encoding after canvas readback",
+  "rivalVersion": "8.33.0",
+  "machine": "RTX A6000, busy machine; diagnostic frame plus completion timings"
+}

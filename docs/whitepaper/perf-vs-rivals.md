@@ -27,6 +27,8 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/tiles` | same view, one settled `update` | 0.300 ms | 3DTilesRendererJS 0.4.21, 2.300 ms | win |
 | `@margoengine/points` | 10,000,000 points, one settled frame | 9.000 ms | potree-core 2.0.17, 5.400 ms | loss |
 | `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels | MAE 0.069543, relative 0.211475 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error |
+| `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
+| `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -138,3 +140,18 @@ occluders and bounce surfaces during every bake; the lifecycle regression detect
 is 0.069543, which is 0.211475 of the Cycles mean. The largest texel miss is 0.900128. The 8-bit step is 0.016984.
 The picture error stays open. The snaps and the direct integral are `packages/lightmap/tests/cornell-box.test.js`.
 Rerun: `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap`.
+
+
+Five unlit binary-colour panes isolate the transparency algorithms. Source channels 0 and 1 are unchanged
+by per-material sRGB encoding; both canvas readbacks are then given one common sRGB encoding. The reference
+casts a primary ray per pixel, intersects every pane, sorts all hits and evaluates the exact emission/coverage
+transport with the Porter-Duff over operator. No refraction, dielectric reflection or stochastic path noise.
+Single-layer and background MAE are zero on both engines. Overlaps retain the weighted-blending error;
+full-image MAE includes the 738,416 background pixels. All per-layer counts/errors are in
+[the raw result](results/batch-168-oit.json). Babylon's default pass count is 5; compatibility mode stays default.
+Seven alternating rounds: Margo 2.000 to 5.000 ms, Babylon 7.100 to 9.300 ms, per-round minimum.
+Completion is queue.onSubmittedWorkDone on Margo, one-pixel readPixels on Babylon, including that transfer.
+Busy machine, diagnostic, not isolated GPU pass costs. Weighted OIT approximates depth-ordered transport,
+while depth peeling resolves these five layers; the quality loss stays open. Nonbinary colours introduce an
+additional display-domain blending limitation, which this binary-palette algorithm comparison does not cover.
+Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.

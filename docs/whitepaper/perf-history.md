@@ -2537,6 +2537,18 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   Citation in clean-room.md. The snaps are `packages/lightmap/tests/cornell-box.test.js`.
   [Raw result](results/batch-168-lightmap.json).
 
+### 109. Weighted OIT against depth peeling and exact ray transport
+
+- **Measurement:** five binary-colour unlit panes, 1280 x 720, default weighted OIT versus Babylon.js 8.33.0
+  default dual depth peeling (5 passes). Exact primary-ray emission/coverage oracle. Common sRGB encoding
+  after readback; single-layer and background error zero. [Raw result](results/batch-168-oit.json).
+- **Result:** frame plus completion 2.000 versus 7.100 ms, seven alternating rounds, per-round minimum,
+  RTX A6000, busy machine, diagnostic. Different completion costs include a one-pixel rival readback.
+  Image loss: MAE 1.567519 versus 0.048151; PSNR 35.388 versus 61.305 dB. Max byte errors 15 versus 1.
+  Weighted averaging cannot reproduce general ordered coverage. Publishing does not close the loss.
+- **Reproduce:** `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+  Oracle tests: `node --test packages/oit/test/oit-reference.test.js`. Dependencies stay in engine-bench/batch-168.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

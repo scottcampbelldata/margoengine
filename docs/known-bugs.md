@@ -1302,3 +1302,18 @@ fail on the prior implementation; no known open scheduling defect remains in the
 ### Audio occlusion (batch 110)
 
 No known open defect in tested static geometry/partial-cover paths. Generated browser tests cover native WebGPU and both WebGL2 routes. Sampling, deformation and acoustic-model limits are documented in limits.md. The first browser fixture incorrectly treated the compatibility engine's WebGPU-shaped API label as its underlying backend; the fixture now asserts isCompatDevice and also exercises the native WebGL2 renderer.
+
+
+- **Weighted OIT has a measured transparency picture loss** (`@margoengine/oit`, perf history 109):
+  five unlit binary-colour panes, exact ray-sorted coverage reference, common output encoding. MAE 1.567519,
+  PSNR 35.388 dB and max byte miss 15, versus Babylon.js 8.33.0 dual depth peeling MAE 0.048151,
+  PSNR 61.305 dB and max 1. Source: `packages/oit/src/index.ts` averages weighted colours with aggregate
+  revealage; this does not retain the full ordered layer sequence. Rerun under the exclusive GPU lock:
+  `node packages/oit/scripts/rival-bench.mjs`. Publishing the loss does not close it.
+- **Transparent material colour is blended in the display domain** (`packages/materials/src/built-material.ts`,
+  `packages/oit/src/index.ts`): the material encodes each source before the transparency hook. For a single
+  50%-coverage basic red with linear source 0.5 over black, the pipeline computes 0.5*sRGB(0.5) rather than
+  sRGB(0.25). Sorted and OIT drawing share this cause. The initial graded-colour batch 168 probe exposed
+  nonzero single-layer error; it is not attributed to weighted depth approximation. Binary source channels in
+  the published comparison bypass this confound without changing geometry or drawing less work. A linear
+  composition/output contract across the owning optional packages is still needed; this remains open.

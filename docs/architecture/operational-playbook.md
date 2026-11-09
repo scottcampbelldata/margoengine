@@ -1749,3 +1749,12 @@ regression prevents isolated-face bakes. Independent solid-angle quadrature cali
 Margo output does not set that scale. The direct-light test checks physical irradiance separately.
 The 881-texel MAE is 0.069543, relative 0.211475; coarse per-quad radiosity, sampling and quantization
 remain limitations. No core, stage or rendering implementation changes, and no convergence claim.
+
+
+### Batch 168 OIT: section 5 evidence
+
+An exact primary-ray coverage oracle now checks the external depth-peeling and own weighted pictures.
+Background and single-layer error are zero. Default weighted blending has MAE 1.567519 (max 15 bytes),
+versus depth peeling 0.048151. A binary palette isolates ordering from material display encoding;
+the separate display-domain blending defect remains in known-bugs. No runtime/core/stage changes.
+Seven alternating frame-plus-completion rounds are diagnostic only, with the readback asymmetry documented.

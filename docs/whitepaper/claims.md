@@ -1200,3 +1200,10 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 | Claim | Evidence | Scope |
 | --- | --- | --- |
 | Cornell irradiance has measured error against Cycles | [Entry 108](perf-history.md), `packages/lightmap/scripts/rival-bench.mjs`, complete-scene lifecycle and direct-integral tests | MAE 0.069543, relative 0.211475 over 881 texels; no accuracy parity or convergence claim |
+
+
+## Batch 168 OIT reference
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Default OIT is faster in the measured scene but loses picture accuracy | [Entry 109](perf-history.md), [raw rounds and errors](results/batch-168-oit.json), `packages/oit/test/oit-reference.test.js` | Five binary-colour coverage panes; MAE 1.567519 vs 0.048151, 2.000 vs 7.100 ms frame plus completion; busy machine, diagnostic; no physical dielectric or general quality parity |

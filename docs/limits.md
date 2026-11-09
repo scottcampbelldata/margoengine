@@ -944,3 +944,12 @@ The modified Cornell box has 15 parallelograms and 881 irradiance texels. Agains
 128-sample diffuse bake, physical lightmap MAE is 0.069543 (relative 0.211475), max 0.900128.
 One coarse radiosity bounce, 16 bounce rays and 16 area samples are not a converged path tracer.
 The 8-bit step is 0.016984. This error remains open in known-bugs.md; no speed claim is made.
+
+
+## Batch 168 transparency reference
+
+Default weighted OIT loses to exact ordered transparency on five overlapping unlit coverage panes:
+full-image MAE 1.567519, PSNR 35.388 dB, max byte miss 15. The external depth-peeling picture has
+MAE 0.048151. Binary source colours and a common output encoding isolate order approximation; general
+nonbinary display-domain material blending remains a separate open defect. Busy-machine frame-plus-completion
+2.000 versus 7.100 ms includes different completion mechanisms; no isolated pass-speed claim.

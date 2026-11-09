@@ -512,3 +512,13 @@ driver/modules are `.lane/p/speed-cert-trim-ab-v1`; browser/rival 12-round outpu
 `.lane/p/speed-cert-trim-browser-v1`. Use new output paths rather than overwriting those records. The paired
 ratio median 1.0001 and 12/24 faster establish no timing gain. CCD remains T-11 / 127.y; quiet release reruns
 remain necessary, while current work continues without waiting for a quiet machine.
+
+
+### Batch 168 OIT (perf history 109)
+
+`node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=2 --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`
+after building packages. External `engine-bench/batch-168/node_modules/@babylonjs/core` is version 8.33.0.
+If absent, install with `npm install --prefix C:\Development\Projects\engine-bench\batch-168 @babylonjs/core@8.33.0`.
+`MARGO_ENGINE_BENCH` overrides the engine-bench parent. The rival stays external. Oracle:
+`node --test packages/oit/test/oit-reference.test.js`. Seven alternating rounds, per-round minimum;
+busy-machine frame-plus-completion timings, not GPU-only timings. [Raw result](results/batch-168-oit.json).

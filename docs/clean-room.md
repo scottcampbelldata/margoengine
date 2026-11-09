@@ -1522,3 +1522,14 @@ The existing mixer finite-FIR meter supplies true peak and a documented float32 
 ## Audio occlusion (batch 110)
 
 Written from the [W3C Web Audio Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/) sections BiquadFilterNode, GainNode and AudioParam automation. The sampled segment geometry and interpolation are Margo-own first-principles design choices. The qualitative attenuation plus low-pass approximation follows the published sound occlusion descriptions in [Funkhouser et al., Survey of Methods for Modeling Sound Propagation in Interactive Virtual Environment Systems, SIGGRAPH 2002 course notes](https://www.cs.princeton.edu/~funk/course02.pdf). No engine or library source was read. Reuses Margo's BVH raycaster. No downloaded assets; generated tones and boxes are stand-ins.
+
+
+### Batch 168 OIT measurement
+
+Babylon.js 8.33.0 is an external black box under engine-bench/batch-168. Only its public Scene,
+WebGPUEngine and material APIs are driven. Renderer source was not opened. The oracle is a clean-room
+primary-ray intersection of five emissive coverage panes and exact ordered over composition, from
+Porter and Duff, "Compositing Digital Images" (1984), https://doi.org/10.1145/800031.808606.
+Weighted-blending interpretation: McGuire and Bavoil (2013), https://jcgt.org/published/0002/02/09/.
+The public depth-peeling controls are documented at
+https://doc.babylonjs.com/typedoc/classes/babylon.depthpeelingrenderer . No refraction is claimed.
