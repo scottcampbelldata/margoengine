@@ -438,3 +438,6 @@ lint and standalone hygiene pass. All 22 video unit tests and the combined 51 fo
 regressions pass. All five video GPU checks pass, including all 150 real frames. The
 video README command passes all six original examples with no exceptions. Entry size
 is 3,458 B gzip under the unchanged 3,593 B ceiling. No public exports changed.
+
+Lane C (missing-test-items) claims P13 real S2 tileset proof; lane Q keeps its five README rows, physics remains held.
+Lane C also claims clustered/readme-ies-profiles-9e957a for its existing licensed IES file and runtime rerun.
