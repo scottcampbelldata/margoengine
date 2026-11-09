@@ -122,6 +122,7 @@ export class ScenePass implements EnginePlugin {
   private pass?: GPURenderPassEncoder;
   private last?: number[];
   private disposed = false;
+  private engine?: Engine;
   /** Makes the pass and adds it to `engine`. */
   static attach(engine: EngineKernel, options: ScenePassOptions): ScenePass {
     const value = new ScenePass(options);
@@ -220,6 +221,7 @@ export class ScenePass implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', 'ScenePass is disposed; create a new ScenePass.');
     if (!engine.gpu)
       throw new MargoError('unsupported', 'ScenePass requires WebGPU; see https://margoengine.com/errors#webgpu');
+    this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -287,8 +289,11 @@ export class ScenePass implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    const engine = this.engine;
+    this.engine = undefined;
     for (const release of [...this.models.values()]) release();
     this.release();
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

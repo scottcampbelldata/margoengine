@@ -658,7 +658,7 @@ export class ComputePass implements EnginePlugin {
     const engine = this.engine;
     this.engine = undefined;
     this.onDeviceRestored();
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

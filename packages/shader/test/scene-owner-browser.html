@@ -1,0 +1,46 @@
+<!doctype html><html><meta charset="utf-8"><title>Shader scene ownership</title><style>body{margin:0}canvas{width:64px;height:64px}</style><canvas></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {ComputePass,storage} from '/packages/shader/dist/index.js';
+import {ScenePass} from '/packages/shader/dist/pass.js';
+import {RawShaders,RawShaderMaterial,RawMesh} from '/packages/shader/dist/raw.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu'}),device=engine.gpu,errors=[];
+engine.onError=e=>errors.push(e.message);
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const owner=engine.createScene('shader-owner');
+const render=async()=>{engine.render({views:[{scene:owner,camera:engine.camera,viewport:[0,0,1,1]}]});await device.queue.onSubmittedWorkDone();};
+const field=storage(1,'u32');
+const read=async()=>{
+ const out=device.createBuffer({size:4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ try{const encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(field.buffer(device),0,out,0,4);device.queue.submit([encoder.finish()]);await out.mapAsync(GPUMapMode.READ);return new Uint32Array(out.getMappedRange())[0];}
+ finally{out.destroy();}
+};
+let effect,primary,rawMesh,rawMaterial;
+window.check={
+ async attach(kind){
+  if(kind==='ComputePass')effect=new ComputePass(1,i=>field.store(i,1));
+  if(kind==='ScenePass')effect=new ScenePass({outputs:{color:'rgba16float'}});
+  if(kind==='RawShaders'){
+   effect=new RawShaders();
+   rawMaterial=new RawShaderMaterial({vertexShader:`
+    @vertex fn vertex(a:Attributes)->@builtin(position) vec4f{return vec4f(a.position,1);}
+    @fragment fn fragment()->@location(0) vec4f{return margoEncode(vec4f(1,0,0,1));}`});
+   rawMesh=effect.add(new RawMesh({material:rawMaterial,attributes:{position:{data:[-1,-1,0.5,3,-1,0.5,-1,3,0.5],type:'vec3f'}},frustumCulled:false}));
+  }
+  primary={name:effect.name,setup(){},dispose(){throw Error('other scene disposed');}};
+  engine.use(primary);owner.use(effect);
+  await render();
+  if(kind==='RawShaders'){await effect.ready();await render();}
+  return {attached:engine.sceneOf(effect)===owner,computed:kind==='ComputePass'?await read():null,targets:kind==='ScenePass'?effect.textures.length:null,draws:kind==='RawShaders'?effect.stats.drawCalls:null,errors};
+ },
+ async dispose(kind){
+  effect.dispose();effect.dispose();
+  if(kind==='ComputePass')device.queue.writeBuffer(field.buffer(device),0,new Uint32Array([0]));
+  await render();
+  const result={detached:!engine.sceneOf(effect)&&owner.plugins.size===0,isolated:engine.scene.plugins.get(primary.name)===primary,computed:kind==='ComputePass'?await read():null,errors};
+  const replacement={name:effect.name,setup(){},dispose(){}};owner.use(replacement);owner.removePlugin(replacement.name);
+  primary.dispose=()=>{};engine.removePlugin(primary.name);rawMesh?.dispose();rawMaterial?.dispose();rawMesh=rawMaterial=undefined;
+  return result;
+ },
+ close(){field.dispose();engine.dispose();return errors;}
+};window.ready=true;
+</script></html>

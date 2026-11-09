@@ -43,6 +43,7 @@ function harness({ samples = 4, format = 'bgra8unorm', depthFormat = 'depth24plu
     meshes: new Map(),
     store: { hidden: new Uint8Array(8), matrices: new Float32Array(128) },
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? h.engine : undefined),
     use(plugin) {
       graph.withOwner(plugin.name, () => {
         plugin.setup(h.engine);
@@ -589,7 +590,9 @@ test('equal index bytes of another format share the buffer and still set the for
     raw = RawShaders.attach(h.engine),
     m = material();
   raw.add(new RawMesh({ material: m, attributes: quad(), index: new Uint32Array([0, 1, 2, 3]), renderOrder: 0 }));
-  raw.add(new RawMesh({ material: m, attributes: quad(), index: new Uint16Array([0, 0, 1, 0, 2, 0, 3, 0]), renderOrder: 1 }));
+  raw.add(
+    new RawMesh({ material: m, attributes: quad(), index: new Uint16Array([0, 0, 1, 0, 2, 0, 3, 0]), renderOrder: 1 }),
+  );
   h.frame();
   const calls = named(
     h.gpu.record(() => h.frame()),
@@ -656,8 +659,18 @@ test('a shared buffer lives until its last mesh lets go', () => {
     }),
     id = named(setup, 'buffer').find((c) => c[2].label === 'shader:raw:vertex')[1],
     shared = a.gpu.vertex.buffer;
-  assert.ok(!named(h.gpu.record(() => a.dispose()), 'destroy').some((c) => c[1] === id));
-  assert.ok(named(h.gpu.record(() => b.dispose()), 'destroy').some((c) => c[1] === id));
+  assert.ok(
+    !named(
+      h.gpu.record(() => a.dispose()),
+      'destroy',
+    ).some((c) => c[1] === id),
+  );
+  assert.ok(
+    named(
+      h.gpu.record(() => b.dispose()),
+      'destroy',
+    ).some((c) => c[1] === id),
+  );
   const c = raw.add(new RawMesh({ material: m, attributes: quad() }));
   h.frame();
   assert.notEqual(c.gpu.vertex.buffer, shared, 'a freed buffer is not handed out again');
@@ -683,7 +696,10 @@ test('uniform arrays and structs follow the WGSL layout, and their values land a
     uniforms: {
       gain: { value: 1 },
       colors: { type: 'vec3f', count: 2, value: ['#ff0000', [0, 1, 0]] },
-      light: { struct: { color: 'vec3f', power: 'f32', spin: 'mat3x3f' }, value: { color: [1, 2, 3], power: 4, spin: [1, 2, 3, 4, 5, 6, 7, 8, 9] } },
+      light: {
+        struct: { color: 'vec3f', power: 'f32', spin: 'mat3x3f' },
+        value: { color: [1, 2, 3], power: 4, spin: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      },
       tail: { value: 5 },
       rows: { count: 2, struct: { a: 'f32' }, value: [{ a: 6 }, { a: 7 }] },
       flat: { type: 'vec4f', count: 2, value: [1, 2, 3, 4, 5, 6, 7, 8] },
@@ -738,7 +754,10 @@ test('uniform arrays and structs refuse what WGSL cannot lay out, and name the f
     raw = RawShaders.attach(h.engine),
     m = new RawShaderMaterial({
       vertexShader: shader,
-      uniforms: { list: { type: 'vec4f', count: 2, value: [1, 2, 3, 4] }, s: { struct: { a: 'vec2f' }, value: { a: [1, 2] } } },
+      uniforms: {
+        list: { type: 'vec4f', count: 2, value: [1, 2, 3, 4] },
+        s: { struct: { a: 'vec2f' }, value: { a: [1, 2] } },
+      },
     });
   raw.add(new RawMesh({ material: m, attributes: quad() }));
   assert.throws(() => h.frame(), /uniform list needs 2 elements/);
@@ -755,10 +774,14 @@ test('uniform arrays and structs refuse what WGSL cannot lay out, and name the f
 test('storage buffers are declared after the textures and bound live; read_write stays out of the vertex stage', () => {
   const h = harness(),
     raw = RawShaders.attach(h.engine),
-    node = { type: 'vec4f', calls: 0, buffer(device) {
-      this.calls++;
-      return (this.made ??= device.createBuffer({ size: 64, usage: 128 }));
-    } },
+    node = {
+      type: 'vec4f',
+      calls: 0,
+      buffer(device) {
+        this.calls++;
+        return (this.made ??= device.createBuffer({ size: 64, usage: 128 }));
+      },
+    },
     buffers = [],
     ids = named(
       h.gpu.record(() => buffers.push(...[0, 1].map(() => h.gpu.device.createBuffer({ size: 64, usage: 128 })))),
@@ -790,9 +813,13 @@ test('storage buffers are declared after the textures and bound live; read_write
   m.storage.items.buffer = next;
   const moved = h.gpu.record(() => h.frame());
   assert.equal(named(moved, 'group').at(-1)[2].entries[4].resource.buffer, ids[1], 'buffer is live');
-  assert.throws(() => new RawShaderMaterial({ vertexShader: shader, storage: { a: {} } }), /must be \{buffer, type, access\?\}/);
   assert.throws(
-    () => new RawShaderMaterial({ vertexShader: shader, storage: { a: { buffer: other, type: 'u32', access: 'write' } } }),
+    () => new RawShaderMaterial({ vertexShader: shader, storage: { a: {} } }),
+    /must be \{buffer, type, access\?\}/,
+  );
+  assert.throws(
+    () =>
+      new RawShaderMaterial({ vertexShader: shader, storage: { a: { buffer: other, type: 'u32', access: 'write' } } }),
     /access must be read or read_write/,
   );
 });
@@ -851,7 +878,10 @@ test('a mesh out of view is skipped and counted; its sphere follows position, th
   assert.deepEqual(seen(), [1, 0], "the world matrix's scale reaches the radius");
   mesh.matrix[0] = 1;
   assert.deepEqual(seen(), [0, 1]);
-  mesh.setAttribute('position', [4, -1, 0, 6, -1, 0, 6, 1, 0].map((v, i) => (i % 3 === 0 ? v - 10 : v)));
+  mesh.setAttribute(
+    'position',
+    [4, -1, 0, 6, -1, 0, 6, 1, 0].map((v, i) => (i % 3 === 0 ? v - 10 : v)),
+  );
   assert.deepEqual(seen(), [1, 0], 'new points make a new sphere');
   mesh.bounds = { center: [90, 0, 0], radius: 1 };
   assert.deepEqual(seen(), [0, 1], 'bounds replace it');
@@ -859,7 +889,9 @@ test('a mesh out of view is skipped and counted; its sphere follows position, th
   assert.deepEqual(seen(), [1, 0]);
   // An instanced mesh places its copies in the shader: no sphere of its points can hold them.
   raw.remove(mesh);
-  const crowd = raw.add(new RawMesh({ material: m, attributes: quad(), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 50, 0, 0, 1] }));
+  const crowd = raw.add(
+    new RawMesh({ material: m, attributes: quad(), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 50, 0, 0, 1] }),
+  );
   assert.deepEqual(seen(), [1, 0]);
   crowd.bounds = { center: [0, 0, 0], radius: 1 };
   assert.deepEqual(seen(), [0, 1]);
@@ -868,7 +900,7 @@ test('a mesh out of view is skipped and counted; its sphere follows position, th
 test('reversed-Z with an infinite far plane culls by the other five planes', () => {
   const h = harness(),
     raw = RawShaders.attach(h.engine),
-    mesh = raw.add(new RawMesh({ material: material(), attributes: { position: quad().position } , vertexCount: 4 }));
+    mesh = raw.add(new RawMesh({ material: material(), attributes: { position: quad().position }, vertexCount: 4 }));
   // x and y as w = -z; clip z = near, so z >= 0 has a zero-length normal and must not divide by it.
   h.matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0];
   mesh.matrix[14] = -5;
@@ -883,7 +915,9 @@ test('a shadow cascade draws the vertex stage with the light matrix, and the fra
   const h = harness(),
     raw = RawShaders.attach(h.engine),
     plain = material(),
-    cut = material({ vertexShader: shader.replace('return margoDisplay', 'if(i.tint.x<0.5){discard;}return margoDisplay') }),
+    cut = material({
+      vertexShader: shader.replace('return margoDisplay', 'if(i.tint.x<0.5){discard;}return margoDisplay'),
+    }),
     a = raw.add(new RawMesh({ material: plain, attributes: quad() })),
     b = raw.add(new RawMesh({ material: cut, attributes: quad() })),
     clear = raw.add(new RawMesh({ material: material({ transparent: true }), attributes: quad() })),
@@ -901,7 +935,9 @@ test('a shadow cascade draws the vertex stage with the light matrix, and the fra
   const first = cascade(a, 0),
     pipeline = named(first, 'renderPipeline')[0][2],
     camera = floats(
-      named(first, 'writeBuffer').find((c) => named(first, 'buffer').some((x) => x[1] === c[1] && x[2].label === 'shader:raw:camera'))[3],
+      named(first, 'writeBuffer').find((c) =>
+        named(first, 'buffer').some((x) => x[1] === c[1] && x[2].label === 'shader:raw:camera'),
+      )[3],
     );
   assert.equal(pipeline.fragment, undefined, 'a depth-only pipeline');
   assert.deepEqual(
@@ -952,7 +988,12 @@ test('SSAO draws only opaque meshes with gbufferEntry, through that entry into t
     own = material({ vertexShader: code, gbufferEntry: 'normals' });
   raw.add(new RawMesh({ material: own, attributes: quad() }));
   raw.add(new RawMesh({ material: material(), attributes: quad() }));
-  raw.add(new RawMesh({ material: material({ vertexShader: code, gbufferEntry: 'normals', transparent: true }), attributes: quad() }));
+  raw.add(
+    new RawMesh({
+      material: material({ vertexShader: code, gbufferEntry: 'normals', transparent: true }),
+      attributes: quad(),
+    }),
+  );
   h.frame();
   const log = h.gpu.record(() => {
       h.view.begin(h.index++);
@@ -995,7 +1036,11 @@ test('RawPicking draws meshes into the tile with IDs from firstId and answers wi
       },
     };
   h.engine.createMesh = () => {
-    const mesh = { dispose() { this.disposed = true; } };
+    const mesh = {
+      dispose() {
+        this.disposed = true;
+      },
+    };
     meshes.push(mesh);
     return mesh;
   };
@@ -1040,7 +1085,10 @@ test('RawPicking draws meshes into the tile with IDs from firstId and answers wi
   b.visible = false;
   pick();
   assert.equal(host.overlays[0].pickHit(1), null, 'a hidden mesh takes no ID');
-  const object = named(h.gpu.record(() => raw.remove(b)), 'pass.draw');
+  const object = named(
+    h.gpu.record(() => raw.remove(b)),
+    'pass.draw',
+  );
   assert.equal(object.length, 0);
   assert.equal(meshes[1].disposed, true, 'its stand-in goes with it');
   picking.dispose();
@@ -1089,8 +1137,17 @@ test('TAA velocity draws only opaque meshes with velocityEntry, with last frame 
     own = material({ vertexShader: code, velocityEntry: 'moved' });
   const mesh = raw.add(new RawMesh({ material: own, attributes: quad() }));
   raw.add(new RawMesh({ material: material(), attributes: quad() }));
-  raw.add(new RawMesh({ material: material({ vertexShader: code, velocityEntry: 'moved', transparent: true }), attributes: quad() }));
-  assert.match(own.code('vertex'), /var<uniform> margoBefore:MargoBefore;/, 'every stage declares what the entry reads');
+  raw.add(
+    new RawMesh({
+      material: material({ vertexShader: code, velocityEntry: 'moved', transparent: true }),
+      attributes: quad(),
+    }),
+  );
+  assert.match(
+    own.code('vertex'),
+    /var<uniform> margoBefore:MargoBefore;/,
+    'every stage declares what the entry reads',
+  );
   assert.doesNotMatch(material().code('vertex'), /margoBefore/, 'a material without it is unchanged');
   const key = {},
     rows = new Float32Array(36);
@@ -1113,7 +1170,10 @@ test('TAA velocity draws only opaque meshes with velocityEntry, with last frame 
   assert.equal(pipeline.primitive.cullMode, 'none');
   const module = named(first, 'module').find((m) => /margoVelocityFragment/.test(m[2].code));
   assert.match(module[2].code, /@vertex fn moved/);
-  const befores = (log) => named(log, 'writeBuffer').filter((c) => c[3].length === 144 * 2).map((c) => floats(c[3]));
+  const befores = (log) =>
+    named(log, 'writeBuffer')
+      .filter((c) => c[3].length === 144 * 2)
+      .map((c) => floats(c[3]));
   assert.equal(befores(first).length, 1, 'one opted-in opaque mesh');
   assert.equal(befores(first)[0][33], 0, 'no last frame yet: no motion');
   assert.deepEqual(befores(first)[0].slice(0, 16), [...rows.slice(16, 32)], "TAA's previous view-projection");
@@ -1124,7 +1184,11 @@ test('TAA velocity draws only opaque meshes with velocityEntry, with last frame 
   assert.ok(second[32] > 0, "last frame's time");
   const third = velocity();
   assert.equal(befores(third)[0][28], 2, 'then the moved one');
-  assert.equal(named(third, 'pass.draw').length + named(third, 'pass.drawIndexed').length, 3 + 1, 'the scene passes draw three, TAA one');
+  assert.equal(
+    named(third, 'pass.draw').length + named(third, 'pass.drawIndexed').length,
+    3 + 1,
+    'the scene passes draw three, TAA one',
+  );
   // Releasing the view's state frees its buffers; idle without an open TAA pass.
   const freed = h.gpu.record(() => raw.releaseVelocity(key));
   assert.equal(named(freed, 'destroy').length, 2, 'the camera block and the one mesh block');

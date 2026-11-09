@@ -1689,8 +1689,10 @@ export class RawShaders implements EnginePlugin {
   }
   /** Releases every GPU object; meshes stay registered, so the plugin can be attached again. */
   dispose(): void {
+    const engine = this.engine;
     this.release();
     this.engine = this.device = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

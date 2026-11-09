@@ -1,5 +1,30 @@
 # @margoengine/shader
 
+`ComputePass`, `ScenePass` and `RawShaders` also detach from their actual scene
+on disposal, leaving same-name plugins in other scenes alone. Restoration keeps
+the registration. For example:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ComputePass, storage} from 'margoengine/shader';
+import {ScenePass} from 'margoengine/shader/pass';
+import {RawShaders} from 'margoengine/shader/raw';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const values = storage(1, 'u32');
+const compute = new ComputePass(1, i => values.store(i, 1));
+const outputs = new ScenePass({outputs:{color:'rgba16float'}});
+const raw = new RawShaders();
+product.use(compute);
+product.use(outputs);
+product.use(raw);
+compute.dispose();
+outputs.dispose();
+raw.dispose();
+values.dispose();
+engine.dispose();
+```
+
 `NodePass.dispose()` detaches the pass from its owning scene. A same-name pass in
 another scene is preserved; device restoration keeps the registration. For a
 secondary scene, attach the PostStack with `scene.use()`:
