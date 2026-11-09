@@ -3851,3 +3851,31 @@ Final follow-up checks: lint, hygiene and full verify passed (13,233 pass, zero 
 The README command ran 11/27, accepting 16 unchanged known exceptions; their repair remains in the work list.
 After GPU capacity opened, exporter capture passed rendering and teardown in 4 seconds on lane-M's cff40d127 fix.
 This lane made no shutdown change. API reports match and public core/stage size numbers are unchanged.
+
+## Batch 69: WFC constraints, large worlds and workers
+
+All five jobs are on main. Core and stage are unchanged; physics remains on hold. Entries are optional and tree-shakable.
+
+| Job | Result | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Overlapping pins and ground | DONE | 73ef38b8b | wfc/overlapping; package tests and real WebGPU/WebGL2 browser checks |
+| 2. Global constraints | DONE | 0f912f407 | wfc/constraints; package tests and real WebGPU/WebGL2 browser checks |
+| 3. Socket adjacency and rotations | DONE | 14bac8447 | wfc/sockets; package tests and real WebGPU/WebGL2 browser checks |
+| 4. Large and chunked outputs | DONE | 039cca096 | wfc/chunks; package tests and real WebGPU/WebGL2 browser checks |
+| 5. Worker solving | DONE | 4326f6a69 | wfc/worker; package tests and real WebGPU/WebGL2 browser checks |
+
+Job 1 adds overlapping pixel pins, ground rows and AbortSignal checkpoints, with conflicting/unsatisfiable restrictions and output-pixel checks. Job 2 adds group counts, connectivity and paths using propagated domains and chronological backtracking, proved against exhaustive binary truth tables. Job 3 expands sockets through Y or all 24 proper cube rotations, supports 4096 variants through the optional solvers, preserves source weights and rotation metadata, and solves a seeded 48-ID fixture; the legacy root remains 32 IDs.
+
+Job 4 adds indexed heap entropy selection and a chunk world with atomic interior commits constrained by one-cell halos. Negative/distant safe-integer coordinates, all-axis seams, a 256x256 chunk world, copies, cancellation and serial lifecycle are tested. Dense 4096-ID fixtures exposed cubic reciprocal-rule validation; grid.ts now uses constant bit membership, with a bounded-read regression. A TypeScript API lazily loads the feature's own Rust SIMD artifact for <=32 unit-weight tiles. Paired interleaved minima on 192x192 and 64x64x4 fixtures show Rust faster in every round, with identical seeded outputs, hashes and work counts. The instrumented artifact was measured again in job 5 with the same conclusion. Record: results/batch-69-heap.json. These are loaded SCOTT-DEV diagnostics, not published release speed numbers. Weighted/wide sets use TypeScript.
+
+Job 5 uses the existing shared worker serve/transfer/error helpers, one dedicated classic worker per job, live TS/SIMD work counters, a promise result, latest-only async iteration and AbortSignal termination. Lifecycle tests cover startup, clone failures, crash/message failures, malformed replies, timeout, dispose, late abort, weighted/wide fallback, pins and coded solver errors; actual shipped classic scripts preserve heap seed streams. Real browser WebGPU and WebGL2 checks render frames during positive work and abort active TS and SIMD solves, with zero browser/GPU errors. Record: results/batch-69-worker.json. The worker's build copies one shared lazy Wasm artifact explicitly; chunks.test.js compares installed bytes with source, and worker.test.js rejects nested artifact copies. The browser launcher fixture preserves its workspace-root check with the expanded evidence result shape.
+
+Docs per job: (1) README, limits, known-bugs, clean-room, claims and operational playbook; (2) the same plus reproduce; (3) the same plus generated API/llms and lazy size records; (4) the same plus perf-history, perf-vs-threejs, reproduce and paired heap record; (5) the same plus worker device record and refreshed paired evidence. This closing commit adds this record and marks list-3 row 69 done. Every job ran the required lint, hygiene, verify, WFC tests, GPU checks and README examples before landing; independent main moves received targeted WFC/claim checks and regenerated records. Closing gates run again on the newest main before this push. Final README evidence is 7/7 examples: six Node and one browser.
+
+Current min+gzip entries with bare peers external: root 1824 B, overlapping 2451 B, constraints 2460 B, sockets 676 B, chunks 3589 B, worker 1331 B. Separately fetched files: one Wasm 24282 B raw / 9596 B gzip, classic worker 7967 B raw / 3326 B gzip. The chunks measurement now excludes the separate Wasm asset instead of rebundling it as data. Core plus stage is 23797 B, below 25000 B.
+
+Limits: bounded restarts can fail, chunk order affects output and retained boundaries can prevent future chunks; no order independence, infinite satisfiability or cross-chunk playability guarantee. Chunk memory grows until clear/dispose. The worker solves local heap rules only, accepts one progress consumer, clones inputs and needs browser Workers/CSP permissions. Work counts are not percentages; Wasm counters wrap after 2^32-1. Synchronous APIs still cannot receive new abort events on their blocked thread. No quiet-machine release speed result, artist-asset compatibility, rival comparison or frame-time guarantee is claimed.
+
+Failures resolved: initial dense validation hit its five-minute hard limit, then passed after the linear membership fix; stale API size summaries were regenerated after entry sizes, rather than before them; the worker's missing emitted artifact was fixed by package-owned copying and installed-byte regression. One launcher fixture needed its new result shape. The previous GPU-slot deadline expired before any test ran; resumed waits use the normal lock wait with a hard limit. The unpushed duplicate SQL cleanup da5bf4383 was rebased out as requested. Batch 160's fix landed as 52ccbbb00 and is used from main; no duplicate cleanup commit was pushed. No WFC defect or timing-test failure remains open. Quiet release speed evidence is still unmeasured.
+
+Closing evidence: verify passed in 377 s, with 13,255 passed, zero failed and 14 existing suite skips (the same skip count before worker solving). WFC separately passed 37/37 with zero skips. Real WebGPU/WebGL2 checks passed, and all 7 README examples passed. No test, tolerance or budget was weakened.
