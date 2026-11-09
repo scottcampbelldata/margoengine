@@ -1350,3 +1350,9 @@ MAE 1.632960 (Margo) versus 0.132651 (Babylon), 1024 samples, seed 168, same emi
 The reference has residual noise/silhouette sampling differences (exact oracle versus Cycles MAE
 0.094812); this does not close or excuse the weighted-order approximation defect. Repro:
 `node scripts/rival-oit-cycles.mjs` under the exclusive GPU lock.
+
+### Audio event containers (batch 110)
+
+No known open defect in tested selection, variation, cooldown and pool-lifecycle paths. Existing AudioVoicePool owns voice stealing and sources. Invalid positions/draws are validated before pool playback so failure does not cut an existing voice or consume container history. Node regression coverage is in events.test.js; real browser PCM uses generated stand-ins. Model and resource limits are in limits.md.
+
+Event review found that Array.every skips sparse-array holes, accepting missing range endpoints and missing coordinates. Explicit finite endpoint/coordinate checks now reject them. AudioVoicePool.play also stopped a sounding voice before validating new coordinates, volume or rate. The owning pool now validates all play inputs before any voice mutation. Regression tests in packages/audio/tests/events.test.js and packages/audio/tests/audio.test.js fail against the previous implementation and pass with both fixes, including preserving the previous source, pose, level, rate and smoothing. No tests or tolerances were loosened.

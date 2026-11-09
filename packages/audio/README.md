@@ -72,6 +72,10 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 - **Sources.** `setBuffer` (decoded files), `setMediaElementSource` (`<audio>`/`<video>`, one node per element and context, reused), `setMediaStreamSource` (microphone, WebRTC) and `setNodeSource` (oscillators, constant sources, worklets). Buffer sources keep a playhead across `pause`/`play`, including playback-rate changes and loop regions. `seek(seconds)` moves it whether playing, paused or stopped: a playing buffer restarts on one new source node (the old one is stopped and disconnected first, so they never overlap); looping wraps into the loop region; past the end of a non-looping buffer it clamps to the end and a playing sound ends (`onEnded` fires). Media elements seek through `currentTime`.
 - **Timeline sync.** `sync(timelineSeconds, playing, rate = 1)`, called every frame with the editor's own clock, makes a buffer sound follow a timeline instead of the audio clock: silent before `timelineStart`, then at buffer position `offset + timelineSeconds - timelineStart` wrapped by the loop region, silent past the end of a non-looping sound. While playing it re-seeks only when the sound drifts more than `Audio.syncTolerance` (50 ms) from the timeline, so steady playback is never chopped and a seam crossing in a loop does not count as drift. With `playing` false (paused, scrubbing) it moves the playhead silently. `rate` is the timeline speed and sets `playbackRate`.
 - **Voice pools.** `new AudioVoicePool(listener, buffer, {voices = 8, ...positional options})` makes `voices` positional sounds that share one decoded buffer, for sounds that overlap: footsteps, block breaks, hits. `play(position, {volume, playbackRate})` takes a voice that is not sounding, or when all are sounding steals the one that started longest ago (it is cut off at once); the play's `volume` and `playbackRate` (pitch variation) default to the pool's options, and a voice jumps to its new position and level instead of easing there. `play` returns the voice. `stopAll()` stops every voice; `dispose()` disposes them (the buffer stays usable).
+
+  Pool play validates all three finite position coordinates, finite playbackRate and
+  nonnegative finite volume before selecting or stopping a voice. Invalid inputs,
+  including sparse coordinate arrays, raise a linked RangeError and leave current playback intact.
 - **Loading.** `loadAudioBuffer(context, url, {signal})` and `listener.load` share one download and one decoded buffer per context and URL. An aborted caller rejects with an `AbortError`; the download is cancelled once every waiting caller aborted. Failed loads are not cached.
 
 ## API
@@ -232,3 +236,68 @@ Node tests use stand-in audio. Real browser renders measure generated 1 kHz tone
 approach, recession, listener approach, co-motion and rest on all three rendering routes.
 Generated audio/motion are stand-ins; recordings, listening quality, other browsers
 and performance remain unmeasured.
+
+## Sound event containers
+
+`@margoengine/audio/events` selects decoded one-shots in random or sequence order,
+with independent pitch and volume variation and an audio-clock cooldown. It reuses
+`AudioVoicePool`; the audio root does not import it. WebGPU and both WebGL2 routes
+use the same Web Audio graph.
+
+```ts
+import {AudioListener} from 'margoengine/audio';
+import {AudioEventContainer} from 'margoengine/audio/events';
+
+const context = new OfflineAudioContext(2, 14400, 48000);
+using listener = new AudioListener({context});
+const buffers = [600, 900].map(hz => {
+  const buffer = context.createBuffer(1, 3840, 48000);
+  buffer.getChannelData(0).forEach((_, i, a) => { a[i] = 0.2 * Math.sin(2 * Math.PI * hz * i / 48000); });
+  return buffer;
+});
+using footsteps = new AudioEventContainer(listener, buffers, {
+  mode: 'sequence', volume: [0.5, 0.8], pitch: [-50, 50], cooldown: 0.1,
+});
+footsteps.play([0, 0, -1]);
+console.log(footsteps.play([0, 0, -1])); // null: cooldown does not consume a sequence step
+const paused = context.suspend(0.128);
+const rendered = context.startRendering();
+await paused;
+footsteps.play([0, 0, -1]); // second buffer
+await context.resume();
+console.log((await rendered).length); // 14400 frames
+// In a live game, load buffers with listener.load(url, {signal}) and call play on game events.
+```
+
+`AudioEventContainer(listener, buffers, options)` needs a nonempty list of decoded,
+positive-duration buffers. `mode='random'` chooses uniformly, excluding the previous
+buffer index when there is more than one; `'sequence'` visits indices in order and
+wraps. Repeated buffer objects at different indices remain separate choices.
+`voices=4` preallocates that many voices per buffer; a full pool steals its oldest
+voice. Total voices are buffer count times `voices`; there is no global container
+voice limit. Returned voices can be moved or stopped while they play.
+
+`volume=[1,1]` is a uniform linear gain range within 0..1. `pitch=[0,0]` is a uniform
+cents range within -4800..4800, converted to playbackRate with `2 ** (cents / 1200)`;
+pitch also changes duration. Endpoints are snapshotted, finite and ordered. `cooldown=0`
+is a finite nonnegative interval in audio-clock seconds. A rejected play returns null
+without consuming random draws or sequence state. Context suspension freezes cooldown;
+a backwards clock accepts a new play and starts a new interval. Play positions default
+to `[0,0,0]` in metres. Invalid positions or draws fail before stopping an existing voice.
+
+`random=Math.random` can be replaced with a uniform function returning a finite number
+in `[0,1)` for reproducible runs. Constant ranges and a single-buffer selection need
+no draw. Draw order is selection (random mode with multiple buffers), volume, pitch.
+`voiceOptions` defaults to the pool's spatial and clip defaults; looping, voice count,
+volume, detune and playback rate are controlled by the container. No buffer is cloned
+or loaded here; existing listener loading supports AbortSignal. No timers or waiting.
+`lastIndex=-1` until the first accepted play; `stopAll()` retains history/cooldown.
+`dispose()` and `using` release voices, preserve shared buffers and are idempotent;
+listener teardown also disposes the container. Disposed use raises `disposed` with a
+help link; invalid selections use `state` and invalid ranges use linked RangeError.
+
+Node tests cover order, variation, exact cooldown boundaries, deterministic selection,
+single-buffer play, overlap, stealing, teardown and failure atomicity. Real browser
+PCM measures generated sequence/random tones and a silent cooldown gap beside WebGPU,
+native WebGL2 and compatibility WebGL2. Generated audio/events are stand-ins; real
+recordings, listening quality, other browsers and performance are unmeasured.

@@ -1,0 +1,75 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated tones and event triggers, stand-ins",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "tones": [
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        },
+        {
+          "rms": 0.06249999848449138,
+          "hz": 3000
+        },
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        }
+      ],
+      "randomTone": {
+        "rms": 0.06249999848449138,
+        "hz": 2999.9999999999995
+      },
+      "cooldownGap": "silent",
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "tones": [
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        },
+        {
+          "rms": 0.06249999848449138,
+          "hz": 3000
+        },
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        }
+      ],
+      "randomTone": {
+        "rms": 0.06249999848449138,
+        "hz": 2999.9999999999995
+      },
+      "cooldownGap": "silent",
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "tones": [
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        },
+        {
+          "rms": 0.06249999848449138,
+          "hz": 3000
+        },
+        {
+          "rms": 0.062499997651786265,
+          "hz": 2000
+        }
+      ],
+      "randomTone": {
+        "rms": 0.06249999848449138,
+        "hz": 2999.9999999999995
+      },
+      "cooldownGap": "silent",
+      "gpuErrors": []
+    }
+  ]
+}

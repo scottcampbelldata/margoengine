@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { margoError } from '../../shared/errors.js';
+import { margoError, rangeError } from '../../shared/errors.js';
 import { PositionalAudio, type PositionalAudioOptions } from './audio.js';
 import type { AudioListener } from './listener.js';
 import type { Vec3 } from './math.js';
@@ -59,6 +59,12 @@ export class AudioVoicePool {
    */
   play(position: Vec3, options: { volume?: number; playbackRate?: number } = {}): PositionalAudio {
     if (this.disposed) throw margoError('disposed', 'AudioVoicePool is disposed; create a new AudioVoicePool');
+    const volume = options.volume ?? this.volume,
+      playbackRate = options.playbackRate ?? this.playbackRate;
+    if (position.length !== 3 || !Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2]))
+      throw rangeError('AudioVoicePool position needs three finite coordinates; pass [x, y, z] in metres', 'state');
+    if (!Number.isFinite(volume) || volume < 0 || !Number.isFinite(playbackRate))
+      throw rangeError('AudioVoicePool needs finite playbackRate and nonnegative finite volume; pass valid play options', 'state');
     let index = this.voices.findIndex((voice) => !voice.isPlaying);
     if (index < 0) index = this.started.indexOf(Math.min(...this.started));
     const voice = this.voices[index],
@@ -68,8 +74,8 @@ export class AudioVoicePool {
     listener.smoothing = 0;
     try {
       voice.setPosition(position[0], position[1], position[2]);
-      voice.volume = options.volume ?? this.volume;
-      voice.playbackRate = options.playbackRate ?? this.playbackRate;
+      voice.volume = volume;
+      voice.playbackRate = playbackRate;
     } finally {
       listener.smoothing = smoothing;
     }

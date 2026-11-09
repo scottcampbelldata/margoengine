@@ -1568,3 +1568,7 @@ https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/transparent
 https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/emission.html . Renderer code was
 not opened. Camera, meshes, node setup, float readback and comparison are independently authored in
 `scripts/rival-oit-cycles.py` and `.mjs`; generated EXR, float data and engine pictures stay in engine-bench.
+
+## Audio event containers (batch 110)
+
+Margo-own uniform index selection with preceding-index exclusion, modular sequence order and audio-clock cooldowns. Playback, sample-rate multiplication and independent linear gain follow the [W3C Web Audio Recommendation, AudioBufferSourceNode](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode) and GainNode. Reuses the existing Margo AudioVoicePool rather than another voice manager. No engine/library source read and no downloaded assets; generated tones/triggers are stand-ins.

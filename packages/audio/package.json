@@ -42,6 +42,10 @@
     "./doppler": {
       "types": "./dist/doppler.d.ts",
       "import": "./dist/doppler.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
     }
   },
   "files": [

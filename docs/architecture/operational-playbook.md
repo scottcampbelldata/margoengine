@@ -1787,3 +1787,9 @@ Cycles independently path-traces the same OIT emission/coverage scene. Its exact
 with identical centre RGB; Margo/Babylon MAE against it is 1.632960/0.132651. Residual path noise and
 silhouette sampling limit full-frame PSNR. This is independent confirmation of the open weighted image
 loss, with no runtime changes or added timing claim. Root scripts reproduce the comparison outside the repo.
+
+### Audio event container evidence (batch 110, section 5)
+
+Optional audio/events layers selection and variation over existing AudioVoicePool. Listener-owned teardown releases every pool; the container has no frame work or timers. LIM-605 and whitepaper/results/audio-events-20261108.json record real browser PCM generated-tone evidence beside WebGPU, native WebGL2 and compatibility WebGL2. Pitch, gain, sequence/random selection and silent cooldown gaps are measured with zero GPU errors. No renderer/core changes; recordings, listening quality, other browsers and speed remain unmeasured.
+
+The event job also repairs AudioVoicePool input ordering: invalid per-play input is rejected before a free or stolen voice changes. Sparse position/range arrays are checked by explicit components, since Array.every skips holes. Focused before/after regressions in audio.test.js and events.test.js prove preserved sounding sources and rejected missing values.

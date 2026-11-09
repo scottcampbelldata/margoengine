@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-604). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-605). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -983,3 +983,11 @@ The independent Cycles OIT reference (1024 samples, seed 168) gives Margo MAE 1.
 0.132651. Exact primary-ray transport versus Cycles MAE is 0.094812; maximum miss 125 includes path
 noise and silhouette sampling. This validates the ordering loss without treating stochastic reference
 pixels as a zero-error raster oracle. No additional speed claim. See whitepaper/results/batch-168-oit-cycles.json.
+
+## Audio event containers (batch 110)
+
+Optional audio/events: 5,491 B gzip with shared audio implementation; audio root 7,638 B and core plus stage 23,626 B. Defaults: mode random (no immediate repeated index), voices 4 per buffer, volume [1,1], pitch [0,0] cents, cooldown 0 seconds, random Math.random, voiceOptions pool defaults, play position origin. Nonempty decoded positive-duration buffers; finite ordered volume endpoints 0..1 and pitch -4800..4800 cents. Cooldown finite and nonnegative; draws finite in [0,1). Pitch changes duration. No loading or timers. Total preallocated voices = buffer count times voices; stealing is per buffer, not a global cap. Snapshot ranges, not caller arrays. Looping disabled; sequence wraps, cooldown rejection consumes no state/draw. Clock suspension freezes cooldown; backwards clock accepts a new interval.
+
+LIM-605: Node stand-in tests and real browser PCM beside all three rendering routes prove order, random selection, volume/pitch and silent cooldown gaps. Generated 1/1.5 kHz tones at +1200 cents give 2/3 kHz within 0.1 Hz, RMS 0.0625 within 1e-6 for 0.5 volume, and zero GPU validation errors. Shared buffers stay usable on disposal. Recordings, listening quality, other browsers, random-generator statistical quality and performance remain unmeasured.
+
+Audio root size growth in this job includes pool input validation before voice stealing, fixing an existing failure that cut valid playback when new arguments were invalid. The new entry remains optional; the root gains only the owning pool bug fix. Current audio/doppler size with rebuilt shared chunks: 1,090 B gzip.

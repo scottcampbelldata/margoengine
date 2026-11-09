@@ -842,6 +842,29 @@ test('voice pool: overlapping plays sound on separate voices sharing one buffer,
   listener.dispose();
 });
 
+test('voice pool validates every coordinate and play option before stealing or stopping a voice', () => {
+  const context = new FakeAudioContext(), listener = new AudioListener({context});
+  const pool = new AudioVoicePool(listener, buffer(1), {voices: 1});
+  const voice = pool.play([1, 2, 3]), source = voice.source;
+  for (const [position, options] of [
+    [[, 0, 0], {}], [[0, NaN, 0], {}], [[0, 0], {}],
+    [[0, 0, 0], {volume: NaN}], [[0, 0, 0], {volume: -1}],
+    [[0, 0, 0], {playbackRate: Infinity}],
+  ]) {
+    assert.throws(() => pool.play(position, options), RangeError);
+    assert.equal(voice.source, source);
+    assert.equal(source.stopped, null);
+    assert.equal(voice.isPlaying, true);
+    assert.deepEqual([...voice.worldPosition], [1, 2, 3]);
+    assert.equal(voice.volume, 1);
+    assert.equal(voice.playbackRate, 1);
+    assert.equal(listener.smoothing, 0.02);
+  }
+  assert.equal(pool.play([4, 5, 6]), voice);
+  assert.equal(source.stopped.when, 0);
+  listener.dispose();
+});
+
 test('voice pool steals the oldest voice when all sound, reuses an ended voice first, resets per-play options', () => {
   const context = new FakeAudioContext({ state: 'running' }),
     listener = new AudioListener({ context, smoothing: 0.02 }),

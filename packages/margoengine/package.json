@@ -138,6 +138,10 @@
       "types": "./dist/audio/doppler.d.ts",
       "import": "./dist/audio/doppler.js"
     },
+    "./audio/events": {
+      "types": "./dist/audio/events.d.ts",
+      "import": "./dist/audio/events.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
