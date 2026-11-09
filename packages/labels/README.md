@@ -37,6 +37,13 @@ label.remove();
 engine.removePlugin(labels.name); // or engine.dispose(): removes every element and the overlay
 ```
 
+`attach` uses plugin name `margoengine-labels` by default. If a subsystem such as
+sciviz Axes already attached it, reuse that LabelRenderer from `engine.plugins`,
+or attach your annotations with an unused name, for example
+`LabelRenderer.attach(engine, {name: 'annotations', layout: callouts})`.
+A duplicate name throws linked code `state` and explains these choices before
+creating an overlay; the existing renderer, layout and labels are preserved.
+
 ## How it works
 
 - **Overlay.** `setup` inserts one `div` right after the canvas (or into `parent`), absolutely positioned over the canvas content box with `pointer-events: none` and `overflow: hidden`. Each frame it measures the canvas and corrects the overlay offset, so it stays aligned inside any containing block, border or padding, and under a CSS `scale()` on the canvas's ancestors (see [Scaled pages](#scaled-pages)).

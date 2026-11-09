@@ -210,3 +210,10 @@ unselected material sliders display core defaults 0.5/0. The new real-Engine/jsd
 case in inspector/test/inspector.test.js fails on main and covers omitted, empty
 and partial effects plus refresh. The reported literal undefined console warning
 is not produced by this code path: disabled controls already skip refresh writes.
+
+Entry 41 is FIXED in labels, without a core change. LabelRenderer.attach checks
+its intended name before allocating an overlay and throws linked code state,
+naming the collision and explaining reuse or an unused name. It never silently
+replaces the existing layout. labels/tests/testpage-attach.test.js fails on main's
+opaque Invalid plugin error and passes with the fix, preserving existing DOM and
+registration and allowing independent named annotations.
