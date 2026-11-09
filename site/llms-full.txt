@@ -2606,6 +2606,13 @@ termination prove policy and lifecycle, not GPU speed or continuous tracing.
 Queue terminal observation bounds owner handle draining at 30 seconds; waiter
 withdrawal has a separate 30-second mutex cleanup bound to close wait accounting.
 
+Batch 134 scalar prototype: private BC4/BC5 for ETC1S and UASTC passes 49 native
+and 22 selected Node tests; 40 of 98 file/target source-quality pairs fail.
+The unchanged conventional and R/alpha bars both apply. Draft Wasm is 158,873 B
+raw / 57,653 B gzip9; this is not final entry, peak-memory or speed acceptance.
+No public decoder integration or prebuilt removal is included. See the
+[unaccepted checkpoint](whitepaper/results/batch-134-scalar-prototype.json).
+
 GPU exclusive policy is checked before verify builds: tracked production source
 and package scripts are scanned for literal CLI/environment/API requests.
 Computed commands are checked at runtime; the syntax gate does not evaluate
@@ -4845,6 +4852,18 @@ size ceiling. It now reports a linked state MargoError with the colliding name,
 reuse guidance and a complete alternate-name example, before construction.
 `packages/labels/tests/testpage-attach.test.js` rejects the old error and covers
 default and custom collisions without replacing existing labels or DOM.
+
+### Open: batch 134 scalar prototype fails source-quality acceptance
+
+The private min/max BC4/BC5 prototype passes 49 native and 22 selected adapter
+tests, but 40 of 98 pairs across 46 primary and three supplementary files fail
+the unchanged no-worse source-SSE bar. The initial independent endpoint choice
+is insufficient; endpoint refinement remains required. BC5 must satisfy both
+the conventional RG and separately mapped R/alpha checks. Reproduce with the
+retained author-workspace `measure/scalar-quality.mjs`; all 1,296 old controls
+and frozen totals reproduce exactly, with no tolerance change. The prototype
+is not integrated into the public package and the prebuilt remains in use.
+[Failure cases and source pins](whitepaper/results/batch-134-scalar-prototype.json).
 
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 

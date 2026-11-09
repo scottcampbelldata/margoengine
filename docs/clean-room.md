@@ -1,5 +1,42 @@
 # Clean room
 
+## Batch 134 scalar prototype and strict quality control (2026-11-09)
+
+Before the private BC4/BC5 prototype, wide searches compared scalar texture
+compression and endpoint quantization. Khronos Group, *Data Format Specification
+1.4* (2025), https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html ,
+chapter 19 introduction and sections 19.1/19.3 including table 121 were reread.
+Microsoft, *Block Compression (Direct3D 10)* (2020, retrieved 2026-11-09),
+https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression ,
+BC3, BC4_UNORM, BC5_UNORM and mip padding sections were reviewed. Shin Fujieda
+and Takahiro Harada, *Neural Texture Block Compression* (2024),
+https://arxiv.org/html/2407.09543v1 , abstract, sections 1/2.1 and section 3's
+opening palette equations were reviewed, not the full paper. Per Wennersten and
+Jacob Strom, *Table-based Alpha Compression* (2009),
+https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf , sections
+1/2 and 4.1/4.2 were read as extracted text, not the full paper or figures.
+No companion implementation or foreign encoder source was read.
+
+The initial independent encoder uses high/low endpoints and nearest rounded
+scalar palette values, with the smallest index on ties. BC5 retains the existing
+source R/alpha-to-destination-RG contract. Neural prediction and the paper's
+table codec are not used. Min/max alone fails the required source-quality bar:
+40 of 98 primary/supplementary pairs are worse. This is an unaccepted private
+prototype, not completed integration or permission to remove the prebuilt.
+
+The quality harness also exposed floating-point aggregate order. Nicholas
+Higham, *The Accuracy of Floating Point Summation* (1993),
+https://nhigham.com/wp-content/uploads/2023/10/high93s.pdf , abstract,
+introduction and section 2's opening ordering statement were reviewed; David
+Goldberg, *What Every Computer Scientist Should Know About Floating-Point
+Arithmetic* (1991), https://doi.org/10.1145/103162.103163 , and Radford Neal,
+*Fast exact summation using small and large superaccumulators* (2015),
+https://arxiv.org/abs/1505.05571 , abstracts only. Preserve the frozen baseline's
+image order for both sums rather than change the established arithmetic or
+tolerance. Two regressions cover non-associative totals and missing/duplicate
+image identities. All 1,296 old payload/source controls and original aggregates
+then reproduce exactly. [Unaccepted evidence](whitepaper/results/batch-134-scalar-prototype.json).
+
 ## Native GL loss-event gate ordering (2026-11-10)
 
 The Khronos WebGL Working Group's *WEBGL_lose_context* specification, revision

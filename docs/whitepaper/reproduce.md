@@ -1,5 +1,15 @@
 # Reproducing Margo's numbers
 
+The [unaccepted scalar prototype](results/batch-134-scalar-prototype.json)
+retains its source/tests and corpus in the author research workspace, outside
+clone contents. There, run native crate tests, the release Wasm build and
+`measure/scalar.test.mjs` with the retained adapter suites, followed by
+`measure/scalar-quality-order.test.mjs` and `measure/scalar-quality.mjs` under
+hard CPU limits. The last command currently fails on 40 of 98 pairs; every old
+payload/source control and frozen aggregate must remain exact. Keep conventional
+RG and mapped R/alpha errors, original references and zero tolerance unchanged.
+Do not treat this prototype as package integration or remove the prebuilt.
+
 CPU pathline foundation (batch 171 job 1): run `npm run build:flow --workspace @margoengine/sciviz`,
 `npm run test:flow-kernel --workspace @margoengine/sciviz`, build the package, then
 `node --test --test-timeout=120000 packages/sciviz/tests/flow.test.js`. No device or GPU lock is requested.

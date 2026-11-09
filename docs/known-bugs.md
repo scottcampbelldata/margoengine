@@ -9,6 +9,18 @@ reuse guidance and a complete alternate-name example, before construction.
 `packages/labels/tests/testpage-attach.test.js` rejects the old error and covers
 default and custom collisions without replacing existing labels or DOM.
 
+### Open: batch 134 scalar prototype fails source-quality acceptance
+
+The private min/max BC4/BC5 prototype passes 49 native and 22 selected adapter
+tests, but 40 of 98 pairs across 46 primary and three supplementary files fail
+the unchanged no-worse source-SSE bar. The initial independent endpoint choice
+is insufficient; endpoint refinement remains required. BC5 must satisfy both
+the conventional RG and separately mapped R/alpha checks. Reproduce with the
+retained author-workspace `measure/scalar-quality.mjs`; all 1,296 old controls
+and frozen totals reproduce exactly, with no tolerance change. The prototype
+is not integrated into the public package and the prebuilt remains in use.
+[Failure cases and source pins](whitepaper/results/batch-134-scalar-prototype.json).
+
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 
 After the helper-program repair, voxel GI passed its rendering assertions but

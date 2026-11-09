@@ -19,6 +19,13 @@ termination prove policy and lifecycle, not GPU speed or continuous tracing.
 Queue terminal observation bounds owner handle draining at 30 seconds; waiter
 withdrawal has a separate 30-second mutex cleanup bound to close wait accounting.
 
+Batch 134 scalar prototype: private BC4/BC5 for ETC1S and UASTC passes 49 native
+and 22 selected Node tests; 40 of 98 file/target source-quality pairs fail.
+The unchanged conventional and R/alpha bars both apply. Draft Wasm is 158,873 B
+raw / 57,653 B gzip9; this is not final entry, peak-memory or speed acceptance.
+No public decoder integration or prebuilt removal is included. See the
+[unaccepted checkpoint](whitepaper/results/batch-134-scalar-prototype.json).
+
 GPU exclusive policy is checked before verify builds: tracked production source
 and package scripts are scanned for literal CLI/environment/API requests.
 Computed commands are checked at runtime; the syntax gate does not evaluate

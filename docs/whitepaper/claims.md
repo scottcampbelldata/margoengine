@@ -5,6 +5,12 @@ state MargoError with the collision and both repair choices. Evidence:
 `packages/labels/tests/testpage-attach.test.js`, including default and custom
 names; clean-room rationale and measured optional-entry cost: `docs/size-restore.md`.
 
+The [private scalar prototype](results/batch-134-scalar-prototype.json) is
+explicitly unaccepted: 49 native, 22 selected Node and two quality-order tests
+pass, but 40 of 98 source-quality pairs fail. All 1,296 old controls and frozen
+aggregate sums reproduce exactly. No completed BC4/BC5 replacement, fuzz,
+peak-memory, speed or full job 2/3 acceptance is claimed by these scoped tests.
+
 Owned Windows Chromium teardown reads its process list before client disconnect
 can invalidate that read. The asynchronous-session regression in
 `tests/browser-teardown.test.js` fails on the prior ordering; all 56 scoped
