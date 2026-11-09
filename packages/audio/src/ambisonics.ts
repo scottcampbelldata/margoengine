@@ -28,6 +28,8 @@ export class AmbisonicAudio {
   private readonly output: GainNode;
   private readonly matrix: GainNode[] = [];
   private readonly values = new Float64Array(8).fill(NaN);
+  private readonly forward = [0, 0, -1];
+  private readonly left = [-1, 0, 0];
   private rotation = [0,0,0,1];
   private readonly smoothing: number;
   private readonly loop: boolean;
@@ -106,11 +108,13 @@ export class AmbisonicAudio {
   /** Update from listener forward/up directions. Listener frame updates call this automatically, including XR poses. */
   update(): void {
     this.assertLive();
-    const f=this.listener.forward,u=this.listener.up;
-    const left=[u[1]*f[2]-u[2]*f[1],u[2]*f[0]-u[0]*f[2],u[0]*f[1]-u[1]*f[0]];
-    const length=Math.hypot(...left);
-    if(!Number.isFinite(length)||length<1e-12)throw fault('state','Ambisonic listener forward/up must be independent directions; set a valid pose');
-    for(let i=0;i<3;i++)left[i]/=length;
+    const pose=this.listener.forward,u=this.listener.up;
+    const candidate=[u[1]*pose[2]-u[2]*pose[1],u[2]*pose[0]-u[0]*pose[2],u[0]*pose[1]-u[1]*pose[0]];
+    const length=Math.hypot(...candidate),f=this.forward,left=this.left;
+    // Retain the last independent basis; a bed created at a degenerate pose starts facing -Z, +Y up.
+    if(Number.isFinite(length)&&length>=1e-12)for(let i=0;i<3;i++) {
+      left[i]=candidate[i]/length;f[i]=pose[i];
+    }
     const [x,y,z,w]=this.rotation;
     for(let ear=0;ear<2;ear++) {
       const sign=ear===0?1:-1;

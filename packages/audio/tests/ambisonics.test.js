@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {AudioListener} from '../dist/index.js';import {AmbisonicAudio} from '../dist/ambisonics.js';
-import {FakeAudioContext,FakeNode} from './fake-web-audio.js';
+import {FakeAudioContext,FakeNode,fakeEngine} from './fake-web-audio.js';
 import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
 function setup(){
  const context=new FakeAudioContext({state:'running'}),nodes=[];
@@ -42,9 +42,25 @@ test('unsupported formats/channels and invalid settings fail before allocating a
  for(const options of [{format:'fuma'},{volume:NaN},{smoothing:-1},{loop:1}])assert.throws(()=>new AmbisonicAudio(s.listener,s.buffer,options));
  assert.throws(()=>new AmbisonicAudio(s.listener,s.context.createBuffer(9,48,48000)),e=>e.code==='unsupported');
  assert.equal(s.nodes.length,0);
- s.listener.setPose([0,0,0],[0,1,0],[0,1,0]);
- assert.throws(()=>new AmbisonicAudio(s.listener,s.buffer),e=>e.code==='state');
- assert.ok(s.nodes.every(n=>n.outputs.size===0));s.listener.dispose();
+ s.listener.dispose();
+});
+test('exact camera poles and roll follow camera up; degenerate manual poses retain a finite decoder',()=>{
+ const s=setup(),engine=fakeEngine();s.listener.setup(engine);
+ const bed=new AmbisonicAudio(s.listener,s.buffer);let after=0;
+ s.listener.addSource({update(){after++;},dispose(){}});
+ for(const sign of [-1,1]) {
+  engine.camera.position=[0,-sign*10,0];engine.camera.up=[0,0,sign];
+  assert.doesNotThrow(()=>s.listener.update());
+  near([...s.listener.up],engine.camera.up);
+  near(coefficients(s),[.5,.25,sign*Math.sqrt(3)/4,0,.5,-.25,sign*Math.sqrt(3)/4,0]);
+ }
+ engine.camera.position=[0,0,10];engine.camera.up=[1,0,0];s.listener.update();
+ near(coefficients(s),[.5,0,.25,Math.sqrt(3)/4,.5,0,-.25,Math.sqrt(3)/4]);
+ const before=coefficients(s);s.listener.follow(null).setPose([0,0,0],[0,-1,0]);
+ assert.doesNotThrow(()=>s.listener.update());near(coefficients(s),before);assert.equal(after,4);
+ bed.dispose();const fresh=new AmbisonicAudio(s.listener,s.buffer);
+ const initial=[...[...s.nodes[2].outputs]].map(n=>n.gain.value);
+ near(initial,[.5,.25,0,Math.sqrt(3)/4,.5,-.25,0,Math.sqrt(3)/4]);fresh.dispose();s.listener.dispose();
 });
 test('licensed external rain stimulus excerpt stays pinned with four discrete 24-bit channels',()=>{
  const base=new URL('./fixtures/',import.meta.url),record=JSON.parse(readFileSync(new URL('rain-foa.json',base)));

@@ -47,7 +47,7 @@ const audioContextClass = (): (new () => AudioContext) => {
 
 /**
  * The ears of the scene. As an engine plugin it follows `engine.camera` every frame (position, forward from the
- * camera position toward its target, Y up), or a mesh such as the player character (`follow`). Owns the master gain that every Audio and PositionalAudio feeds.
+ * camera position toward its target, camera up), or a mesh such as the player character (`follow`). Owns the master gain that every Audio and PositionalAudio feeds.
  * The AudioContext is created lazily on first use, never at import time.
  */
 export class AudioListener implements EnginePlugin {
@@ -251,7 +251,7 @@ export class AudioListener implements EnginePlugin {
     forward[0] = t[0] - p[0];
     forward[1] = t[1] - p[1];
     forward[2] = t[2] - p[2];
-    this.setPose(p, forward);
+    this.setPose(p, forward, camera.up);
   }
 
   /** Sets the listener pose directly (world position, forward direction, up direction). */

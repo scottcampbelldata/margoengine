@@ -2004,3 +2004,7 @@ No new core/stage API, shader algorithm or speed claim. Node tests enter check:m
 ### WFC rotation evidence (batch 69, section 5)
 
 Optional CPU socket construction checks all 24 proper signed-axis transforms, independent face-normal mapping and a 48-ID 3D solve. Browser tests run the same seeded socket rules beside real WebGPU and WebGL2 contexts. No rendering/backend code changes. Labels are logical connectors, with no texture-orientation or imported-geometry proof.
+
+### Audio camera orientation regression (section 5, 2026-11-09)
+
+The listener copies camera.up as well as position/forward, so panner orientation follows camera roll and Top/Bottom views. Ambisonic beds retain their last independent orientation during a collinear manual pose, using -Z forward and +Y up initially. `packages/audio/tests/ambisonics.test.js` checks both exact poles, roll, finite initial/frozen decoder gains and continued updates of later sources. Browser offline PCM matrix proofs remain separate from live device evidence.

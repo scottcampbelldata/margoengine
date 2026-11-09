@@ -6,6 +6,8 @@ Web Audio listener, global and positional sounds, encoded-file loading and a fre
 
 Build from source with `npm run build` in `packages/audio`.
 
+For the loading examples, serve `tests/fixtures/rain-foa.wav` at `/sounds/rain-foa.wav` (CC BY 4.0, attribution in `tests/fixtures/NOTICE.md`). Replace this shared sample with your app's engine, cue and step recordings.
+
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
 import {Engine} from 'margoengine/core';
@@ -25,7 +27,7 @@ const engineSound = new PositionalAudio(listener, {
   mesh: truck, refDistance: 2, distanceModel: 'inverse', rolloffFactor: 1.2,
   coneInnerAngle: 90, coneOuterAngle: 220, coneOuterGain: 0.3, muteWhenHidden: true,
 });
-engineSound.setBuffer(await listener.load('/sounds/engine.ogg'));
+engineSound.setBuffer(await listener.load('/sounds/rain-foa.wav'));
 engineSound.loop = true;
 engineSound.fadeIn(0.5);
 
@@ -34,11 +36,11 @@ music.setMediaElementSource(document.querySelector('audio')!).play();
 
 // A sound on an editor timeline: starts at timeline second 4, follows play, pause, scrubbing and timeline speed.
 const cue = new Audio(listener, {volume: 0.6, loop: false, timelineStart: 4});
-cue.setBuffer(await listener.load('/sounds/cue.ogg'));
+cue.setBuffer(await listener.load('/sounds/rain-foa.wav'));
 engine.onFrame(() => cue.sync(timeline.seconds, timeline.playing, timeline.speed));
 
 // Footsteps and block sounds: 6 voices share one buffer; a 7th overlapping play steals the oldest voice.
-const steps = new AudioVoicePool(listener, await listener.load('/sounds/step.ogg'), {voices: 6, refDistance: 2});
+const steps = new AudioVoicePool(listener, await listener.load('/sounds/rain-foa.wav'), {voices: 6, refDistance: 2});
 steps.play([x, y, z], {volume: 0.7, playbackRate: 0.9 + Math.random() * 0.2});
 
 const analyser = new AudioAnalyser(music, 1024);
@@ -54,7 +56,7 @@ engine.removePlugin(listener.name);
 import {AudioListener, Audio} from 'margoengine/audio';
 
 using listener = new AudioListener({volume: 0.8}); // disposed at the end of the block
-const buffer = await listener.load('/sounds/step.ogg', {signal: AbortSignal.timeout(10_000)}); // rejects with an AbortError
+const buffer = await listener.load('/sounds/rain-foa.wav', {signal: AbortSignal.timeout(10_000)}); // rejects with an AbortError
 using step = new Audio(listener).setBuffer(buffer);
 step.play();
 ```
@@ -64,7 +66,7 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 ## How it works
 
 - **Lazy context.** Nothing touches `AudioContext`, `window` or `document` at import time. The listener creates its `AudioContext` the first time `listener.context` is read (normally when the first sound is created), or uses the context you pass, for example an `OfflineAudioContext`. A context the listener created is closed on dispose; a context you passed is left open.
-- **Listener follows the camera.** As an engine plugin the listener adds a frame pass (order 900) that runs after the camera and world matrices are updated. It writes the listener position, forward (camera position toward target) and Y up, and skips the write when nothing changed. `listener.follow(mesh, forward = [0, 0, 1])` puts the ears on a mesh instead, such as a third-person character: its world position, its local `forward` axis (glTF characters face +Z) and local +Y as up, read from the engine's world matrices each frame (a disposed mesh keeps the last pose). `follow('camera')` goes back; `follow(null)` stops following so only `setPose` moves the listener. `setPose` also sets the pose by hand when you do not use an engine.
+- **Listener follows the camera.** As an engine plugin the listener adds a frame pass (order 900) that runs after the camera and world matrices are updated. It writes the listener position, forward (camera position toward target) and camera up (including rolled and exact-pole views), and skips the write when nothing changed. `listener.follow(mesh, forward = [0, 0, 1])` puts the ears on a mesh instead, such as a third-person character: its world position, its local `forward` axis (glTF characters face +Z) and local +Y as up, read from the engine's world matrices each frame (a disposed mesh keeps the last pose). `follow('camera')` goes back; `follow(null)` stops following so only `setPose` moves the listener. `setPose` also sets the pose by hand when you do not use an engine.
 - **Autoplay.** With `autoResume` (default) the listener resumes a suspended context on the first `pointerdown`, `mousedown`, `keydown` or `touchend` anywhere in the window, then removes its listeners. `suspend()` and `resume()` are there for explicit control.
 - **Graph.** `source -> filters -> fade gain -> volume gain -> [PannerNode] -> master gain -> destination`. Fades have their own gain stage, so `fadeIn`/`fadeOut` never fight with `volume`, and hidden-mesh muting rides on the volume stage.
 - **No clicks.** Volume, master volume, playback rate, detune, listener pose and panner pose move with `setTargetAtTime` (time constant `smoothing`, default 20 ms) on a running context. The first write, and every write on a suspended or offline context, is set immediately, so a sound never sweeps in from the origin.
@@ -477,7 +479,7 @@ Disposed calls raise linked `disposed`; invalid values use linked `state` errors
 
 The listener updates the matrix each frame. For XR, feed the headset's world forward
 and up vectors through `listener.follow(null).setPose(position, forward, up)` before
-`listener.update()`. Directions must be independent; a collinear pose raises `state`.
+`listener.update()`. A collinear pose keeps the last independent decoder orientation; a bed created at such a pose starts facing -Z with +Y up. A valid pose resumes orientation updates.
 This entry adds no XR session/headset driver. Physical headset tracking and subjective
 localization are unmeasured. CPU tests cover full quaternion yaw/pitch/roll basis
 changes; browser PCM covers channel routing, looping, listener yaw and field yaw on

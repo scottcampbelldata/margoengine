@@ -12,6 +12,10 @@ required mutable arrays. Regenerated `api/text.extrude.api.md` from the built de
 `npm run api:check` checks the snapshot against the public declaration without changing it.
 The runtime and the accepted inputs are unchanged by this documentation repair.
 
+### Fixed 2026-11-09: audio listener camera poles
+
+Camera following omitted camera.up, making exact Top/Bottom views collinear with the listener up vector. Ambisonic decoding then threw from the frame pass. The listener now follows camera up and beds retain a valid decoder basis through degenerate manual poses. The regression in packages/audio/tests/ambisonics.test.js checks exact poles, roll, first-use degeneracy and later-source updates.
+
 ## Own 2D physics acceptance gaps
 
 The contact support-ceiling defect is fixed by the sustained-support correction below under Fixed 2026-11-08.

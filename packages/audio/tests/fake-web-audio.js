@@ -215,7 +215,7 @@ export function fakeEngine({ capacity = 8 } = {}) {
   const passes = [];
   const engine = {
     canvas: { ownerDocument: document },
-    camera: { position: [0, 0, 5], target: [0, 0, 0] },
+    camera: { position: [0, 0, 5], target: [0, 0, 0], up: [0, 1, 0] },
     disposed: false,
     meshes: new Map(),
     store: {
