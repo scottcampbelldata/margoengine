@@ -12,7 +12,7 @@ try{
   if(product==='raised box')await page.evaluate(()=>window.check.box());
   const off=async()=>{await page.evaluate(()=>window.check.render(0,0));return decodePNG(await page.locator('canvas').screenshot());};
   const base=await off();
-  const first=await page.evaluate(()=>window.check.render(0));const on=decodePNG(await page.locator('canvas').screenshot());
+  const first=await page.evaluate(()=>window.check.render(0));const on=await decodePNG(await page.locator('canvas').screenshot());
   assert(first.count>100,`${product} casts shadow pixels`);
   let darkened=0;for(let i=0;i<base.data.length;i+=4)if(on.data[i]+on.data[i+1]+on.data[i+2]<base.data[i]+base.data[i+1]+base.data[i+2])darkened++;
   assert(darkened>20,`${product} darkens the photographed HDR floor`);
