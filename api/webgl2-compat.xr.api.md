@@ -571,6 +571,9 @@ interface Extensions {
     readonly depthClamp: {
         DEPTH_CLAMP_EXT: number;
     } | null;
+    readonly polygonOffsetClamp: {
+        polygonOffsetClampEXT(factor: number, units: number, clamp: number): void;
+    } | null;
     readonly colorBufferFloat: boolean;
     readonly floatBlend: boolean;
     readonly floatLinear: boolean;
