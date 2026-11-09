@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { runSuite } from './support/shutdown.mjs';
 import { direct, iridescentFresnel, vec } from '../tests/support/khr-brdf.js';
 
 // Deterministic cases: a small LCG so every run checks the same inputs.
@@ -54,7 +55,7 @@ const browser = await openBrowser({ startPath: '/examples/khronos-gallery.html?m
   { page, hardware } = browser,
   errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
-try {
+await runSuite(async () => {
   await page.waitForSelector('body[data-ready]', { timeout: 120000 });
   const result = await page.evaluate(
     async ({ iridescenceCases, directCases }) => {
@@ -268,6 +269,4 @@ try {
     `direct BRDF differs from the spec reference by ${directError}`,
   );
   console.log('gltf-pro extended materials: real-GPU check passed');
-} finally {
-  await browser.close();
-}
+}, () => browser.close());

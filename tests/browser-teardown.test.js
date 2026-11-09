@@ -149,6 +149,23 @@ test('a Chromium browser has its processes ended before the close, whose own shu
   assert.deepEqual(steps, ['SystemInfo.getProcessInfo', 'end 1', 'close']);
 });
 
+test('owned Chromium cleanup releases a client waiting after native process termination', async () => {
+  let release;
+  const cleanup = new Promise((resolve) => (release = resolve));
+  const calls = [];
+  const browser = withBoundedClose({ close: async () => { calls.push('client'); await cleanup; } }, {
+    server: { kill: async () => { calls.push('owner'); release(); } },
+    end: () => assert.fail('external termination cannot settle the driver cleanup'),
+  });
+  try {
+    await closeAll({ browser, budgetMs: 500 });
+    assert.deepEqual(calls, ['owner', 'client']);
+  } finally {
+    // A regression must release its fake client too, so its own 30-second close does not hold the test open.
+    release();
+  }
+});
+
 test('Firefox and a browser already gone close the ordinary way', async () => {
   for (const fake of [
     { browserType: () => ({ name: () => 'firefox' }), isConnected: () => true },
