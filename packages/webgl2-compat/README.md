@@ -41,7 +41,8 @@ engine.render();
 context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
 the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
 objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
-WebGPU has an adapter it does nothing (it resolves `{ installed: false, reason: 'webgpu' }`) unless you pass
+WebGPU has an adapter it retains native WebGPU (it resolves `{ installed: false, reason: 'webgpu' }` and warns with
+a linked `MargoError` code `state`, explaining the choice) unless you pass
 `{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
 `unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
 back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end
@@ -505,7 +506,7 @@ Selection outlines and gltf-pro already refused on main before this change; the 
 for those two could not be reproduced with a real preview engine. Their regression uses an HTTP glTF
 fixture, verifies both refusals, proves loadCompat runs once and setup runs on both tiers, and checks
 red model pixels and magenta selection pixels on native and compatibility devices.
-The procedural texture baker's preview refusal is correct; it runs on the full layer.
+The former GPU-only baker correctly refused preview; current main also supplies a native fragment preview route. The full layer continues to run its compute route.
 
 Use the existing /auto example above and await asynchronous loads inside setup. Only an unsupported
 error during setup triggers escalation, and setup builds the scene again on a fresh canvas. Packages
@@ -517,3 +518,9 @@ tests/preview-refusal.test.js, packages/lod/test/preview.test.js and
 npm run check:preview-contract. The source gate is in verify, therefore in check:merge.
 It parses package pass owners and requires an attach-time unsupported refusal or a reviewed,
 tested preview route; it includes guarded work reached through class methods and shared helpers.
+
+### Choosing a tier explicitly
+
+The full layer is still a WebGPU-shaped device: after `await install({ force: true })`, use `Engine.create(canvas)` or `backend: 'webgpu'`. Setting `backend: 'webgl2'` selects the small preview, so it requires `fallback: webglRenderer` from `/preview`; without that renderer core already throws linked `unsupported`. Installing the full layer does not change that meaning. `autoEngine` imports the preview itself and escalates only for a coded setup refusal.
+
+The reported preview refusals for PostStack (21), Shadows (22), Video (26), VFX (29), Splats (30), Lighting2D/LayerCompositor (31) and CulledInstances (33) are covered by the package-tier browser test: direct preview refusal and one `loadCompat` escalation per attachment. Their full-layer rendering is covered by their package GPU suites. The current Gemini product, transition, particle and world pages force-install the full layer and leave the main engine on its default backend; their query-string badge does not identify the engine tier. The world's separate worker explicitly selects the small preview. The earlier report's actual no-device errors identify preview, not the full device. No silent blank was reproduced for Selection or gltf-pro.

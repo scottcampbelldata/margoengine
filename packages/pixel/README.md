@@ -294,3 +294,7 @@ console.log(sheet.frames.length); // 2; sheet.texture works as a SpriteLayer atl
 | `name` | `render3d-1`, ... | Plugin name, unique per scene |
 
 Every pixel is one colour of the view or the outline colour. For a palette, chain `PaletteQuantize` of `margoengine/pixel/palette`. `outlineMask` is the CPU form of the outline. `renderSpriteFrames` shoots a mesh at each turn about Y into one sheet and puts its rotation back.
+
+## Rendering tiers
+
+GPU attachments refuse the small `@margoengine/webgl2-compat/preview` engine during setup with linked `MargoError` code `unsupported`. Use native WebGPU, the full WebGL2 compatibility layer, or awaited [automatic escalation](../webgl2-compat/README.md#automatic-escalation). The package-tier browser regression checks refusal and escalation; the package GPU suite checks drawing on both complete tiers.

@@ -306,3 +306,7 @@ to the physical-correctness claims above until its known defects are resolved.
 Height lights accumulate into an owned `rgba16float` image and present once to the target. This retains contributions smaller than one target byte (100 lights at intensity .001 sum to .1); the HDR image is rebuilt on resize or device restoration.
 
 Direct-light bind groups use the current mask buffer and normal target every frame. Contiguous uniform fields are packed together; validation still checks every numeric field before rendering.
+
+## Rendering tiers
+
+GPU attachments refuse the small `@margoengine/webgl2-compat/preview` engine during setup with linked `MargoError` code `unsupported`. Use native WebGPU, the full WebGL2 compatibility layer, or awaited [automatic escalation](../webgl2-compat/README.md#automatic-escalation). The package-tier browser regression checks refusal and escalation; the package GPU suite checks drawing on both complete tiers.

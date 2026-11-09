@@ -271,3 +271,42 @@ test('createBindGroup refuses a buffer range below the minimum binding size or p
   assert.equal(fine.group.invalid, null);
   device.destroy();
 });
+
+// Explicit installation on a native WebGPU browser must explain why the renderer did not change.
+test('install keeps native WebGPU with a coded warning and forcing installs the full layer', async () => {
+  const { installCompat, uninstallCompat } = await import('../dist/device.js');
+  const saved = ['navigator', 'OffscreenCanvas'].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  const native = { requestAdapter: async () => ({}) };
+  const warnings = [];
+  const warn = console.warn;
+  Object.defineProperty(globalThis, 'navigator', { value: { gpu: native }, configurable: true });
+  globalThis.OffscreenCanvas = class {
+    getContext() {
+      return fakeContext();
+    }
+  };
+  console.warn = (value) => warnings.push(value);
+  try {
+    assert.deepEqual(await installCompat(), { installed: false, reason: 'webgpu' });
+    assert.equal(navigator.gpu, native);
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0].name, 'MargoError');
+    assert.equal(warnings[0].code, 'state');
+    assert.match(warnings[0].message, /force: true/);
+    assert.match(warnings[0].message, /backend 'webgpu'/);
+    assert.match(warnings[0].message, /https:\/\/margoengine.com\/errors#compatibility-layer/);
+    assert.equal((await installCompat({ force: true })).installed, true);
+    assert.notEqual(navigator.gpu, native);
+    assert.equal(warnings.length, 1, 'forced installation has no native-retained warning');
+  } finally {
+    uninstallCompat();
+    console.warn = warn;
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});

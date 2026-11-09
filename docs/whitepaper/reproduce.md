@@ -1467,3 +1467,5 @@ Batch 99 history/artifact landing: build the current workspace, run voxel-pathtr
 ### Preview attachment contract
 
 After `npm run build:packages`, run `npm run check:preview-contract` and `node --test --test-timeout=120000 tests/preview-contract.test.js tests/preview-refusal.test.js packages/lod/test/preview.test.js`. Run browser evidence under `node scripts/gpu-lock.mjs run --owner=preview-contract --max=15 -- node packages/webgl2-compat/test/package-tiers-browser.mjs`; add `--compat` to exercise the first scene on the full layer too. Results: `test-results/preview-package-tiers.json`. The fixture is a clean-room triangle embedded in an HTTP glTF, with selected magenta edges. No external asset or rival source is needed.
+
+The package-tier browser gate also covers Gemini entries 21, 22, 26, 29, 30, 31, 33 and the missing-fallback diagnostic (28). Run webgl2-compat/test/device.test.js after the package build for the native-retained install warning (27). The procedural preview route must finish without loading the compatibility layer.

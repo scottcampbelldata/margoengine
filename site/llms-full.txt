@@ -4725,7 +4725,9 @@ existing APIs without changing runtime behavior, exports or entry sizes.
 
 ## Optional packages on the small preview
 
-The small `/preview` engine has backend `webgl2` and no GPU device; the full WebGL2 compatibility layer exposes backend `webgpu`. GPU-only renderers refuse during setup with linked `unsupported`, allowing awaited `autoEngine` setup to escalate through `loadCompat`. Mesh/geometry LOD, screen UI, HTML, stats and picking via `/pick` retain their preview routes. Imposter levels and LOD fading require a complete tier. The texture baker runs under the full layer and correctly refuses the small preview. Selection and gltf-pro already refused; their reported silent blank was not reproduced. See `packages/webgl2-compat/test/package-tiers-browser.mjs` for pixel and escalation evidence and `scripts/check-preview-contract.mjs` for the merge gate. Core and stage source are unchanged.
+The small `/preview` engine has backend `webgl2` and no GPU device; the full WebGL2 compatibility layer exposes backend `webgpu`. GPU-only renderers refuse during setup with linked `unsupported`, allowing awaited `autoEngine` setup to escalate through `loadCompat`. Mesh/geometry LOD, screen UI, HTML, stats and picking via `/pick` retain their preview routes. Imposter levels and LOD fading require a complete tier. The texture baker runs under the full layer; current main also provides a native fragment baker on the small preview. Selection and gltf-pro already refused; their reported silent blank was not reproduced. See `packages/webgl2-compat/test/package-tiers-browser.mjs` for pixel and escalation evidence and `scripts/check-preview-contract.mjs` for the merge gate. Core and stage source are unchanged.
+
+Explicit install() retains an available native WebGPU adapter with a linked MargoError state warning, unless force is true. The full layer needs backend webgpu (or auto), while backend webgl2 requires a preview fallback. The added Gemini GPU attachments refuse preview and escalate; Lighting2D and LayerCompositor use the full device. The current procedural native fragment baker is a real preview route. No new hardware or performance claim is made.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -7789,7 +7791,8 @@ engine.render();
 context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
 the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
 objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
-WebGPU has an adapter it does nothing (it resolves `{ installed: false, reason: 'webgpu' }`) unless you pass
+WebGPU has an adapter it retains native WebGPU (it resolves `{ installed: false, reason: 'webgpu' }` and warns with
+a linked `MargoError` code `state`, explaining the choice) unless you pass
 `{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
 `unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
 back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end

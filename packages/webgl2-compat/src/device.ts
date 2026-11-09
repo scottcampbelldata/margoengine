@@ -141,7 +141,16 @@ export async function installCompat(options: InstallOptions = {}): Promise<Insta
   if (!nav) throw new TypeError('install() runs in a browser page: there is no navigator here');
   if (!options.force && nav.gpu) {
     const adapter = await nav.gpu.requestAdapter().catch(() => null);
-    if (adapter) return { installed: false, reason: 'webgpu' };
+    if (adapter) {
+      console.warn(
+        fault(
+          'state',
+          "install() kept native WebGPU; to test the full WebGL2 layer use install({ force: true }) then Engine.create() with backend 'webgpu', not 'webgl2'",
+          'compatibility-layer',
+        ),
+      );
+      return { installed: false, reason: 'webgpu' };
+    }
   }
   const caps = probeWebGL2();
   if (!caps) throw fault('unsupported', 'This browser has neither WebGPU nor WebGL2', 'compatibility-layer');

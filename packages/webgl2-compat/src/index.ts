@@ -188,7 +188,7 @@ let device: typeof import('./device.js') | undefined;
  * Installs the WebGL2 compatibility layer: `navigator.gpu` becomes a WebGPU-shaped GPU on WebGL2, `getContext('webgpu')`
  * on canvases returns its canvas context, the `GPUBufferUsage`-style flag objects are defined where missing, and the
  * WebGPU interface names (`GPUBuffer`, `GPUDevice` and the rest) name the layer's classes while it is installed, so
- * `instanceof GPUBuffer` holds for its objects. Core and the packages then run their WebGPU code unchanged. Does nothing where the browser's own WebGPU has an adapter,
+ * `instanceof GPUBuffer` holds for its objects. Core and the packages then run their WebGPU code unchanged. Retains native WebGPU with a linked state warning where the browser's own WebGPU has an adapter,
  * unless `force` is set. The device, back end and WGSL front end load here, on first call, so a page that only probes
  * never downloads them.
  * @param options See {@link InstallOptions}.

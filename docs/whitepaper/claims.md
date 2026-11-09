@@ -1911,3 +1911,5 @@ Batch 99 history/artifact landing evidence: 448 current controlled history cases
 ### Preview attachment refusal (2026-11-09)
 
 GPU-only optional renderers reject the small preview during setup with linked `unsupported`, so awaited `autoEngine` setup can load the full compatibility layer. Proof: `tests/preview-refusal.test.js`, `packages/lod/test/preview.test.js`, `packages/webgl2-compat/test/package-tiers-browser.mjs`; the latter verifies direct refusal, one compatibility load, two setup tiers, glTF/selection pixels and procedural bake readback. Selection and gltf-pro already refused on the baseline. Real CPU/GL preview routes stay available. No performance or additional hardware support claim.
+
+Preview continuation: package-tiers-browser.mjs explicitly covers PostStack, Shadows, Video, VFX, Splats, Lighting2D, LayerCompositor and CulledInstances refusal and escalation, plus the real procedural preview baker. device.test.js proves install() warns with a linked state code when retaining native WebGPU, and force installs without warning. These are correctness and diagnostic claims, with no speed claim.

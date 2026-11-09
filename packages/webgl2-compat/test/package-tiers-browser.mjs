@@ -83,7 +83,7 @@ try {
   await page.addInitScript(() => Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined }));
   await page.goto(browser.page.url());
   const tiers = await page.evaluate(async () => {
-    const { Engine, box } = await import('/packages/core/dist/index.js');
+    const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js');
     const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { autoEngine } = await import('/packages/webgl2-compat/dist/auto.js');
     const { Selection } = await import('/packages/selection/dist/index.js');
@@ -100,6 +100,14 @@ try {
     const { LODFade } = await import('/packages/lod/dist/fade.js');
     const { TerrainColors } = await import('/packages/terrain/dist/index.js');
     const { createTextureBaker } = await import('/packages/procedural/dist/textures.js');
+    const { PostStack } = await import('/packages/post/dist/index.js');
+    const { Shadows } = await import('/packages/shadows/dist/index.js');
+    const { Video } = await import('/packages/video/dist/index.js');
+    const { VFX } = await import('/packages/vfx/dist/index.js');
+    const { Splats } = await import('/packages/splats/dist/index.js');
+    const { LayerCompositor } = await import('/packages/pixel/dist/index.js');
+    const { Lighting2D } = await import('/packages/lighting2d/dist/index.js');
+    const { CulledInstances } = await import('/packages/culling/dist/index.js');
     const make = () => {
       const c = document.createElement('canvas');
       c.style.cssText = 'width:96px;height:64px';
@@ -165,8 +173,77 @@ try {
             wetDarkening: 0.5,
           }),
       ],
-      ['procedural', (e) => createTextureBaker(e)],
+      ['PostStack', (e) => PostStack.attach(e, { bloom: { intensity: 0.5 } })],
+      ['Shadows', (e) => Shadows.attach(e, { cascades: 3, resolution: 128 })],
+      ['Video', (e) => Video.attach(e, document.createElement('video'))],
+      ['VFX', (e) => VFX.attach(e, { capacity: 16, rate: 1 })],
+      [
+        'Splats',
+        (e) =>
+          Splats.attach(e, {
+            positions: new Float32Array([0, 0, 0]),
+            covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1]),
+            colors: new Float32Array([1, 0, 0, 1]),
+          }),
+      ],
+      ['LayerCompositor', (e) => LayerCompositor.attach(e, { camera: { width: 16, height: 16 } })],
+      [
+        'Lighting2D',
+        (e) => {
+          const layer = e.gpu ? LayerCompositor.attach(e, { camera: { width: 16, height: 16 } }).addLayer() : null;
+          return Lighting2D.attach(e, {
+            target: () => layer.texture,
+            ambient: '#ffffff',
+          });
+        },
+      ],
+      [
+        'CulledInstances',
+        (e) =>
+          CulledInstances.attach(
+            e,
+            [
+              {
+                geometry: box(),
+                material: new PbrMaterial(),
+                transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+              },
+            ],
+            { culling: 'frustum' },
+          ),
+      ],
     ];
+    let noFallback;
+    try {
+      await Engine.create(make(), options);
+    } catch (error) {
+      noFallback = { name: error.name, code: error.code, message: error.message };
+    }
+    if (noFallback?.code !== 'unsupported' || !noFallback.message.includes('fallback'))
+      throw new Error('backend webgl2 without a preview renderer must explain its coded refusal');
+    // The native fragment baker was added on main while this change was being checked.
+    // It is a real preview route and must not trigger automatic escalation.
+    const bakedPreview = await autoEngine(
+      make(),
+      async (e) => {
+        const baker = await createTextureBaker(e);
+        try {
+          const output = await baker.bake({ width: 16, height: 16 });
+          if (output.backend !== 'webgl2') throw new Error('Expected native preview texture');
+          output.dispose();
+        } finally {
+          baker.dispose();
+        }
+      },
+      {
+        ...options,
+        loadCompat: async () => {
+          throw new Error('Real preview baker must not escalate');
+        },
+      },
+    );
+    if (bakedPreview.backend !== 'webgl2') throw new Error('Baker left its real preview route');
+    bakedPreview.dispose();
     const results = [];
     for (const [name, attach] of attaches) {
       const direct = await Engine.create(make(), { ...options, fallback: webglRenderer });
