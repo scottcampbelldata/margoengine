@@ -11,6 +11,16 @@ import type {
 } from '@margoengine/voxel-pathtracer';
 import { buildTraceMeshes } from './mesh-build.js';
 import { meshSource } from './mesh-shader.js';
+import type { VoxelTraceFeature } from './compose-types.js';
+
+/** Mixed triangle geometry for a composed tracer. Wasm loads only during create/setScene. */
+export function triangleMeshes(): VoxelTraceFeature {
+  return Object.freeze({
+    id: 'mesh',
+    source: meshSource,
+    geometry: (scene: VoxelTraceScene, signal?: AbortSignal) => buildTraceMeshes(scene as MeshTraceScene, signal),
+  });
+}
 
 /** Indexed world-space triangles. Positions are copied; no engine mesh or loader is required. */
 export interface TraceTriangleMesh {

@@ -1,0 +1,92 @@
+<!doctype html><html><meta charset="utf-8"><title>Composed tracer regressions</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+import {resampledEmitters} from '/packages/voxel-pathtracer/dist/restir.js';
+import {triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {coloredMedia} from '/packages/voxel-pathtracer/dist/media.js';
+import {causticGuiding} from '/packages/voxel-pathtracer/dist/guiding.js';
+import {spectralTransport} from '/packages/voxel-pathtracer/dist/spectral.js';
+window.run=async(compat=false,phase='all')=>{
+ const progress=(phase,extra={})=>{window.progress={phase,...extra,ms:performance.now()};console.info('compose-progress '+JSON.stringify(window.progress));};
+ progress('backend-install',{compat});
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ progress('engine-create');
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const gpu=engineRuntime(engine).gpu,errors=[],messages=[],reports=[];
+ for(const method of ['createComputePipelineAsync','createRenderPipelineAsync']){
+  const original=gpu[method].bind(gpu);
+  gpu[method]=descriptor=>{
+   const entry=descriptor.compute?.entryPoint??descriptor.fragment?.entryPoint,label=descriptor.label;
+   progress('pipeline-start',{method,entry,label});
+   return original(descriptor).then(p=>{progress('pipeline-ready',{method,entry,label});return p;});
+  };
+ }
+ gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=gpu.createShaderModule.bind(gpu);
+ gpu.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(x=>x.type==='error').map(x=>x.message))));return m;};
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
+ const transform=(x,y,z,sx=1,sy=1,sz=1)=>[sx,0,0,0,0,sy,0,0,0,0,sz,0,x,y,z,1];
+ const scene={revision:1,models:[
+  {id:'light',revision:1,size:[1,1,1],voxels:new Uint8Array([1])},
+  {id:'fog',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}],
+  instances:[{id:'light',modelId:'light',matrix:transform(-8,-8,-2,16,16,1)},
+   {id:'fog',modelId:'fog',matrix:transform(-8,-8,1,16,16,1)}],
+  materials:[{id:1,type:'emit',color:[1,1,1],emission:1},
+   {id:2,type:'media',color:[0,0,0],density:0,extinction:[Math.log(2),Math.log(3),Math.log(4)]}],
+  meshes:[{id:'triangle',positions:new Float32Array([-8,-8,0,8,-8,0,0,8,0]),indices:new Uint32Array([0,1,2]),material:1}],
+  environment:{skyIntensity:0,sunIntensity:0}};
+ const factories=[resampledEmitters,triangleMeshes,coloredMedia,causticGuiding,spectralTransport];
+ const mean=im=>[0,1,2].map(c=>{let s=0;for(let i=c;i<im.color.length;i+=3)s+=im.color[i];return s/(im.color.length/3);});
+ const render=async(features,s=scene,samples=1)=>{
+  progress('tracer-create',{features:features.map(f=>f.id),samples});
+  const t=await ComposedVoxelPathTracer.create(engine,{scene:s,features,denoise:false,maxBounces:8});
+  try{progress('tracer-ready-wait');await t.ready;progress('render-image',{samples});const im=await t.renderImage({width:8,height:8,samples,seed:739,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});progress('render-complete');return im;}
+  finally{progress('tracer-dispose');t.dispose();progress('tracer-disposed');}
+ };
+ try{
+  const subsets=[];
+  for(let mask=0;mask<32;mask++){
+   progress('subset',{mask});
+   const selected=factories.filter((_,i)=>mask&(1<<i)).map(make=>make()).reverse();
+   const im=await render(selected);
+   const expected=mask&4?[0.5,1/3,0.25]:[1,1,1];
+   subsets.push({mask,actual:mean(im),expected,finite:im.color.every(Number.isFinite),
+    firstBoundary:im.instance.every(id=>id===1)});
+  }
+  const noFog=structuredClone(scene);noFog.instances.pop();
+  const triangleImage=await render(factories.map(make=>make()),noFog);
+  const triangleMarker=triangleImage.instance.every(id=>id<=-4);
+  if(phase==='ids'){await Promise.all(reports);return {subsets,triangleMarker,errors,messages};}
+  // The RIS helper is inserted before media vectorizes shadow(), and before mesh
+  // adds marker branches. Exercise all three in reflected direct light, not only camera attenuation.
+  const s=structuredClone(scene);
+  s.materials[0]={id:1,type:'diffuse',color:[1,1,1]};
+  s.materials.push({id:3,type:'emit',color:[1,1,1],emission:1});
+  s.models[0].voxels[0]=1;
+  s.instances[0].matrix=transform(-8,-8,-1,16,16,1);
+  s.models.push({id:'ceiling',revision:1,size:[1,1,1],voxels:new Uint8Array([3])});
+  // Light behind the camera, fog on its shadow segment; a remote triangle remains live in the BVH.
+  s.instances.push({id:'ceiling',modelId:'ceiling',matrix:transform(-8,-8,5,16,16,1)});
+  s.meshes[0].positions=new Float32Array([20,-8,0,28,-8,0,24,8,0]);
+  const other=[triangleMeshes(),coloredMedia(),causticGuiding(),spectralTransport()];
+  progress('reflected');
+  const reference=await render(other,s,4096),actual=await render([resampledEmitters(),...other],s,2048);
+  const reflected={reference:mean(reference),actual:mean(actual),finite:actual.color.every(Number.isFinite)};
+  // Scene replacement must change both palette conversion and geometry, then restoration
+  // must use that same converted scene rather than the caller's mutated arrays.
+  const t=await ComposedVoxelPathTracer.create(engine,{scene,features:factories.map(make=>make()),denoise:false});
+  progress('update');
+  let update;
+  try{
+   await t.ready;const next=structuredClone(scene);next.revision=2;
+   next.materials[1].extinction=[0,0,0];next.meshes[0].positions[2]=0.25;
+   const pending=t.setScene(next);next.materials[1].extinction.fill(100);await pending;
+   const im=await t.renderImage({width:8,height:8,samples:1,jitter:false,signal:AbortSignal.timeout(120000)});
+   update={actual:mean(im),revision:t.stats.sceneRevision};
+  }finally{t.dispose();}
+  await Promise.all(reports);return {subsets,triangleMarker,reflected,update,errors,messages};
+ }finally{progress('engine-dispose');engine.dispose();progress('engine-disposed');}
+};
+window.ready=true;
+</script></html>

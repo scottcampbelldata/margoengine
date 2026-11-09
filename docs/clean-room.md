@@ -3204,3 +3204,38 @@ zero-added-reconstruction-error comparator is not an encoded BC output and
 not a universal lower bound on original-source SSE. No runtime fitting,
 fourth scalar campaign, tolerance change or bar adoption. Scott's ruling is
 pending; other targets continue under the existing bars.
+
+## Review 99 optional tracer composition
+
+Sources compared before implementation:
+- Yong He, Theresa Foley, Teguh Hofstee, Haomin Long and Kayvon Fatahalian,
+  Shader Components: Modular and High Performance Shader Development, 2017,
+  https://graphics.cs.cmu.edu/projects/shadercomp/he17_shadercomp.pdf.
+- Yong He, Kayvon Fatahalian and Theresa Foley, Slang: Language Mechanisms for
+  Extensible Real-time Shading Systems, 2018, sections 2.6, 3.2 and 4.1-4.3,
+  https://d1qx31qr3h6wln.cloudfront.net/publications/he18_slang.pdf.
+- Eric Veach, Robust Monte Carlo Methods for Light Transport Simulation, 1997,
+  chapter 9, https://www-graphics.stanford.edu/papers/veach_thesis/.
+
+The component paper couples specialization with parameter ownership. Slang
+adds an explicit interface contract and static specialization of selected
+effects. Margo keeps its WGSL generator, with typed per-entry transforms plus
+scene-conversion/storage hooks. The compositor imports no effect implementation;
+users import factories from optional entries. A fixed transform order resolves
+the shared shadow and march edits. Media conversion happens before mesh storage
+preparation on every snapshot; one lifecycle owns both. Veach's estimator
+partition still applies: unsampled triangle emitters retain path-hit weight,
+and RIS directional candidates must reject triangle markers before voxel-frame
+lookup. This composition does not implement triangle NEE or expand guide tables.
+Only papers and Margo sources were read; no companion or foreign engine code.
+
+Composition startup attribution compared the W3C GPU for the Web Working Group,
+WebGPU (2026), createComputePipelineAsync and createRenderPipelineAsync,
+https://www.w3.org/TR/webgpu/#async-pipeline-creation , with Jie Chen, Geoff Lang
+and the Khronos WebGL Working Group, KHR_parallel_shader_compile (2020 revision 6),
+https://registry.khronos.org/webgl/extensions/KHR_parallel_shader_compile/ .
+Async readiness and nonblocking completion queries do not establish where an
+uninstrumented older run spent its time. Log pipeline promises, tracer readiness,
+capture and teardown separately; retain all transport checks and hard limits.
+The Vulkan continuation and native Dawn README diagnostic are distinct from
+lane-U's D3D11 compiler work. No foreign implementation was read.

@@ -1886,7 +1886,7 @@ Review 99 root voxel-glass correction: duplicate unchanged inverse Snell directi
 
 Uncertain ray-space edge determinants use exact integer product subtraction, with no geometric edge dilation. Transformed coordinates and transport remain Float32; no universal watertightness, ill-conditioned triangle, production-asset or outside-renderer equality claim. Builds copy caller arrays and check cancellation around synchronous Rust work; a worker is needed to interrupt that work in flight. setScene rebuilds all triangle geometry.
 
-Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method measures 22,954 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,808 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 81,091 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,924 B gzip, below the strict 25,000 B cap.
+Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method now measures 23,021 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,888 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 81,091 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,924 B gzip, below the strict 25,000 B cap.
 
 ### Complete Potree README folder evidence (2026-11-09)
 
@@ -1966,12 +1966,12 @@ Lens settings are immutable at attachment: lensAbbe 0 or 5-200 (default 0), foca
 units (default 0.05). Only camera projection with nonzero aperture uses longitudinal chromatic power.
 There is no lateral colour, physical lens stack, diffraction, lens transmission or measured optical
 fidelity. Slope correction permits virtual/infinite wavelength focus without singular division.
-One sample uses one traversal; no equal-cost convergence or speed claim. Independent optional
-tracer subclasses are not combined by this entry. Root glass and sampling limitations still apply.
+One sample uses one traversal; no equal-cost convergence or speed claim. The spectralTransport factory
+combines this entry with the other optional tracing features through /compose. Root glass and sampling limitations still apply.
 
 Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
-plain WebGL2 gives linked unsupported. The corrected entry measures 1083 B gzip (previously 1541 B,
-ceiling 1797 B), with inherited root 81091 B gzip. Core plus stage stays 23924 B gzip, under 25,000 B.
+plain WebGL2 gives linked unsupported. The spectral transport repair measured 1083 B gzip (previously 1541 B);
+its composition factory brings the current entry to 1215 B (unchanged ceiling 1797 B), with inherited root 81091 B gzip. Core plus stage stays 23924 B gzip, under 25,000 B.
 
 ## Rectangular building grammar (LIM-642)
 
@@ -2723,3 +2723,27 @@ Support hashes change to identify the restored readable bytes: keep each asset
 bundle with the support manifest it names and review any existing-project
 support replacement separately. No native Unity execution or speed claim.
 Research and exact byte/digest regressions: [size restoration](size-restore.md).
+
+### Optional tracer composition (Review 99)
+
+The /compose entry accepts any subset of resampling, mesh, media, guiding and
+spectral features, once each; [] is the default root transport. Factory defaults
+and bounds match the standalone entries. Transform order is fixed in that order,
+independent of caller order. Feature settings are immutable. Scene replacement
+copies inputs before awaiting geometry, converts RGB media palettes, rebuilds
+mesh storage and applies updates atomically in call order. Existing storage,
+triangle/glass, guide-table and capture limits remain. Triangles are not added
+to the voxel deflector table or emissive light list by composition; full-scene
+mesh work remains open. No throughput or general convergence claim.
+
+Measured bare-peer min+gzip: compose 1333 B (new), resampling 1934 -> 2045 B,
+guiding 2535 -> 2644 B, media 1954 -> 2000 B, mesh 22954 -> 23021 B,
+spectral 1083 -> 1215 B. Root remains 81091 B; core + stage remains 23924 B.
+The small additions expose shared transforms instead of importing all effects
+into the compositor. Existing optional ceilings are unchanged; the new compose
+entry has its own 1589 B ceiling. Native transport/AOV evidence is retained;
+WebGL2/Vulkan now passes all 32 subsets, IDs, RGB RIS shadows and atomic replacement
+inside the unchanged 12-minute lease. The isolated resampled README diagnostic
+passes 20 seconds on Dawn, with trace compile 15.5 seconds and capture 0.13 seconds;
+the actual runner selection also passes 1/1 at its unchanged deadline. No deadline or numeric bound changed.
+This is startup attribution only; it does not measure release throughput.

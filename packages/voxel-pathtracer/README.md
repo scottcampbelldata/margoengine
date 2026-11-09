@@ -42,6 +42,63 @@ tracer.enabled = false; // back to the raster frame, bit for bit
 tracer.dispose();
 ```
 
+## Combining optional tracing features
+
+`margoengine/voxel-pathtracer/compose` (or `@margoengine/voxel-pathtracer/compose`) exports
+`ComposedVoxelPathTracer`. Import feature factories from the entries you need and pass any subset,
+including an empty array. The original standalone tracers remain available.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
+import { resampledEmitters } from 'margoengine/voxel-pathtracer/restir';
+import { causticGuiding } from 'margoengine/voxel-pathtracer/guiding';
+import { coloredMedia } from 'margoengine/voxel-pathtracer/media';
+import { triangleMeshes } from 'margoengine/voxel-pathtracer/mesh';
+import { spectralTransport } from 'margoengine/voxel-pathtracer/spectral';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 1, 4], target: [0, 0, 0]},
+});
+const tracer = await ComposedVoxelPathTracer.create(engine, {
+  scene: {
+    revision: 1, models: [], instances: [],
+    materials: [{id: 1, type: 'diffuse', color: [0.3, 0.6, 0.8]}],
+    meshes: [{id: 'panel', material: 1,
+      positions: new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]),
+      indices: new Uint32Array([0, 1, 2])}],
+    environment: {skyColor: [0.7, 0.8, 1], sunIntensity: 3},
+  },
+  features: [resampledEmitters(), causticGuiding(), coloredMedia(), triangleMeshes(), spectralTransport()],
+  signal: AbortSignal.timeout(30_000),
+});
+engine.start();
+window.addEventListener('pagehide', () => { tracer.dispose(); engine.dispose(); }, {once: true});
+```
+
+Defaults are `features: []`, 8 resampling candidates, guiding strength 0.5, an achromatic spectral
+lens and focal length 0.05 world units. Options on a feature are fixed at creation and use the same
+validators as the standalone entry. Factory settings must be an object; arrays and primitive values
+reject. Duplicate features reject before GPU allocation. Array order
+does not affect the result: transforms always run resampling, mesh, media, guiding, then spectral.
+Only selected entries are imported; mesh Wasm loads during geometry preparation, with abort support.
+RGB palette conversion precedes geometry preparation on every `create` and asynchronous `setScene`.
+Updates copy caller arrays immediately, apply in call order and replace the scene atomically.
+`whenIdle`, captures, viewport rendering, device restoration and disposal retain the root contracts.
+
+| Entry | Factory | Feature options |
+| --- | --- | --- |
+| `/restir` | `resampledEmitters()` | `candidates: 1..64`, default 8 |
+| `/guiding` | `causticGuiding()` | `guideStrength: 0..0.95`, default 0.5 |
+| `/media` | `coloredMedia()` | RGB `extinction` on scene media materials |
+| `/mesh` | `triangleMeshes()` | `meshes` on the scene |
+| `/spectral` | `spectralTransport()` | `lensAbbe: 0` or `5..200`, default 0; `focalLength: 1e-6..1e6`, default 0.05 |
+
+Composition retains each feature's documented transport limits. Triangle emission currently uses
+path hits; emissive-triangle light sampling and triangle-bound caustic guiding remain gaps recorded
+in `docs/known-bugs.md`. `tests/compose-browser.mjs` checks all 32 subsets, RGB media with RIS and
+triangle markers on native WebGPU and WebGL2 compatibility.
+
 ## Resampled emissive lighting
 
 `margoengine/voxel-pathtracer/restir` (or `@margoengine/voxel-pathtracer/restir`) exports

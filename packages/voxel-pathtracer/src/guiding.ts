@@ -1,11 +1,26 @@
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { VoxelPathTracer, type VoxelPathTracerOptions } from '@margoengine/voxel-pathtracer';
+import { validateFeatureOptions, type VoxelTraceFeature } from './compose-types.js';
 
 /** Options for the optional bounding-box caustic path guide. */
 export interface GuidedVoxelPathTracerOptions extends VoxelPathTracerOptions {
   /** Share of diffuse continuation directions drawn toward glass/mirror bounds, 0 to 0.95. Default 0.5. */
   guideStrength?: number;
+}
+
+function strengthValue(guideStrength: number): number {
+  if (typeof guideStrength !== 'number') throw new TypeError('GuidedVoxelPathTracer guideStrength must be a number');
+  if (!Number.isFinite(guideStrength) || guideStrength < 0 || guideStrength > 0.95)
+    throw new RangeError('GuidedVoxelPathTracer guideStrength must be finite and between 0 and 0.95');
+  return guideStrength;
+}
+
+/** Bounding-box caustic guiding for a composed tracer. Default strength 0.5; 0 disables guiding. */
+export function causticGuiding(options: Pick<GuidedVoxelPathTracerOptions, 'guideStrength'> = {}): VoxelTraceFeature {
+  validateFeatureOptions(options, 'causticGuiding');
+  const guideStrength = strengthValue(options.guideStrength === undefined ? 0.5 : options.guideStrength);
+  return Object.freeze({ id: 'guiding', source: (source: string) => guidedSource(source, guideStrength) });
 }
 
 /**
@@ -21,9 +36,7 @@ export class GuidedVoxelPathTracer extends VoxelPathTracer {
     if (!options || typeof options !== 'object')
       throw new TypeError('GuidedVoxelPathTracer.attach expects (engine, {scene, ...options})');
     const { guideStrength = 0.5, ...rest } = options;
-    if (typeof guideStrength !== 'number') throw new TypeError('GuidedVoxelPathTracer guideStrength must be a number');
-    if (!Number.isFinite(guideStrength) || guideStrength < 0 || guideStrength > 0.95)
-      throw new RangeError('GuidedVoxelPathTracer guideStrength must be finite and between 0 and 0.95');
+    strengthValue(guideStrength);
     super(rest);
     this.guideStrength = guideStrength;
   }
@@ -34,29 +47,33 @@ export class GuidedVoxelPathTracer extends VoxelPathTracer {
   }
 
   protected override tracingSource(): string {
-    const source = super.tracingSource();
-    if (this.guideStrength === 0) return source;
-    const edits = [
-      [
-        'let e=evalAt(kind,m,n,wo,wi,lobes);',
-        'var e=evalAt(kind,m,n,wo,wi,lobes);if(kind==0u&&air&&guideable(m)){e.pdf=guidePdf(o,n,wi);}',
-      ],
-      ['let s=sampleSurface(m,n,wo,etaI);', 'let s=guidedSurface(m,n,wo,etaI,p+off,inAir);'],
-      ['var medium=0u;var mInst=NONE;', 'var guideRoulette=1.0;var medium=0u;var mInst=NONE;'],
-      [
-        '\n  thr*=s.w;\n  if(s.transmit){',
-        '\n  if(inAir&&guideable(m)&&guideCount()>0u){guideRoulette=clamp(guideRoulette*s.pdf/max(dot(n,s.wi)*INV_PI,1e-20),1e-20,1e20);}\n  thr*=s.w;\n  if(s.transmit){',
-      ],
-    ];
-    if (edits.some(([original]) => !source.includes(original)))
-      throw new MargoError(
-        'state',
-        'Caustic guiding kernel does not match this tracer; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
-      );
-    let result = source;
-    for (const [original, replacement] of edits) result = result.replace(original, replacement);
-    result = result.replaceAll('roulette(&thr,bounces)', 'guidedRoulette(&thr,bounces,guideRoulette)');
-    const helpers = /* wgsl */ `
+    return guidedSource(super.tracingSource(), this.guideStrength);
+  }
+}
+
+function guidedSource(source: string, guideStrength: number): string {
+  if (guideStrength === 0) return source;
+  const edits = [
+    [
+      'let e=evalAt(kind,m,n,wo,wi,lobes);',
+      'var e=evalAt(kind,m,n,wo,wi,lobes);if(kind==0u&&air&&guideable(m)){e.pdf=guidePdf(o,n,wi);}',
+    ],
+    ['let s=sampleSurface(m,n,wo,etaI);', 'let s=guidedSurface(m,n,wo,etaI,p+off,inAir);'],
+    ['var medium=0u;var mInst=NONE;', 'var guideRoulette=1.0;var medium=0u;var mInst=NONE;'],
+    [
+      '\n  thr*=s.w;\n  if(s.transmit){',
+      '\n  if(inAir&&guideable(m)&&guideCount()>0u){guideRoulette=clamp(guideRoulette*s.pdf/max(dot(n,s.wi)*INV_PI,1e-20),1e-20,1e20);}\n  thr*=s.w;\n  if(s.transmit){',
+    ],
+  ];
+  if (edits.some(([original]) => !source.includes(original)))
+    throw new MargoError(
+      'state',
+      'Caustic guiding kernel does not match this tracer; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
+    );
+  let result = source;
+  for (const [original, replacement] of edits) result = result.replace(original, replacement);
+  result = result.replaceAll('roulette(&thr,bounces)', 'guidedRoulette(&thr,bounces,guideRoulette)');
+  const helpers = /* wgsl */ `
 // Sampling a small bound lowers throughput by its directional importance weight.
 // Do not immediately discard that variance gain at the next dielectric exit.
 // Roulette's probability may be chosen freely; its actual survival divides throughput.
@@ -115,13 +132,13 @@ fn guidePdf(o:vec3f,n:vec3f,wi:vec3f)->f32 {
  if(count==0u){return base;}
  var pdf=0.0;
  for(var k=0u;k<count;k++){pdf+=boxPdf(o,wi,guideBox(o,k))/f32(count);}
- return ${(1 - this.guideStrength).toPrecision(9)}*base+${this.guideStrength.toPrecision(9)}*pdf;
+ return ${(1 - guideStrength).toPrecision(9)}*base+${guideStrength.toPrecision(9)}*pdf;
 }
 fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
  let count=guideCount();
  if(!air||!guideable(m)||count==0u){return sampleSurface(m,n,wo,etaI);}
  var s:Bounce;
- if(rand()<${this.guideStrength.toPrecision(9)}){
+ if(rand()<${guideStrength.toPrecision(9)}){
   let k=min(u32(rand()*f32(count)),count-1u);let g=guideBox(o,k);
   var pick=rand()*g.total;var selected=0u;
   for(var face=0u;face<6u;face++){
@@ -147,9 +164,5 @@ fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
  return s;
 }
 `;
-    return result.replace(
-      '@compute @workgroup_size(8,8) fn trace',
-      helpers + '\n@compute @workgroup_size(8,8) fn trace',
-    );
-  }
+  return result.replace('@compute @workgroup_size(8,8) fn trace', helpers + '\n@compute @workgroup_size(8,8) fn trace');
 }

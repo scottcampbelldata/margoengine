@@ -31,6 +31,8 @@ export interface MediaVoxelPathTracerOptions extends Omit<VoxelPathTracerOptions
     scene: MediaTraceScene;
 }
 
+export function coloredMedia(): VoxelTraceFeature;
+
 // Not exported from this entry, but used by the exports above:
 
 type ResolvedTraceOptions = Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits' | 'edges' | 'grid'> & {
@@ -273,6 +275,15 @@ interface VoxelTraceCaptureOptions {
     denoise?: boolean;
     transparent?: boolean;
 }
+
+interface VoxelTraceFeature {
+    readonly id: VoxelTraceFeatureId;
+    readonly source: (source: string) => string;
+    readonly scene?: (scene: VoxelTraceScene) => VoxelTraceScene;
+    readonly geometry?: (scene: VoxelTraceScene, signal?: AbortSignal) => Promise<Uint32Array>;
+}
+
+type VoxelTraceFeatureId = 'resampling' | 'mesh' | 'media' | 'guiding' | 'spectral';
 
 interface VoxelTraceHit {
     readonly instanceId: string;

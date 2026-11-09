@@ -3648,32 +3648,36 @@
         "gzip": 81091
       },
       "./restir": {
-        "raw": 4182,
-        "gzip": 1934
+        "raw": 4464,
+        "gzip": 2045
+      },
+      "./compose": {
+        "raw": 3391,
+        "gzip": 1333
       },
       "./studio": {
         "raw": 2228,
         "gzip": 1047
       },
       "./guiding": {
-        "raw": 5736,
-        "gzip": 2535
+        "raw": 6011,
+        "gzip": 2644
       },
       "./sky": {
         "raw": 313,
         "gzip": 212
       },
       "./media": {
-        "raw": 4661,
-        "gzip": 1954
+        "raw": 4770,
+        "gzip": 2000
       },
       "./mesh": {
-        "raw": 54809,
-        "gzip": 22954
+        "raw": 54989,
+        "gzip": 23021
       },
       "./spectral": {
-        "raw": 2364,
-        "gzip": 1083
+        "raw": 2823,
+        "gzip": 1215
       }
     },
     "@margoengine/water": {

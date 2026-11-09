@@ -1,5 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
+import type { VoxelTraceFeature } from './compose-types.js';
 import {
   VoxelPathTracer,
   type VoxelPathTracerOptions,
@@ -70,6 +71,11 @@ function scene(input: MediaTraceScene): VoxelTraceScene {
   };
 }
 
+/** RGB free-flight and shadow transport, including palette conversion on every composed scene update. */
+export function coloredMedia(): VoxelTraceFeature {
+  return Object.freeze({ id: 'media', source: mediaSource, scene });
+}
+
 /**
  * RGB free-flight mixture sampling and exact piecewise Beer-Lambert shadow integration.
  * The voxel palette supplies heterogeneous coefficients; no density resampling,
@@ -93,46 +99,51 @@ export class MediaVoxelPathTracer extends VoxelPathTracer {
   }
 
   protected override tracingSource(): string {
-    let source = super.tracingSource();
-    const edit = (from: string, to: string) => {
-      if (!source.includes(from))
-        throw new MargoError(
-          'state',
-          'Media kernel mismatch; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
-        );
-      source = source.replace(from, to);
-    };
-    // Vectorize the existing exact voxel shadow walk. Sentinel tests still
-    // distinguish an opaque obstruction from arbitrarily dense coloured media.
-    const vectorize = (start: string, end: string, depth: string) => {
-      const a = source.indexOf(start),
-        b = source.indexOf(end, a);
-      if (a < 0 || b < a)
-        throw new MargoError(
-          'state',
-          'Media shadow kernel mismatch; see https://margoengine.com/errors#voxel-pathtracer',
-        );
-      const original = source.slice(a, b);
-      let result = original
-        .replace('->f32 {', '->vec3f {')
-        .replaceAll('return -1.0;', 'return vec3f(-1.0);')
-        .replaceAll('return 0.0;', 'return vec3f(0.0);')
-        .replaceAll('return 1.0;', 'return vec3f(1.0);')
-        .replaceAll('if(k<0.0)', 'if(k.x<0.0)')
-        .replaceAll('if(x<0.0)', 'if(x.x<0.0)');
-      result = result.replace(`var ${depth}=0.0;`, `var ${depth}=vec3f(0.0);`);
-      edit(original, result);
-    };
-    edit('fn extinction(v:u32,own:bool)->f32 {', 'fn extinction(v:u32,own:bool)->vec3f {');
-    edit('return select(-1.0,x.x,(fl&MEDIA)', 'return select(vec3f(-1.0),x.x*mat(v*MV+4u).yzw,(fl&MEDIA)');
-    vectorize('fn marchShadow(', '// A surface of another instance', 'depth');
-    vectorize('fn shadow(', 'fn unitAxis(', 'tau');
-    edit('if(v>0.0){L+=e.f*radiance*v*', 'if(any(v>vec3f(0.0))){L+=e.f*radiance*v*');
-    edit('exp(-(md.absorb+md.sigma)*min(h.t,1e30))', 'exp(-mediaExtinction(wMedium)*min(h.t,1e30))');
-    // Preserve the scalar kernel exactly for neutral media and all glass.
-    edit(
-      'if(medium!=0u){\n   let md=mediumOf(medium);',
-      `if(medium!=0u){
+    return mediaSource(super.tracingSource());
+  }
+}
+
+function mediaSource(input: string): string {
+  let source = input;
+  const edit = (from: string, to: string) => {
+    if (!source.includes(from))
+      throw new MargoError(
+        'state',
+        'Media kernel mismatch; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
+      );
+    source = source.replace(from, to);
+  };
+  // Vectorize the existing exact voxel shadow walk. Sentinel tests still
+  // distinguish an opaque obstruction from arbitrarily dense coloured media.
+  const vectorize = (start: string, end: string, depth: string) => {
+    const a = source.indexOf(start),
+      b = source.indexOf(end, a);
+    if (a < 0 || b < a)
+      throw new MargoError(
+        'state',
+        'Media shadow kernel mismatch; see https://margoengine.com/errors#voxel-pathtracer',
+      );
+    const original = source.slice(a, b);
+    let result = original
+      .replace('->f32 {', '->vec3f {')
+      .replaceAll('return -1.0;', 'return vec3f(-1.0);')
+      .replaceAll('return 0.0;', 'return vec3f(0.0);')
+      .replaceAll('return 1.0;', 'return vec3f(1.0);')
+      .replaceAll('if(k<0.0)', 'if(k.x<0.0)')
+      .replaceAll('if(x<0.0)', 'if(x.x<0.0)');
+    result = result.replace(`var ${depth}=0.0;`, `var ${depth}=vec3f(0.0);`);
+    edit(original, result);
+  };
+  edit('fn extinction(v:u32,own:bool)->f32 {', 'fn extinction(v:u32,own:bool)->vec3f {');
+  edit('return select(-1.0,x.x,(fl&MEDIA)', 'return select(vec3f(-1.0),x.x*mat(v*MV+4u).yzw,(fl&MEDIA)');
+  vectorize('fn marchShadow(', '// A surface of another instance', 'depth');
+  vectorize('fn shadow(', 'fn unitAxis(', 'tau');
+  edit('if(v>0.0){L+=e.f*radiance*v*', 'if(any(v>vec3f(0.0))){L+=e.f*radiance*v*');
+  edit('exp(-(md.absorb+md.sigma)*min(h.t,1e30))', 'exp(-mediaExtinction(wMedium)*min(h.t,1e30))');
+  // Preserve the scalar kernel exactly for neutral media and all glass.
+  edit(
+    'if(medium!=0u){\n   let md=mediumOf(medium);',
+    `if(medium!=0u){
    let md=mediumOf(medium);
    let st=mediaExtinction(medium);
    if(md.media&&any(st!=st.xxx)){
@@ -160,9 +171,9 @@ export class MediaVoxelPathTracer extends VoxelPathTracer {
      }else{thr*=relative/(dot(relative,vec3f(1.0))/3.0);}
     }
    }else{`,
-    );
-    edit('if(!scatter){thr*=exp(-md.absorb*h.t);}\n  }', 'if(!scatter){thr*=exp(-md.absorb*h.t);}\n   }\n  }');
-    const helpers = /* wgsl */ `
+  );
+  edit('if(!scatter){thr*=exp(-md.absorb*h.t);}\n  }', 'if(!scatter){thr*=exp(-md.absorb*h.t);}\n   }\n  }');
+  const helpers = /* wgsl */ `
 fn mediaExtinction(id:u32)->vec3f {
  let m=material(id);
  if((m.flags&MEDIA)!=0u){return m.density*m.metalColor;}
@@ -176,7 +187,6 @@ fn mediaIntegral(sigma:vec3f,d:f32)->vec3f {
  return select((vec3f(1.0)-exp(-tau))/sigma,series,tau<vec3f(0.001));
 }
 `;
-    edit('@compute @workgroup_size(8,8) fn trace', helpers + '\n@compute @workgroup_size(8,8) fn trace');
-    return source;
-  }
+  edit('@compute @workgroup_size(8,8) fn trace', helpers + '\n@compute @workgroup_size(8,8) fn trace');
+  return source;
 }

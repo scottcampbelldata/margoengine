@@ -31,6 +31,10 @@
       "types": "./dist/restir.d.ts",
       "import": "./dist/restir.js"
     },
+    "./compose": {
+      "types": "./dist/compose.d.ts",
+      "import": "./dist/compose.js"
+    },
     "./studio": {
       "types": "./dist/studio.d.ts",
       "import": "./dist/studio.js"
@@ -91,6 +95,8 @@
     "test:mesh-kernel": "node scripts/build-mesh.mjs --test",
     "test:gpu:mesh": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-browser.mjs",
     "test:gpu:spectral": "cd ../.. && node packages/voxel-pathtracer/tests/spectral-browser.mjs",
+    "test:gpu:compose-native": "cd ../.. && node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native",
+    "test:gpu:compose-compat": "cd ../.. && node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=compat",
     "test:gpu:parity-gamma": "cd ../.. && node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs",
     "test:gpu:history-taps": "cd ../.. && node packages/voxel-pathtracer/tests/history-taps-browser.mjs"
   },
@@ -107,6 +113,8 @@
       "test:gpu:media": 10,
       "test:gpu:mesh": 10,
       "test:gpu:spectral": 10,
+      "test:gpu:compose-native": 12,
+      "test:gpu:compose-compat": 12,
       "test:gpu:parity-gamma": 6,
       "test:gpu:history-taps": 6
     }

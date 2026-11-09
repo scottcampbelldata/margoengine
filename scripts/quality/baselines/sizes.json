@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11817866,
+  "total": 11819455,
   "history": [
     {
       "date": "2026-10-24",
@@ -5192,6 +5192,12 @@
       "commit": "fc20cdca6",
       "grew": 1,
       "reason": "Size restoration finding 7: exporters/unity 40965 to 50038 B gzip; ceiling 42194 to 51540. Deliver canonical C# comments/layout and remove the partial compactor. Keeping source embedded avoids runtime fetch/module/deployment complexity only to save optional bytes. No root/core/stage growth."
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "8ca1632cb",
+      "reason": "Review 99: new optional composition entry, 0 to 1333 B gzip plus 256 B headroom. Shared feature transforms avoid loading unselected effects. Core plus stage stays 23924 B; splitting lifecycle ownership would duplicate scene and storage work.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6174,6 +6180,7 @@
     "@margoengine/bvh/alpha-triangles": 1381,
     "@margoengine/shadows/rt-alpha": 8816,
     "@margoengine/webgl2-compat/tiers": 107679,
-    "@margoengine/staging/ground": 9363
+    "@margoengine/staging/ground": 9363,
+    "@margoengine/voxel-pathtracer/compose": 1589
   }
 }

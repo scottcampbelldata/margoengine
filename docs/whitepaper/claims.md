@@ -2284,3 +2284,16 @@ embedded and delivered payload, manifest length and SHA-256, and a syntax-rich
 generator fixture. Existing support bundle tests retain archive determinism
 and content hashes. This is a source-preservation claim; no new native Unity
 execution or speed claim follows. Research and bytes: size-restore.md, limits.md.
+
+## Review 99 optional tracer composition
+
+The /compose entry accepts all 32 subsets of the existing five optional tracing
+features with deterministic transform order and their existing validators.
+The same pure transforms power standalone and composed tracers. CPU regressions
+check exact single-feature shader equality, lifecycle and scene/storage updates.
+Retained native transport/AOV evidence and the failed-only WebGL2/Vulkan run
+cover all 32 subsets, RGB attenuation, first-boundary/triangle IDs, RGB RIS shadows
+and atomic updates: results/review-99-compose-20261109.json. The unchanged
+12-minute compatibility limit passes. The earlier timeout has no phase record.
+No general rendering fidelity, compile-time guarantee or equal-cost convergence
+claim follows. Triangle sampling and mesh-deflector guiding remain open.

@@ -1830,3 +1830,18 @@ Input hashes and per-image/pair results are written to the JSON evidence.
 Use an external hard process-tree timeout, 240 seconds for the retained corpus.
 This is a zero-added-reconstruction-error diagnostic, not BC bitstream output
 or a universal source-error lower bound. Both current bars stay unchanged.
+
+## Review 99 optional tracer composition
+
+Build voxel-pathtracer and the generated umbrella entries, then run
+`node --test packages/voxel-pathtracer/tests/compose.test.js`.
+Real-GPU command: `node scripts/gpu-lock.mjs run --owner=review-99-compose
+--wait-max=60 --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`
+(join the command onto one line), then the same command with --backend=compat.
+Each backend runs under its own bounded lease, one at a time. Reports are
+test-results/voxel-pathtracer-compose-{native,compat}-all.json. The --phase=ids
+option reruns only the AOV checks after a fixture correction, preserving transport evidence.
+The page checks all 32 subsets against analytic Beer attenuation, triangle ids,
+atomic scene replacement and RGB RIS shadows against the non-RIS composition.
+The existing standalone GPU suites retain their independent numeric bars.
+No timings or speed experiments run.

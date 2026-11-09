@@ -1,11 +1,28 @@
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { VoxelPathTracer, type VoxelPathTracerOptions } from '@margoengine/voxel-pathtracer';
+import { validateFeatureOptions, type VoxelTraceFeature } from './compose-types.js';
 
 /** Options for emissive-face resampled importance sampling. */
 export interface ResampledVoxelPathTracerOptions extends VoxelPathTracerOptions {
   /** Light and directional proposals per shading point, integer 1 to 64. Default 8. */
   candidates?: number;
+}
+
+function candidateCount(candidates: number): number {
+  if (typeof candidates !== 'number') throw new TypeError('ResampledVoxelPathTracer candidates must be a number');
+  if (!Number.isInteger(candidates) || candidates < 1 || candidates > 64)
+    throw new RangeError('ResampledVoxelPathTracer candidates must be an integer from 1 to 64');
+  return candidates;
+}
+
+/** Many-light RIS for a composed tracer. Default 8 proposals; 1 retains the root sampler. */
+export function resampledEmitters(
+  options: Pick<ResampledVoxelPathTracerOptions, 'candidates'> = {},
+): VoxelTraceFeature {
+  validateFeatureOptions(options, 'resampledEmitters');
+  const candidates = candidateCount(options.candidates === undefined ? 8 : options.candidates);
+  return Object.freeze({ id: 'resampling', source: (source: string) => resampledSource(source, candidates) });
 }
 
 /**
@@ -21,9 +38,7 @@ export class ResampledVoxelPathTracer extends VoxelPathTracer {
     if (!options || typeof options !== 'object')
       throw new TypeError('ResampledVoxelPathTracer.attach expects (engine, {scene, ...options})');
     const { candidates = 8, ...rest } = options;
-    if (typeof candidates !== 'number') throw new TypeError('ResampledVoxelPathTracer candidates must be a number');
-    if (!Number.isInteger(candidates) || candidates < 1 || candidates > 64)
-      throw new RangeError('ResampledVoxelPathTracer candidates must be an integer from 1 to 64');
+    candidateCount(candidates);
     super(rest);
     this.candidates = candidates;
   }
@@ -34,37 +49,41 @@ export class ResampledVoxelPathTracer extends VoxelPathTracer {
   }
 
   protected override tracingSource(): string {
-    const source = super.tracingSource();
-    if (this.candidates === 1) return source;
-    const edits = [
-      ['var<private> rng:u32;', 'var<private> rng:u32;var<private> emitterSearch:bool;'],
-      // Directional light proposals pass media without scattering. The final shadow
-      // evaluation supplies their transmittance, just as for power-based proposals.
-      ['let u=ue;', 'let u=select(ue,0u,emitterSearch&&(u32(mat(ue*MV+3u).w)&MEDIA)!=0u);'],
-      [
-        'let v=select(0u,base|pv,pv!=0u);',
-        'var v=select(0u,base|pv,pv!=0u);if(emitterSearch&&(u32(mat(v*MV+3u).w)&MEDIA)!=0u){v=0u;}',
-      ],
-      ['pv!=0u&&!uniform&&!step);', 'v!=0u&&!uniform&&!step);'],
-      [
-        'let t=rectHit(k,o,d);\n  if(t<=0.0',
-        'if(emitterSearch&&!opaqueArea(k)){continue;}\n  let t=rectHit(k,o,d);\n  if(t<=0.0',
-      ],
-      ['var ls:LightPoint;', 'if(q==1u){L+=resampledEmitters(kind,m,n,wo,o,mask);continue;}\n   var ls:LightPoint;'],
-      // This integral is now entirely estimated by the mixed reservoir. Delta
-      // paths and camera emission (lastPdf == 0) retain their original treatment.
-      ['return power2(lastPdf,lp);', 'return 0.0;'],
-    ];
-    if (edits.some(([original]) => !source.includes(original)))
-      throw new MargoError(
-        'state',
-        'Emissive sampling kernel does not match this tracer; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
-      );
-    let result = source;
-    for (const [original, replacement] of edits) result = result.replace(original, replacement);
-    const lights = Math.ceil(this.candidates / 2),
-      directions = Math.floor(this.candidates / 2);
-    const helpers = /* wgsl */ `
+    return resampledSource(super.tracingSource(), this.candidates);
+  }
+}
+
+function resampledSource(source: string, candidates: number): string {
+  if (candidates === 1) return source;
+  const edits = [
+    ['var<private> rng:u32;', 'var<private> rng:u32;var<private> emitterSearch:bool;'],
+    // Directional light proposals pass media without scattering. The final shadow
+    // evaluation supplies their transmittance, just as for power-based proposals.
+    ['let u=ue;', 'let u=select(ue,0u,emitterSearch&&(u32(mat(ue*MV+3u).w)&MEDIA)!=0u);'],
+    [
+      'let v=select(0u,base|pv,pv!=0u);',
+      'var v=select(0u,base|pv,pv!=0u);if(emitterSearch&&(u32(mat(v*MV+3u).w)&MEDIA)!=0u){v=0u;}',
+    ],
+    ['pv!=0u&&!uniform&&!step);', 'v!=0u&&!uniform&&!step);'],
+    [
+      'let t=rectHit(k,o,d);\n  if(t<=0.0',
+      'if(emitterSearch&&!opaqueArea(k)){continue;}\n  let t=rectHit(k,o,d);\n  if(t<=0.0',
+    ],
+    ['var ls:LightPoint;', 'if(q==1u){L+=resampledEmitters(kind,m,n,wo,o,mask);continue;}\n   var ls:LightPoint;'],
+    // This integral is now entirely estimated by the mixed reservoir. Delta
+    // paths and camera emission (lastPdf == 0) retain their original treatment.
+    ['return power2(lastPdf,lp);', 'return 0.0;'],
+  ];
+  if (edits.some(([original]) => !source.includes(original)))
+    throw new MargoError(
+      'state',
+      'Emissive sampling kernel does not match this tracer; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
+    );
+  let result = source;
+  for (const [original, replacement] of edits) result = result.replace(original, replacement);
+  const lights = Math.ceil(candidates / 2),
+    directions = Math.floor(candidates / 2);
+  const helpers = /* wgsl */ `
 // A directional proposal's emitting surface and the power sampler's area PDF.
 fn directionalEmitter(o:vec3f,wi:vec3f)->LightPoint {
  var light:LightPoint;
@@ -93,7 +112,7 @@ fn directionalEmitter(o:vec3f,wi:vec3f)->LightPoint {
 // With target luminance(f), the selected RGB contribution is sum(weights)*RGB/luminance(RGB).
 fn resampledEmitters(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,mask:u32)->vec3f {
  var kept=vec3f(0.0);var scale=0.0;var sum=0.0;
- for(var candidate=0u;candidate<${this.candidates}u;candidate++){
+ for(var candidate=0u;candidate<${candidates}u;candidate++){
   var light:LightPoint;
   if(candidate<${lights}u){light=sampleEmitter();}
   else{
@@ -124,8 +143,7 @@ fn resampledEmitters(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,mask:u32)->vec3f {
  return kept*(scale*sum);
 }
 `;
-    // The compatibility route extracts declarations before the compute entry.
-    const entry = '@compute @workgroup_size(8,8) fn trace';
-    return result.replace(entry, helpers + '\n' + entry);
-  }
+  // The compatibility route extracts declarations before the compute entry.
+  const entry = '@compute @workgroup_size(8,8) fn trace';
+  return result.replace(entry, helpers + '\n' + entry);
 }

@@ -4469,3 +4469,27 @@ including the previous asset-profile example, remain unchanged). The new source
 example passes. Combined-build entry/network evidence measures the retained
 8b5c04aab implementation commit, followed by API/llms generation; merged size,
 record/API and documentation checks pass. No native Unity or speed claim is added.
+
+### Review 99 composition and section 5 evidence
+
+Optional tracer entries now export validated feature factories. /compose owns
+the root lifecycle and applies transforms in a fixed resampling/mesh/media/
+guiding/spectral order. Feature interfaces carry scene conversion and optional
+geometry preparation as well as WGSL specialization, so RGB media and mesh
+storage survive scene updates, captures and device replacement together.
+The root imports no feature. Media vectorizes the already-installed RIS and
+mesh shadow code; triangle markers never enter RIS voxel-frame lookup.
+
+CPU evidence covers all 32 subsets, input-order invariance, exact standalone
+shader equivalence, atomic replacement, caller-array isolation, disposal and
+replacement-device specialization. The registered test:gpu:compose-native and test:gpu:compose-compat suites add
+analytic camera attenuation for all 32 subsets and interacting RGB RIS shadow
+sampling. The failed-only WebGL2/Vulkan continuation now passes all 32 subsets,
+IDs, RGB RIS shadows and atomic replacement within the unchanged 12-minute lease.
+Native transport/AOV proofs are retained without repetition. The old timeout has
+no phase record; it cannot be attributed to ANGLE D3D11. An isolated resampled
+README diagnostic runs on Dawn and passes its unchanged 20-second deadline;
+its trace compile takes 15.5 seconds and its capture 0.13 seconds. The actual
+README runner selection also passes 1/1 at its unchanged deadline. These are startup diagnostics on a busy
+machine, not speed claims. Triangle emitter NEE and expanded mesh guide tables
+remain open. Evidence: whitepaper/results/review-99-compose-20261109.json.

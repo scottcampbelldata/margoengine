@@ -1,0 +1,1567 @@
+{
+  "scope": "Review 99 P2 composition only; full-scene mesh and remaining P3 findings stay open",
+  "notes": [
+    "Native transport capture is retained from the first run. Its original AOV oracle incorrectly expected a triangle id through a medium. The suite reports the first boundary. The corrected AOV checks ran separately, without changing numeric bounds or repeating the transport comparisons.",
+    "Each backend uses a separate bounded shared GPU lease. CPU checks and builds take no GPU lease. No timing or speed experiments ran.",
+    "Standalone shader strings match the parent 8ca1632cb exactly for default, disabled and extreme feature settings. The new composed RIS triangle-marker branch does not alter standalone mesh shaders."
+  ],
+  "nativeTransport": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "subsets": [
+        {
+          "mask": 0,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 1,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 2,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 3,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 4,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 5,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 6,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 7,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 8,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 9,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 10,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 11,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 12,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 13,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 14,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 15,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 16,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 17,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 18,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 19,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 20,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 21,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 22,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 23,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 24,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 25,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 26,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 27,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "mask": 28,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 29,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 30,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        },
+        {
+          "mask": 31,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true
+        }
+      ],
+      "reflected": {
+        "reference": [
+          0.1635738431941718,
+          0.06192044593626633,
+          0.03189677558839321
+        ],
+        "actual": [
+          0.16305164899677038,
+          0.06179698393680155,
+          0.03184553366736509
+        ],
+        "finite": true
+      },
+      "update": {
+        "actual": [
+          1,
+          1,
+          1
+        ],
+        "revision": 2
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  "nativeIds": {
+    "compat": false,
+    "phase": "ids",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "subsets": [
+        {
+          "mask": 0,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 1,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 2,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 3,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 4,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 5,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 6,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 7,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 8,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 9,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 10,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 11,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 12,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 13,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 14,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 15,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 16,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 17,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 18,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 19,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 20,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 21,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 22,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 23,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 24,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 25,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 26,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 27,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 28,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 29,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 30,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 31,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        }
+      ],
+      "triangleMarker": true,
+      "errors": [],
+      "messages": []
+    }
+  },
+  "compatibility": {
+    "compat": true,
+    "phase": "all",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "subsets": [
+        {
+          "mask": 0,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 1,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 2,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 3,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 4,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 5,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 6,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 7,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 8,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 9,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 10,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 11,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 12,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 13,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 14,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 15,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 16,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 17,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 18,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 19,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 20,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 21,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 22,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 23,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 24,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 25,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 26,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 27,
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 28,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 29,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 30,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        },
+        {
+          "mask": 31,
+          "actual": [
+            0.5,
+            0.3333333134651184,
+            0.25
+          ],
+          "expected": [
+            0.5,
+            0.3333333333333333,
+            0.25
+          ],
+          "finite": true,
+          "firstBoundary": true
+        }
+      ],
+      "triangleMarker": true,
+      "reflected": {
+        "reference": [
+          0.16357384389266372,
+          0.061920445528812706,
+          0.03189677558839321
+        ],
+        "actual": [
+          0.16305164992809296,
+          0.06179698492633179,
+          0.031845534133026376
+        ],
+        "finite": true
+      },
+      "update": {
+        "actual": [
+          1,
+          1,
+          1
+        ],
+        "revision": 2
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  "gzipBytes": {
+    "root": 81091,
+    "coreStage": 23924,
+    "compose": 1333,
+    "resampling": 2045,
+    "guiding": 2644,
+    "media": 2000,
+    "mesh": 23021,
+    "spectral": 1215
+  },
+  "diagnostics": {
+    "measuredRevision": "077ad2dd5",
+    "scope": "One failed-step diagnostic on this busy RTX A6000; not a benchmark or release speed claim",
+    "compatibility": {
+      "backend": "ANGLE Vulkan",
+      "elapsedPageMs": 103405.8,
+      "hardLeaseMinutes": 12,
+      "previousTimeoutCause": "No phase record was retained; its cause cannot be attributed to D3D11 from the available evidence."
+    },
+    "readme": {
+      "backend": "native WebGPU (Dawn), no compatibility install",
+      "traceCompileMs": 15505.19999998808,
+      "captureMs": 129.4000000357628,
+      "moduleBodyMs": 15757.199999988079,
+      "deadlineMs": 20000,
+      "diagnosticResult": "passed",
+      "actualRunnerResult": "passed 1/1, unchanged 20 s deadline"
+    }
+  }
+}

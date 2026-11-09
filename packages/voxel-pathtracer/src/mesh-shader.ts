@@ -125,6 +125,9 @@ export function meshSource(input: string): string {
     'fn edgeBand(h:Hit,p:vec3f)->bool {\n if(h.inst==TRIANGLE){return false;}',
   );
   edit('if(scene[0]==0u||h.inst>=AREA)', 'if(scene[0]==0u||h.inst>=TRIANGLE)');
+  // Until triangle light sampling is installed, a directional RIS proposal must
+  // leave triangle emission to path hits, without treating its marker as an instance.
+  source = source.replace('if(h.inst>=AREA||h.value==0u)', 'if(h.inst>=TRIANGLE||h.value==0u)');
   edit(
     'fn emitWeight(h:Hit,n:vec3f,d:vec3f,radiance:vec3f,lastPdf:f32)->f32 {',
     'fn emitWeight(h:Hit,n:vec3f,d:vec3f,radiance:vec3f,lastPdf:f32)->f32 {\n if(h.inst==TRIANGLE){return 1.0;}',
