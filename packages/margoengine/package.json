@@ -3338,6 +3338,10 @@
       "types": "./dist/voxel-pathtracer/studio.d.ts",
       "import": "./dist/voxel-pathtracer/studio.js"
     },
+    "./voxel-pathtracer/guiding": {
+      "types": "./dist/voxel-pathtracer/guiding.d.ts",
+      "import": "./dist/voxel-pathtracer/guiding.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

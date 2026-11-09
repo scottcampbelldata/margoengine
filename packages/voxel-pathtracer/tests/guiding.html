@@ -1,0 +1,84 @@
+<!doctype html><html><meta charset="utf-8"><title>Caustic guiding value checks</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {GuidedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/guiding.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,0]}});
+ const errors=[],messages=[],reports=[],device=engineRuntime(engine).gpu;
+ device.addEventListener('uncapturederror',event=>errors.push(event.error.message));
+ const create=device.createShaderModule.bind(device);
+ device.createShaderModule=descriptor=>{const module=create(descriptor);reports.push(module.getCompilationInfo().then(info=>messages.push(...info.messages.filter(m=>m.type==='error').map(m=>m.message))));return module;};
+ engine.camera.up=[0,0,-1];
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=1/1000;out[14]=1;out[15]=1;};
+ engine.render();
+ const matrix=(x,y,z,s=1)=>[s,0,0,0,0,s,0,0,0,0,s,0,x,y,z,1];
+ const scene={revision:1,models:[
+  {id:'glass',revision:1,size:[1,1,1],voxels:new Uint8Array([1])},
+  {id:'lamp',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}],
+  instances:[{id:'glass',modelId:'glass',matrix:matrix(-0.5,6,-0.5)},
+   {id:'lamp',modelId:'lamp',matrix:matrix(-0.5,8,-0.5)}],
+  materials:[{id:1,type:'glass',color:[1,1,1],ior:1.5,roughness:0},
+   {id:2,type:'emit',color:[1,0.6,0.2],emission:100}],
+  environment:{skyIntensity:0,sunIntensity:0,groundColor:[1,1,1]}};
+ const render=async(Tracer,strength,samples,seed,size=16)=>{
+  const tracer=Tracer.attach(engine,{scene,denoise:false,maxBounces:6,...(strength===undefined?{}:{guideStrength:strength})});
+  try{await tracer.ready;const image=await tracer.renderImage({width:size,height:size,samples,seed,jitter:false,signal:AbortSignal.timeout(120000)});console.log(`guiding render: ${Tracer.name}, ${samples} samples, seed ${seed}`);return image;}
+  finally{tracer.dispose();}
+ };
+ const mean=image=>[0,1,2].map(c=>{let sum=0;for(let i=c;i<image.color.length;i+=3)sum+=image.color[i];return sum/(image.color.length/3);});
+ const delta=(a,b)=>Math.max(...a.color.map((v,i)=>Math.abs(v-b.color[i])));
+ const coverage=[];
+ const compare=async(name,samples=4096,size=16)=>{
+  const reference=await render(VoxelPathTracer,undefined,samples,317,size),actual=await render(GuidedVoxelPathTracer,0.5,samples,419,size);
+  coverage.push({name,reference:mean(reference),actual:mean(actual),finite:actual.color.every(Number.isFinite)});
+ };
+ try{
+  const reference=await render(GuidedVoxelPathTracer,0.5,16384,987);
+  const original=await render(VoxelPathTracer,undefined,64,17),zero=await render(GuidedVoxelPathTracer,0,64,17);
+  const guided=await render(GuidedVoxelPathTracer,0.5,64,17);
+  let baseError=0,guidedError=0;
+  for(let i=0;i<reference.color.length;i++){baseError+=(original.color[i]-reference.color[i])**2;guidedError+=(guided.color[i]-reference.color[i])**2;}
+  await compare('glass caustic');
+  scene.instances.push({id:'glass2',modelId:'glass',matrix:matrix(0.25,5,-0.5)});scene.revision++;
+  await compare('overlapping guide bounds');
+  scene.instances.pop();scene.materials[0]={id:1,type:'glass',color:[0.2,0.5,0.8],density:0.7,ior:1.5};scene.revision++;
+  await compare('coloured absorbing glass');
+  scene.materials[0]={id:1,type:'glass',color:[1,1,1],ior:1};
+  scene.materials[1]={id:2,type:'diffuse',color:[1,1,1]};
+  scene.instances.push({id:'overlap',modelId:'glass',matrix:matrix(-0.25,6.25,-0.5)});
+  scene.environment.map={width:4,height:2,data:new Float32Array(24).fill(1)};scene.environment.skyIntensity=1;scene.revision++;
+  await compare('overlapping guides in unit furnace',2048);coverage.at(-1).expected=1;
+  // The centre continuation starts exactly on the sparse guide's x-min face.
+  // That face has zero solid angle and must not receive singular proposal mass.
+  const savedModel=scene.models[0],savedInstances=scene.instances;
+  scene.models[0]={id:'glass',revision:2,size:[1,8,1],voxels:new Uint8Array([0,0,0,0,0,0,0,1])};
+  scene.instances=[{id:'glass',modelId:'glass',matrix:matrix(0,-1,-0.5)}];scene.revision++;
+  await compare('continuation on guide face',16384,1);coverage.at(-1).expected=1;
+  scene.models[0]=savedModel;scene.instances=savedInstances;scene.revision++;
+  scene.instances.pop();delete scene.environment.map;
+  scene.materials[1]={id:2,type:'emit',color:[1,0.6,0.2],emission:100};
+  scene.materials[0]={id:1,type:'metal',color:[0.9,0.8,0.5],roughness:0};scene.revision++;
+  scene.environment.skyColor=[1,1,1];scene.environment.skyIntensity=1;
+  await compare('mirror guide and environment MIS',2048);
+  scene.materials[0]={id:1,type:'diffuse',color:[1,1,1]};scene.revision++;
+  const noGuidesBase=await render(VoxelPathTracer,undefined,4,71),noGuides=await render(GuidedVoxelPathTracer,0.5,4,71);
+  // A pure diffuse object above the receiver is no guide: the random stream remains identical.
+  const noGuideDelta=delta(noGuidesBase,noGuides);
+  scene.materials[0]={id:1,type:'glass',color:[1,1,1],ior:1.5};scene.revision++;
+  scene.instances.push({id:'huge',modelId:'glass',matrix:matrix(-100,-100,-100,200)});scene.revision++;
+  const extreme=await render(GuidedVoxelPathTracer,0.95,4,73);
+  coverage.push({name:'inside and huge guide bounds',finite:extreme.color.every(Number.isFinite)});
+  scene.models=[];scene.instances=[];scene.materials=[];scene.environment={skyIntensity:0,sunIntensity:0,ground:false};scene.revision++;
+  const empty=await render(GuidedVoxelPathTracer,0.95,1,13);
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});
+  let refusal;
+  try{GuidedVoxelPathTracer.attach(native,{scene});}catch(error){refusal={code:error.code,message:error.message};}finally{native.dispose();}
+  await Promise.all(reports);
+  return {baseError,guidedError,reference:mean(reference),guided:mean(guided),zeroDelta:delta(original,zero),noGuideDelta,coverage,emptyBlack:empty.color.every(v=>v===0),refusal,errors,messages};
+ }finally{engine.dispose();}
+};
+window.ready=true;
+</script></html>

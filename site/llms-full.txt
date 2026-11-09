@@ -2605,7 +2605,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-621). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-622). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3814,6 +3814,31 @@ Synthetic fixtures and a float64 oracle prove spacing, bounds, area weighting an
 Real production-browser WebGPU/WebGL2 contexts prove lazy assets below a non-root base and independence from
 device/context loss. Authored meshes, hardware speed and cross-platform bit identity are unmeasured.
 
+## Caustic path guiding (batch 99, LIM-622)
+
+`@margoengine/voxel-pathtracer/guiding` adds a pure diffuse continuation proposal toward the existing deflector
+table: up to eight static orthogonal pure smooth non-dispersive glass instances and eight mirrors. Visible box
+faces are sampled by world area; interior origins use enclosing faces, excluding any face containing the origin.
+The PDF converts to solid angle and sums all overlapping bounds. Actual voxel traversal and Fresnel transport
+remain unchanged. `guideStrength` is finite `0..0.95`, default `0.5`; zero uses the original kernel exactly,
+and empty guide tables retain the baseline random stream. No learning, photons or persistent GPU allocation.
+
+Roulette removes accumulated cosine/mixture factors from its survival heuristic so small importance weights
+are not immediately discarded. The heuristic scale is bounded `1e-20..1e20`, with actual survival `0.05..1`
+after bounce three and actual throughput divided by that survival. Ordinary bounce caps still truncate paths.
+Bounds can contain empty geometry or point below the surface, producing zero-contribution proposals. Other
+BSDFs, unsupported deflectors and geometry beyond the table retain ordinary path sampling. A geometry prior
+can increase variance when its objects contribute little. No general convergence or wall-time gain is claimed.
+
+`tests/guiding-browser.mjs` keeps a fixed 2x squared-RGB-error bar on a generated small-glass caustic at 64 samples
+against a 16,384-sample guided reference, with separate independent original-tracer energy comparisons and an
+analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; native WebGL2 refuses with code
+`unsupported` and a registered help link. Native device restoration and disposal are exercised.
+
+Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
+Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,797 B remain unchanged. No existing size,
+accuracy or time gate was relaxed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -3843,6 +3868,10 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
 
 - **Job 1, repro:** voxel-pathtracer's README and `tests/magicavoxel/` record subsurface differences of 7-16 display levels, glass over a lit floor 1-2 levels brighter, and atmosphere residuals. The renderer uses a fitted single-density random-walk subsurface model and a fitted single-scattering atmosphere; neither establishes the external editor's full transport model. No checked-in repeatable zero-error image oracle exists. These partial implementations do not satisfy exact pixel parity. Closing this needs an external black-box reference corpus across density, glass and atmosphere settings and a root-cause transport comparison, without changing the oracle or its zero-error requirement. Job 1 remains BLOCKED.
 - **Job 2, repro:** `tests/browser-check.mjs denoisehistory` and the README's viewport measurements retain noise on newly uncovered surfaces after a camera move. Reprojection has no valid history there, and a finite noisy first-frame spatial estimate cannot in general recover an arbitrary hidden radiance field exactly. Schied et al., [Spatiotemporal Variance-Guided Filtering](https://research.nvidia.com/sites/default/files/pubs/2017-07_Spatiotemporal-Variance-Guided-Filtering%3A/svgf_preprint.pdf), section 6, also reports low-light and motion limitations. The existing classical temporal filter is partial coverage, not the requested noise-free guarantee. A repeatable disocclusion oracle and an algorithm meeting that guarantee remain missing. Job 2 remains BLOCKED.
+
+### Batch 99 caustic guide scope
+
+Job 4's optional caustic guide is independently covered by `packages/voxel-pathtracer/tests/guiding-browser.mjs`. Its finite deflector table and geometry-prior variance trade-off are design limits in the README and `docs/limits.md`; they do not close the separate job 1 parity or job 2 disocclusion defects above.
 
 ### Fixed in batch 99: media-boundary emitter MIS distance
 
@@ -8982,9 +9011,7 @@ candidate count costs work; no wall-time speedup or universal variance reduction
 the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
 scene at 32 samples against an 8,192-sample baseline reference. See `tests/restir-browser.mjs`.
 
-## Scene data
-
-Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data at your boundary.
+## Caustic path guiding
 
 [README continues: https://margoengine.com/llms/packages/voxel-pathtracer.md]
 

@@ -1,0 +1,335 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "baseError": 350.31802240506374,
+      "guidedError": 9.98467529035455,
+      "reference": [
+        0.6238491067197174,
+        0.3736736415885389,
+        0.12434608765761368
+      ],
+      "guided": [
+        0.6283882120042108,
+        0.3763915986637585,
+        0.1252500916889403
+      ],
+      "zeroDelta": 0,
+      "noGuideDelta": 0,
+      "coverage": [
+        {
+          "name": "glass caustic",
+          "reference": [
+            0.632562585407868,
+            0.37885607132920995,
+            0.12605829739186447
+          ],
+          "actual": [
+            0.6262529564555734,
+            0.3751231142086908,
+            0.12483165951562114
+          ],
+          "finite": true
+        },
+        {
+          "name": "overlapping guide bounds",
+          "reference": [
+            0.7388543582055718,
+            0.4426977066323161,
+            0.1473609458480496
+          ],
+          "actual": [
+            0.733300959225744,
+            0.43933792714960873,
+            0.1462318807898555
+          ],
+          "finite": true
+        },
+        {
+          "name": "coloured absorbing glass",
+          "reference": [
+            0.06872956458391855,
+            0.1280101243610261,
+            0.08735175072797574
+          ],
+          "actual": [
+            0.0689628422842361,
+            0.12789833545684814,
+            0.08729419694282115
+          ],
+          "finite": true
+        },
+        {
+          "name": "overlapping guides in unit furnace",
+          "reference": [
+            0.9937813512515277,
+            0.9937813512515277,
+            0.9937813512515277
+          ],
+          "actual": [
+            0.9947270802222192,
+            0.9947270802222192,
+            0.9947270802222192
+          ],
+          "finite": true,
+          "expected": 1
+        },
+        {
+          "name": "continuation on guide face",
+          "reference": [
+            0.9978430867195129,
+            0.9978430867195129,
+            0.9978430867195129
+          ],
+          "actual": [
+            1.006321668624878,
+            1.006321668624878,
+            1.006321668624878
+          ],
+          "finite": true,
+          "expected": 1
+        },
+        {
+          "name": "mirror guide and environment MIS",
+          "reference": [
+            1.0309437243267894,
+            1.0168728043790907,
+            1.00155095057562
+          ],
+          "actual": [
+            1.0328188294079155,
+            1.0189086773898453,
+            1.0035901768133044
+          ],
+          "finite": true
+        },
+        {
+          "name": "inside and huge guide bounds",
+          "finite": true
+        }
+      ],
+      "emptyBlack": true,
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "baseError": 350.31802203507345,
+      "guidedError": 9.984675301141776,
+      "reference": [
+        0.6238491088151932,
+        0.3736736421706155,
+        0.12434608791954815
+      ],
+      "guided": [
+        0.6283882117713802,
+        0.37639159947866574,
+        0.12525009174714796
+      ],
+      "zeroDelta": 0,
+      "noGuideDelta": 0,
+      "coverage": [
+        {
+          "name": "glass caustic",
+          "reference": [
+            0.632562585407868,
+            0.3788560710963793,
+            0.12605829745007213
+          ],
+          "actual": [
+            0.6262529569212347,
+            0.3751231151400134,
+            0.12483165963203646
+          ],
+          "finite": true
+        },
+        {
+          "name": "overlapping guide bounds",
+          "reference": [
+            0.7388543579727411,
+            0.44269770628307015,
+            0.1473609459353611
+          ],
+          "actual": [
+            0.7333009608555585,
+            0.43933792761527,
+            0.14623188096447848
+          ],
+          "finite": true
+        },
+        {
+          "name": "coloured absorbing glass",
+          "reference": [
+            0.06872955981816631,
+            0.1280101193842711,
+            0.08735175066976808
+          ],
+          "actual": [
+            0.06896283684181981,
+            0.1278983295778744,
+            0.08729419688461348
+          ],
+          "finite": true
+        },
+        {
+          "name": "overlapping guides in unit furnace",
+          "reference": [
+            0.9937761412002146,
+            0.9937761412002146,
+            0.9937761412002146
+          ],
+          "actual": [
+            0.994784610811621,
+            0.994784610811621,
+            0.994784610811621
+          ],
+          "finite": true,
+          "expected": 1
+        },
+        {
+          "name": "continuation on guide face",
+          "reference": [
+            0.9978125691413879,
+            0.9978125691413879,
+            0.9978125691413879
+          ],
+          "actual": [
+            1.0063291788101196,
+            1.0063291788101196,
+            1.0063291788101196
+          ],
+          "finite": true,
+          "expected": 1
+        },
+        {
+          "name": "mirror guide and environment MIS",
+          "reference": [
+            1.030943723861128,
+            1.0168728039134294,
+            1.0015509515069425
+          ],
+          "actual": [
+            1.0328188294079155,
+            1.0189086773898453,
+            1.0035901768133044
+          ],
+          "finite": true
+        },
+        {
+          "name": "inside and huge guide bounds",
+          "finite": true
+        }
+      ],
+      "emptyBlack": true,
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 250
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 56.59999996423721,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 14.800000011920929,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 14.800000011920929,
+        "gpuBytes": 4980816,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

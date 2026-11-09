@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-621). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-622). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1226,3 +1226,28 @@ conversion to float32 can reduce separation. Signals precede synchronous samplin
 Synthetic fixtures and a float64 oracle prove spacing, bounds, area weighting and exact rejection output.
 Real production-browser WebGPU/WebGL2 contexts prove lazy assets below a non-root base and independence from
 device/context loss. Authored meshes, hardware speed and cross-platform bit identity are unmeasured.
+
+## Caustic path guiding (batch 99, LIM-622)
+
+`@margoengine/voxel-pathtracer/guiding` adds a pure diffuse continuation proposal toward the existing deflector
+table: up to eight static orthogonal pure smooth non-dispersive glass instances and eight mirrors. Visible box
+faces are sampled by world area; interior origins use enclosing faces, excluding any face containing the origin.
+The PDF converts to solid angle and sums all overlapping bounds. Actual voxel traversal and Fresnel transport
+remain unchanged. `guideStrength` is finite `0..0.95`, default `0.5`; zero uses the original kernel exactly,
+and empty guide tables retain the baseline random stream. No learning, photons or persistent GPU allocation.
+
+Roulette removes accumulated cosine/mixture factors from its survival heuristic so small importance weights
+are not immediately discarded. The heuristic scale is bounded `1e-20..1e20`, with actual survival `0.05..1`
+after bounce three and actual throughput divided by that survival. Ordinary bounce caps still truncate paths.
+Bounds can contain empty geometry or point below the surface, producing zero-contribution proposals. Other
+BSDFs, unsupported deflectors and geometry beyond the table retain ordinary path sampling. A geometry prior
+can increase variance when its objects contribute little. No general convergence or wall-time gain is claimed.
+
+`tests/guiding-browser.mjs` keeps a fixed 2x squared-RGB-error bar on a generated small-glass caustic at 64 samples
+against a 16,384-sample guided reference, with separate independent original-tracer energy comparisons and an
+analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; native WebGL2 refuses with code
+`unsupported` and a registered help link. Native device restoration and disposal are exercised.
+
+Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
+Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,797 B remain unchanged. No existing size,
+accuracy or time gate was relaxed.

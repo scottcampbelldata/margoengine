@@ -700,3 +700,19 @@ Run `node --experimental-test-module-mocks --test --test-timeout=120000 tests/br
 ### Audio review regressions (2026-11-09)
 
 Run npm test --workspace @margoengine/audio for suspended/resumed live-context stand-ins, quantized audio clocks with monotonic frame time, source-kind detachment, pooled/event authored pitch, disposed occlusion, missing engines and evidence wording. Run node scripts/gpu-lock.mjs run --owner=audio-review --max=12 --wait-max=2 -- npm run test:browser --workspace @margoengine/audio for native WebGPU and both WebGL2 routes. The browser harness also uses a real AudioContext with controlled 60 Hz frame and 10.667 ms audio clocks, and OfflineAudioContext fractional-loop markers at 130 bpm: one hour at 8 kHz, 300 s each at 44.1/48 kHz. Every loop is checked against its original fractional-sample grid; the allowed crossing interpolation error is 1.5 frames, not a per-loop allowance. Result: results/audio-review-20261109.json. No speed measurement or device-output proof.
+
+## Batch 99 caustic guiding accuracy
+
+After `npm run build:packages`, run `node scripts/gpu-lock.mjs run --owner=guiding-proof --max=10 --wait-max=10 -- npm run test:gpu:guiding --workspace packages/voxel-pathtracer`.
+The fixed generated scene has a one-voxel smooth glass block above a white ground plane and a one-voxel emissive lamp
+above the glass. The orthographic camera is below the block. At 16 x 16, seed 17 and 64 samples, the default guide
+must have less than half the original tracer's squared RGB error against its 16,384-sample seed-987 guided reference.
+The score sums 768 channel errors; it is not MSE. Separate 4,096-sample original-tracer images check converged energy,
+coloured absorption and overlapping bounds. A unit environment furnace supplies an independent analytic value.
+The driver also checks zero-strength and empty-table identity, finite inside/huge bounds, empty black scenes,
+native WebGL2 refusal, WebGL2 compatibility values, disposal and real device restoration.
+Output: `test-results/voxel-pathtracer-guiding.json`. Generated stand-ins, one GPU/browser; no timing claim.
+The initial cone proposal scored 304.785742 against 345.995718, the tighter cone 224.264648 against 350.006292,
+and the box proposal with unmodified roulette 241.098699 against 350.533552. All failed the unchanged 2x bar.
+The default throughput heuristic was terminating successful guided paths at the glass exit; correcting its
+survival heuristic removes that cause without changing the scene, sample count or threshold.

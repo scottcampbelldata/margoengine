@@ -81,6 +81,59 @@ candidate count costs work; no wall-time speedup or universal variance reduction
 the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
 scene at 32 samples against an 8,192-sample baseline reference. See `tests/restir-browser.mjs`.
 
+## Caustic path guiding
+
+`margoengine/voxel-pathtracer/guiding` (or `@margoengine/voxel-pathtracer/guiding`) exports
+`GuidedVoxelPathTracer`. It draws a share of pure diffuse continuation directions toward the scene's
+glass and mirror bounds, then traces the actual voxels and Fresnel events. `guideStrength` is finite
+from 0 to 0.95, default 0.5. Zero uses the original kernel exactly. The cosine share retains support
+outside every bound. All overlapping bounds contribute to the mixture PDF, including direct-light MIS.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { GuidedVoxelPathTracer } from 'margoengine/voxel-pathtracer/guiding';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [3, 2, 5], target: [0, 0, 0]},
+});
+const tracer = GuidedVoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{id: 'glass', revision: 1, size: [1, 1, 1], voxels: new Uint8Array([1])}],
+    instances: [{id: 'glass', modelId: 'glass', matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, -0.5,1,-0.5,1]}],
+    materials: [{id: 1, type: 'glass', color: [1, 1, 1], ior: 1.5}],
+    lights: [{position: [0, 4, 0], direction: [0, -1, 0], width: 1, height: 1,
+      color: [1, 0.8, 0.5], intensity: 10}],
+    environment: {groundColor: [0.8, 0.8, 0.8], skyIntensity: 0},
+  },
+  guideStrength: 0.5,
+  denoise: false,
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 8, signal: AbortSignal.timeout(30_000)});
+tracer.dispose();
+engine.dispose();
+```
+
+The guide reuses the existing deflector table: at most eight static, orthogonal glass instances whose
+used refracting material is pure smooth non-dispersive glass, plus eight mirror instances. Other objects
+and all other BSDFs retain path sampling. Scene changes update the table automatically. Empty tables
+retain the baseline random stream. The guide samples visible box faces by their world area and converts
+their density to solid angle. Inside a bound it samples the enclosing faces. Empty space inside a sparse
+model's box and below-surface directions retain their correct zero contribution. There is no learning,
+photon storage, density-estimation blur or added persistent GPU allocation.
+
+Roulette uses throughput with the accumulated cosine/mixture importance factor removed from its
+survival heuristic, so it does not immediately discard the paths the guide finds. Actual throughput
+is still divided by actual survival. The heuristic scale stays in `1e-20..1e20`, survival in `0.05..1`
+after bounce three; the ordinary bounce caps still apply.
+
+This is a geometry prior: convergence can improve when small glass objects carry important light paths,
+and can worsen when the chosen objects contribute little. No universal variance or wall-time gain is
+claimed. Native WebGL2 gives `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer);
+the WebGL2 compatibility layer runs the guide. `tests/guiding-browser.mjs` requires 2x lower squared
+RGB error on its fixed small-glass caustic scene, checks energy against independent baseline tracing,
+overlapping-bound unit-furnace values, empty/huge bounds, disposal and real device restoration.
+
 ## Scene data
 
 Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data at your boundary.
@@ -674,7 +727,8 @@ Not done or not verified, stated plainly:
 - **Speed:** light sampling through glass costs time even in scenes without glass (see "Measured performance").
 - **Caustics:** light turned more than once by glass (or by glass and a mirror), glossy reflections of a small sun and
   glass beyond the 8 light-sampled instances are found by path sampling only and converge slowly; `clamp` trades that
-  noise for bias.
+  noise for bias. The optional `/guiding` entry directs pure diffuse continuations toward the existing deflector
+  bounds; it does not add objects to the eight-per-kind table or solve specular manifolds.
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane;
