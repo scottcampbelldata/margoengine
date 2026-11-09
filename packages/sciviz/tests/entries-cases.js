@@ -1,6 +1,7 @@
 // The drawing cases of entries-browser.js, one per entry feature. Each places the camera, adds its layer and returns
 // the facts it checked.
-import { gridLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
+import { gridLayer, meshLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
+import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles } from '@margoengine/sciviz/tubes';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
 import { tileLayer } from '@margoengine/sciviz/geo';
 import { tracePathline, traceStreakline, flowParticles, flowSeeds } from '@margoengine/sciviz/flow';
@@ -9,6 +10,24 @@ import { lic } from '@margoengine/sciviz/lic';
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
 const addCase = (name, run, mode = '3d') => cases.push({ name, run, mode });
+
+for (const kind of ['tubes', 'ribbons']) addCase(kind, async (figure, { assert, pixels, lit }) => {
+  look(figure);
+  const positions = Array.from({ length: 65 }, (_, i) => {
+    const t = i / 64 * 2 * Math.PI; return [Math.cos(t), Math.sin(t), i / 32 - 1];
+  }).flat(), scalar = Array.from({ length: 65 }, (_, i) => i / 64);
+  const mesh = kind === 'tubes'
+    ? streamTubeGeometry({ positions, scalar }, { radius: scalar.map((v) => 0.06 + 0.1 * v), sides: 16, steps: 192 })
+    : streamRibbonGeometry({ positions, scalar }, { width: 0.3, steps: 192,
+      streamwiseVorticity: scalar.map(() => 2), speeds: scalar.map(() => 1) });
+  const set = streamMeshTriangles(mesh), layer = meshLayer(figure, set, { range: [0, 1] });
+  await figure.ready();
+  const image = await pixels(), count = lit(image);
+  assert(count > 1000, `${kind} has ${count} lit pixels`);
+  assert(layer.triangles === mesh.indices.length / 3, 'all generated triangles are drawn');
+  assert(set.normals.every(Number.isFinite), 'smooth normals survive triangle conversion');
+  return { triangles: layer.triangles, lit: count };
+});
 
 addCase('lic', async (figure, { assert, pixels, lit }) => {
   figure.engine.stop();

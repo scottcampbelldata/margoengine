@@ -8,4 +8,5 @@ export const scientificPages = [
   'sciviz-wind',
   'sciviz-moving-flow',
   'sciviz-lic',
+  'sciviz-tubes',
 ];

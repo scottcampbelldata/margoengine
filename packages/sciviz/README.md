@@ -1022,3 +1022,7 @@ const ribbon = streamRibbonGeometry(path, {
 });
 console.log(tube.positions.length / 3, ribbon.indices.length / 3, layer.triangles);
 ```
+
+[North Atlantic wind paths](../../examples/sciviz-tubes.html) shows tubes and ribbons on the same frozen
+public-domain NOAA daily mean winds as the wind and LIC pages. Radius and colour encode measured speed;
+the horizontal field has zero streamwise curl. Width is explicitly exaggerated and is not a measured diameter.

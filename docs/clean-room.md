@@ -60,6 +60,35 @@ ETC2/EAC code remains. Rejected latent source code/tests stay archived in
 private experiment backups. Existing byte/header/vector tests are retained.
 Earlier notes below retain the bars and observations at their checkpoint.
 
+## Batch 171 job 3 rendering checkpoint and critical-point investigation
+
+Existing mesh rendering draws the new tube and physical-twist ribbon fixtures on native WebGPU and real
+WebGL2 compatibility, with zero backend differences and exact pixels after actual device replacement.
+Records: whitepaper/results/batch-171-tubes.json and batch-171-ribbons.json. Lit pixels 3793 and 3890.
+The new optional entry measures 2533 B gzip, ceiling 2789 B; mesh ownership correction changes grids from
+23599 to 23735 B within its existing 24307 B ceiling. Root 50303, LIC 23461, core/stage 23924 B unchanged.
+All 185 existing-plus-new package/site CPU cases passed before adding the newly discovered failing
+stagnation regression. All seven example type-check projects and nine production scientific HTML targets
+pass; hygiene passes. No complete job 3/full verify or README-runtime acceptance is claimed.
+
+The unchanged NOAA wind asset drives the new official wind-path page. Its day-change GPU check fails on
+a false two-cycle from the pre-existing normalized fixed-step streamline tracer. A 2x2 analytical sink
+independently reproduces zero-progress publication. Keep the failure and fix the integration owner; do not
+silently trim paths, filter seeds, reduce the demo step, relax cusp rejection or change the failing gate.
+
+Research started before attempting this repair, comparing local-error-controlled integral curves and
+critical-point stopping: David Pugmire, Hank Childs, Christoph Garth, Sean Ahern and Gunther H. Weber,
+*Scalable Computation of Streamlines on Very Large Datasets*, 2009, authors' methodological description
+https://dav.lbl.gov/archive/Events/SC09/Streamlines/ (adaptive Runge-Kutta/Prince-Dormand);
+Eduard Deines, Gunther H. Weber, Christoph Garth, Brian Van Straalen and Sergey Borovikov,
+*On the Computation of Integral Curves in Adaptive Mesh Refinement Vector Fields*,
+2011, https://doi.org/10.4230/DFU.Vol2.SciViz.2011.73 (abstract/search description only; full fetch failed).
+A wide search also compared interactive illuminated-streamline error monitoring, critical-point placement
+and mesh-independent cell-to-cell integration. No companion or rival implementation was opened, no repair
+or new scientific accuracy claim is made at this checkpoint. The analytical and NOAA repros are the next
+required correctness work before job 3 may land. Details: known-bugs.md.
+
+
 ## Batch 171 job 3: scientific tube and ribbon adapters (CPU checkpoint)
 
 Before implementation, audited sciviz README/source/manifest exports: no scientific radius/twist adapter.

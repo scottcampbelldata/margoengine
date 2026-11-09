@@ -53,6 +53,13 @@ historical reports below keep their original bars and results. Their statements
 about waiting for Scott or a then-current bar do not describe this new ruling.
 No public decoder replacement or completed batch job is claimed.
 
+Batch 171 job 3 rendering checkpoint: generated tube/ribbon fixtures light 3793/3890 pixels, with exact
+actual-device restoration and zero native/compatibility pixel differences in the existing strict harness.
+Records: results/batch-171-tubes.json and results/batch-171-ribbons.json. The official NOAA example is not
+accepted: its January 4 change exposes the open normalized streamline critical-point defect. The analytical
+regression is failing and remains required. No full job 3 or successful demo claim follows from these records.
+
+
 Batch 171 job 3 CPU checkpoint only: tubes.test.js independently checks tapered straight-tube normals,
 scalar radius/colour, unequal input intervals, signed half-vorticity twist including partial quadratic
 integration, straight/inflection frames and exact closed seams. mesh-ownership.test.js reproduces four

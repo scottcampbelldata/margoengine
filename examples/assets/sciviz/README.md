@@ -60,3 +60,10 @@ Credit: UCLA Consortium for Neuropsychiatric Phenomics, Poldrack et al. (2016),
 [doi:10.1038/sdata.2016.110](https://doi.org/10.1038/sdata.2016.110).
 2MASS is a joint project of the University of Massachusetts and IPAC/California Institute of Technology,
 funded by NASA and NSF. NCEP-NCAR Reanalysis 1 data provided by NOAA PSL, Boulder, Colorado, USA.
+
+The official North Atlantic wind paths example (examples/sciviz-tubes.html) reuses the unchanged NOAA PSL
+NCEP-NCAR Reanalysis 1 daily wind.bin asset (US-government public domain), SHA-256
+e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd. It traces the instantaneous
+projected daily mean; original interpolated speed sets colour and drawing width. The horizontal field has
+zero streamwise curl, so the real-data ribbons have no physical spin. Tube radii and ribbon widths are
+drawing aids, not observed flow diameters. No measured parcel, vertical motion or forecast claim.

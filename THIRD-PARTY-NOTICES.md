@@ -272,3 +272,10 @@ install script only clears the macOS quarantine flag on its binary. `rhino3dm` a
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.
 `aioquic` (BSD-3-Clause) is not in the lock: `packages/netcode/tests/webtransport-proof/server.py` uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.
+
+The official North Atlantic wind paths example (examples/sciviz-tubes.html) reuses the unchanged NOAA PSL
+NCEP-NCAR Reanalysis 1 daily wind.bin asset (US-government public domain), SHA-256
+e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd. It traces the instantaneous
+projected daily mean; original interpolated speed sets colour and drawing width. The horizontal field has
+zero streamwise curl, so the real-data ribbons have no physical spin. Tube radii and ribbon widths are
+drawing aids, not observed flow diameters. No measured parcel, vertical motion or forecast claim.

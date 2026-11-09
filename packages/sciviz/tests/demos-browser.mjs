@@ -128,7 +128,7 @@ async function run(compat) {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
-      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'lic', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
+      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'lic', 'tubes', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
         if (only && !only.split(',').includes(name)) continue;
         const fixture = ['aeroflow', 'astrometrics', 'medical', 'showcase'].includes(name);
         const path = `${fixture ? '/packages/sciviz/tests/pages' : '/examples'}/sciviz-${name}.ts`;
@@ -330,6 +330,21 @@ async function run(compat) {
             'field/colour/animation replacements keep exactly one layer');
           await download('export');
           await page.screenshot({ path: `test-results/sciviz-fixes/lic-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png` });
+        } else if (name === 'tubes') {
+          const first = await structure(path);
+          await select('day', '3'); await settled(path);
+          assert.notEqual(await structure(path), first, 'another real NOAA day changes the stream tubes');
+          await select('shape', 'ribbon'); await settled(path);
+          const ribbon = await structure(path);
+          await select('scale', '2'); await settled(path);
+          assert.notEqual(await structure(path), ribbon, 'drawing width changes the ribbons');
+          assert.match(await page.locator('#status').textContent(), /zero streamwise curl/);
+          const count = await page.evaluate(async (path) => {
+            const m = await import(path);
+            return { owned: m.layers.length, retained: m.figure.layers.length };
+          }, path);
+          assert(count.owned > 0); assert.equal(count.owned, count.retained, 'replacement disposes every previous layer');
+          await download('export');
         } else if (name === 'wind') {
           const first = await structure(path);
           await page.evaluate(monitor, path);

@@ -1,0 +1,65 @@
+{
+  "checkpoint": "job3-rendering-with-open-tracer-defect",
+  "landed": false,
+  "cpuBeforeNewRegression": {
+    "tests": 185,
+    "pass": 185,
+    "fail": 0
+  },
+  "currentKnownFailure": {
+    "test": "packages/sciviz/tests/streamline-stagnation.test.js",
+    "firstRepeatedSample": 2,
+    "owner": "packages/sciviz/src/fields.ts"
+  },
+  "gpu": {
+    "tubes": {
+      "lit": 3793,
+      "backendShare": 0,
+      "backendMean": 0,
+      "exactDeviceRestore": true
+    },
+    "ribbons": {
+      "lit": 3890,
+      "backendShare": 0,
+      "backendMean": 0,
+      "exactDeviceRestore": true
+    },
+    "noaaDemo": {
+      "passed": false,
+      "dayIndex": 3,
+      "cause": "normalized fixed-step RK4 false critical-point cycle"
+    }
+  },
+  "sizes": {
+    "tubes": 2533,
+    "tubesCeiling": 2789,
+    "grids": 23735,
+    "gridsCeiling": 24307,
+    "lic": 23461,
+    "root": 50303,
+    "coreStage": 23924
+  },
+  "passed": [
+    "full package build",
+    "api:update",
+    "all seven example type projects",
+    "nine scientific production HTML targets",
+    "lint at CPU checkpoint",
+    "hygiene"
+  ],
+  "pending": [
+    "fix stagnation owner with regression",
+    "complete NOAA demo gate",
+    "package GPU/README acceptance",
+    "full verify once for job 3",
+    "fresh paired measurements",
+    "final lint/quality/docs integration",
+    "rebase and fast-forward push"
+  ],
+  "policy": {
+    "sharedGpu": true,
+    "slotsPerLane": 1,
+    "waitMax": 60,
+    "speedWork": false
+  }
+}

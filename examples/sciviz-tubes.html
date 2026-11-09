@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>North Atlantic wind paths | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html">Wind texture</a><a href="./sciviz-tubes.html" aria-current="page">Wind paths</a></nav>
+  <header><h1>North Atlantic wind paths</h1><p>Tubes and ribbons along instantaneous NOAA daily mean near-surface wind streamlines, January 1-8, 2024. Colour and exaggerated radius show measured speed. This horizontal field has zero streamwise curl: ribbons do not spin. These are numerical traces of a daily mean, not observed parcel paths or forecasts.</p></header>
+  <div class="controls">
+    <label>Day <select id="day"><option value="0">January 1</option><option value="1">January 2</option><option value="2">January 3</option><option value="3">January 4</option><option value="4">January 5</option><option value="5">January 6</option><option value="6">January 7</option><option value="7">January 8</option></select></label>
+    <label>Geometry <select id="shape"><option value="tube">Tubes</option><option value="ribbon">Ribbons</option></select></label>
+    <label>Drawing scale <select id="scale"><option value="1">1</option><option value="2">2</option><option value="0.5">0.5</option></select></label>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="NOAA wind stream tubes and ribbons coloured by speed"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <footer>NCEP-NCAR Reanalysis 1 from <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. US-government public domain. Native 2.5 degree grid, 100 W to 20 E, 20 N to 65 N, 0.995 sigma. The fixed equirectangular projection is centred at 42.5 N and corrects longitude velocity by latitude. Colour uses original measured speed, 0-35 m/s. Radius is the drawing rule 8 km + speed × 1.8 km per m/s, multiplied by drawing scale; full ribbon width is four times that radius. Neither is a physical vortex diameter. <a href="./assets/sciviz/README.md">Sources, hashes and limits</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-tubes.ts'));
+  </script>
+</body>
+</html>

@@ -49,6 +49,13 @@ Public integration, remaining targets, all-current-Wasm fuzz/corpus,
 candidate GPU uploads, peak memory and final entry acceptance remain open.
 All timing proof stays deferred. Earlier reports below are historical.
 
+Batch 171 job 3 rendering checkpoint: /tubes is 2533 B gzip, optional ceiling 2789 B. The mesh lifecycle
+repair grows /grids 23599 to 23735 B, within its existing 24307 B ceiling. Tube/ribbon fixtures have exact
+restored pixels and zero backend differences on this GPU. The new NOAA page's day-change check fails on
+the existing streamline critical-point two-cycle described in known-bugs.md; no real-data/full job 3
+acceptance is claimed. Core/stage remains 23924 B. Historical CPU-only pending-size text below is superseded.
+
+
 Batch 171 tubes/ribbons CPU checkpoint: a new optional /tubes adapter reuses Margo geometry's sweep,
 parallel transport, joined seam normals and flat caps. Polyline input is resampled at equal arc length:
 2..16385 points, 1..16384 output steps, tube sides 3..128, at most one million wall vertices. Increase steps
