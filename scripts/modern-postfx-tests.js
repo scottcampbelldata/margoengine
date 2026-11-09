@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -436,7 +437,11 @@ try {
           return v;
         };
         const run = (k, comp = 0) => {
-          device.queue.writeBuffer(meter, 0, meterValues(new Float32Array(16), [0, 0, 64, 64], { compensation: comp }, k));
+          device.queue.writeBuffer(
+            meter,
+            0,
+            meterValues(new Float32Array(16), [0, 0, 64, 64], { compensation: comp }, k),
+          );
           const e = device.createCommandEncoder(),
             p = e.beginComputePass();
           p.setPipeline(meterPipeline);
@@ -535,21 +540,22 @@ try {
       // Bug 58: on the layer DOF's WebGPU kernels ran on the CPU tier (2.4 s a frame at 1100 x 660 here), so the
       // page's main thread stayed busy and the fill below timed out on a slower CPU. Its route must be taken: frames
       // with no CPU-tier dispatch, its kernels as fragment draws.
-      const route = await page.evaluate(async () => {
+      const route = await page.evaluate(async (timing) => {
         const gpu = window.dofDemo.stage.engine.gpu,
           frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         for (let tries = 0; tries < 100; tries++) {
           const before = { ...gpu.dispatches },
-            start = performance.now();
+            start = timing ? performance.now() : undefined;
           await frame();
-          const ms = (performance.now() - start) / 2;
+          const ms = timing ? (performance.now() - start) / 2 : undefined;
           if (gpu.dispatches.cpu === before.cpu && gpu.dispatches.fragment > before.fragment)
             return { tries, ms, ...gpu.dispatches };
         }
         return { tries: -1, ...gpu.dispatches };
-      });
+      }, speedEnabled());
       assert.ok(route.tries >= 0, `DOF on the WebGL2 layer never took its route: ${JSON.stringify(route)}`);
-      console.log(`DOF example on the WebGL2 layer: its route, ${route.ms.toFixed(1)} ms a frame`);
+      if (speedEnabled()) console.log(`DOF example on the WebGL2 layer: its route, ${route.ms.toFixed(1)} ms a frame`);
+      else deferSpeed('DOF route frame-time diagnostic');
     }
     if (name === 'dof') {
       await page.locator('#focus').fill('4');

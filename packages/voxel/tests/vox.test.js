@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -944,7 +945,9 @@ test('pasteVoxModel: batching by chunk changes what one setBlock per voxel would
   assert.ok(changed > 100000, `${changed} cells changed`);
 });
 
-test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
+test('parse, write and paste a 1M-voxel model; speed measurements are a separate phase', (t) => {
+  const timing = speedEnabled();
+  if (!timing) deferSpeed('voxel 1M-voxel parse/write/paste measurements');
   const next = random(2),
     voxels = new Uint8Array(4 << 20);
   for (let i = 0; i < voxels.length; i += 4)
@@ -963,9 +966,10 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
   start = performance.now();
   const back = parseVox(bytes);
   const parse = performance.now() - start;
-  t.diagnostic(
-    `1,048,576 voxels (${(bytes.length / 2 ** 20).toFixed(1)} MiB): write ${write.toFixed(1)} ms, parse ${parse.toFixed(1)} ms`,
-  );
+  if (timing)
+    t.diagnostic(
+      `1,048,576 voxels (${(bytes.length / 2 ** 20).toFixed(1)} MiB): write ${write.toFixed(1)} ms, parse ${parse.toFixed(1)} ms`,
+    );
   // Pasting, best of 3, against one setBlock per voxel: random cells, and the tree.vox fixture tiled 2,635 times.
   const mapping = Uint32Array.from({ length: 256 }, (_, i) => (i ? 1 + (i % 8) : 0)),
     world = () => {
@@ -977,11 +981,11 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
       let ms = Infinity,
         w,
         changed;
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < (timing ? 3 : 1); r++) {
         w = world();
         const begin = performance.now();
         changed = run(w);
-        ms = Math.min(ms, performance.now() - begin);
+        if (timing) ms = Math.min(ms, performance.now() - begin);
       }
       return { ms, w, changed };
     },
@@ -1026,6 +1030,7 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
     assert.equal(batched.changed, single.changed, name);
     for (let i = 0; i < cells.length; i += 997)
       assert.equal(batched.w.getBlock(...cells[i].slice(0, 3)), single.w.getBlock(...cells[i].slice(0, 3)), name);
-    t.diagnostic(`paste ${name}: ${batched.ms.toFixed(0)} ms (one setBlock per voxel: ${single.ms.toFixed(0)} ms)`);
+    if (timing)
+      t.diagnostic(`paste ${name}: ${batched.ms.toFixed(0)} ms (one setBlock per voxel: ${single.ms.toFixed(0)} ms)`);
   }
 });

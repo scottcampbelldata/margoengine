@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
@@ -127,7 +128,7 @@ test('closed meshes have no boundary edges and reading uses positions and indice
       30,
     );
   assert.equal(pairs.length, 0, 'a smooth closed sphere has no feature edges');
-  assert.ok(cpu() < 150, 'linear time on 8,385 vertices');
+  speedBudget('geometry-edges', { cpu });
   // Threshold 0 returns every welded edge of a closed box once: 12 cube edges + 6 face diagonals.
   assert.equal(edgesGeometry(boxGeometry(1, 1, 1), 0).length / 2, 18);
 });

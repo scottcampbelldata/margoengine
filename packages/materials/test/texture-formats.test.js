@@ -1,3 +1,5 @@
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // Texture sources beyond 8-bit 2D images: float, one- and two-channel data, 3D and array layouts, borrowed GPU
 // textures, transcoded KTX2 files, Display P3 pixels and cube maps, recorded on a mock device (what is allocated and
 // uploaded, and which views bind). scripts/mat-more-gpu-check.js samples them on a real adapter.
@@ -73,12 +75,14 @@ test('bulk half conversion equals toHalf per value and is fast on large images (
     expected = Uint16Array.from(values, toHalf);
   for (const native of [true, false]) {
     assert.deepEqual(toHalfArray(values, native), expected, `native ${native}`);
-    const big = new Float32Array(4_194_304).map((_, i) => (i % 9973) * 0.37 - 900);
-    toHalfArray(big, native);
-    const cpu = cpuTimer();
-    toHalfArray(big, native);
-    const ms = cpu();
-    assert.ok(ms < 120, `4M values took ${ms.toFixed(0)} ms (native ${native}); the per-value callback took ~400`);
+    if (speedEnabled()) {
+      const big = new Float32Array(4_194_304).map((_, i) => (i % 9973) * 0.37 - 900);
+      toHalfArray(big, native);
+      const cpu = cpuTimer();
+      toHalfArray(big, native);
+      const ms = cpu();
+      speedBudget('materials-half', { ms, native });
+    }
   }
 });
 

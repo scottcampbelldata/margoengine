@@ -1,8 +1,8 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // Generation speed, printed and not asserted: noiseTerrain per chunk on this thread, then a VoxelStreamer filling a
 // 565-chunk range (distance 6, vertical 2) from the built terrain worker with 1, 2 and 3 Node worker threads, and the
 // main-thread cost of update() per 16 ms frame while chunks join, with and without frameBudget. Prints the machine's CPU
 // use during each run (other jobs share it).
-import test from 'node:test';
 import { cpus } from 'node:os';
 import { BlockTypes, VoxelChunk, VoxelWorld } from '../dist/index.js';
 import { noiseTerrain } from '../dist/generate.js';
@@ -21,7 +21,7 @@ const load = (before) => {
   return `${Math.round((100 * (work - before[1])) / (idle - before[0] + work - before[1]))}% CPU`;
 };
 
-test('generation benchmark (printed)', async (t) => {
+speedTest('generation benchmark (printed)', async (t) => {
   const previous = globalThis.Worker;
   globalThis.Worker = NodeWebWorker;
   t.after(() => (globalThis.Worker = previous));
@@ -75,7 +75,7 @@ test('generation benchmark (printed)', async (t) => {
   }
 });
 
-test('frame cost while generated chunks arrive (printed)', async (t) => {
+speedTest('frame cost while generated chunks arrive (printed)', async (t) => {
   const previous = globalThis.Worker;
   globalThis.Worker = NodeWebWorker;
   t.after(() => (globalThis.Worker = previous));

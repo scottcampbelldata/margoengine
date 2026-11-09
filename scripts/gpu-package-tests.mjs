@@ -1,3 +1,4 @@
+import { deferSpeed, reportSpeedPhase, speedEnabled } from './support/speed-phase.mjs';
 // Every real-GPU browser test, once (`npm run check:gpu-packages`, part of `npm run check:merge`): each package's
 // `test:*browser*` and `test:*gpu*` scripts plus the root browser suites in ROOT, after one `npm run build:packages`
 // (a package script's leading `npm run build && ` is dropped: build:packages already ran every package's build).
@@ -127,6 +128,7 @@ export const PREPARE = {
 export const RUNNER_SMOKE = [
   'shader/test:gpu',
   'biomes/test:gpu:flythrough',
+  'biomes/test:gpu:flythrough:speed',
   'voxel/test:gpu',
   'root/test:lifecycle:browser',
   'root/modern:test:usdz:browser',
@@ -831,6 +833,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     ),
     sideBySide = parallelMode({ argv: process.argv, env: process.env, profile }),
     keepGoing = keepGoingMode({ argv: process.argv, env: process.env });
+  reportSpeedPhase('check:gpu-packages');
+  if (!speedEnabled()) {
+    for (let i = steps.length - 1; i >= 0; i--)
+      if (steps[i].exclusive) {
+        deferSpeed(steps[i].label);
+        steps.splice(i, 1);
+      }
+  }
   if (phase && phase !== 'shared' && phase !== 'timing')
     throw new RangeError(`--phase must be shared or timing, got ${phase}`);
   if (process.argv.includes('--list')) {

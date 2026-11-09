@@ -1,3 +1,5 @@
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -62,31 +64,30 @@ test('the half lookup table equals halfToFloat for every pattern, and BrightRing
   const table = halfFloats();
   for (let bits = 0; bits < 65536; bits++) assert.ok(same(table[bits], Math.fround(halfToFloat(bits))), `${bits}`);
   // Timed against the per-texel conversion alone, on the same machine and load: the old parse did that and more.
-  const bytes = fixture('BrightRings.exr'),
-    texels = new Uint16Array(parseEXR(bytes).data.length).map((_, i) => (i * 40503) & 0xffff),
-    out = new Float32Array(texels.length),
-    time = (f) => {
-      const s = performance.now();
-      f();
-      return performance.now() - s;
-    },
-    convertAll = () => {
-      for (let i = 0; i < texels.length; i++) out[i] = halfToFloat(texels[i]);
-    };
-  // Alternate the two measurements, so a burst of load from other processes lands on both and not on one window.
-  let parse = Infinity,
-    convert = Infinity;
-  for (let i = 0; i < 9; i++) {
-    parse = Math.min(
-      parse,
-      time(() => parseEXR(bytes)),
-    );
-    convert = Math.min(convert, time(convertAll));
+  if (speedEnabled()) {
+    const bytes = fixture('BrightRings.exr'),
+      texels = new Uint16Array(parseEXR(bytes).data.length).map((_, i) => (i * 40503) & 0xffff),
+      out = new Float32Array(texels.length),
+      time = (f) => {
+        const s = performance.now();
+        f();
+        return performance.now() - s;
+      },
+      convertAll = () => {
+        for (let i = 0; i < texels.length; i++) out[i] = halfToFloat(texels[i]);
+      };
+    // Alternate the two measurements, so a burst of load from other processes lands on both and not on one window.
+    let parse = Infinity,
+      convert = Infinity;
+    for (let i = 0; i < 9; i++) {
+      parse = Math.min(
+        parse,
+        time(() => parseEXR(bytes)),
+      );
+      convert = Math.min(convert, time(convertAll));
+    }
+    speedBudget('environment-exr', { parse, convert });
   }
-  assert.ok(
-    parse < convert,
-    `parse ${parse.toFixed(1)} ms is not below halfToFloat per texel ${convert.toFixed(1)} ms`,
-  );
 });
 
 // ------------------------------------------------------------------ OpenEXR

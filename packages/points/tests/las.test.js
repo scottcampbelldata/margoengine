@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
@@ -36,7 +37,10 @@ function survey(n, seed = 3) {
 test('a header box that misses the points does not cost float32 precision', async () => {
   // Real files do this (simple1_3.las stores its box as raw integers). The points sit far from the box, 2 mm apart.
   const data = survey(50),
-    file = writeLAS({ ...data, positions: data.positions.map((_, i) => 5_800_000 + (i % 3) * 7 + Math.floor(i / 3) * 0.002) });
+    file = writeLAS({
+      ...data,
+      positions: data.positions.map((_, i) => 5_800_000 + (i % 3) * 7 + Math.floor(i / 3) * 0.002),
+    });
   const v = new DataView(file.buffer, file.byteOffset);
   for (const at of [179, 187, 195, 203, 211, 219]) v.setFloat64(at, v.getFloat64(at, true) * 1000, true);
   for (const options of [{}, { origin: 'min' }]) {
@@ -52,7 +56,10 @@ test('a sound header box gives its centre, or its minimum corner', async () => {
   const file = writeLAS(survey(50)),
     { header } = readLASHeader(file);
   assert.deepEqual([...(await parseLAS(file, { origin: 'min' })).origin], [...header.min]);
-  assert.deepEqual([...(await parseLAS(file)).origin], [0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2));
+  assert.deepEqual(
+    [...(await parseLAS(file)).origin],
+    [0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2),
+  );
 });
 
 test('LAS round trip: every point format 0 to 10 through writeLAS and parseLAS', async () => {
@@ -118,10 +125,10 @@ test('the written bytes hold the header fields and records the specification lay
       }
       assert.equal(view.getUint16(at + 12, true), data.intensity[i]);
       const flags = file[at + offsets.flags];
-      assert.deepEqual(
-        minor === 4 ? [flags & 15, flags >> 4] : [flags & 7, (flags >> 3) & 7],
-        [data.returnNumber[i], data.numberOfReturns[i]],
-      );
+      assert.deepEqual(minor === 4 ? [flags & 15, flags >> 4] : [flags & 7, (flags >> 3) & 7], [
+        data.returnNumber[i],
+        data.numberOfReturns[i],
+      ]);
       assert.equal(file[at + offsets.classification] & 31, data.classification[i]);
       assert.equal(f64(at + offsets.gps), data.gpsTime[i]);
       for (let k = 0; k < 3; k++) assert.equal(view.getUint16(at + offsets.rgb + k * 2, true), data.rgb[i * 3 + k]);
@@ -176,7 +183,7 @@ test('fuzz: truncated and corrupt LAS never crashes or hangs; errors are TypeErr
       );
     }
   }
-  assert.ok(cpu() < 150);
+  speedBudget('points-las', { cpu });
 });
 
 test('decodePoints reads the records a LAZ decoder returns', () => {

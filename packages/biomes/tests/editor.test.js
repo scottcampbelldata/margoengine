@@ -1,3 +1,4 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // B4: editor hooks. Replaying a stroke gives the same digest, undo returns the exact previous bytes, every changed cell
 // lies inside the dirty rectangle (fuzz), incremental edits give the same digests as a full rebuild (paint and height),
 // brush modes, history, validation, and the undo time budget (G5: undo within one frame).
@@ -193,19 +194,22 @@ test('validation, nested strokes and an edit inside onChange', async () => {
   assert.deepEqual(editor.dirty, []);
 });
 
-test('time budget: an undo and a 50 m dab take under 2 ms of CPU, far inside one 60 Hz frame, before tiles are remade', async () => {
-  const w = await world(),
-    editor = BiomeEditor.attach(w);
-  editor.paint('desert', { center: [0, 0], radius: 50 });
-  let cpu = cpuTimer();
-  // A hundred of each: Windows charges CPU time by the 15.6 ms clock tick, too coarse to read one.
-  for (let i = 0; i < 100; i++) editor.paint('desert', { center: [i, i], radius: 50 });
-  const dab = cpu() / 100;
-  cpu = cpuTimer();
-  for (let i = 0; i < 100; i++) editor.undo();
-  const undo = cpu() / 100;
-  assert.ok(dab < 2 && undo < 2, `dab ${dab.toFixed(2)} ms, undo ${undo.toFixed(2)} ms of CPU`);
-});
+speedTest(
+  'time budget: an undo and a 50 m dab take under 2 ms of CPU, far inside one 60 Hz frame, before tiles are remade',
+  async () => {
+    const w = await world(),
+      editor = BiomeEditor.attach(w);
+    editor.paint('desert', { center: [0, 0], radius: 50 });
+    let cpu = cpuTimer();
+    // A hundred of each: Windows charges CPU time by the 15.6 ms clock tick, too coarse to read one.
+    for (let i = 0; i < 100; i++) editor.paint('desert', { center: [i, i], radius: 50 });
+    const dab = cpu() / 100;
+    cpu = cpuTimer();
+    for (let i = 0; i < 100; i++) editor.undo();
+    const undo = cpu() / 100;
+    assert.ok(dab < 2 && undo < 2, `dab ${dab.toFixed(2)} ms, undo ${undo.toFixed(2)} ms of CPU`);
+  },
+);
 
 // Biome look plan 2 item 4: a painted patch met its neighbour in a one-cell step (paint composed after the climate warp
 // and the 3x3 blur, cell by cell), with none of the wander of the climate borders. The `ecotone` option (default 24 m)

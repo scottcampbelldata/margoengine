@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // CPU cost per frame of a crowd of RobotExpressive characters (7,214 vertices, 19 primitives, 43 joints, Walking clip):
 //   skinned - one gltf-pro model + Animation each: track sampling, joint palettes and a compute dispatch per skinned
 //             primitive, then one draw per primitive (the GPU-skinning path this package already had);
@@ -15,6 +16,8 @@ import { Engine, TransformStore } from '@margoengine/core/extension';
 import { current, entryAt, announce, save } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
+const measure = speedEnabled();
+if (!measure) deferSpeed('animation-vat.proof CPU timing diagnostics');
 const pin = current ? undefined : '700838e';
 announce('gltf-pro + animation (measured, no baseline)', '-', pin);
 const [{ GLTFAsset, PBRModel }, { Animation }, { bakeVAT, VATCrowd }] = await Promise.all(
@@ -69,14 +72,14 @@ async function skinned(n) {
     render = [];
   for (let f = 0; f < 23; f++) {
     view.begin(f);
-    const t0 = performance.now();
+    const t0 = measure ? performance.now() : undefined;
     for (const a of animations) a.onPreUpdate(1 / 60);
     store.tick(false);
-    const t1 = performance.now();
+    const t1 = measure ? performance.now() : undefined;
     engine.frameGraph.execute(view.c);
-    const t2 = performance.now();
+    const t2 = measure ? performance.now() : undefined;
     view.end();
-    if (f >= 3) {
+    if (measure && f >= 3) {
       update.push(t1 - t0);
       render.push(t2 - t1);
     }
@@ -90,8 +93,8 @@ async function skinned(n) {
   });
   engine.dispose();
   return {
-    updateMs: median(update),
-    recordMs: median(render),
+    updateMs: measure ? median(update) : undefined,
+    recordMs: measure ? median(render) : undefined,
     draws: calls.filter((e) => e[0] === 'pass.drawIndexed').length,
     dispatches: calls.filter((e) => e[0] === 'pass.dispatchWorkgroups').length,
     bufferWrites: calls.filter((e) => e[0] === 'writeBuffer').length,
@@ -110,13 +113,13 @@ async function vat(n, data) {
     render = [];
   for (let f = 0; f < 23; f++) {
     view.begin(f);
-    const t0 = performance.now();
+    const t0 = measure ? performance.now() : undefined;
     crowd.onPreUpdate(1 / 60);
-    const t1 = performance.now();
+    const t1 = measure ? performance.now() : undefined;
     engine.frameGraph.execute(view.c);
-    const t2 = performance.now();
+    const t2 = measure ? performance.now() : undefined;
     view.end();
-    if (f >= 3) {
+    if (measure && f >= 3) {
       update.push(t1 - t0);
       render.push(t2 - t1);
     }
@@ -129,8 +132,8 @@ async function vat(n, data) {
   });
   engine.dispose();
   return {
-    updateMs: median(update),
-    recordMs: median(render),
+    updateMs: measure ? median(update) : undefined,
+    recordMs: measure ? median(render) : undefined,
     draws: calls.filter((e) => e[0] === 'pass.drawIndexed').length,
     dispatches: 0,
     bufferWrites: calls.filter((e) => e[0] === 'writeBuffer').length,
@@ -142,25 +145,25 @@ async function vat(n, data) {
 const { engine: bakeEngine } = await rig(128),
   model = new PBRModel(bakeEngine, new GLTFAsset(doc, [], bin)),
   animation = new Animation(model);
-let t = performance.now();
+let t = measure ? performance.now() : undefined;
 const data = bakeVAT(animation, { fps: 30, clips: ['Walking'] });
-const bakeMs = performance.now() - t;
-t = performance.now();
-bakeVAT(animation, { fps: 30, clips: ['Walking'] });
-const rowMs = (performance.now() - t) / data.rows;
+const bakeMs = (measure ? performance.now() : undefined) - t;
+t = measure ? performance.now() : undefined;
+if (measure) bakeVAT(animation, { fps: 30, clips: ['Walking'] });
+const rowMs = ((measure ? performance.now() : undefined) - t) / data.rows;
 const bake = {
   vertices: data.vertexCount,
   rows: data.rows,
   textureBytes: data.texels.byteLength,
-  bakeMs: +bakeMs.toFixed(1),
-  cpuSkinningMsPerCharacterFrame: +rowMs.toFixed(3),
+  bakeMs: measure ? +bakeMs.toFixed(1) : undefined,
+  cpuSkinningMsPerCharacterFrame: measure ? +rowMs.toFixed(3) : undefined,
 };
 console.log('bake', JSON.stringify(bake));
 const results = {};
 for (const n of (process.argv.slice(2).find((arg) => !arg.startsWith('--')) ?? '100,1000').split(',').map(Number)) {
   const s = await skinned(n),
     v = await vat(n, data);
-  results[n] = { skinned: s, vat: v, cpuSkinningMs: +(rowMs * n).toFixed(1) };
+  results[n] = { skinned: s, vat: v, cpuSkinningMs: measure ? +(rowMs * n).toFixed(1) : undefined };
   console.log(n, JSON.stringify(results[n]));
   assert.equal(v.draws, 1);
   assert.equal(s.draws, n * model.primitives.length);
@@ -176,4 +179,4 @@ const report = {
   notes:
     'CPU work per frame only (mock GPU). VAT moves skinning to a texture read in the vertex shader: per-frame CPU is one uniform write and one draw, whatever the crowd size. GPU cost is not measured here.',
 };
-await save('animation-vat', report);
+if (measure) await save('animation-vat', report);

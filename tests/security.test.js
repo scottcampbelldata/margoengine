@@ -1,3 +1,4 @@
+import { speedBudget } from '../scripts/speed/budgets.mjs';
 // Launch gate 11 (b): attack surface of the packages (docs/security.md). Model files, URLs inside them and worker
 // replies are untrusted; these tests feed each path a hostile value and check it stays data. Per-format cases also live
 // next to their fixtures: packages/fbx/test/fbx.test.js, packages/loaders/tests/loaders.test.js and
@@ -305,7 +306,7 @@ test('STL text with unterminated facets is rejected in linear time (ReDoS)', () 
     cpu = cpuTimer();
   assert.throws(() => parseSTL(text), /not closed with "endfacet"/);
   const took = cpu();
-  assert.ok(took < 150, `took ${took} ms of CPU`);
+  speedBudget('security-stl', { took });
 });
 
 test('USDA property metadata named __proto__ stays data', async () => {

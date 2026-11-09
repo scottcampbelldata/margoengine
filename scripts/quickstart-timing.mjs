@@ -1,3 +1,5 @@
+import { speedEnabled } from './support/speed-phase.mjs';
+import { speedBudget } from './speed/budgets.mjs';
 // `npm run check:quickstart`: times the README quickstart the way a new reader does it, and proves it works.
 //
 // In a fresh temp folder outside the repository, with only Node, npm and git assumed, it follows the README's install
@@ -636,13 +638,12 @@ export async function main() {
     const firstFrame = timeline.find((t) => t.step.startsWith('first frame')).seconds;
     sizes.secondsToFirstFrame = firstFrame;
     sizes.secondsToVerifiedInteractive = secondsToInteractive;
-    assert.ok(
-      secondsToInteractive < gate,
-      `machine time to the verified interactive frame was ${secondsToInteractive} s; the gate is ${gate} s`,
-    );
+    speedBudget('quickstart', { secondsToInteractive, gate });
     writeResults(true);
     console.log(
-      `PASSED: first frame ${firstFrame} s, verified interactive ${secondsToInteractive} s (gate ${gate} s) on ${hardwareLine(sizes.hardware)}. Results: test-results/quickstart-timing.json`,
+      speedEnabled()
+        ? `PASSED: first frame ${firstFrame} s, verified interactive ${secondsToInteractive} s (gate ${gate} s) on ${hardwareLine(sizes.hardware)}. Results: test-results/quickstart-timing.json`
+        : 'PASSED quickstart correctness; speed assertion deferred (test-results/quickstart-timing.json)',
     );
   } catch (error) {
     if (!dead) writeResults(false, String(error?.message ?? error).slice(0, 2000));

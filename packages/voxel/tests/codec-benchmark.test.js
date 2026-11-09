@@ -1,5 +1,5 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // Codec throughput and sizes, printed and not asserted (timings vary by machine). Single thread, about a second.
-import test from 'node:test';
 import { VoxelChunk } from '../dist/index.js';
 import { decodeBlockChanges, decodeChunk, EntityCodec, encodeBlockChanges, encodeChunk } from '../dist/codec.js';
 
@@ -34,7 +34,7 @@ function terrain() {
   return chunk;
 }
 
-test('benchmark: chunk, block-change and entity codecs (printed)', async (t) => {
+speedTest('benchmark: chunk, block-change and entity codecs (printed)', async (t) => {
   const chunk = terrain(),
     raw = await encodeChunk(chunk, { compress: false }),
     deflated = await encodeChunk(chunk),

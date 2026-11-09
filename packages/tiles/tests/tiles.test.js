@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
@@ -179,7 +180,7 @@ test('fuzz: truncated or corrupt content never crashes or hangs; errors are Type
       }
     }
   assert.ok(thrown > 500, `most corrupt inputs are rejected (${thrown})`);
-  assert.ok(cpu() < 150, 'fuzzing finishes quickly');
+  speedBudget('tiles-fuzz', { cpu });
 });
 
 test('implicit tiling: Morton order, availability indices, templates, subtree bitstreams and subdivision', async () => {

@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
@@ -117,7 +118,8 @@ test('the written bytes hold the pages, header, XML and packets the standard lay
     data = packet + 6 + streams * 2;
   assert.equal(streams, 3, 'x, y and z');
   assert.equal(bytes % 8, 0);
-  for (let i = 0; i < bytes / 8; i++) assert.equal(logicalView.getFloat64(data + i * 8, true), positions[i * 3], `x of ${i}`);
+  for (let i = 0; i < bytes / 8; i++)
+    assert.equal(logicalView.getFloat64(data + i * 8, true), positions[i * 3], `x of ${i}`);
 });
 
 test('E57 integrity: a flipped byte fails its page checksum; truncated or corrupt files never crash or hang', () => {
@@ -144,5 +146,5 @@ test('E57 integrity: a flipped byte fails its page checksum; truncated or corrup
       );
     }
   }
-  assert.ok(cpu() < 300);
+  speedBudget('points-e57', { cpu });
 });

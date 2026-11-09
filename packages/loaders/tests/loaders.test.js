@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
@@ -1748,7 +1749,7 @@ test('security: file-supplied names never resolve or swap prototypes (gate 11b)'
   );
   const cpu = cpuTimer();
   await parse3MF(package3MF(modelXML({ items: `<item objectid="1" ${'x'.repeat(200_000)}/>` })));
-  assert.ok(cpu() < 150, 'XML attribute scan must stay linear');
+  speedBudget('loaders-xml', { cpu });
   // PLY: `property constructor w` is not a type (it made every binary truncation check NaN).
   const ply = (type) =>
     `ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty ${type} w\nend_header\n0 0 0 1\n1 0 0 1\n0 1 0 1\n`;

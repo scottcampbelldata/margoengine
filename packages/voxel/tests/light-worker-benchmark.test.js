@@ -1,8 +1,8 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // Page-thread cost of a big light change: VoxelLighting floods on the page; VoxelLightWorker only posts the edits and
 // writes the answer back. Prints both; checks only that the worker leaves the page less to do than the flood itself.
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
-import test from 'node:test';
 import { BlockTypes, VoxelWorld } from '../dist/index.js';
 import { VoxelLighting } from '../dist/light.js';
 import { VoxelLightWorker } from '../dist/light-worker.js';
@@ -31,7 +31,7 @@ const roof = (world, state) => {
   world.setBlocks(edits);
 };
 
-test('a roof removed and put back: page milliseconds with VoxelLighting and with VoxelLightWorker', async () => {
+speedTest('a roof removed and put back: page milliseconds with VoxelLighting and with VoxelLightWorker', async () => {
   const a = make(),
     page = VoxelLighting.attach(a, { budget: Infinity }),
     b = make(),

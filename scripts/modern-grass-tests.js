@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
@@ -17,7 +18,8 @@ browser.page.on('console', (message) => {
     errors.push(message.text());
 });
 try {
-  const result = await browser.page.evaluate(async () => {
+  if (!speedEnabled()) deferSpeed('grass 100k/500k frame timing diagnostics');
+  const result = await browser.page.evaluate(async (timing) => {
     const { GrassField, PostProcessing } = await import('/packages/creative/dist/index.js'),
       { Bloom } = await import('/packages/post/dist/bloom.js');
     const { Stage } = await import('/packages/stage/dist/index.js');
@@ -320,21 +322,23 @@ try {
       await device.queue.onSubmittedWorkDone();
       const visible = await counts(meadow);
       assert(visible[1] === blades && visible[5] === 0, 'Benchmark did not draw every full-detail blade');
-      const durations = [];
-      for (let i = 0; i < 90; i++) {
-        const start = window.performance.now();
-        engine.render({ delta: 1 / 60 });
-        await device.queue.onSubmittedWorkDone();
-        durations.push(window.performance.now() - start);
+      if (timing) {
+        const durations = [];
+        for (let i = 0; i < 90; i++) {
+          const start = window.performance.now();
+          engine.render({ delta: 1 / 60 });
+          await device.queue.onSubmittedWorkDone();
+          durations.push(window.performance.now() - start);
+        }
+        durations.sort((a, b) => a - b);
+        performance.push({
+          blades,
+          fullDetailVisible: visible[1],
+          resolution: [1280, 720],
+          medianFrameMs: durations[45],
+          p95FrameMs: durations[85],
+        });
       }
-      durations.sort((a, b) => a - b);
-      performance.push({
-        blades,
-        fullDetailVisible: visible[1],
-        resolution: [1280, 720],
-        medianFrameMs: durations[45],
-        p95FrameMs: durations[85],
-      });
       meadow.dispose();
     }
     engine.camera.position = [0, 6, 18];
@@ -429,7 +433,7 @@ try {
         'HDR, resize, device restoration and destruction during ongoing animation',
       ],
     };
-  });
+  }, speedEnabled());
   const instrument = () => {
     window.meadowAudit = {
       live: new Set(),

@@ -1,5 +1,5 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // meshChunk timings, printed and not asserted (they vary by machine). Single thread, about a second.
-import test from 'node:test';
 import { BlockTypes, VoxelWorld, blockState, chunkKey } from '../dist/index.js';
 import { QUAD_WORDS, meshChunk, meshInput } from '../dist/mesher.js';
 
@@ -51,7 +51,7 @@ function terrain(world, ox, oz) {
       }
 }
 
-test('benchmark: meshChunk per random-terrain chunk and per worst-case checkerboard (printed)', (t) => {
+speedTest('benchmark: meshChunk per random-terrain chunk and per worst-case checkerboard (printed)', (t) => {
   const inputs = [],
     world = new VoxelWorld({ blocks });
   for (let i = 0; i < 8; i++) {

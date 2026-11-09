@@ -1,3 +1,5 @@
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
@@ -162,7 +164,7 @@ test('a 20,000-vertex ring triangulates exactly in well under a second', () => {
   assert.equal(m.notCCW, 0);
   relClose(m.area, Math.abs(ringArea(rings(data)[0])), 1e-9, 'area');
   // About 16 ms of CPU on the reference PC; the budget leaves room for slower machines.
-  assert.ok(ms < 150, `took ${ms.toFixed(0)} ms of CPU`);
+  speedBudget('geometry-triangulate', { ms });
 });
 
 test('bad dim and hole boundaries throw RangeError before any work', () => {
@@ -299,6 +301,7 @@ test('typed arrays and plain arrays give the same triangles', () => {
 
 /** Best of three runs, in ms of CPU. */
 function bestTime(data) {
+  if (!speedEnabled()) return { out: triangulate(data) };
   let best = Infinity,
     out;
   for (let k = 0; k < 3; k++) {
@@ -324,7 +327,7 @@ test('a 100k-point circle and a 65,536-gon cut as fast as a noisy 100k ring (no 
       r = 1 + (0.3 * Math.sin(i * 0.7) * ((i * 7919) % 13)) / 13;
     noisy.push(Math.cos(a) * r, Math.sin(a) * r);
   }
-  const reference = bestTime(noisy).ms;
+  const reference = speedEnabled() ? bestTime(noisy).ms : undefined;
   for (const data of [circle(n), circle(65_536, 0.3)]) {
     const { ms, out } = bestTime(data),
       count = data.length / 2;
@@ -338,10 +341,7 @@ test('a 100k-point circle and a 65,536-gon cut as fast as a noisy 100k ring (no 
     const expected = (count / 2) * Math.sin((2 * Math.PI) / count);
     assert.ok(Math.abs(area - expected) < 1e-9, `area ${area} vs ${expected}`);
     // Was about 12x the noisy ring (5.2 s against 0.42 s) when ears were ranked by shape alone.
-    assert.ok(
-      ms < 2.5 * reference + 50,
-      `${count} points: ${ms.toFixed(0)} ms vs noisy ring ${reference.toFixed(0)} ms`,
-    );
+    speedBudget('geometry-circle', { ms, reference, count });
   }
 });
 

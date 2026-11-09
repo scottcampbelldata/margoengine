@@ -1,3 +1,4 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BlockTypes, VoxelWorld } from '../dist/index.js';
@@ -647,7 +648,7 @@ test('VoxelCharacter: teleports, carries the remainder and validates', () => {
   assert.throws(() => c.update(1 / 60), RangeError);
 });
 
-test('benchmark: ray casts, sweeps and character updates (printed)', (t) => {
+speedTest('benchmark: ray casts, sweeps and character updates (printed)', (t) => {
   const { world, ids } = kit(),
     edits = [];
   // Rolling terrain over 128 x 128 columns (16 chunks), stone under grass-level glass and flowers.

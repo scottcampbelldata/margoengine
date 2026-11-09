@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ForceLayout, boundsOf } from '@margoengine/sciviz/graph';
@@ -98,6 +99,7 @@ test('a million-edge graph lays out step by step (diagnostic timing)', () => {
     edges[i + 1] = next();
   }
   const layout = new ForceLayout({ nodes, edges }, { seed: 1 });
+  if (!speedEnabled()) deferSpeed('sciviz million-edge graph timing');
   const started = performance.now();
   for (let i = 0; i < 2; i++) {
     const step = layout.step();
@@ -105,7 +107,7 @@ test('a million-edge graph lays out step by step (diagnostic timing)', () => {
   }
   const ms = (performance.now() - started) / 2;
   for (const v of layout.positions) assert.ok(Number.isFinite(v));
-  console.log(`1,000,000 edges, 100,000 nodes: ${ms.toFixed(0)} ms per step (diagnostic)`);
+  if (speedEnabled()) console.log(`1,000,000 edges, 100,000 nodes: ${ms.toFixed(0)} ms per step (diagnostic)`);
 });
 
 test('bad graphs are refused', () => {

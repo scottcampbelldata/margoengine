@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 // Recheck the bundled production demos on a hardware desktop GPU.
 // DEMO_BASE_URL=https://margoengine.com node scripts/desktop-demo-tests.js
 // Without DEMO_BASE_URL, preview the already-built site/dist; this script never builds.
@@ -384,7 +385,8 @@ try {
       const scenePath = resolve(output, prefix + '-' + demo.name + '-scene.png');
       result.scene = await canvasImage(page, scenePath);
       result.sceneScreenshot = scenePath;
-      result.cadence = await page.evaluate(nativeCadence, 3000);
+      if (speedEnabled()) result.cadence = await page.evaluate(nativeCadence, 3000);
+      else deferSpeed('desktop callback cadence diagnostic');
       result.controls = await checkControls(page, demo);
       await page.setViewportSize(resizedViewport);
       await page.waitForFunction(() => {

@@ -13,6 +13,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
+import { deferSpeed, speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import { build } from 'vite';
 import { isAncestor, revision, show as showAt } from './history.js';
 import { begin, canonicalNaN, fact, golden, readOnly, reading, tape } from './golden.js';
@@ -211,6 +213,7 @@ export async function versions(name, ref, entry = 'src/index.ts', candidateRef) 
 const median = (values) => values.slice().sort((a, b) => a - b)[values.length >> 1];
 /** Interleave baseline (A) and candidate (B) runs A B B A so drift affects both alike. Each run returns nothing. */
 export function time(runBaseline, runCandidate, rounds = 12) {
+  if (deferSpeed('proof paired wall-clock comparisons')) return { deferred: true };
   for (let i = 0; i < 3; i++) {
     runBaseline();
     runCandidate();
@@ -247,8 +250,7 @@ export async function save(file, report) {
 
 /** Save one package's proof next to this file and fail when the candidate (`pin`, else the working tree) is not faster. */
 export async function record(name, ref, cases, notes = '', pin) {
-  for (const item of cases)
-    assert.ok(item.speedup >= 1, `${name} ${item.case} is slower than ${ref}: ${item.speedup}x`);
+  for (const item of cases) speedBudget('proof-speedup', { item, name, ref });
   const report = {
     package: name,
     baseline: ref,
@@ -259,7 +261,7 @@ export async function record(name, ref, cases, notes = '', pin) {
     notes,
     cases,
   };
-  await save(name, report);
+  if (speedEnabled()) await save(name, report);
   console.log(JSON.stringify(report, null, 2));
 }
 

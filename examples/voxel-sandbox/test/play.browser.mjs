@@ -1,3 +1,5 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // Real-GPU play test of the voxel sandbox in headless Edge: spawn on dry ground, pointer lock, fly up and forward,
 // land, break the block under the crosshair, place stone, swim in the lake, change the render distance, and find the
 // placed block again after a reload (IndexedDB save). Then Plaza: a second client's figure and name tag on a local shard,
@@ -251,38 +253,40 @@ async function plaza() {
   console.log('ok the figure draws (test-results/plaza-figures.png)');
 
   // The figures' frame cost: 200 players moving, 32 of them tagged, on the real instanced crowd.
-  const cost = await sandbox(() => {
-    const { figures } = window.voxelSandbox,
-      players = new Map();
-    for (let id = 1000; id < 1200; id++) {
-      const a = id * 0.7;
-      players.set(id, {
-        id,
-        name: 'Quiet Otter',
-        snapshot: {
-          position: new Float64Array([Math.cos(a) * 30, 20, Math.sin(a) * 30]),
-          rotation: new Float64Array([0, Math.sin(a), 0, Math.cos(a)]),
-          velocity: new Float64Array([2, 0, 1]),
-        },
-      });
-    }
-    for (let i = 0; i < 300; i++) figures.update(players, 1 / 60, [0, 20, 0]); // warm up
-    const heap = () => performance.memory?.usedJSHeapSize ?? 0,
-      times = [],
-      before = heap();
-    for (let i = 0; i < 2000; i++) {
-      const start = performance.now();
-      figures.update(players, 1 / 60, [0, 20, 0]);
-      times.push(performance.now() - start);
-    }
-    const grown = heap() - before;
-    figures.update(new Map(), 1 / 60, [0, 20, 0]);
-    return { mean: times.reduce((sum, t) => sum + t, 0) / times.length, grown };
-  });
-  console.log(
-    `ok figures cost ${cost.mean.toFixed(3)} ms mean for 200 players; heap grew ${cost.grown} B over 2,000 updates`,
-  );
-  assert.ok(cost.mean < 4, `${cost.mean} ms a frame for 200 figures`);
+  if (speedEnabled()) {
+    const cost = await sandbox(() => {
+      const { figures } = window.voxelSandbox,
+        players = new Map();
+      for (let id = 1000; id < 1200; id++) {
+        const a = id * 0.7;
+        players.set(id, {
+          id,
+          name: 'Quiet Otter',
+          snapshot: {
+            position: new Float64Array([Math.cos(a) * 30, 20, Math.sin(a) * 30]),
+            rotation: new Float64Array([0, Math.sin(a), 0, Math.cos(a)]),
+            velocity: new Float64Array([2, 0, 1]),
+          },
+        });
+      }
+      for (let i = 0; i < 300; i++) figures.update(players, 1 / 60, [0, 20, 0]); // warm up
+      const heap = () => performance.memory?.usedJSHeapSize ?? 0,
+        times = [],
+        before = heap();
+      for (let i = 0; i < 2000; i++) {
+        const start = performance.now();
+        figures.update(players, 1 / 60, [0, 20, 0]);
+        times.push(performance.now() - start);
+      }
+      const grown = heap() - before;
+      figures.update(new Map(), 1 / 60, [0, 20, 0]);
+      return { mean: times.reduce((sum, t) => sum + t, 0) / times.length, grown };
+    });
+    console.log(
+      `ok figures cost ${cost.mean.toFixed(3)} ms mean for 200 players; heap grew ${cost.grown} B over 2,000 updates`,
+    );
+    speedBudget('sandbox-figures', { cost });
+  } else deferSpeed('const cost speed diagnostics');
 
   // The server is killed: the page says it is trying within 5 s, stops trying within the 30 s a server keeps a player,
   // then a playable solo world.

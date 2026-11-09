@@ -20,13 +20,18 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 
 test('a timing test runs as its own step under the exclusive GPU lock; every other test stays shared', () => {
   const tests = plan(),
-    fly = tests.find((t) => t.label === 'biomes test:gpu:flythrough');
+    fly = tests.find((t) => t.label === 'biomes test:gpu:flythrough:speed');
   assert.ok(fly, 'the biomes flythrough has a script of its own');
   assert.equal(fly.exclusive, true);
-  assert.equal(fly.command, 'cd ../.. && node packages/biomes/tests/flythrough-check.mjs');
-  for (const label of ['biomes test:gpu', 'biomes test:gpu:objects'])
+  assert.equal(fly.command, 'cd ../.. && node packages/biomes/tests/flythrough-speed.mjs');
+  for (const label of [
+    'biomes test:gpu',
+    'biomes test:gpu:objects',
+    'biomes test:gpu:flythrough',
+    'biomes test:gpu:objects-frame',
+  ])
     assert.equal(tests.find((t) => t.label === label)?.exclusive, undefined, `${label} runs in a shared slot`);
-  assert.match(read('packages/biomes/tests/flythrough-check.mjs'), TIMING_TEST);
+  assert.match(read('packages/biomes/tests/flythrough-speed.mjs'), TIMING_TEST);
   const ordered = lockOrder(tests);
   assert.deepEqual(
     ordered.slice(-tests.filter((t) => t.exclusive).length).map((t) => t.label),
@@ -151,6 +156,7 @@ test('every timing test fails at once when it is run inside a shared GPU slot', 
           timeout: 60_000,
           env: {
             ...process.env,
+            MARGO_SPEED_PHASE: 'active',
             MARGO_GPU_LOCK: lock,
             MARGO_GPU_LOCK_NESTED: join(lock, 'nested'),
             MARGO_GPU_LOCK_NESTED_MODE: 'shared',

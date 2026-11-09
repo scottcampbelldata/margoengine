@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
@@ -79,7 +80,8 @@ try {
     name: 'GPU depth precision: near=1 mm, far=10 km, 0.1 mm surface separation at 500 m survives adverse draw order',
     pixel: precision,
   });
-  const stress = await page.evaluate(async () => {
+  if (!speedEnabled()) deferSpeed('10k hierarchy CPU/GPU timing diagnostics');
+  const stress = await page.evaluate(async (timing) => {
     const { Engine, box } = await import('/packages/core/dist/extension.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:640px;height:400px';
@@ -98,15 +100,17 @@ try {
         .setPosition([(i % 100) * 0.06 - 3, Math.floor(i / 100) * 0.01, 0]);
     const samples = [],
       gpu = [];
+    let sampledFrames = 0;
     for (let i = 0; i < 70; i++) {
       root.position.y = Math.sin(i / 10) * 0.2;
-      const start = performance.now();
+      const start = timing ? performance.now() : undefined;
       e.render({ delta: 1 / 60 });
-      const end = performance.now();
+      const end = timing ? performance.now() : undefined;
       await e.gpu.queue.onSubmittedWorkDone();
       if (i >= 10) {
-        samples.push(end - start);
-        gpu.push(performance.now() - start);
+        sampledFrames++;
+        if (timing) samples.push(end - start);
+        if (timing) gpu.push(performance.now() - start);
       }
     }
     const percentile = (values, p) => values.sort((a, b) => a - b)[Math.ceil(values.length * p) - 1],
@@ -114,11 +118,11 @@ try {
         entities: e.meshes.size,
         visible: e.stats.visible,
         batches: e.stats.drawCalls,
-        frames: samples.length,
-        cpuMedianMs: percentile(samples, 0.5),
-        cpuP95Ms: percentile(samples, 0.95),
-        completedGpuMedianMs: percentile(gpu, 0.5),
-        completedGpuP95Ms: percentile(gpu, 0.95),
+        frames: sampledFrames,
+        cpuMedianMs: timing ? percentile(samples, 0.5) : undefined,
+        cpuP95Ms: timing ? percentile(samples, 0.95) : undefined,
+        completedGpuMedianMs: timing ? percentile(gpu, 0.5) : undefined,
+        completedGpuP95Ms: timing ? percentile(gpu, 0.95) : undefined,
         memoryBytes: e.store.matrices.buffer.byteLength,
       };
     await e.rebootDevice();
@@ -127,7 +131,7 @@ try {
     e.dispose();
     canvas.remove();
     return report;
-  });
+  }, speedEnabled());
   assert.ok(stress.entities > 10000 && stress.frames === 60 && stress.batches < 10);
   checks.push({
     name: 'Hierarchy stress: 10000 shared-geometry parts under a moving parent, batched draws and reboot',

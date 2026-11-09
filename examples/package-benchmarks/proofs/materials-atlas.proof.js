@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Draw and batch reduction from texture atlases (@margoengine/materials packAtlas, uvTransform, transformUVs), counted on
 // the recording mock GPU over a steady frame, and the CPU time per frame of the same scenes (silent mock, medians).
 // 256 boxes, each with its own 32x32 image:
@@ -13,6 +14,8 @@ import { Engine, TransformStore } from '@margoengine/core/extension';
 import { current, entryAt, announce, save } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
+const measure = speedEnabled();
+if (!measure) deferSpeed('materials-atlas.proof CPU timing diagnostics');
 const pin = current ? undefined : '700838e';
 announce('geometry + materials (measured, no baseline)', '-', pin);
 const [{ boxGeometry, mergeGeometries, applyMatrix4 }, { Texture, Material, createMesh, packAtlas, transformUVs }] =
@@ -77,11 +80,12 @@ async function scene(variant) {
   const steady = gpu.record(() => frame(2)),
     kinds = (name) => steady.filter((e) => e[0] === name).length;
   const times = [];
-  for (let i = 0; i < 60; i++) {
-    const t = performance.now();
-    frame(3 + i);
-    times.push(performance.now() - t);
-  }
+  if (measure)
+    for (let i = 0; i < 60; i++) {
+      const t = measure ? performance.now() : undefined;
+      frame(3 + i);
+      if (measure) times.push((measure ? performance.now() : undefined) - t);
+    }
   times.sort((a, b) => a - b);
   return {
     draws: kinds('pass.drawIndexed'),
@@ -91,7 +95,7 @@ async function scene(variant) {
     texturesCreated: setup.filter((e) => e[0] === 'texture').length,
     pipelinesCreated: setup.filter((e) => e[0] === 'renderPipeline').length,
     bindGroupsCreated: setup.filter((e) => e[0] === 'group').length,
-    cpuMsPerFrame: +times[30].toFixed(3),
+    cpuMsPerFrame: measure ? +times[30].toFixed(3) : undefined,
   };
 }
 const results = {};
@@ -118,4 +122,4 @@ const report = {
   notes:
     'Counts are one steady frame on the recording mock GPU. gltf-pro draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only).',
 };
-await save('materials-atlas', report);
+if (measure) await save('materials-atlas', report);

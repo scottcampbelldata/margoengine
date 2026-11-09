@@ -1,7 +1,7 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // VoxelMesher throughput on worker_threads, printed and not asserted: meshes per second with 1, 2 and 3 workers over
 // 64 chunks of seeded random terrain (meshInput on this thread, meshChunk in the workers), with the machine's CPU load
 // during each run, since other jobs share the machine. At most half the logical cores (workers plus this thread).
-import test from 'node:test';
 import { cpus } from 'node:os';
 import { VoxelMesher } from '../dist/mesher.js';
 import { NodeWebWorker, terrainWorld } from './worker-support.js';
@@ -15,7 +15,7 @@ const times = () =>
     [0, 0],
   );
 
-test('benchmark: VoxelMesher meshes per second with 1, 2 and 3 workers (printed)', async (t) => {
+speedTest('benchmark: VoxelMesher meshes per second with 1, 2 and 3 workers (printed)', async (t) => {
   const previous = globalThis.Worker;
   globalThis.Worker = NodeWebWorker;
   t.after(() => (globalThis.Worker = previous));

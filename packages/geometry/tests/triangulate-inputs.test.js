@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -20,7 +21,7 @@ function rejectsQuickly(body) {
   assert.equal(child.error, undefined, `Invalid input did not return within 120 s: ${child.error?.message}`);
   assert.equal(child.status, 0, child.stderr);
   const ms = Number(child.stdout.trim());
-  assert.ok(ms < 1500, `Invalid input took ${ms} ms of CPU time to reject`);
+  speedBudget('geometry-inputs', { ms });
 }
 
 test('invalid triangulation dimensions reject without blocking the caller', () => {

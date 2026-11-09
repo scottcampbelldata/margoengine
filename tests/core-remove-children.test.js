@@ -1,3 +1,4 @@
+import { speedTest } from '../scripts/support/speed-test.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../scripts/support/cpu-budget.mjs';
@@ -42,7 +43,7 @@ test('removing a mesh unparents only its current children, also after reparentin
   assert.equal(parents()[child.id], -1);
 });
 
-test('removing many meshes does not scan every slot per mesh', async () => {
+speedTest('removing many meshes does not scan every slot per mesh', async () => {
   // Before: each remove scanned the whole parent column (capacity), 30,000 x 524,288 slots, about 3 s here.
   using engine = await create(1 << 19);
   const root = engine.createMesh(),

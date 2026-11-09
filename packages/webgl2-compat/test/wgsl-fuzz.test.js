@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // Fuzz and property tests of the WGSL front end. Fuzz: random token soup, mutated corpus shaders and nesting bombs
 // either check or fail with a WGSLError whose code, line, column and offset agree; nothing else may escape, and every
 // case ends quickly. Properties: constant folding of i32, u32 and f32 operators matches a reference evaluator, struct
@@ -61,7 +62,7 @@ function contract(source, what) {
     outcome = error.code;
   }
   const ms = cpu();
-  assert.ok(ms < 400, `${what}: took ${Math.round(ms)} ms of CPU`);
+  speedBudget('wgsl-fuzz', { ms, what });
   return outcome;
 }
 

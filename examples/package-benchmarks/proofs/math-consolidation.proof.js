@@ -1,3 +1,4 @@
+import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Proof for the math consolidation: every helper that moved into @margoengine/math gives
 // bit-identical results to the package copy it replaced. The old copies are built from `ref` with the repo harness
 // (compare.js `versions`); copies that were not exported are first checked to be textually identical (whitespace and
@@ -19,7 +20,7 @@ import { resolve } from 'node:path';
 import { refs, versions, time, entryAt, fileAt, tape, fact, atRef } from './compare.js';
 import { deterministicMath } from './golden.js';
 
-const timing = process.argv.includes('--time'),
+const timing = process.argv.includes('--time') && !deferSpeed('math consolidation hot-path timings'),
   { ref, pin } = refs('2484971', '4eed254');
 // The stored digests are compared on every host, so they may hold only exactly specified results (golden.js tape):
 // Math.sin, Math.cos and Math.hypot become exact stand-ins (old copies and today's math both call them), and the results

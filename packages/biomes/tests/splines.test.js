@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // /splines: roads and paths. Settings are checked with messages that name the fix; polylines, Catmull-Rom and B-spline
 // curves sample in integers through (or from) their points; a carved height flattens or cuts the ground under a path and
 // leaves the rest alone; painting goes through the editor (exact undo, replay, any order); placement keeps off the
@@ -468,7 +469,7 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
   ]);
   assert.ok(rasters(world, 'mask/wide').every((r) => r.every((v) => v === 255)));
   let ms = cpu();
-  assert.ok(ms < 200, `${ms} ms of CPU`);
+  speedBudget('biomes-wide-road', { ms });
   // A path outside the world writes nothing and carves nothing.
   const outside = {
     points: [
@@ -493,7 +494,7 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
   await digests(carved);
   paintPaths(editor, [wander]);
   ms = cpu();
-  assert.ok(ms < 800, `${ms} ms of CPU`);
+  speedBudget('biomes-wander-road', { ms });
   const whole = rasters(world, 'mask/wander');
   editor.undo();
   // The same line drawn as one two-point path per piece, painted with 'max': the same bytes.

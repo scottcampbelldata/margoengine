@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // LAZ decoder tests. Every file here comes from tests/laz-encoder.js, a separate encoder written from the same public description. A round trip proves
 // that the decoder inverts that reading of the specification; it does not prove byte compatibility with LASzip.
 import assert from 'node:assert/strict';
@@ -341,7 +342,11 @@ test('LAZ compressors 0 and 1, and a chunk size of 0 for adaptive chunks', async
   const parsed = await parseLAS(whole);
   assert.deepEqual(parsed.gpsTime, (await parseLAS(plain)).gpsTime);
   // Chunk size 0 is the specification's other mark for adaptive chunks.
-  const adaptive = await roundTrip(lasFile(7, 100, surveyFill(4)), { chunks: [30, 70], adaptiveZero: true }, 'chunk size 0');
+  const adaptive = await roundTrip(
+    lasFile(7, 100, surveyFill(4)),
+    { chunks: [30, 70], adaptiveZero: true },
+    'chunk size 0',
+  );
   assert.equal(lazInfo(readLASHeader(adaptive.laz).records).chunkSize, 'variable');
 });
 
@@ -436,7 +441,7 @@ test('fuzz: corrupt and truncated LAZ only ever throws coded errors, never hangs
     }
   }
   assert.ok(thrown > 0 && decoded > 0, `${thrown} thrown, ${decoded} decoded`);
-  assert.ok(cpu() < 8000);
+  speedBudget('points-laz', { cpu });
 });
 
 test('property: random point counts, chunkings and seeds always round-trip byte for byte', async () => {

@@ -1,3 +1,4 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // B1: climate fields. Closed forms against numeric sums, analytic surfaces with known slope and curvature, the
 // distance transform and Priority-Flood against brute force, rain shadow and drift on a ridge, cold-air pools and the
 // treeline, determinism across tile order and tile size, golden digests and a time budget.
@@ -373,11 +374,14 @@ test('validation, abort, update, onChange and dispose', async () => {
   assert.throws(() => w.sample(0, 0), { name: 'MargoError', code: 'disposed' });
 });
 
-test('time budget: one default 256 m tile at 1 m in under 150 ms of CPU (measured about 30 ms on the reference PC)', async () => {
-  const w = await BiomeWorld.create({ seed: 5 });
-  await w.tile(0, 0);
-  const cpu = cpuTimer();
-  for (let i = 1; i <= 4; i++) await w.tile(i, 0);
-  const each = cpu() / 4;
-  assert.ok(each < 150, `tile fields took ${each.toFixed(1)} ms of CPU`);
-});
+speedTest(
+  'time budget: one default 256 m tile at 1 m in under 150 ms of CPU (measured about 30 ms on the reference PC)',
+  async () => {
+    const w = await BiomeWorld.create({ seed: 5 });
+    await w.tile(0, 0);
+    const cpu = cpuTimer();
+    for (let i = 1; i <= 4; i++) await w.tile(i, 0);
+    const each = cpu() / 4;
+    assert.ok(each < 150, `tile fields took ${each.toFixed(1)} ms of CPU`);
+  },
+);

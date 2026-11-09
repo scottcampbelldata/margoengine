@@ -1,3 +1,4 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // B5: stored-object placement. Records and decoding; the hard core across tile seams; tile order and tile size
 // independence; the lazy rounds equal a brute-force run of Luby's rounds; the unresolved share; exclusions, shade, edges
 // and canopy layers; golden digests; and the quality gates of goal G7: global envelope tests (studentised maximum
@@ -677,23 +678,26 @@ test('the editor dirty margin covers the placement reach, and an edit leaves til
   assert.notEqual(await p.digest(7, 1), near);
 });
 
-test('time budget (G1): one preset forest tile placed in under 150 ms of CPU on one thread (measured about 30 ms on the reference PC)', async () => {
-  const w = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
-    p = BiomePlacement.attach(w);
-  await p.tile(0, 0);
-  for (const [x, z] of [
-    [1, 1],
-    [2, 1],
-    [1, 2],
-  ])
-    await w.tile(x, z);
-  for (let x = 0; x <= 3; x++) for (let z = 0; z <= 3; z++) await w.tile(x, z);
-  const cpu = cpuTimer();
-  await p.tile(1, 1);
-  await p.tile(2, 1);
-  const each = cpu() / 2;
-  assert.ok(each < 150, `placement took ${each.toFixed(0)} ms of CPU per tile`);
-});
+speedTest(
+  'time budget (G1): one preset forest tile placed in under 150 ms of CPU on one thread (measured about 30 ms on the reference PC)',
+  async () => {
+    const w = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
+      p = BiomePlacement.attach(w);
+    await p.tile(0, 0);
+    for (const [x, z] of [
+      [1, 1],
+      [2, 1],
+      [1, 2],
+    ])
+      await w.tile(x, z);
+    for (let x = 0; x <= 3; x++) for (let z = 0; z <= 3; z++) await w.tile(x, z);
+    const cpu = cpuTimer();
+    await p.tile(1, 1);
+    await p.tile(2, 1);
+    const each = cpu() / 2;
+    assert.ok(each < 150, `placement took ${each.toFixed(0)} ms of CPU per tile`);
+  },
+);
 
 test('sea level: no species stands on ground below the sea, and inland objects do not move', async () => {
   // Regression: placement read climate fields only, so the wetland coast had alders, willows, oaks and hazels standing

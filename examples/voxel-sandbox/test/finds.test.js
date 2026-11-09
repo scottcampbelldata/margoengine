@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // What a Plaza world hides: the fields finds.ts evaluates match real terrain, the opals are exact, chunks come out the same
 // in any order, and nothing touches the square, the sign or the spawn ring.
 import assert from 'node:assert/strict';
@@ -88,7 +89,7 @@ test('exactly GEM_TOTAL opals, known from the seed, each generated where the lis
     const list = [...gems.values()].flat();
     assert.equal(list.length, GEM_TOTAL, `seed ${seed}`);
     assert.equal(new Set(list.map(String)).size, GEM_TOTAL, 'all different');
-    assert.ok(ms < 1000, `worked out in ${ms.toFixed(0)} ms`);
+    speedBudget('sandbox-finds', { ms });
     for (const [x, y, z] of list) {
       assert.ok(Math.hypot(x, z) <= GEM_RADIUS + 1, 'inside the radius');
       assert.ok(isFindsClear(x, z), `${x},${z} clear of the square and ring`);

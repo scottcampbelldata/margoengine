@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // The objects entry without a GPU: argument checks (its drawing is proved on a real GPU by objects-check.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +31,7 @@ test('detail maps have a byte budget and the device texture limit, checked befor
     BiomeObjects.attach(engine, placement, { heightmap, bounds: [0, 0, 1e6, 1e6], detailResolution: 0.01 }),
     (error) => error.code === 'unsupported' && /detailBudget/.test(error.message),
   );
-  assert.ok(cpu() < 100, 'no allocation before the check');
+  speedBudget('biomes-object-allocation', { cpu });
   // Within the texture limit but over the default budget; a raised budget lets it through the check.
   const bounds = [0, 0, 8000, 8000];
   assert.ok(!detailFits(bounds, 1, 3, 8192));

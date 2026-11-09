@@ -1,5 +1,5 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // Get/set throughput, printed and not asserted (timings vary by machine). Single thread, well under a second.
-import test from 'node:test';
 import { BlockTypes, VoxelChunk, VoxelWorld } from '../dist/index.js';
 
 const random = (seed) => () => {
@@ -10,7 +10,7 @@ const random = (seed) => () => {
 };
 const rate = (n, ms) => `${(((n / ms) * 1e3) / 1e6).toFixed(1)} M/s`;
 
-test('benchmark: chunk and world get/set throughput (printed)', (t) => {
+speedTest('benchmark: chunk and world get/set throughput (printed)', (t) => {
   const next = random(1),
     n = 400000,
     cells = Int32Array.from({ length: n * 3 }, () => Math.floor(next() * 32)),

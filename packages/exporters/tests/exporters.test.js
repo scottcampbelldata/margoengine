@@ -1,3 +1,5 @@
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -1064,51 +1066,47 @@ test('numbers are written as the shortest text that reads back as the same Float
     };
   assert.ok(numbers.length > 140_000, `${numbers.length} numbers`);
   assert.deepEqual(numbers.slice(0, 5000).map(num), numbers.slice(0, 5000).map(reference));
-  let writer = Infinity,
-    search = Infinity;
-  for (let round = 0; round < 9; round++) {
-    writer = Math.min(
-      writer,
-      time(() => numbers.map(num)),
-    );
-    search = Math.min(
-      search,
-      time(() => numbers.map(reference)),
-    );
-  }
-  assert.ok(
-    writer < search,
-    `The number writer ${writer.toFixed(1)} ms is not below the old search ${search.toFixed(1)} ms`,
-  );
-  // The whole export against a recorded budget, in units of a control job that allocates alike: strings joined into one
-  // text, encoded to bytes and copied. A budget in milliseconds cannot hold on a loaded machine: with every core
-  // allocating the export's best round reads 90 to 144 ms against 18 alone, and the control slows with it.
-  const control = () => {
-    const parts = [];
-    for (let i = 0; i < numbers.length; i++) parts.push(`${i}.5`);
-    const bytes = new TextEncoder().encode(parts.join(' '));
-    return new Uint8Array(bytes.length * 2).set(bytes);
-  };
-  // Six controls per timing, so both jobs last about as long. A control of 3 ms alone finds a quiet gap between bursts of
-  // load that a 20 ms export cannot, which read 41.6 against 4.0 ms (10.3) in 1 of 10 runs with 40 processes in bursts;
-  // the long control read 4.8 to 6.8 in those runs.
-  const repeats = 6,
-    controls = () => {
-      for (let i = 0; i < repeats; i++) control();
+  if (speedEnabled()) {
+    let writer = Infinity,
+      search = Infinity;
+    for (let round = 0; round < 9; round++) {
+      writer = Math.min(
+        writer,
+        time(() => numbers.map(num)),
+      );
+      search = Math.min(
+        search,
+        time(() => numbers.map(reference)),
+      );
+    }
+    speedBudget('exporters-writer', { writer, search });
+    // The whole export against a recorded budget, in units of a control job that allocates alike: strings joined into one
+    // text, encoded to bytes and copied. A budget in milliseconds cannot hold on a loaded machine: with every core
+    // allocating the export's best round reads 90 to 144 ms against 18 alone, and the control slows with it.
+    const control = () => {
+      const parts = [];
+      for (let i = 0; i < numbers.length; i++) parts.push(`${i}.5`);
+      const bytes = new TextEncoder().encode(parts.join(' '));
+      return new Uint8Array(bytes.length * 2).set(bytes);
     };
-  let usdz = Infinity,
-    unit = Infinity;
-  for (let round = 0; round < 15; round++) {
-    usdz = Math.min(
-      usdz,
-      time(() => exportUSDZ({ nodes })),
-    );
-    unit = Math.min(unit, time(controls) / repeats);
+    // Six controls per timing, so both jobs last about as long. A control of 3 ms alone finds a quiet gap between bursts of
+    // load that a 20 ms export cannot, which read 41.6 against 4.0 ms (10.3) in 1 of 10 runs with 40 processes in bursts;
+    // the long control read 4.8 to 6.8 in those runs.
+    const repeats = 6,
+      controls = () => {
+        for (let i = 0; i < repeats; i++) control();
+      };
+    let usdz = Infinity,
+      unit = Infinity;
+    for (let round = 0; round < 15; round++) {
+      usdz = Math.min(
+        usdz,
+        time(() => exportUSDZ({ nodes })),
+      );
+      unit = Math.min(unit, time(controls) / repeats);
+    }
+    // The ratio read 4.9 to 5.1 alone and 2.6 to 4.9 with 32 processes allocating on 32 threads; the export before its number
+    // writer was fast reads about 16.
+    speedBudget('exporters-usdz', { usdz, unit });
   }
-  // The ratio read 4.9 to 5.1 alone and 2.6 to 4.9 with 32 processes allocating on 32 threads; the export before its number
-  // writer was fast reads about 16.
-  assert.ok(
-    usdz < unit * 10,
-    `exportUSDZ of 1,000 boxes took ${usdz.toFixed(1)} ms, the control ${unit.toFixed(1)} ms`,
-  );
 });

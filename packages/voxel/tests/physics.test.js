@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // VoxelPhysics against the real solver of @margoengine/physics.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -704,10 +705,11 @@ rtest('a cave chunk entering a ball radius is meshed piece by piece within the b
   assert.deepEqual([...spread.seen], ['voxels'], 'until its mesh is complete the chunk keeps its voxel collider');
   const worst = max(spread.spent),
     worstWork = max(spread.work);
-  t.diagnostic(
-    `cave chunk meshed for a ball: all at once ${whole.spent[0].toFixed(1)} ms in one step; budget 2: ` +
-      `${spread.steps} steps, at most ${worst.toFixed(2)} ms a step (${spread.pieces} pieces)`,
-  );
+  if (speedEnabled())
+    t.diagnostic(
+      `cave chunk meshed for a ball: all at once ${whole.spent[0].toFixed(1)} ms in one step; budget 2: ` +
+        `${spread.steps} steps, at most ${worst.toFixed(2)} ms a step (${spread.pieces} pieces)`,
+    );
   assert.ok(
     worstWork < whole.work[0] / 4,
     `no step meshes more than a quarter of the whole build (${worstWork} of ${whole.work[0]} triangles)`,
@@ -777,10 +779,11 @@ rtest('a ball spawned inside a cave chunk gets the mesh around it at once; no bo
     drift = Math.max(drift, Math.abs(box.position[1] - rest));
   }
   const pieces = voxels.colliders.get('0,0,0').length;
-  t.diagnostic(
-    `ball spawned in a cave chunk: first step ${spent[0].toFixed(2)} ms built ${first} of ${pieces} pieces; ` +
-      `the rest took ${done} more steps, at most ${max(spent.slice(1, done + 1)).toFixed(2)} ms each`,
-  );
+  if (speedEnabled())
+    t.diagnostic(
+      `ball spawned in a cave chunk: first step ${spent[0].toFixed(2)} ms built ${first} of ${pieces} pieces; ` +
+        `the rest took ${done} more steps, at most ${max(spent.slice(1, done + 1)).toFixed(2)} ms each`,
+    );
   assert.ok(first < pieces / 2, `the first step built only the pieces near the bodies (${first} of ${pieces})`);
   assert.equal(voxels.pending, 0);
   assert.ok(calls.triangles <= 2048);
@@ -824,10 +827,11 @@ rtest('chunks entering a moving body radius are built within the budget, never u
   const whole = cross(Infinity),
     spread = cross(2);
   const top = (list) => [...list].sort((a, b) => b - a).slice(0, 5);
-  t.diagnostic(
-    `crossing chunk borders over cave chunks: budget Infinity, worst steps ${top(whole.spent).map((v) => v.toFixed(1))} ms; ` +
-      `budget 2: ${top(spread.spent).map((v) => v.toFixed(1))} ms`,
-  );
+  if (speedEnabled())
+    t.diagnostic(
+      `crossing chunk borders over cave chunks: budget Infinity, worst steps ${top(whole.spent).map((v) => v.toFixed(1))} ms; ` +
+        `budget 2: ${top(spread.spent).map((v) => v.toFixed(1))} ms`,
+    );
   assert.equal(spread.holes, 0, 'the chunk under the body always had its collider');
   assert.ok(
     max(spread.work) < max(whole.work) / 2,
@@ -972,7 +976,12 @@ rtest('arguments and a solver without voxels are rejected with clear errors', ()
   assert.throws(() => new VoxelPhysics(physics, world), { name: 'MargoError', code: 'disposed' });
 });
 
-rtest('benchmark: collider builds and edit updates (printed)', (t) => {
+const speedRtest = (...args) => {
+  if (deferSpeed(args[0])) return;
+  return rtest(...args);
+};
+
+speedRtest('benchmark: collider builds and edit updates (printed)', (t) => {
   // One chunk alone in its world, built all at once by the first step (the solver's collider creation included); best of 3.
   const single = (make, ball) => {
     let best = Infinity,
@@ -1003,11 +1012,12 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
       return chunk;
     };
   for (const ball of [false, true])
-    t.diagnostic(
-      `one chunk all at once, ${ball ? 'triangle mesh' : 'voxel collider'}: terrain surface ${single(surface, ball)}, ` +
-        `solid with open faces ${single(() => new VoxelChunk(stone), ball)}, 50% random ${single(() => caves(3), ball)}, ` +
-        `air ${single(() => new VoxelChunk(), ball)}`,
-    );
+    if (speedEnabled())
+      t.diagnostic(
+        `one chunk all at once, ${ball ? 'triangle mesh' : 'voxel collider'}: terrain surface ${single(surface, ball)}, ` +
+          `solid with open faces ${single(() => new VoxelChunk(stone), ball)}, 50% random ${single(() => caves(3), ball)}, ` +
+          `air ${single(() => new VoxelChunk(), ball)}`,
+      );
   // Terrain over 8 x 8 chunk columns: uniform stone at chunk y -2..0, the surface in chunk y 1, nothing above.
   const height = (x, z) => 42 + Math.floor(8 * Math.sin(x * 0.13) * Math.cos(z * 0.11)),
     terrain = () => {
@@ -1052,11 +1062,12 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
         crossings.push(settle());
       }
       const mean = (key) => (crossings.reduce((a, c) => a + c[key], 0) / 4).toFixed(1);
-      t.diagnostic(
-        `${ball ? 'a ball' : 'a body'} on terrain, budget ${budget}: spawn ${spawn.builds} builds in ${spawn.steps} ` +
-          `steps, worst ${spawn.worst.toFixed(1)} ms; a chunk border crossing ${mean('builds')} builds in ` +
-          `${mean('steps')} steps, ${mean('total')} ms, worst step ${max(crossings.map((c) => c.worst)).toFixed(1)} ms`,
-      );
+      if (speedEnabled())
+        t.diagnostic(
+          `${ball ? 'a ball' : 'a body'} on terrain, budget ${budget}: spawn ${spawn.builds} builds in ${spawn.steps} ` +
+            `steps, worst ${spawn.worst.toFixed(1)} ms; a chunk border crossing ${mean('builds')} builds in ` +
+            `${mean('steps')} steps, ${mean('total')} ms, worst step ${max(crossings.map((c) => c.worst)).toFixed(1)} ms`,
+        );
     }
     if (budget === Infinity) kept = { physics, world, voxels, spent };
     else physics.dispose();
@@ -1083,10 +1094,11 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
   const without = edit(plain),
     updates = calls.setVoxel,
     withColliders = edit(world);
-  t.diagnostic(
-    `dig + place at the surface of voxel chunks: ${withColliders.toFixed(1)} us per edit (` +
-      `${((calls.setVoxel - updates) / (cells.length / 3) / 2).toFixed(1)} setVoxel each), ${without.toFixed(1)} us without`,
-  );
+  if (speedEnabled())
+    t.diagnostic(
+      `dig + place at the surface of voxel chunks: ${withColliders.toFixed(1)} us per edit (` +
+        `${((calls.setVoxel - updates) / (cells.length / 3) / 2).toFixed(1)} setVoxel each), ${without.toFixed(1)} us without`,
+    );
   // A mesh piece rebuilds at the next step however many edits it took.
   const [meshKey] = [...voxels.colliders].find(([key, list]) => key.split(',')[1] === '1' && isMesh(list)),
     [mx, , mz] = meshKey.split(',').map(Number),
@@ -1094,9 +1106,10 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
   world.setBlock(mx * 32 + 5, height(mx * 32 + 5, mz * 32 + 5) - 1, mz * 32 + 5, 0);
   spent.length = 0;
   physics.step();
-  t.diagnostic(
-    `an edit in a mesh chunk: ${calls.meshes - meshes} piece rebuilt at the next step, ${spent[0].toFixed(1)} ms`,
-  );
+  if (speedEnabled())
+    t.diagnostic(
+      `an edit in a mesh chunk: ${calls.meshes - meshes} piece rebuilt at the next step, ${spent[0].toFixed(1)} ms`,
+    );
   physics.dispose();
 });
 

@@ -190,6 +190,8 @@
     "test:gpu:objects-frame": "cd ../.. && node packages/biomes/tests/objects-frame-check.mjs",
     "test:gpu:backend": "cd ../.. && node packages/biomes/tests/gpu-backend-check.mjs",
     "test:gpu:backend-placement": "cd ../.. && node packages/biomes/tests/gpu-backend-placement-check.mjs",
-    "test:gpu:prefetch": "cd ../.. && node packages/biomes/tests/prefetch-check.mjs"
+    "test:gpu:prefetch": "cd ../.. && node packages/biomes/tests/prefetch-check.mjs",
+    "test:gpu:flythrough:speed": "cd ../.. && node packages/biomes/tests/flythrough-speed.mjs",
+    "test:gpu:objects-frame:speed": "cd ../.. && node packages/biomes/tests/objects-frame-speed.mjs"
   }
 }

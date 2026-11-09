@@ -1,3 +1,4 @@
+import { speedBudget } from '../scripts/speed/budgets.mjs';
 // Launch gate 11a: one regression per fuzzer finding in the asset parsers (scripts/fuzz/targets-assets.js).
 // Each hostile input, minimized, must now end in a named error
 // quickly (a generous 10 s bound: these were hangs) and without allocating far beyond its size; valid inputs nearby still parse.
@@ -38,7 +39,7 @@ const quick = async (label, run, ms = 600) => {
   const cpu = cpuTimer();
   await run();
   const took = cpu();
-  assert.ok(took < ms, `${label} took ${took} ms of CPU`);
+  speedBudget('fuzz-parsers', { took, ms, label });
 };
 
 test('PLY and OFF: a short body cannot claim millions of elements (allocation before validation)', async () => {

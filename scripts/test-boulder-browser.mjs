@@ -1,3 +1,4 @@
+import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 // The Boulder demo in a real browser on the built page (node scripts/build-boulder.mjs first; `--shots=<dir>` saves
 // screenshots there). On every tier it checks: no console errors, the opening stance is clear, every move of a route
 // reaches its hold with hull gaps kept and knees under the armour limit, the climber faces the way a person does on every
@@ -183,25 +184,27 @@ try {
       assert.ok(result.passesPerFrame <= 10, `phone: ${result.passesPerFrame} GPU passes a frame, the budget is 10`);
     result.hullLoadMs = await page.evaluate(() => globalThis.boulder.climber.hullLoadMs);
     // Timing, this PC only, and only meaningful when it is quiet.
-    result.gpuSubmitMs = await page.evaluate(async () => {
-      globalThis.__passes.timing = true;
-      // fixed-wait: the length of the timing window
-      await new Promise((r) => setTimeout(r, 2000));
-      globalThis.__passes.timing = false;
-      const sorted = [...globalThis.__passes.gpuMs].sort((a, b) => a - b);
-      return {
-        samples: sorted.length,
-        median: sorted[sorted.length >> 1],
-        p95: sorted[Math.floor(sorted.length * 0.95)],
-      };
-    });
-    result.solve = await page.evaluate(async () => {
-      globalThis.boulder.climber.resetTimes();
-      // fixed-wait: the length of the timing window
-      const wait = () => new Promise((r) => setTimeout(r, 1500));
-      await wait();
-      return { averageMs: globalThis.boulder.climber.solveMs, largestMs: globalThis.boulder.climber.solveMaxMs };
-    });
+    if (speedEnabled()) {
+      result.gpuSubmitMs = await page.evaluate(async () => {
+        globalThis.__passes.timing = true;
+        // fixed-wait: the length of the timing window
+        await new Promise((r) => setTimeout(r, 2000));
+        globalThis.__passes.timing = false;
+        const sorted = [...globalThis.__passes.gpuMs].sort((a, b) => a - b);
+        return {
+          samples: sorted.length,
+          median: sorted[sorted.length >> 1],
+          p95: sorted[Math.floor(sorted.length * 0.95)],
+        };
+      });
+      result.solve = await page.evaluate(async () => {
+        globalThis.boulder.climber.resetTimes();
+        // fixed-wait: the length of the timing window
+        const wait = () => new Promise((r) => setTimeout(r, 1500));
+        await wait();
+        return { averageMs: globalThis.boulder.climber.solveMs, largestMs: globalThis.boulder.climber.solveMaxMs };
+      });
+    } else deferSpeed('result.gpuSubmitMs speed diagnostics');
 
     // A hold far above: the reach comes up short and the stance stays.
     const short = await page.evaluate(async () => {

@@ -1,3 +1,4 @@
+import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Proof that gltf-pro's lighting hooks change nothing on the GPU: shadows, clustered lights, environment IBL and
 // fog used to find their places in gltf-pro's WGSL by text search; now each hands gltf-pro a `pbr(group)` contribution and
 // gltf-pro composes it. A 14-frame story (effects added in different orders, a text-patching custom effect in between, the
@@ -172,7 +173,7 @@ console.log(
 
 // --time: CPU of one beauty draw of 300 primitives (60 per material) lit by shadows, clustered, IBL and fog, steady frames.
 // The pipeline key used to append the whole shader text, so every draw flattened and hashed ~20 kB of string.
-if (process.argv.includes('--time')) {
+if (process.argv.includes('--time') && !deferSpeed('gltf-pro beauty-draw hot-path timings')) {
   const { time } = await import('./compare.js');
   const scene = async ([gltf, shadowsModule, clusteredModule, environment]) => {
     const gpu = mockGPU(),

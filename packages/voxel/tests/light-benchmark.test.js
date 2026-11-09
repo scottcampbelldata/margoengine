@@ -1,5 +1,5 @@
+import { speedTest } from '../../../scripts/support/speed-test.mjs';
 // Light throughput, printed and not asserted (timings vary by machine). Single thread, well under a second.
-import test from 'node:test';
 import { BlockTypes, VoxelChunk, VoxelWorld } from '../dist/index.js';
 import { VoxelLighting } from '../dist/light.js';
 
@@ -10,7 +10,7 @@ const settle = (lighting) => {
 };
 const rate = (cells, ms) => `${Math.round(cells / ms)} cells/ms (${cells} cells, ${ms.toFixed(2)} ms)`;
 
-test('benchmark: torch in open air and a 32-wide roof removal (printed)', (t) => {
+speedTest('benchmark: torch in open air and a 32-wide roof removal (printed)', (t) => {
   const blocks = new BlockTypes(),
     stone = blocks.define('stone'),
     torch = blocks.define('torch', { shape: 'cross', layer: 'cutout', solid: false, light: 14 }),

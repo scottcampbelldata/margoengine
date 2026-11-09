@@ -1,3 +1,4 @@
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';
@@ -29,7 +30,7 @@ test('a real-time server over WebSocket: two clients join, move and are seen by 
   const seen = watcher.interpolated().boxes.get(mover.player).x;
   assert.ok(seen > start + 1, `the watcher saw the mover go from ${start} to ${seen}`);
   assert.ok(mover.predicted.boxes.get(mover.player).x >= seen, 'the mover sees itself ahead of what others see');
-  assert.ok(mover.stats.rtt < 250, `rtt ${mover.stats.rtt} ms on localhost`);
+  speedBudget('netcode-rtt', { mover });
   mover.close();
   watcher.close();
 });

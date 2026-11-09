@@ -824,8 +824,12 @@ test('case 5: runner files run the smoke list plus the tests of the packages tha
   for (const t of tests.filter((x) => x.dir === 'wfc')) assert.ok(ids.includes(testId(t)), testId(t));
   for (const id of ['water/test:gpu', 'materials/test:gpu', 'root/test:catalog:browser'])
     assert.ok(!ids.includes(id), id);
-  assert.ok(!runs(planned, 'check:views'));
-  assert.ok(!runs(planned, 'check:depth'));
+  // gpu-lock's detached queue now uses run-limited. Both drivers reach that limiter through gpu-lock,
+  // so changing it must select them as well as the pinned smoke cases.
+  for (const step of ['check:views', 'check:depth']) {
+    assert.ok(stepsOf[step].files.has('scripts/support/run-limited.mjs'), `${step} reaches the queue limiter`);
+    assert.ok(runs(planned, step), `${step} runs when its limiter changes`);
+  }
 });
 
 test('an optional staging integrator peer selects its real downstream GPU coverage', () => {
