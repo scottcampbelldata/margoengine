@@ -4918,3 +4918,15 @@ material mapping. The two high-bit stencil failures remain open for the next
 checkpoint; this is not a pass of failure 10 or a suite closure.
 Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
 batch-273-clamp-{before,after,render-state} logs under test-results.
+
+### Section 5 evidence: Video overlay ownership
+
+Video has one EnginePlugin; other entries own material-feature or media handles
+and install no scene plugin. The active-name removal and missing pass view state
+are repaired in its optional root. A class-wide owner guard and the extended
+environment/staging/video pass-state guard run in check:merge's unit inventory.
+Corrected same-frame parent GPU proof changes 4608 out-of-scissor components.
+The repair passes four owner GPU cases, each with zero outside changes and
+512 red pixels. All 34 units/guards, six GPU leaves and seven runtime README
+examples pass. Only affected checks rerun; inherited full verify is
+retained. No hunter capture, core or stage source is changed.

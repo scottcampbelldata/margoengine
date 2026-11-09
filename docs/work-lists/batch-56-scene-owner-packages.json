@@ -436,8 +436,8 @@
     },
     {
       "package": "video",
-      "status": "pending",
-      "evidence": null
+      "status": "audited",
+      "evidence": "docs/whitepaper/results/batch-56-video-owner-20261109.json"
     },
     {
       "package": "viewcube",

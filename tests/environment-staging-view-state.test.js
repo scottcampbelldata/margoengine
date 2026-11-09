@@ -35,8 +35,8 @@ function missing(source) {
   visit(program);
   return problems;
 }
-test('environment and staging render passes declare and apply their view state', () => {
-  for (const packageName of ['environment', 'staging'])
+test('environment, staging and video render passes declare and apply their view state', () => {
+  for (const packageName of ['environment', 'staging', 'video'])
     for (const file of readdirSync(`packages/${packageName}/src`))
       if (file.endsWith('.ts')) {
         assert.deepEqual(

@@ -4254,3 +4254,36 @@ and reset behavior; hardware polygon offset preserves rasterizer slope/precision
 semantics better than injecting an approximate fragment depth. The repair uses
 that extension and explicitly refuses nonzero clamp when absent. No paper
 companion code or rival implementation was read or used.
+
+### Video overlay scene and view ownership (batch 56 continuation)
+
+Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with Algebraic
+Effects* (2017), https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+W3C GPU for the Web Working Group, *WebGPU*, editors Kai Ninomiya, Brandon Jones
+and Jim Blandy (2026), https://www.w3.org/TR/webgpu/; and Khronos Group, *OpenGL ES
+3.0.6 Specification* (2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf.
+Confinement motivates resolving the actual overlay registration. Structured
+lifetime motivates idempotent detachment while leaving the caller's frame alive.
+The graphics standards separately define viewport transformation and scissor
+clipping; WebGPU starts each pass with full-attachment state. The optional repair
+therefore combines sceneOf(this) disposal with the existing applyView helper.
+These are engineering inferences, not formal ownership proofs. No companion code
+or other repository implementation was read.
+
+The parent fails direct secondary disposal and the viewport/scissor unit. Its
+real-GPU overlay changes 4608 components outside the selected scissor, against
+the unchanged exact-zero assertion. The optional repair passes package units and
+source guards. All 34 checks, all six GPU leaves and seven runtime README
+examples pass. Core, stage and
+the hunter capture repair are untouched.
+
+The corrected GPU fixture draws its neighbor and overlay in the same frame;
+WebGPU swapchain textures do not retain undrawn pixels from an earlier task.
+The actual parent bundle still changes 4608 out-of-scissor components in this
+controlled fixture, while the repair changes zero and fills exactly 512 red
+pixels in each of four default/secondary direct/owner cases. No capture source
+was changed. Root size 2144 -> 2211 B; ceiling 2199 -> 2467 B under Scott's
+optional-size exception. Splitting would add bootstrap complexity for correctness
+that all overlays require.

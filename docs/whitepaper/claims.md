@@ -2652,3 +2652,13 @@ material mapping. The two high-bit stencil failures remain open for the next
 checkpoint; this is not a pass of failure 10 or a suite closure.
 Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
 batch-273-clamp-{before,after,render-state} logs under test-results.
+
+### Video overlay owner and view CPU/GPU proof
+
+Video's optional root resolves its actual scene and applies view state to its
+own pass. The parent fails the direct secondary owner regression and the pass
+state regression; its pixel repro changes 4608 out-of-scissor components.
+All 34 units/guards, six GPU leaves and seven runtime README examples pass.
+Each of four owner GPU cases draws 512 red pixels with zero changed components
+outside scissor, against the corrected parent's 4608. No speed
+claim or whole-audit completion is made.

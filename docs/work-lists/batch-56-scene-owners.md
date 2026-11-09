@@ -171,3 +171,22 @@ end of the wider audit and includes packages with no syntactic owner matches;
 their lack of a match is not a waiver. Prior environment/staging/TAA/post proofs
 cover the listed fixes, not a completed audit of every package entry. Core/stage
 source and the hunter's capture repair remain outside this lane's edit scope.
+
+Video source audit finds one direct EnginePlugin and one active-scene attach
+factory; attach intentionally chooses the supplied engine's active scene. Other
+entries (material, panorama, alpha, codecs, recording) have caller/material/media
+handle lifetimes and no EnginePlugin registration or scene capture. Direct
+secondary disposal and the overlay's missing viewport/scissor state fail on the
+parent; the real-GPU viewport parent changes 4608 components outside scissor.
+The optional repair passes units/guards; complete GPU and README acceptance are
+pending. This package remains pending in the finite ledger until acceptance.
+
+Video acceptance is complete: 34 units/guards, six GPU leaves, seven runtime
+README examples, six unchanged APIs and the documented optional size exception.
+The corrected actual-parent GPU fixture changes 4608 components outside scissor;
+all four fixed owner cases change zero and draw 512 red pixels. The finite ledger
+now marks Video audited. Ten packages audited, 83 pending, three physics-held,
+two outside this lane's edit scope. Animation is next; its source-confirmed
+registration cleanup defect is explicitly recorded in known-bugs, including the
+no-detachment VATCrowd candidate and unproved factories/inheritance. The wider
+audit stays OPEN; no syntax-only category is waived.

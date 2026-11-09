@@ -350,3 +350,31 @@ browser, keying quality comparison or speed measurement is claimed.
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## Scene-owned overlays and views
+
+Construct Video and use it on a scene to keep an overlay in that scene. Direct
+disposal removes its registration and pass from that scene, without removing a
+same-name plugin in another scene. Its rectangle is relative to the active view;
+the view's viewport and scissor also constrain the draw. Disposal is terminal and
+idempotent. A replacement can reuse the name; create a new Video to attach again.
+The caller still owns the source frame.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Video} from 'margoengine/video';
+const pixels = new OffscreenCanvas(8, 8);
+const drawing = pixels.getContext('2d')!;
+drawing.fillStyle = '#ff0000';
+drawing.fillRect(0, 0, 8, 8);
+const frame = new VideoFrame(pixels, {timestamp: 0});
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const scene = engine.createScene('video');
+const overlay = new Video(frame);
+scene.use(overlay);
+engine.render({views: [{scene, camera: engine.camera, viewport: [0, 0, 0.5, 1]}]});
+await engine.gpu!.queue.onSubmittedWorkDone();
+overlay.dispose();
+frame.close();
+engine.dispose();
+```

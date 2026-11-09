@@ -3797,3 +3797,25 @@ UNKNOWN, before renderer/GPU startup. The [resource documentation](https://learn
 distinguishes IDs 1 and 2. No installation, binary, registry or setting was changed;
 no Firefox pixel pass is claimed. Evidence with hashes, resource IDs, manifest
 text and event: docs/whitepaper/results/batch-273-firefox-diagnosis.json.
+
+### Video overlay scene/view ownership: resolved
+
+Direct secondary disposal and a missing viewport/scissor application are repaired
+in the optional Video root. All 34 units/guards, all six package GPU leaves and
+seven runtime README examples pass. The corrected same-frame parent pixel proof
+changes 4608 out-of-scissor components; the repaired four owner cases change
+zero and each draws exactly 512 red pixels. The caller's frame stays alive.
+[Video receipt](whitepaper/results/batch-56-video-owner-20261109.json).
+
+### Open: Animation registration cleanup still uses the active scene
+
+The next package owner audit is Animation. Source inspection confirms that
+Animation.dispose (packages/animation/src/index.ts) calls model.root.engine.removePlugin
+without sceneOf(this). With a live model, register a new Animation on a secondary
+scene, then call animation.dispose outside dispatch: the active default registry
+is queried and the secondary registration remains. The model disposal callback
+reaches that same cleanup. The package's other class, factory and inheritance
+candidates still need their own runtime proofs; VATCrowd.dispose contains no
+detachment at all. The package is explicitly pending in the finite ledger.
+No Animation source was edited in this continuation; reproduce and fix its own
+registration/factory paths with regression and complete package gates next.

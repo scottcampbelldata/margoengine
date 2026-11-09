@@ -3,6 +3,34 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { Video } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+test('video overlay applies its view viewport and scissor before drawing', () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<video></video>'),
+    old = globalThis.HTMLVideoElement;
+  globalThis.HTMLVideoElement = dom.window.HTMLVideoElement;
+  try {
+    const source = dom.window.document.querySelector('video');
+    Object.defineProperties(source, { videoWidth: { value: 8 }, readyState: { value: 2 } });
+    const order = [];
+    const begin = h.context.encoder.beginRenderPass;
+    h.context.encoder.beginRenderPass = (d) => ({
+      ...begin(d),
+      setViewport: (...args) => order.push(['viewport', ...args]),
+      setScissorRect: (...args) => order.push(['scissor', ...args]),
+      draw: () => order.push(['draw']),
+    });
+    h.context.view = { viewport: [0, 0, 64, 96], scissor: [2, 3, 20, 30] };
+    const video = new Video(source);
+    h.engine.use(video);
+    h.frame();
+    assert.deepEqual(order, [['viewport', 0, 0, 64, 96, 0, 1], ['scissor', 2, 3, 20, 30], ['draw']]);
+    video.dispose();
+  } finally {
+    globalThis.HTMLVideoElement = old;
+    dom.window.close();
+  }
+});
 test('video imports external frames without uploads and reuses frequency bins', () => {
   const h = optionalGPU(),
     dom = new JSDOM('<video></video>'),

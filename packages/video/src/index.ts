@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { group, render } from '../../shared/gpu.js';
+import { applyView } from '../../shared/view-rect.js';
 import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Options for `Video`. */
@@ -160,6 +161,7 @@ export class Video implements EnginePlugin {
         const pass = c.encoder.beginRenderPass({
           colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
         });
+        applyView(pass, c);
         pass.setPipeline(this.pipeline!);
         pass.setBindGroup(0, bind);
         pass.draw(6);
@@ -177,7 +179,7 @@ export class Video implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.uniform?.destroy();
     if (this.analyser) {
       this.audioSource?.disconnect(this.analyser);

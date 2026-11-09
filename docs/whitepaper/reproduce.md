@@ -2185,3 +2185,25 @@ MARGO_COMPAT=1, each under one shared scripts/gpu-lock.mjs run slot with
 negative native-bias clamp cases extend the grid. The clamp checkpoint retains
 the two independently known stencil failures and does not count that suite closed.
 Never invoke the canonical compatibility GPU chain containing tracer compilation.
+
+### Video overlay owner/view continuation
+
+Build Video outside the GPU lock, then run node --test --test-timeout=120000
+packages/video/test/*.test.js tests/video-owner-contract.test.js
+tests/environment-staging-view-state.test.js. Run each of the six package GPU
+leaves and scripts/run-readme-examples.mjs --packages=video in separate shared
+GPU lock commands, one lane slot and --wait-max=60, with a measured hold plus
+margin. The new scene-owner-browser.mjs tests default/secondary direct/owner
+removal, actual VideoFrame pixels, scissor exact-zero preservation, replacement,
+source ownership and redraw after removal.
+
+Video final acceptance passes all 34 units/guards, six GPU leaves and seven
+runtime README examples. The owner browser draws a background scene and the
+overlay view in one frame, rather than expecting a swapchain image to retain a
+previous task's undrawn pixels. It waits on actual pipeline readiness. In the
+same controlled fixture the actual 234f94fdb Video source bundle fails exact-zero
+preservation with 4608 changed outside components; the repair passes all four
+cases with exactly 512 red pixels and zero outside changes. Retained earlier
+fixture diagnostics are not used as the final parent proof. All six APIs match.
+[Receipt](results/batch-56-video-owner-20261109.json). The optional root size
+2144 -> 2211 B and ceiling 2199 -> 2467 B are documented with the split cost.

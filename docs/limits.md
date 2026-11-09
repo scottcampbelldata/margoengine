@@ -3146,3 +3146,18 @@ Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
 batch-273-clamp-{before,after,render-state} logs under test-results.
 
 Clamp entry sizes (minified gzip, bare imports external): {"index":{"beforeSource":105011,"afterSource":105099,"afterDist":105179},"device":{"beforeSource":105553,"afterSource":105646,"afterDist":105227},"xr":{"beforeSource":105409,"afterSource":105502,"afterDist":105134},"tiers":{"beforeSource":105513,"afterSource":105607,"afterDist":104916}}. Source before/after uses the parent versions of only the two owned changed source files through a build plugin. Dist uses the real package build. No ceiling changes.
+
+### Video overlay lifetime and view bounds (batch 56)
+
+Direct overlay disposal resolves its actual registered scene and preserves
+same-name peers/replacements. View viewport/scissor state constrains every
+overlay draw. Disposal is terminal; the caller owns VideoFrame.close. Parent
+pixel proof finds 4608 out-of-scissor changed components; the repaired four
+owner GPU cases change zero and each draws exactly 512 red pixels. All 34
+units/guards, six GPU leaves and seven runtime README examples pass. No core/stage source,
+public exports, optional ceiling or timing budget changes.
+
+Video optional root grows from 2144 to 2211 B min+gzip for correct disposal and
+viewport/scissor state. Its ceiling changes from 2199 to 2467 B (standard measured
+size plus 256 B). A split would add an entry/bootstrap for correctness that every
+existing overlay requires. Other five entry ceilings and core/stage are unchanged.

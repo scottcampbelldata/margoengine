@@ -1,0 +1,247 @@
+{
+  "status": "ACCEPTED_AFFECTED_CHECKS",
+  "parent": "234f94fdb",
+  "regressions": [
+    "packages/video/test/scene-owner.test.js",
+    "packages/video/test/video.test.js",
+    "packages/video/test/scene-owner-browser.mjs"
+  ],
+  "parentPixelOutsideComponents": 4608,
+  "verify": {
+    "inherited": "batch-56-save-owner-20261109.json",
+    "fullRunRepeated": false,
+    "reason": "Scott requested affected checks only"
+  },
+  "pending": [],
+  "fix": "same-change acceptance commit; original local source proof retained as localFixBeforeAcceptance",
+  "units": {
+    "pass": 34,
+    "fail": 0,
+    "skip": 0
+  },
+  "ownerParent": {
+    "pass": 6,
+    "fail": 1
+  },
+  "viewUnitParent": {
+    "pass": 4,
+    "fail": 1
+  },
+  "ownerGpu": {
+    "results": [
+      {
+        "target": "default",
+        "mode": "direct",
+        "outside": 0,
+        "red": 512
+      },
+      {
+        "target": "default",
+        "mode": "owner",
+        "outside": 0,
+        "red": 512
+      },
+      {
+        "target": "secondary",
+        "mode": "direct",
+        "outside": 0,
+        "red": 512
+      },
+      {
+        "target": "secondary",
+        "mode": "owner",
+        "outside": 0,
+        "red": 512
+      }
+    ],
+    "errors": []
+  },
+  "ownerGpuRun": {
+    "code": 0,
+    "timedOut": false,
+    "seconds": 6.24
+  },
+  "correctedParentGpu": {
+    "code": 1,
+    "timedOut": false,
+    "seconds": 9.556
+  },
+  "remainingGpuAndReadme": [
+    {
+      "id": "material",
+      "max": 1,
+      "words": [
+        "node",
+        "packages/video/test/material-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 8.7,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-material.log"
+    },
+    {
+      "id": "record",
+      "max": 1,
+      "words": [
+        "node",
+        "packages/video/test/record-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 21.368,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-record.log"
+    },
+    {
+      "id": "panorama",
+      "max": 1,
+      "words": [
+        "node",
+        "packages/video/test/panorama-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 9.361,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-panorama.log"
+    },
+    {
+      "id": "codecs",
+      "max": 1,
+      "words": [
+        "node",
+        "packages/video/test/codecs-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 19.944,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-codecs.log"
+    },
+    {
+      "id": "alpha",
+      "max": 1,
+      "words": [
+        "node",
+        "packages/video/test/alpha-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 8.631,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-alpha.log"
+    },
+    {
+      "id": "readme",
+      "max": 1,
+      "words": [
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=video"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 15.899,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-readme.log"
+    }
+  ],
+  "sizes": {
+    "parentRoot": 2144,
+    "sizes": [
+      {
+        "name": "@margoengine/video",
+        "gzip": 2211,
+        "ceiling": 2467
+      },
+      {
+        "name": "@margoengine/video/material",
+        "gzip": 1151,
+        "ceiling": 1407
+      },
+      {
+        "name": "@margoengine/video/record",
+        "gzip": 1140,
+        "ceiling": 1396
+      },
+      {
+        "name": "@margoengine/video/360",
+        "gzip": 1694,
+        "ceiling": 1881
+      },
+      {
+        "name": "@margoengine/video/codecs",
+        "gzip": 3458,
+        "ceiling": 3593
+      },
+      {
+        "name": "@margoengine/video/alpha",
+        "gzip": 1898,
+        "ceiling": 2154
+      }
+    ]
+  },
+  "sizeException": {
+    "before": 2144,
+    "after": 2211,
+    "ceilingBefore": 2199,
+    "ceilingAfter": 2467,
+    "reason": "Existing overlay ownership and view correctness; splitting adds entry/bootstrap complexity for universally required behavior."
+  },
+  "checks": {
+    "lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 5.815
+    },
+    "hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 31.053
+    },
+    "api": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 18.719
+    },
+    "readmetypes": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 13.993
+    },
+    "links": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 5.168
+    },
+    "sizes-final": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 34.848
+    }
+  },
+  "initialQuality": {
+    "code": 1,
+    "timedOut": false,
+    "seconds": 63.43
+  },
+  "quality": "Initial all-gate run only failed optional root size by 12 B; the same-run duplicate/tests/API/clean-room gates passed. Authorized optional ceiling updated, affected sizes gate passed. No full verify rerun.",
+  "localFixBeforeAcceptance": "52c9eb625",
+  "acceptanceChecks": {
+    "lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 4.515
+    },
+    "hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 19.29
+    },
+    "links": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 1.702
+    },
+    "readmetypes": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 6.903
+    }
+  }
+}
