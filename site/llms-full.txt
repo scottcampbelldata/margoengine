@@ -5917,8 +5917,22 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   cause is not isolated between uniform replay and multisample rendering;
   neither a driver cause nor acceptable numerical drift is proven. Failure 9
   stays open; no tolerance, shader math, sample grid or resource work is changed.
-  `materials/test:gpu:render-state` also reached its 60 s body deadline; the
-  awaited operation remains unisolated. `materials/test:gpu:wireframe` reports
+- `materials/test:gpu:render-state`: the complete owned probe now finishes in
+  72.5 s including orchestration, with 588 checks/274 captures and six assertion
+  failures. At both 4x and 1x, native/material clamped depth bias is red instead
+  of green and a stencil reference with high bits misses its eight-bit target.
+  Root owners: Replayer.applyPipeline calls two-argument gl.polygonOffset and
+  ignores depthBiasClamp; its stencilFuncSeparate call passes the unmasked
+  uint32 reference, which GL clamps to stencil range instead of taking the low
+  eight bits. Chrome and Edge expose EXT_polygon_offset_clamp locally, but the
+  device's extensions() does not load it. A complete repair needs sign-correct
+  clamp mapping, cache invalidation on clamp changes, an honest path/refusal
+  without the extension, and stencil masking before GL's signed/clamped input.
+  No runtime, stencil arithmetic, pixel expectation or timeout was changed.
+  Receipts: test-results/batch-273-render-state-probe.log and
+  test-results/material-render-state/gpu.json. This is an assertion failure,
+  not a remaining unidentified initial await or a busy exemption.
+- `materials/test:gpu:wireframe` reports
   mirrored/reference pixel hashes and duplicate-edge alpha differences, and
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
   rasterization/orientation divergences still need numeric root-cause proof.

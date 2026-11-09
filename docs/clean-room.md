@@ -3831,6 +3831,23 @@ assertions are retained. A shared 75-second GPU hold gives the prior 60-second
 failure a bounded observation margin. No runtime repair, timeout waiver or
 rendering pass is inferred from a marker. No companion/rival code was read.
 
+The complete probe finishes in 72.5 s including orchestration: 588 checks,
+274 captures and six failures. At both sample counts it fails native/material
+depth-bias clamp and the high-bit stencil reference. Replayer.applyPipeline
+ignores depthBiasClamp and calls gl.polygonOffset; the extensions table does
+not load the locally exposed EXT_polygon_offset_clamp. It also passes a uint32
+stencil reference directly to GL, whose signed/range clamp differs from masking
+to the eight-bit target. Compared Eric Lengyel and Tobias Hector,
+EXT_polygon_offset_clamp, OpenGL ES extension 252 revision 4 (2016),
+https://registry.khronos.org/OpenGL/extensions/EXT/EXT_polygon_offset_clamp.txt,
+with Khronos WebGL Working Group, EXT_polygon_offset_clamp revision 3 (2023),
+https://registry.khronos.org/webgl/extensions/EXT_polygon_offset_clamp/.
+They specify positive min, negative max, and that ordinary polygonOffset
+resets the clamp to zero. A repair must include the clamp in cached state,
+retain these signs and define the missing-extension case; merely dropping
+the clamp or changing the fixture would retain the root bug. No runtime repair
+is claimed in this checkpoint. Detailed repro and receipt: known-bugs.md.
+
 ## Batch 171 LIC landing integration
 
 Main's full published-precision colormap restoration changes shared data, not LIC tracing or shader source.
