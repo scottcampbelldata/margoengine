@@ -12,7 +12,7 @@ import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, NO_FILL, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
-import { margoError } from '../../shared/errors.js';
+import { margoError, fault } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
@@ -34,7 +34,7 @@ export interface Wave {
   amplitude: number;
   /** Crest spacing in world units, 0-100,000 (exclusive of 0). */
   wavelength: number;
-  /** Gerstner crest sharpness, 0..1; rejected (RangeError) when it would fold the surface. Default 0.5. */
+  /** Gerstner crest sharpness, 0..1; rejected (coded failed) when it would fold the surface. Default 0.5. */
   steepness?: number;
   /** Phase offset in radians. Default 0. */
   phase?: number;
@@ -341,7 +341,7 @@ interface WaterView {
  * An opaque, Y-up water surface: up to eight Gerstner swell trains with analytic normals, Fresnel reflection, glints,
  * absorption and shoreline foam, with optional terrain-coupled shallow-water flow and spray. `Water.attach(engine,
  * options)`; WebGPU only.
- * @throws RangeError / TypeError from the constructor when an option is invalid (including folding wave steepness).
+ * @throws RangeError / TypeError for invalid options; linked MargoError with code failed for folding wave steepness.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` during a frame when a
  * borrowed texture (depth, reflection, scene colour, terrain heightmap) does not have the required size or format.
  */
@@ -536,8 +536,10 @@ export class Water implements EnginePlugin {
         );
       const k = (2 * Math.PI) / w.wavelength;
       if (q * w.amplitude * k > 1 / waves.length)
-        throw new RangeError(
+        throw fault(
+          'failed',
           'Wave steepness would fold the surface; lower the amplitude or steepness, or lengthen the wavelength',
+          'geometry',
         );
       // Fade waves shorter than four triangle edges to prevent mesh sampling artifacts.
       const t = Math.max(0, Math.min(1, (w.wavelength / edge - 2) / 2));
@@ -647,8 +649,10 @@ export class Water implements EnginePlugin {
       const o = 32 + i * 8,
         amplitude = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
       if (this.values[o + 4] * amplitude * this.values[o + 3] > 1 / this.values[23])
-        throw new RangeError(
+        throw fault(
+          'failed',
           'Wave steepness would fold the surface; lower the amplitude or steepness, or lengthen the wavelength',
+          'geometry',
         );
     }
     for (let i = 0; i < this.values[23]; i++)
