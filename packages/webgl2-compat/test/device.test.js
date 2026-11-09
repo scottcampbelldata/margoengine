@@ -62,9 +62,11 @@ async function offsetDevice(withClamp) {
     return get(name);
   };
   const constants = ['DITHER', 'SCISSOR_TEST', 'CULL_FACE', 'DEPTH_TEST', 'STENCIL_TEST',
-    'POLYGON_OFFSET_FILL', 'SAMPLE_ALPHA_TO_COVERAGE', 'ALWAYS', 'TRIANGLES', 'CW'];
+    'POLYGON_OFFSET_FILL', 'SAMPLE_ALPHA_TO_COVERAGE', 'ALWAYS', 'TRIANGLES', 'CW', 'FRONT', 'BACK',
+    'EQUAL', 'NOTEQUAL', 'KEEP', 'REPLACE'];
   constants.forEach((name, i) => { context[name] = i + 1; });
   context.polygonOffset = (...args) => calls.push(['plain', ...args]);
+  context.stencilFuncSeparate = (...args) => calls.push(['stencil', ...args]);
   const gl = new Proxy(context, { get: (target, key) => key in target ? target[key] : () => ({}) });
   const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
   const device = await adapter.requestDevice();
@@ -75,8 +77,28 @@ async function offsetDevice(withClamp) {
       depthStencil: { depthBias: bias, depthBiasSlopeScale: slope, depthBiasClamp: clamp },
     }, pass);
   };
-  return { device, calls, requested, apply };
+  return { device, gl, calls, requested, apply };
 }
+
+test('stencil replay masks uint32 references before GL signed clamping and caches both faces by effective value', async () => {
+  const { device, gl, calls } = await offsetDevice(false);
+  const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth-stencil' } } } } } };
+  const pipeline = { program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [],
+    depthStencil: { stencilFront: { compare: 'equal', passOp: 'replace' },
+      stencilBack: { compare: 'not-equal', passOp: 'replace' }, stencilReadMask: 0xf3 } };
+  try {
+    for (const reference of [0x1000005, 0x80000005, 0xffffffff, 0, 0x80000005]) {
+      device.replayer.pass = pass;
+      device.replayer.setStencilReference(reference);
+      device.replayer.applyPipeline(pipeline, pass);
+    }
+    assert.deepEqual(calls.filter(([op]) => op === 'stencil'),
+      [5, 255, 0, 5].flatMap((ref) => [
+        ['stencil', gl.FRONT, device.compare('equal'), ref, 0xf3],
+        ['stencil', gl.BACK, device.compare('not-equal'), ref, 0xf3],
+      ]));
+  } finally { device.destroy(); }
+});
 
 test('polygon offset loads its extension and caches the signed clamp, including reset to zero', async () => {
   const { device, calls, requested, apply } = await offsetDevice(true);

@@ -368,6 +368,24 @@ try {
       await render('native-reference-high-bits', [reader(0x1000005)], { clear: 5 }),
       blue,
     );
+    for (const reference of [0x80000005, 0xffffffff]) {
+      const low = reference & 255;
+      colors(
+        'unsigned reference comparison ' + reference,
+        await render('native-reference-uint32-' + reference, [reader(reference)], { clear: low }),
+        blue,
+      );
+      colors(
+        'unsigned reference replace ' + reference,
+        await render('native-replace-uint32-' + reference, [writer(reference), reader(low)]),
+        blue,
+      );
+    }
+    colors(
+      'reference changes and reset preserve low bits',
+      await render('native-reference-reset', [writer(0xffffffff), writer(0), writer(0x80000005), reader(5)]),
+      blue,
+    );
     for (const [phase, field] of [
       ['pass', 'stencilZPass'],
       ['fail', 'stencilFail'],

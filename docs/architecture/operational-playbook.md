@@ -5149,3 +5149,17 @@ raw direction into a shader that now expects a unit light. Its package-owned
 writer uses shared/unit-light.js; textured.test.js exercises the real frame
 upload with ordinary, huge and tiny vectors, unchanged intensity and caller
 input. This closes an alias form missed by the upstream textual writer scan.
+
+
+### Section 5 evidence: batch 273 stencil reference repair
+
+The optional compatibility replayer masks a dynamic uint32 stencil reference to
+its eight-bit target before GL clamps its signed input. Both faces retain the
+existing operation/mask cache and use the effective reference as the cache key.
+The new recording regression fails on unmasked replay and passes after repair;
+all 160 compatibility and 199 materials unit tests pass. The canonical expanded
+full-compat render-state grid passes 616 checks/288 captures on physical RTX A6000,
+at 4x and 1x. No assertion or tolerance changed. Native evidence and remaining
+gates are recorded in whitepaper/results/batch-273-stencil-checkpoint.json.
+This closes only failure 10 once the checkpoint gates land; other failures remain
+open. No speed claim, core/stage runtime or public export change.

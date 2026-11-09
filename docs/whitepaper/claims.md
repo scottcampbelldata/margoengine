@@ -2733,3 +2733,14 @@ full build on 1,445 crafted bounded-read names, including malformed groups, BOM
 and exact raw name keys. Total 1,613: 1,591 exact,22 trailing-storage losses still
 open. This is not full equivalence. Proof: decoders/tests/draco-native-entry.test.js
 and [the complete experiment record](results/batch-133-metadata-strings.json).
+
+### Batch 273 stencil reference semantics
+
+The full compatibility device truncates dynamic uint32 references to the stencil
+aspect's eight bits before GL's signed/clamped conversion. A recording regression
+fails the old implementation for bit 31 and UINT32_MAX, equivalent references,
+both faces, reference changes and reset. The expanded canonical full-compat
+render-state grid passes 616 checks/288 captures, with all old assertions and new
+comparison/replace/reset cases at 4x and 1x. This is physical RTX A6000/D3D11
+correctness evidence, not a multi-browser parity or speed claim. Native/gate
+acceptance is in [the stencil receipt](results/batch-273-stencil-checkpoint.json).

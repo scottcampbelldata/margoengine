@@ -3128,6 +3128,20 @@ Animator entry sizes after the owner repair (min+gzip, package dependencies exte
 | @margoengine/animator/spline-ik | 3862 | 4094 |
 
 
+### Batch 273 stencil reference checkpoint
+
+The full compatibility device masks dynamic references to eight bits before
+passing them to GL's signed, clamping API. Comparison and replace operations
+therefore share WebGPU's effective reference, including uint32 bit 31 and
+UINT32_MAX. Both faces and reference changes/reset use the existing state cache.
+No stencil width, tolerance, sample count, core/stage runtime or export changes.
+The regression fails the unmasked implementation and all 160 compat units pass.
+Source min+gzip before/after: root 105099/105096, device 105646/105646,
+xr 105502/105505, tiers 105607/105603 B. Real built entries: root 105186,
+device 105232, xr 105035, tiers 104920 B; ceilings unchanged. Upstream main's
+unit-light repair changes core/stage to 23950 B, below 25000 B; this lane does
+not edit core/stage. GPU and gate results are retained in the stencil receipt.
+
 ### Batch 273 polygon offset clamp checkpoint
 
 The optional compatibility device now loads EXT_polygon_offset_clamp and replays

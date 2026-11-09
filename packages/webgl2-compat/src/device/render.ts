@@ -1441,7 +1441,8 @@ export class Replayer {
     const stencilOn = !!ds && !!d && hasStencil(d.view.texture.info);
     s.enable(gl.STENCIL_TEST, stencilOn);
     if (stencilOn && ds) {
-      const ref = pass.stencilReference,
+      // All WebGPU stencil aspects are eight bits. GL clamps a signed GLint instead of truncating it.
+      const ref = pass.stencilReference & 0xff,
         read = ds.stencilReadMask ?? 0xffffffff,
         write = d?.stencilReadOnly ? 0 : (ds.stencilWriteMask ?? 0xffffffff);
       for (const [face, f] of [

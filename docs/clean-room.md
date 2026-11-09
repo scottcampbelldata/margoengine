@@ -4232,6 +4232,27 @@ orchestration: JSON.stringify traverses device.queue.device before any caller
 comparison can finish. Receipt: test-results/batch-273-dispersion-before.log.
 This is a fixture failure, not evidence of a rendering mismatch.
 
+### Batch 273 compatibility failure 10: stencil reference repair
+
+Compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/#depth-stencil-state (eight-bit stencil formats,
+uint32 dynamic reference and comparison/replacement); Khronos Group,
+OpenGL ES glStencilFuncSeparate reference (2014),
+https://registry.khronos.org/OpenGL-Refpages/es3/html/glStencilFuncSeparate.xhtml
+(signed GLint and clamping to the stencil range); and Cass Everitt and
+Mark J. Kilgard, Practical and Robust Stenciled Shadow Volumes for
+Hardware-Accelerated Rendering (2003), https://arxiv.org/abs/cs/0301002
+(two-sided stencil and separate depth-fail/pass operations). The API specs
+determine the numeric translation; the paper motivates exercising both faces
+and replacement, rather than testing only a passing comparison. GL's clamp is
+not WebGPU's truncation. Mask the reference to eight bits at replay, before
+GL argument conversion, and key cached state with that effective value.
+The device regression calls the real dynamic setter and replay/cache, with
+bit 31, UINT32_MAX, equivalent references, changes and reset. It fails on the
+unmasked owner implementation. The canonical GPU grid adds unsigned comparison,
+replacement and reset cases at 4x and 1x without changing existing assertions.
+No rival or companion source was read; no core or stage code was changed.
+
 ### Batch 273 compatibility failure 10: render-state await observation
 
 Before probing, compared W3C GPU for the Web Working Group, WebGPU (2026),

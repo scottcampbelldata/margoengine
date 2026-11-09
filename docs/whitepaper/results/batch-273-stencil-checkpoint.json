@@ -1,0 +1,90 @@
+{
+  "scope": "Failure 10 stencil reference repair; gates pending",
+  "base": "a105c063f",
+  "corePlusStageGzip": 23950,
+  "sourceSizes": {
+    "index": {
+      "beforeSource": 105099,
+      "afterSource": 105096,
+      "afterDist": 105186
+    },
+    "device": {
+      "beforeSource": 105646,
+      "afterSource": 105646,
+      "afterDist": 105232
+    },
+    "xr": {
+      "beforeSource": 105502,
+      "afterSource": 105505,
+      "afterDist": 105035
+    },
+    "tiers": {
+      "beforeSource": 105607,
+      "afterSource": 105603,
+      "afterDist": 104920
+    }
+  },
+  "units": {
+    "compat": 160,
+    "materials": 199
+  },
+  "regressionBefore": {
+    "ok": false,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 0.2
+  },
+  "compat": {
+    "checks": 616,
+    "captures": 288,
+    "failures": [],
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    }
+  },
+  "native": {
+    "checks": 616,
+    "captures": 288,
+    "failures": [],
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    }
+  },
+  "readmeInitial": "12/13; new snippet lacked pass setup; replaced with a complete executable example",
+  "gates": "Pending final verify and corrected README runner",
+  "openSuites": "23/26; 5, 6, 10 repaired after final acceptance",
+  "research": "docs/clean-room.md#batch-273-compatibility-failure-10-stencil-reference-repair",
+  "sizeCeilings": "unchanged",
+  "speed": "No speed runs or claims"
+}

@@ -386,14 +386,14 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   cause is not isolated between uniform replay and multisample rendering;
   neither a driver cause nor acceptable numerical drift is proven. Failure 9
   stays open; no tolerance, shader math, sample grid or resource work is changed.
-- `materials/test:gpu:render-state`: clamp repaired in the optional device.
-  EXT_polygon_offset_clamp is loaded where present; signed clamp and reset to zero
-  are cached/replayed. Nonzero clamp is explicitly unsupported without it.
-  The full grid finishes 596 checks/278 captures, with positive and negative clamp
-  pixels passing at 4x and 1x. Two high-bit stencil-reference failures remain:
-  stencilFuncSeparate receives the unmasked uint32; GL clamps instead of using
-  the target's low eight bits. Failure 10 remains open. Receipt:
-  test-results/batch-273-clamp-render-state.json. No tolerance is changed.
+- `materials/test:gpu:render-state`: failure 10 repaired in the optional device.
+  The earlier signed polygon-offset clamp repair is retained. Dynamic stencil
+  references now use the target's low eight bits before GL's signed clamp;
+  both faces, bit 31, UINT32_MAX, replacement and reset have regressions.
+  The full expanded native and compat grids each pass 616 checks/288 captures
+  at 4x and 1x. No assertion or tolerance changed. Durable receipt:
+  whitepaper/results/batch-273-stencil-checkpoint.json. Remaining batch failures
+  are still open; this does not establish whole-package parity.
 - `materials/test:gpu:wireframe` reports
   mirrored/reference pixel hashes and duplicate-edge alpha differences, and
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those

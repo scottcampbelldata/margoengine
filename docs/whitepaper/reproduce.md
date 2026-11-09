@@ -2278,3 +2278,18 @@ packages/decoders/tests/draco-native-entry.test.js. The metadata-strings fixture
 contains 1,445 Margo-crafted streams and frozen full-oracle names. The receipt
 results/batch-133-metadata-strings.json retains discovery/held input/output
 hashes and complete22 failed streams. No timing or GPU is involved.
+
+### Batch 273 stencil reference repair
+
+Build outside the GPU lock with npm run build:packages. Run node --test
+packages/webgl2-compat/test/*.test.js and packages/materials/test/*.test.js in
+separate bounded commands. The new device.test.js regression fails before the
+one-line effective-reference mask and passes after it. Run the full canonical
+node scripts/material-render-state-gpu-check.js through node scripts/gpu-lock.mjs
+run --owner=codex-batch273 --wait-max=60 --max=3 --, once normally and once with
+MARGO_COMPAT=1. One shared slot per lane; outer bound 64 minutes includes queue.
+The prior measured leaf cost is 84 seconds including queue; no build runs during
+GPU reads. Retain both reports because the canonical output path is reused.
+The expanded grid retains every existing case and adds unsigned bit-31/MAX
+comparison, replacement and change/reset at both sample counts. Research and
+numeric translation rationale: ../clean-room.md, stencil reference repair.

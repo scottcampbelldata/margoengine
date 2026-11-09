@@ -59,6 +59,35 @@ checks capabilities; package parity failures remain tracked in
 
 What it does:
 
+Stencil references use the low eight bits for both comparison and replacement,
+including uint32 values with bit 31 set. Changing a reference or resetting it to
+zero takes effect on the next draw. This browser example records both changes:
+
+```js
+import { createCompatGPU } from '@margoengine/webgl2-compat/device';
+
+const adapter = await createCompatGPU().requestAdapter();
+if (!adapter) throw new Error('Full-tier WebGL2 is required');
+const device = await adapter.requestDevice();
+const stencil = device.createTexture({
+  size: [1, 1], format: 'stencil8', usage: GPUTextureUsage.RENDER_ATTACHMENT,
+});
+const encoder = device.createCommandEncoder();
+const pass = encoder.beginRenderPass({
+  colorAttachments: [],
+  depthStencilAttachment: {
+    view: stencil.createView(), stencilLoadOp: 'clear', stencilStoreOp: 'store',
+  },
+});
+pass.setStencilReference(0x80000005); // compares and replaces as 5
+pass.setStencilReference(0); // resets both faces for subsequent draws
+pass.end();
+device.queue.submit([encoder.finish()]);
+await device.queue.onSubmittedWorkDone();
+stencil.destroy();
+device.destroy();
+```
+
 Depth bias uses `EXT_polygon_offset_clamp` when available: positive `depthBiasClamp`
 caps the offset with `min`, negative uses `max`, and zero (the default) leaves it
 unclamped. Clamp changes, including reset to zero, are replayed with pipeline
