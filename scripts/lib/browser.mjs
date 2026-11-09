@@ -1,6 +1,6 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
-import { closeAll, endTree } from '../support/shutdown.mjs';
+import { closeAll, endTree, waitSignaled, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
 
 const ownedBrowserServers = new WeakMap();
 const ownedProcessCloses = new WeakMap();
@@ -211,13 +211,14 @@ async function listOwnedPids(browser, listMs) {
  * which `kill()` raises synchronously) is thrown, never left as an unhandled event.
  * @param {import('node:child_process').ChildProcess} child
  * @param {{ newBrowserCDPSession?: () => Promise<{ send(method: string): Promise<any> }> }} browser
- * @param {{ end: (pid: number) => Promise<number[]>, listMs?: number, pids?: number[]|null, alive?: (pid: number) => boolean, kill?: (pid: number) => void }} options
+ * @param {{ end: (pid: number) => Promise<number[]>, listMs?: number, pids?: number[]|null, settle?: typeof waitSignaled|null, alive?: (pid: number) => boolean, kill?: (pid: number) => void }} options
  */
 export async function stopOwned(
   child,
   browser,
-  { end, listMs = LIST_PROCESSES_MS, pids, alive = running, kill = (pid) => process.kill(pid, 'SIGKILL') },
+  { end, listMs = LIST_PROCESSES_MS, pids, settle = process.platform === 'win32' ? waitSignaled : null, alive = running, kill = (pid) => process.kill(pid, 'SIGKILL') },
 ) {
+  const begun = Date.now();
   const listed = pids === undefined ? await listOwnedPids(browser, listMs) : pids;
   let remaining = [];
   if (!listed) remaining = (await end(child.pid)) ?? [];
@@ -238,8 +239,16 @@ export async function stopOwned(
       if (error.code !== 'ESRCH') throw error;
     }
   }
-  // Polling the process table, which has no event to wait on; the shared shutdown budget bounds it.
-  while ((children = children.filter(alive)).length) await new Promise((resolve) => setTimeout(resolve, 10));
+  // Windows can reuse a PID immediately. Check creation time before waiting so a
+  // replacement process cannot consume the old process's shutdown budget.
+  if (settle && children.length) {
+    remaining.push(...await settle(children, SHUTDOWN_BUDGET_MS - (Date.now() - begun), begun));
+  } else {
+    while ((children = children.filter(alive)).length) {
+      if (Date.now() - begun >= SHUTDOWN_BUDGET_MS) { remaining.push(...children); break; }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
   if (remaining.length)
     throw Object.assign(new Error(`Chromium processes did not exit: ${remaining.join(', ')}`), {
       code: 'SHUTDOWN_TIMEOUT',
@@ -255,20 +264,28 @@ export async function stopOwned(
  */
 export function withBoundedClose(
   browser,
-  { end = endTree, server = ownedBrowserServers.get(browser), platform = process.platform, stop = stopOwned } = {},
+  { end = endTree, server = ownedBrowserServers.get(browser), platform = process.platform, stop = stopOwned, budgetMs = SHUTDOWN_BUDGET_MS } = {},
 ) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
-  browser.close = (...args) =>
-    closeAll({
+  browser.close = (...args) => {
+    const pending = new Set();
+    browser[SHUTDOWN_STEPS] = pending;
+    const step = async (name, run) => {
+      pending.add(name);
+      try { return await run(); } finally { pending.delete(name); }
+    };
+    return closeAll({
+      budgetMs,
       browser: {
+        [SHUTDOWN_STEPS]: pending,
         close: async () => {
           if (server) {
             const child = server.process?.();
             // Listing needs a connected client. Finish this read before close() can
             // disconnect its CDP session, then terminate and clean up concurrently.
             const pids = platform === 'win32' && child?.pid && child.exitCode === null && child.signalCode === null
-              ? await listOwnedPids(browser, LIST_PROCESSES_MS) : undefined;
+              ? await step('Chromium process listing', () => listOwnedPids(browser, LIST_PROCESSES_MS)) : undefined;
             // Windows driver kill uses synchronous taskkill: calling it on a live process blocks even
             // the shutdown timer. End the owned process first, then finish driver cleanup.
             const terminate = async () => {
@@ -292,21 +309,21 @@ export function withBoundedClose(
                   try {
                     // Termination completion can depend on canceling pending pipe I/O. Request it,
                     // release the pipes, then await it; waiting before release creates a circular wait.
-                    stopped = running ? stop(child, browser, { end, pids }) : undefined;
+                    stopped = running ? step(`Chromium process termination (${child.pid}; children ${(pids ?? []).filter(pid => pid !== child.pid).join(', ')})`, () => stop(child, browser, { end, pids })) : undefined;
                   } finally {
                     for (const pipe of pipes) pipe?.destroy();
                   }
                   await stopped;
-                  if (tracked || running || openPipes) await closed;
+                  if (tracked || running || openPipes) await step(`Chromium process/stdio close (${child.pid})`, () => closed);
                 } finally {
                   if (onClose) child.removeListener('close', onClose);
                 }
               }
-              await server.kill();
+              await step('Playwright server kill', () => server.kill());
             };
             const results = await Promise.allSettled([
               Promise.resolve().then(terminate),
-              Promise.resolve().then(() => close(...args)),
+              Promise.resolve().then(() => step('Playwright client close', () => close(...args))),
             ]);
             for (const result of results) if (result.status === 'rejected') throw result.reason;
             return;
@@ -324,6 +341,7 @@ export function withBoundedClose(
         },
       },
     });
+  };
   return browser;
 }
 

@@ -8,6 +8,9 @@ import { execFile, spawnSync } from 'node:child_process';
 /** How long `closeAll` may take in all before it throws. */
 export const SHUTDOWN_BUDGET_MS = 30_000;
 
+/** Pending nested teardown steps, shared by a resource and wrappers that own its shutdown. */
+export const SHUTDOWN_STEPS = Symbol('shutdown steps');
+
 /** An `http.Server`, a Vite dev or preview server (its `httpServer`), or anything with `close()`. */
 function httpServerOf(server) {
   return typeof server?.closeAllConnections === 'function' ? server : server?.httpServer;
@@ -56,7 +59,7 @@ export function taskkillPids(output) {
  * @param {number} sinceMs
  * @returns {Promise<number[]>}
  */
-export function waitSignaled(pids, waitMs, sinceMs) {
+export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
   const ids = pids.filter((pid) => Number.isInteger(pid) && pid > 0);
   if (!ids.length) return Promise.resolve([]);
   if (!(waitMs > 0)) return Promise.resolve(ids);
@@ -72,12 +75,12 @@ export function waitSignaled(pids, waitMs, sinceMs) {
   ].join('\n');
   return new Promise((resolve) => {
     // A PowerShell that did not answer in time says nothing about the pids, so all of them count as still running.
-    execFile(
+    run(
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', script],
       { timeout: waitMs + 10_000, windowsHide: true },
       (error, stdout) =>
-        resolve(error?.killed ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
+        resolve(error ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
     );
   });
 }
@@ -244,6 +247,10 @@ export async function closeAll({ context, browser, servers = [], children = [], 
   const outcome = await Promise.race([work.then(() => 'done'), late]);
   clearTimeout(timer);
   if (outcome === 'late') {
+    if (open.has('browser') && browser?.[SHUTDOWN_STEPS]?.size) {
+      open.delete('browser');
+      for (const name of browser[SHUTDOWN_STEPS]) open.add(name);
+    }
     const error = new Error(
       `shutdown did not finish within ${budgetMs} ms; still open: ${[...open].join(', ')}. Find what holds it (netstat -ano, tasklist) and close it before the suite ends`,
       { cause: failures[0] },

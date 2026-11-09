@@ -434,3 +434,25 @@ test('every known-list entry names an example the READMEs still hold, so an edit
     'run npm run check:readme-run -- --only=<package> and fix the renamed example, or -- --shrink if it passes',
   );
 });
+
+test('headless comparison examples prepare their own reference before the unchanged example', async (t) => {
+  const { encodePNG } = await import('../packages/headless/dist/index.js');
+  mkdirSync('test-results', { recursive: true });
+  const wrong = join(process.cwd(), 'test-results', 'readme-reference-' + process.pid + '.png');
+  const bytes = await encodePNG({ width: 1, height: 1, data: new Uint8Array([255, 0, 0, 255]) });
+  writeFileSync(wrong, bytes);
+  t.after(() => rmSync(wrong, { force: true }));
+  const code = `import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { encodePNG } from '@margoengine/headless';
+import { compareImages } from '@margoengine/headless/compare';
+const engine = { width: 3, height: 2, data: new Uint8Array(24).fill(80) };
+const readPixels = async (engine) => engine;
+const result = await compareImages(await readPixels(engine), await readFile('reference.png'));
+assert.ok(result.pass);`;
+  const result = await runInNode({ id: 'runner-test/headless-reference', code }, {
+    byName: new Map([['reference.png', { path: wrong }]]), byExtension: new Map(),
+  });
+  assert.equal(result.result, 'pass', result.reason);
+  assert.deepEqual(readFileSync(wrong), Buffer.from(bytes), 'the external reference fixture is never changed');
+});

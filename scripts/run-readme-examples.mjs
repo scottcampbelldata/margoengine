@@ -31,6 +31,7 @@ import { chromiumLaunchOptions, launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
 import { closeAll, endTree } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
+import { headlessReference } from './support/headless-readme.mjs';
 import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
 import { finishLiveExample, observeLiveExample, serveLiveLink, usesLiveLink } from './support/readme-live.mjs';
 
@@ -298,8 +299,19 @@ async function writeNodeExample(example, samples) {
   return { file, folder };
 }
 
-export async function runInNode(example, samples, { timeout = NODE_LIMIT } = {}) {
-  const { file, folder } = await writeNodeExample(example, samples);
+export async function runInNode(example, samples, options = {}) {
+  const location = await writeNodeExample(example, samples);
+  const reference = headlessReference(example.code);
+  if (reference) {
+    const file = join(location.folder, 'reference.mjs');
+    writeFileSync(file, (await transformWithOxc(reference, 'reference.tsx', { jsx: { runtime: 'automatic' } })).code);
+    const result = await runNodeFile({ ...example, code: reference }, { file, folder: location.folder }, options);
+    if (result.result !== 'pass') return { ...result, reason: 'Reference preparation failed: ' + result.reason };
+  }
+  return runNodeFile(example, location, options);
+}
+
+function runNodeFile(example, { file, folder }, { timeout = NODE_LIMIT } = {}) {
   const launch = browserAutomation(example.code) ? chromiumLaunchOptions() : undefined;
   return new Promise((done) => {
     const child = spawn(

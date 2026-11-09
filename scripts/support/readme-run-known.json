@@ -9,8 +9,6 @@
   "fbx/readme-nurbs-curves-and-lines-4d004a": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
   "fbx/readme-scale-inheritance-b099af": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
   "fbx/readme-skinning-modes-and-in-between-sh-84ddc1": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
-  "headless/readme-comparing-images-db338c": "sample: RangeError: Images must be one size to compare; see https://margoengine.com/errors#headless",
-  "headless/readme-image-sequences-and-video-9967ce": "example: MargoError: readPixels needs an engine on createHeadlessCanvas; see https://margoengine.com/errors#headless",
   "input/readme-chords-contexts-rebinding-and-pr-5e2c1c": "example: TimeoutError: signal timed out",
   "mesh-edit/readme-import-to-editable-meshes-and-fl-03d481": "sample: TypeError: glTF accessor undefined does not exist; pass an index into accessors",
   "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips",

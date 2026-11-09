@@ -133,7 +133,11 @@ export async function createHeadlessStage({
   onError,
   ...options
 }: HeadlessStageOptions): Promise<HeadlessStage> {
-  if (onError !== undefined && typeof onError !== 'function') throw typeError('Invalid stage options', 'arguments');
+  if (onError !== undefined && typeof onError !== 'function')
+    throw typeError(
+      'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError',
+      'arguments',
+    );
   const canvas = createHeadlessCanvas({ width, height }),
     release = acquire(gpu, globals);
   try {

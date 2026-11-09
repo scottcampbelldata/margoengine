@@ -2662,3 +2662,9 @@ All 34 units/guards, six GPU leaves and seven runtime README examples pass.
 Each of four owner GPU cases draws 512 red pixels with zero changed components
 outside scissor, against the corrected parent's 4608. No speed
 claim or whole-audit completion is made.
+
+### Headless onError guidance (2026-11-10)
+
+createHeadlessStage names onError's function/undefined contract in its linked
+TypeError before GPU installation or engine creation. Proof and reproduction:
+packages/headless/tests/stage.test.js and [size restoration](../size-restore.md).

@@ -99,8 +99,10 @@ engine.dispose();
 ```ts
 import { Engine, box } from '@margoengine/core';
 import { encodeVideo, renderFrames } from '@margoengine/headless/video';
+import { createHeadlessCanvas } from '@margoengine/headless';
 
-const engine = await Engine.create(document.querySelector('canvas')!); // in a browser, which has WebCodecs
+// In a browser, which has WebCodecs; the readable canvas keeps each rendered frame.
+const engine = await Engine.create(createHeadlessCanvas({ width: 512, height: 512 }), { backend: 'webgpu' });
 engine.createMesh().setGeometry(box());
 
 const video = await encodeVideo(renderFrames(engine, { frames: 90 }), { format: 'mp4' });
@@ -209,3 +211,10 @@ The engine's own output is tone-mapped sRGB, so an EXR made from `readPixels` ho
 For a capture with true highlights, read `stack.sceneTexture`. Images are at most 65,535 pixels wide for JPEG and 16,384 for WebP.
 
 The errors are listed at [margoengine.com/errors#headless](https://margoengine.com/errors#headless).
+
+### Headless stage error callback
+
+`createHeadlessStage` accepts `onError` as a function; its default is
+`undefined`. Pass an error callback or omit the option. Other types throw a
+TypeError naming `onError`, both accepted choices and the arguments help link,
+before installing GPU globals or creating an engine.

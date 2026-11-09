@@ -571,3 +571,118 @@ Genuine paired records measure 0f509ea6c with dirty=false, then API/llms
 regeneration, 17 record tests, full API currentness, docs links and size gate
 pass. The ten restored stage entry sizes and 23924 B core/stage are unchanged.
 Retain every successful stage unit/GPU/README and verification step.
+
+## Finding 10, headless/stage: name the invalid callback
+
+Restore createHeadlessStage's onError diagnostic with the exact option name,
+function/undefined choices, callback-or-omit advice and existing arguments help
+link. The stage root keeps its separate compact message. Register this optional
+message beside it and regenerate the shared help page and MCP help data.
+Research is the same Shneiderman (1982), Neusesser/Sunwall (2023) and Node
+standards comparison recorded above for stage diagnostics; precise subject and
+recovery advice replace a generic options error without changing the API.
+
+Regression: packages/headless/tests/stage.test.js checks null, booleans,
+numbers, strings and objects; the TypeError must give the full guidance before
+GPU installation or Engine.create. The old built implementation fails the new
+case. Existing tests cover accepted callbacks and omitted defaults.
+
+Measured entry growth: @margoengine/headless/stage: 3106->3140 B gzip; ceiling 3306->3396. Core/stage remains 23924 B.
+All 82 headless unit cases pass. The real browser GPU suite passes PNG/page
+parity, WebM/MP4 playback and JPEG/WebP/EXR readback, with eight shader modules
+and zero compilation errors.
+
+### Headless README validation prerequisites
+
+The generic README run exposed two real causes: the browser video snippet used
+a page canvas that readPixels cannot read, and the generic sample picker gave
+the comparison snippet an unrelated, differently sized PNG. Correct the browser
+snippet to createHeadlessCanvas. Move the native Node check's existing reference
+maker into one shared testing helper; the generic runner prepares that reference
+in an isolated, bounded child, then executes the original comparison unchanged.
+This is an execution fixture, not an independent golden rendering oracle.
+
+The CPU runner regression supplies a wrong-size PNG, requires the unchanged
+comparison to pass with its prepared reference, and asserts the supplied source
+file stays byte-identical. It fails the old runner with the size error. Preserve
+all pixel/SSIM thresholds, child timeouts and whole-process cleanup.
+
+Research compares the distinction between an execution fixture and independent
+visual evidence in Finlay Macklon, Mohammad Reza Taesiri, Markos Viggiato, Stefan
+Antoszko, Natalia Romanova, Dale Paas and Cor-Paul Bezemer,
+[Automatically Detecting Visual Bugs in HTML5 canvas Games](https://arxiv.org/abs/2208.02335)
+(2022), and Haruto Tanno, Yu Adachi, Yu Yoshimura, Katsuyuki Natsukawa and Hideya
+Iwasaki, [Region-based Detection of Essential Differences in Image-based Visual
+Regression Testing](https://doi.org/10.2197/ipsjjip.28.268) (2020). Neither metric
+nor oracle algorithm is adopted. PNG Working Group, [PNG Third Edition](https://www.w3.org/TR/png/)
+(2025), provides the image dimension contract; Node.js contributors,
+[Child process](https://nodejs.org/api/child_process.html) (2026 documentation),
+provides isolated subprocess/close semantics. The existing bounded child runner
+is reused; no companion implementation source is read or copied.
+
+Headless closure: all six native Node README scenes pass (including sequence,
+MP4, comparison and HDR files), and all seven generic README examples pass
+across retained five original passes and the two failed/changed examples.
+Remove exactly those two obsolete known-failure exceptions. Browser and Node
+GPU checks run sequentially with one worktree slot, wait-max 60. The initially
+unclassified Node leaf was rejected before execution; an explicit native-GPU
+reason admits the real command. No successful browser or Node suite is repeated.
+
+Headless acceptance checkpoint: lint and hygiene pass. Full verify passes every
+non-unit step and 13997 of 13998 unit cases. The sole failure is page-ready.test.js
+at browser shutdown, SHUTDOWN_TIMEOUT at the unchanged 30000 ms budget, after
+page readiness completed. The latest shutdown fix 0107d519d is already in this
+branch; no newer shutdown repair exists on the fetched main. The stalled close
+substep is not isolated; this is not a busy-machine exemption or a green full
+verify. Record the repro and immediate cause in known-bugs.md. Headless work is
+not pushed until the owning close cause is repaired and that failed step passes.
+No successful verification, GPU or README suite is repeated.
+
+### Browser teardown investigation and closure evidence
+
+The failed verification case is tests/page-ready.test.js:30; its finally block
+awaits browser.close after all readiness assertions. One diagnostic run with
+phase tracing completed every native, pipe, driver and client wait before any
+repair. It is a diagnostic result, not retry-to-green acceptance.
+
+A separate deterministic repro isolates stopOwned's child-PID polling step:
+Windows can recycle a killed PID while another browser starts. The old
+children.filter(alive) loop treats that replacement as the original forever.
+The new regression fails the parent at that exact loop. Reuse the existing
+creation-time-aware Windows waiter, keep native process-handle termination and
+pipe release, and retain the unchanged 30000 ms shared deadline. POSIX polling
+also has an explicit hard bound. A native waiter launch/error with no stdout
+retains every unresolved PID; the parent wrongly returns none. Its regression
+also fails on the parent. No helper error is accepted as successful cleanup.
+
+Add nested shutdown phase reporting for process listing, process termination
+(with PIDs), process/stdio close, server kill and client close. Injected stalled
+phases must appear in both SHUTDOWN_TIMEOUT.message and .open through wrappers.
+The original log did not retain these phases, so attribution of that particular
+occurrence to PID reuse is an inference, not a captured failing native trace.
+The original limitation remains explicit in known-bugs.md.
+
+Research: Microsoft, *Process Handles and Identifiers* (2025),
+https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers;
+Microsoft, *TerminateProcess function* (2026 documentation),
+https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess;
+Node.js contributors, *Child process* (2026 documentation),
+https://nodejs.org/api/child_process.html; Microsoft Playwright contributors,
+*BrowserServer* and *Browser* (2026 documentation),
+https://playwright.dev/docs/api/class-browserserver and
+https://playwright.dev/docs/api/class-browser. Compare PID lifetime with held
+handles, async native termination with stdio closure, and owner cleanup with
+client disconnect; use each for its distinct resource contract. No external
+implementation or companion code was read or copied.
+
+Validation: 59 affected teardown/selection/shutdown cases pass, including the
+new recycled-PID and four-phase regressions; the changed shutdown file passes
+eight cases. The failed page-ready continuation passes four cases after repair.
+Retain all previously successful verification/headless/GPU/README results.
+Logs in test-results/size-restore: shutdown-red-recycled-pid (parent failure),
+native-red-native-helper (parent failure), shutdown-diagnostic-page-ready
+(pre-repair diagnostic), shutdown-corrected-{teardown,page-ready} and
+shutdown-final-native-waiter (repair). An intermediate edit failed because CRLF
+prevented several scripted replacements, leaving step undefined; its owned
+runner/browser tree was terminated, the edit corrected and affected files
+rerun. This is not a product failure or a hidden successful full-verify claim.

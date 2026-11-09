@@ -3161,3 +3161,8 @@ Video optional root grows from 2144 to 2211 B min+gzip for correct disposal and
 viewport/scissor state. Its ceiling changes from 2199 to 2467 B (standard measured
 size plus 256 B). A split would add an entry/bootstrap for correctness that every
 existing overlay requires. Other five entry ceilings and core/stage are unchanged.
+
+Size restoration finding 10, headless/stage: onError must be a function or
+undefined (default). Invalid types reject with linked TypeError before GPU
+installation or engine creation. Entry growth: @margoengine/headless/stage: 3106->3140 B gzip; ceiling 3306->3396.
+Core plus stage remains 23924 B. No new rendering or speed claim.

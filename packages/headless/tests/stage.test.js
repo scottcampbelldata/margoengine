@@ -172,3 +172,16 @@ test('a failing fit still clears the CSS size', async (t) => {
 test('importing the entry sets nothing', () => {
   assert.equal(navigator.gpu, undefined);
 });
+
+test('onError guidance names its type and rejects before GPU installation or engine creation', async (t) => {
+  const create = t.mock.method(Engine, 'create', async () => { throw new Error('must not create an engine'); });
+  const previous = Object.getOwnPropertyDescriptor(navigator, 'gpu');
+  for (const onError of [null, false, 0, 1, 'callback', {}]) {
+    await assert.rejects(createHeadlessStage({ gpu, width: 1, height: 1, onError }), {
+      name: 'TypeError',
+      message: 'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError; see https://margoengine.com/errors#arguments',
+    });
+    assert.deepEqual(Object.getOwnPropertyDescriptor(navigator, 'gpu'), previous);
+  }
+  assert.equal(create.mock.calls.length, 0);
+});

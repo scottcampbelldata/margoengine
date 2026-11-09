@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, request } from 'node:http';
-import { closeAll } from '../scripts/support/shutdown.mjs';
+import { closeAll, waitSignaled } from '../scripts/support/shutdown.mjs';
 
 // A server that answers with headers and never ends the body (an event stream, an HMR socket): a non-idle connection.
 async function streamingServer() {
@@ -158,4 +158,16 @@ test('watchExit never holds a suite that ends cleanly', async () => {
   assert.equal(err, '');
   // wall-clock: the child is killed at 10 s if the watch holds it.
   assert.ok(ms < 5000, `took ${ms} ms`);
+});
+
+
+test('a native process waiter that cannot start or fails proves no process has exited', async () => {
+  for (const error of [{ code: 'ENOENT' }, { code: 1 }, { killed: true }]) {
+    const result = await waitSignaled([11, 12], 50, Date.now(), (_file, _args, options, callback) => {
+      assert.equal(options.windowsHide, true);
+      callback(error, '');
+    });
+    assert.deepEqual(result, [11, 12], 'an empty failed response must not mean all processes exited');
+  }
+  assert.deepEqual(await waitSignaled([11, 12], 50, Date.now(), (_f, _a, _o, callback) => callback(null, '12\r\n')), [12]);
 });

@@ -3819,3 +3819,31 @@ candidates still need their own runtime proofs; VATCrowd.dispose contains no
 detachment at all. The package is explicitly pending in the finite ledger.
 No Animation source was edited in this continuation; reproduce and fix its own
 registration/factory paths with regression and complete package gates next.
+
+### Browser shutdown recurrence: reproduced PID-wait defect repaired (2026-11-09)
+
+The original full verify at 60bb86ab6 plus dirty headless changes passed every
+non-unit step and 13997/13998 cases. tests/page-ready.test.js:30 completed its
+readiness assertions, then closeAll timed out at the unchanged 30000 ms budget.
+Repro command: node --test --test-timeout=300000 tests/page-ready.test.js.
+The original log names only browser; it cannot establish a native/client/pipe
+substep retrospectively. A single phase-traced diagnostic run passed before
+repair, so that run is not accepted as proof of a fix.
+
+The deterministic teardown repro isolates stopOwned's child-process wait:
+a killed child's PID is reused, kill(pid, 0) reports the replacement alive,
+and the unbounded children.filter(alive) loop never completes. Use the existing
+Windows creation-time-aware native waiter instead. Its failed helper response
+must retain all unresolved PIDs; previously a non-timeout launch error with no
+stdout falsely meant all gone. Both new regressions fail the parent. The
+complete affected teardown/selection/shutdown files pass 59 cases, the changed
+shutdown file passes eight cases, and the failed page-ready file passes all four.
+This repairs a demonstrated cause, not a proven attribution of the old log.
+
+Pending owned-close phases now identify process listing, native termination
+(with PIDs), process/stdio close, Playwright server kill and client close even
+through outer closeAll wrappers. A four-case regression injects a hang into
+each teardown phase and requires its exact name at the hard limit. Preserve
+this record and capture those names if the original recurrence returns. No
+deadline was raised, retry loop added, full verify replayed or other lane killed.
+See [size restoration](size-restore.md) for research and retained log receipts.

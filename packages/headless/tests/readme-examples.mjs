@@ -28,16 +28,7 @@ export function needs(code) {
   };
 }
 
-/**
- * The example cut before its comparison, writing the picture it would compare instead: run first, in its own process,
- * it makes the reference the example then reads. Throws when the example has no `const result = await compareImages(`.
- */
-export function referenceMaker(code, file = 'reference.png') {
-  const cut = code.indexOf('const result = await compareImages(');
-  if (cut < 0)
-    throw new Error('the comparing example no longer starts its comparison with `const result = await compareImages(`');
-  return `${code.slice(0, cut)}await writeFile('${file}', await encodePNG(await readPixels(engine)));\n`;
-}
+export { referenceMaker } from '../../../scripts/support/headless-readme.mjs';
 
 /**
  * Why `examples` cannot all run on this machine, or undefined when they can: an example that pipes to ffmpeg needs it

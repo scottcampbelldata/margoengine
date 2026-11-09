@@ -405,7 +405,8 @@ Fix (`scripts/lib/browser.mjs`, `stopOwned`): the browser process is ended
 through the handle Node holds (`ChildProcess.kill`, TerminateProcess), and
 each process Chromium lists for itself over CDP (`SystemInfo.getProcessInfo`)
 by its pid, then the close waits for the listed processes to exit and for the
-browser's `close` event. No helper program runs. Measured on this PC: killing
+browser's `close` event. Process termination uses no helper program; the
+Windows child-exit wait now uses the existing creation-time-aware native waiter. Measured on this PC: killing
 only the browser process left two Edge utility processes
 (`entity_extraction_service`, `edge_collections`) running past 10 s, so the
 listed children are ended explicitly; with them, the whole tree, crashpad
@@ -4930,3 +4931,27 @@ The repair passes four owner GPU cases, each with zero outside changes and
 512 red pixels. All 34 units/guards, six GPU leaves and seven runtime README
 examples pass. Only affected checks rerun; inherited full verify is
 retained. No hunter capture, core or stage source is changed.
+
+### Section 5 evidence: headless callback diagnostic
+
+Finding 10 rejects invalid onError types before touching GPU globals or
+creating the engine, with explicit function/undefined and recovery guidance.
+The regression checks six wrong values and unchanged installation state; it
+fails the old generic message. Sources and sizes: [size restoration](../size-restore.md).
+
+Headless README closure also corrects the browser video canvas and shares the
+native checker's reference preparation with the generic runner. A wrong-size
+sample regression fails the old runner. Original examples execute separately
+from fixture preparation; each child keeps its existing timeout/tree cleanup.
+This proves executable examples, not an independent visual golden.
+
+
+Size restoration shutdown follow-up: stopOwned must not poll recycled Windows
+child PIDs indefinitely. It reuses the identity-aware native waiter after
+native termination; a failed helper response retains unresolved PIDs. Nested
+close phases name process listing/termination, process/stdio close, server kill
+and client close at the unchanged hard limit. Deterministic parent failures and
+59 affected cases plus the four-case failed page-ready continuation prove the
+repair class. The old generic timeout cannot establish which substep stalled
+in that original run; retain that evidence limit. See size-restore.md and
+known-bugs.md. No full verification replay or speed measurement is claimed.

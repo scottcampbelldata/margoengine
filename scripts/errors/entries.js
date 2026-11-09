@@ -494,6 +494,7 @@ export const entries = [
       'Box: 3 values',
       'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
       'Invalid stage options',
+      'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError',
       'Expected element',
       'shadows: contact, cascaded or false',
       'Turntable: finite seconds not 0, finite resumeAfter 0 or more',
