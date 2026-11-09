@@ -4461,3 +4461,11 @@ and raw strings without imposing a partial C# grammar. Native source is unchange
 this is source-delivery evidence, not a new native Unity execution claim. The
 existing Unity optional entry embeds the payload; only its ceiling grows.
 Research, tests and bytes are in size-restore.md and limits.md.
+
+Finding 7 validation passes all 13778 repository unit tests after the indexed
+deletion is staged and only failed/unrun verify steps are resumed. The exporters
+GPU suite passes, as do 33 of 35 README examples (two prior known failures,
+including the previous asset-profile example, remain unchanged). The new source
+example passes. Combined-build entry/network evidence measures the retained
+8b5c04aab implementation commit, followed by API/llms generation; merged size,
+record/API and documentation checks pass. No native Unity or speed claim is added.

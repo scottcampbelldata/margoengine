@@ -364,3 +364,14 @@ passes, including all 13778 unit tests with zero failures, skips or cancellation
 The retained hygiene/GPU/README results are not replayed. Logs and the exact
 command/result manifest are test-results/size-restore/unity-verify-remaining*;
 no checker, test, tolerance or known-failure list is weakened.
+
+Rebase onto 4e5dbdf04 preserves concurrent WebGL2 tier/post integration, its
+source, docs, generated APIs, ceilings and histories. Exporter source and tests
+are byte-identical to the tested restoration. The complete combined package
+build passes, then paired entry/network records genuinely measure 8b5c04aab
+(dirty=false), followed by api:update and llms generation. This implementation
+commit remains in history; the measurement refresh is its own following commit.
+Unity remains 50038 B, exporters root unchanged, core plus stage 23924 B. The
+merged size gate, nine paired-record/API tests, llms currentness and documentation
+links pass. Retain the successful full unit, GPU and README evidence without
+replaying those suites. No record is relabeled and no timing work is introduced.
