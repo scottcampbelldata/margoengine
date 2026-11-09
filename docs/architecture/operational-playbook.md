@@ -137,6 +137,12 @@ policy still applies to every caller, including historical reproduction scripts.
 This is a syntax check, not whole-program evaluation of computed command strings;
 runtime refusal remains the final check before any holder or ticket is created.
 
+`tests/docs-encoding.test.js` rejects common UTF-8-as-single-byte artifacts in
+the limits guide and generated LLM copy. Conflict resolution reads/writes UTF-8
+explicitly; a valid UTF-8 round trip alone cannot catch already corrupted text.
+Encoding reference: Unicode Consortium, *The Unicode Standard 17.0*, 2025,
+[chapter 3, conformance and encoding forms](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/).
+
 Evidence: `tests/gpu-policy-check.test.js` plants CLI, environment and aliased API
 regressions and exercises regex/interpolated-template scanning. The whole tracked
 repository is checked without a GPU. `tests/check-merge-affected.test.js` pins the
