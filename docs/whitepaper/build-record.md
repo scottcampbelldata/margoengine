@@ -3348,11 +3348,6 @@ Five optional video entries, built clean room on the dev PC (RTX A6000, Edge). E
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Drag to orbit on the cube | DONE | fa07cbcf0 | `drag` option and field | LIM-579 |
-| 2 | Your own home view | DONE | 333940364 | `home`, `setHome`, `getHome`, `home()` | LIM-580 |
-| 3 | Roll buttons | DONE | c57cd2ce4 | `roll` option, `roll(turns)`, `turns` | LIM-581 |
-| 4 | Themes | DONE | 70522dc8c | `theme`, `setTheme`, `THEMES` | LIM-585 |
-| 5 | Axis triad gizmo | DONE | this commit | `@margoengine/viewcube/axes` (`AxisTriad`) | LIM-588 |
 | 1 | External video on mesh materials | DONE (stand-in evidence) | 52620833b | `@margoengine/video/material` | LIM-566 |
 | 2 | Canvas recording with audio | DONE (stand-in evidence) | 4b83eee8a | `@margoengine/video/record` | LIM-571 |
 | 3 | 360 and stereo video | DONE (stand-in screen/XR evidence) | 687f4b330 | `@margoengine/video/360` | LIM-573 |
@@ -3390,6 +3385,20 @@ motion, and clean-room extruded 3D vector text meshes from OpenType font files.
 - **Limits:** rows in `docs/limits.md` for text atlas eviction (LIM-572), per-glyph animation (LIM-577), and extruded 3D text (LIM-587).
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=text`, API surface check, quality size baseline, LLMS check, and text browser GPU test suite.
 
+## Lane H batch 109: viewcube
+
+Five jobs for `@margoengine/viewcube` on the Beelink (Radeon 680M), one commit each. Jobs 1 to 4 extend the
+`ViewCube` in the package's root entry; job 5 adds the entry `@margoengine/viewcube/axes`. Core and stage are
+untouched (23,626 B gzip together after the batch).
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Drag to orbit on the cube | DONE | fa07cbcf0 | `drag` option and field | LIM-579 |
+| 2 | Your own home view | DONE | 333940364 | `home`, `setHome`, `getHome`, `home()` | LIM-580 |
+| 3 | Roll buttons | DONE | c57cd2ce4 | `roll` option, `roll(turns)`, `turns` | LIM-584 |
+| 4 | Themes | DONE | 70522dc8c | `theme`, `setTheme`, `THEMES` | LIM-585 |
+| 5 | Axis triad gizmo | DONE | c9397eb2f | `@margoengine/viewcube/axes` (`AxisTriad`) | LIM-588 |
+
 - **Built from:** the `docs/clean-room.md` section "View cube: `@margoengine/viewcube` (batch 109)": spherical
   coordinates, W3C Pointer Events, Rodrigues' rotation formula, WCAG 2.2 contrast, CSS Custom Properties, Media
   Queries Level 5, CSS Transforms. No other engine's or CAD application's view cube or gizmo source was read.
@@ -3408,7 +3417,3 @@ motion, and clean-room extruded 3D vector text meshes from OpenType font files.
   e165bfedf) is covered by this batch's closing verify.
 - **Limits and unmeasured:** rows in `docs/limits.md`. One browser (Chromium); touch drags, other browsers and
   `prefers-contrast` in a real browser are not run.
-Five jobs for `@margoengine/viewcube` on the Beelink (Radeon 680M), one commit each. Jobs 1 to 4 extend the
-`ViewCube` in the package's root entry; job 5 adds the entry `@margoengine/viewcube/axes`. Core and stage are
-untouched (23,626 B gzip together after the batch).
-## Lane H batch 109: viewcube
