@@ -89,11 +89,11 @@ test('an old-style holder blocks new shared and exclusive requests until it rele
     assert.equal(await settled(shared), 'waiting');
     assert.equal(await settled(bench), 'waiting');
     oldRelease();
-    // The exclusive request queued first, so it goes first; the shared one follows it.
-    const benchRelease = await bench;
-    assert.equal(await settled(shared), 'waiting');
-    benchRelease();
-    (await shared)();
+    // Shared requests now retain FIFO tickets too. This earlier shared request goes first.
+    const sharedRelease = await shared;
+    assert.equal(await settled(bench), 'waiting');
+    sharedRelease();
+    (await bench)();
     assert.equal(now.status(), null);
   }));
 

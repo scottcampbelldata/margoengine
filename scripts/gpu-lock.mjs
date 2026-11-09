@@ -16,7 +16,9 @@
 //               its owner and the command it runs.
 // Layout of the lock folder: shared/<token>.json per shared holder, exclusive.json for the exclusive holder and mutex/
 // (an atomically published directory link, populated with owner.json before publication). Queued exclusive requests are <ts>-<token>.json in the
-// folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. A holder, waiter or legacy owner.json whose process is gone is stale and removed. Release removes
+// folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. Shared
+// requests also retain FIFO tickets. Detached jobs have status records in gpu.lock-jobs/ and logs in the submitter's
+// worktree. A holder, waiter or legacy owner.json whose process is gone is stale and removed. Release removes
 // only our own entry: never delete an entry you don't own.
 // Compatibility with the one-holder lock (before 2026-10-26, still run by agents in older worktrees): that version
 // holds the GPU by creating the folder itself (atomic mkdir, then owner.json) and waits while the folder exists. Every
@@ -524,6 +526,8 @@ export async function acquire({
   waitMax = number('MARGO_GPU_WAIT_MAX_MIN', 60),
   command = process.argv.slice(1).join(' ').slice(0, 300),
   timing,
+  queuedAt = Date.now(),
+  onQueued,
   poll = 1_000,
   log = console.error,
 } = {}) {
@@ -557,7 +561,7 @@ export async function acquire({
         beats,
       });
     };
-  const ticket = `${String(Date.now()).padStart(15, '0')}-${token}.json`;
+  let ticket;
   let queued = false;
   const waitStart = Date.now();
   const take = (file) => {
@@ -585,23 +589,27 @@ export async function acquire({
         if (queued && others.length === state.waiting.length) queued = false;
         const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
         if (mode === 'shared') {
-        if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
+          if (!state.exclusive && first && state.shared.length < slots()) {
+            if (queued) rmSync(join(waitingDir, ticket), { force: true });
             mkdirSync(sharedDir, { recursive: true });
             const file = join(sharedDir, `${token}.json`);
             writeFileSync(file, entry());
             return { file };
           }
-        return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
         }
-      if (!state.exclusive && !state.shared.length && first) {
+        if (mode === 'exclusive' && !state.exclusive && !state.shared.length && first) {
           if (queued) rmSync(join(waitingDir, ticket), { force: true });
           writeFileSync(exclusiveFile, entry());
           return { file: exclusiveFile };
         }
         if (!queued) {
+          // Allocate order while holding the mutex. Timestamp ties must not reorder owners alphabetically.
+          const last = Math.max(0, ...state.waiting.map((w) => Number(/^(\d+)-/.exec(basename(w.file))?.[1]) || 0));
+          ticket ??= `${String(Math.max(queuedAt, last + 1)).padStart(15, '0')}-${token}.json`;
           mkdirSync(waitingDir, { recursive: true });
           writeFileSync(join(waitingDir, ticket), entry(false));
           queued = true;
+          onQueued?.();
         }
         return { held: [state.exclusive, ...state.shared, ...others].filter(Boolean) };
       },
@@ -645,9 +653,13 @@ export function windowsCommandLine(args) {
 }
 
 export const USAGE = `usage: node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<id> -- <command...>
+       node scripts/gpu-lock.mjs enqueue --owner=<id> [--max=<min>] [--wait-max=<min>] -- <command...>
+       node scripts/gpu-lock.mjs wait <ticket> [--wait-max=<min>]
        node scripts/gpu-lock.mjs status
 
 Runs a command while holding the GPU lock (test-results/gpu.lock of the main checkout), or prints the holders.
+enqueue returns a ticket after queueing a detached command. Do CPU work, then wait for its result without losing its place.
+Shared and exclusive requests retain FIFO order. wait timing out does not cancel the queued command.
 
 Options:
   --exclusive                hold the whole GPU for speed measurement only
@@ -697,6 +709,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         utimesSync(file, now, now);
       } catch {}
     }, beatMs());
+  } else if (['enqueue', 'wait', 'queue-run'].includes(verb)) {
+    const { createGpuQueue } = await import('./gpu-queue.mjs');
+    await createGpuQueue({
+      acquire,
+      defaultMaxMinutes,
+      lockDir,
+      measuresSpeed,
+      resolveMode,
+      windowsCommandLine,
+    }).queueCli(verb, rest);
   } else if (verb === 'run') {
     const split = rest.indexOf('--'),
       flags = rest.slice(0, split < 0 ? rest.length : split),

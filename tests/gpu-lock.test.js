@@ -160,6 +160,26 @@ async function withLock(body, envOrFn = {}) {
   }
 }
 
+test('shared FIFO tickets preserve arrival order when timestamps tie and owner names sort backwards', () =>
+  withLock(async (gpu) => {
+    const held = [await take(gpu, 'hold-1'), await take(gpu, 'hold-2'), await take(gpu, 'hold-3')];
+    const options = { queuedAt: 123, poll: 1, waitMax: 0.2, max: 1, log: quiet };
+    const first = gpu.acquire({ ...options, owner: 'z-first' });
+    while (!gpu.status()?.waiting?.length) await sleep(1);
+    const second = gpu.acquire({ ...options, owner: 'a-second' });
+    assert.equal(await settled(second), 'waiting');
+    assert.deepEqual(
+      gpu.status().waiting.map((w) => w.owner),
+      ['z-first', 'a-second'],
+    );
+    held.pop()();
+    const firstRelease = await first;
+    assert.equal(await settled(second), 'waiting');
+    firstRelease();
+    (await second)();
+    for (const release of held) release();
+  }));
+
 test('shared holders share: up to the slot count at once, the next waits for a free slot', () =>
   withLock(async (gpu) => {
     const held = [await take(gpu, 'a'), await take(gpu, 'b'), await take(gpu, 'c')];

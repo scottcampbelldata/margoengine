@@ -118,6 +118,42 @@ Research guiding the remaining queue and phase work, read before implementation:
   emphasizes hermetic resources and explicit shard support. Correctness and
   speed work need explicit suite ownership, with every deferred budget retained.
 
+## Queue GPU gates early, keep working (section 5 supplement)
+
+Push gates default to a 60-minute admission wait, including direct `acquire()`
+and `run`. Correctness uses a shared slot. To reserve a place without blocking
+the agent's CPU work, submit the actual bounded command early:
+
+```powershell
+node scripts/gpu-lock.mjs enqueue --owner=lane-G --wait-max=60 --max=20 -- node scripts/run-readme-examples.mjs
+# Copy the ticket field from the JSON result. Continue independent CPU work.
+node scripts/gpu-lock.mjs wait <ticket>
+```
+
+The detached owner queues and runs the command when a slot becomes available;
+`wait` observes its result and prints its log. The command retains the submitter's
+working directory, and logs stay in that worktree's `test-results/gpu-queue/`.
+Waiting as an observer never surrenders a ticket. Its optional wait limit can
+expire while the queued command continues; the same ticket can be observed
+again. A default observer bound covers the command's admission wait plus hold
+limit and one minute of shutdown allowance. The command itself retains its
+independent hard limit and process-tree termination.
+
+All new shared and exclusive requests keep FIFO tickets in the existing
+`gpu.lock-waiting/` format. Shared admission requires a free slot and the head
+ticket; it does not wait for other shared holders to finish. Old reader/writer
+clients conservatively treat these tickets as exclusive waiters, preserving
+exclusion but not providing FIFO guarantees for old clients. Old one-holder
+clients also retain their own ordering. Worktrees must rebase to get the new
+admission policy. Never remove another owner's entry to advance a queue.
+
+CPU-only proof: `tests/gpu-queue.test.js` fills three fake slots, queues two
+detached commands, times out an observer, then checks exact FIFO admission ahead
+of a later ordinary request while two original holders stay live. Completed
+results and logs survive the submitting process, and malformed tickets are
+rejected before filesystem access. Existing mutex/legacy/limit tests remain
+required; this adds no GPU performance claim.
+
 ## Purpose and authority
 
 ### GPU exclusive request policy

@@ -9,6 +9,14 @@ Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip agains
 its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
+New GPU clients retain FIFO admission tickets for shared and exclusive requests.
+Detached `gpu-lock.mjs enqueue` submissions retain the 60-minute default gate
+wait; `wait <ticket>` observes the same request and never cancels it on timeout.
+Status records persist beside the lock, and command logs stay in the submitting
+worktree. Older clients remain interoperable but keep their older ordering;
+FIFO applies only to new clients. A shared head request needs one free slot,
+not an empty GPU. Commands and observers each have a hard time limit.
+
 Exclusive GPU holds are reserved for classified speed commands or an explicit,
 logged timing reason, with a 20-minute maximum including wrapper overhead.
 Oversize holds and correctness requests fail before waiting and are recorded in
