@@ -1,5 +1,15 @@
 # Engine architecture and quality reference
 
+## README live-link lifecycle (section 5 evidence, 2026-11-10)
+
+The runner supplies Blender's documented continuing example with native SSE
+and a real exported model through its own HTTP service. It drives pagehide
+only after model attachment and framing, then requires module completion and
+observed model/node/event-source cleanup within the unchanged 20 s deadline.
+Observers preserve real calls, returns and exceptions, including idempotent
+re-entry during plugin disposal. No package or renderer changed. CPU regression
+and the real WebGPU README run are described in `docs/readme-live.md`.
+
 ### Section 5 evidence: batch 134 scalar refinement
 
 Private BC4/BC5 both-mode endpoint fitting and extrema-slot seeds pass the new

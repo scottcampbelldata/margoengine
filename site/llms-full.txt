@@ -4891,6 +4891,17 @@ See known-bugs.md and testpage-research.md for the reproduction and evidence.
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-10: README runner did not drive Blender's live-link lifecycle
+
+The harness waited for a continuing module without supplying its live service
+or pagehide. It now serves one real Blender model through HTTP and native SSE,
+waits for attachment and framing, drives pagehide externally, then requires
+module completion, model disposal, node removal and EventSource closure. The
+20 s deadline and known-failure list are unchanged. The live README passes;
+tests/readme-live.test.js proves lifecycle ordering and refusal of missing work
+or cleanup, and fails against the old runner. Sources and repro:
+`docs/readme-live.md`.
+
 ### Fixed 2026-11-09: owned termination waited before releasing its pipes
 
 The close path awaited native termination work before destroying its owned

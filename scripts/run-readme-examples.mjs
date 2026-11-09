@@ -23,7 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { reportSpeedPhase } from './support/speed-phase.mjs';
@@ -32,6 +32,7 @@ import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-typ
 import { closeAll, endTree } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
+import { finishLiveExample, observeLiveExample, serveLiveLink, usesLiveLink } from './support/readme-live.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   // Each run writes only its own folder: the lock gives a run one shared GPU slot, so two runs in one checkout can overlap,
@@ -390,6 +391,11 @@ for (const selector of JSON.parse(query.get('elements'))) {
 }
 if (!document.querySelector('canvas')) document.body.append(document.createElement('canvas'));
 try {
+  if (query.has('live')) {
+    const { PBRModel } = await import('/@fs/${fileURLToPath(import.meta.resolve('@margoengine/gltf-pro/model')).replaceAll('\\', '/')}');
+    const { Camera } = await import('/@fs/${fileURLToPath(import.meta.resolve('@margoengine/core')).replaceAll('\\', '/')}');
+    (${observeLiveExample.toString()})(PBRModel, Camera);
+  }
   await import(query.get('example'));
   window.__ran = 'done';
 } catch (error) {
@@ -417,6 +423,7 @@ async function startPages(samples, examples) {
         name: 'readme-samples',
         configureServer(vite) {
           vite.middlewares.use((request, response, next) => {
+            if (serveLiveLink(request, response)) return;
             const { pathname } = new URL(request.url, 'http://example.test');
             if (pathname === '/run.html') {
               response.setHeader('content-type', 'text/html');
@@ -451,7 +458,8 @@ async function startPages(samples, examples) {
 
 export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
   const file = await writePageExample(example);
-  const url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
+  const live = usesLiveLink(example.code);
+  const url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}${live ? '&live' : ''}`;
   let phase = 'creating page',
     page,
     result,
@@ -460,8 +468,25 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
   const work = (async () => {
     try {
       page = await pages.browser.newPage();
+      if (live) {
+        // Redirect the documented add-on address to this run's own service. No shared port or fake browser API.
+        await page.route('http://127.0.0.1:8765/**', (route) => {
+          const target = new URL(route.request().url());
+          return route.fulfill({
+            status: 307,
+            headers: {
+              location: `${pages.origin}/__readme-live${target.pathname}${target.search}`,
+              'access-control-allow-origin': '*',
+            },
+          });
+        });
+      }
       phase = 'navigating';
       await page.goto(url, { timeout });
+      if (live) {
+        phase = 'completing live-link lifecycle';
+        await finishLiveExample(page, timeout);
+      }
       phase = 'waiting for module completion';
       await page.waitForFunction(() => window.__ran, undefined, { timeout });
       phase = 'settling';
