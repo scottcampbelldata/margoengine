@@ -114,6 +114,8 @@ export interface VFXOptions {
   skinned?: VFXSkinned;
   /** Blend each lifetime atlas frame into the next. Needs `flipbook` from `@margoengine/vfx/flipbook` and a texture atlas whose frames are `'lifetime'`. */
   flipbook?: VFXFlipbook;
+  /** Particles cast sphere shadows and the first live slots emit point lights. Needs `shadows` from `@margoengine/vfx/shadows`. */
+  shadows?: VFXShadows;
 }
 /**
  * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf-pro`, with a
@@ -147,6 +149,35 @@ export interface VFXSkinned {
  * whose atlas frames are `'lifetime'`, and the `flipbook` feature.
  */
 export interface VFXFlipbook {}
+/** One point light packed from a live particle. `decay` is 2, the windowed inverse-square term. */
+export interface VFXParticleLight {
+  position: [number, number, number];
+  /** World units, not scaled by the particle's size. */
+  range: number;
+  color: [number, number, number];
+  intensity: number;
+  decay: 2;
+}
+/**
+ * Particles cast sun shadows into `cast` and the first live slots emit point lights into `into`. `count`, `range` and
+ * `intensity` are read every frame; `cast` and `into` are fixed at attach. The feature sets `buffer`.
+ */
+export interface VFXShadows {
+  /** How many of the first live slots, in slot order, become lights. A whole number from 0 to 64. Default 8. */
+  count?: number;
+  /** Light range in world units, finite and above 0. Default 4. */
+  range?: number;
+  /** Light intensity, finite and 0 or more. Default 1. */
+  intensity?: number;
+  /** A `Shadows` from `@margoengine/shadows`, or anything with `add`. Fixed at attach. */
+  cast?: {
+    add(source: { drawShadow(ctx: unknown): void; disposed?: boolean }, options?: { static?: boolean }): () => void;
+  };
+  /** A `Clustered` from `@margoengine/clustered`, or anything with `setLights`. Fixed at attach. */
+  into?: { setLights(lights: readonly VFXParticleLight[]): void };
+  /** The light list on the GPU (a header, then up to 64 lights). Set by the feature at attach. */
+  buffer?: GPUBuffer;
+}
 /** A point that pulls particles towards it (or pushes them away with a negative strength). */
 export interface VFXAttractor {
   position: Vec3;
@@ -404,6 +435,8 @@ export interface VFXRuntime {
   shade?(code: string, group: number): string;
   /** Sets the feature's bind group `group` on a billboard draw with `pipeline`. */
   bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
+  /** Drops what the feature registered, before its buffers are destroyed (device restore and `dispose`). */
+  dispose?(): void;
 }
 /** A feature beyond the first seven (ribbons and later). The shape is internal: pass the entry's export. */
 export interface VFXExtension<T> {
@@ -424,6 +457,7 @@ const extensions = [
   'fields',
   'skinned',
   'flipbook',
+  'shadows',
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
@@ -490,6 +524,7 @@ export interface VFXFeatures {
   fields?: VFXExtension<VFXFields>;
   skinned?: VFXExtension<VFXSkinned>;
   flipbook?: VFXExtension<VFXFlipbook>;
+  shadows?: VFXExtension<VFXShadows>;
 }
 let nextId = 0;
 /**
@@ -1101,6 +1136,7 @@ export class VFX implements EnginePlugin {
     return { particles: this.particles, indirect: this.indirect, alive: this.alive, visible: this.visible };
   }
   private release(): void {
+    for (const runtime of this.runtimes) runtime.dispose?.();
     for (const buffer of [
       this.uniform,
       this.particles,

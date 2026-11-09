@@ -17,6 +17,7 @@ import { stretch } from './stretch.js';
 import { fields } from './fields.js';
 import { skinned } from './skinned.js';
 import { flipbook } from './flipbook.js';
+import { shadows } from './shadows.js';
 export type {
   VFXOptions,
   VFXObstacle,
@@ -39,6 +40,8 @@ export type {
   VFXSkinned,
   VFXSkinnedPrimitive,
   VFXFlipbook,
+  VFXShadows,
+  VFXParticleLight,
 } from './base.js';
 const features = {
   obstacles,
@@ -57,9 +60,10 @@ const features = {
   fields,
   skinned,
   flipbook,
+  shadows,
 };
 /**
- * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh, events, lit, depthCollide, stretch, fields, skinned, flipbook). Effects that use none of them load
+ * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh, events, lit, depthCollide, stretch, fields, skinned, flipbook, shadows). Effects that use none of them load
  * less with `VFX` from `@margoengine/vfx/base`, adding only the feature entries they use.
  */
 export class VFX extends VFXBase {

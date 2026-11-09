@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11376120,
+  "total": 11381750,
   "history": [
     {
       "date": "2026-10-24",
@@ -4676,6 +4676,12 @@
       "commit": "7b836e3b3",
       "reason": "viewcube home view adds 392 B gzip (3709 to 4101 B measured)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "13f52ad57",
+      "reason": "vfx/shadows:",
+      "grew": 2
     }
   ],
   "items": {
@@ -5417,7 +5423,7 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13771,
-    "@margoengine/vfx": 27517,
+    "@margoengine/vfx": 30086,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/depth-collide": 2262,
@@ -5429,6 +5435,7 @@
     "@margoengine/vfx/mesh": 3449,
     "@margoengine/vfx/obstacles": 1364,
     "@margoengine/vfx/ribbons": 2854,
+    "@margoengine/vfx/shadows": 3061,
     "@margoengine/vfx/skinned": 2314,
     "@margoengine/vfx/soft": 1551,
     "@margoengine/vfx/sort": 1356,

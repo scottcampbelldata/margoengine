@@ -105,6 +105,10 @@
     "./flipbook": {
       "types": "./dist/flipbook.d.ts",
       "import": "./dist/flipbook.js"
+    },
+    "./shadows": {
+      "types": "./dist/shadows.d.ts",
+      "import": "./dist/shadows.js"
     }
   },
   "files": [

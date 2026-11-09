@@ -162,6 +162,15 @@ interface VFXOptions {
     fields?: VFXFields;
     skinned?: VFXSkinned;
     flipbook?: VFXFlipbook;
+    shadows?: VFXShadows;
+}
+
+interface VFXParticleLight {
+    position: [number, number, number];
+    range: number;
+    color: [number, number, number];
+    intensity: number;
+    decay: 2;
 }
 
 interface VFXRibbons {
@@ -183,6 +192,25 @@ interface VFXRuntime {
     key?(group: number): string;
     shade?(code: string, group: number): string;
     bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
+    dispose?(): void;
+}
+
+interface VFXShadows {
+    count?: number;
+    range?: number;
+    intensity?: number;
+    cast?: {
+        add(source: {
+            drawShadow(ctx: unknown): void;
+            disposed?: boolean;
+        }, options?: {
+            static?: boolean;
+        }): () => void;
+    };
+    into?: {
+        setLights(lights: readonly VFXParticleLight[]): void;
+    };
+    buffer?: GPUBuffer;
 }
 
 interface VFXSkinned {

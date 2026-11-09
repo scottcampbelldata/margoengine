@@ -129,6 +129,7 @@ export interface VFXFeatures {
     fields?: VFXExtension<VFXFields>;
     skinned?: VFXExtension<VFXSkinned>;
     flipbook?: VFXExtension<VFXFlipbook>;
+    shadows?: VFXExtension<VFXShadows>;
 }
 
 export interface VFXFields {
@@ -208,6 +209,15 @@ export interface VFXOptions {
     fields?: VFXFields;
     skinned?: VFXSkinned;
     flipbook?: VFXFlipbook;
+    shadows?: VFXShadows;
+}
+
+export interface VFXParticleLight {
+    position: [number, number, number];
+    range: number;
+    color: [number, number, number];
+    intensity: number;
+    decay: 2;
 }
 
 export interface VFXRibbons {
@@ -215,6 +225,24 @@ export interface VFXRibbons {
     interval?: number;
     width?: number;
     heads?: boolean;
+}
+
+export interface VFXShadows {
+    count?: number;
+    range?: number;
+    intensity?: number;
+    cast?: {
+        add(source: {
+            drawShadow(ctx: unknown): void;
+            disposed?: boolean;
+        }, options?: {
+            static?: boolean;
+        }): () => void;
+    };
+    into?: {
+        setLights(lights: readonly VFXParticleLight[]): void;
+    };
+    buffer?: GPUBuffer;
 }
 
 export interface VFXSkinned {
@@ -314,6 +342,7 @@ interface VFXRuntime {
     key?(group: number): string;
     shade?(code: string, group: number): string;
     bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
+    dispose?(): void;
 }
 
 interface VFXState {

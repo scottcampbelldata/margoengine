@@ -3128,12 +3128,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 88334,
-        "gzip": 27335
+        "raw": 95399,
+        "gzip": 29209
       },
       "./base": {
-        "raw": 33975,
-        "gzip": 11170
+        "raw": 34026,
+        "gzip": 11183
       },
       "./obstacles": {
         "raw": 2388,
@@ -3198,6 +3198,10 @@
       "./flipbook": {
         "raw": 2064,
         "gzip": 911
+      },
+      "./shadows": {
+        "raw": 7048,
+        "gzip": 2805
       }
     },
     "@margoengine/video": {

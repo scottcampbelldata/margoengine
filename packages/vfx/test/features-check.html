@@ -379,5 +379,64 @@ window.checkFlipbook=async()=>{
  });
  return {error,errors:errors.splice(0),mismatches,got,want};
 };
+/**
+ * Shadows and lights. Four slots (live, dead, live, live) with count 2 keep the first two live slots as point lights.
+ * A second effect draws one sphere at the origin into a 64 x 64 depth map: the centre and a rim pixel match the
+ * orthographic sphere, and a corner stays clear.
+ */
+window.checkShadows=async()=>{
+ const n=4;
+ const list=[
+  {at:[1,2,3],life:4,size:2,color:[1,0,0]},
+  {at:[9,9,9],life:0,size:2,color:[0,1,0]},
+  {at:[4,5,6],life:4,size:2,color:[0,0,1]},
+  {at:[7,8,9],life:4,size:2,color:[1,1,0]},
+ ];
+ const seen=[];
+ const shadows={count:2,range:5,intensity:3,into:{setLights(lights){seen.push(lights.map(light=>({position:[...light.position],range:light.range,color:[...light.color],intensity:light.intensity,decay:light.decay})));}}};
+ const effect=new VFX({...still,capacity:n,velocity:[0,0,0],size:2,shadows});
+ const {buffers,error}=await run(effect,{frames:0,dt:0,samples:1,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records(list,n)),read:()=>[shadows.buffer]});
+ const hold=device.createTexture({size:[4,4],format:'rgba8unorm',usage:GPUTextureUsage.RENDER_ATTACHMENT});
+ const holdDepth=device.createTexture({size:[4,4],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT});
+ for(let i=0;i<4;i++){
+  const encoder=device.createCommandEncoder();
+  const c={backend:'webgpu',device,delta:0,camera,width:size,height:size,format:'rgba8unorm',color:hold.createView(),depth:holdDepth.createView(),descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}},encoder};
+  effect.simulate(c);effect.draw(c);
+  device.queue.submit([encoder.finish()]);
+  await device.queue.onSubmittedWorkDone();
+ }
+ effect.dispose();hold.destroy();holdDepth.destroy();
+ const data=buffers[0];
+ const header=[data[0],data[1],data[2]];
+ const lightAt=(i)=>{const o=4+i*8;return {position:[data[o],data[o+1],data[o+2]],range:data[o+3],color:[data[o+4],data[o+5],data[o+6]],intensity:data[o+7]};};
+ const depthN=64;
+ const matrix=new Float32Array([0.5,0,0,0, 0,0.5,0,0, 0,0,0.05,0, 0,0,0.5,1]);
+ let caster;
+ const cast={add(source){caster=source;return ()=>{};}};
+ const one=[{at:[0,0,0],life:4,size:2,color:[1,1,1]}];
+ const sphere=new VFX({...still,capacity:1,velocity:[0,0,0],size:2,shadows:{count:0,cast}});
+ device.pushErrorScope('validation');
+ const depthRun=await run(sphere,{frames:0,dt:0,samples:1,setup:()=>device.queue.writeBuffer(sphere.gpuState.particles,0,records(one,1))});
+ const depthTex=device.createTexture({size:[depthN,depthN],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+ const encoder=device.createCommandEncoder();
+ const pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+ caster.drawShadow({context:{device,encoder},pass,matrix,cascade:0});
+ pass.end();
+ const depthBuf=device.createBuffer({size:depthN*256,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ encoder.copyTextureToBuffer({texture:depthTex},{buffer:depthBuf,bytesPerRow:256},[depthN,depthN]);
+ device.queue.submit([encoder.finish()]);
+ await depthBuf.mapAsync(GPUMapMode.READ);
+ const depth=new Float32Array(depthBuf.getMappedRange().slice(0));
+ const depthError=await device.popErrorScope();
+ sphere.dispose();depthTex.destroy();depthBuf.destroy();
+ const ndc=(px,py)=>[2*(px+0.5)/depthN-1,1-2*(py+0.5)/depthN];
+ const expectDepth=(px,py)=>{
+  const [x,y]=ndc(px,py),local=[x/0.5,y/0.5],d=local[0]*local[0]+local[1]*local[1];
+  if(d>1)return 1;
+  return Math.min(1,Math.max(0,0.5-Math.sqrt(1-d)*0.05));
+ };
+ const samples=[[32,32],[47,32],[0,0]];
+ return {error:error??depthRun.error??depthError?.message??null,errors:errors.splice(0),header,lights:[0,1,2].map(lightAt),published:seen.at(-1)??null,depthGot:samples.map(([px,py])=>depth[py*depthN+px]),depthWant:samples.map(([px,py])=>expectDepth(px,py))};
+};
 window.ready=true;
 </script></body></html>

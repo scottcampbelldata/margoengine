@@ -23,6 +23,8 @@
 // bind-pose area; with no deformer yet they lie on the bind pose.
 // Flipbook: two particles held halfway between atlas frames (including a row wrap) match the CPU mix of the two
 // solid cells times the life fade, within 2 of 255. Removing the mix fails this.
+// Shadows: the first two live slots of four (a dead slot between them) pack as point lights, and one sphere at the
+// origin writes the orthographic sphere depth into a 64 x 64 map. The WebGL2 route is not part of this check.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -154,6 +156,37 @@ try {
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}: ${r.got.map((p) => p.join(',')).join(' | ')}`);
+  }
+  {
+    const name = 'shadows',
+      r = await page.evaluate(() => window.checkShadows());
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(
+      r.header.map((v) => Math.round(v * 1e6) / 1e6),
+      [2, 5, 3],
+      name,
+    );
+    assert.deepEqual(r.lights[0].position, [1, 2, 3], name);
+    assert.deepEqual(r.lights[0].color, [1, 0, 0], name);
+    assert.equal(r.lights[0].range, 5, name);
+    assert.equal(r.lights[0].intensity, 3, name);
+    assert.deepEqual(r.lights[1].position, [4, 5, 6], name);
+    assert.deepEqual(r.lights[1].color, [0, 0, 1], name);
+    assert.equal(r.lights[1].range, 5, name);
+    assert.equal(r.lights[1].intensity, 3, name);
+    assert.notDeepEqual(r.lights[2].position, [7, 8, 9], name);
+    assert.equal(r.published?.length, 2, name);
+    assert.equal(r.published[0].decay, 2, name);
+    assert.deepEqual(r.published[0].position, [1, 2, 3], name);
+    assert.deepEqual(r.published[1].position, [4, 5, 6], name);
+    assert.deepEqual(r.published[1].color, [0, 0, 1], name);
+    for (let i = 0; i < 3; i++)
+      assert.ok(
+        Math.abs(r.depthGot[i] - r.depthWant[i]) < 1e-4,
+        `${name} sample ${i}: got ${r.depthGot[i]} want ${r.depthWant[i]}`,
+      );
+    console.log(`ok ${name}: lights ${r.header.join(',')} depth ${r.depthGot.map((v) => v.toFixed(5)).join(' ')}`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

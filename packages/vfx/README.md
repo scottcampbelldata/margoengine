@@ -213,12 +213,12 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (27,335 B min+gzip) carries every feature. An effect that uses none of them can
+`VFX` from `@margoengine/vfx` (29,209 B min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same), `/skinned` (2.1 kB, the same) and `/flipbook` (0.9 kB, 911 B min+gzip, the quality gate's figure). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same), `/skinned` (2.1 kB, the same), `/flipbook` (0.9 kB, 911 B min+gzip, the quality gate's figure) and `/shadows` (2.8 kB, 2,805 B min+gzip, the quality gate's figure). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 27,335 B. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 29,209 B. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
@@ -562,3 +562,26 @@ On WebGPU the mix is in the billboard fragment shader. On the WebGL2 route the s
 centre pixels read 111,111,0 and 0,79,79, within 1 of the CPU mix 112,112,0 and 0,80,80.
 `node packages/vfx/test/features-check.mjs` (real GPU) holds two particles halfway between frames of a 2 x 2 solid
 atlas, one of them wrapping onto the next row, and checks each centre pixel against the same mix computed on the CPU.
+
+### Particle shadows and lights
+
+`shadows` makes particles cast sun shadows and emit point lights. Each live particle is a sphere impostor in the directional shadow map: under the cascade's orthographic matrix the front of the sphere is `centerZ - sqrt(r^2 - x^2 - y^2)`. The map's own receiver bias stays in the shadow pass. The first `count` live slots, in slot order, become point lights (default 8, at most 64). `range` is a distance in world units (default 4), not scaled by the particle's size. `intensity` (default 1) is the light's intensity. `decay` is always 2, so a clustered list uses its windowed inverse-square falloff. `cast` is a `Shadows` and `into` is a `Clustered`; either may be left out. `count`, `range` and `intensity` are read every frame. `cast` and `into` are fixed at attach. The feature sets `buffer` on the options object to the light list (a header, then up to 64 lights). `into` sees that list about two frames later, because the read-back waits for the frame to finish.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {shadows} from 'margoengine/vfx/shadows';
+import {Clustered} from 'margoengine/clustered';
+import {Shadows} from 'margoengine/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const sun = Shadows.attach(engine);
+const lights = Clustered.attach(engine);
+// Sparks that block the sun and light what is near them.
+VFX.attach(engine, {
+  capacity: 4096, rate: 200, size: 0.15, lifetime: [1, 2], color: [1, 0.4, 0.1, 1], intensity: 2,
+  shadows: {cast: sun, into: lights, count: 8, range: 5},
+}, {shadows});
+engine.start();
+```
+
+The light list is packed with a workgroup prefix sum, so the same slots give the same lights and nothing is chosen with an atomic. The sphere draw is a depth-only pass, one per cascade, and it does not add a storage buffer to the simulation. `node packages/vfx/test/features-check.mjs` (real GPU) reads the light buffer of four slots (live, dead, live, live) with `count` 2 and checks a sphere at the origin against the orthographic depth. The WebGL2 route was not run.

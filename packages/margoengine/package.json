@@ -3006,6 +3006,10 @@
       "types": "./dist/vfx/flipbook.d.ts",
       "import": "./dist/vfx/flipbook.js"
     },
+    "./vfx/shadows": {
+      "types": "./dist/vfx/shadows.d.ts",
+      "import": "./dist/vfx/shadows.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
