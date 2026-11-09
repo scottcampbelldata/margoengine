@@ -874,6 +874,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   cap certification and supported-path planning remain work to profile, not grounds to remove required bars.
   Existing point normals still fail 1:100 drift, 1:1000 sag/drift/creep and chain-box seam speed after the support
   fix, so replacing the block with that option is rejected. No faster solver is accepted from a partial matrix.
+  Entry 107 removes compiled finite-predicate work with identical output, but its paired ratio 1.0001
+  (IQR 0.9254 to 1.0686, 12/24 faster) proves no timing gain. Latest separate browser sessions still lose:
+  Edge Margo/Box2D/Rapier 4.065/1.500/8.855 ms; Firefox 4.420/1.420/10.460 ms. Profile the complete corrected
+  hot path before another redesign; the required block-coupled accuracy remains intact.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

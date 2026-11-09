@@ -1180,3 +1180,11 @@ force probe. This correction makes no Box2D speed-parity claim and does not impl
 | Planner retained storage follows maximum body/contact counts, rather than sums of per-slot historical maxima | Flat adjacency offsets/cursors, flat path/gap ranges and fixed-V/E migrating-hub/path resource regressions in `solver/path_support_storage_tests.rs` | Planner backing buffers; local accepted-component solves still allocate |
 | Existing per-point normals become accuracy-eligible after the support fix | [Corrected-baseline diagnostic](../architecture/physics2d-solver-study.md#point-normal-diagnostic-on-the-corrected-support-baseline), complete 58-case comparison in the raw record | REJECTED: 1:100 drift, 1:1000 collapse and chain-box seam speed fail unchanged predicates |
 | This change establishes a stable browser speed gain or matches Box2D v3 Wasm | Paired rounds and browser/rival rows in the raw record and perf history entry 106 | UNPROVEN; loaded-machine diagnostics, loss remains open and quiet release rerun required |
+
+## Own 2D finite certificates (2026-11-08)
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Reduced finite predicates preserve the original accepted and exceptional lanes | [IEEE proof](../architecture/physics2d-finite-certificates.md), private old-predicate controls over actual caller expressions, retained-guard and per-visit shadow tests | Actual private caller dataflow, including finite/nonfinite inputs; unrelated independently supplied helper arguments are excluded |
+| The compiled normal-solver finite-predicate inventory decreases | [Raw compiler inventories and provenance](results/physics2d-finite-certificates-20261108.json): Wasm hot function abs 42 to 28, le 44 to 30, mask AND 64 to 50; native comparison/mask reductions | Static emitted operations across branches and call sites; solver arithmetic counts unchanged, not per-contact dynamic instructions or micro-ops |
+| This trim changes the accuracy baseline or establishes a browser speed win | All three current pins and 29 physical bars, paired ratio median 1.0001 and 12/24 faster, browser loss rows in entry 107 | No re-pin or physical-contract change; timing gain and Box2D parity remain UNPROVEN |

@@ -2486,6 +2486,44 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   units and full landing gates. No scene, physical tolerance, pass count or current pin changes. Box2D goal
   remains unmet; quiet release reruns are required. Owned-2D CCD remains separate T-11 / 127.y.
 
+### 107. Exact 2D finite certificates: compiled predicates removed, no timing win
+
+- **Change and proof:** starting from flat-planner main `119d55a9a`, remove two redundant SIMD finite predicates.
+  Finite caller-derived m11/m22/det already implies finite K entries; finite caller-derived impulse/sum implies
+  finite bias, normal speed, normal mass and selected total. Keep the row's raw-K guard, used-soft domains,
+  mutable RHS/answer/sum overflow, cap membership, post-motion and exact exceptional restart/error behavior.
+  The [IEEE proof](../architecture/physics2d-finite-certificates.md) states the actual-caller restriction and
+  counterexamples for unrelated helper inputs. No solver arithmetic expression, layout field, scene, count,
+  setting, physical predicate or current hash changes.
+- **Compiled work:** matching rustc 1.99.0 / LLVM 23.1.1 release builds, shipped simd128; Binaryen 132 read/decode
+  only. Hot Wasm function $111 emits abs **42 to 28**, le **44 to 30**, mask AND **64 to 50**. Solver
+  add/subtract/multiply/divide/sqrt opcode counts stay unchanged. Native comparison/mask inventories also shrink.
+  These are static branch-inclusive inventories, not per-contact dynamic instructions or micro-ops. Named
+  module sizes are 268,372 and 268,181 B. Decoded source-filename/panic-data relocations explain different
+  control artifacts; no binary-identity or layout-independent timing claim is made.
+- **Accuracy:** all 29 physical bars, input/domain tests, existing per-visit shadows and current native/Wasm
+  pins pass. New controls compare 262,144 block and 131,072 row four-lane masks using actual caller expressions;
+  a separate guard test preserves sum-overflow, raw-K and used-soft refusal while allowing an unused invalid
+  soft state. No re-pin follows this work. Owned-2D CCD remains separate T-11 / 127.y.
+- **Paired diagnostic:** SCOTT-DEV Ryzen 9 9950X, Node 26.12, 66.05% aggregate CPU busy; 24 alternating rounds,
+  one process, fresh unchanged 100-row scenes, 60 settle steps plus minimum of 40 steps. All three explicit
+  pins and every 5,050-awake visit match. Minimum 5.0895 to 4.9111 ms; paired candidate/control ratio median
+  **1.0001**, IQR **0.9254 to 1.0686**, candidate faster **12/24**. No timing win is established.
+- **Browser before/after:** 12-round minimum milliseconds, separate changing-load sessions, exclusive GPU
+  lease, unchanged black-box rivals and scene. Margo loses to Box2D in all rounds and beats Rapier in all rounds.
+
+  | Browser/backend | Before Margo / Box2D v3 / Rapier | After Margo / Box2D v3 / Rapier |
+  | --- | --- | --- |
+  | Edge 157 WebGPU | 4.090 / 1.490 / 8.400 | 4.065 / 1.500 / 8.855 |
+  | Firefox 157 WebGL2 | 4.400 / 1.440 / 9.780 | 4.420 / 1.420 / 10.460 |
+
+  Available Edge WebGPU/WebGL2 and Firefox WebGL2 checks pass; Firefox WebGPU has no adapter. These sessions
+  establish neither a controlled speed gain nor Box2D parity. The loss remains open.
+- **Reproduce/evidence:** [raw compiler inventories, provenance, masks, physical matrix and rounds](results/physics2d-finite-certificates-20261108.json),
+  [bounded commands](reproduce.md#own-2d-finite-certificates-perf-history-entry-107), and the source proof above.
+  Retain all bars and profile the complete corrected hot path before selecting another redesign. Quiet release
+  reruns are required; no wall-clock tuning or forecast substitutes for work/result evidence.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2582,3 +2620,4 @@ These entries lack a recorded number, a named machine or a quiet run:
 28. 10 million points against potree-core (entry 105): a quiet paired rerun of the frame time. The loss stays open.
 
 29. Flat 2D planner storage (entry 106): quiet paired/browser reruns on the corrected accuracy baseline; allocation reduction is proven, browser speed parity remains open.
+30. Exact 2D finite certificates (entry 107): quiet paired/browser reruns; compiled predicate reduction is proven, speed gain and Box2D parity remain open.

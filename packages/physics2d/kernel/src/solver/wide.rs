@@ -951,8 +951,7 @@ fn certify_block(
     let mut mask = c
         .live
         .and(finite(&intermediates))
-        .and(finite(&answer))
-        .and(finite(&[c.k11, c.k12, c.k22]));
+        .and(finite(&answer));
     for i in 0..2 {
         mask = certify_potential(
             mask,
@@ -983,7 +982,7 @@ fn certify_row(
     let kii = if i == 0 { c.k11 } else { c.k22 };
     let mask = c
         .live
-        .and(finite(&values))
+        .and(finite(&values[3..5]))
         .and(finite(&[kii]))
         .and(kii.ge(F4::splat(0.0)));
     certify_potential(

@@ -875,6 +875,12 @@ mass threshold was fitted to hide it. See the [support derivation](architecture/
 [bending analysis and executable probe](architecture/physics2d-support-bending.md), and
 [reproduction commands](whitepaper/reproduce.md#own-2d-sustained-support).
 
+The normal solver's finite-predicate reduction relies on actual private caller dataflow, not arbitrary
+independent helper arguments. It preserves the same accepted/exceptional lane masks, raw-row and used-soft
+domain checks, cap membership, post-motion finiteness and coded errors. The
+[IEEE proof and compiler inventory](architecture/physics2d-finite-certificates.md) state those restrictions;
+static predicate counts do not establish dynamic instruction counts or a browser speed gain.
+
 The frame planner is linear in bodies, contacts and joints. Its flat graph/path/gap buffers retain capacity
 bounded by historical maximum body/contact counts, rather than per-body or per-component capacity maxima.
 Current graph contents, eligibility and weights rebuild each frame. General branching graphs skip the extra

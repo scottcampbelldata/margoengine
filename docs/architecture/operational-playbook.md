@@ -1710,3 +1710,17 @@ on the unchanged pyramid, with identical work counts and final state. Paired/bro
 perf history entry 106; they establish neither a stable timing gain nor Box2D parity. The existing point-normal
 replacement is rejected again on the full corrected 29-case contract. Local accepted-component allocations and
 two banded factorizations remain, and owned-2D CCD remains separate T-11 / 127.y.
+
+### Own 2D exact SIMD certificates (batch 127, section 5 evidence)
+
+The normal solver drops only finite predicates implied by its actual K-derived matrix and impulse/sum
+expressions. No stored masks or layout fields are added. The [IEEE proof](physics2d-finite-certificates.md)
+states the caller contract, including why unrelated helper arguments would invalidate the reduction.
+Raw-row/used-soft domains, mutable RHS/answer overflow, cap membership, post-motion and exact fallback/error
+behavior remain. Directed finite/nonfinite mask controls, retained-guard cases, the existing per-visit shadow,
+all 29 physical bars and current native/Wasm/browser pins provide evidence. No physical assertion or pin changes.
+
+Shipped Wasm emits 14 fewer each of abs, comparison and mask-AND operations in the identified hot function,
+with unchanged solver add/subtract/multiply/divide counts. These are static branch-inclusive inventories.
+Decoded source-path/panic-data relocations explain distinct artifact hashes; timing independence from layout
+is not claimed. Entry 107 records paired/browser diagnostics without a demonstrated gain or Box2D parity.

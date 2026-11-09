@@ -170,3 +170,8 @@ the largest body/contact counts seen by the world; changing component order cann
 high-water allocation for every component. Accepted components still allocate local solve buffers.
 The native `planner_allocations` example measures whole-step allocation requests on the unchanged 100-row
 scene; [reproduce.md](../../docs/whitepaper/reproduce.md) records its paired-control procedure and timing limits.
+
+The four-lane normal solver also omits finite predicates already implied by its exact caller expressions.
+Its [IEEE proof](../../docs/architecture/physics2d-finite-certificates.md) states that contract and the checks
+retained for mutable arithmetic, cap membership and scalar fallback. The compiled finite-predicate count
+falls while all current hashes and physical bars remain unchanged; a browser speed gain is unproven.

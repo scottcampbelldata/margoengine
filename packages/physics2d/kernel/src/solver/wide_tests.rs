@@ -1,4 +1,5 @@
 use super::*;
+include!("wide_certificate_tests.rs");
 
 std::thread_local! { static VISITS: core::cell::Cell<[u64;4]> = const { core::cell::Cell::new([0;4]) }; }
 

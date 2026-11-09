@@ -468,3 +468,46 @@ Use `BOX2D_WASM` with the existing external black-box build and `REPLAY_FIREFOX`
 and a hard 600-second process-tree limit. Preserve original scene and engine order. The before/after browser
 sessions have different load and do not establish a controlled speed gain. Firefox WebGPU without an adapter
 is unrun; owned-2D CCD remains separate T-11 / 127.y. Quiet release reruns are still required.
+
+## Own 2D finite certificates (perf history entry 107)
+
+The [IEEE proof](../architecture/physics2d-finite-certificates.md) identifies the two removed predicates and
+the precise private caller contract. All arithmetic, settings, scene/work counts, physical predicates and
+three pins remain unchanged. The [raw record](results/physics2d-finite-certificates-20261108.json) includes
+the complete compiler inventories, source/compiler identities, decoded static relocations and every round.
+
+Run the native and shipped Wasm checks with their existing hard limits:
+
+~~~sh
+npm run test:physics2d-kernel
+npm run check:rust-kernels
+~~~
+
+The new private controls in `solver/wide_certificate_tests.rs` compare old and reduced certificate masks
+after evaluating the actual caller expressions. They include partial live masks, four block answer forms,
+both biased states, signed zeros, subnormals, extreme values, infinity and NaN bit patterns. The separate
+retained-guard case covers finite-operand sum overflow, an infinite raw diagonal, used invalid soft state
+and unused invalid soft state. Current physical tests and pins are not rewritten for this comparison.
+
+For compiler reproduction, archive main `119d55a9a` and the entry-107 implementation into separate new own
+worktree subdirectories, preserving the physics2d kernel/checker and shared kernel-common paths. Use the
+same rustc 1.99.0 / LLVM 23.1.1 and Cargo release profiles on both. Build shipped simd128 checker modules
+with `-C target-feature=+simd128`; use separate target directories and hard 180-second process-tree limits.
+Native assembly/IR is emitted by `cargo rustc --locked --release --lib --manifest-path <kernel>/Cargo.toml -- --emit=asm,llvm-ir`
+under the same bounded wrapper described for the allocation probe. Decode Wasm with Binaryen 132
+`readBinary`/`emitText` only: do not optimize or rewrite the module before counting. The recorded function
+index $111 and exact SHA-256 identities identify this compiler output, not a stable public function number.
+Static opcode totals across branches are not dynamic instructions or CPU micro-ops.
+
+Compare embedded filename/panic records and static address changes as well as code when source paths differ.
+The named frozen flat control and rebuilt control have text-identical hot function $111; two other changed
+constants reference the same decoded panic Location and string. The shorter live source paths relocate data
+and BSS throughout code. These observations establish the named provenance without asserting raw binary
+identity or performance independence from layout.
+
+For timing, use the entry-106 unchanged-scene protocol: explicit full three-pin arrays, 24 alternating one-process
+rounds, 60 settling steps and minimum of 40 steps, checking 5,050 awake bodies on every visit. The retained
+driver/modules are `.lane/p/speed-cert-trim-ab-v1`; browser/rival 12-round outputs and statistics are
+`.lane/p/speed-cert-trim-browser-v1`. Use new output paths rather than overwriting those records. The paired
+ratio median 1.0001 and 12/24 faster establish no timing gain. CCD remains T-11 / 127.y; quiet release reruns
+remain necessary, while current work continues without waiting for a quiet machine.
