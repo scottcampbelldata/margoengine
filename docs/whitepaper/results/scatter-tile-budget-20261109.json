@@ -1,0 +1,461 @@
+{
+  "date": "2026-11-09",
+  "parent": "cff40d1274e17597ce595d111c5b4f541783a0b3",
+  "command": "node scripts/gpu-lock.mjs run --owner=codex-77fix --max=5 -- node packages/scatter/test/grass-tiles.browser.mjs",
+  "scope": "Generated packed records, fresh rings on one real GPU; no speed or appearance claim.",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "before": [
+    {
+      "name": "far endpoint",
+      "counts": [
+        0,
+        0,
+        1
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "f32 origin",
+      "counts": [
+        1,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "f32 origin control",
+      "counts": [
+        64,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "f32 camera",
+      "counts": [
+        1,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "rounded upper edge",
+      "counts": [
+        1,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "rounded distance",
+      "counts": [
+        0,
+        0,
+        1
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "near hard endpoint",
+      "counts": [
+        0,
+        64,
+        0
+      ],
+      "expected": [
+        0,
+        64,
+        0
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "middle hard endpoint",
+      "counts": [
+        0,
+        0,
+        64
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        1,
+        352
+      ]
+    },
+    {
+      "name": "near fade",
+      "counts": [
+        64,
+        64,
+        0
+      ],
+      "expected": [
+        64,
+        64,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "middle fade",
+      "counts": [
+        0,
+        64,
+        64
+      ],
+      "expected": [
+        0,
+        64,
+        64
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "outside far",
+      "counts": [
+        0,
+        0,
+        0
+      ],
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "capacities": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "explicit cap",
+      "counts": [
+        0,
+        0,
+        1
+      ],
+      "expected": [
+        0,
+        0,
+        32
+      ],
+      "capacities": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "after": [
+    {
+      "name": "far endpoint",
+      "counts": [
+        0,
+        0,
+        64
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        1,
+        352
+      ]
+    },
+    {
+      "name": "f32 origin",
+      "counts": [
+        64,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "f32 origin control",
+      "counts": [
+        64,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "f32 camera",
+      "counts": [
+        64,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "rounded upper edge",
+      "counts": [
+        64,
+        0,
+        0
+      ],
+      "expected": [
+        64,
+        0,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "rounded distance",
+      "counts": [
+        0,
+        0,
+        64
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        1,
+        352
+      ]
+    },
+    {
+      "name": "near hard endpoint",
+      "counts": [
+        0,
+        64,
+        0
+      ],
+      "expected": [
+        0,
+        64,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "middle hard endpoint",
+      "counts": [
+        0,
+        0,
+        64
+      ],
+      "expected": [
+        0,
+        0,
+        64
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "near fade",
+      "counts": [
+        64,
+        64,
+        0
+      ],
+      "expected": [
+        64,
+        64,
+        0
+      ],
+      "capacities": [
+        352,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "middle fade",
+      "counts": [
+        0,
+        64,
+        64
+      ],
+      "expected": [
+        0,
+        64,
+        64
+      ],
+      "capacities": [
+        1,
+        352,
+        352
+      ]
+    },
+    {
+      "name": "outside far",
+      "counts": [
+        0,
+        0,
+        0
+      ],
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "capacities": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "explicit cap",
+      "counts": [
+        0,
+        0,
+        32
+      ],
+      "expected": [
+        0,
+        0,
+        32
+      ],
+      "capacities": [
+        1,
+        1,
+        32
+      ]
+    }
+  ],
+  "gpuErrors": []
+}

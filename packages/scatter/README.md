@@ -374,6 +374,11 @@ costs little. A
 second mesh of the same objects (a tree's canopy over its trunk) passes `share` and draws the first one's records,
 culling and rings.
 
+Ring budgeting includes the last LOD distance, matching GPU acceptance at that endpoint. It uses the same f32 tile
+origin, side and camera position as the GPU, with conservative allowance for placement and distance arithmetic.
+Near a boundary it can reserve extra space; the GPU still selects rings and fades. The explicit `drawn` limit can
+truncate a ring, keeping the first instances in record order.
+
 ```ts
 import { ScatterTiles } from '@margoengine/scatter/tiles';
 import { cylinderGeometry, sphereGeometry, toGeometry } from '@margoengine/geometry';

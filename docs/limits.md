@@ -1036,9 +1036,10 @@ All original accuracy predicates and three corrected pins remain; no Box2D parit
 
 ## Creative texture targets (batch 77)
 
-LIM-606. Optional /targets entry: 4021 B gzip, 11373 B minified with bare dependencies external.
+LIM-606. Optional /targets entry: 4027 B gzip, 11373 B minified with bare dependencies external.
 The optional entry's prior 2821 B size budget covered only the 2D HDR target. Adding subresource rendering
-sets its measured budget to 4277 B (4021 B plus the existing 256 B headroom); the feature stays in size class S.
+set its budget to 4277 B from the initial 4021 B measurement plus 256 B headroom; the current 4027 B stays within it
+and the feature stays in size class S.
 Cube/array/3D color only, rgba8unorm or rgba16float, one sample, explicit mip rendering. Positive integer
 dimensions within device limits; total logical texture bytes including mips at most 256 MiB. Cubes are square
 with six faces. Volume depth shrinks at mips; array layers do not. No core scene capture, depth attachment,
@@ -1158,8 +1159,15 @@ The full residual remains open; this does not prove physical equivalence.
 Tile bounds, coordinates and spans must fit normal f32 (zero coordinates allowed), with ordered converted bounds.
 The side is positive, its product with 65,535 and its endpoint sums fit f32. Subarrays may have any byte offset;
 unaligned views are copied before packed-word reads. Invalid updates leave held records unchanged. The tiles entry
-measures 7,975 minified / 3,295 B gzip, within its existing 3,415 B budget. Existing slots, per-tile, GPU binding and
+measures 8,234 minified / 3,401 B gzip, within its existing 3,415 B budget. Existing slots, per-tile, GPU binding and
 drawn-ring limits still apply. No speed measurement or increase to supported world size is claimed.
+
+Capacity budgeting includes the GPU's far-distance endpoint and uses uploaded f32 tile coordinates and camera
+conversion. Conservative bounds allow for packed-coordinate arithmetic, distance rounding and flushed squared
+components; extra allocation near a boundary is intentional. The explicit `drawn` cap can still truncate a ring.
+`packages/scatter/test/tiles-budget.test.js` checks this class in verify; the existing check:merge grass-tiles GPU
+suite also checks 64-record exact endpoints, origin 16777217, camera conversion, rounded upper edges and distances,
+hard switches, fades and the explicit cap. Generated records on one GPU only; no throughput or wider precision claim.
 
 ## WFC sockets (batch 69)
 

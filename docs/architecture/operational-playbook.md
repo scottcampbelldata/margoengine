@@ -1934,7 +1934,7 @@ No core or stage changes. Unit checks reject invalid dimensions, memory, mips, l
 Real WebGPU full texel readback covers 78 generated subresources across rgba8unorm/rgba16float, partial draws
 with load, shrinking volume mips, explicit device loss and redraw on a replacement device. A real native WebGL2
 engine gets unsupported with help link. Reproduce with packages/creative/scripts/test-targets.js under gpu-lock.
-No scene capture, depth, MSAA, automatic mip generation, other-device or speed proof. Entry 4021 B gzip.
+No scene capture, depth, MSAA, automatic mip generation, other-device or speed proof. Entry 4027 B gzip.
 
 ### Adaptive music evidence (batch 110, section 5)
 
@@ -2039,6 +2039,18 @@ near/middle/far ring, two after adding a tile, one after removal and restoration
 distinct shader modules compile without errors. Native WebGL2 refusal is exercised with a help link. Existing LOD
 pixel/complementary fade tests remain the image proof; this new test asserts draw values, not artistic appearance.
 No new core/stage API, shader algorithm or speed claim. Node tests enter check:merge via the package test glob.
+
+Batch 77 review repairs: CPU ring needs now share the inclusive outer-limit rule with generated WGSL, retain the
+uploaded f32 origin/side and convert the eye identically. A conservative distance bound covers placement and
+distance rounding and squared-component flushing under the [WGSL accuracy rules](https://www.w3.org/TR/WGSL/#floating-point-accuracy).
+`scatter/test/tiles-budget.test.js` enters verify and check:merge; the existing grass-tiles GPU step now covers
+64 records at the exact far boundary, origin 16777217, the f32 control, camera conversion, rounded upper endpoints
+and rounded distance, hard ring switches, fades, outside rejection and an explicit 32-instance cap. All five
+allocation regressions fail on the parent. The recorded [before/after GPU counts](../whitepaper/results/scatter-tile-budget-20261109.json)
+use generated records on RTX A6000 only. Ordinary Scatter and compatibility rings already reserve every candidate;
+ordered compaction, shared rings, imposter and shadow capacities were also audited. No other allocation mismatch
+was found. Optional tiles now measures 8,234 B minified / 3,401 B gzip within the unchanged 3,415 B budget.
+Large-world throughput, other devices and artistic quality remain unmeasured.
 
 ### WFC rotation evidence (batch 69, section 5)
 

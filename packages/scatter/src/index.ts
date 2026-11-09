@@ -17,6 +17,7 @@ export {
 } from './placement.js';
 import { windShader, validateWind, type ScatterWind } from './wind.js';
 import { fadeCode, poseShader } from './pose.js';
+import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterWind } from './wind.js';
 import { validateExclusions, type GroundBounds } from './placement.js';
@@ -212,7 +213,7 @@ fn emit(ring:u32,instance:Instance){
   if(dot(offset,offset)<=radius*radius){return;}
  }
  for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.planes[j].w < -radius){return;}}
- let d=distance(p,frame.eye.xyz);if(d>frame.lod.z){return;}
+ let d=distance(p,frame.eye.xyz);if(${outsideLod('d', 'frame.lod.z')}){return;}
  // edgeShrink: scale toward zero approaching the cull distance instead of cutting there.
  let shrink=select(1.0,clamp((frame.lod.z-d)/frame.ground.z,0.0,1.0),frame.ground.z>0.0);
  let angle=hash(i*7u+5u)*6.2831853;let q=round((normal.xz*0.5+0.5)*4095.0);
@@ -406,8 +407,8 @@ export function scatterCullShader(o: ScatterOptions): string {
   if (o.inner)
     // Slot 7 of the instance's hashes is its own (slots 1 to 6 are placement); offset.z is inner, offset.w the band.
     code = code.replace(
-      'if(d>frame.lod.z){return;}',
-      `if(d>frame.lod.z||d<frame.offset.z+frame.offset.w*hash(${o.follow ? 'key' : 'i'}*7u+7u)){return;}`,
+      `if(${outsideLod('d', 'frame.lod.z')}){return;}`,
+      `if(${outsideLod('d', 'frame.lod.z')}||d<frame.offset.z+frame.offset.w*hash(${o.follow ? 'key' : 'i'}*7u+7u)){return;}`,
     );
   return code;
 }

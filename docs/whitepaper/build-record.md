@@ -3692,7 +3692,7 @@ physics2d remain on hold and were not changed by this batch.
 
 | Job | Status | Commit | Entry and evidence |
 | --- | --- | --- | --- |
-| 1. Cube, array, mip and 3D slice targets | DONE | 0fd6733f5 | creative/targets: 11,373 B minified / 4,021 B gzip; colour-only explicit subresources, 78 generated GPU readbacks, HDR/load and restore; native WebGL2 coded refusal |
+| 1. Cube, array, mip and 3D slice targets | DONE | 0fd6733f5 | creative/targets: 11,373 B minified / 4,027 B gzip; colour-only explicit subresources, 78 generated GPU readbacks, HDR/load and restore; native WebGL2 coded refusal |
 | 2. Grass on terrain | SKIPPED | af1249532 | Existing scatter heightmap/densityMap/blades/wind; all-packages audit in batch-77-audit.md |
 | 3. Grass interaction | SKIPPED | a609bda24 | Existing scatter/interact radial player/vehicle/one-frame explosion pushes; no second field |
 | 4. Grass clumps, chunks and LOD | SKIPPED | 75406d386 | Existing procedural 7/3/1-blade clumps plus scatter/tiles, terrain/wind/fades and page streaming; generated GPU composition proof |
@@ -3811,3 +3811,12 @@ packages; 11/12 for voxel-net), including the other causes Scott deferred. No ex
 main `14af78269`; regenerated the tracked llms pages after that merge. Lane-M's teardown fix is `cff40d127`.
 The capture-only rerun could not acquire any of the three GPU slots within its 480-second tree deadline, so it
 never started the test and supplies no new rendering evidence; the original 18 successful GPU suites remain recorded.
+
+Batch 77 review: corrected both tile-capacity P2s in scatter, including three related cases found in the ring audit
+(camera conversion, rounded tile upper edge and rounded distance). CPU and generated WGSL share an inclusive
+outer-limit predicate; held coordinates and the eye use uploaded f32 values with conservative allocation bounds.
+All five Node allocation regressions fail on the parent; the real-GPU grass-tiles step reports 1 instead of 64
+on that parent and 64 after repair. The explicit cap still returns 32. Recorded evidence:
+`results/scatter-tile-budget-20261109.json`; Node and GPU tests are already in check:merge's package coverage.
+Targets prose corrected to its unchanged measured 11,373 B minified / 4,027 B gzip; its 4,277 B budget is unchanged.
+Current tiles: 8,234 B minified / 3,401 B gzip within the unchanged 3,415 B budget. No public API or core/stage changes.

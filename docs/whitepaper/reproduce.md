@@ -716,3 +716,13 @@ The initial cone proposal scored 304.785742 against 345.995718, the tighter cone
 and the box proposal with unmodified roulette 241.098699 against 350.533552. All failed the unchanged 2x bar.
 The default throughput heuristic was terminating successful guided paths at the glass exit; correcting its
 survival heuristic removes that cause without changing the scene, sample count or threshold.
+
+## Scatter tile capacity boundaries (batch 77 review)
+
+After `npm run build:packages`, run `node --test --test-timeout=60000 packages/scatter/test/tiles-budget.test.js`
+and `node scripts/gpu-lock.mjs run --owner=codex-77fix --max=5 -- node packages/scatter/test/grass-tiles.browser.mjs`.
+The latter already runs in check:merge through scatter's `test:browser:grass-tiles` script. Each boundary fixture
+starts with fresh one-instance rings and 64 generated packed records; compare counts and capacities with
+[the recorded before/after result](results/scatter-tile-budget-20261109.json). The parent loses records in all five
+allocation regressions; controls, hard transitions, fades, outside rejection and the explicit cap remain checked.
+This is correctness evidence on one GPU, not a performance benchmark.

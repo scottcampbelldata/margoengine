@@ -1311,3 +1311,12 @@ This move makes no speed or new image-parity claim. See `docs/webgl-consolidatio
 ### Bounded Windows browser termination
 
 The shared Chromium launcher asynchronously terminates its owned native process before asking the driver to finish cleanup. `tests/browser-teardown.test.js` requires this ordering, tests an unresolved termination without blocking the shutdown timer, and preserves the POSIX driver route. This proves the control flow, not that every operating-system process can exit within 30 seconds. A process that cannot exit still fails the unchanged bound.
+
+### Scatter tile capacity boundaries (batch 77 review)
+
+CPU budgeting includes the GPU's far-distance endpoint and uses the same f32 tile and eye coordinates with a
+conservative arithmetic allowance. Five fresh-buffer regressions fail on the parent: exact distance 4, origin
+16777217, camera conversion, a rounded tile upper edge and rounded GPU distance. Each keeps all 64 records after
+the repair; explicit `drawn: 32` still keeps 32. Proof: `packages/scatter/test/tiles-budget.test.js`, the existing
+check:merge `packages/scatter/test/grass-tiles.browser.mjs` step and [recorded GPU counts](results/scatter-tile-budget-20261109.json).
+Generated records on RTX A6000 WebGPU only. No new supported coordinate range, throughput or visual-quality claim.

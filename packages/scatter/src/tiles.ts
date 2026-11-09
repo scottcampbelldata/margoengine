@@ -13,6 +13,7 @@ import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/
 import { MargoError } from '@margoengine/math/errors';
 // Through the package name, so the tiles entry shares the root's Scatter class with the app.
 import { Scatter, scatterCullShader, type ScatterOptions } from '@margoengine/scatter';
+import { outsideLod, tileDistance } from './lod.js';
 
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; INDIRECT: number };
 type TilesPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -265,7 +266,7 @@ export class ScatterTiles extends Scatter {
       table[e + 3] = Math.min(PAGE, n - q * PAGE);
       this.#written.add(p);
     });
-    this.#held.set(key, { pages, count: n, x: origin[0], z: origin[1], side });
+    this.#held.set(key, { pages, count: n, x: Math.fround(origin[0]), z: Math.fround(origin[1]), side: Math.fround(side) });
     this.#tableDirty = true;
   }
 
@@ -336,18 +337,18 @@ export class ScatterTiles extends Scatter {
   }
 
   /**
-   * Instances each ring can be asked for at this camera: a ring takes instances closer than its outer distance (plus
-   * half the fade), and every instance of a tile is at least the tile's nearest distance away.
+   * Instances each ring can be asked for at this camera: include its outer distance plus half the fade. The nearest
+   * tile distance is a conservative lower bound using the uploaded f32 coordinates, including the eye conversion.
    */
   #ringNeeds(eye: ArrayLike<number>, out: number[]): void {
     const lod = this.values,
-      fade = lod[31] * 0.5;
+      fade = lod[31] * 0.5,
+      eyeX = Math.fround(eye[0]),
+      eyeZ = Math.fround(eye[2]);
     out.fill(0);
     for (const h of this.#held.values()) {
-      const dx = Math.max(0, h.x - eye[0], eye[0] - h.x - h.side),
-        dz = Math.max(0, h.z - eye[2], eye[2] - h.z - h.side),
-        d = Math.hypot(dx, dz);
-      for (let ring = 0; ring < 3; ring++) if (d < lod[32 + ring] + fade) out[ring] += h.count;
+      const d = tileDistance(h.x, h.z, h.side, eyeX, eyeZ);
+      for (let ring = 0; ring < 3; ring++) if (!outsideLod(d, lod[32 + ring] + fade)) out[ring] += h.count;
     }
   }
 
