@@ -75,3 +75,18 @@ Ecma International, *ECMA-262, 16th edition* (2025),
 provides the message/object distinction: the existing code/name/help contract
 and every missing capability remain tested in device.test.js. No companion
 repository or external implementation source was read.
+
+## Clone-accessible evidence pointers
+
+The final integration run exposed an upstream report pointing readers at an
+untracked coordination document unavailable in a clone. The report now describes
+the private coordination activity without a broken repository path; the existing
+no-private-paths.test.js fails on the original pointer and passes after repair.
+This follows the accessibility/provenance distinction in Mark D. Wilkinson,
+Michel Dumontier, I. Jsbrand Jan Aalbersberg et al., *The FAIR Guiding Principles
+for scientific data management and stewardship* (2016),
+[paper](https://doi.org/10.1038/sdata.2016.18), compared with ACM,
+*Artifact Review and Badging*, version 1.1 (2020),
+[policy](https://www.acm.org/publications/policies/artifact-review-and-badging-current).
+Tracked evidence remains self-contained; confidential coordination stays separate.
+No private document contents or external source code were copied.

@@ -3735,3 +3735,13 @@ bytes, and no unused built file. Its gate retains the real renderer and network
 assertions; a lane-local acquisition wrapper only tightens its shared GPU hold
 to one minute. API reports retain 887 entries and 8,638 exports. No exports,
 core/stage source, benchmark scene, error tolerance or size ceiling changed.
+
+
+Final rebased integration: lint and hygiene pass. Full verify runs without an
+outer GPU lock, with speed deferred, and passes all non-unit stages including
+GPU policy, API, size, quality, docs and examples. Of 13,633 unit tests, 13,632
+pass with zero skips; the sole failure is the upstream GPU report's untracked
+coordination-path pointer. The pointer is reworded in its owning report, retaining
+the existing no-private-paths regression unchanged. The final focused regression
+and metadata run validates that repair; no full-verify pass is substituted for
+this recorded result. Package/browser/README proofs above remain unchanged.
