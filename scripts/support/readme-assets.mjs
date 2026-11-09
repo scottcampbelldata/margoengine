@@ -6,6 +6,8 @@ import { readmeCache } from '../fetch-readme-assets.mjs';
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/textures/albedo.ktx2': decoder + 'ktx2-gpu/alpha-uastc-zstd.ktx2',
+  '/textures/sky-cube.ktx2': decoder + 'ktx2-layers/cube-uastc-zstd.ktx2',
   '/albedo.ktx2': decoder + 'ktx2-gpu/alpha-etc1s.ktx2',
   '/texture.ktx2': decoder + 'ktx2-gpu/alpha-uastc-zstd.ktx2',
   '/rock.ktx2': decoder + 'ktx2-gpu/alpha-uastc-zstd.ktx2',
@@ -36,6 +38,7 @@ export const README_FILES = {
   '/assets/hero.fbx': 'packages/fbx/test/fixtures/real/maya_dq_weights_7500_binary.fbx',
 };
 export const README_DOWNLOADS = {
+  '/scans/plant-room.e57': 'e57-room/room-scan-two-stations.e57',
   '/models/teapot.3ds': '3ds-nasa/Shuttle Carrier - SLIC.3ds',
   '/models/ship.lwo': 'lwo-nasa/TOPEX-Poseidon.lwo',
   '/prints/bracket.amf': 'amf-rook/Rook.amf',

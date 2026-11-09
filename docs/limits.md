@@ -1350,3 +1350,11 @@ and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,28
 ### Transitions owner-scene disposal repair
 
 The root entry now measures 4307 B min+gzip (7 B above job 2); its budget is 4563 B, restoring the usual 256 B headroom. Removal resolves the actual scene by plugin identity and never removes another scene's same-named effect. Core plus stage remains 23797 B.
+
+## Further README asset evidence (2026-11-09)
+
+Original materials 2D/cube KTX2 and points E57 examples now pass with explicit standard
+assets. E57 uses an outside CC0 authored two-station room with 108,000 points, not surveyed
+reference geometry. The selected aliases prove API execution only. The 45/47 scoped run
+retains two existing failures; 64 exceptions remain repository-wide. No image-quality,
+sensor-accuracy, speed or wider-format claim follows from these three passes.

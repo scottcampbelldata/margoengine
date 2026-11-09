@@ -96,3 +96,10 @@ test('real HTTP byte-range reads return exactly the requested file bytes', async
     rmSync(folder, { recursive: true, force: true });
   }
 });
+
+
+test('material texture aliases preserve 2D and cube shape, and E57 resolves the complete room sample', () => {
+  assert.equal(README_FILES['/textures/albedo.ktx2'], README_FILES['/texture.ktx2']);
+  assert.equal(README_FILES['/textures/sky-cube.ktx2'], README_FILES['/sky.ktx2']);
+  assert.equal(README_DOWNLOADS['/scans/plant-room.e57'], 'e57-room/room-scan-two-stations.e57');
+});

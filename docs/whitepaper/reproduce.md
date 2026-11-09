@@ -805,3 +805,11 @@ direct raster writes against a full-grid membership oracle with exactly matching
 Run `node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
 for a production consumer under /sampling/: both independent lazy Wasm assets, no asset fetch on import,
 native WebGPU and WebGL2 values, real loss events and disposal. Generated maps only (STAND-IN, LIM-628).
+
+### Material KTX2 and E57 README inputs
+
+Run node scripts/fetch-readme-assets.mjs, then npm run check:readme-run -- --packages=materials,points
+after npm run build:packages. The two KTX2 aliases use the existing 2D and cube KTX-Software
+fixtures; /scans/plant-room.e57 serves the complete outside CC0 two-station room, not a
+plant survey. Source/hash/size live in scripts/fetch-readme-assets.mjs; bytes stay in the
+shared README cache. The recorded result is 45/47, two retained other-cause failures.

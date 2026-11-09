@@ -173,10 +173,10 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | loaders/readme-textured-obj-meshes-b6f1ea | /crate.mtl, /models/crate.obj | sample: LoaderError: OBJ: the OBJ has no faces to draw as a mesh; draw its points with pointsToGeometry instead | Pending file selection, provenance and rerun |
 | loaders/readme-textured-obj-meshes-c37231 | See named example | sample: LoaderError: load: request for https://example.com/models/chair.obj failed (Failed to fetch) | Pending file selection, provenance and rerun |
 | loaders/readme-xml-128d10 | /map.tmx | sample: LoaderError: TMX: closing tag </head> does not match <meta> | Passed with explicit licensed sample; exception removed |
-| materials/readme-ktx2-textures-11832d | /textures/albedo.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Pending file selection, provenance and rerun |
-| materials/readme-ktx2-textures-8d6d24 | /textures/sky-cube.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Pending file selection, provenance and rerun |
+| materials/readme-ktx2-textures-11832d | /textures/albedo.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Passed with explicit licensed full sample; exception removed |
+| materials/readme-ktx2-textures-8d6d24 | /textures/sky-cube.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Passed with explicit licensed full sample; exception removed |
 | points/readme-copc-files-margoengine-points-co-e8bfa1 | /scan.copc.laz | sample: MargoError: GET /scan.copc.laz answered 404; check the URL and that the server allows it | Passed with explicit licensed sample; exception removed |
-| points/readme-e57-scans-margoengine-points-e57-27ad6c | /scans/plant-room.e57 | sample: MargoError: GET /scans/plant-room.e57 answered 404; check the URL and the server | Pending file selection, provenance and rerun |
+| points/readme-e57-scans-margoengine-points-e57-27ad6c | /scans/plant-room.e57 | sample: MargoError: GET /scans/plant-room.e57 answered 404; check the URL and the server | Passed with explicit licensed full sample; exception removed |
 | points/readme-las-and-laz-scans-margoengine-po-2d683c | /scans/site.las | sample: MargoError: GET /scans/site.las answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
 | points/readme-las-and-laz-scans-margoengine-po-6ccdb7 | /scans/fullwave.laz, /scans/fullwave.wdp | sample: MargoError: GET /scans/fullwave.laz answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
 | points/readme-laz-decoder-margoengine-points-l-7c341a | /scans/site.laz | sample: MargoError: GET /scans/site.laz answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
@@ -363,3 +363,32 @@ Final skip-enforcement checks on 2ef2fc7c0: lint and standalone hygiene pass. Fu
 All nine affected package GPU suites pass after the WebGL workspace removal rebase, and the
 README run remains 45/52 with seven existing exceptions and zero fresh failures. The three
 package-specific test suites passed all 668 tests. No core/stage/physics package changed.
+
+## Further README inputs and source investigations (2026-11-09)
+
+The original material KTX2 examples now select separate existing KTX-Software-authored 2D
+and cube files; no dimensionality fallback is involved. The E57 example reads Innerscene's
+complete CC0 authored two-station room sample: 2,069,504 bytes, two scans of 54,000 points.
+Its publisher page, immutable storage URL, SHA-256 and size are recorded in the fetch registry
+and THIRD-PARTY-NOTICES.md; a fresh pinned download and complete parse both passed. This
+is an outside authored format sample, not surveyed-ground-truth or sensor-calibration proof.
+The scoped materials/points run passes 45/47 original examples, with two retained existing
+failures and zero fresh. Only those three passing exceptions were removed; 64 remain overall.
+Durable evidence: docs/whitepaper/results/readme-missing-inputs-20261109.json.
+
+P25 remains open: 97 small public transform/instancing USDA scenes from OpenUSD commit
+2d39590aac6dde875507d2a334ff6e5b9dc05fe1 were downloaded and inspected as standard data
+only. The only reset-stack scene found is the already identified Cone/Sphere scene, without
+a Mesh; it cannot prove the mesh reader's reset behaviour. No implementation source was read.
+P29 remains open: the official Sintel trailer and the retired GTV Big Buck Bunny endpoint
+both answer HTTP 403. No movie was saved, no B-frame decoder pass is claimed. The CC0
+Cloud Forest Zenodo download also returned 403; it was not substituted for the authored room.
+
+The first README-group full verify ran 13,299 tests with zero skips; its only failure was
+the generated site/llms-full.txt after the limits/claims evidence edit. Regenerating it with
+node scripts/build-llms.mjs repairs the documented generated-file contract. Lint, standalone
+hygiene, 45 focused regressions and the pinned E57 fetch passed; final verify follows rebase.
+
+Final README-group verification after the mask-wipe rebase passes 13,304 tests with zero
+failures/skips in 335.7 s. The 45 focused regressions, lint, hygiene and pinned full E57
+fetch pass. Original scoped README result remains 45/47, two retained other-cause failures.

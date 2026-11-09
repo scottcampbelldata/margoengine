@@ -52,6 +52,14 @@ readmeDownloads.push({
   licence: 'MIT (Brotli test data); Alice in Wonderland text public domain',
 });
 
+readmeDownloads.push({
+  local: 'e57-room/room-scan-two-stations.e57',
+  url: 'https://files.innerscene.com/library/room-scan-two-stations-cfa3398f/44e9f80fab5e8c710ff3/room-scan-two-stations.e57',
+  sha256: '5c2d803ad56c83b689d9d9b9801e2f64d5a7ee6c58bad7d5a902337d2d3211fa',
+  size: 2069504,
+  licence: 'CC0-1.0 (Innerscene authored two-station room sample)',
+});
+
 export async function fetchReadmeAssets() {
   for (const item of readmeDownloads) {
     await fetchFixture(item.url, resolve(readmeCache(), item.local), item.sha256, { maxBytes: item.size ?? 32 << 20 });

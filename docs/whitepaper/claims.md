@@ -1359,3 +1359,11 @@ strictly increasing float64 pairs that upload equal, and sparse triples. It acce
 The parent accepts the rejected fixtures; all use the owning Scatter constructor, also inherited by ScatterTiles.
 This is input-contract evidence; the existing inclusive endpoint, conservative capacity and explicit drawn-cap
 regressions and real-GPU fixtures remain unchanged. No performance claim.
+
+### Further original README inputs (2026-11-09)
+
+The materials 2D/cube KTX2 and points E57 examples run unchanged with explicitly mapped,
+licensed standard files. The outside CC0 room contains two 54,000-point scans. The scoped
+run passes 45/47 examples with two existing failures, so it proves only these three formerly
+missing-input examples, not all README examples, survey accuracy or rendered-image quality.
+Evidence: [readme-missing-inputs-20261109.json](results/readme-missing-inputs-20261109.json).

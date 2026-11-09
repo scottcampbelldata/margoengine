@@ -1,0 +1,37 @@
+{
+  "scope": "Original README examples: material 2D/cube KTX2 loading and outside authored E57 sample; not image quality or surveyed geometry accuracy",
+  "results": [
+    {
+      "id": "points/readme-e57-scans-margoengine-points-e57-27ad6c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "materials/readme-ktx2-textures-8d6d24",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "materials/readme-ktx2-textures-11832d",
+      "result": "pass",
+      "place": "page"
+    }
+  ],
+  "source": {
+    "url": "https://files.innerscene.com/library/room-scan-two-stations-cfa3398f/44e9f80fab5e8c710ff3/room-scan-two-stations.e57",
+    "licence": "CC0-1.0, Innerscene authored sample",
+    "licenceUrl": "https://www.innerscene.com/tools/library/3d-parts/room-scan-two-stations-cfa3398f",
+    "size": 2069504,
+    "sha256": "5c2d803ad56c83b689d9d9b9801e2f64d5a7ee6c58bad7d5a902337d2d3211fa",
+    "scans": [
+      54000,
+      54000
+    ]
+  },
+  "checks": {
+    "examples": 47,
+    "pass": 45,
+    "existingFailures": 2
+  },
+  "remainingKnown": 64
+}
