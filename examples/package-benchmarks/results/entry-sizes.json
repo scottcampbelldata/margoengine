@@ -1,10 +1,10 @@
 {
-  "commit": "7b836e3b3",
+  "commit": "9c9d266a8",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23626,
+    "gzip": 23590,
     "limit": 25000
   },
   "packages": {
@@ -597,17 +597,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21285
+        "gzip": 21258
       },
       "./extension": {
-        "raw": 51315,
-        "gzip": 21311
+        "raw": 51313,
+        "gzip": 21323
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 62200,
-        "gzip": 19154
+        "raw": 61586,
+        "gzip": 19100
       },
       "./particles": {
         "raw": 1028,
@@ -626,16 +626,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16377,
-        "gzip": 5961
+        "raw": 16111,
+        "gzip": 5944
       },
       "./planet": {
-        "raw": 20958,
-        "gzip": 7027
+        "raw": 20730,
+        "gzip": 7011
       },
       "./stars": {
-        "raw": 6153,
-        "gzip": 2665
+        "raw": 6033,
+        "gzip": 2653
       }
     },
     "@margoengine/culling": {
@@ -2792,8 +2792,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7318,
-        "gzip": 2974
+        "raw": 7314,
+        "gzip": 2966
       },
       "./gltf": {
         "raw": 2922,
@@ -3410,16 +3410,16 @@
     },
     "@margoengine/voxel-net": {
       ".": {
-        "raw": 22512,
-        "gzip": 8141
+        "raw": 22570,
+        "gzip": 8161
       },
       "./server": {
-        "raw": 46748,
-        "gzip": 16808
+        "raw": 47139,
+        "gzip": 16915
       },
       "./bot": {
-        "raw": 25425,
-        "gzip": 9526
+        "raw": 25483,
+        "gzip": 9546
       },
       "./file-store": {
         "raw": 1513,
@@ -3428,6 +3428,10 @@
       "./entities": {
         "raw": 6261,
         "gzip": 2535
+      },
+      "./shards": {
+        "raw": 25301,
+        "gzip": 9373
       }
     },
     "@margoengine/voxel-pathtracer": {
@@ -3587,9 +3591,9 @@
       "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
-      "raw": 44525,
-      "gzip": 15091,
-      "brotli": 13514
+      "raw": 44576,
+      "gzip": 15106,
+      "brotli": 13504
     },
     "packages/creative/dist/post.js": {
       "raw": 19250,

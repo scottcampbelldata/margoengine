@@ -3214,6 +3214,10 @@
       "types": "./dist/voxel-net/entities.d.ts",
       "import": "./dist/voxel-net/entities.js"
     },
+    "./voxel-net/shards": {
+      "types": "./dist/voxel-net/shards.d.ts",
+      "import": "./dist/voxel-net/shards.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

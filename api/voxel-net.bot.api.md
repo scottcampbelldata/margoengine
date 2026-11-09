@@ -171,6 +171,7 @@ class VoxelNetClient {
     get detached(): boolean;
     detach(): void;
     attach(transport: VoxelNetTransport): void;
+    removeChunks(): void;
     close(): void;
 }
 

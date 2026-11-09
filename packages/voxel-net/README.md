@@ -317,9 +317,61 @@ setInterval(() => {
   `ENTITY_SCHEMA` (position, a yaw rotation, kind u16, state u8). `server.metrics.bytesOut.entities` and
   `client.stats.received.entities` count the bytes.
 
+## Sharded worlds (`./shards`)
+
+One world on several servers (processes or machines), split by region. A `ShardMap` cuts the x-z plane into square
+regions (`regionSize`, default 256 blocks) and gives each region to one shard: by default a hash of the region, so
+every shard gets about the same share, or your `assign(rx, rz)`. Each shard owns the edits of its regions
+(`allowEdit` refuses the rest) and spawns new players inside them. When a player walks more than `margin` (default 8)
+blocks past its shard's regions, the shard sends it a handoff: the next shard's address and a ticket signed with the
+secret all shards share (HMAC-SHA-256, good for `ticketLife`, default 10 s, and only once). The client closes the old
+connection, takes that server's chunks out of the world and connects to the next shard, which checks the ticket and
+spawns the player where it left, with the same name and identity.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+import { connectShards, ShardMap, VoxelShard } from 'margoengine/voxel-net/shards';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+
+// Every machine builds the same map. Here both shards run in one process on loopback; x >= 0 is shard 0.
+const map = new ShardMap({
+  shards: ['ws://127.0.0.1:8811', 'ws://127.0.0.1:8812'],
+  assign: (rx) => (rx >= 0 ? 0 : 1),
+});
+const secret = 'change me: the same 16+ characters on every shard';
+for (const index of [0, 1]) {
+  const shard = new VoxelShard({ map, index, secret });
+  const server = new VoxelServer(shard.options({ blocks }));
+  shard.attach(server);
+  await server.listen(8811 + index);
+}
+
+// Client: follows the player from shard to shard. Set handlers on it, not on follower.client (that changes).
+const follower = connectShards(map, new VoxelWorld({ blocks }), { name: 'Ada' });
+follower.onHandoff = (url) => console.log(`now on ${url}`);
+follower.onApp = (data) => console.log(`your app message, ${data.length} bytes`);
+```
+
+- **Server.** `new VoxelShard({map, index, secret, margin?, ticketLife?, grace?})`, then `shard.options(yours)` for
+  the `VoxelServer` (your `authenticate`, `spawn` and `allowEdit` still run: `authenticate` for players without a
+  ticket, `spawn` for new players, default the middle of this shard's region nearest the origin) and
+  `shard.attach(server)`. A player that stays `grace` (default 5 s) after its handoff is closed with 4001
+  `'shard-handoff'` (`server.disconnect(player, code, reason)` is public). `shard.stats` counts `handedOff`, `arrived`
+  and `refused` tickets. `signShardTicket(secret, ticket)` sends a player to a shard from your own lobby.
+- **Client.** `connectShards(map, world, options, index = 0)` gives a `VoxelShardClient`: `client` (the connection now),
+  `onApp`, `onHandoff`, `onClose`, `onError`, `close()`. `client.removeChunks()` takes a client's chunks out of the world.
+- **Wire.** A handoff is an app message starting with `SHARD_HANDOFF_PREFIX` (`MSH` and 1); keep your own app messages
+  from starting with it. The ticket rides the WebSocket URL as `?shard-ticket=`, so use `wss://` between machines.
+- **Limits.** Each shard sees only its own edits: a player near a border sees the other side as generated, without
+  that shard's edits, until it crosses. A handoff keeps the position, not the velocity, and lands the player on the
+  ground. The chunks around the player are fetched again from the next shard (one round trip of empty world).
+
 ## Limits of the prototype
 
-No chat or inventories, no TLS (put `wss://` behind a reverse proxy), one process per world. The server trusts
+No chat or inventories, no TLS (put `wss://` behind a reverse proxy); one world over several processes is `./shards` above. The server trusts
 nothing from clients and rate-limits edits and inputs; connections that have not joined are capped as above, but a
 flood at the network level needs a proxy or firewall in front.
 

@@ -810,6 +810,23 @@ export class VoxelServer {
     c.out.push(encodeServerMessage({ type: 'entities', tick, full, data }));
     return true;
   }
+  /**
+   * Closes a player's connection with `code` (1000, or 4000 to 4999 for your own reasons) and `reason`; it does not
+   * resume. `@margoengine/voxel-net/shards` closes a player that stays past its handoff with 4001 `'shard-handoff'`.
+   * @returns false when the player has left already.
+   * @throws TypeError when `player` is not a player; RangeError for another code.
+   */
+  disconnect(player: VoxelServerPlayer, code = 1000, reason = ''): boolean {
+    if (!player || typeof player !== 'object' || typeof (player as { id?: unknown }).id !== 'number')
+      throw new TypeError('VoxelServer.disconnect needs a player from server.players; pass one');
+    if (!(code === 1000 || (Number.isInteger(code) && code >= 4000 && code <= 4999)))
+      throw new RangeError(`VoxelServer.disconnect code ${code} must be 1000 or 4000 to 4999`);
+    const c = player as unknown as Client;
+    if (!this.#clients.has(c) || c.phase === 'gone') return false;
+    if (c.connected) this.#kick(c, code, reason);
+    else this.#leave(c);
+    return true;
+  }
   #queueApp(c: Client, message: Uint8Array): boolean {
     // Only a client the server holds, past its hello: before the welcome there is nothing to deliver to.
     if (!this.#clients.has(c) || c.phase === 'hello' || c.phase === 'auth' || c.phase === 'gone') return false;

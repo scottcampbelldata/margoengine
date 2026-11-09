@@ -42,6 +42,10 @@
     "./entities": {
       "types": "./dist/entities.d.ts",
       "import": "./dist/entities.js"
+    },
+    "./shards": {
+      "types": "./dist/shards.d.ts",
+      "import": "./dist/shards.js"
     }
   },
   "files": [

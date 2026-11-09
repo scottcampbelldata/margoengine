@@ -6,7 +6,9 @@ import { encodeChunk } from '@margoengine/voxel/codec';
 import { encodeServerMessage, VoxelNetClient } from '../dist/index.js';
 import { testBlocks } from './blocks.js';
 
-test('a chunk the app already made at that key goes to onError as a state error, not an unhandled rejection', { timeout: 5000 }, async (t) => {
+test('a chunk the app already made at that key goes to onError as a state error, not an unhandled rejection', {
+  timeout: 5000,
+}, async (t) => {
   const unhandled = [],
     onUnhandled = (reason) => unhandled.push(reason);
   process.on('unhandledRejection', onUnhandled);

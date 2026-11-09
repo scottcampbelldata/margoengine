@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11381750,
+  "total": 11391405,
   "history": [
     {
       "date": "2026-10-24",
@@ -4682,6 +4682,12 @@
       "commit": "13f52ad57",
       "reason": "vfx/shadows:",
       "grew": 2
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "9c9d266a8",
+      "reason": "voxel-net gains the ./shards entry, server.disconnect and client.removeChunks",
+      "grew": 1
     }
   ],
   "items": {
@@ -5476,6 +5482,7 @@
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
     "@margoengine/voxel-net/server": 17313,
+    "@margoengine/voxel-net/shards": 9655,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,

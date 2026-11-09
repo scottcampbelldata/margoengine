@@ -442,6 +442,13 @@ export class VoxelNetClient {
       }),
     );
   }
+  /**
+   * Takes every chunk this client put in the world out of it, and forgets them (so a later message for one is a new
+   * chunk). For moving a world to another server, as `@margoengine/voxel-net/shards` does on a handoff.
+   */
+  removeChunks(): void {
+    for (const key of [...this.#chunks.keys()]) this.#drop(key);
+  }
   /** Closes the connection. */
   close(): void {
     if (this.#closed) return;
