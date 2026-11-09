@@ -557,5 +557,12 @@ window.checkNodeNorm=async()=>{
  const huge=await step([1e20,0,0]);
  return {error:tiny.error??huge.error,errors:errors.splice(0),tiny:tiny.accel,huge:huge.accel};
 };
+// A finite double that is not a finite f32 is rejected before a uniform is packed.
+window.checkNodeF32=()=>{
+ let error=null;
+ try{new VFX({...still,capacity:1,nodes:{graph:[{op:'const',value:[1e40,0,0]},{op:'force',inputs:[0]}]}});}
+ catch(e){error={name:e.name,message:e.message};}
+ return {error,errors:errors.splice(0)};
+};
 window.ready=true;
 </script></body></html>

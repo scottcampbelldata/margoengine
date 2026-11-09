@@ -1262,4 +1262,21 @@ export const entries = [
       'An option or argument of a scatter entry is out of its range or of the wrong type: for `InstancePicker`, transforms that are not 16 floats an instance, a box with its min above its max, a mesh index past its positions, a ray with no direction, or an instance number past `count`.',
     fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. The package README lists every option with its range.',
   },
+  {
+    id: 'vfx-f32',
+    title: '@margoengine/vfx: numbers that do not fit in f32',
+    kind: 'family',
+    messages: [
+      'VFX nodes const is not a finite f32',
+      'VFX nodes const[0] is not a finite f32',
+      'VFX nodes const[1] is not a finite f32',
+      'VFX nodes const[2] is not a finite f32',
+      'VFX nodes scale is not a finite f32',
+      'VFX shadows range is not a finite f32',
+      'VFX shadows intensity is not a finite f32',
+    ],
+    cause:
+      'A node literal or a shadow range or intensity was a finite JavaScript number that is infinite once stored as an f32, so the GPU uniform would not be a real value.',
+    fix: 'Pass a number that stays finite as an f32, such as a range of 4, an intensity of 1, or a force of [0, 2, 0]. Values that underflow to zero are finite and are kept.',
+  },
 ];

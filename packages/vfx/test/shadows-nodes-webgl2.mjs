@@ -107,6 +107,12 @@ try {
     `ok node norm webgl2: ${norm.tiny.map((v) => v.toFixed(5)).join(',')} and ${norm.huge.map((v) => v.toFixed(5)).join(',')}`,
   );
 
+  const f32 = await page.evaluate(() => window.checkNodeF32());
+  assert.equal(f32.error?.name, 'RangeError', 'node f32');
+  assert.match(f32.error.message, /https:\/\/margoengine.com\/errors#vfx-f32/, 'node f32');
+  assert.deepEqual(f32.errors, [], 'node f32');
+  console.log('ok node f32 webgl2');
+
   assert.deepEqual(pageErrors, []);
   const report = {
     hardware,

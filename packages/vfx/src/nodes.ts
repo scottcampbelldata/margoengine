@@ -62,6 +62,8 @@ function fail(message: string): never {
 
 const finite = (value: unknown, what: string): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) fail(`VFX nodes ${what} needs a finite number`);
+  if (!Number.isFinite(Math.fround(value)))
+    throw new RangeError(`VFX nodes ${what} is not a finite f32; see https://margoengine.com/errors#vfx-f32`);
   return value;
 };
 

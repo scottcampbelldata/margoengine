@@ -293,3 +293,35 @@ test('disposing a vfx removes the point lights it published', async () => {
   removed.h.engine.removePlugin(removed.effect.name);
   assert.equal(again.at(-1), 0);
 });
+
+test('shadows rejects a range or intensity that overflows f32', () => {
+  const link = /https:\/\/margoengine.com\/errors#vfx-f32/;
+  assert.throws(
+    () => new VFX({ shadows: { range: 1e40 } }),
+    (error) => error instanceof RangeError && link.test(error.message) && /range/.test(error.message),
+  );
+  assert.throws(
+    () => new VFX({ shadows: { intensity: 1e40 } }),
+    (error) => error instanceof RangeError && link.test(error.message) && /intensity/.test(error.message),
+  );
+  assert.throws(() => new VFX({ shadows: { range: 0 } }), (error) => {
+    assert.equal(error instanceof RangeError, true);
+    assert.equal(link.test(error.message), false);
+    return true;
+  });
+  assert.throws(
+    () => new VFX({ shadows: { intensity: -0.1 } }),
+    (error) => error instanceof RangeError && !link.test(error.message),
+  );
+  const { h, effect } = attach({ capacity: 1, shadows: { range: 4, intensity: 1 } });
+  h.frame();
+  effect.options.shadows.range = 1e40;
+  assert.throws(() => h.frame(), (error) => error instanceof RangeError && link.test(error.message));
+  effect.options.shadows.range = 4;
+  effect.options.shadows.intensity = 1e40;
+  assert.throws(
+    () => h.frame(),
+    (error) => error instanceof RangeError && link.test(error.message) && /intensity/.test(error.message),
+  );
+  effect.dispose();
+});

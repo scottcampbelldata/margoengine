@@ -243,6 +243,15 @@ try {
       `ok ${name}: ${r.tiny.map((v) => v.toFixed(5)).join(',')} and ${r.huge.map((v) => v.toFixed(5)).join(',')}`,
     );
   }
+  {
+    const name = 'node f32',
+      r = await page.evaluate(() => window.checkNodeF32());
+    report.results[name] = r;
+    assert.equal(r.error?.name, 'RangeError', name);
+    assert.match(r.error.message, /https:\/\/margoengine.com\/errors#vfx-f32/, name);
+    assert.deepEqual(r.errors, [], name);
+    console.log(`ok ${name}`);
+  }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/vfx-features-check.json', JSON.stringify(report, null, 1));

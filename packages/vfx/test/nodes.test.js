@@ -201,3 +201,57 @@ test('nodes rejects a bad graph and a base effect that did not import the entry'
   assert.throws(() => h.frame(), /fixed at attach/);
   effect.dispose();
 });
+
+test('nodes rejects a finite double that is not a finite f32', () => {
+  const link = /https:\/\/margoengine.com\/errors#vfx-f32/;
+  assert.throws(
+    () =>
+      evaluateNodes(
+        [
+          { op: 'const', value: [1e40, 0, 0] },
+          { op: 'force', inputs: [0] },
+        ],
+        sample,
+      ),
+    (error) => error instanceof RangeError && link.test(error.message) && /const\[0\]/.test(error.message),
+  );
+  assert.throws(
+    () => evaluateNodes([{ op: 'const', value: NaN }, { op: 'force', inputs: [0] }], sample),
+    TypeError,
+  );
+  assert.throws(
+    () =>
+      evaluateNodes(
+        [
+          { op: 'const', value: [1, 0, 0] },
+          { op: 'scale', inputs: [0], value: 1e40 },
+          { op: 'force', inputs: [1] },
+        ],
+        sample,
+      ),
+    (error) => error instanceof RangeError && link.test(error.message) && /scale/.test(error.message),
+  );
+  assert.deepEqual(
+    evaluateNodes(
+      [
+        { op: 'const', value: [0, 2, 0] },
+        { op: 'force', inputs: [0] },
+      ],
+      sample,
+    ),
+    [0, 2, 0],
+  );
+  const { h, effect } = attach({
+    capacity: 1,
+    nodes: {
+      graph: [
+        { op: 'const', value: [0, 2, 0] },
+        { op: 'force', inputs: [0] },
+      ],
+    },
+  });
+  h.frame();
+  effect.options.nodes.graph[0].value = [1e40, 0, 0];
+  assert.throws(() => h.frame(), (error) => error instanceof RangeError && link.test(error.message));
+  effect.dispose();
+});
