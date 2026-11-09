@@ -28,6 +28,7 @@ export class SoftLighting2D implements EnginePlugin {
     sourceRadius: number;
     samples: number;
     readonly lights: SoftLight2D[];
+    layer: number;
     constructor(options: SoftLighting2DOptions);
     static attach(instance: EngineKernel, options: SoftLighting2DOptions): SoftLighting2D;
     addLight(options?: SoftLight2DOptions): SoftLight2D;
@@ -61,6 +62,7 @@ class SoftLighting2D implements EnginePlugin {
     sourceRadius: number;
     samples: number;
     readonly lights: SoftLight2D[];
+    layer: number;
     constructor(options: SoftLighting2DOptions);
     static attach(instance: EngineKernel, options: SoftLighting2DOptions): SoftLighting2D;
     addLight(options?: SoftLight2DOptions): SoftLight2D;

@@ -1,4 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MaskData, maskShader } from './masks.js';
+import { checkLight, checkCamera, checkLayer } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -50,6 +52,9 @@ export function checkHeightOccluder(o: HeightOccluder2D): void {
   if (!Number.isFinite(o.height) || o.height <= 0) {
     throw rangeError('Invalid occluder height: must be positive finite number', 'pixel-lighting');
   }
+  if (o.rotation !== undefined && !Number.isFinite(o.rotation)) {
+    throw rangeError('Invalid occluder rotation', 'pixel-lighting');
+  }
   if (o.elevation !== undefined && !Number.isFinite(o.elevation)) {
     throw rangeError('Invalid occluder elevation', 'pixel-lighting');
   }
@@ -96,7 +101,7 @@ export function createHeightOccluder(options: HeightOccluder2D): HeightOccluder2
     elevation: options.elevation ?? 0,
     width: options.width ?? 16,
     depth: options.depth ?? 16,
-    offset: options.offset ?? [0, 0],
+    offset: options.offset ? [options.offset[0], options.offset[1]] : [0, 0],
     rotation: options.rotation ?? 0,
     radius: options.radius ?? 8,
     to: options.to ? [options.to[0], options.to[1]] : undefined,
@@ -240,10 +245,7 @@ export function inHeightShadow(
       }
       if (!selfShadow) continue;
       const exitZ = getRayZ(t1);
-      if (exitZ <= topZ && exitZ >= baseZ) {
-        return true;
-      }
-      if (receiverElevation >= baseZ && receiverElevation <= topZ) {
+      if (Math.max(receiverElevation, exitZ) >= baseZ && Math.min(receiverElevation, exitZ) <= topZ) {
         return true;
       }
     } else {
@@ -285,6 +287,7 @@ export function heightLightAt(
   normal: readonly number[] = [0, 0, 1],
   layer?: number,
 ): number[] {
+  checkLight(light);
   if (layer !== undefined && !lightAffectsLayer(light, layer)) return [0, 0, 0];
   if (light.mask && !inLightMask(light.mask, x, y)) return [0, 0, 0];
 
@@ -327,7 +330,7 @@ export function heightLightAt(
 /** Options for the {@link HeightLighting2D} plugin. */
 export interface HeightLighting2DOptions {
   /** Target texture or function returning target texture. */
-  target?: any;
+  target?: GPUTexture | (() => GPUTexture);
   /** Receiver ground elevation. Default 0. */
   elevation?: number;
   /** Active height occluders. */
@@ -345,263 +348,229 @@ export interface HeightLighting2DOptions {
 }
 
 const HEIGHT_LIGHTING_WGSL = /* wgsl */ `
-struct LightData {
-  posRadius: vec4<f32>,       // pos.x, pos.y, radius, falloff
-  colorIntensity: vec4<f32>,  // color.r, color.g, color.b, intensity
-  geomParams: vec4<f32>,      // height, angle, cone, softness
-  miscParams: vec4<f32>,      // elevation, receiverElevation, camX, camY
-  camScaleTarget: vec4<f32>,  // camZoom, targetW, targetH, 0.0
-  flags: vec4<u32>,           // kind, shadows, occluderCount, layer
-  layerMasks: vec4<u32>,      // lightLayers, 0, 0, 0
+struct LightData{
+posRadius:vec4f,colorIntensity:vec4f,geomParams:vec4f,miscParams:vec4f,camScaleTarget:vec4f,flags:vec4u,layerMasks:vec4u,mask_bounds:vec4f,mask_info:vec4f,}
+struct OccluderData{
+offset:vec2f,size:vec2f,rotElevH:vec4f,flags:vec4u,}
+@group(0)@binding(0)var<uniform>light:LightData;
+@group(0)@binding(1)var<storage,read>occluders:array<OccluderData>;
+struct VertexOutput{
+@builtin(position)position:vec4f,@location(0)uv:vec2f,}
+@vertex fn vs_main(@builtin(vertex_index)index:u32)->VertexOutput{
+var out:VertexOutput;
+let x=f32((index<<1u)&2u);
+let y=f32(index&2u);
+out.position=vec4f(x*2.0 - 1.0,1.0 - y*2.0,0.0,1.0);
+out.uv=vec2f(x,y);
+return out;
 }
-
-struct OccluderData {
-  offset: vec2<f32>,
-  size: vec2<f32>,
-  rotElevH: vec4<f32>,       // rot, elev, height, pad
-  flags: vec4<u32>,          // shape, selfShadow, 0, 0
+fn rayOccluderFootprint(px:f32,py:f32,vx:f32,vy:f32,maxDist:f32,idx:u32)->vec2f{
+let occ=occluders[idx];
+let shape=occ.flags.x;
+if(shape==0u){
+let cosR=cos(-occ.rotElevH.x);
+let sinR=sin(-occ.rotElevH.x);
+let dx=px - occ.offset.x;
+let dy=py - occ.offset.y;
+let plx=dx*cosR - dy*sinR;
+let ply=dx*sinR+dy*cosR;
+let vlx=vx*cosR - vy*sinR;
+let vly=vx*sinR+vy*cosR;
+var tMin=-1e9;
+var tMax=1e9;
+if(abs(vlx)>1e-6){
+let t1=(-occ.size.x - plx)/vlx;
+let t2=(occ.size.x - plx)/vlx;
+tMin=max(tMin,min(t1,t2));
+tMax=min(tMax,max(t1,t2));
 }
-
-@group(0) @binding(0) var<uniform> light: LightData;
-@group(0) @binding(1) var<storage, read> occluders: array<OccluderData>;
-
-struct VertexOutput {
-  @builtin(position) position: vec4<f32>,
-  @location(0) uv: vec2<f32>,
+else if(abs(plx)>occ.size.x){
+return vec2f(-1.0,-1.0);
 }
-
-@vertex
-fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
-  var out: VertexOutput;
-  let x = f32((index << 1u) & 2u);
-  let y = f32(index & 2u);
-  out.position = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
-  out.uv = vec2<f32>(x, y);
-  return out;
+if(abs(vly)>1e-6){
+let t1=(-occ.size.y - ply)/vly;
+let t2=(occ.size.y - ply)/vly;
+tMin=max(tMin,min(t1,t2));
+tMax=min(tMax,max(t1,t2));
 }
-
-fn rayOccluderFootprint(px: f32, py: f32, vx: f32, vy: f32, maxDist: f32, idx: u32) -> vec2<f32> {
-  let occ = occluders[idx];
-  let shape = occ.flags.x;
-  if (shape == 0u) {
-    let cosR = cos(-occ.rotElevH.x);
-    let sinR = sin(-occ.rotElevH.x);
-    let dx = px - occ.offset.x;
-    let dy = py - occ.offset.y;
-    let plx = dx * cosR - dy * sinR;
-    let ply = dx * sinR + dy * cosR;
-    let vlx = vx * cosR - vy * sinR;
-    let vly = vx * sinR + vy * cosR;
-
-    var tMin = -1e9;
-    var tMax = 1e9;
-
-    if (abs(vlx) > 1e-6) {
-      let t1 = (-occ.size.x - plx) / vlx;
-      let t2 = (occ.size.x - plx) / vlx;
-      tMin = max(tMin, min(t1, t2));
-      tMax = min(tMax, max(t1, t2));
-    } else if (abs(plx) > occ.size.x) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-
-    if (abs(vly) > 1e-6) {
-      let t1 = (-occ.size.y - ply) / vly;
-      let t2 = (occ.size.y - ply) / vly;
-      tMin = max(tMin, min(t1, t2));
-      tMax = min(tMax, max(t1, t2));
-    } else if (abs(ply) > occ.size.y) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-
-    if (tMin > tMax || tMax < 1e-4 || tMin > maxDist) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-    return vec2<f32>(max(0.0, tMin), min(maxDist, tMax));
-  } else if (shape == 1u) {
-    let dx = px - occ.offset.x;
-    let dy = py - occ.offset.y;
-    let b = dx * vx + dy * vy;
-    let c = dx * dx + dy * dy - occ.size.x * occ.size.x;
-    let disc = b * b - c;
-    if (disc < 0.0) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-    let s = sqrt(disc);
-    let t1 = -b - s;
-    let t2 = -b + s;
-    let tMin = min(t1, t2);
-    let tMax = max(t1, t2);
-    if (tMax < 1e-4 || tMin > maxDist) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-    return vec2<f32>(max(0.0, tMin), min(maxDist, tMax));
-  } else if (shape == 2u) {
-    let sx = occ.size.x - occ.offset.x;
-    let sy = occ.size.y - occ.offset.y;
-    let cross = vx * sy - vy * sx;
-    if (abs(cross) < 1e-6) {
-      return vec2<f32>(-1.0, -1.0);
-    }
-    let dx = occ.offset.x - px;
-    let dy = occ.offset.y - py;
-    let t = (dx * sy - dy * sx) / cross;
-    let u = (dx * vy - dy * vx) / cross;
-    if (t >= 1e-4 && t <= maxDist && u >= 0.0 && u <= 1.0) {
-      return vec2<f32>(t - 1e-3, t + 1e-3);
-    }
-  }
-  return vec2<f32>(-1.0, -1.0);
+else if(abs(ply)>occ.size.y){
+return vec2f(-1.0,-1.0);
 }
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  if ((light.layerMasks.x & light.flags.w) == 0u) {
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-  }
-
-  let camX = light.miscParams.z;
-  let camY = light.miscParams.w;
-  let camZoom = light.camScaleTarget.x;
-  let screenPos = in.position.xy;
-  let worldPos = vec2<f32>(
-    camX + screenPos.x / camZoom,
-    camY + screenPos.y / camZoom
-  );
-
-  let rcvElev = light.miscParams.y;
-  let kind = light.flags.x;
-  let lightPos = light.posRadius.xy;
-  let lightRadius = light.posRadius.z;
-  let lightFalloff = light.posRadius.w;
-  let lightColor = light.colorIntensity.xyz;
-  let lightIntensity = light.colorIntensity.w;
-  let lightH = light.geomParams.x;
-  let lightAngle = light.geomParams.y;
-  let lightCone = light.geomParams.z;
-  let lightSoftness = light.geomParams.w;
-  let lightElev = light.miscParams.x;
-
-  var vx = 0.0;
-  var vy = 0.0;
-  var maxDist = 10000.0;
-  var tanElev = 1.0;
-
-  if (kind == 2u) {
-    let elev = max(0.01, min(1.56, lightElev));
-    tanElev = tan(elev);
-    vx = -cos(lightAngle);
-    vy = -sin(lightAngle);
-  } else {
-    let dx = lightPos.x - worldPos.x;
-    let dy = lightPos.y - worldPos.y;
-    maxDist = hypot(dx, dy);
-    if (maxDist < 1e-5) {
-      return vec4<f32>(lightColor * lightIntensity, 1.0);
-    }
-    vx = dx / maxDist;
-    vy = dy / maxDist;
-    if (maxDist > lightRadius) {
-      return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    }
-  }
-
-  var inShadow = false;
-  let shadowsEnabled = light.flags.y;
-  let occCount = light.flags.z;
-
-  if (shadowsEnabled == 1u) {
-    for (var i = 0u; i < occCount; i = i + 1u) {
-      let occ = occluders[i];
-      let baseZ = occ.rotElevH.y;
-      let topZ = baseZ + occ.rotElevH.z;
-      let selfShadow = occ.flags.y;
-
-      let hit = rayOccluderFootprint(worldPos.x, worldPos.y, vx, vy, maxDist, i);
-      if (hit.x < 0.0) {
-        continue;
-      }
-
-      let t0 = hit.x;
-      let t1 = hit.y;
-
-      var z0 = 0.0;
-      var z1 = 0.0;
-      if (kind == 2u) {
-        z0 = rcvElev + t0 * tanElev;
-        z1 = rcvElev + t1 * tanElev;
-      } else {
-        z0 = rcvElev + (t0 / maxDist) * (lightH - rcvElev);
-        z1 = rcvElev + (t1 / maxDist) * (lightH - rcvElev);
-      }
-
-      if (t0 <= 1e-4) {
-        if (rcvElev >= topZ - 1e-3) {
-          continue;
-        }
-        if (selfShadow == 1u) {
-          if (z1 <= topZ && z1 >= baseZ) {
-            inShadow = true;
-            break;
-          }
-          if (rcvElev >= baseZ && rcvElev <= topZ) {
-            inShadow = true;
-            break;
-          }
-        }
-      } else {
-        let minRayZ = min(z0, z1);
-        let maxRayZ = max(z0, z1);
-        if (maxRayZ >= baseZ && minRayZ <= topZ) {
-          inShadow = true;
-          break;
-        }
-      }
-    }
-  }
-
-  if (inShadow) {
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-  }
-
-  var amount = 1.0;
-  var l = vec3<f32>(0.0, 0.0, 1.0);
-
-  if (kind == 2u) {
-    l = vec3<f32>(-cos(lightAngle) * cos(lightElev), -sin(lightAngle) * cos(lightElev), sin(lightElev));
-  } else {
-    let dx = lightPos.x - worldPos.x;
-    let dy = lightPos.y - worldPos.y;
-    let dz = lightH - rcvElev;
-    let flat = hypot(dx, dy);
-    let len = sqrt(flat * flat + dz * dz);
-    amount = pow(max(0.0, 1.0 - flat / lightRadius), lightFalloff);
-    if (len > 0.0) {
-      l = vec3<f32>(dx / len, dy / len, dz / len);
-    }
-    if (kind == 1u) {
-      var along = 1.0;
-      if (flat > 0.0) {
-        along = -(dx * cos(lightAngle) + dy * sin(lightAngle)) / flat;
-      }
-      let outer = cos(lightCone);
-      let inner = cos(lightCone * (1.0 - lightSoftness));
-      if (inner > outer) {
-        amount = amount * clamp((along - outer) / (inner - outer), 0.0, 1.0);
-      } else if (along < outer) {
-        amount = 0.0;
-      }
-    }
-  }
-
-  let n = vec3<f32>(0.0, 0.0, 1.0);
-  let diffuse = max(0.0, dot(n, l));
-  let finalRgb = lightColor * lightIntensity * amount * diffuse;
-  return vec4<f32>(finalRgb, 1.0);
+if(tMin>tMax||tMax<1e-4||tMin>maxDist){
+return vec2f(-1.0,-1.0);
 }
-
-fn hypot(x: f32, y: f32) -> f32 {
-  return sqrt(x * x + y * y);
+return vec2f(max(0.0,tMin),min(maxDist,tMax));
+}
+else if(shape==1u){
+let dx=px - occ.offset.x;
+let dy=py - occ.offset.y;
+let b=dx*vx+dy*vy;
+let c=dx*dx+dy*dy - occ.size.x*occ.size.x;
+let disc=b*b - c;
+if(disc<0.0){
+return vec2f(-1.0,-1.0);
+}
+let s=sqrt(disc);
+let t1=-b - s;
+let t2=-b+s;
+let tMin=min(t1,t2);
+let tMax=max(t1,t2);
+if(tMax<1e-4||tMin>maxDist){
+return vec2f(-1.0,-1.0);
+}
+return vec2f(max(0.0,tMin),min(maxDist,tMax));
+}
+else if(shape==2u){
+let sx=occ.size.x - occ.offset.x;
+let sy=occ.size.y - occ.offset.y;
+let cross=vx*sy - vy*sx;
+if(abs(cross)<1e-6){
+return vec2f(-1.0,-1.0);
+}
+let dx=occ.offset.x - px;
+let dy=occ.offset.y - py;
+let t=(dx*sy - dy*sx)/cross;
+let u=(dx*vy - dy*vx)/cross;
+if(t>=1e-4&&t<=maxDist&&u>=0.0&&u<=1.0){
+return vec2f(t - 1e-3,t+1e-3);
+}
+}
+return vec2f(-1.0,-1.0);
+}
+@fragment fn fs_main(in:VertexOutput)->@location(0)vec4f{
+if((light.layerMasks.x&light.flags.w)==0u){
+return vec4f(0.0,0.0,0.0,1.0);
+}
+let camX=light.miscParams.z;
+let camY=light.miscParams.w;
+let camZoom=light.camScaleTarget.x;
+let screenPos=in.position.xy;
+let worldPos=vec2f(camX+screenPos.x/camZoom,camY+screenPos.y/camZoom);
+if(!maskVisible(worldPos,light.mask_bounds,light.mask_info)){
+return vec4f(0.0,0.0,0.0,1.0);
+}
+let rcvElev=light.miscParams.y;
+let kind=light.flags.x;
+let lightPos=light.posRadius.xy;
+let lightRadius=light.posRadius.z;
+let lightFalloff=light.posRadius.w;
+let lightColor=light.colorIntensity.xyz;
+let lightIntensity=light.colorIntensity.w;
+let lightH=light.geomParams.x;
+let lightAngle=light.geomParams.y;
+let lightCone=light.geomParams.z;
+let lightSoftness=light.geomParams.w;
+let lightElev=light.miscParams.x;
+var vx=0.0;
+var vy=0.0;
+var maxDist=10000.0;
+var tanElev=1.0;
+if(kind==2u){
+let elev=max(0.01,min(1.56079632679,lightElev));
+tanElev=tan(elev);
+vx=-cos(lightAngle);
+vy=-sin(lightAngle);
+}
+else{
+let dx=lightPos.x - worldPos.x;
+let dy=lightPos.y - worldPos.y;
+maxDist=hypot(dx,dy);
+if(maxDist>=1e-5){
+vx=dx/maxDist;
+vy=dy/maxDist;
+}
+if(maxDist>lightRadius){
+return vec4f(0.0,0.0,0.0,1.0);
+}
+}
+var inShadow=false;
+let shadowsEnabled=light.flags.y;
+let occCount=light.flags.z;
+if(shadowsEnabled==1u&&maxDist>=1e-5){
+for(var i=0u;
+i<occCount;
+i=i+1u){
+let occ=occluders[i];
+let baseZ=occ.rotElevH.y;
+let topZ=baseZ+occ.rotElevH.z;
+let selfShadow=occ.flags.y;
+let hit=rayOccluderFootprint(worldPos.x,worldPos.y,vx,vy,maxDist,i);
+if(hit.x<0.0){
+continue;
+}
+let t0=hit.x;
+let t1=hit.y;
+var z0=0.0;
+var z1=0.0;
+if(kind==2u){
+z0=rcvElev+t0*tanElev;
+z1=rcvElev+t1*tanElev;
+}
+else{
+z0=rcvElev+(t0/maxDist)*(lightH - rcvElev);
+z1=rcvElev+(t1/maxDist)*(lightH - rcvElev);
+}
+if(t0<=1e-4){
+if(rcvElev>=topZ - 1e-3){
+continue;
+}
+if(selfShadow==1u){
+if(max(z0,z1)>=baseZ&&min(z0,z1)<=topZ){
+inShadow=true;
+break;
+}
+}
+}
+else{
+let minRayZ=min(z0,z1);
+let maxRayZ=max(z0,z1);
+if(maxRayZ>=baseZ&&minRayZ<=topZ){
+inShadow=true;
+break;
+}
+}
+}
+}
+if(inShadow){
+return vec4f(0.0,0.0,0.0,1.0);
+}
+var amount=1.0;
+var l=vec3f(0.0,0.0,1.0);
+if(kind==2u){
+l=vec3f(-cos(lightAngle)*cos(lightElev),-sin(lightAngle)*cos(lightElev),sin(lightElev));
+}
+else{
+let dx=lightPos.x - worldPos.x;
+let dy=lightPos.y - worldPos.y;
+let dz=lightH - rcvElev;
+let flat=hypot(dx,dy);
+let len=sqrt(flat*flat+dz*dz);
+amount=pow(max(0.0,1.0 - flat/lightRadius),lightFalloff);
+if(len>0.0){
+l=vec3f(dx/len,dy/len,dz/len);
+}
+if(kind==1u){
+var along=1.0;
+if(flat>0.0){
+along=-(dx*cos(lightAngle)+dy*sin(lightAngle))/flat;
+}
+let outer=cos(lightCone);
+let inner=cos(lightCone*(1.0 - lightSoftness));
+if(inner>outer){
+amount=amount*clamp((along - outer)/(inner - outer),0.0,1.0);
+}
+else if(along<outer){
+amount=0.0;
+}
+}
+}
+let n=vec3f(0.0,0.0,1.0);
+let diffuse=max(0.0,dot(n,l));
+let finalRgb=lightColor*lightIntensity*amount*diffuse;
+return vec4f(finalRgb,1.0);
+}
+fn hypot(x:f32,y:f32)->f32{
+return sqrt(x*x+y*y);
 }
 `;
 
@@ -612,15 +581,18 @@ fn hypot(x: f32, y: f32) -> f32 {
 export class HeightLighting2D implements EnginePlugin, Disposable {
   readonly name: string;
   readonly order: number;
-  private readonly lights = new Set<HeightLight2D>();
-  private occluders: HeightOccluder2D[] = [];
-  private engine: Engine | null = null;
-  private pipeline: any = null;
-  private uniformBuffer: any = null;
-  private storageBuffer: any = null;
-  private bindGroupLayout: any = null;
-  private disposed = false;
-  private target: any;
+  readonly #lights = new Set<HeightLight2D>();
+  #occluders: HeightOccluder2D[] = [];
+  #engine: Engine | null = null;
+  #pipeline: GPURenderPipeline | null = null;
+  #uniformBuffer: GPUBuffer | null = null;
+  #storageBuffer: GPUBuffer | null = null;
+  #bindGroupLayout: GPUBindGroupLayout | null = null;
+  #device: GPUDevice | null = null;
+  #format: string | null = null;
+  #masks = new MaskData();
+  #disposed = false;
+  #target?: GPUTexture | (() => GPUTexture);
   receiverElevation: number;
   layer: number;
   camera: { x: number; y: number; zoom: number };
@@ -628,7 +600,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   constructor(options: HeightLighting2DOptions = {}) {
     this.name = options.name ?? `height-lighting2d-${++heightPluginCount}`;
     this.order = options.order ?? 15;
-    this.target = options.target;
+    this.#target = options.target;
     this.receiverElevation = options.elevation ?? 0;
     this.layer = options.layer ?? 0xffffffff;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
@@ -636,7 +608,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       this.setOccluders(options.occluders);
     }
     if (options.lights) {
-      for (const l of options.lights) this.lights.add(l);
+      for (const l of options.lights) this.#lights.add(l);
     }
   }
 
@@ -644,64 +616,76 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     const lighting = new HeightLighting2D(options);
     const runtime = engineRuntime(instance);
     if (!runtime.gpu || typeof runtime.gpu.createShaderModule !== 'function') {
-      throw rangeError('WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
+      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
     }
     runtime.use(lighting);
     return lighting;
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw fault('disposed', 'HeightLighting2D disposed; create a new one');
+    if (this.#disposed) throw fault('disposed', 'HeightLighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu' || !engine.gpu) {
-      throw rangeError('WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
+      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
     }
-    this.engine = engine;
+    this.#engine = engine;
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
       execute: (c: PassContext) => {
-        if (c.backend === 'webgpu') this.render(this.target ?? (c as any).target);
+        if (c.backend === 'webgpu') this.render(this.#target, c.encoder);
       },
     });
   }
 
   /** Adds a light to the height lighting pass. */
   addLight(options: HeightLight2DOptions = {}): HeightLight2D {
-    if (this.disposed) throw typeError('HeightLighting2D has been disposed', 'pixel-lighting');
+    if (this.#disposed) throw typeError('HeightLighting2D has been disposed', 'pixel-lighting');
     const light = new HeightLight2D(options);
-    this.lights.add(light);
+    this.#lights.add(light);
     return light;
   }
 
   /** Removes a light. */
   removeLight(light: HeightLight2D): boolean {
-    return this.lights.delete(light);
+    return this.#lights.delete(light);
   }
 
   /** Sets the active height occluders. */
   setOccluders(occluders: readonly HeightOccluder2D[]): void {
-    if (this.disposed) throw typeError('HeightLighting2D has been disposed', 'pixel-lighting');
+    if (this.#disposed) throw typeError('HeightLighting2D has been disposed', 'pixel-lighting');
     for (const o of occluders) checkHeightOccluder(o);
-    this.occluders = occluders.map(createHeightOccluder);
+    this.#occluders = occluders.map(createHeightOccluder);
   }
 
   /** Renders the height lighting pass onto target. */
-  render(targetTexture: any, commandEncoder?: any): void {
-    if (!this.engine || !this.engine.gpu || this.disposed) return;
-    const device = this.engine.gpu;
+  render(targetTexture: GPUTexture | (() => GPUTexture) | undefined, commandEncoder?: GPUCommandEncoder): void {
+    if (!this.#engine || !this.#engine.gpu || this.#disposed) return;
+    const device = this.#engine.gpu;
     const target = typeof targetTexture === 'function' ? targetTexture() : targetTexture;
     if (!target) return;
+    checkCamera(this.camera);
+    checkLayer(this.layer);
+    if (!Number.isFinite(this.receiverElevation)) throw rangeError('Invalid receiver elevation', 'pixel-lighting');
+    for (const light of this.#lights) checkLight(light);
+    for (const occluder of this.#occluders) checkHeightOccluder(occluder);
 
-    if (!this.pipeline) {
-      const module = device.createShaderModule({ code: HEIGHT_LIGHTING_WGSL });
-      this.bindGroupLayout = device.createBindGroupLayout({
+    if (this.#device !== device || this.#format !== target.format) {
+      this.#release();
+      this.#device = device;
+      this.#format = target.format;
+    }
+    this.#masks.upload(device, Array.from(this.#lights));
+    if (!this.#pipeline) {
+      const module = device.createShaderModule({ code: maskShader(2) + HEIGHT_LIGHTING_WGSL });
+      this.#bindGroupLayout = device.createBindGroupLayout({
         entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 112 } },
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 144, hasDynamicOffset: true } },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+          { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
       });
-      this.pipeline = device.createRenderPipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [this.bindGroupLayout] }),
+      this.#pipeline = device.createRenderPipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [this.#bindGroupLayout] }),
         vertex: { module, entryPoint: 'vs_main' },
         fragment: {
           module,
@@ -717,21 +701,24 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       });
     }
 
-    const MAX_OCCLUDERS = 64;
-    const occluderBufferSize = Math.max(256, MAX_OCCLUDERS * 48);
-    if (!this.storageBuffer) {
-      this.storageBuffer = device.createBuffer({
+    const count = this.#occluders.length;
+    const occluderBufferSize = Math.max(48, count * 48);
+    if (occluderBufferSize > device.limits.maxStorageBufferBindingSize) {
+      throw rangeError('Height occluders exceed maxStorageBufferBindingSize', 'pixel-lighting');
+    }
+    if (!this.#storageBuffer || this.#storageBuffer.size < occluderBufferSize) {
+      this.#storageBuffer?.destroy();
+      this.#storageBuffer = device.createBuffer({
         size: occluderBufferSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
     }
 
-    const occFloats = new Float32Array(MAX_OCCLUDERS * 12);
+    const occFloats = new Float32Array(occluderBufferSize / 4);
     const occU32 = new Uint32Array(occFloats.buffer);
-    const count = Math.min(this.occluders.length, MAX_OCCLUDERS);
 
     for (let i = 0; i < count; i++) {
-      const o = this.occluders[i];
+      const o = this.#occluders[i];
       const base = i * 12;
       occFloats[base + 0] = o.offset ? o.offset[0] : 0;
       occFloats[base + 1] = o.offset ? o.offset[1] : 0;
@@ -761,11 +748,17 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       occU32[base + 11] = 0;
     }
 
-    device.queue.writeBuffer(this.storageBuffer, 0, occFloats);
+    device.queue.writeBuffer(this.#storageBuffer, 0, occFloats);
 
-    if (!this.uniformBuffer) {
-      this.uniformBuffer = device.createBuffer({
-        size: 112,
+    const stride = Math.max(256, device.limits.minUniformBufferOffsetAlignment);
+    const uniformSize = Math.max(1, this.#lights.size) * stride;
+    if (uniformSize > device.limits.maxBufferSize) {
+      throw rangeError('Height lights exceed maxBufferSize', 'pixel-lighting');
+    }
+    if (!this.#uniformBuffer || this.#uniformBuffer.size < uniformSize) {
+      this.#uniformBuffer?.destroy();
+      this.#uniformBuffer = device.createBuffer({
+        size: uniformSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
     }
@@ -774,18 +767,23 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     const pass = encoder.beginRenderPass({
       colorAttachments: [{
         view: target.createView ? target.createView() : target,
-        loadOp: 'load',
+        loadOp: 'clear',
+        clearValue: [0, 0, 0, 1],
         storeOp: 'store',
       }],
     });
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.#pipeline);
 
-    const uniformFloats = new Float32Array(28);
-    const uniformU32 = new Uint32Array(uniformFloats.buffer);
+    const values = new Float32Array(uniformSize / 4);
+    let index = 0;
 
-    for (const light of this.lights) {
-      if ((light.layers & this.layer) === 0) continue;
+    for (const light of this.#lights) {
+      const mask = this.#masks.fields[index];
+      if ((light.layers & this.layer) === 0) { index++; continue; }
 
+      const offset = index++ * stride;
+      const uniformFloats = new Float32Array(values.buffer, offset, 36);
+      const uniformU32 = new Uint32Array(values.buffer, offset, 36);
       const rgb = hexColor(light.color) ?? [1, 1, 1];
       uniformFloats[0] = light.x;
       uniformFloats[1] = light.y;
@@ -825,22 +823,23 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       uniformU32[25] = 0;
       uniformU32[26] = 0;
       uniformU32[27] = 0;
-
-      device.queue.writeBuffer(this.uniformBuffer, 0, uniformFloats);
+      uniformFloats.set(mask, 28);
 
       const bindGroup = device.createBindGroup({
-        layout: this.bindGroupLayout,
+        layout: this.#bindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.storageBuffer } },
+          { binding: 0, resource: { buffer: this.#uniformBuffer, size: 144 } },
+          { binding: 1, resource: { buffer: this.#storageBuffer } },
+          { binding: 2, resource: { buffer: this.#masks.buffer! } },
         ],
       });
 
-      pass.setBindGroup(0, bindGroup);
+      pass.setBindGroup(0, bindGroup, [offset]);
       pass.draw(3);
     }
 
     pass.end();
+    device.queue.writeBuffer(this.#uniformBuffer, 0, values);
     if (!commandEncoder) {
       device.queue.submit([encoder.finish()]);
     }
@@ -851,20 +850,24 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   }
 
   [Symbol.dispose](): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.lights.clear();
-    this.occluders = [];
-    if (this.uniformBuffer) {
-      this.uniformBuffer.destroy?.();
-      this.uniformBuffer = null;
-    }
-    if (this.storageBuffer) {
-      this.storageBuffer.destroy?.();
-      this.storageBuffer = null;
-    }
-    this.pipeline = null;
-    this.bindGroupLayout = null;
-    this.engine = null;
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#lights.clear();
+    this.#occluders = [];
+    this.#engine?.removePlugin(this.name);
+    this.#engine = null;
+    this.#release();
+  }
+
+  onDeviceRestored(): void {
+    this.#release();
+  }
+
+  #release(): void {
+    this.#masks.dispose();
+    this.#uniformBuffer?.destroy();
+    this.#storageBuffer?.destroy();
+    this.#uniformBuffer = this.#storageBuffer = null;
+    this.#pipeline = this.#bindGroupLayout = this.#device = this.#format = null;
   }
 }

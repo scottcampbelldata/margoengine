@@ -39,6 +39,7 @@ export class CookieLighting2D implements EnginePlugin {
     cookieWrap: CookieWrapMode;
     cookieMode: CookieBlendMode;
     readonly lights: CookieLight2D[];
+    layer: number;
     constructor(options: CookieLighting2DOptions);
     static attach(instance: EngineKernel, options: CookieLighting2DOptions): CookieLighting2D;
     addLight(options?: CookieLight2DOptions): CookieLight2D;

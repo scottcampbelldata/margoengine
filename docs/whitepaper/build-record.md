@@ -3520,8 +3520,35 @@ are extended or built over. No job was skipped.
 - **Built from:** Published specs and papers: Fernando 2005 (PCSS 2D area light penumbra estimation) and Akenine-Moller & Assarsson 2002 (penumbra wedges) for soft shadows; Segal et al. 1992 (projective texture masks) for cookies; Franklin 1970 (PNPOLY Jordan curve theorem point-in-polygon) for light masks; Alexander Sannikov 2023 ("Radiance Cascades: A Novel Approach to Calculating Global Illumination") for 2D radiance cascade GI; standard 3D perspective/directional ray-slab and ray-cylinder projection geometry along height intervals for 2.5D height and self-shadowing; and standard polynomial distance attenuation with luminance thresholding for emissive sprites and bloom hookup.
 - **Slips and bugs:** In radiance cascade testing, segment endpoints exactly on the 45-degree ray diagonal passing through pixel centers caused float32 boundary rounding differences against double float64, resolved by extending wall segments past grid diagonals. In direct pass with blending, alpha was initially cleared to 0, resolved by writing alpha 1.0 (255). Concurrent pushes from other lanes required ordinary rebases; no force-push, skipped checks or loosened bars.
 - **Docs per job:** 1, 2, 3, 4, 5 and 6 each update packages/lighting2d/README.md, docs/limits.md, docs/whitepaper/claims.md, docs/clean-room.md, plus generated API surface and LLM records. Job 6 adds this record and marks list-2 row 55 done.
-- **Final entry sizes (gzip B):** root 4,896 B; soft 4,778 B; cookie 4,213 B; gi 6,432 B; height 5,310 B; emissive 4,685 B. Core plus stage stays 23,626 B, well under the 25,000 B freeze gate.
+- **Reviewed batch-55 entry sizes (gzip B):** root 4,896; soft 5,349; cookie 6,823; gi 6,685; height 6,067; emissive 3,524.
+  These replace the stale completion figures. Core plus stage was 23,626 B, below 25,000.
 
+### Batch 55 repair in lane C (2026-11-08, not yet landed)
+
+Direct-light repair candidates cover F1/F2/F8/F9/F11/F13-F23/F25: independent per-light height uniforms, frame-encoder
+ordering, device/format keyed resource lifetimes, owned cookie texture destruction, masks/layers on all direct entries,
+scalar cookie colour gain, exact soft-shadow limits, floating height spans and receiver-facing shading, growing scene
+storage, unregistering disposal, and hostile numeric validation. F10 now owns separate HDR emission and local extraction
+images and dispatches the actual unattached Bloom image API through an owned per-device factory. Public API reports and
+README examples describe the changed adapter contract.
+
+The Node regression file was run against original source (fails) and restored repaired source (passes unchanged).
+`frame-regressions.js` and `emission-regressions.js` extend the check:merge-discovered GPU suite with 147 checks and
+native WebGL2 coded refusals on RTX A6000/Edge. These are correctness measurements, not timing claims or a multi-GPU claim.
+GI F3/F4/F5/F6/F7/F12/F24 remains open: LIM-599 is withdrawn and every repro/cause is recorded in known-bugs.md.
+
+Candidate min+gzip entry bytes, other packages external, measured with `bundleBytes` from `scripts/measure-size.js`:
+root 5,421; soft 5,926; cookie 7,374; gi 6,687; height 6,698; emissive 4,198. The optional-entry ratchet budgets remain
+unchanged (5,152/5,605/7,079/6,941/6,323/3,780 respectively in root/soft/cookie/gi/height/emissive order). Several candidates
+exceed those budgets; reducing bytes without removing work remains a landing requirement. Full gate results are recorded
+by the lane's handoff, not inferred from the passing pixel suite.
+
+Repair checkpoint gates: 54 lighting2d Node tests pass; GPU suite 147 checks, zero wrong values and zero validation errors;
+8/8 README examples run; API reports regenerated and api:check passes; lint has warnings only and hygiene passes. The one
+full verify run finished in 375.9 s with quality sizes failing for the five optional entries above (emissive was 4,154 B
+at that run, before the additional RGB-threshold regression raised its candidate to 4,198 B). Other completed quality
+subgates passed; no retry, budget increase, force-push or push was performed. An additional 100-dim-height-light probe found
+unorm accumulation loss, now recorded with its root cause in known-bugs.md. Work is not ready to land.
 
 ## Batch 168: rival measurements
 

@@ -118,15 +118,9 @@ test('EmissiveLighting2D lifecycle, bloom hookup, and WebGL2 refusal', () => {
   assert.ok(sprite instanceof EmissiveSprite2D);
   assert.equal(plugin.removeSprite(sprite), true);
 
-  // connectBloom hookup
-  let connectedInput = null;
-  const mockBloom = {
-    setInput(fn) {
-      connectedInput = fn;
-    },
-  };
-  plugin.connectBloom(mockBloom);
-  assert.ok(typeof connectedInput === 'function');
+  // The factory owns an unattached encodeImage effect, never an unrecognized setInput mock.
+  plugin.connectBloom(() => ({ encodeImage() {}, dispose() {} }));
+  assert.throws(() => plugin.connectBloom({ setInput() {} }), TypeError);
 
   // WebGL2 mock refusal
   const mockWebgl = {
@@ -143,4 +137,14 @@ test('EmissiveLighting2D lifecycle, bloom hookup, and WebGL2 refusal', () => {
 
   plugin.dispose();
   assert.throws(() => plugin.addSprite(), /EmissiveLighting2D has been disposed/);
+});
+
+test('F10 local extraction uses RGB brightness and removes threshold proportionally', () => {
+  const sprite = { radius: 10, glowRadius: 10, color: '#404040', intensity: 2, bloomThreshold: 0.8 };
+  const peak = 2 * 64 / 255;
+  assert.deepEqual(emissiveLightAt(sprite, 0, 0), [peak, peak, peak]);
+  const above = { ...sprite, intensity: 4 };
+  const direct = 4 * 64 / 255;
+  const expected = direct + direct - 0.8;
+  for (const v of emissiveLightAt(above, 0, 0)) assert.ok(Math.abs(v - expected) < 1e-12);
 });

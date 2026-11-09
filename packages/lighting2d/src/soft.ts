@@ -1,4 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MaskData, maskShader } from './masks.js';
+import { checkLight, checkCamera, checkLayer } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -41,10 +43,11 @@ export class SoftLight2D extends Light2D {
 const invalid = () => rangeError('Invalid light value', 'pixel-lighting');
 
 function checkSoftLight(l: SoftLight2D): void {
+  checkLight(l);
   if (
     !Number.isFinite(l.sourceRadius) ||
     l.sourceRadius < 0 ||
-    !Number.isFinite(l.samples) ||
+    !Number.isInteger(l.samples) ||
     l.samples < 1 ||
     l.samples > 64
   ) {
@@ -78,6 +81,10 @@ export function softShadowFactor(
   y: number,
   options?: SoftShadowOptions,
 ): number {
+  checkLight(light);
+  const value = options?.samples ?? (light as SoftLight2D).samples ?? 16;
+  const source = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
+  if (!Number.isInteger(value) || value < 1 || value > 64 || !Number.isFinite(source) || source < 0) throw invalid();
   if (!light.shadows || edges.length < 4) return 1;
   const radius = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
   const samples = Math.max(1, Math.min(64, Math.round(options?.samples ?? (light as SoftLight2D).samples ?? 16)));
@@ -102,7 +109,7 @@ export function softShadowFactor(
       alphaL = Math.asin(Math.min(0.9999, radius / dL));
     }
   } else {
-    alphaL = Math.max(0.001, radius);
+    alphaL = radius;
   }
 
   if (alphaL <= 0 || samples === 1) {
@@ -175,132 +182,140 @@ export function softLightAt(
 }
 
 const shader = /* wgsl */ `
-struct L {
-  view: vec4f,
-  size: vec4f,
-  at: vec4f,
-  way: vec4f,
-  color: vec4f,
-  soft: vec4f,
+struct L{
+view:vec4f,size:vec4f,at:vec4f,way:vec4f,color:vec4f,soft:vec4f,mask_bounds:vec4f,mask_info:vec4f,}
+@group(0)@binding(0)var<uniform>u:L;
+@group(0)@binding(1)var bumps:texture_2d<f32>;
+@group(0)@binding(2)var<storage,read>edges:array<vec4f>;
+@group(0)@binding(3)var sum:texture_2d_array<f32>;
+@vertex fn wide(@builtin(vertex_index)i:u32)->@builtin(position)vec4f{
+return vec4f(f32(i&1u)*4.0 - 1.0,f32(i>>1u)*4.0 - 1.0,0.0,1.0);
 }
-@group(0) @binding(0) var<uniform> u: L;
-@group(0) @binding(1) var bumps: texture_2d<f32>;
-@group(0) @binding(2) var<storage, read> edges: array<vec4f>;
-@group(0) @binding(3) var sum: texture_2d_array<f32>;
-
-@vertex fn wide(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
-  return vec4f(f32(i & 1u) * 4.0 - 1.0, f32(i >> 1u) * 4.0 - 1.0, 0.0, 1.0);
+@fragment fn show(@builtin(position)f:vec4f)->@location(0)vec4f{
+let p=vec2i(f.xy);
+return vec4f(textureLoad(sum,p,0,0).rgb+textureLoad(sum,p,1,0).rgb+textureLoad(sum,p,2,0).rgb+textureLoad(sum,p,3,0).rgb,1.0);
 }
-
-@fragment fn show(@builtin(position) f: vec4f) -> @location(0) vec4f {
-  let p = vec2i(f.xy);
-  return vec4f(
-    textureLoad(sum, p, 0, 0).rgb +
-    textureLoad(sum, p, 1, 0).rgb +
-    textureLoad(sum, p, 2, 0).rgb +
-    textureLoad(sum, p, 3, 0).rgb,
-    1.0
-  );
+@fragment fn lit(@builtin(position)f:vec4f)->@location(0)vec4f{
+let world=u.view.xy+f.xy/u.view.z;
+if(!maskVisible(world,u.mask_bounds,u.mask_info)){
+return vec4f(0.0);
 }
-
-@fragment fn lit(@builtin(position) f: vec4f) -> @location(0) vec4f {
-  let world = u.view.xy + f.xy / u.view.z;
-  var n = vec3f(0.0, 0.0, 1.0);
-  if (u.size.z > 0.0) {
-    let s = textureLoad(bumps, vec2i(f.xy), 0);
-    if (s.a > 0.0) { n = normalize(s.xyz * 2.0 - 1.0); }
-  }
-  var l = u.at.xyz;
-  var a = 1.0;
-  let isPoint = u.at.w > 0.0;
-  var dL = 0.0;
-  var thetaL = 0.0;
-  if (isPoint) {
-    let d = u.at.xy - world;
-    dL = length(d);
-    a = pow(max(0.0, 1.0 - dL / u.color.w), u.way.w);
-    let v = vec3f(d, u.at.z);
-    l = n;
-    if (dot(v, v) > 0.0) { l = normalize(v); }
-    if (u.size.w > 0.0) {
-      var c = 1.0;
-      if (dL > 0.0) { c = -dot(d, u.way.xy) / dL; }
-      if (u.way.z > u.view.w) { a *= clamp((c - u.view.w) / (u.way.z - u.view.w), 0.0, 1.0); }
-      else if (c < u.view.w) { a = 0.0; }
-    }
-    thetaL = atan2(d.y, d.x);
-  } else {
-    thetaL = atan2(u.at.y, u.at.x);
-  }
-
-  var vis = 1.0;
-  let hasShadows = u.soft.w > 0.5;
-  let edgeCount = u32(u.soft.y);
-  if (hasShadows && edgeCount > 0u && a > 0.0) {
-    let sourceRadius = u.soft.x;
-    let samples = max(1u, min(64u, u32(u.soft.z)));
-    var alphaL = 0.0;
-    if (isPoint) {
-      if (dL > sourceRadius && sourceRadius > 0.0) {
-        alphaL = asin(clamp(sourceRadius / dL, 0.0, 0.9999));
-      }
-    } else {
-      alphaL = max(0.001, sourceRadius);
-    }
-
-    if (alphaL > 0.0 && samples > 1u) {
-      var unblocked = 0u;
-      for (var k = 0u; k < samples; k++) {
-        let frac = (f32(k) + 0.5) / f32(samples);
-        let angle = thetaL - alphaL + 2.0 * alphaL * frac;
-        let rx = cos(angle);
-        let ry = sin(angle);
-        var hit = false;
-        for (var e = 0u; e < edgeCount; e++) {
-          let seg = edges[e];
-          let ax = seg.x - world.x;
-          let ay = seg.y - world.y;
-          let ex = seg.z - seg.x;
-          let ey = seg.w - seg.y;
-          let across = rx * ey - ry * ex;
-          if (abs(across) > 1e-6) {
-            let t = (ax * ey - ay * ex) / across;
-            let s = (ax * ry - ay * rx) / across;
-            if (t >= 0.0 && (!isPoint || t <= dL) && s >= 0.0 && s <= 1.0) {
-              hit = true;
-              break;
-            }
-          }
-        }
-        if (!hit) { unblocked++; }
-      }
-      vis = f32(unblocked) / f32(samples);
-    } else {
-      let rx = cos(thetaL);
-      let ry = sin(thetaL);
-      var hit = false;
-      for (var e = 0u; e < edgeCount; e++) {
-        let seg = edges[e];
-        let ax = seg.x - world.x;
-        let ay = seg.y - world.y;
-        let ex = seg.z - seg.x;
-        let ey = seg.w - seg.y;
-        let across = rx * ey - ry * ex;
-        if (abs(across) > 1e-6) {
-          let t = (ax * ey - ay * ex) / across;
-          let s = (ax * ry - ay * rx) / across;
-          if (t >= 0.0 && (!isPoint || t <= dL) && s >= 0.0 && s <= 1.0) {
-            hit = true;
-            break;
-          }
-        }
-      }
-      if (hit) { vis = 0.0; }
-    }
-  }
-
-  let shade = a * vis * max(0.0, dot(n, l));
-  return vec4f(u.color.rgb * shade, 0.0);
+var n=vec3f(0.0,0.0,1.0);
+if(u.size.z>0.0){
+let s=textureLoad(bumps,vec2i(f.xy),0);
+if(s.a>0.0){
+n=normalize(s.xyz*2.0 - 1.0);
+}
+}
+var l=u.at.xyz;
+var a=1.0;
+let isPoint=u.at.w>0.0;
+var dL=0.0;
+var thetaL=0.0;
+if(isPoint){
+let d=u.at.xy - world;
+dL=length(d);
+a=pow(max(0.0,1.0 - dL/u.color.w),u.way.w);
+let v=vec3f(d,u.at.z);
+l=n;
+if(dot(v,v)>0.0){
+l=normalize(v);
+}
+if(u.size.w>0.0){
+var c=1.0;
+if(dL>0.0){
+c=-dot(d,u.way.xy)/dL;
+}
+if(u.way.z>u.view.w){
+a*=clamp((c - u.view.w)/(u.way.z - u.view.w),0.0,1.0);
+}
+else if(c<u.view.w){
+a=0.0;
+}
+}
+thetaL=atan2(d.y,d.x);
+}
+else{
+thetaL=atan2(u.at.y,u.at.x);
+}
+var vis=1.0;
+let hasShadows=u.soft.w>0.5;
+let edgeCount=u32(u.soft.y);
+if(hasShadows&&edgeCount>0u&&a>0.0&&!(isPoint&&u.soft.x>0.0&&dL<=u.soft.x)){
+let sourceRadius=u.soft.x;
+let samples=max(1u,min(64u,u32(u.soft.z)));
+var alphaL=0.0;
+if(isPoint){
+if(dL>sourceRadius&&sourceRadius>0.0){
+alphaL=asin(clamp(sourceRadius/dL,0.0,0.9999));
+}
+}
+else{
+alphaL=sourceRadius;
+}
+if(alphaL>0.0&&samples>1u){
+var unblocked=0u;
+for(var k=0u;
+k<samples;
+k++){
+let frac=(f32(k)+0.5)/f32(samples);
+let angle=thetaL - alphaL+2.0*alphaL*frac;
+let rx=cos(angle);
+let ry=sin(angle);
+var hit=false;
+for(var e=0u;
+e<edgeCount;
+e++){
+let seg=edges[e];
+let ax=seg.x - world.x;
+let ay=seg.y - world.y;
+let ex=seg.z - seg.x;
+let ey=seg.w - seg.y;
+let across=rx*ey - ry*ex;
+if(abs(across)>1e-6){
+let t=(ax*ey - ay*ex)/across;
+let s=(ax*ry - ay*rx)/across;
+if(t>=0.0&&(!isPoint||t<=dL)&&s>=0.0&&s<=1.0){
+hit=true;
+break;
+}
+}
+}
+if(!hit){
+unblocked++;
+}
+}
+vis=f32(unblocked)/f32(samples);
+}
+else{
+let rx=cos(thetaL);
+let ry=sin(thetaL);
+var hit=false;
+for(var e=0u;
+e<edgeCount;
+e++){
+let seg=edges[e];
+let ax=seg.x - world.x;
+let ay=seg.y - world.y;
+let ex=seg.z - seg.x;
+let ey=seg.w - seg.y;
+let across=rx*ey - ry*ex;
+if(abs(across)>1e-6){
+let t=(ax*ey - ay*ex)/across;
+let s=(ax*ry - ay*rx)/across;
+if(t>=0.0&&(!isPoint||t<=dL)&&s>=0.0&&s<=1.0){
+hit=true;
+break;
+}
+}
+}
+if(hit){
+vis=0.0;
+}
+}
+}
+let shade=a*vis*max(0.0,dot(n,l));
+return vec4f(u.color.rgb*shade,0.0);
 }
 `;
 
@@ -354,6 +369,8 @@ export class SoftLighting2D implements EnginePlugin {
   #flat?: GPUTexture;
   #group?: GPUBindGroup;
   #groupBump?: GPUTexture;
+  layer: number;
+  #masks = new MaskData();
   #disposed = false;
 
   constructor(options: SoftLighting2DOptions) {
@@ -365,6 +382,7 @@ export class SoftLighting2D implements EnginePlugin {
     this.#order = order;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.ambient = options.ambient ?? '#000000';
+    this.layer = options.layer ?? 0xffffffff;
     this.sourceRadius = options.sourceRadius ?? 4;
     this.samples = options.samples ?? 16;
     this.name = options.name ?? `soft-lighting2d-${++count}`;
@@ -428,6 +446,7 @@ export class SoftLighting2D implements EnginePlugin {
   }
 
   #release(): void {
+    this.#masks.dispose();
     this.#uniform?.destroy();
     this.#edgeBuffer?.destroy();
     this.#flat?.destroy();
@@ -446,16 +465,17 @@ export class SoftLighting2D implements EnginePlugin {
       this.#device = device;
     }
     if (!this.#module) {
-      this.#module = device.createShaderModule({ label: 'soft-lighting2d', code: shader });
+      this.#module = device.createShaderModule({ label: 'soft-lighting2d', code: maskShader(4) + shader });
       this.#layout = device.createBindGroupLayout({
         entries: [
           {
             binding: 0,
             visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 96 },
+            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 128 },
           },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
           { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+          { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
       });
       this.#pipelines = device.createPipelineLayout({ bindGroupLayouts: [this.#layout] });
@@ -507,12 +527,16 @@ export class SoftLighting2D implements EnginePlugin {
       bump = this.#normals && pick(this.#normals),
       camera = this.camera,
       ambient = hexColor(this.ambient),
-      lights = this.lights;
-    if (!ambient || !(camera.zoom > 0) || !Number.isFinite(camera.x) || !Number.isFinite(camera.y)) throw invalid();
+      lights = this.lights.filter((light) => (light.layers & this.layer) !== 0);
+    if (!ambient) throw invalid();
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
-    lights.forEach(checkSoftLight);
+    checkCamera(camera);
+    checkLayer(this.layer);
+    this.lights.forEach(checkSoftLight);
     this.#prepare(device, target.format);
+    this.#masks.upload(device, lights);
+    this.#group = undefined;
 
     const wanted = Math.max(1, lights.length) * FLOATS;
     if (!this.#uniform || this.#values.length < wanted) {
@@ -553,8 +577,9 @@ export class SoftLighting2D implements EnginePlugin {
       this.#group = device.createBindGroup({
         layout: this.#layout!,
         entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 96 } },
+          { binding: 0, resource: { buffer: this.#uniform, size: 128 } },
           { binding: 1, resource: shown.createView() },
+          { binding: 4, resource: { buffer: this.#masks.buffer! } },
           { binding: 2, resource: { buffer: this.#edgeBuffer! } },
         ],
       });
@@ -613,6 +638,7 @@ export class SoftLighting2D implements EnginePlugin {
           edgeCount,
           l.samples,
           l.shadows ? 1 : 0,
+          ...this.#masks.fields[i],
         ],
         i * FLOATS,
       );

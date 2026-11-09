@@ -1358,6 +1358,20 @@ compatibility; native WebGL2 explicitly rejects PBR. See whitepaper/results/batc
 and scripts/reference-rendering/run.mjs. The remaining picture loss is open in known-bugs; other material
 families and the independent path-traced IBL/Cornell controls are still unmeasured. No core change.
 
+### Lighting2d batch 55 repair evidence (2026-11-08)
+
+`packages/lighting2d/tests/frame-regressions.js`, `emission-regressions.js` and `frame-lifecycle.test.js` extend the existing
+`test:gpu` suite, already discovered by `check:gpu-packages` in `check:merge`. Every direct-light entry now runs the same
+mask/layer, repeated-frame, format, name-reuse and device-loss scenarios. Independent arithmetic checks cover separate
+height uniforms and isolated HDR threshold images; actual `Bloom.encodeImage` output is checked against a separately
+encoded dispatch and must spread outside a zero-glow sprite. All six entries reject a native WebGL2 engine with a coded
+error and help link. Direct-light storage ceilings are device limits rather than silent 64-item truncation.
+
+Current evidence is one RTX A6000/Edge device. Cross-vendor rounding and adapter behaviour remain unproved. GI's spatial
+hierarchy, interval/transmittance merging, source visibility, actual cascade/bounce counts and ringing fix are not proved;
+LIM-599 is withdrawn and the seven review repros remain in `docs/known-bugs.md`. No speed claim or benchmark is added.
+
+
 The following remain technical gaps, not permission to weaken a check:
 
 PixelScale, CRT and PaletteQuantize have CPU-reference/readback evidence on the RTX A6000 through native WebGPU and

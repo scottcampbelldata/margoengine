@@ -6,10 +6,21 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
+export interface EmissiveBloom2D {
+    encodeImage(context: {
+        device: GPUDevice;
+        encoder: GPUCommandEncoder;
+        width: number;
+        height: number;
+    }, input: GPUTextureView, output: GPUTextureView): void;
+    dispose(): void;
+}
+
 export class EmissiveLighting2D implements EnginePlugin, Disposable {
     readonly name: string;
     readonly order: number;
-    emissiveTexture: any;
+    emissiveTexture: GPUTexture | null;
+    bloomTexture: GPUTexture | null;
     camera: {
         x: number;
         y: number;
@@ -24,14 +35,15 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     setup(engine: Engine): void;
     addSprite(options?: EmissiveSpriteItem2D): EmissiveSprite2D;
     removeSprite(sprite: EmissiveSprite2D): boolean;
-    connectBloom(bloomPass: any): void;
-    render(targetTexture: any, commandEncoder?: any): void;
+    connectBloom(create: () => EmissiveBloom2D): void;
+    render(targetTexture: GPUTexture | (() => GPUTexture) | undefined, commandEncoder?: GPUCommandEncoder): void;
     dispose(): void;
     [Symbol.dispose](): void;
+    onDeviceRestored(): void;
 }
 
 export interface EmissiveLighting2DOptions {
-    target?: any;
+    target?: GPUTexture | (() => GPUTexture);
     sprites?: readonly EmissiveSpriteItem2D[];
     camera?: {
         x: number;
@@ -81,5 +93,5 @@ export interface EmissiveSpriteItem2D {
 
 export function checkEmissiveSprite(sp: EmissiveSpriteItem2D): void;
 
-export function emissiveLightAt(sprite: EmissiveSpriteItem2D, x: number, y: number, layerMask?: number, bloomIntensity?: number): number[];
+export function emissiveLightAt(sprite: EmissiveSpriteItem2D, x: number, y: number, layerMask?: number, bloomIntensity?: number, bloomThreshold?: number): number[];
 ```

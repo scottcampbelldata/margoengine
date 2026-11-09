@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { checkCamera, checkLayer } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -6,7 +7,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { Point2D } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number; COPY_SRC: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 let emissivePluginCount = 0;
@@ -100,7 +101,13 @@ export function checkEmissiveSprite(sp: EmissiveSpriteItem2D): void {
   if (sp.falloff !== undefined && (!Number.isFinite(sp.falloff) || sp.falloff <= 0)) {
     throw rangeError('Invalid falloff: must be positive', 'pixel-lighting');
   }
-  if (sp.color && !hexColor(sp.color)) {
+  for (const field of ['bloomStrength', 'bloomThreshold'] as const) {
+    if (sp[field] !== undefined && (!Number.isFinite(sp[field]) || sp[field]! < 0)) {
+      throw rangeError(`Invalid ${field}`, 'pixel-lighting');
+    }
+  }
+  if (sp.layer !== undefined) checkLayer(sp.layer);
+  if (sp.color !== undefined && !hexColor(sp.color)) {
     throw rangeError('Invalid emissive color', 'pixel-lighting');
   }
 }
@@ -115,7 +122,10 @@ export function emissiveLightAt(
   y: number,
   layerMask?: number,
   bloomIntensity: number = 1.0,
+  bloomThreshold: number = 0.8,
 ): number[] {
+  checkEmissiveSprite(sprite);
+  if (![bloomIntensity, bloomThreshold].every(Number.isFinite) || bloomIntensity < 0 || bloomThreshold < 0) throw rangeError('Invalid bloomIntensity', 'pixel-lighting');
   const spLayer = sprite.layer ?? 0xffffffff;
   if (layerMask !== undefined && (spLayer & layerMask) === 0) return [0, 0, 0];
 
@@ -128,7 +138,7 @@ export function emissiveLightAt(
     glowR = sprite.glowRadius ?? 48,
     falloff = sprite.falloff ?? 2,
     intensity = sprite.intensity ?? 1.0,
-    threshold = sprite.bloomThreshold ?? 0.8,
+    threshold = Math.max(sprite.bloomThreshold ?? 0.8, bloomThreshold),
     strength = sprite.bloomStrength ?? 1.0,
     rgb = hexColor(sprite.color ?? '#ffffff')!;
 
@@ -161,8 +171,9 @@ export function emissiveLightAt(
 
   if (inside) {
     amount = intensity;
-    if (intensity > threshold) {
-      bloom = (intensity - threshold) * strength * bloomIntensity;
+    const peak = Math.max(rgb[0], rgb[1], rgb[2]) * intensity;
+    if (peak > threshold) {
+      bloom = intensity * (peak - threshold) / peak * strength * bloomIntensity;
     }
   } else if (distFromEdge > 0 && glowR > 0) {
     const atten = Math.max(0, 1 - distFromEdge / glowR) ** falloff;
@@ -170,7 +181,7 @@ export function emissiveLightAt(
     amount = added;
     const luma = Math.max(rgb[0] * added, rgb[1] * added, rgb[2] * added);
     if (luma > threshold) {
-      bloom = (luma - threshold) * strength * bloomIntensity;
+      bloom = added * (luma - threshold) / luma * strength * bloomIntensity;
     }
   }
 
@@ -181,7 +192,7 @@ export function emissiveLightAt(
 /** Options for the {@link EmissiveLighting2D} plugin. */
 export interface EmissiveLighting2DOptions {
   /** Target texture or function returning target texture. */
-  target?: any;
+  target?: GPUTexture | (() => GPUTexture);
   /** Active emissive sprites. */
   sprites?: readonly EmissiveSpriteItem2D[];
   /** Camera configuration. Default { x: 0, y: 0, zoom: 1 }. */
@@ -201,115 +212,101 @@ export interface EmissiveLighting2DOptions {
 }
 
 const EMISSIVE_WGSL = /* wgsl */ `
-struct EmissiveSpriteGPU {
-  pos: vec2<f32>,
-  size: vec2<f32>,           // circle: (radius, halfH), box: (halfW, halfH)
-  colorIntensity: vec4<f32>, // r, g, b, intensity
-  params: vec4<f32>,         // falloff, glowRadius, bloomThreshold, bloomStrength
-  flags: vec4<u32>,          // shape (0: circle, 1: box), layer, pad, pad
+struct EmissiveSpriteGPU{
+pos:vec2f,size:vec2f,colorIntensity:vec4f,params:vec4f,flags:vec4u,}
+struct Uniforms{
+camX:f32,camY:f32,camZoom:f32,targetW:f32,targetH:f32,spriteCount:u32,passLayer:u32,enableBloom:u32,bloomThreshold:f32,bloomIntensity:f32,pad0:f32,pad1:f32,}
+@group(0)@binding(0)var<uniform>uniforms:Uniforms;
+@group(0)@binding(1)var<storage,read>sprites:array<EmissiveSpriteGPU>;
+struct VertexOutput{
+@builtin(position)position:vec4f,@location(0)uv:vec2f,}
+@vertex fn vs_main(@builtin(vertex_index)index:u32)->VertexOutput{
+var out:VertexOutput;
+let x=f32((index<<1u)&2u);
+let y=f32(index&2u);
+out.position=vec4f(x*2.0 - 1.0,1.0 - y*2.0,0.0,1.0);
+out.uv=vec2f(x,y);
+return out;
 }
-
-struct Uniforms {
-  camX: f32,
-  camY: f32,
-  camZoom: f32,
-  targetW: f32,
-  targetH: f32,
-  spriteCount: u32,
-  passLayer: u32,
-  enableBloom: u32,
-  bloomThreshold: f32,
-  bloomIntensity: f32,
-  pad0: f32,
-  pad1: f32,
+struct EmissionOutput{
+@location(0)emission:vec4f,@location(1)extracted:vec4f,}
+@fragment fn fs_main(in:VertexOutput)->EmissionOutput{
+let screenPos=in.position.xy;
+let worldPos=vec2f(uniforms.camX+screenPos.x/uniforms.camZoom,uniforms.camY+screenPos.y/uniforms.camZoom);
+var totalLight=vec3f(0.0);
+var bloomGlow=vec3f(0.0);
+for(var i=0u;
+i<uniforms.spriteCount;
+i=i+1u){
+let sp=sprites[i];
+if((sp.flags.y&uniforms.passLayer)==0u){
+continue;
 }
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var<storage, read> sprites: array<EmissiveSpriteGPU>;
-
-struct VertexOutput {
-  @builtin(position) position: vec4<f32>,
-  @location(0) uv: vec2<f32>,
+let d=worldPos - sp.pos;
+var inside=false;
+var distFromEdge=0.0;
+let shape=sp.flags.x;
+let glowR=sp.params.y;
+let falloff=sp.params.x;
+if(shape==0u){
+let r=sp.size.x;
+let dist=length(d);
+if(dist<=r){
+inside=true;
 }
-
-@vertex
-fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
-  var out: VertexOutput;
-  let x = f32((index << 1u) & 2u);
-  let y = f32(index & 2u);
-  out.position = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
-  out.uv = vec2<f32>(x, y);
-  return out;
+else if(dist<r+glowR){
+distFromEdge=dist - r;
 }
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  let screenPos = in.position.xy;
-  let worldPos = vec2<f32>(
-    uniforms.camX + screenPos.x / uniforms.camZoom,
-    uniforms.camY + screenPos.y / uniforms.camZoom
-  );
-
-  var totalLight = vec3<f32>(0.0);
-  var bloomGlow = vec3<f32>(0.0);
-
-  for (var i = 0u; i < uniforms.spriteCount; i = i + 1u) {
-    let sp = sprites[i];
-    if ((sp.flags.y & uniforms.passLayer) == 0u) {
-      continue;
-    }
-
-    let d = worldPos - sp.pos;
-    var inside = false;
-    var distFromEdge = 0.0;
-    let shape = sp.flags.x;
-    let glowR = sp.params.y;
-    let falloff = sp.params.x;
-
-    if (shape == 0u) {
-      let r = sp.size.x;
-      let dist = length(d);
-      if (dist <= r) {
-        inside = true;
-      } else if (dist < r + glowR) {
-        distFromEdge = dist - r;
-      }
-    } else {
-      let hw = sp.size.x;
-      let hh = sp.size.y;
-      let ox = max(0.0, abs(d.x) - hw);
-      let oy = max(0.0, abs(d.y) - hh);
-      let dist = length(vec2<f32>(ox, oy));
-      if (dist == 0.0) {
-        inside = true;
-      } else if (dist < glowR) {
-        distFromEdge = dist;
-      }
-    }
-
-    let col = sp.colorIntensity.xyz;
-    let intens = sp.colorIntensity.w;
-
-    if (inside) {
-      totalLight += col * intens;
-      if (uniforms.enableBloom == 1u && intens > sp.params.z) {
-        bloomGlow += col * ((intens - sp.params.z) * sp.params.w * uniforms.bloomIntensity);
-      }
-    } else if (distFromEdge > 0.0 && glowR > 0.0) {
-      let atten = pow(max(0.0, 1.0 - distFromEdge / glowR), falloff);
-      let added = intens * atten;
-      totalLight += col * added;
-      let luma = max(col.r * added, max(col.g * added, col.b * added));
-      if (uniforms.enableBloom == 1u && luma > sp.params.z) {
-        bloomGlow += col * ((luma - sp.params.z) * sp.params.w * uniforms.bloomIntensity);
-      }
-    }
-  }
-
-  let finalColor = totalLight + bloomGlow;
-  return vec4<f32>(finalColor, 1.0);
+}
+else{
+let hw=sp.size.x;
+let hh=sp.size.y;
+let ox=max(0.0,abs(d.x)- hw);
+let oy=max(0.0,abs(d.y)- hh);
+let dist=length(vec2f(ox,oy));
+if(dist==0.0){
+inside=true;
+}
+else if(dist<glowR){
+distFromEdge=dist;
+}
+}
+let col=sp.colorIntensity.xyz;
+let intens=sp.colorIntensity.w;
+if(inside){
+totalLight+=col*intens;
+let peak=max(col.r,max(col.g,col.b))*intens;
+if(uniforms.enableBloom==1u&&peak>max(sp.params.z,uniforms.bloomThreshold)){
+bloomGlow+=col*(intens*(peak - max(sp.params.z,uniforms.bloomThreshold))/peak*sp.params.w*uniforms.bloomIntensity);
+}
+}
+else if(distFromEdge>0.0&&glowR>0.0){
+let atten=pow(max(0.0,1.0 - distFromEdge/glowR),falloff);
+let added=intens*atten;
+totalLight+=col*added;
+let luma=max(col.r*added,max(col.g*added,col.b*added));
+if(uniforms.enableBloom==1u&&luma>max(sp.params.z,uniforms.bloomThreshold)){
+bloomGlow+=col*(added*(luma - max(sp.params.z,uniforms.bloomThreshold))/luma*sp.params.w*uniforms.bloomIntensity);
+}
+}
+}
+let finalColor=totalLight+bloomGlow;
+var result:EmissionOutput;
+result.emission=vec4f(finalColor,1.0);
+result.extracted=vec4f(bloomGlow,1.0);
+return result;
+}
+@group(1)@binding(0)var image:texture_2d<f32>;
+@fragment fn present(in:VertexOutput)->@location(0)vec4f{
+return textureLoad(image,vec2i(in.position.xy),0);
 }
 `;
+
+/** An owned, unattached image effect, such as a new Bloom from @margoengine/post/bloom. */
+export interface EmissiveBloom2D {
+  encodeImage(context: { device: GPUDevice; encoder: GPUCommandEncoder; width: number; height: number }, input: GPUTextureView, output: GPUTextureView): void;
+  dispose(): void;
+}
 
 /**
  * 2D Emissive Sprites & Bloom hookup plugin.
@@ -318,16 +315,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 export class EmissiveLighting2D implements EnginePlugin, Disposable {
   readonly name: string;
   readonly order: number;
-  private readonly sprites = new Set<EmissiveSprite2D>();
-  private engine: Engine | null = null;
-  private pipeline: any = null;
-  private uniformBuffer: any = null;
-  private storageBuffer: any = null;
-  private bindGroupLayout: any = null;
-  private disposed = false;
-  private target: any;
-  /** Isolated emissive texture available for connecting to Bloom passes. */
-  emissiveTexture: any = null;
+  readonly #sprites = new Set<EmissiveSprite2D>();
+  #engine: Engine | null = null;
+  #pipeline: GPURenderPipeline | null = null;
+  #presentation: GPURenderPipeline | null = null;
+  #createBloom?: () => EmissiveBloom2D;
+  #bloomPass?: EmissiveBloom2D;
+  #filtered: GPUTexture | null = null;
+  #uniformBuffer: GPUBuffer | null = null;
+  #storageBuffer: GPUBuffer | null = null;
+  #bindGroupLayout: GPUBindGroupLayout | null = null;
+  #device: GPUDevice | null = null;
+  #format: string | null = null;
+  #disposed = false;
+  #target?: GPUTexture | (() => GPUTexture);
+  /** Owned rgba16float emission and local glow, excluding all other scene lighting. Replaced on resize/restore. */
+  emissiveTexture: GPUTexture | null = null;
+  /** Owned rgba16float local threshold extraction, before spatial filtering. */
+  bloomTexture: GPUTexture | null = null;
   camera: { x: number; y: number; zoom: number };
   bloom: boolean;
   bloomIntensity: number;
@@ -337,12 +342,13 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   constructor(options: EmissiveLighting2DOptions = {}) {
     this.name = options.name ?? `emissive-lighting2d-${++emissivePluginCount}`;
     this.order = options.order ?? 22;
-    this.target = options.target;
+    this.#target = options.target;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.bloom = options.bloom ?? true;
     this.bloomIntensity = options.bloomIntensity ?? 1.0;
     this.bloomThreshold = options.bloomThreshold ?? 0.8;
     this.layer = options.layer ?? 0xffffffff;
+    this.#validate();
 
     if (options.sprites) {
       for (const sp of options.sprites) this.addSprite(sp);
@@ -353,95 +359,115 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     const emissive = new EmissiveLighting2D(options);
     const runtime = engineRuntime(instance);
     if (!runtime.gpu || typeof runtime.gpu.createShaderModule !== 'function') {
-      throw rangeError('WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
+      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
     }
     runtime.use(emissive);
     return emissive;
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw fault('disposed', 'EmissiveLighting2D disposed; create a new one');
+    if (this.#disposed) throw fault('disposed', 'EmissiveLighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu' || !engine.gpu) {
-      throw rangeError('WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
+      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
     }
-    this.engine = engine;
+    this.#engine = engine;
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
       execute: (c: PassContext) => {
-        if (c.backend === 'webgpu') this.render(this.target ?? (c as any).target);
+        if (c.backend === 'webgpu') this.render(this.#target, c.encoder);
       },
     });
   }
 
   /** Adds an emissive sprite. */
   addSprite(options: EmissiveSpriteItem2D = {}): EmissiveSprite2D {
-    if (this.disposed) throw typeError('EmissiveLighting2D has been disposed', 'pixel-lighting');
+    if (this.#disposed) throw typeError('EmissiveLighting2D has been disposed', 'pixel-lighting');
     const sprite = new EmissiveSprite2D(options);
-    this.sprites.add(sprite);
+    this.#sprites.add(sprite);
     return sprite;
   }
 
   /** Removes an emissive sprite. */
   removeSprite(sprite: EmissiveSprite2D): boolean {
-    return this.sprites.delete(sprite);
+    return this.#sprites.delete(sprite);
   }
 
-  /** Connects this emissive pass to an external bloom pass or post stack. */
-  connectBloom(bloomPass: any): void {
-    if (this.disposed) throw typeError('EmissiveLighting2D has been disposed', 'pixel-lighting');
-    if (bloomPass && typeof bloomPass.setInput === 'function') {
-      bloomPass.setInput(() => this.emissiveTexture ?? this.target);
-    }
+  /** Takes ownership of an unattached Bloom made per device. Called again after restoration. */
+  connectBloom(create: () => EmissiveBloom2D): void {
+    if (this.#disposed) throw typeError('EmissiveLighting2D has been disposed', 'pixel-lighting');
+    if (typeof create !== 'function') throw typeError('connectBloom needs a factory returning an unattached Bloom', 'pixel-lighting');
+    this.#bloomPass?.dispose();
+    this.#bloomPass = undefined;
+    this.#createBloom = create;
   }
 
   /** Renders the emissive pass onto target texture. */
-  render(targetTexture: any, commandEncoder?: any): void {
-    if (!this.engine || !this.engine.gpu || this.disposed) return;
-    const device = this.engine.gpu;
+  render(targetTexture: GPUTexture | (() => GPUTexture) | undefined, commandEncoder?: GPUCommandEncoder): void {
+    if (!this.#engine || !this.#engine.gpu || this.#disposed) return;
+    const device = this.#engine.gpu;
     const target = typeof targetTexture === 'function' ? targetTexture() : targetTexture;
     if (!target) return;
+    this.#validate();
+    for (const sprite of this.#sprites) checkEmissiveSprite(sprite);
 
-    this.emissiveTexture = target;
-
-    if (!this.pipeline) {
+    if (this.#device !== device || this.#format !== target.format) {
+      this.#release();
+      this.#device = device;
+      this.#format = target.format;
+    }
+    if (!this.emissiveTexture || this.emissiveTexture.width !== target.width || this.emissiveTexture.height !== target.height) {
+      this.emissiveTexture?.destroy();
+      this.bloomTexture?.destroy();
+      this.#filtered?.destroy();
+      const descriptor = {
+        size: [target.width, target.height], format: 'rgba16float' as const,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      };
+      this.emissiveTexture = device.createTexture({ ...descriptor, label: 'emissive HDR' });
+      this.bloomTexture = device.createTexture({ ...descriptor, label: 'emissive threshold extraction' });
+      this.#filtered = device.createTexture({ ...descriptor, label: 'emissive spatial bloom' });
+    }
+    if (!this.#pipeline) {
       const module = device.createShaderModule({ code: EMISSIVE_WGSL });
-      this.bindGroupLayout = device.createBindGroupLayout({
+      this.#bindGroupLayout = device.createBindGroupLayout({
         entries: [
           { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 48 } },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
       });
-      this.pipeline = device.createRenderPipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [this.bindGroupLayout] }),
+      this.#pipeline = device.createRenderPipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [this.#bindGroupLayout] }),
         vertex: { module, entryPoint: 'vs_main' },
         fragment: {
           module,
           entryPoint: 'fs_main',
-          targets: [{
-            format: target.format ?? 'rgba8unorm',
-            blend: {
-              color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-              alpha: { srcFactor: 'one', dstFactor: 'zero', operation: 'add' },
-            },
-          }],
+          targets: [{ format: 'rgba16float' }, { format: 'rgba16float' }],
         },
+      });
+      this.#presentation = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vs_main' },
+        fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] },
       });
     }
 
-    const MAX_SPRITES = 64;
-    const bufferSize = Math.max(256, MAX_SPRITES * 64);
-    if (!this.storageBuffer) {
-      this.storageBuffer = device.createBuffer({
+    const spriteList = Array.from(this.#sprites);
+    const count = spriteList.length;
+    const bufferSize = Math.max(64, count * 64);
+    if (bufferSize > device.limits.maxStorageBufferBindingSize) {
+      throw rangeError('Emissive sprites exceed maxStorageBufferBindingSize', 'pixel-lighting');
+    }
+    if (!this.#storageBuffer || this.#storageBuffer.size < bufferSize) {
+      this.#storageBuffer?.destroy();
+      this.#storageBuffer = device.createBuffer({
         size: bufferSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
     }
 
-    const spriteFloats = new Float32Array(MAX_SPRITES * 16);
+    const spriteFloats = new Float32Array(bufferSize / 4);
     const spriteU32 = new Uint32Array(spriteFloats.buffer);
-    const spriteList = Array.from(this.sprites);
-    const count = Math.min(spriteList.length, MAX_SPRITES);
 
     for (let i = 0; i < count; i++) {
       const sp = spriteList[i];
@@ -474,10 +500,10 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
       spriteU32[base + 15] = 0;
     }
 
-    device.queue.writeBuffer(this.storageBuffer, 0, spriteFloats);
+    device.queue.writeBuffer(this.#storageBuffer, 0, spriteFloats);
 
-    if (!this.uniformBuffer) {
-      this.uniformBuffer = device.createBuffer({
+    if (!this.#uniformBuffer) {
+      this.#uniformBuffer = device.createBuffer({
         size: 48,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
@@ -499,29 +525,41 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     uniFloats[10] = 0;
     uniFloats[11] = 0;
 
-    device.queue.writeBuffer(this.uniformBuffer, 0, uniFloats);
+    device.queue.writeBuffer(this.#uniformBuffer, 0, uniFloats);
 
     const encoder = commandEncoder ?? device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [{
-        view: target.createView ? target.createView() : target,
-        loadOp: 'load',
+        view: this.emissiveTexture!.createView(),
+        loadOp: 'clear',
+        clearValue: [0, 0, 0, 1],
         storeOp: 'store',
-      }],
+      }, { view: this.bloomTexture!.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.#pipeline);
 
     const bindGroup = device.createBindGroup({
-      layout: this.bindGroupLayout,
+      layout: this.#bindGroupLayout!,
       entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: { buffer: this.storageBuffer } },
+        { binding: 0, resource: { buffer: this.#uniformBuffer } },
+        { binding: 1, resource: { buffer: this.#storageBuffer } },
       ],
     });
 
     pass.setBindGroup(0, bindGroup);
     pass.draw(3);
     pass.end();
+    let shown = this.emissiveTexture!;
+    if (this.#createBloom) {
+      this.#bloomPass ??= this.#createBloom();
+      this.#bloomPass.encodeImage({ device, encoder, width: target.width, height: target.height }, shown.createView(), this.#filtered!.createView());
+      shown = this.#filtered!;
+    }
+    const presentation = encoder.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }] });
+    presentation.setPipeline(this.#presentation!);
+    presentation.setBindGroup(1, device.createBindGroup({ layout: this.#presentation!.getBindGroupLayout(1), entries: [{ binding: 0, resource: shown.createView() }] }));
+    presentation.draw(3);
+    presentation.end();
 
     if (!commandEncoder) {
       device.queue.submit([encoder.finish()]);
@@ -533,19 +571,38 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   }
 
   [Symbol.dispose](): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.sprites.clear();
-    if (this.uniformBuffer) {
-      this.uniformBuffer.destroy?.();
-      this.uniformBuffer = null;
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#sprites.clear();
+    this.#engine?.removePlugin(this.name);
+    this.#engine = null;
+    this.#release();
+  }
+
+  onDeviceRestored(): void {
+    this.#release();
+  }
+
+  #validate(): void {
+    checkCamera(this.camera);
+    checkLayer(this.layer);
+    if (!Number.isFinite(this.order)) throw rangeError('Invalid emissive order', 'pixel-lighting');
+    for (const value of [this.bloomThreshold, this.bloomIntensity]) {
+      if (!Number.isFinite(value) || value < 0) throw rangeError('Invalid emissive pass value', 'pixel-lighting');
     }
-    if (this.storageBuffer) {
-      this.storageBuffer.destroy?.();
-      this.storageBuffer = null;
-    }
-    this.pipeline = null;
-    this.bindGroupLayout = null;
-    this.engine = null;
+  }
+
+  #release(): void {
+    this.#uniformBuffer?.destroy();
+    this.#storageBuffer?.destroy();
+    this.#uniformBuffer = this.#storageBuffer = null;
+    this.#pipeline = this.#bindGroupLayout = this.#device = this.#format = null;
+    this.emissiveTexture?.destroy();
+    this.bloomTexture?.destroy();
+    this.#filtered?.destroy();
+    this.emissiveTexture = this.bloomTexture = this.#filtered = null;
+    this.#bloomPass?.dispose();
+    this.#bloomPass = undefined;
+    this.#presentation = null;
   }
 }

@@ -1,4 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MaskData, maskShader } from './masks.js';
+import { checkLight, checkCamera, checkLayer } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -12,6 +14,7 @@ import {
   type Point2D,
   occluderEdges,
   lightAt,
+  inLightMask,
 } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
@@ -209,6 +212,7 @@ export class CookieLight2D extends Light2D {
 const invalid = () => rangeError('Invalid cookie light value', 'pixel-lighting');
 
 function checkCookieLight(l: CookieLight2D): void {
+  checkLight(l);
   const good =
     l.cookieScale.every((v) => Number.isFinite(v) && v > 0) &&
     l.cookieOffset.every(Number.isFinite) &&
@@ -237,6 +241,7 @@ export function cookieLightAt(
 ): number[] {
   const base = lightAt(light, x, y, normal);
   if (!light.cookie) return base;
+  if (light.mask && !inLightMask(light.mask, x, y)) return [0, 0, 0];
 
   // Project point (x, y) into cookie coordinate space
   const dx = x - light.x - light.cookieOffset[0];
@@ -281,147 +286,151 @@ export function cookieLightAt(
 }
 
 const cookieShader = /* wgsl */ `
-struct Uniforms {
-  view: vec4f,
-  size: vec4f,
-  at: vec4f,
-  way: vec4f,
-  color: vec4f,
-  cookie_scale: vec4f,
-  cookie_rot: vec4f,
-  cookie_info: vec4f,
+struct Uniforms{
+view:vec4f,size:vec4f,at:vec4f,way:vec4f,color:vec4f,cookie_scale:vec4f,cookie_rot:vec4f,cookie_info:vec4f,cookie_origin:vec4f,mask_bounds:vec4f,mask_info:vec4f,}
+@group(0)@binding(0)var<uniform>u:Uniforms;
+@group(0)@binding(1)var bumps:texture_2d<f32>;
+@group(0)@binding(2)var<storage,read>edges:array<vec4f>;
+@group(1)@binding(0)var cookie_tex:texture_2d<f32>;
+@group(1)@binding(1)var cookie_samp:sampler;
+@group(0)@binding(3)var sum:texture_2d_array<f32>;
+@vertex fn wide(@builtin(vertex_index)i:u32)->@builtin(position)vec4f{
+return vec4f(f32(i&1u)*4.0 - 1.0,f32(i>>1u)*4.0 - 1.0,0.0,1.0);
 }
-
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var bumps: texture_2d<f32>;
-@group(0) @binding(2) var<storage, read> edges: array<vec4f>;
-@group(1) @binding(0) var cookie_tex: texture_2d<f32>;
-@group(1) @binding(1) var cookie_samp: sampler;
-@group(0) @binding(3) var sum: texture_2d_array<f32>;
-
-@vertex fn wide(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
-  return vec4f(f32(i & 1u) * 4.0 - 1.0, f32(i >> 1u) * 4.0 - 1.0, 0.0, 1.0);
+fn clip(d:vec2f)->vec2f{
+return d*u.view.z/u.size.xy*vec2f(2.0,-2.0);
 }
-
-fn clip(d: vec2f) -> vec2f {
-  return d * u.view.z / u.size.xy * vec2f(2.0, -2.0);
+@vertex fn edge(@builtin(vertex_index)i:u32,@location(0)e:vec4f)->@builtin(position)vec4f{
+var p=e.xy;
+if((i&1u)==1u){
+p=e.zw;
 }
-
-@vertex fn edge(@builtin(vertex_index) i: u32, @location(0) e: vec4f) -> @builtin(position) vec4f {
-  var p = e.xy;
-  if ((i & 1u) == 1u) { p = e.zw; }
-  if (i < 2u) { return vec4f(clip(p - u.view.xy) + vec2f(-1.0, 1.0), 0.0, 1.0); }
-  return vec4f(clip(p * u.at.w - u.at.xy), 0.0, 0.0);
+if(i<2u){
+return vec4f(clip(p - u.view.xy)+vec2f(-1.0,1.0),0.0,1.0);
 }
-
-@fragment fn none() -> @location(0) vec4f { return vec4f(0.0); }
-
-@fragment fn show(@builtin(position) f: vec4f) -> @location(0) vec4f {
-  let p = vec2i(f.xy);
-  return vec4f(
-    textureLoad(sum, p, 0, 0).rgb +
-    textureLoad(sum, p, 1, 0).rgb +
-    textureLoad(sum, p, 2, 0).rgb +
-    textureLoad(sum, p, 3, 0).rgb,
-    1.0
-  );
+return vec4f(clip(p*u.at.w - u.at.xy),0.0,0.0);
 }
-
-@fragment fn lit(@builtin(position) f: vec4f) -> @location(0) vec4f {
-  let world = u.view.xy + f.xy / u.view.z;
-  var n = vec3f(0.0, 0.0, 1.0);
-  if (u.size.z > 0.0) {
-    let s = textureLoad(bumps, vec2i(f.xy), 0);
-    if (s.a > 0.0) { n = normalize(s.xyz * 2.0 - 1.0); }
-  }
-
-  var l = u.at.xyz;
-  var a = 1.0;
-  let isPoint = u.at.w > 0.0;
-  var dL = 0.0;
-  if (isPoint) {
-    let d = u.at.xy - world;
-    dL = length(d);
-    a = pow(max(0.0, 1.0 - dL / u.color.w), u.way.w);
-    let v = vec3f(d, u.at.z);
-    l = n;
-    if (dot(v, v) > 0.0) { l = normalize(v); }
-    if (u.size.w > 0.0) {
-      var c = 1.0;
-      if (dL > 0.0) { c = -dot(d, u.way.xy) / dL; }
-      if (u.way.z > u.view.w) { a *= clamp((c - u.view.w) / (u.way.z - u.view.w), 0.0, 1.0); }
-      else if (c < u.view.w) { a = 0.0; }
-    }
-  }
-
-  var vis = 1.0;
-  let hasShadows = u.cookie_info.z > 0.5;
-  let edgeCount = u32(u.cookie_info.y);
-  if (hasShadows && edgeCount > 0u && a > 0.0) {
-    let thetaL = select(atan2(u.at.y, u.at.x), atan2(u.at.y - world.y, u.at.x - world.x), isPoint);
-    let rx = cos(thetaL);
-    let ry = sin(thetaL);
-    for (var e = 0u; e < edgeCount; e++) {
-      let seg = edges[e];
-      let ax = seg.x - world.x;
-      let ay = seg.y - world.y;
-      let ex = seg.z - seg.x;
-      let ey = seg.w - seg.y;
-      let across = rx * ey - ry * ex;
-      if (abs(across) > 1e-6) {
-        let t = (ax * ey - ay * ex) / across;
-        let s = (ax * ry - ay * rx) / across;
-        if (t >= 0.0 && (!isPoint || t <= dL) && s >= 0.0 && s <= 1.0) {
-          vis = 0.0;
-          break;
-        }
-      }
-    }
-  }
-
-  if (vis <= 0.0 || a <= 0.0) { return vec4f(0.0); }
-
-  var cookieMod = vec4f(1.0);
-  if (u.cookie_info.x > 0.5) {
-    let delta = world - u.at.xy - u.cookie_scale.zw;
-    let rx = delta.x * u.cookie_rot.x - delta.y * u.cookie_rot.y;
-    let ry = delta.x * u.cookie_rot.y + delta.y * u.cookie_rot.x;
-    var uv = vec2f(rx / u.cookie_scale.x + 0.5, ry / u.cookie_scale.y + 0.5);
-    let wrapMode = u32(u.cookie_rot.z);
-    var oob = false;
-    if (wrapMode == 0u) {
-      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { oob = true; }
-    } else if (wrapMode == 1u) {
-      uv = clamp(uv, vec2f(0.0), vec2f(1.0));
-    } else if (wrapMode == 2u) {
-      uv = fract(uv);
-    } else if (wrapMode == 3u) {
-      let m = abs(uv) % vec2f(2.0);
-      uv = select(m, vec2f(2.0) - m, m > vec2f(1.0));
-    }
-    if (oob) {
-      cookieMod = vec4f(0.0);
-    } else {
-      // The texel is chosen as cookieSample does (floor plus COOKIE_TEXEL_BIAS), not by the nearest sampler, whose
-      // choice on a texel edge depends on the GPU's division error.
-      let dims = vec2i(textureDimensions(cookie_tex));
-      let texel = clamp(vec2i(floor(uv * vec2f(dims) + vec2f(${COOKIE_TEXEL_BIAS}))), vec2i(0), dims - vec2i(1));
-      cookieMod = textureLoad(cookie_tex, texel, 0);
-    }
-  }
-
-  let diffuse = max(0.0, dot(n, l));
-  let blendMode = u32(u.cookie_rot.w);
-  var outCol = vec3f(0.0);
-  if (blendMode == 1u) {
-    outCol = u.color.rgb * a * diffuse * vis * cookieMod.a;
-  } else if (blendMode == 2u) {
-    outCol = cookieMod.rgb * cookieMod.a * a * diffuse * vis * length(u.color.rgb);
-  } else {
-    outCol = u.color.rgb * a * diffuse * vis * cookieMod.rgb * cookieMod.a;
-  }
-
-  return vec4f(outCol, 0.0);
+@fragment fn none()->@location(0)vec4f{
+return vec4f(0.0);
+}
+@fragment fn show(@builtin(position)f:vec4f)->@location(0)vec4f{
+let p=vec2i(f.xy);
+return vec4f(textureLoad(sum,p,0,0).rgb+textureLoad(sum,p,1,0).rgb+textureLoad(sum,p,2,0).rgb+textureLoad(sum,p,3,0).rgb,1.0);
+}
+@fragment fn lit(@builtin(position)f:vec4f)->@location(0)vec4f{
+let world=u.view.xy+f.xy/u.view.z;
+if(!maskVisible(world,u.mask_bounds,u.mask_info)){
+return vec4f(0.0);
+}
+var n=vec3f(0.0,0.0,1.0);
+if(u.size.z>0.0){
+let s=textureLoad(bumps,vec2i(f.xy),0);
+if(s.a>0.0){
+n=normalize(s.xyz*2.0 - 1.0);
+}
+}
+var l=u.at.xyz;
+var a=1.0;
+let isPoint=u.at.w>0.0;
+var dL=0.0;
+if(isPoint){
+let d=u.at.xy - world;
+dL=length(d);
+a=pow(max(0.0,1.0 - dL/u.color.w),u.way.w);
+let v=vec3f(d,u.at.z);
+l=n;
+if(dot(v,v)>0.0){
+l=normalize(v);
+}
+if(u.size.w>0.0){
+var c=1.0;
+if(dL>0.0){
+c=-dot(d,u.way.xy)/dL;
+}
+if(u.way.z>u.view.w){
+a*=clamp((c - u.view.w)/(u.way.z - u.view.w),0.0,1.0);
+}
+else if(c<u.view.w){
+a=0.0;
+}
+}
+}
+var vis=1.0;
+let hasShadows=u.cookie_info.z>0.5;
+let edgeCount=u32(u.cookie_info.y);
+if(hasShadows&&edgeCount>0u&&a>0.0){
+let thetaL=select(atan2(u.at.y,u.at.x),atan2(u.at.y - world.y,u.at.x - world.x),isPoint);
+let rx=cos(thetaL);
+let ry=sin(thetaL);
+for(var e=0u;
+e<edgeCount;
+e++){
+let seg=edges[e];
+let ax=seg.x - world.x;
+let ay=seg.y - world.y;
+let ex=seg.z - seg.x;
+let ey=seg.w - seg.y;
+let across=rx*ey - ry*ex;
+if(abs(across)>1e-6){
+let t=(ax*ey - ay*ex)/across;
+let s=(ax*ry - ay*rx)/across;
+if(t>=0.0&&(!isPoint||t<=dL)&&s>=0.0&&s<=1.0){
+vis=0.0;
+break;
+}
+}
+}
+}
+if(vis<=0.0||a<=0.0){
+return vec4f(0.0);
+}
+var cookieMod=vec4f(1.0);
+if(u.cookie_info.x>0.5){
+let delta=world - u.cookie_origin.xy - u.cookie_scale.zw;
+let rx=delta.x*u.cookie_rot.x - delta.y*u.cookie_rot.y;
+let ry=delta.x*u.cookie_rot.y+delta.y*u.cookie_rot.x;
+var uv=vec2f(rx/u.cookie_scale.x+0.5,ry/u.cookie_scale.y+0.5);
+let wrapMode=u32(u.cookie_rot.z);
+var oob=false;
+if(wrapMode==0u){
+if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){
+oob=true;
+}
+}
+else if(wrapMode==1u){
+uv=clamp(uv,vec2f(0.0),vec2f(1.0));
+}
+else if(wrapMode==2u){
+uv=fract(uv);
+}
+else if(wrapMode==3u){
+let m=abs(uv)% vec2f(2.0);
+uv=select(m,vec2f(2.0)- m,m>vec2f(1.0));
+}
+if(oob){
+cookieMod=vec4f(0.0);
+}
+else{
+let dims=vec2i(textureDimensions(cookie_tex));
+let texel=clamp(vec2i(floor(uv*vec2f(dims)+vec2f(${
+COOKIE_TEXEL_BIAS}
+))),vec2i(0),dims - vec2i(1));
+cookieMod=textureLoad(cookie_tex,texel,0);
+}
+}
+let diffuse=max(0.0,dot(n,l));
+let blendMode=u32(u.cookie_rot.w);
+var outCol=vec3f(0.0);
+if(blendMode==1u&&u.cookie_info.x>0.5){
+outCol=u.color.rgb*a*diffuse*vis*cookieMod.a;
+}
+else if(blendMode==2u&&u.cookie_info.x>0.5){
+outCol=cookieMod.rgb*cookieMod.a*a*diffuse*vis*u.cookie_info.w;
+}
+else{
+outCol=u.color.rgb*a*diffuse*vis*cookieMod.rgb*cookieMod.a;
+}
+return vec4f(outCol,0.0);
 }
 `;
 
@@ -481,8 +490,10 @@ export class CookieLighting2D implements EnginePlugin {
   #flatCookie?: GPUTexture;
   #cookieSampler?: GPUSampler;
   #defaultCookieGroup?: GPUBindGroup;
-  #cookieGpuMap = new WeakMap<CookieTexture2D, GPUTexture>();
+  #cookieGpuMap = new Map<CookieTexture2D, GPUTexture>();
   #cookieGroupMap = new WeakMap<CookieTexture2D, GPUBindGroup>();
+  layer: number;
+  #masks = new MaskData();
   #disposed = false;
 
   constructor(options: CookieLighting2DOptions) {
@@ -494,6 +505,7 @@ export class CookieLighting2D implements EnginePlugin {
     this.#order = order;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.ambient = options.ambient ?? '#000000';
+    this.layer = options.layer ?? 0xffffffff;
     const cs = options.cookieScale ?? 64;
     this.cookieScale = Array.isArray(cs) ? [cs[0], cs[1]] : [cs, cs];
     this.cookieWrap = options.cookieWrap ?? 'zero';
@@ -561,6 +573,10 @@ export class CookieLighting2D implements EnginePlugin {
   }
 
   #release(): void {
+    this.#masks.dispose();
+    for (const texture of this.#cookieGpuMap.values()) texture.destroy();
+    this.#cookieGpuMap.clear();
+    this.#cookieGroupMap = new WeakMap();
     this.#uniform?.destroy();
     this.#edgeBuffer?.destroy();
     this.#flat?.destroy();
@@ -580,6 +596,7 @@ export class CookieLighting2D implements EnginePlugin {
     let tex = this.#cookieGpuMap.get(cookie);
     if (!tex) {
       tex = device.createTexture({
+        label: 'lighting2d cookie upload',
         size: [cookie.width, cookie.height, 1],
         format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -605,16 +622,17 @@ export class CookieLighting2D implements EnginePlugin {
       this.#device = device;
     }
     if (!this.#module) {
-      this.#module = device.createShaderModule({ label: 'cookie-lighting2d', code: cookieShader });
+      this.#module = device.createShaderModule({ label: 'cookie-lighting2d', code: maskShader(4) + cookieShader });
       this.#layout = device.createBindGroupLayout({
         entries: [
           {
             binding: 0,
             visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 128 },
+            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 176 },
           },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
           { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+          { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
       });
       this.#cookieLayout = device.createBindGroupLayout({
@@ -696,12 +714,16 @@ export class CookieLighting2D implements EnginePlugin {
       bump = this.#normals && pick(this.#normals),
       camera = this.camera,
       ambient = hexColor(this.ambient),
-      lights = this.lights;
-    if (!ambient || !(camera.zoom > 0) || !Number.isFinite(camera.x) || !Number.isFinite(camera.y)) throw invalid();
+      lights = this.lights.filter((light) => (light.layers & this.layer) !== 0);
+    if (!ambient) throw invalid();
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
-    lights.forEach(checkCookieLight);
+    checkCamera(camera);
+    checkLayer(this.layer);
+    this.lights.forEach(checkCookieLight);
     this.#prepare(device, target.format);
+    this.#masks.upload(device, lights);
+    this.#group = undefined;
 
     const wanted = Math.max(1, lights.length) * FLOATS;
     if (!this.#uniform || this.#values.length < wanted) {
@@ -742,8 +764,9 @@ export class CookieLighting2D implements EnginePlugin {
       this.#group = device.createBindGroup({
         layout: this.#layout!,
         entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 128 } },
+          { binding: 0, resource: { buffer: this.#uniform, size: 176 } },
           { binding: 1, resource: shown.createView() },
+          { binding: 4, resource: { buffer: this.#masks.buffer! } },
           { binding: 2, resource: { buffer: this.#edgeBuffer! } },
         ],
       });
@@ -811,7 +834,9 @@ export class CookieLighting2D implements EnginePlugin {
           l.cookie ? 1 : 0,
           edgeCount,
           l.shadows ? 1 : 0,
-          0,
+          l.intensity,
+          l.x, l.y, 0, 0,
+          ...this.#masks.fields[i],
         ],
         i * FLOATS,
       );

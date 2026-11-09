@@ -1,3 +1,4 @@
+import { frameRegressions } from './frame-regressions.js';
 // The page of browser-check.mjs: each picture is read back and compared with the CPU form, pixel by pixel.
 import { EngineKernel } from '/packages/core/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
@@ -603,6 +604,7 @@ window.check = {
       );
       pass.dispose();
     }
+    await frameRegressions({ instance, engine, texture, read, compare, frame, checks: out.checks, errors, width: WIDTH, height: HEIGHT });
     out.errors = errors.splice(0);
     return out;
   },

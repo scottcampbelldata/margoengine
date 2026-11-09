@@ -31,13 +31,14 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     addLight(options?: HeightLight2DOptions): HeightLight2D;
     removeLight(light: HeightLight2D): boolean;
     setOccluders(occluders: readonly HeightOccluder2D[]): void;
-    render(targetTexture: any, commandEncoder?: any): void;
+    render(targetTexture: GPUTexture | (() => GPUTexture) | undefined, commandEncoder?: GPUCommandEncoder): void;
     dispose(): void;
     [Symbol.dispose](): void;
+    onDeviceRestored(): void;
 }
 
 export interface HeightLighting2DOptions {
-    target?: any;
+    target?: GPUTexture | (() => GPUTexture);
     elevation?: number;
     occluders?: readonly HeightOccluder2D[];
     lights?: readonly HeightLight2D[];

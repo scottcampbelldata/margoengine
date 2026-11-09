@@ -153,9 +153,10 @@ and `createWindowCookie` construct standard patterns. CPU helper `cookieLightAt(
 
 ## 2D global illumination
 
-`@margoengine/lighting2d/gi` computes diffuse bounce light and emissive sprite illumination using 2D radiance cascades.
-The spatial and angular domain is partitioned into cascades that decouple interval distance from angular resolution,
-merging radiance from higher cascades to evaluate diffuse indirect bounce illumination from occluder surfaces.
+The `@margoengine/lighting2d/gi` prototype has unresolved correctness defects. It is not a validated spatial radiance-cascade
+implementation. Multi-bounce transport, interval merging, visibility, light packing and camera alignment remain under repair;
+see [the lighting2d findings](../../docs/known-bugs.md#lighting2d-batch-55-gi-review). CPU/GPU agreement in the original scene
+is not proof of physical correctness. The example below demonstrates the current API only.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -185,7 +186,8 @@ gi.emitters[0] = {x: 41, y: 30, radius: 12, color: '#ffd9a0', intensity: 2};
 
 `@margoengine/lighting2d/height` casts perspective height shadows and self-shadows for top-down and isometric games.
 Sprites and structures have vertical height (z-axis extrusion) and elevation; light rays from point, spot and directional
-lights cast geometric shadows onto ground planes and lower receivers, and self-shadow vertical faces and lower structures.
+lights cast geometric shadows onto flat ground planes and lower receivers. Each GPU pass shades a flat +z-facing receiver
+at one elevation; arbitrary vertical-face normals are supported only by the CPU helper.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -215,7 +217,9 @@ and `heightLightAt(light, occluders, x, y, receiverElevation, normal)` evaluate 
 ## Emissive sprites and bloom hookup
 
 `@margoengine/lighting2d/emissive` adds glowing emissive sprites that emit light into the scene with falloff, and isolates
-HDR light above a bloom threshold for connection to bloom passes (such as `@margoengine/post/bloom`) or integrated 2D bloom glow.
+linear HDR emission and local threshold extraction in separate owned `rgba16float` textures. The pass clears and replaces
+its target every frame. `emissiveTexture` contains emission plus the local glow; `bloomTexture` contains the local threshold
+contribution alone. Neither texture aliases the caller's target. These textures are replaced on resize or restoration.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -239,8 +243,28 @@ engine.render({delta: 1 / 60});
 orb.x += 1;
 ```
 
-`connectBloom(bloomPass)` wires `emissive.emissiveTexture` into an external bloom pass. `emissiveLightAt(sprite, x, y)`
-evaluates emitted light and bloom glow in Node.
+`connectBloom(() => new Bloom(options))` owns an unattached image effect from `@margoengine/post/bloom`, dispatches
+its real `encodeImage` API on the isolated HDR emission, and presents the filtered HDR result to the target. Its factory is
+called again after device restoration; the pass disposes the old effect. An attached Bloom or a `setInput` mock is not a
+supported adapter. Set `bloom: false` to use only the external spatial blur, without the local glow contribution.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {EmissiveLighting2D} from 'margoengine/lighting2d/emissive';
+import {Bloom} from 'margoengine/post/bloom';
+const engine = await EngineKernel.create(document.querySelector('canvas')!, {backend: 'webgpu', exactSize: [320, 180]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 2}});
+const shade = compositor.addLayer({blend: 'add'});
+const emission = EmissiveLighting2D.attach(engine, {target: shade.target, camera: shade.camera, bloom: false});
+emission.addSprite({x: 80, y: 45, radius: 3, glowRadius: 0, intensity: 3});
+emission.connectBloom(() => new Bloom({threshold: 0.8, strength: 0.8}));
+engine.render({delta: 0});
+```
+
+`emissiveLightAt(sprite, x, y, layerMask, bloomIntensity, bloomThreshold)` evaluates direct emission and local glow in Node.
+The effective local threshold is the larger of the sprite threshold and global threshold (default 0.8 for each).
+The local glow is an analytic intensity term, not a spatial convolution; the optional Bloom adapter supplies spatial filtering.
 
 ## CPU forms
 
@@ -248,3 +272,22 @@ evaluates emitted light and bloom glow in Node.
 `inShadow(light, edges, x, y)` the shadow test. They run in Node, for tools and tests.
 
 Trademark notice: names of other tools belong to their owners.
+
+## Lifetime and scene limits
+
+All entries are WebGPU-only and reject native WebGL2 with `code: 'unsupported'` and a help link. Each entry owns its GPU
+resources, rebuilds them after device restoration or target format changes, unregisters on disposal, and allows a new pass
+with the same name to attach. Submit a manually supplied command encoder before disposing its pass.
+
+The direct-light entries (root, soft, cookie and height) share rect, circle and polygon masks, including inversion and
+pass/light layer filtering. An omitted circle-mask centre is world `(0, 0)`. Mask points are uploaded every frame so mutable
+polygons take effect immediately. Polygon storage is bounded by the device's `maxStorageBufferBindingSize` (16 bytes per
+point). Height occluders cost 48 bytes each, emissive sprites 64 bytes each, bounded by the same limit; neither silently drops
+items beyond 64. Height uniforms cost at least 256 bytes per light, bounded by `maxBufferSize`. Excess storage throws before
+a draw. Soft sample counts must be integers in `[1, 64]`. Camera coordinates and zoom must be finite, with zoom above zero.
+
+Height and emissive targets contain the current frame only, including when all lights/sprites are removed. Compose separate
+lighting targets with pixel layers when combining passes. The regression suite includes native WebGL2 refusals, distinct
+height light uniforms, floating volumes, lights below the receiver, 65-item scenes, frame ordering, repeated frames, target
+format changes, name reuse, HDR extraction, the actual Bloom image adapter and device restoration. GI remains the exception
+to the physical-correctness claims above until its known defects are resolved.

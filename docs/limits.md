@@ -925,15 +925,21 @@ Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio time
 
 ## 2D global illumination (batch 55)
 
-Optional `@margoengine/lighting2d/gi` adds 2D global illumination with radiance cascades for multi-bounce bounce lighting and emissive sprites. Angular directions and ray intervals partition ray marching across cascades; emissive sprites and occluder edges cast light and block rays. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-599.
+The `@margoengine/lighting2d/gi` prototype is not a validated spatial radiance-cascade or multi-bounce implementation.
+LIM-599 is withdrawn pending the seven GI correctness fixes in [known bugs](known-bugs.md#lighting2d-batch-55-gi-review).
+The accepted options allow cascades 1..8, base rays 1..32, angular ratio 1..8 and bounces 0..4, but the current code only
+traces three nested ray levels and treats positive bounce counts identically. These API ceilings are not working-feature claims.
 
 ## 2.5D height and self-shadowing (batch 55)
 
-Optional `@margoengine/lighting2d/height` casts perspective and directional height shadows and self-shadows based on vertical extrusion and elevation for top-down games. Ray-interval clipping along height spans projects shadows on the ground and lower receivers, and self-shadows vertical walls and lower surfaces. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-600.
+Optional `@margoengine/lighting2d/height` casts perspective and directional height shadows and self-shadows based on vertical extrusion and elevation for top-down games. Ray-interval clipping along height spans projects shadows on the ground and lower receivers, and self-shadows flat +z-facing receivers at one elevation per pass. The CPU helper additionally accepts a normal; the GPU height pass has no normal-map input. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-600.
 
 ## Emissive sprites and bloom hookup (batch 55)
 
-Optional `@margoengine/lighting2d/emissive` adds glowing emissive sprites with distance falloff and bloom threshold extraction. Emissive sprites emit light directly into the 2D lighting target and isolate HDR light above a luminance threshold for external bloom passes (`connectBloom`) or integrated 2D bloom glow. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-601.
+Optional `@margoengine/lighting2d/emissive` adds glowing emissive sprites with distance falloff and bloom threshold extraction. The pass owns separate `rgba16float` emission and local extraction textures and replaces its target each frame.
+The local threshold is `max(sprite.bloomThreshold, pass.bloomThreshold)`, default 0.8 for both; intensity/strength defaults
+are 1. An unattached image effect factory (`connectBloom(() => new Bloom(options))`) is recreated after device restoration
+and dispatched with the actual `encodeImage` API. The local analytic glow is not a blur; spatial convolution comes from Bloom. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-601.
 
 ## Audio occlusion and obstruction (batch 110)
 
@@ -1075,3 +1081,22 @@ while the GPU reproduction requires those outside files. No speed or bundle-size
 ## Wasm Content Security Policy
 
 A policy that restricts scripts must permit Wasm compilation with `script-src 'wasm-unsafe-eval'` for each Wasm-backed path, including core engine creation and stages. Worker response policies need the permission too. [CSP requirements](csp.md) list the exact header and entries. Blocked initialization reports MargoError code `failed` with a help link; unrelated binary, SIMD and fetch errors retain their identity.
+
+### Lighting2d direct-pass storage and lifetime ceilings
+
+- Rect, circle and polygon masks (including inversion) and layer filtering run on root, soft, cookie and height.
+  Circle centres default to world `(0,0)`. Polygon vertices cost 16 bytes each and must fit `maxStorageBufferBindingSize`.
+- Height occluders cost 48 bytes each; emissive sprites cost 64 bytes each. Both lists grow to the device storage binding
+  limit; the former 64-item truncation is removed. Oversized lists throw before drawing.
+- Height light uniforms cost `max(256, minUniformBufferOffsetAlignment)` bytes each, capped by `maxBufferSize`.
+  Soft samples are integers 1..64. Cameras require finite values and positive zoom. Mutated lights/sprites are validated.
+- Height directional shadow rays are capped at 10,000 world units; elevation for shadow projection clamps to
+  `[0.01, PI/2 - 0.01]` radians. Circle footprints are analytic here; ordinary direct shadows use 24-sided circle edges.
+- Emissive owns three full-resolution `rgba16float` textures, 24 bytes/pixel, plus caller output and any optional Bloom
+  intermediates. HDR values may overflow half precision above 65,504; an unorm presentation clips above 1.
+- Native WebGL2 is unsupported by every lighting2d entry. Tests assert the coded rejection rather than a rendered route.
+  GPU evidence is one RTX A6000 only. Manually supplied command encoders must be submitted before pass disposal.
+
+Lighting2d repair candidate entry bytes (min+gzip, other packages external): root 5,421; soft 5,926; cookie 7,374;
+gi 6,687; height 6,698; emissive 4,198. These are unlanded measurements, not an accepted increase of the existing optional
+entry budgets. Core plus stage remains 23,626 B. See the batch-55 repair record and known bugs for remaining blockers.

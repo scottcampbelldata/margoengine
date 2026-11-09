@@ -1630,3 +1630,15 @@ improvements have been implemented:
 
 The picture residual has not been attributed to one of those effects by a controlled ablation. The
 frozen measured budget records the loss and does not excuse it or prove physical equivalence.
+
+### Lighting2d review repair provenance
+
+The height volume fix uses intersection of the ray's entire height range with the solid's base/top range. The shared mask
+shader uses the same even/odd crossing inequality as the independent CPU predicate. No engine/library source was read or
+copied. Emission threshold images use analytic sprite distance and HDR textures; spatial filtering reuses Margo's existing
+Bloom image API (Jimenez, SIGGRAPH 2014, as cited in the post package).
+
+GI acceptance must follow the mathematical descriptions in [Sannikov's Radiance Cascades paper](https://github.com/Raikiri/RadianceCascadesPaper/blob/main/RadianceCascades.tex),
+including spatial probes and radiance/transmittance interval composition, and [Osborne and Sannikov, RASTI](https://doi.org/10.1093/rasti/rzae062),
+sections 2.2.1 and 2.3, including the bilinear fix for ringing. Only these papers were consulted during this repair;
+the existing GI implementation is not yet certified against them. No third-party engine files or assets were imported.

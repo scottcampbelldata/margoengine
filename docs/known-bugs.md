@@ -65,6 +65,56 @@ README still expected a phone DPR cap of 2. The demo now uses the returned tier 
 documents DPR 1. `scripts/modern-grass-tests.js` asserts the exact phone label and exact DPR 1 on an actual
 mobile browser context; the existing pixel, interaction, device restoration and teardown checks remain.
 
+### Lighting2d repair candidate byte budgets
+
+The unlanded direct-light repair measures root/soft/cookie/height/emissive at 5,421/5,926/7,374/6,698/4,198 B min+gzip,
+above their unchanged 5,152/5,605/7,079/6,323/3,780 B budgets. The verify run fails only quality sizes at this checkpoint.
+Cause: shared GPU mask data, validation, resource lifetime keys and actual HDR extraction/adapter code add required work
+that the old broken implementations omitted. Reduce emitted bytes without dropping work or weakening tests before landing.
+The GI candidate remains within its existing 6,941 B budget (6,687 B measured). No optional budget was raised.
+
+### Height lights round away individually dim contributions on unorm targets
+
+Found while checking the F1 repair. On an 8x8 rgba8unorm target, add 100 directional height lights with elevation PI/2
+and intensity .001, no occluders. CPU sum is .10000000000000007 (25.5 byte levels); real RTX A6000 GPU readback is
+[0,0,0,255], with no validation error. Repro: construct that scene in HeightLighting2D and read its first pixel after render.
+Cause: each light additively blends into the caller's unorm texture, rounding to zero separately. The uniform-slice repair
+fixes F1 but cannot fix this separate precision loss. Requires an owned HDR accumulation texture and a single presentation,
+plus a regression for many individually sub-byte lights. It is a release blocker, not an accepted difference. Local probe:
+`test-results/lighting2d-height-dim-probe.mjs` in lane C; its log records the values.
+
+### Lighting2d batch 55 GI review
+
+The direct-light and emissive repairs are in progress in lane C. GI still requires a spatial-probe hierarchy rewrite;
+its former multi-bounce/radiance-cascade claim is withdrawn. These are correctness defects, not accepted limits, and
+must be fixed and proved before release. Review repros use `RadianceCascade2D.evaluateAt` and the GI browser pass:
+
+- **F3, storage layout:** point light `(20,0)`, radius 64, red; reflecting wall `x=-10`; query `(-.5,-.5)`.
+  CPU red is about .0449005 but GPU is zero. WGSL vec3 alignment puts colour at byte 16 and stride 64;
+  the uploader puts colour at byte 8 and stride 48. Requires matching layout plus multiple differently coloured lights.
+- **F4, wall leak:** query `(0,0)`, wall `x=5, y=-100..100`, emitter `(30,30)`, radius 2;
+  cascades 2, baseRays 1, baseDistance 16, bounces 0 returns .25 across an opaque wall. Parent and child rays have
+  different directions and child nearer intervals are not checked. Requires transmittance-carrying compatible interval merges.
+- **F5, reflected visibility:** seal a radius-.1 emitter at `(20,0)` in a 2x2 box, reflector `x=-10`, query `(0,0)`;
+  cascades 1, baseRays 1, baseDistance 100. Enabling bounce creates .0821445/channel. Direct irradiation at reflecting
+  edges has no shadow visibility test. A sealed emitter must contribute exactly zero at every bounce count.
+- **F6, cascade and bounce counts:** emitter 500 units along PI/4 is invisible at cascade counts 4 and 8,
+  baseDistance 16, intervalRatio 4, although a 1024-unit ray sees .25. Bounce counts 1, 2 and 4 are identical in F5.
+  The implementation hard-codes three ray-fan levels and treats bounce count as a boolean; there is no reusable spatial
+  probe hierarchy or iterative bounce propagation. Requires the Sannikov and Osborne/Sannikov algorithms and ringing proof.
+- **F7, emitter transmission:** a white radius-1000 emitter centred on the query returns 1, 2, 3 for cascades 1, 2, 3.
+  Emitter intersections add emission but never terminate transmission, so the same source is counted in each interval.
+- **F12, camera convention:** on a 16x16 target, camera `(0,0,1)` places a world emitter `(0,0)` at the centre.
+  The GI shader subtracts half the viewport; pixel/sprite cameras instead specify the top-left world coordinate.
+- **F24, direct light semantics:** spot `(20,0)`, angle 0, cone .1, reflector `x=-10`, query `(0,0)`, one PI ray
+  returns .0449178, although the spot faces away. GI treats every light as a point, ignoring kind, cone, angle,
+  elevation, masks and shadow settings. Directional lights are incorrectly range-limited.
+
+No scalar tolerance increase or shared CPU/GPU approximation closes these items. The existing GI test is only a
+cross-implementation comparison for one scene and must be supplemented by independent physical assertions and lifecycle
+coverage before its claim is restored.
+
+
 ### Two identical runs of GlassVaseFlowers can differ on a few pixels
 
 - **What:** the same model, camera and sorted path, built twice in one page, differed on fewer than 8 of 147,456 pixels

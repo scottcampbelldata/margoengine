@@ -1,4 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MaskData, maskShader } from './masks.js';
+import { checkLight, checkCamera, checkLayer } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -118,36 +120,6 @@ export class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
 
 const invalid = () => rangeError('Invalid light value', 'pixel-lighting');
 
-function checkMask(m: LightMask2D): boolean {
-  if (m.kind === 'rect') {
-    return [m.minX, m.minY, m.maxX, m.maxY].every(Number.isFinite) && m.minX <= m.maxX && m.minY <= m.maxY;
-  } else if (m.kind === 'circle') {
-    return Number.isFinite(m.radius) && m.radius >= 0 && (!m.center || m.center.every(Number.isFinite));
-  } else if (m.kind === 'polygon') {
-    return Array.isArray(m.points) && m.points.length >= 3 && m.points.every((p) => p.every(Number.isFinite));
-  }
-  return false;
-}
-
-function checkLight(l: Light2D): void {
-  const good =
-    (l.kind === 'point' || l.kind === 'spot' || l.kind === 'directional') &&
-    [l.x, l.y, l.angle, l.elevation].every(Number.isFinite) &&
-    l.intensity >= 0 &&
-    l.radius > 0 &&
-    l.falloff > 0 &&
-    l.height >= 0 &&
-    l.cone > 0 &&
-    l.softness >= 0 &&
-    l.softness <= 1 &&
-    [l.intensity, l.radius, l.falloff, l.height, l.cone].every(Number.isFinite) &&
-    Number.isInteger(l.layers) &&
-    l.layers >= 0 &&
-    (!l.mask || checkMask(l.mask)) &&
-    !!hexColor(l.color);
-  if (!good) throw invalid();
-}
-
 /** Where a directional light comes from, as a unit vector. */
 const towards = (l: Light2D): [number, number, number] => [
   -Math.cos(l.angle) * Math.cos(l.elevation),
@@ -167,6 +139,7 @@ export function lightAt(
   normal: readonly number[] = [0, 0, 1],
   layer?: number,
 ): number[] {
+  checkLight(light);
   if (layer !== undefined && (light.layers & layer) === 0) return [0, 0, 0];
   if (light.mask && !inLightMask(light.mask, x, y)) return [0, 0, 0];
   const size = Math.hypot(normal[0], normal[1], normal[2]),
@@ -283,15 +256,7 @@ return vec4f(clip(p*u.at.w-u.at.xy),0,0);
 @fragment fn show(@builtin(position) f:vec4f)->@location(0) vec4f{let p=vec2i(f.xy);return vec4f(textureLoad(sum,p,0,0).rgb+textureLoad(sum,p,1,0).rgb+textureLoad(sum,p,2,0).rgb+textureLoad(sum,p,3,0).rgb,1);}
 @fragment fn lit(@builtin(position) f:vec4f)->@location(0) vec4f{
 let world=u.view.xy+f.xy/u.view.z;
-if(u.mask_info.x>0.5){
-let mt=u32(u.mask_info.x);
-let inv=u.mask_info.y>0.5;
-var ins=true;
-if(mt==1u){ins=world.x>=u.mask_bounds.x&&world.x<=u.mask_bounds.z&&world.y>=u.mask_bounds.y&&world.y<=u.mask_bounds.w;}
-else if(mt==2u){let d=world-u.mask_bounds.xy;ins=dot(d,d)<=u.mask_bounds.w;}
-if(inv){ins=!ins;}
-if(!ins){return vec4f(0);}
-}
+if(!maskVisible(world,u.mask_bounds,u.mask_info)){return vec4f(0);}
 var n=vec3f(0,0,1);
 if(u.size.z>0){
 let s=textureLoad(bumps,vec2i(f.xy),0);
@@ -394,6 +359,7 @@ export class Lighting2D implements EnginePlugin {
   #flat?: GPUTexture;
   #group?: GPUBindGroup;
   #groupBump?: GPUTexture;
+  #masks = new MaskData();
   #disposed = false;
 
   constructor(options: Lighting2DOptions) {
@@ -459,6 +425,7 @@ export class Lighting2D implements EnginePlugin {
   }
 
   #release(): void {
+    this.#masks.dispose();
     this.#uniform?.destroy();
     this.#edgeBuffer?.destroy();
     this.#stencil?.destroy();
@@ -477,7 +444,7 @@ export class Lighting2D implements EnginePlugin {
       this.#device = device;
     }
     if (!this.#module) {
-      this.#module = device.createShaderModule({ label: 'lighting2d', code: shader });
+      this.#module = device.createShaderModule({ label: 'lighting2d', code: maskShader(3) + shader });
       this.#layout = device.createBindGroupLayout({
         entries: [
           {
@@ -486,6 +453,7 @@ export class Lighting2D implements EnginePlugin {
             buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 112 },
           },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+          { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
       });
       this.#pipelines = device.createPipelineLayout({ bindGroupLayouts: [this.#layout] });
@@ -561,12 +529,16 @@ export class Lighting2D implements EnginePlugin {
       camera = this.camera,
       ambient = hexColor(this.ambient),
       lights = this.lights;
-    if (!ambient || !(camera.zoom > 0) || !Number.isFinite(camera.x) || !Number.isFinite(camera.y)) throw invalid();
+    checkCamera(camera);
+    checkLayer(this.layer);
+    if (!ambient) throw invalid();
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
     lights.forEach(checkLight);
     this.#prepare(device, target.format);
     const activeLights = lights.filter((l) => (l.layers & this.layer) !== 0);
+    this.#masks.upload(device, activeLights);
+    this.#group = undefined;
     const wanted = Math.max(1, activeLights.length) * FLOATS;
     if (!this.#uniform || this.#values.length < wanted) {
       this.#uniform?.destroy();
@@ -585,6 +557,7 @@ export class Lighting2D implements EnginePlugin {
         entries: [
           { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
           { binding: 1, resource: shown.createView() },
+          { binding: 3, resource: { buffer: this.#masks.buffer! } },
         ],
       });
       this.#groupBump = shown;
@@ -635,21 +608,6 @@ export class Lighting2D implements EnginePlugin {
       const rgb = hexColor(l.color)!,
         far = l.kind === 'directional',
         from = far ? towards(l) : [l.x, l.y, l.height];
-      let maskType = 0,
-        maskBounds = [0, 0, 0, 0],
-        invert = 0;
-      if (l.mask) {
-        invert = l.mask.invert ? 1 : 0;
-        if (l.mask.kind === 'rect') {
-          maskType = 1;
-          maskBounds = [l.mask.minX, l.mask.minY, l.mask.maxX, l.mask.maxY];
-        } else if (l.mask.kind === 'circle') {
-          maskType = 2;
-          const cx = l.mask.center ? l.mask.center[0] : l.x,
-            cy = l.mask.center ? l.mask.center[1] : l.y;
-          maskBounds = [cx, cy, l.mask.radius, l.mask.radius * l.mask.radius];
-        }
-      }
       values.set(
         [
           camera.x,
@@ -672,14 +630,7 @@ export class Lighting2D implements EnginePlugin {
           rgb[1] * l.intensity,
           rgb[2] * l.intensity,
           l.radius,
-          maskBounds[0],
-          maskBounds[1],
-          maskBounds[2],
-          maskBounds[3],
-          maskType,
-          invert,
-          0,
-          0,
+          ...this.#masks.fields[i],
         ],
         i * FLOATS,
       );
