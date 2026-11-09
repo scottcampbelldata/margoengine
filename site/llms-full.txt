@@ -3508,6 +3508,14 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+### Fixed 2026-11-08: text extrusion API report
+
+The batch 110 baseline `npm run verify` found that the text extrusion repair changed
+`classifyLoops` to accept readonly loop arrays while its committed API snapshot still
+required mutable arrays. Regenerated `api/text.extrude.api.md` from the built declaration;
+`npm run api:check` checks the snapshot against the public declaration without changing it.
+The runtime and the accepted inputs are unchanged by this documentation repair.
+
 ## Own 2D physics acceptance gaps
 
 The contact support-ceiling defect is fixed by the sustained-support correction below under Fixed 2026-11-08.

@@ -25,3 +25,8 @@ test('a scoped entry check of core/extension matches the committed full report',
   const result = run('--package=core', '--entry=./extension');
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
+
+test('text/extrude report matches its public readonly loop contract', () => {
+  const result = run('--package=text', '--entry=./extrude');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
