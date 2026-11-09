@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Ground backdrop composition</title>
+<style>body{margin:0}canvas{width:400px;height:300px;display:block}</style></head><body><canvas></canvas>
+<script type="module">
+import {Engine, PbrMaterial, box} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {GroundProjectedBackground} from '/packages/environment/dist/ground.js';
+import {ContactShadows} from '/packages/staging/dist/index.js';
+const engine = await Engine.create(document.querySelector('canvas'), {
+  backend: 'webgpu', camera: {position: [0, 2.5, 5], target: [0, 0.4, 0]},
+});
+const lighting = await EnvironmentLighting.load(engine,
+  '/packages/environment/tests/fixtures/BrightRings.exr', {size: 32, samples: 32});
+const ground = GroundProjectedBackground.attach(engine, lighting.environment,
+  {height: 1.6, radius: 20, order: 0.25});
+const model = engine.createMesh().setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({color: '#a08050'})).setPosition([0, 0.5, 0]);
+const contact = ContactShadows.attach(engine, {size: 4, height: 2, blur: 0.15, resolution: 256});
+const remove = contact.add(model);
+const errors = [];
+engine.onError = error => errors.push(error.message);
+const watch = () => engine.gpu.addEventListener('uncapturederror', e => errors.push(e.error.message));
+watch();
+window.check = {
+  async render(opacity) {
+    contact.options.opacity = opacity;
+    engine.gpu.pushErrorScope('validation');
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    const error = await engine.gpu.popErrorScope();
+    if (error) errors.push(error.message);
+    return errors;
+  },
+  points() {
+    const m = engine.camera.matrix;
+    const at = p => {
+      const c = [0,1,2,3].map(r => m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);
+      return [Math.round((1+c[0]/c[3])*200), Math.round((1-c[1]/c[3])*150)];
+    };
+    return {contact: at([0,0,0.56]), product: at([0,1,0]), outside: at([2.5,0,1])};
+  },
+  remove() { remove(); remove(); },
+  async restore() {
+    const device = engine.gpu;
+    device.destroy();
+    await device.lost;
+    await engineRuntime(engine).rebootDevice();
+    watch();
+    return engine.gpu !== device;
+  },
+  restored() { return lighting.environment.device === engine.gpu; },
+  dispose() { contact.dispose(); ground.dispose(); engine.dispose(); return errors; },
+};
+window.ready = true;
+</script></body></html>

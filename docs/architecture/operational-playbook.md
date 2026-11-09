@@ -2260,3 +2260,13 @@ The optional mask entry appends one owned RGBA8 texture binding through the tran
 ### Transitions scene disposal: section 5 evidence (batch 76 continuation)
 
 Owner lookup through the existing extension sceneOf API removes the owning registration before releasing GPU resources. Unit regression preserves a default-scene effect while disposing a second scene; real WebGPU proof renders both afterward. The shared GPU test engine now models sceneOf identity lookup, so default-scene lifecycle tests exercise this contract too. No core or stage change.
+
+### Ground backdrop composition: section 5 evidence (batch 56, job 1)
+
+No renderer or optional entry is rebuilt: environment/ground already supplies the projected HDR floor,
+and staging already supplies the contact catcher. Their composition needs background order 0.25 before
+contact order 0.5. staging/test/ground-browser.mjs uses the licensed OpenEXR BrightRings image and a
+generated box: on/off contact pixels, unchanged product/outside pixels, caster removal, disposal and
+actual device replacement pass on WebGPU and the WebGL2 compatibility layer. Native WebGL2 remains
+unsupported. The photo's lighting is not reconstructed by the contact cue; the existing physical-picture
+loss remains open. No new core, stage, CPU geometry loop or shader is introduced.

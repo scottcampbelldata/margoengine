@@ -1734,3 +1734,11 @@ Generated grid proofs do not establish gameplay quality, 3D geometry or navigati
 During rebase, prepending the dungeon asset ahead of another package split the procedural asset group.
 The size page groups each package once, so registry order and rendered order differed. Dungeon and Poisson
 records now stay adjacent; the unchanged lazy-row assertions in `tests/sizes-page.test.js` catch this class.
+
+### Batch 56 ground composition audit
+
+Job 1 reuses the existing projection and catcher with background order 0.25. No new defect was found
+in the composition tests on WebGPU or the WebGL2 compatibility layer, including actual device
+replacement. The uniform-blur catcher's physical-picture loss recorded under batch 168 remains open;
+this audit does not infer HDR light directions or claim that loss is fixed. Native WebGL2 and Y-up
+scope remain explicit limits. The generated box is a stand-in.

@@ -1767,3 +1767,13 @@ direct row/segment rasterization. The connectivity argument is induction over th
 leaf is connected; an orthogonal path between child room centres joins two connected child layouts.
 No implementation or source repository linked by these papers was opened. Tests generate stand-in maps;
 the independent oracle checks whole-grid geometric membership, not the production rasterization loops.
+
+## Batch 56 job 1: ground backdrop reuse
+
+The all-package search found environment/ground and staging's ContactShadows, so neither is rebuilt.
+The composition test and example are Margo-authored. Research consulted before the audit:
+- Paul Debevec, [Rendering Synthetic Objects into Real Scenes](https://www.pauldebevec.com/Research/IBL/debevec-siggraph98.pdf), 1998: local receiving surfaces and differential compositing; the current contact cue does not implement the full illumination solution.
+- Cook, Porter and Carpenter, [Distributed Ray Tracing](https://www.cs.cmu.edu/~462/www/lectures/cook84.pdf), 1984: distributed visibility and physical penumbrae, distinguishing the existing fixed-blur contact cue from light sampling.
+- Steve Marschner, [Soft shadows](https://www.cs.cornell.edu/courses/cs569/2008sp/notes/09softshad-notes.pdf), 2008: planar shadow textures and accumulated light samples; informs the next job, not a claim about this composition.
+Only papers and existing Margo code were read. No other renderer or library implementation was opened.
+BrightRings is an already recorded standard test image; no third-party implementation files are introduced.

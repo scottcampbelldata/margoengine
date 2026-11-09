@@ -1,0 +1,15 @@
+{
+  "batch": 56,
+  "job": 1,
+  "status": "SKIPPED",
+  "reason": "GroundProjectedBackground and ContactShadows already implement the projected floor and contact cue; no duplicate entry added.",
+  "test": "packages/staging/test/ground-browser.mjs",
+  "fixture": "packages/environment/tests/fixtures/BrightRings.exr",
+  "fixtureSource": "OpenEXR test images, already licensed in THIRD-PARTY-NOTICES.md",
+  "product": "Generated box stand-in",
+  "runs": [
+    {"backend": "WebGPU", "off": [181, 181, 181], "on": [159, 159, 159], "checks": 7, "passed": true},
+    {"backend": "WebGL2 compatibility layer", "off": [181, 181, 181], "on": [159, 159, 159], "checks": 7, "passed": true}
+  ],
+  "scope": "Composition, occlusion, caster removal, disposal and actual device replacement. No physical HDR-shadow or performance claim."
+}

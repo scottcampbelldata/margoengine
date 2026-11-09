@@ -63,3 +63,35 @@ The default effect is compared with 4096 cosine rays per exposed-ground pixel ar
 hemispherical lighting. Independent projected-solid-angle tests validate the ray tracer. Normalized darkness
 MAE is 0.048174; the local contact cue differs from broad physical occlusion. This remains an open picture
 loss. [Scene, metrics and scope](../../docs/whitepaper/perf-vs-rivals.md).
+
+## A product on the HDR floor
+
+Ground projection already lives in `@margoengine/environment/ground`. Combine it with this package's
+shadow catcher. Draw the background at order `0.25`, before the contact plane at `0.5`, so the background
+does not paint over the shadow:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {EnvironmentLighting} from 'margoengine/environment';
+import {GroundProjectedBackground} from 'margoengine/environment/ground';
+import {ContactShadows} from 'margoengine/staging';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 2, 4], target: [0, 0.5, 0]},
+});
+const light = await EnvironmentLighting.load(engine, '/garage.hdr', {signal: AbortSignal.timeout(30_000)});
+GroundProjectedBackground.attach(engine, light.environment, {height: 1.6, radius: 20, order: 0.25});
+const product = engine.createMesh().setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({color: '#8090a0'})).setPosition([0, 0.5, 0]);
+const shadow = ContactShadows.attach(engine, {size: 4, height: 2, blur: 0.12});
+shadow.add(product);
+engine.start();
+// Later: engine.dispose() releases the lighting, backdrop and shadow.
+```
+
+Keep the catcher position at the background's `center` (both default to the origin). This is a contact
+cue over the photographed floor; it does not infer light directions or reproduce the HDR's physical
+shadows. The existing Y-up and native WebGL2 limitations above apply. `test/ground-browser.mjs` compares
+on/off pixels using the licensed OpenEXR BrightRings image, checks the model remains visible, removes
+the caster and replaces a real device. Run it with `--compat` for the WebGL2 compatibility layer;
+that path passes the same assertions. The native WebGL2 engine remains unsupported. The box is a
+generated stand-in, not a photographed product.

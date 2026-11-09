@@ -1358,3 +1358,13 @@ assets. E57 uses an outside CC0 authored two-station room with 108,000 points, n
 reference geometry. The selected aliases prove API execution only. The 45/47 scoped run
 retains two existing failures; 64 exceptions remain repository-wide. No image-quality,
 sensor-accuracy, speed or wider-format claim follows from these three passes.
+
+### Ground backdrop with a contact cue (batch 56, job 1 reuse)
+
+Use existing environment/ground at order 0.25 and ContactShadows at 0.5. Both planes are Y-up, centred
+at the same world position; the projection's flat floor and dome limitations and the catcher's uniform
+blur remain. The contact cue is not an HDR-derived physical shadow. Composition pixels, removal,
+disposal and actual device replacement are tested on WebGPU and the WebGL2 compatibility layer;
+the native WebGL2 engine remains unsupported. No staging/ground alias or new runtime bytes are added.
+The fixture is a licensed real EXR image, the product a generated box stand-in; no photographic-product
+quality or performance claim. Existing root staging size and core plus stage size are unchanged.

@@ -3946,6 +3946,16 @@ reference geometry. The selected aliases prove API execution only. The 45/47 sco
 retains two existing failures; 64 exceptions remain repository-wide. No image-quality,
 sensor-accuracy, speed or wider-format claim follows from these three passes.
 
+### Ground backdrop with a contact cue (batch 56, job 1 reuse)
+
+Use existing environment/ground at order 0.25 and ContactShadows at 0.5. Both planes are Y-up, centred
+at the same world position; the projection's flat floor and dome limitations and the catcher's uniform
+blur remain. The contact cue is not an HDR-derived physical shadow. Composition pixels, removal,
+disposal and actual device replacement are tested on WebGPU and the WebGL2 compatibility layer;
+the native WebGL2 engine remains unsupported. No staging/ground alias or new runtime bytes are added.
+The fixture is a licensed real EXR image, the product a generated box stand-in; no photographic-product
+quality or performance claim. Existing root staging size and core plus stage size are unchanged.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5684,6 +5694,14 @@ Generated grid proofs do not establish gameplay quality, 3D geometry or navigati
 During rebase, prepending the dungeon asset ahead of another package split the procedural asset group.
 The size page groups each package once, so registry order and rendered order differed. Dungeon and Poisson
 records now stay adjacent; the unchanged lazy-row assertions in `tests/sizes-page.test.js` catch this class.
+
+### Batch 56 ground composition audit
+
+Job 1 reuses the existing projection and catcher with background order 0.25. No new defect was found
+in the composition tests on WebGPU or the WebGL2 compatibility layer, including actual device
+replacement. The uniform-blur catcher's physical-picture loss recorded under batch 168 remains open;
+this audit does not infer HDR light directions or claim that loss is fixed. Native WebGL2 and Y-up
+scope remain explicit limits. The generated box is a stand-in.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

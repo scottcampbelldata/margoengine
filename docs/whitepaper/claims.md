@@ -1367,3 +1367,14 @@ licensed standard files. The outside CC0 room contains two 54,000-point scans. T
 run passes 45/47 examples with two existing failures, so it proves only these three formerly
 missing-input examples, not all README examples, survey accuracy or rendered-image quality.
 Evidence: [readme-missing-inputs-20261109.json](results/readme-missing-inputs-20261109.json).
+
+## Batch 56 job 1: existing ground backdrop composition
+
+SKIPPED implementation: environment/ground already projects the HDR floor; staging's ContactShadows
+already overlays a contact cue. The new staging README composes them with background order 0.25.
+[The GPU evidence](results/batch-56-ground.json) records the same on/off contact pixels, unchanged
+product/outside pixels, removal, disposal and actual replacement-device assertions on native WebGPU
+and WebGL2 through the compatibility layer. The image is the licensed OpenEXR BrightRings file and
+the box is a generated stand-in. This establishes composition only, not HDR-derived physical shadows,
+photographed-product quality, any-up-axis support or measured performance. Existing LIM-498 projection
+evidence and the batch 168 physical contact-shadow loss remain unchanged.

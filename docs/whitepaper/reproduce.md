@@ -813,3 +813,13 @@ after npm run build:packages. The two KTX2 aliases use the existing 2D and cube 
 fixtures; /scans/plant-room.e57 serves the complete outside CC0 two-station room, not a
 plant survey. Source/hash/size live in scripts/fetch-readme-assets.mjs; bytes stay in the
 shared README cache. The recorded result is 45/47, two retained other-cause failures.
+
+### Batch 56 job 1: projected HDR floor and contact composition
+
+After building packages, run
+`node scripts/gpu-lock.mjs run --owner=codex-56 --max=5 --wait-max=4 -- node packages/staging/test/ground-browser.mjs`
+and the same command with `--compat` appended. Both read the existing licensed BrightRings EXR,
+compare shadow-on/off pixels, assert unchanged product/outside pixels, destroy and replace an actual
+device, remove the caster and dispose the scene. The product geometry is a stand-in. The README's
+order 0.25 is essential: a backdrop at its default order 1 covers a depth-read-only contact plane at 0.5.
+No new projection or shadow algorithm, physical HDR-shadow claim or timing measurement is added.
