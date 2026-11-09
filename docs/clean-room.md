@@ -1,5 +1,34 @@
 # Clean room
 
+## Batch 134 independent scalar endpoint refinement (2026-11-09)
+
+Before refinement, wide searches compared BC4/BC5 endpoint fitting, S3TC cluster
+fit, scalar alpha compression and neural block compression. Reread Khronos Group,
+[Data Format Specification 1.4 (2025)](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html),
+chapter 19 introduction, 19.1/table 121 and 19.3; Shin Fujieda and Takahiro Harada,
+[Neural Texture Block Compression (2024)](https://arxiv.org/html/2407.09543v1),
+2.1, 2.3 and 3 through 3.2; and Per Wennersten and Jacob Strom,
+[Table-based Alpha Compression (2009)](https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf),
+extracted sections 1/2 and 4.1/4.2, without figures. Also reviewed Ignacio Castano,
+[High Quality DXT Compression using CUDA (2007)](https://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/dxtc/doc/cuda_dxtc.pdf),
+abstract through Cluster Fit on PDF pages 3-5. The web excerpt additionally
+exposed sorting pseudocode from page 6; none was used. These were partial
+readings, not full-paper claims; no companion repository or foreign encoder was
+opened or used. The independent synthesis combines fixed-index least squares
+with scoring actual rounded palettes and both legal scalar endpoint orders.
+
+The min/max prototype missed six-value palettes and unused endpoint slots.
+New regressions prove both defects. The draft additionally derives seeds by
+assigning observed extrema to every ordered pair of interpolation slots, solving
+their two endpoint equations and testing neighboring integer pairs. Selectors
+remain nearest rounded values with smallest-index ties. Search accepts only
+strict score improvements and retains the existing per-texel quantization bound.
+No old endpoint fields or optimizer were inferred. All original source/mip,
+channel, arithmetic, order and quality rules remain unchanged. The resulting
+86/98 passing pairs leave 12 real failures; reconstructed-input improvements
+do not replace original-source acceptance.
+[Unaccepted refinement evidence](whitepaper/results/batch-134-scalar-refinement.json).
+
 ## Owned Chromium termination and pipe release (2026-11-09)
 
 Research before the change compared Edward G. Coffman Jr., Michael J. Elphick

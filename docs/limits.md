@@ -1,5 +1,14 @@
 # Design envelope
 
+Batch 134 scalar refinement remains unaccepted: 86/98 original-source quality
+pairs pass, 12 fail; both conventional and mapped R/alpha bars remain unchanged.
+Draft Wasm is 168,906 B raw / 60,673 B gzip9, compared with the initial scalar
+prototype's 158,873 / 57,653 B. The 3,020 gzip bytes provide both-mode endpoint
+fitting and exterior endpoint seeds in the same optional Wasm; this private
+draft has no package ceiling or final entry acceptance. No core/stage bytes,
+public integration, full fuzz, peak-memory or speed result is claimed.
+[Current scoped evidence](whitepaper/results/batch-134-scalar-refinement.json).
+
 Owned Chromium teardown requests native termination before releasing its owned
 stdio/CDP pipes, and releases those pipes before awaiting termination completion.
 Driver cleanup still waits for process close; the 30,000 ms shutdown budget and

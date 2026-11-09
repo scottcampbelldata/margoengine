@@ -1,5 +1,15 @@
 # Reproducing Margo's numbers
 
+The [scalar refinement](results/batch-134-scalar-refinement.json) lists retained
+author-workspace file identifiers and exact input, source, adapter and Wasm pins.
+Its native crate tests include `scalar_refinement.rs`; build that crate for
+wasm32-unknown-unknown before running identifiers
+`measure/scalar-quality-report15b.mjs` and `measure/scalar-diagnose-report15b.mjs`.
+The first retains both original-source bars and exits nonzero for 12 failures.
+The second measures reconstruction error only and cannot establish acceptance.
+The research workspace is retained separately; these are not shipped clone
+commands or a completed public decoder. Earlier prototype evidence stays intact.
+
 Owned browser I/O regression: run
 `node --test --test-timeout=90000 tests/browser-teardown.test.js tests/shutdown.test.js tests/page-ready.test.js`.
 The pipe-dependent completion test fails before the ordering repair. Existing

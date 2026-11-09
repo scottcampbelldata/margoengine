@@ -1,5 +1,13 @@
 # Claims and evidence
 
+The [private scalar refinement](results/batch-134-scalar-refinement.json) passes
+86 of 98 original-source quality pairs with all 1,296 old controls exact.
+Twelve still fail; lower reconstructed-input SSE in those cases is diagnostic,
+not acceptance. Both-mode and exterior-endpoint regressions fail before their
+repairs. The native suite passed 52 tests, followed by the additional deterministic
+property test and four fresh scalar Node tests. No completed jobs 2/3, public
+decoder integration, full fuzz, peak-memory or speed acceptance is claimed.
+
 Owned browser cleanup releases its pipes before awaiting termination completion,
 while retaining process-list-before-disconnect and process-close-before-driver
 ordering. The pipe-dependent regression in `tests/browser-teardown.test.js`

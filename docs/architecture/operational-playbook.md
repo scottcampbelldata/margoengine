@@ -1,5 +1,18 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: batch 134 scalar refinement
+
+Private BC4/BC5 both-mode endpoint fitting and extrema-slot seeds pass the new
+failing-before six-value and unused-endpoint regressions. A deterministic
+512-block property preserves the original min/max reconstruction SSE and
+per-texel quantization bound. All 1,296 old payload/source controls and frozen
+totals reproduce exactly; 86/98 original-source pairs pass and 12 still fail.
+Every remaining failure has lower reconstructed-input SSE than old, which is
+diagnostic only. Full source-quality acceptance, remaining encoders, public
+integration, complete fuzz, GPU/peak-memory/final-entry gates remain open.
+Timing stays deferred. No prebuilt removal or job 2/3 completion.
+[Scoped result](../whitepaper/results/batch-134-scalar-refinement.json).
+
 ### Section 5 evidence: owned termination and pipe release
 
 The browser owner now releases stdio/CDP pipes after requesting termination and

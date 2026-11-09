@@ -2587,6 +2587,15 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 134 scalar refinement remains unaccepted: 86/98 original-source quality
+pairs pass, 12 fail; both conventional and mapped R/alpha bars remain unchanged.
+Draft Wasm is 168,906 B raw / 60,673 B gzip9, compared with the initial scalar
+prototype's 158,873 / 57,653 B. The 3,020 gzip bytes provide both-mode endpoint
+fitting and exterior endpoint seeds in the same optional Wasm; this private
+draft has no package ceiling or final entry acceptance. No core/stage bytes,
+public integration, full fuzz, peak-memory or speed result is claimed.
+[Current scoped evidence](whitepaper/results/batch-134-scalar-refinement.json).
+
 Owned Chromium teardown requests native termination before releasing its owned
 stdio/CDP pipes, and releases those pipes before awaiting termination completion.
 Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
@@ -4873,15 +4882,19 @@ default and custom collisions without replacing existing labels or DOM.
 
 ### Open: batch 134 scalar prototype fails source-quality acceptance
 
-The private min/max BC4/BC5 prototype passes 49 native and 22 selected adapter
-tests, but 40 of 98 pairs across 46 primary and three supplementary files fail
-the unchanged no-worse source-SSE bar. The initial independent endpoint choice
-is insufficient; endpoint refinement remains required. BC5 must satisfy both
-the conventional RG and separately mapped R/alpha checks. Reproduce with the
-retained author-workspace `measure/scalar-quality.mjs`; all 1,296 old controls
-and frozen totals reproduce exactly, with no tolerance change. The prototype
-is not integrated into the public package and the prebuilt remains in use.
-[Failure cases and source pins](whitepaper/results/batch-134-scalar-prototype.json).
+The initial min/max BC4/BC5 prototype failed 40 of 98 pairs. Both-mode endpoint
+fitting and exterior-endpoint seeds now pass 86 pairs; 12 still fail across the
+same 46 primary and three supplementary files. All 1,296 old controls and frozen
+totals remain exact. Two proven search defects are covered by failing-before
+regressions. Every remaining loss has lower reconstructed-input error than the
+old output, yet loses one of the unchanged original-source bars. Reconstruction
+error alone therefore does not establish acceptance; no remaining case is waived
+or classified impossible. BC5 still must satisfy both conventional RG and mapped
+R/alpha checks. Reproduce with retained author-workspace identifier
+`measure/scalar-quality-report15b.mjs`. The private draft is not integrated into
+the public package and the prebuilt remains in use.
+[Current failures](whitepaper/results/batch-134-scalar-refinement.json) and
+[initial prototype](whitepaper/results/batch-134-scalar-prototype.json).
 
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 
