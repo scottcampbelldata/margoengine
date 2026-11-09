@@ -116,6 +116,7 @@ function setup(camera = { position: [0, 0, 10], target: [0, 0, 0] }) {
       return engine;
     },
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => plugins.get(plugin.name) === plugin ? engine : undefined,
     removePlugin(name) {
       const p = plugins.get(name);
       plugins.delete(name);
@@ -155,6 +156,18 @@ const matrix = (cube) =>
     .style.transform.slice(9, -1)
     .split(',')
     .map(Number);
+
+test('engine fixture finds plugin owners by identity and OrbitControls disposal removes its registration', () => {
+  const { engine, plugins } = setup();
+  const orbit = new OrbitControls(engine);
+  const registration = [...plugins.values()].find(p => p.name.startsWith('margoengine-controls:'));
+  assert.ok(registration);
+  assert.equal(engine.sceneOf(registration), engine);
+  assert.equal(engine.sceneOf({ ...registration }), undefined, 'same name is not the registered identity');
+  orbit.dispose();
+  assert.equal(plugins.has(registration.name), false);
+  assert.equal(engine.sceneOf(registration), undefined);
+});
 
 test('six faces of nine cells cover all 26 views; the six faces are labelled buttons', () => {
   const { engine, container } = setup(),
