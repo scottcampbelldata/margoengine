@@ -509,3 +509,7 @@ The downloaded Lefebvre/Poulin 2000 figure 1(d) supplies a measured running-bond
 offset for a calibrated structural check only. Generated numerical controls remain
 stand-ins; no photograph reconstruction, wood/rust realism, material quality,
 cross-device byte identity or timing is claimed (LIM-639).
+
+GPU wait promises are observed before checking cancellation, and loss/cancellation
+is checked again after completion. An already lost factory and a cancelled queue
+cannot leave a later GPU rejection unhandled; the original abort reason still wins.

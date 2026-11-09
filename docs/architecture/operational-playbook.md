@@ -2575,3 +2575,15 @@ coverage test remains unchanged and guards every package that gains shaders.
 Runtime renderer, core and stage code are unchanged. The procedural compute shader
 was recorded from the actual GPU run; original published-reference images are not
 included in the corpus. This is quality-gate metadata, not a new renderer claim.
+
+### GPU cancellation rejection observation (batch 68)
+
+An already resolved device-loss promise could race a successful compilation-info
+promise, start a pipeline on the lost device, and then reject early without
+observing that pipeline promise. The returned error was coded, but the later GPU
+rejection was unhandled. The same class affected a queue promise rejected after
+early cancellation. Texture waits now observe success/failure before prechecks and
+check cancellation/loss again after completion. Ordinary GPU failures still propagate
+with their original cause, and explicit cancellation retains the caller's reason.
+The CPU regression covers both races and partial cleanup; the real GPU test invokes
+the factory on an already lost device. No core or stage source changed.

@@ -180,3 +180,27 @@ test('GPU allocation and queue failures release partial resources and carry a co
   assert.ok(g.textures[0].destroyed);
   assert.ok(g.buffers[0].destroyed);
 });
+
+test('already lost factories and early-cancelled queue promises never leak an unhandled rejection', async () => {
+  const f = fake();
+  f.device.lost = Promise.resolve({ reason: 'destroyed' });
+  let pipelines = 0;
+  f.device.createComputePipelineAsync = () => {
+    pipelines++;
+    return Promise.reject(new Error('lost pipeline'));
+  };
+  await assert.rejects(createTextureBaker(f.device), linked('failed'));
+  assert.equal(pipelines, 0, 'no pipeline is created after observed device loss');
+  const g = fake(),
+    controller = new AbortController(),
+    reason = new Error('cancel queue');
+  using baker = await createTextureBaker(g.device);
+  g.device.queue.onSubmittedWorkDone = () => {
+    controller.abort(reason);
+    return Promise.reject(new Error('late GPU rejection'));
+  };
+  await assert.rejects(baker.bake({ signal: controller.signal }), (e) => e === reason);
+  assert.ok(g.textures[0].destroyed);
+  assert.ok(g.buffers[0].destroyed);
+  await new Promise(setImmediate);
+});

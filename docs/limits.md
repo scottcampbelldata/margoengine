@@ -1616,5 +1616,5 @@ limited to a calibrated row-offset measurement from Lefebvre/Poulin 2000 Fig.1(d
 39/88 pitch with two source pixels of uncertainty, plus GPU raster quantization.
 Original PDF/JPEG downloaded for measurement, never redistributed. No external
 colour reconstruction, wood/rust realism, cross-device bytes or speed claim.
-Entry JavaScript plus shader is 2,832 B gzip (new ceiling 2,989 B); no lazy asset.
+Entry JavaScript plus shader is 2,874 B gzip (new ceiling 2,989 B); no lazy asset.
 Core plus stage remains 23,797 B gzip, strictly below 25,000 B.

@@ -135,6 +135,13 @@ try {
     }
     if (!pendingLost) throw new Error('In-flight lost bake did not fail with a code');
     await device.lost;
+    let lostFactory = false;
+    try {
+      await window.createTextureBaker(device);
+    } catch (error) {
+      lostFactory = error.code === 'failed';
+    }
+    if (!lostFactory) throw new Error('Factory accepted an already lost device');
     let lost = false;
     try {
       await baker.bake();

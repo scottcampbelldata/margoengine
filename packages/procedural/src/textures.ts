@@ -57,6 +57,10 @@ const tuple = (v: unknown, count: number, lo: number, hi: number): v is number[]
 const lost = () =>
   fault('failed', 'Texture baker device was lost; create a baker on the replacement device', 'procedural');
 async function wait<T>(work: Promise<T>, lifecycle: AbortSignal, signal?: AbortSignal): Promise<T> {
+  const outcome = work.then(
+    (value) => ({ ok: true as const, value }),
+    (error) => ({ ok: false as const, error }),
+  );
   signal?.throwIfAborted();
   lifecycle.throwIfAborted();
   const combined = signal ? AbortSignal.any([lifecycle, signal]) : lifecycle;
@@ -66,7 +70,11 @@ async function wait<T>(work: Promise<T>, lifecycle: AbortSignal, signal?: AbortS
     combined.addEventListener('abort', abort, { once: true });
   });
   try {
-    return await Promise.race([work, cancelled]);
+    const result = await Promise.race([outcome, cancelled]);
+    signal?.throwIfAborted();
+    lifecycle.throwIfAborted();
+    if (!result.ok) throw result.error;
+    return result.value;
   } finally {
     if (abort) combined.removeEventListener('abort', abort);
   }
