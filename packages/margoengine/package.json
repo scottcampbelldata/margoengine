@@ -1330,6 +1330,10 @@
       "types": "./dist/lighting2d.d.ts",
       "import": "./dist/lighting2d.js"
     },
+    "./lighting2d/soft": {
+      "types": "./dist/lighting2d/soft.d.ts",
+      "import": "./dist/lighting2d/soft.js"
+    },
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"

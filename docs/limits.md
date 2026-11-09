@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-591). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-592). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -537,6 +537,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Component names in React DevTools on WebKit | By the browser: JavaScriptCore replaces a tail call's frame, so a component that ends in `return <Mesh ... />` is missing from the owner stack `DevTools` names a mesh by. | Proper tail calls are in the language, and only JavaScriptCore has them. | The mesh shows its nearer owners only. | Give the mesh a `name`, or assign the element before returning it. |
 | One-frame audio buffers on WebKit | By the browser: a one-frame buffer played above rate 1 never fires `ended`. | WebKit starts it past its end. `@margoengine/audio` plays its own silent frame at rate 1, so only an app's own one-frame buffer can hit this. | `onEnded` does not fire for that sound. | Use a buffer of two frames or more. |
 | Light sum in `@margoengine/lighting2d` | Measured (43 lights, Apple M6, Chrome 157 and Playwright WebKit): within 1 level. Lights share four `rgba16float` layers, so the sum costs 32 B per pixel. | Each additive blend rounds to half precision, and the M6 rounds toward zero; a sum of a quarter of the light loses a quarter as much. | On a GPU that rounds toward zero, many lights on one pixel read slightly dark. | None needed. |
+| 2D soft shadows in `@margoengine/lighting2d/soft` | Up to 64 filter ray samples per light; occluder edge counts supported up to device storage buffer limits. | Penumbra width scales with emitter source radius and distance from occluder; WebGPU only (refuses WebGL2 with coded error). | Very dense occluder lists scale linearly with edge count per pixel. | Simplify complex tile geometry or segment lists with coarse occluder hulls. |
 | sRGB twin copies on the WebGL2 compatibility layer | Enforced ([render.ts](../packages/webgl2-compat/src/device/render.ts)): a copy into an sRGB twin passes through client memory on every driver, so it waits for the GPU. | ANGLE on Metal encodes bytes that arrive through a pixel unpack buffer, and refuses `copyTexSubImage2D` from unorm. | One stall per such copy. | Create the texture with the format you read it in. |
 | Apple GPUs: centroid varyings (scatter blades, 2026-11-06) | Measured (Chrome 157 and Playwright WebKit 27.2, Apple M6, 40,000 blades at 4x MSAA, 384 x 384): about 350 pixels of the far grass move by up to 4 levels on some frames, most often the first few of a page, rarely after. | Blades read their colour and ground weight at the centroid so a thin blade never reads past its triangle, and on an Apple GPU that point follows hidden surface removal, which varies under heavy geometry. Inputs are bit-identical on those frames. | Not seen by eye. An RTX A6000 gives the same frame every time. | A check that needs exact frames of this much grass on an Apple GPU runs at one sample a pixel (`exactSize`), as `packages/scatter/test/shadow-cull.browser.mjs` does. |
 | Compatibility feature level on WebKit | By the browser: asked for `featureLevel: 'compatibility'`, Playwright WebKit 27.2 gives a full device, which WebGPU allows. | WebKit has no such level. | The level's own checks prove nothing there; the frames are the same. | Test the level in Chrome. |
@@ -834,3 +835,7 @@ mono/stereo; static geometry changes need recreation. Default/range table is in 
 Pure Node geometry and real Edge convolution beside WebGPU/WebGL2 use generated stand-ins;
 real measured rooms, other browsers, listening quality and timing remain unmeasured. LIM-591.
 Reflections entry: 3,227 B gzip, budget 3,483 B.
+
+## 2D soft shadows (batch 55)
+
+Optional `@margoengine/lighting2d/soft` adds 2D soft shadows with penumbra edges that soften with distance from the occluder. Penumbra width scales with emitter radius (`sourceRadius`) and distance from occluder edges; 0 gives hard shadows. Up to 64 radial samples per light on GPU and CPU. Occluders support polygon, polyline, segment, box and circle shapes. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU form. LIM-592.

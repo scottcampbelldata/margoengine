@@ -67,6 +67,31 @@ collision shapes cast shadows too.
 A pixel is in shadow when an occluder edge lies between its centre and the light, so the inside of a closed shape is dark
 to a light outside it. Shadow edges are hard: each pixel is lit or not, with no soft penumbra.
 
+## Soft shadows
+
+`@margoengine/lighting2d/soft` provides soft penumbra shadows that soften with distance from the occluder. Near the occluder,
+shadow edges remain crisp; as distance increases, the penumbra widens proportionally to the light's emitter radius (`sourceRadius`).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {SoftLighting2D} from 'margoengine/lighting2d/soft';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const soft = SoftLighting2D.attach(engine, {target: shade.target, camera: shade.camera, ambient: '#202030', sourceRadius: 6});
+const lamp = soft.addLight({x: 40, y: 30, radius: 80, color: '#ffd9a0', sourceRadius: 8});
+soft.setOccluders([{shape: 'box', width: 16, height: 16, offset: [80, 45]}]);
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+lamp.x += 1;
+```
+
+CPU helper functions `softShadowFactor(light, edges, x, y, options)`, `softInShadow(light, edges, x, y, options)` and
+`softLightAt(light, x, y, edges, normal, options)` evaluate soft shadows in Node for testing.
+
 ## CPU forms
 
 `lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and

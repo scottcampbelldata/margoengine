@@ -4,6 +4,7 @@ import { engineRuntime } from '/packages/core/dist/extension.js';
 import { LayerCompositor } from '/packages/pixel/dist/index.js';
 import { SpriteLayer } from '/packages/sprites/dist/index.js';
 import { inShadow, lightAt, Lighting2D, occluderEdges } from '/packages/lighting2d/dist/index.js';
+import { SoftLighting2D, softLightAt } from '/packages/lighting2d/dist/soft.js';
 
 const WIDTH = 32,
   HEIGHT = 16,
@@ -357,6 +358,34 @@ window.check = {
       out.checks['multiplied through a compositor'] = { wrong, first };
       pass.dispose();
       compositor.dispose();
+    }
+
+    // Soft shadows check
+    {
+      const softTarget = texture();
+      const wall = [{ shape: 'segment', from: [20.1, 3.2], to: [20.1, 11.3] }];
+      const softPass = SoftLighting2D.attach(instance, {
+        target: () => softTarget,
+        ambient: '#000000',
+        occluders: wall,
+        sourceRadius: 4,
+      });
+      const softLamp = softPass.addLight({ x: 8.3, y: 7.2, radius: 40, height: 10, sourceRadius: 4, samples: 16 });
+      frame();
+      const bytes = await read(softTarget);
+      const wantSoft = new Float64Array(WIDTH * HEIGHT * 3);
+      const wallEdges = occluderEdges(wall);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = x + 0.5;
+          const wy = y + 0.5;
+          const add = softLightAt(softLamp, wx, wy, wallEdges, [0, 0, 1], { sourceRadius: 4, samples: 16 });
+          for (let c = 0; c < 3; c++) wantSoft[(y * WIDTH + x) * 3 + c] = Math.min(1, add[c]) * 255;
+        }
+      }
+      out.checks['soft shadows with penumbra'] = compare(bytes, wantSoft);
+      softPass.dispose();
+      softTarget.destroy();
     }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();

@@ -1467,3 +1467,7 @@ Only the paper's theory/description was consulted, not its FORTRAN appendix or a
 Six first-order mirror points, inverse path length, excess propagation delay and two-tap fractional
 placement are derived here. The existing Margo tail and Web Audio convolution are reused.
 No engine/library source or external assets. Generated impulses are stand-ins.
+
+## 2D soft shadows (batch 55)
+
+`@margoengine/lighting2d/soft` is written from published descriptions of 2D area light penumbra filtering: R. Fernando, "Percentage-Closer Soft Shadows", GPU Gems 2, ch. 8, 2005 (penumbra estimation from light source radius and distance between receiver and occluder), and T. Akenine-Moller and U. Assarsson, "Plausible Soft Shadows using Penumbra Wedges", 2002. Angular extent calculation and radial ray filtering across occluder edge lists are Margo-own clean room implementations derived from first principles geometry; no other engine source or library code was read.

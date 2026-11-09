@@ -36,6 +36,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./soft": {
+      "types": "./dist/soft.d.ts",
+      "import": "./dist/soft.js"
     }
   },
   "files": [
