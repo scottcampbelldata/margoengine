@@ -4287,3 +4287,14 @@ cleanup. PostStack also excludes a removed child's stage when its name is reused
 The real-engine scene-owner regression covers explicit disposal, scene removal,
 replacement and failed setup. Package GPU/README acceptance remains pending;
 this adds no rendering pass, shader change, speed claim or core change.
+
+The post audit extends the same regression to 22 other classes, and verify now
+rejects direct engine.removePlugin cleanup in post sources. DepthTexture removes
+its registered wrapper before releasing its unregistered SceneTargets helper.
+Proof hosts reflect the actual ownership API and registration-before-setup order;
+GPU-call parity and all original assertions remain required.
+CPU audit evidence: 167 post tests pass with zero skips, including both explicit
+disposal and owner removal for all 22 classes; all 20 current GPU-recorder proofs
+pass without changing stored call sequences or tolerances. Lint, hygiene, README
+type checks and size measurement pass. These recorder proofs use no physical GPU.
+Browser package gates remain pending under the coordinator's CPU-only restriction.

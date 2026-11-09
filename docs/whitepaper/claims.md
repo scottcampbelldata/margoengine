@@ -2177,3 +2177,8 @@ same-name effects in other scenes and replacement children. Removed stages no
 longer render through their reused names. Proof: packages/post/test/scene-owner.test.js
 uses real engine registries with inert GPU calls; browser/README acceptance is
 pending. This is a lifecycle claim, with no new image-quality or speed claim.
+
+The same owner-detachment claim has per-class real-engine regressions for 22
+additional post classes in effect-owners.test.js; a source guard prevents direct
+active-scene cleanup. DepthTexture's wrapper and capture have separate lifetimes.
+Package GPU/README acceptance remains pending.

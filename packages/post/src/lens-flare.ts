@@ -242,7 +242,7 @@ export class LensFlare implements EnginePlugin {
     this.disposed = true;
     const stack = this.stack;
     this.stack = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
     stack?.dispose();

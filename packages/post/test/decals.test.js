@@ -20,6 +20,9 @@ function rig({ samples = 4, capture = true, options } = {}) {
   const engine = {
     gpu: gpu.device,
     removed: [],
+    sceneOf(plugin) {
+      return plugin === decals && !this.removed.includes(plugin.name) ? this : undefined;
+    },
     removePlugin(name) {
       this.removed.push(name);
     },

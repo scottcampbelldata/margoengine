@@ -74,7 +74,7 @@ async function story(make, samples, preset) {
         list = [{ order: 0, execute: (c) => c.draw() }],
         effects = make();
       for (const effect of effects) {
-        effect.setup(engine);
+        engine.use(effect);
         effect.registerPasses?.({ add: (pass) => list.push(pass) });
       }
       effects[0].setLights?.([point, spot]);

@@ -10,7 +10,7 @@ import { wgsl } from '../../core/src/shaders.ts';
 function recorded(shader = wgsl) {
   const gpu = mockGPU(),
     ssao = new SSAO();
-  ssao.setup({ gpu: gpu.device, hasPlugin: () => false, removePlugin() {} });
+  ssao.setup({ gpu: gpu.device, hasPlugin: () => false, sceneOf: () => undefined, removePlugin() {} });
   const run = passes(ssao),
     view = context(gpu, { samples: 1, shader });
   return {

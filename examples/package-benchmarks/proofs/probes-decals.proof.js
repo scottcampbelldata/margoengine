@@ -120,7 +120,7 @@ assert.deepEqual(await story(candidate, true), expected, 'an unattached LightPro
 // An attached Decals without decals records no GPU work in its pass (a frame's calls are the same with and without it).
 const gpu = mockGPU(),
   decals = new Decals();
-decals.setup({ gpu: gpu.device, removePlugin() {} });
+decals.setup({ gpu: gpu.device, sceneOf: () => undefined, removePlugin() {} });
 const view = context(gpu, { samples: 4, shader: 'lit' });
 view.begin(0);
 assert.deepEqual(
@@ -155,7 +155,9 @@ async function ssrStory(m, g, make, samples, shader) {
   const engine = {
     gpu: gpu.device,
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
     use(plugin) {
+      plugins.set(plugin.name, plugin);
       plugin.setup(engine);
       plugin.registerPasses?.({ add: (pass) => passList.push(pass) });
       plugins.set(plugin.name, plugin);

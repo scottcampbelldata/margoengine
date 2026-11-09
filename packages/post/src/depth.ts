@@ -20,6 +20,7 @@ export interface DepthTextureOptions {
  * add gltf-pro models and materials meshes with `add(model)`. Do not add a model whose material samples it. WebGPU only.
  */
 export class DepthTexture implements EnginePlugin {
+  private engine?: Engine;
   private readonly targets: SceneTargets;
   constructor(options: DepthTextureOptions = {}) {
     this.targets = new SceneTargets({ outputs: { distance: 'distance' }, order: options.order });
@@ -51,6 +52,7 @@ export class DepthTexture implements EnginePlugin {
   }
   setup(engine: Engine): void {
     this.targets.setup(engine);
+    this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
     this.targets.registerPasses(graph);
@@ -60,6 +62,9 @@ export class DepthTexture implements EnginePlugin {
   }
   /** Releases the textures. */
   dispose(): void {
+    const engine = this.engine;
+    this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.targets.dispose();
   }
   declare [Symbol.dispose]: () => void;

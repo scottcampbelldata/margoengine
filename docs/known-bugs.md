@@ -292,11 +292,14 @@ has restored the default active scene. Stack disposal additionally checks child
 membership against that active scene. The existing `sceneOf` API can hold the
 repair in the owning optional packages; no core change is needed.
 
-The FXAA/PostStack repair now uses sceneOf-based identity for disposal and live
+The post-package repair now uses sceneOf-based identity for disposal and live
 child rendering. packages/post/test/scene-owner.test.js proves default-scene
-isolation, owner removal, replacement and failed-setup cleanup. Its GPU and
-README package gates remain pending, so this audit is not closed or accepted.
-Other direct default-scene disposal call sites still need
+isolation, owner removal, replacement and failed-setup cleanup. The sibling
+effect-owners.test.js reproduces and repairs 22 more classes, including the
+DepthTexture wrapper (its internal SceneTargets is not itself registered).
+An explicit source guard in verify rejects active-scene removal in post cleanup.
+GPU and README acceptance remains pending, so this audit is not closed or accepted.
+Direct default-scene disposal call sites outside post still need
 per-plugin classification and regressions, followed by their package checks.
 Do not treat the batch 56 scene-ownership finding as fully accepted until that
 work and the required GPU proofs are complete.

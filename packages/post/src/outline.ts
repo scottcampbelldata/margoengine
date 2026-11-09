@@ -135,7 +135,7 @@ export class Outline implements EnginePlugin {
     this.disposed = true;
     const engine = this.engine;
     this.engine = undefined;
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.stack?.dispose();
     this.stack = undefined;

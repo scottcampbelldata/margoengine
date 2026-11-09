@@ -29,7 +29,7 @@ const signed = (code) =>
 
 function story(module, samples) {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, hasPlugin: () => false, removePlugin() {} };
+    engine = { gpu: gpu.device, hasPlugin: () => false, sceneOf: () => undefined, removePlugin() {} };
   const ssao = new module.SSAO({ radius: 0.5 });
   ssao.setup(engine);
   for (let i = 0; i < 2; i++)

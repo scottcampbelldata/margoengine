@@ -21,11 +21,14 @@ const ibl =
 function story(m, make, samples, shader) {
   const gpu = mockGPU(),
     passes = [{ order: 0, execute: (c) => c.draw() }],
-    plugins = new Map();
+    plugins = new Map(),
+    owned = new Set();
   const engine = {
     gpu: gpu.device,
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (owned.has(plugin) ? engine : undefined),
     use(plugin) {
+      owned.add(plugin);
       plugin.setup(engine);
       plugin.registerPasses?.({ add: (pass) => passes.push(pass) });
       plugins.set(plugin.name, plugin);
@@ -34,6 +37,7 @@ function story(m, make, samples, shader) {
     removePlugin(name) {
       const plugin = plugins.get(name);
       plugins.delete(name);
+      owned.delete(plugin);
       plugin?.dispose?.();
     },
   };

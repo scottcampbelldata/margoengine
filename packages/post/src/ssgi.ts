@@ -742,7 +742,7 @@ export class SSGI implements EnginePlugin {
     const stack = this.stack;
     this.stack = undefined;
     for (const release of [...this.models.values()]) release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.releaseBuffers();
     this.engine = undefined;

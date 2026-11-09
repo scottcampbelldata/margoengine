@@ -730,7 +730,7 @@ export class SSR implements EnginePlugin {
     const stack = this.stack;
     this.stack = undefined;
     for (const release of [...this.models.values()]) release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     retire(this.device!, this.uniform);
     retire(this.device!, this.roughUniform);

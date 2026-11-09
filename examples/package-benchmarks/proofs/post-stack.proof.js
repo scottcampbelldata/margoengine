@@ -22,7 +22,7 @@ const creative = readOnly() ? {} : await versions('creative', before, 'src/post.
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
 function story(make, samples, edit) {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, hasPlugin: () => false, removePlugin() {} },
+    engine = { gpu: gpu.device, hasPlugin: () => false, sceneOf: () => undefined, removePlugin() {} },
     view = context(gpu, { samples, shader: wgsl, format: 'bgra8unorm' });
   return gpu.record(() => {
     const effects = make(engine),

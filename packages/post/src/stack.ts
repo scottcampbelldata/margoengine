@@ -59,7 +59,7 @@ export class PostStack implements EnginePlugin {
     )
       throw new TypeError('PostStack needs distinct effects');
     if (effects.some((effect) => effect?.name === 'smaa') && effects.some((effect) => effect?.name === 'fxaa'))
-      throw new TypeError('PostStack takes SMAA or FXAA, never both');
+      throw new TypeError('PostStack: use SMAA or FXAA, never both');
     let last = 0,
       displays = 0;
     this.stages = effects.map((effect) => {

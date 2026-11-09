@@ -367,7 +367,7 @@ export class SceneTargets implements EnginePlugin {
     this.listeners.clear();
     const engine = this.engine;
     this.engine = undefined;
-    if (engine?.plugins?.has?.(this.name)) engine.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

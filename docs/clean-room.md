@@ -2987,3 +2987,10 @@ PostStack uses the same identity test for live rendering, so a removed child's
 name cannot reanimate its disposed stage. No foreign implementation or companion
 code is used. Real-engine inert-GPU regressions check direct and scene removal,
 same-name isolation, child replacement and failed setup cleanup. Core is untouched.
+
+The same identity rule is applied to the rest of post's effects, with a per-class
+real-engine regression. DepthTexture owns its wrapper registration independently
+of the unregistered SceneTargets helper it delegates GPU resources to. Shared
+proof hosts now model registration before setup and identity-based sceneOf;
+the quality-preset proof registers its effects through the real engine. The
+recorded GPU work and tolerances are unchanged. No timing measurement is added.

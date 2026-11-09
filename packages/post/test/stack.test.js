@@ -218,6 +218,10 @@ test('PostStack validates its order and keeps an LDR-only stack on the core shad
   ])
     assert.throws(() => new PostStack(kinds.map((kind, i) => fake('x' + i, kind, log))), /order/);
   assert.throws(() => new PostStack([]), /distinct/);
+  assert.throws(() => new PostStack([{ name: 'smaa' }, { name: 'fxaa' }]), {
+    name: 'TypeError',
+    message: /use SMAA or FXAA/,
+  });
   assert.throws(() => new PostStack([fake('x', 'hdr', log), fake('x', 'hdr', log)]), /distinct/);
   assert.throws(() => new PostStack([{ name: 'plain', setup() {} }]), /cannot join/);
   const effect = new Bloom();

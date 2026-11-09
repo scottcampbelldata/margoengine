@@ -2611,4 +2611,8 @@ Batch 56 repair tree entry gzip bytes (bundleBytes, packages external): staging 
 Batch 56 post audit: FXAA and PostStack disposal and stack-child liveness resolve
 registered object identity through sceneOf. This covers secondary scenes and
 same-name replacement without a new core API. Other post-effect disposal sites
-remain under audit in known-bugs.md; no cross-package closure is claimed.
+are covered by effect-owners.test.js, including DepthTexture's registered wrapper.
+Disposal sites outside post remain under audit in known-bugs.md; no cross-package
+closure is claimed. Existing entry-size ceilings are unchanged.
+The audited FXAA entry is 4,642 bytes gzip and PostStack is 3,995 bytes gzip
+(bundleBytes, packages external); their ceilings remain 4,699 and 4,001 bytes.

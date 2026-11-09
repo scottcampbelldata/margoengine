@@ -16,7 +16,7 @@ function rig() {
     target = new SceneTarget(gpu.device, texture('rgba16float'), texture('depth24plus-stencil8'), 1),
     effect = new Decals(),
     run = passes(effect);
-  effect.setup({ gpu: gpu.device, removePlugin() {} });
+  effect.setup({ gpu: gpu.device, sceneOf: () => undefined, removePlugin() {} });
   let n = 0;
   const frame = () =>
     gpu.record(() => {

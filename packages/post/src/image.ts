@@ -419,7 +419,7 @@ export class ImagePost implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.active?.abort(margoError('disposed', 'ImagePost was disposed during capture'));
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.stack?.dispose();
     this.previewBloom.dispose();
     this.display.dispose();
