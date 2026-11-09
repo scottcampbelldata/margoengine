@@ -1215,6 +1215,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   on these numbers is not remeasured yet. If a quiet rerun does not close the gap, record what is left as an accepted
   difference.
 
+## Fixed 2026-11-09
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| `scatter` `test:browser:interact` failed every run on an Apple M6 since it was added (67b6324ea): `an empty field draws as plain grass`, about 300 bytes differing, all off by 1 to 3 levels in the far grass | Not trampling. The plain frame is drawn on the page's first heavy frames and the trampled one later. On those first frames an Apple GPU's hidden surface removal treats the 40,000 blades differently: blades read their varyings at the centroid, which follows it (the limit in [limits.md](limits.md), "Apple GPUs: centroid varyings"). Inputs (rings, draw counts, frame uniform) and the depth samples were bit-identical; only colour samples moved. A never-taken `discard` in the blade shader (hidden surface removal off) gave 0 bytes differing, as did one sample a pixel, and drawing 200,000 blades for 3 frames first; 2,000 blades first did not. Stripping `centroid` left 1 byte | The check runs at one sample a pixel (`exactSize`), as the limit prescribes; it still compares the frames bit for bit | `packages/scatter/test/interact.browser.mjs` (5 of 5 on the M6; 0 of 3 before) |
+
 ## Fixed 2026-11-08
 
 | Bug | Cause | Fix | Regression test |

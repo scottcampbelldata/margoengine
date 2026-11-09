@@ -2,12 +2,15 @@
 <script type="module">
 // Real-GPU proof for @margoengine/scatter/interact (interact.browser.mjs drives it): a meadow of blades as a
 // TrampledScatter and as a plain Scatter with the same options; the push field is read back after each step.
+// One sample a pixel (exactSize): the frames are compared bit for bit, and at 4x MSAA an Apple GPU's hidden surface
+// removal moves the centroid of far blades on the first heavy frames of a page (docs/limits.md, "Apple GPUs: centroid
+// varyings"), so the plain frame drawn first differed from the trampled one by about 300 bytes on an Apple M6.
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,box} from '/packages/core/dist/index.js';
 import {Scatter} from '/packages/scatter/dist/index.js';
 import {TrampledScatter} from '/packages/scatter/dist/interact.js';
 const canvas=document.querySelector('canvas'),errors=[];
-const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,9,9],target:[0,0,0],near:0.1,far:200}}),device=engine.gpu;
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,9,9],target:[0,0,0],near:0.1,far:200}}),device=engine.gpu;
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.createMesh().setGeometry(box(200,0.1,200)).setPosition([0,-0.05,0]);
 const options={count:40000,area:[40,40],lod:[30,60,90],blades:{},color:[0.3,0.6,0.2]};
