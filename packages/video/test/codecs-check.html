@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><title>Frame-accurate video decode check</title>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {encodeVideo} from '/packages/headless/dist/video.js';
+import {openVideo} from '/packages/video/dist/codecs.js';
+import {videoMaterial} from '/packages/video/dist/material.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const colours=['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff'];
+window.check=async()=>{
+  const art=new OffscreenCanvas(64,64),paint=art.getContext('2d'),frames=[];
+  for(const colour of colours){paint.fillStyle=colour;paint.fillRect(0,0,64,64);frames.push({width:64,height:64,data:paint.getImageData(0,0,64,64).data});}
+  const file=await encodeVideo(frames,{format:'mp4',codec:'avc1.42001e',fps:10,keyFrameInterval:.3,bitrate:1000000});
+  const video=await openVideo(new Blob([file.bytes]));
+  const decoded=[],rendered=[],errors=[];
+  try{
+    for(const i of [5,0,3,1,4,2]){
+      const frame=await video.frame(i);paint.drawImage(frame,0,0);
+      decoded.push({i,timestamp:frame.timestamp,pixel:[...paint.getImageData(32,32,1,1).data]});frame.close();
+    }
+    const at=await video.seek(.299999);const seek={index:video.currentFrame,timestamp:at.timestamp};at.close();
+    const next=await video.step();const step={index:video.currentFrame,timestamp:next.timestamp};
+    for(const backend of ['webgpu','webgl2']){
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=64;canvas.style.width=canvas.style.height='64px';document.body.append(canvas);
+      const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:{position:[0,0,2],target:[0,0,0]}});engine.stop();
+      let mesh,material;
+      try{
+        if(backend==='webgpu'){
+          engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+          material=new UnlitMaterial({features:[videoMaterial(next)]});
+          mesh=createMesh(engine,{positions:[-2,-2,0,2,-2,0,2,2,0,-2,2,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]},material);
+          await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});engine.render({delta:0});paint.drawImage(canvas,0,0);
+        }else{
+          // Decoder frames are renderer independent. A 2D canvas accepts them beside a real WebGL2 engine.
+          paint.drawImage(next,0,0);
+        }
+        rendered.push({backend,pixel:[...paint.getImageData(32,32,1,1).data]});
+      }finally{mesh?.dispose();material?.dispose();engine.dispose();canvas.remove();}
+    }
+    next.close();
+    const abort=new AbortController();const pending=video.frame(5,{signal:abort.signal});abort.abort();let cancelled;
+    try{await pending;}catch(e){cancelled=e.name;}
+    return {source:'generated AVC MP4 stand-in',fileBytes:file.bytes.length,frameCount:video.frameCount,duration:video.duration,decoded,seek,step,rendered,cancelled,errors};
+  }finally{video.dispose();}
+};
+</script>

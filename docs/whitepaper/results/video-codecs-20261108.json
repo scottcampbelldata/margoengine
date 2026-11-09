@@ -1,0 +1,116 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "source": "generated AVC MP4 stand-in",
+  "fileBytes": 993,
+  "frameCount": 6,
+  "duration": 0.6,
+  "decoded": [
+    {
+      "i": 5,
+      "timestamp": 500000,
+      "pixel": [
+        0,
+        255,
+        253,
+        255
+      ]
+    },
+    {
+      "i": 0,
+      "timestamp": 0,
+      "pixel": [
+        254,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "i": 3,
+      "timestamp": 300000,
+      "pixel": [
+        253,
+        255,
+        0,
+        255
+      ]
+    },
+    {
+      "i": 1,
+      "timestamp": 100000,
+      "pixel": [
+        0,
+        255,
+        0,
+        255
+      ]
+    },
+    {
+      "i": 4,
+      "timestamp": 400000,
+      "pixel": [
+        254,
+        1,
+        255,
+        255
+      ]
+    },
+    {
+      "i": 2,
+      "timestamp": 200000,
+      "pixel": [
+        0,
+        1,
+        255,
+        255
+      ]
+    }
+  ],
+  "seek": {
+    "index": 2,
+    "timestamp": 200000
+  },
+  "step": {
+    "index": 3,
+    "timestamp": 300000
+  },
+  "rendered": [
+    {
+      "backend": "webgpu",
+      "pixel": [
+        253,
+        255,
+        0,
+        255
+      ]
+    },
+    {
+      "backend": "webgl2",
+      "pixel": [
+        253,
+        255,
+        0,
+        255
+      ]
+    }
+  ],
+  "cancelled": "AbortError",
+  "errors": []
+}

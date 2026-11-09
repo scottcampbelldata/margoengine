@@ -1540,3 +1540,7 @@ The block solver remains unchanged. [Solver study](physics2d-solver-study.md) re
 alternatives with all old bars retained and zero accepted hash re-pins. A new 1:1000 contact diagnostic exposes
 the old recovery-bias support ceiling; it is distinct from the passing 1000:1 joint chain. Owned-2D CCD is missing,
 not proved by speculation. Both acceptance gaps and the separate raw-density defect are tracked in known-bugs.
+
+### Video frame decoding evidence (batch 112, section 5 addendum)
+
+The optional `video/codecs` path owns MP4 demuxing and WebCodecs decode/flush lifecycle outside core/stage. Its unit tests cover decode versus presentation order, signed offsets, chunk runs, 64-bit offsets, edit timeline boundary regression, bounds, cancellation, exclusivity and caller-owned frames. The video GPU suite now includes `codecs-check.mjs`: real Edge/RTX A6000 decoding of a generated MP4, random frame access with exact timestamps, seek/step, cancellation and consumption on WebGPU/beside WebGL2. GOP decoding is renderer independent; external material binding still refuses WebGL2. Evidence is a stand-in; real B-frame files, third-party movies, other hardware/browsers and speed unmeasured. Supported container scope and memory limits are in LIM-575 and limits.md. No new open engine defect; known-bugs.md unchanged.

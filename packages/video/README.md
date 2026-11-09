@@ -187,3 +187,69 @@ delegation, packing and disposal; no headset has been run. Generated panorama co
 prove the screen sphere axes and both eyes on RTX A6000/Edge; real movie files, headset
 projection, other browsers/GPUs and speed remain unmeasured.
 
+## Frame-accurate seek and step
+
+`openVideo` from `margoengine/video/codecs` (or `@margoengine/video/codecs`) reads a
+complete, nonfragmented AVC/H.264 MP4 and decodes with WebCodecs. It includes its own
+sample-table demuxer. This example generates a small MP4 with the existing headless
+encoder; pass a URL, Blob or ArrayBuffer for an existing movie:
+
+```ts
+import {encodeVideo} from 'margoengine/headless/video';
+import {openVideo} from 'margoengine/video/codecs';
+
+const data = new Uint8Array(64 * 64 * 4);
+for (let i = 0; i < data.length; i += 4) data.set([255, 0, 0, 255], i);
+const file = await encodeVideo(
+  Array.from({length: 4}, () => ({width: 64, height: 64, data})),
+  {format: 'mp4', codec: 'avc1.42001e', fps: 10},
+);
+using video = await openVideo(new Blob([file.bytes]));
+const frame = await video.seek(0.2);
+console.log(video.currentFrame, video.timestamp(video.currentFrame)); // 2, 0.2 seconds
+// A VideoFrame can feed videoMaterial, drawImage, or a custom renderer.
+frame.close();
+const next = await video.step(); // Frame 3 in presentation order.
+next.close();
+```
+
+`frame(index)` selects an exact zero-based presentation index. `timestamp(index)` returns
+its movie time in seconds; the returned VideoFrame retains its original media timestamp
+in integer microseconds. `seek(seconds)` selects the last frame at or before a finite
+time, clamped to the ends. `step(delta = 1)` moves by a signed integer frame count,
+clamped to the ends; the initial `currentFrame` is -1, so the first `step()` returns 0.
+`frameCount` counts visible frames after edits, and `duration` is movie time in seconds.
+No wall clock, HTML video seeking or guessed constant frame rate is used. Reordered
+samples and variable sample durations use their composition timestamps. Movie times
+are rounded to WebCodecs' microsecond precision; colliding timestamps are refused.
+
+Each request decodes from the preceding sync sample through the end of that GOP,
+flushes delayed outputs and selects the exact timestamp, closing all other frames.
+The caller must close every returned frame after its consumers finish. Requests are
+exclusive: await a request before another seek/step; concurrency rejects with code
+`state`. A request's optional `{signal}` cancels that request without closing the video.
+The signal passed to `openVideo` controls fetching and the whole opened video's lifetime.
+`dispose()`/`Symbol.dispose` cancels pending decoding and releases buffered compressed
+bytes; previously returned frames remain caller-owned. Blob reading and codec support
+probing finish before cancellation is observed; fetch and active decoding are cancelled.
+
+Supported MP4 tables: `stsd/avc1/avcC`, `stsz`, `stsc`, `stco/co64`, `stts`, signed or
+unsigned `ctts`, optional `stss`, and one rate-1 `elst` media edit optionally preceded
+by an empty edit (versions 0 and 1). The first video track is selected; audio is ignored.
+Empty lead-in seeks clamp to the first visible frame. Self-contained, unencrypted media
+with one AVC sample description is required. Fragmented MP4, WebM, other codecs,
+external data references, arbitrary edit sequences, rotation/display transforms and
+audio synchronization are outside this entry. Unsupported structures or codecs receive
+a coded error with help link; malformed tables fail before decoding. Browser support
+for an AVC profile is checked, never assumed.
+
+The whole file, sample index and one request's GOP are buffered; large files or long
+GOPs can use substantial memory and CPU. This is an editor/sync primitive, not a
+streaming player or scheduler. WebCodecs requires a secure browser context. Decoding
+is renderer independent and also runs beside WebGL2; the separate external-texture
+material still requires WebGPU. Node and browsers without VideoDecoder receive coded
+`unsupported`. Generated MP4 colours prove random seeks, stepping, exact timestamps,
+cancellation and WebGPU material integration on RTX A6000/Edge. Reordered samples,
+chunk layouts, edit boundaries and ownership use unit stand-ins. No third-party movie,
+real B-frame bitstream, other browser/GPU or speed measurement is claimed.
+
