@@ -3766,3 +3766,10 @@ The research checkpoint in [water-query.md](water-query.md) compares Finch
 and Wald (2013) before implementation. Only papers, public descriptions and
 Margo code were read; no companion or rival implementation.
 
+
+The submitted-uniform correction compared W3C GPU for the Web Working Group,
+WebGPU (2026) queue timelines/writeBuffer and WGSL uniform resource rules,
+linked in water-query.md. The preservation proof caught an unnecessary test-only
+flux texture usage change; that rendering change was removed. Its independent
+flux oracle instead reads the existing sampleable texture in a compute pass.
+

@@ -1,0 +1,75 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "observation": {
+    "station": "46042",
+    "windSpeed": 17.2
+  },
+  "reports": [
+    {
+      "kind": "water",
+      "count": 440,
+      "maxHeight": 1.873586468366384e-7,
+      "maxNormal": 1.2772326551946378e-7,
+      "maxVelocity": 0.000784851610660553,
+      "disposedRejected": true
+    },
+    {
+      "kind": "horizon",
+      "count": 620,
+      "maxHeight": 2.2008440306309218e-7,
+      "maxNormal": 1.143238097522925e-7,
+      "maxVelocity": 0.0006354525685310364,
+      "disposedRejected": true
+    },
+    {
+      "kind": "coast",
+      "count": 410,
+      "maxHeight": 2.643184693028322e-7,
+      "maxNormal": 1.1329307325613769e-7,
+      "maxVelocity": 2.501660184217029e-8,
+      "disposedRejected": true
+    },
+    {
+      "kind": "still",
+      "count": 380,
+      "maxHeight": 1.873586468366384e-7,
+      "maxNormal": 1.2772326551946378e-7,
+      "maxVelocity": 0,
+      "disposedRejected": true
+    },
+    {
+      "kind": "fft",
+      "count": 429,
+      "maxHeight": 3.1247111786925075e-7,
+      "maxNormal": 1.2559081208340928e-7,
+      "maxVelocity": 0.00042065978050231934,
+      "disposedRejected": true
+    },
+    {
+      "kind": "folded",
+      "count": 495,
+      "maxHeight": 0.0000014494625713012965,
+      "maxNormal": 0.000003187007981159118,
+      "maxVelocity": 0.001628875732421875,
+      "disposedRejected": true
+    }
+  ],
+  "validation": null
+}

@@ -275,3 +275,58 @@ Run `node packages/water/test/fft.browser.mjs`, then the same command with
 Jacobian/normal checks and lifecycle evidence are described in
 [the batch record](../../docs/water-fft.md). These are correctness checks,
 with no timing or speed claim.
+
+## CPU wave queries
+
+Import `WaveQuery` from `@margoengine/water/query`. Capture a rendered `Water`
+or `FFTOcean` once, then query any number of world XZ positions synchronously
+on the CPU. The snapshot uses the actual displaced draw triangles, including
+camera-following grids, coastline blending and overlapping FFT folds.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Water } from '@margoengine/water';
+import { WaveQuery } from '@margoengine/water/query';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const water = Water.attach(engine, { size: [128, 128] });
+engine.render({ delta: 1 / 60 });
+const frame = await WaveQuery.capture(water);
+const surface = frame.sample(0, 0);
+if (surface) console.log(surface.height, surface.normal, surface.velocity, surface.time);
+```
+
+`sample(x, z)` returns height in metres, unit macro normal, upward geometric
+triangle normal, surface-particle XYZ velocity in m/s and rendered time in
+seconds. `heightAt`, `normalAt` and `velocityAt` return individual fields.
+All return `undefined` on dry ground or outside the finite draw mesh. Folded
+surfaces return the highest hit. The macro normal is the surface's authored
+orientation before a view-dependent underside flip; Water's shading-only
+micro ripples do not change geometry or floating-object orientation.
+
+Wave velocities differentiate the same bent Gerstner phases or transformed
+FFT fields as the renderer. Coastal motion uses the current conservative
+face flux, height gradient and sea relaxation; `still` suppresses that flow.
+This is surface-particle motion, including currents, rather than height change
+at a fixed world coordinate. It is not a boat dynamics solver.
+
+`capture(source, { signal })` defaults to no cancellation. It performs an
+explicit GPU geometry/bounds evaluation and readback; ordinary rendering and
+CPU queries perform no readback. A snapshot stays valid after the water is
+disposed and retains its original time. Capture another rendered frame to
+refresh it. Keep the previous snapshot while the next capture is pending.
+Concurrent captures are independent. Aborting, disposing or restoring the
+source during capture rejects; capture before the first draw rejects with
+linked `state`. Unrendered `setWaveHeight`/`setTime` edits do not leak into the
+last rendered snapshot. No GPU resources remain owned after capture resolves.
+
+Snapshot memory is 48 bytes per draw vertex plus 16 bytes per node of a
+GPU-built bounding hierarchy, an FFT field copy (48 bytes per spectral sample)
+or a coastal field copy (16 bytes per texel). Capturing temporarily also owns
+GPU output and staging buffers. Capture frequency and grid resolution control
+this cost. Native WebGPU and the full WebGL2 compatibility layer are supported;
+the small preview tier cannot render these water sources.
+
+`node packages/water/test/query.browser.mjs` and the same with `--compat`
+compare CPU answers to actual GPU raster samples, analytic wave motion to
+GPU finite differences, and coastal velocities to an independent flux oracle.
+Use the shared GPU lock. Sources and evidence: [wave-query record](../../docs/water-query.md).

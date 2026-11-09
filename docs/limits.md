@@ -2869,3 +2869,22 @@ its unchanged 8438 B ceiling. Core plus stage stays 23924 B, below 25000 B. The
 complete four-command Save GPU suite passes, including 484 red secondary-scene
 factory pixels, one surviving owner pass and exact failure cleanup. All 12 README
 examples pass (eight Node, four browser); no benchmark or speed claim.
+
+## Batch 234 wave queries
+
+Optional `@margoengine/water/query` captures actual rendered Water/FFTOcean
+geometry and performs synchronous CPU triangle queries. Highest overlapping
+hits win; finite mesh edges and coastal dry masks can return undefined.
+Macro normals exclude shading-only ripples and view-dependent underside
+flipping. Particle velocity includes wave motion and conservative coastal
+current; it is not Eulerian height rate or a boat solver. Snapshots retain
+rendered time and need explicit refresh. Captures use the GPU and read back
+48 B per vertex, 16 B per projected hierarchy node, and FFT/coastal source
+fields (48/16 B per sample respectively), with temporary GPU staging memory.
+The hierarchy handles arbitrary segment counts; no CPU FFT or geometry build.
+Native/full compatibility evidence and remaining limits: [water-query.md](water-query.md).
+
+Bare-peer min+gzip: `/query` 4,463 B (new ceiling 4,719 B), water root
+19,846 -> 20,013 B, `/fft` 7,334 -> 7,438 B, both within existing ceilings.
+The small root changes expose an internal resource bridge, with all capture
+and query implementation in the optional entry. Core + stage stays 23,924 B.

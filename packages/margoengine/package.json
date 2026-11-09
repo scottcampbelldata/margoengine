@@ -3474,6 +3474,10 @@
       "types": "./dist/water/fft.d.ts",
       "import": "./dist/water/fft.js"
     },
+    "./water/query": {
+      "types": "./dist/water/query.d.ts",
+      "import": "./dist/water/query.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

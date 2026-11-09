@@ -18,6 +18,7 @@ import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shar
 export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
+import { queryStates } from './query-state.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -609,6 +610,23 @@ export class Water implements EnginePlugin {
         }
       }
     this.count = this.triangles.length;
+    queryStates.set(this, () =>
+      this.disposed || !this.engine?.gpu || !this.uniform || !this.view?.groups.length
+        ? undefined
+        : {
+            kind: 'water',
+            device: this.engine.gpu,
+            token: this.uniform,
+            values: this.values,
+            time: this.values[20],
+            shader: this.shaderCode.slice(0, this.shaderCode.indexOf('struct Output')),
+            segments,
+            positions: this.positions,
+            resources: this.view.resources[this.view.drawn],
+            coast: this.coastal,
+            still: this.shaderCode.includes('const STILL=true;'),
+          },
+    );
   }
   static attach(engine: EngineKernel, options: WaterOptions = {}): Water {
     const effect = new Water(options);

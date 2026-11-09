@@ -13,6 +13,7 @@ import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { resolveMSAA } from '../../shared/msaa.js';
 import { oceanCompute, oceanSurface } from './fft-shaders.js';
+import { queryStates } from './query-state.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   COPY_DST: number;
@@ -208,6 +209,22 @@ export class FFTOcean implements EnginePlugin {
     this.frame.set(this.lengths, 40);
     this.frame.set(color, 44);
     this.indices = new Uint32Array(this.segments * this.segments * 6);
+    queryStates.set(this, () =>
+      this.disposed || !this.engine?.gpu || !this.frameBuffer || this.renderedTime === undefined
+        ? undefined
+        : {
+            kind: 'fft',
+            device: this.engine.gpu,
+            token: this.frameBuffer,
+            values: this.frame,
+            time: this.renderedTime,
+            shader: oceanSurface(this.resolution, this.lengths.length).split('struct SurfaceVertex')[0],
+            segments: this.segments,
+            resolution: this.resolution,
+            lengths: this.lengths,
+            field: this.result,
+          },
+    );
     for (let z = 0; z < this.segments; z++)
       for (let x = 0; x < this.segments; x++) {
         const a = z * (this.segments + 1) + x,

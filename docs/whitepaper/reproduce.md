@@ -1984,3 +1984,13 @@ Run `npm run test --workspace @margoengine/save` for all 112 units, including
 max), then `npm run check:readme-run -- --packages=save`. The engine browser gate
 renders the secondary factory mesh and verifies target-only pass execution and
 failure cleanup alongside the existing real-model exact frame comparison.
+
+## Batch 234 wave-query reproduction
+
+Follow [water-query.md](../water-query.md). Run water unit tests and
+`node packages/water/test/query.browser.mjs` on native WebGPU and with
+`--compat`, using separate shared GPU leases, `--wait-max=60 --max=3`.
+The retained NOAA wind observation drives the FFT cases. Actual GPU raster
+positions/normals, finite-difference displacement velocity, an independent
+coastal face-flux oracle and lifecycle/edit invalidation are correctness
+checks. The detailed results are `batch234-water-query-*.json` in `results/`.

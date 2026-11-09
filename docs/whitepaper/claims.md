@@ -2423,3 +2423,14 @@ and skips; API, quality, sizes, parity, XR records, preview contracts, both
 sandboxes, README type checks, documentation links and all historical proofs pass.
 Lint passes with 120 existing warnings; hygiene passes. The [Save receipt](results/batch-56-save-owner-20261109.json)
 retains the full acceptance scope.
+
+## Batch 234 wave-query claim
+
+Optional `@margoengine/water/query` supplies CPU height, macro normal,
+geometric normal and surface-particle velocity from explicit rendered-frame
+snapshots of Gerstner/coastal Water and FFTOcean. The finite displaced draw
+triangles, highest folded hit and coastal dry mask define the result.
+[water-query.md](../water-query.md) records research, exact limits, raster
+agreement, independent coastal-flux evidence and GPU displacement derivatives
+on native WebGPU and the full compatibility backend. No boat dynamics,
+shading-micro-ripple geometry, universal hardware or speed claim is made.

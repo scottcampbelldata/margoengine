@@ -1930,6 +1930,15 @@ source/payload controls hold: EAC R11 passes 26/26 quality pairs, RG11 fails
 no public integration or timing claim. Full record:
 [remaining-target evidence](../whitepaper/results/batch-134-remaining-targets.json).
 
+Batch 234 water `/query`: explicit GPU capture reuses the exact drawn surface
+function/uniforms, derives particle velocity and builds projected bounds.
+Synchronous CPU queries intersect the actual finite triangles, including folds
+and signed dry masks. [Evidence and limits](../water-query.md) cover native
+and full compatibility raster agreement, a separate coastal flux oracle,
+derivative checks and lifecycle invalidation. No CPU FFT or geometry build,
+implicit readback, core/stage change or speed claim. Other GPUs/browsers and
+release throughput remain unmeasured.
+
 Batch 234 water `/fft`: a separate GPU spectrum/evolution/2D-FFT/folding-foam
 pass owns all of its buffers and writes surface colour and depth at order 4.
 Core and stage are untouched. The [batch record](../water-fft.md) defines the

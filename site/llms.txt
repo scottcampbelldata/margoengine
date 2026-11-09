@@ -217,7 +217,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 21 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 9 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 18 entry points
-- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 2 entry points
+- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 3 entry points
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 6 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 6 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 7 entry points
@@ -316,6 +316,7 @@ One page per package: every exported name with its declaration, generated from t
 - [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
 - [Verification wiring repaired during size restoration](https://margoengine.com/llms/docs/verification-repairs.md): Finding 8's full verification exposed inherited integration defects at 5ec86fe7c:
 - [Batch 234: spectral ocean](https://margoengine.com/llms/docs/water-fft.md): Scope: job 1, optional `@margoengine/water/fft`. No core or stage source changes. The previous water root exported `Water` and its…
+- [Batch 234: wave queries](https://margoengine.com/llms/docs/water-query.md): Job 2: optional `@margoengine/water/query`. Core and stage are unchanged.
 - [WebGL2 package consolidation](https://margoengine.com/llms/docs/webgl-consolidation.md): The preview and the full compatibility device belong to one optional package, `@margoengine/webgl2-compat`. The root `install()` path runs…
 - [Site demos on the WebGL2 compatibility layer](https://margoengine.com/llms/docs/webgl2-compat-demos.md): Every live demo on margoengine.com and every model of the Khronos gallery, drawn once on native WebGPU and once on the WebGL2…
 - [Batch 160: outside rendering references](https://margoengine.com/llms/docs/work-lists/batch-160-plan.md): Eight jobs, each with a separate checked commit and push. Reference renderer source is never read. Reference programs, downloaded standard…

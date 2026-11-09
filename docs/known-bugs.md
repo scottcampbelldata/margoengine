@@ -48,6 +48,14 @@ package CPU/GPU, README and quality gates pass. Native sciviz/webgl2 has no LIC 
 rejects it explicitly; compatibility-backed WebGL2 is the supported fallback.
 There is no claim of physical unsteady advection, volume LIC or arbitrary triangle-surface support.
 
+### Fixed during batch 234: unrendered edits in wave-query snapshots
+
+A draft capture uploaded Water's authored CPU parameters, which `setWaveHeight`
+can change before the next draw. Captures now bind the already submitted GPU
+uniform, ordered before subsequent render uploads. The query browser regression
+requires an unrendered zero-height edit to leave the last-drawn snapshot exactly
+unchanged on native/full compatibility. [Research and repro](water-query.md).
+
 ### Fixed: moving-flow sort centre on offset grids
 
 The initial moving-flow layer returned its model translation as the transparent sorting centre. That is

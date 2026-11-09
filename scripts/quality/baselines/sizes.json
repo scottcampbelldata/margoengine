@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11919203,
+  "total": 11923922,
   "history": [
     {
       "date": "2026-10-24",
@@ -6213,6 +6213,7 @@
     "@margoengine/staging/ground": 9363,
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/water/fft": 7590,
-    "@margoengine/sciviz/lic": 24165
+    "@margoengine/sciviz/lic": 24165,
+    "@margoengine/water/query": 4719
   }
 }
