@@ -6,6 +6,10 @@ WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, H
 
 Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
 
+For grass on terrain, use the [scatter heightmap and density-map example](../scatter/README.md#density-maps-a-grid-that-follows-the-camera-and-stored-tiles).
+Scatter also provides [interaction and trampling](../scatter/README.md#interaction-and-trampling-margoenginescatterinteract)
+and [streamed grass chunks with three LOD meshes](../scatter/README.md#tile-input-storage).
+
 Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh

@@ -4718,6 +4718,11 @@ The sky README bakes its environment, then starts the progressive viewport indep
 
 History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
 
+Skip-audit item 5 supplies a complete 2x2x2 identity Cube in the tonemap README;
+it is an example using the existing 2..65 parser bound, not a new LUT limit.
+Smooth PixelCamera and the physical-camera and terrain-grass pointers expose
+existing APIs without changing runtime behavior, exports or entry sizes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -7390,6 +7395,22 @@ The history landing README run failed at the unchanged 20-second module-completi
 
 After the compatibility example repair, the runtime README gate reached the sky example and hit the unchanged 20-second module-completion limit. The isolated cache-disabled diagnostic completed: the sky bake finished before attach, while trace compilation took most of initialization. This did not reproduce the full-run deadline failure. The example nevertheless awaited full readiness before its sole render call. A controlled unresolved-trace regression fails that initialization dependency and passes with the existing progressive loop, eventual tracing and pagehide disposal. All 9 runtime README examples now pass with the unchanged 20-second module limit.
 
+### Skip-audit item 5: complete executable examples (2026-11-09)
+
+PixelCamera now shows smooth: true with fractional movement; tonemap points to
+PhysicalCamera, and creative points to grass interaction and terrain chunks/LOD.
+The first tonemap example also supplied no grade.cube asset. It now contains
+a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
+README regression fails before the repair and passes with exact identity samples,
+LUT clearing and both owners disposed. Research: docs/work-lists/skip-gaps-research.md.
+Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
+or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
+passes all ten package GPU suites and all 19 executable README examples with
+zero exceptions (59.5 s combined). No size ceiling, runtime or export changed.
+The earlier recording-enabled verify attempt was interrupted during shadow-cache
+bookkeeping before its test chains; the complete successful run disabled only
+shadow recording, never checks or result work. Evidence: test-results/skip-gaps/item5-*.log.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -9771,13 +9792,14 @@ Core stays the same size: an app that does not import this package ships none of
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { LayerCompositor } from 'margoengine/pixel';
+import { LayerCompositor, PixelCamera } from 'margoengine/pixel';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
 const engine = await EngineKernel.create(canvas, { exactSize: [640, 360] });
 
 // A 160 x 90 view. With no zoom set it takes the largest whole number that fits: 4 here.
-const compositor = LayerCompositor.attach(engine, { camera: { width: 160, height: 90 } });
+const camera = new PixelCamera({ width: 160, height: 90, smooth: true });
+const compositor = LayerCompositor.attach(engine, { camera });
 
 // A picture fixed in the world, at half the camera's speed. An ImageBitmap works too.
 const data = new Uint8Array(160 * 90 * 4).fill(255);
@@ -9790,9 +9812,12 @@ glow.write({ width: 160, height: 90, data });
 
 engine.start();
 
-// Moves nothing until the scroll reaches a whole low-res pixel.
+// With smooth: true, half a low-res pixel moves two output pixels at zoom 4.
 compositor.camera.x += 0.5;
 ```
+
+`smooth: true` carries fractional low-res scroll into whole output pixels, preserving crisp texels. The default is
+`false`: scrolling then waits for a whole low-res pixel. View layers include the extra border needed by smooth scroll.
 
 Draw into a layer with `@margoengine/sprites`, which reads the layer's target and camera each frame, or with a core view.
 A sprite layer's order must be below the compositor's, and its default of 10 is. Views into layers come before the canvas:
@@ -10400,6 +10425,11 @@ Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/to
 
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 
+For exposure driven by aperture, shutter time and ISO, use
+[`PhysicalCamera` from `@margoengine/cameras/physical`](../cameras/README.md#physical-exposure-margoenginecamerasphysical).
+Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
+sets Tonemap's exposure in stops.
+
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
@@ -10407,7 +10437,17 @@ const stage = await createStage('#viewport', {backend:'webgpu'});
 const tonemap = Tonemap.attach(stage.engine, {curve:'neutral', exposure:0, contrast:1});
 tonemap.options.exposure = 1;
 tonemap.options.curve = 'agx';
-tonemap.setLUT(await (await fetch('/grade.cube')).text());
+// A complete identity Cube LUT; replace its RGB rows with your own grade.
+tonemap.setLUT(`LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+`);
 tonemap.setLUT(null);
 tonemap.dispose();
 stage.dispose();
@@ -10444,18 +10484,6 @@ All are off by default and compiled in only when asked for: without them the sha
   swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure.
   Every mode shares one compute pipeline; checked on a real GPU against a CPU oracle of the meter within 0.002 stops in
   all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, M6 Mac mini, Metal).
-
-```ts
-import {createStage} from 'margoengine';
-import {Tonemap} from 'margoengine/tonemap';
-const stage = await createStage('#viewport', {backend: 'webgpu'});
-const tonemap = Tonemap.attach(stage.engine, {autoExposure: {method: 'histogram', metering: 'center'}});
-tonemap.options.autoExposure = {metering: 'spot', spot: {x: 0.5, y: 0.4, radius: 0.08}}; // meter the face
-stage.dispose();
-```
-- `temperature` is the colour temperature of the scene's light (1667-25000 K, default 6500 = no change): 3200 cools tungsten light to neutral. `tint` runs from -1 (green) to 1 (magenta). The gain keeps luminance.
-- `vignette` 0-1 with `vignetteRadius` and `vignetteSoftness` (fractions of the distance to the corner; defaults 0.5). Per view when the engine draws several.
-- `grain` 0-1 is film grain that changes every frame, strongest in the mid-tones.
 
 [README continues: https://margoengine.com/llms/packages/tonemap.md]
 
@@ -11349,6 +11377,10 @@ WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, H
 
 Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
 
+For grass on terrain, use the [scatter heightmap and density-map example](../scatter/README.md#density-maps-a-grid-that-follows-the-camera-and-stored-tiles).
+Scatter also provides [interaction and trampling](../scatter/README.md#interaction-and-trampling-margoenginescatterinteract)
+and [streamed grass chunks with three LOD meshes](../scatter/README.md#tile-input-storage).
+
 Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
@@ -11412,8 +11444,6 @@ meadow.windStrength = 0.6;
 // Remove this field early, or let stage.dispose() release it with the scene.
 meadow.dispose();
 ```
-
-`GrassField.attach(engine, options)` takes any core engine (`new GrassField({engine}, options)` is the older form). It advances `windTime` by the frame delta, supports multiple fields, and rebuilds GPU resources after device restoration. Do not add a second time increment in `onTick`. All roots lie on Y=0 in a rectangle centered on the origin.
 
 [README continues: https://margoengine.com/llms/packages/creative.md]
 

@@ -2667,3 +2667,19 @@ The history landing README run failed at the unchanged 20-second module-completi
 ### Fixed: sky README waited for tracing before starting (Batch 99)
 
 After the compatibility example repair, the runtime README gate reached the sky example and hit the unchanged 20-second module-completion limit. The isolated cache-disabled diagnostic completed: the sky bake finished before attach, while trace compilation took most of initialization. This did not reproduce the full-run deadline failure. The example nevertheless awaited full readiness before its sole render call. A controlled unresolved-trace regression fails that initialization dependency and passes with the existing progressive loop, eventual tracing and pagehide disposal. All 9 runtime README examples now pass with the unchanged 20-second module limit.
+
+### Skip-audit item 5: complete executable examples (2026-11-09)
+
+PixelCamera now shows smooth: true with fractional movement; tonemap points to
+PhysicalCamera, and creative points to grass interaction and terrain chunks/LOD.
+The first tonemap example also supplied no grade.cube asset. It now contains
+a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
+README regression fails before the repair and passes with exact identity samples,
+LUT clearing and both owners disposed. Research: docs/work-lists/skip-gaps-research.md.
+Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
+or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
+passes all ten package GPU suites and all 19 executable README examples with
+zero exceptions (59.5 s combined). No size ceiling, runtime or export changed.
+The earlier recording-enabled verify attempt was interrupted during shadow-cache
+bookkeeping before its test chains; the complete successful run disabled only
+shadow recording, never checks or result work. Evidence: test-results/skip-gaps/item5-*.log.

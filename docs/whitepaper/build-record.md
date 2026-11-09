@@ -4636,3 +4636,19 @@ Graphics, SIGGRAPH 1995, https://graphics.stanford.edu/papers/camera/; W3C GPU f
 the Web Working Group, WebGPU, 2026, https://www.w3.org/TR/webgpu/.
 Sampling and optical exposure are separate concerns; the attachment/resource
 rules support sharing the existing PostStack capture. No foreign code was read.
+
+### Skip-audit item 5: complete executable examples (2026-11-09)
+
+PixelCamera now shows smooth: true with fractional movement; tonemap points to
+PhysicalCamera, and creative points to grass interaction and terrain chunks/LOD.
+The first tonemap example also supplied no grade.cube asset. It now contains
+a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
+README regression fails before the repair and passes with exact identity samples,
+LUT clearing and both owners disposed. Research: docs/work-lists/skip-gaps-research.md.
+Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
+or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
+passes all ten package GPU suites and all 19 executable README examples with
+zero exceptions (59.5 s combined). No size ceiling, runtime or export changed.
+The earlier recording-enabled verify attempt was interrupted during shadow-cache
+bookkeeping before its test chains; the complete successful run disabled only
+shadow recording, never checks or result work. Evidence: test-results/skip-gaps/item5-*.log.

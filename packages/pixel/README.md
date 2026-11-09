@@ -9,13 +9,14 @@ Core stays the same size: an app that does not import this package ships none of
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { LayerCompositor } from 'margoengine/pixel';
+import { LayerCompositor, PixelCamera } from 'margoengine/pixel';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
 const engine = await EngineKernel.create(canvas, { exactSize: [640, 360] });
 
 // A 160 x 90 view. With no zoom set it takes the largest whole number that fits: 4 here.
-const compositor = LayerCompositor.attach(engine, { camera: { width: 160, height: 90 } });
+const camera = new PixelCamera({ width: 160, height: 90, smooth: true });
+const compositor = LayerCompositor.attach(engine, { camera });
 
 // A picture fixed in the world, at half the camera's speed. An ImageBitmap works too.
 const data = new Uint8Array(160 * 90 * 4).fill(255);
@@ -28,9 +29,12 @@ glow.write({ width: 160, height: 90, data });
 
 engine.start();
 
-// Moves nothing until the scroll reaches a whole low-res pixel.
+// With smooth: true, half a low-res pixel moves two output pixels at zoom 4.
 compositor.camera.x += 0.5;
 ```
+
+`smooth: true` carries fractional low-res scroll into whole output pixels, preserving crisp texels. The default is
+`false`: scrolling then waits for a whole low-res pixel. View layers include the extra border needed by smooth scroll.
 
 Draw into a layer with `@margoengine/sprites`, which reads the layer's target and camera each frame, or with a core view.
 A sprite layer's order must be below the compositor's, and its default of 10 is. Views into layers come before the canvas:

@@ -4,6 +4,11 @@ Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/to
 
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 
+For exposure driven by aperture, shutter time and ISO, use
+[`PhysicalCamera` from `@margoengine/cameras/physical`](../cameras/README.md#physical-exposure-margoenginecamerasphysical).
+Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
+sets Tonemap's exposure in stops.
+
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
@@ -11,7 +16,17 @@ const stage = await createStage('#viewport', {backend:'webgpu'});
 const tonemap = Tonemap.attach(stage.engine, {curve:'neutral', exposure:0, contrast:1});
 tonemap.options.exposure = 1;
 tonemap.options.curve = 'agx';
-tonemap.setLUT(await (await fetch('/grade.cube')).text());
+// A complete identity Cube LUT; replace its RGB rows with your own grade.
+tonemap.setLUT(`LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+`);
 tonemap.setLUT(null);
 tonemap.dispose();
 stage.dispose();

@@ -2130,3 +2130,8 @@ The WebGL2 compatibility README example also initializes independently of full t
 The sky README bakes its environment, then starts the progressive viewport independently of full tracer readiness. The bake still has its documented AbortSignal; no bake or driver-compilation deadline was raised. Preview-to-tracing startup is proven separately from any compilation-time bound.
 
 History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
+
+Skip-audit item 5 supplies a complete 2x2x2 identity Cube in the tonemap README;
+it is an example using the existing 2..65 parser bound, not a new LUT limit.
+Smooth PixelCamera and the physical-camera and terrain-grass pointers expose
+existing APIs without changing runtime behavior, exports or entry sizes.

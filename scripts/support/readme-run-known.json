@@ -31,7 +31,6 @@
   "rigging/readme-retarget-presets-margoengine-rig-9101f3": "sample: RangeError: Retarget source naming is not recognised; pass from (mixamo, godot, roblox, margo or humanoid)",
   "rigging/readme-spring-bones-and-jiggle-margoeng-a41e82": "sample: RangeError: Spring center must be the chain's first joint or an ancestor of it",
   "rigging/readme-vrm-avatars-margoengine-rigging-009c8e": "sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum",
-  "tonemap/readme-margoengine-tonemap-5802b3": "sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header",
   "usdz/readme-composition-fbebfe": "sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404",
   "voxel-edit/readme-voxel-files-657e4f": "sample: RangeError: QB file holds 1634476140 matrices, over 4096; split the file",
   "voxel/readme-bevels-and-baked-light-render-e03f31": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
