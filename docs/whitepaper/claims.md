@@ -2179,6 +2179,14 @@ leaf now tests both backends with identical input-count and pixel assertions:
 47,234 lit pixels, zero differing pixels per backend. No runtime, speed or
 whole-package compatibility claim follows from this one regression.
 
+Full-tier materials features fixture evidence: all 15 groups pass on native
+WebGPU and full compatibility. Optional clip distances remain native-only;
+the compatibility discard fallback passes the same plane, depth, shadow,
+instancing and live-change pixel checks. Native rasterizer and discard differ
+at 192 edge pixels and zero away from the cut; compatibility's requested and
+unrequested feature cases match exactly. This is test coverage, with no new
+renderer or speed claim and no claim for the other indexed suite failures.
+
 The compute scene-owner regression is now registered in the package GPU plan;
 the planner still rejects unregistered browser leaves. Its native and full-layer
 cases retain all 1,024 four-dispatch values and every owner/disposal assertion.

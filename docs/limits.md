@@ -2565,6 +2565,13 @@ zero differing pixels with input trimming disabled. This fixture-only repair
 changes no package runtime entry, precision limit or size ceiling, and closes
 only that indexed suite failure.
 
+The materials features leaf now also selects native and full compatibility
+explicitly. All 15 groups pass on both. Native clip distances retain rasterizer
+edge coverage (192 pixels differ from discard, none away from the cut); full
+compatibility advertises no clip distances and both discard images match
+exactly. Shadow, instancing, depth and live plane-change bars are unchanged.
+This test-only repair changes no runtime entry, size ceiling or precision limit.
+
 The separate compute scene-owner GPU leaf is registered in its package manifest,
 with an explicit native baseline before the full-layer case. Exactly four
 dispatches are the value oracle, not a readiness delay. No runtime size or

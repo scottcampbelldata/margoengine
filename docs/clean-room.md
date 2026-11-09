@@ -3552,3 +3552,11 @@ an oblique projection would change the depth contract rather than test the
 existing fallback. Keep the native rasterizer checks and independently require
 the compatibility device to use discard, with the same plane, depth, shadow,
 instancing and live-switch pixel bars. No companion or rival source was read.
+
+The original forced-compatibility leaf fails exactly at the feature expectation,
+despite zero wrong pixels and exact fallback-image equality. The corrected
+canonical leaf runs all 15 feature groups on native WebGPU and full compatibility;
+both pass, with every original numeric bar retained. Native clipping still
+differs only along the cut (192 edge pixels, none outside). Compatibility's
+requested/unrequested feature images match exactly. Materials units pass 402/402.
+Receipts: test-results/batch-273-features-before.log and -features-after.log.

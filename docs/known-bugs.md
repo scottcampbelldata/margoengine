@@ -242,9 +242,11 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline; the process tree was killed. Native evidence for the complete suite
   was 113 s. No new timeout or speed claim is justified; isolate the await and
   determine actual compatibility work before changing a limit.
-- `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
-  which it does not. The feature expectation needs owning-package investigation,
-  preserving native feature coverage. The separate vertex-inputs fixture was
+- Resolved `materials/test:gpu:features`: the fixture assumed every adapter
+  advertises optional `clip-distances`. The canonical leaf now selects native
+  and full compatibility explicitly, preserving native rasterizer coverage and
+  requiring compatibility discard with the original plane/depth/shadow bars.
+  All 15 feature groups pass on both devices. Vertex-inputs was separately
   repaired by observing the engine's actual device (see batch 273 evidence below).
 - `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
   compressed texture because its view-copy path requires a renderable format.

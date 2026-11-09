@@ -2033,6 +2033,14 @@ assertions. The package GPU suite used by check:merge runs this two-backend leaf
 No renderer, shader or runtime API changed. Other indexed compatibility failures
 remain separate obligations.
 
+The materials features GPU leaf likewise explicitly selects native and full
+compatibility, retaining all 15 feature groups on each. Native clip-distances
+assertions still require hardware clipping; compatibility explicitly requires
+the unavailable optional feature to use discard. Both retain every plane,
+depth, shadow, instancing and live-switch pixel bound. The original forced
+compatibility run fails its feature expectation; the corrected full leaf passes
+both devices. No shader or backend behavior changed, and Bug 45 stays lane-U's.
+
 The inherited compute scene-owner browser regression was missing from its package
 GPU scripts. The planner correctly rejected that gap. A dedicated package script
 and planner regression now keep it in check:merge. Its four render calls define

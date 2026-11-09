@@ -1289,6 +1289,10 @@ whose vertex outputs reach location 13 (`eye()`, `hair()` with a mesh-axis `dire
 inter-stage slots and instancing one more; and the passes that do not run the colour shader (picking, TAA velocity,
 contact shadows, local shadows).
 
+`npm run test:gpu:features --workspace @margoengine/materials` checks native WebGPU and the full WebGL2 compatibility
+device explicitly. Native coverage includes rasterizer cuts; compatibility coverage requires the discard fallback,
+including instancing, shadows and live plane changes, with the same pixel and depth bounds.
+
 ```ts
 import { Engine } from 'margoengine/core';
 import { Material, createMesh } from 'margoengine/materials';

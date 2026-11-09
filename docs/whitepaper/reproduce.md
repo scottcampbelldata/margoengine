@@ -1933,3 +1933,15 @@ The normalized source hashes cover every published row; numerical checks
 cover interpolation, reversal and sRGB/linear float32 tables. Research and
 original data container hashes: [size restoration](../size-restore.md), finding 8.
 No timing or new display perceptual claim is made.
+
+Batch 273 failure 6: after building packages, run
+`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/features-browser.mjs`.
+The canonical leaf explicitly opens native then full compatibility, even under
+MARGO_COMPAT=1. Every one of the 15 groups runs on both devices. Add `clip` to
+isolate the plane/depth/shadow/instancing/live-switch regression. Original
+forced-compatibility fixture fails its clip-distances expectation; corrected
+complete leaf passes in 66.4 s including orchestration, a duration receipt only.
+Logs: test-results/batch-273-features-before.log and -features-after.log.
+Materials units pass 402/402. No pixel bound, shader, runtime entry or ceiling
+changed. Core plus stage remains 23,924 B; the size gate is recorded with the
+landing checks. This closes features separately from vertex-inputs (2/26 total).
