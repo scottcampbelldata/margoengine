@@ -1,7 +1,7 @@
 # Test-page bug review
 
-Working-tree review only: implementation statuses below are unlanded. Final verify,
-GPU package suites, README execution, rebasing, commit and push remain pending.
+Implementation is preserved in separate local commits and rebased onto origin/main
+269da2b90. Final verify, GPU package suites, README execution and push remain pending.
 
 Source: the read-only, untracked test-page log in the main checkout. Reviewed on
 2026-11-09 against origin/main b9985bd07. Road entries 1, 2 and 6 are included by
@@ -49,7 +49,7 @@ harness hung restoring the lost GL context from the loss-event dispatch. It now
 waits for the next task, and event waits have a 10 s hard limit; loss and actual
 restoration both pass. Core + stage currently measures 23,837 B gzip, below the
 unchanged 25,000 B gate. SDF entry: 1,856 B gzip; sdf.wasm: 40,798 B raw / 17,310 B
-gzip. Textures joined entry (including lazy fragment code): 5,008 B gzip; complete
+gzip. Textures joined entry (including lazy fragment code): 5,030 B gzip; complete
 tree helper: 3,144 B gzip. These are size measurements, with no speed claim.
 
 ## Follow-up entries discovered before handoff
@@ -63,3 +63,16 @@ removal (25), video preview (26), forced compatibility installation docs (27),
 explicit fallback configuration (28), VFX preview (29), splats preview (30), and
 pixel/lighting2d preview (31). Check the separate whole-class preview brief before
 editing overlapping code. Their listing here is not a defect finding or waiver.
+
+## Local bug commits before gates
+
+Each implementation was committed before resuming gates: 1 `441e94276`,
+2 `f8ec42559`, 6 `fc29ef757`, 7 `e161c8b1a`, 8 `bf538cf01`,
+9 `71ef97171`, 10 `a4df18805`, floating crowns `529a10616`,
+11 `09d835599`, 12 `ef5247d1e`, 13 `6a4f24a76`, 14 `9b6f1d665`,
+16 `6b064b64b`, 18 `4bfd3ed76`, 19 `43aa7b861`. These IDs precede
+any later rebase; the commit subjects retain the entry numbers. API regeneration
+after rebuilding procedural, sciviz and staging reports 886 entries/8,634 exports
+with no unrelated snapshot changes. The final procedural suite passes 101 tests.
+The latest Added section assigns 20, 23, 24 and 25 after this batch lands;
+21, 22 and 26-31 belong to lane S. Physics remains on hold.

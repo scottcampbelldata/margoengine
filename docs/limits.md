@@ -1829,7 +1829,7 @@ physics feature, speed claim or general civil-road/topology guarantee.
 
 Test-page measured sizes: core plus stage 23,837 B gzip (limit 25,000 unchanged);
 SDF entry 1,856 B gzip with feature-local asset 40,798 B raw / 17,310 B gzip;
-joined texture entry 5,008 B gzip, including its lazily loaded native fragment path;
+joined texture entry 5,030 B gzip, including its lazily loaded native fragment path;
 optional complete-tree placement 3,144 B gzip. No wall-time performance claim.
 Both native texture backends pass 88,830 oracle channel checks at maximum error
 one RGBA8 step, with parity, phase seams, state restoration, loss, restoration,
