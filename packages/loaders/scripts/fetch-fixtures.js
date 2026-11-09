@@ -4,6 +4,21 @@ import { fileURLToPath } from 'node:url';
 import { fetchFixture } from '../../../scripts/support/fetch-fixture.mjs';
 const sources = [
   [
+    'sphere.vdb',
+    'https://media.githubusercontent.com/media/AcademySoftwareFoundation/openvdb-website/3d8fd4d3f2d670464f4390e2775cfc87274233dc/download/models/sphere.vdb',
+    'bb884a9a38354e47191c4ece4a11d1e051594a910fde56501cfc51ff52b171ab',
+  ],
+  [
+    'box.off',
+    'https://people.sc.fsu.edu/~jburkardt/data/off/box.off',
+    '805a04c722a2ebd82faf28ef000cdd13a2730ef0196598928b4e03c6ed56c894',
+  ],
+  [
+    'mctri.off',
+    'https://people.sc.fsu.edu/~jburkardt/data/off/mctri.off',
+    '1dae1f3a2c9e49cff68c55ef47cfcdd9c35633c9106543d6041d8b4a5f7fb0aa',
+  ],
+  [
     'bunny.pcd',
     'https://raw.githubusercontent.com/PointCloudLibrary/pcl/3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d/test/bunny.pcd',
     'f5418a140de7a21adc8a46b83bca8ee05b0ebd5a5fe3ca8a0925bcb6535ed511',

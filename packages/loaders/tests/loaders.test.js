@@ -492,7 +492,7 @@ test('OFF: plain, COFF with 0-255 colors, NOFF, STOFF, comments and counts on th
   assert.equal(points.kind, 'points');
 });
 
-test('OFF: errors and real libigl files', () => {
+test('OFF: errors and LGPL Geomview files', () => {
   rejects(() => parseOFF(text('PLY\n')), 'header');
   rejects(() => parseOFF(text('OFF BINARY\n')), 'unsupported');
   rejects(() => parseOFF(text('4OFF\n')), 'unsupported');
@@ -502,25 +502,29 @@ test('OFF: errors and real libigl files', () => {
   rejects(() => parseOFF(text('OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n4 0 1 2\n')), 'syntax');
   rejects(() => parseOFF(text('OFF\n3 1 0\n0 0 0\n1 0 x\n0 1 0\n3 0 1 2\n')), 'syntax');
   rejects(() => parseOFF(text('OFF\n3000000000 1 0\n')), 'limit');
-  const cube = fixture('cube.off'),
-    knight = fixture('decimated-knight.off');
+  const cube = fixture('box.off'),
+    letters = fixture('mctri.off');
   const c = parseOFF(cube);
   assert.equal(c.positions.length / 3, 8);
   assert.equal(c.indices.length / 3, 12);
-  assert.deepEqual(bounds(c.positions), { min: [-1, -1, -1], max: [1, 1, 1] });
-  const k = parseOFF(knight),
-    lines = new TextDecoder().decode(knight).trim().split('\n');
-  assert.equal(k.positions.length / 3, 502);
-  assert.equal(k.indices.length / 3, 1000);
+  assert.deepEqual(bounds(c.positions), { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] });
+  const k = parseOFF(letters),
+    lines = new TextDecoder()
+      .decode(letters)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+  assert.equal(k.positions.length / 3, 405);
+  assert.equal(k.indices.length / 3, 810);
   closeArray(
     k.positions,
-    lines.slice(2, 504).flatMap((l) => l.trim().split(/\s+/).map(Number)),
+    lines.slice(2, 407).flatMap((l) => l.trim().split(/\s+/).map(Number)),
     1e-6,
-    'knight',
+    'MC letters',
   );
   assert.deepEqual(
     [...k.indices],
-    lines.slice(504, 1504).flatMap((l) => l.trim().split(/\s+/).slice(1).map(Number)),
+    lines.slice(407, 1217).flatMap((l) => l.trim().split(/\s+/).slice(1, 4).map(Number)),
   );
 });
 

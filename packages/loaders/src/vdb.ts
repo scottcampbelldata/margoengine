@@ -458,6 +458,8 @@ class ValueReader {
   private async raw(count: number): Promise<{ view: DataView; base: number }> {
     const { reader, codec, compression, half } = this,
       size = count * codec.components * (half ? 2 : codec.size);
+    // The half-value stream omits empty arrays; full-precision streams retain their compressed-size prefix.
+    if (size === 0 && half) return { view: new DataView(new ArrayBuffer(0)), base: 0 };
     let bytes: Uint8Array;
     if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
       const packed = reader.i64('compressed size');

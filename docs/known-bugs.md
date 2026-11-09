@@ -11,6 +11,19 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+### Fixed 2026-11-09: VDB empty half-value blocks shifted the next node
+
+The pinned OpenVDB website sphere and smoke samples exposed a read of an eight-byte compressed-size prefix
+when a half-precision node has zero stored values. That prefix is absent; consuming the next node's bytes led to unknown
+value kind -1. The owning VDB reader now consumes no bytes for an empty value array. Its synthetic writer had
+mirrored the error and now emits the actual layout. ZIP/Blosc empty-node tests and a required, licensed real
+sphere regress the failure, comparing leaf count, active voxels and bounds with stored metadata.
+
+The old libigl/Cosmic Blobs knight fixture has no verified licence grant. It remains solely because held physics
+tests and the existing benchmark workload read it; this audit does not replace those workloads while physics
+is on hold. Loader comparisons now use explicitly LGPL-licensed Geomview files.
+
+
 ### Fixed 2026-11-09: SQL-store integration cleanup kept verify alive
 
 The newly landed SQL-store restart test registered folder removal before its second server/database cleanup.
@@ -46,12 +59,12 @@ and executable skip/return patterns; `tests/python-venv.test.js` checks missing 
 flags unset. [The inventory](work-lists/missing-test-items.md) separates batch 160, held physics and
 remaining unverified real-file variants. Their proof gaps are not claimed fixed by the gate.
 
-### Open 2026-11-09: exporter capture browser shutdown exceeded its deadline
+### Fixed by lane-M 2026-11-09: exporter capture browser shutdown exceeded its deadline
 
 - **Repro:** after a package build, run `node scripts/gpu-lock.mjs run --owner=codex-missing -- node packages/exporters/tests/capture-browser.mjs` with a process-tree limit. The required-input audit's 19-suite GPU run observed this at base `c1646e3ec` plus test-only edits, RTX A6000, Edge 157.0.4341.42.
 - **Observed:** all capture/render/GIF/JPEG/WebM assertions printed success, then `closeAll` threw `SHUTDOWN_TIMEOUT`, still open: browser, at its unchanged 30,000 ms deadline. The suite failed in 36 s; the other 18 selected suites, including real Jupyter notebooks, passed.
 - **Cause narrowed, not isolated:** shutdown awaits the wrapped browser close before closing the server. The owned Chromium wrapper waits for both `server.kill()` and the connected client's ordinary `close()` through `Promise.allSettled`; at least one browser teardown wait did not settle before the deadline. The failing run did not instrument the two promises independently, so it does not identify which one or establish a load-only explanation.
-- **Owner:** Scott assigned this GPU teardown hang to batch 160 in lane-M (2026-11-09). This lane does not work on it or count the suite as passing. No retry, budget increase or assertion change was made. Logs remain in the lane's ignored `test-results/missing-items/gpu-packages.log`; the active [work list](work-lists/missing-test-items.md) records the owner.
+- **Resolution:** lane-M fixed the owning Chromium shutdown path in `cff40d127`. Once a GPU slot became available, this lane reran capture successfully, including teardown (4 seconds); no browser/shutdown source changed here. Scott assigned this GPU teardown hang to batch 160 in lane-M (2026-11-09). This lane does not work on it or count the suite as passing. No retry, budget increase or assertion change was made. Logs remain in the lane's ignored `test-results/missing-items/gpu-packages.log`; the active [work list](work-lists/missing-test-items.md) records the owner.
 
 ### Fixed 2026-11-08: text extrusion API report
 

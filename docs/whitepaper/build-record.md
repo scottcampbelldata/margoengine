@@ -3820,3 +3820,34 @@ on that parent and 64 after repair. The explicit cap still returns 32. Recorded 
 `results/scatter-tile-budget-20261109.json`; Node and GPU tests are already in check:merge's package coverage.
 Targets prose corrected to its unchanged measured 11,373 B minified / 4,027 B gzip; its 4,277 B budget is unchanged.
 Current tiles: 8,234 B minified / 3,401 B gzip within the unchanged 3,415 B budget. No public API or core/stage changes.
+
+
+## Required test items: licensed OFF and empty half-value VDB blocks
+
+The loader's two OFF comparisons now read the unchanged LGPL Geomview box and MC-letter files, with pinned
+hashes, source attribution and licence texts. Full position/triangle comparisons remain; MC's per-face RGBA is
+not imported. The old cube is removed, while the legacy knight remains for held physics and unchanged workloads.
+
+A clearly licensed OpenVDB website sphere/smoke download exposed an owning-reader bug: an empty half-precision
+array has no size prefix. Consuming eight bytes advanced into the following node and failed with kind -1.
+The reader and the synthetic test writer now follow the observed layout; ZIP and Blosc regressions plus a required
+version-223 real sphere cover it. Its 1,451 leaves, 270,638 active voxels and bounds match embedded metadata.
+The malformed LGPL MATLAB big-endian cow PLY is correctly refused, not counted as proof of a valid real PLY.
+No core/stage, physics, exported API, benchmark workload or numeric tolerance changed. Remaining README
+asset wiring and source investigations stay explicit in missing-test-items.md.
+
+
+The first full verify of this follow-up caught an overbroad empty-block change in the existing Blender
+volume regression. Native OpenVDB 13 then wrote/read the same grid twice, once at each precision: full
+storage retains its empty compressed block; half storage omits it. The final fix follows that distinction,
+without a version/input special case. Paired native version-225 fixtures/oracles and the existing Blender
+volume test preserve the full-precision path; ZIP/Blosc synthetic cases cover empty internal and leaf nodes
+at both precisions. No assertion or numeric tolerance changed. The outside half sphere remains the independent
+real-file regression, rather than being replaced by the generated control grids.
+
+
+Final follow-up checks: lint, hygiene and full verify passed (13,233 pass, zero failures/skips, 294.4 s),
+70 focused loader/VDB/Blender tests, both loader GPU suites, the pinned fixture fetch, and README execution.
+The README command ran 11/27, accepting 16 unchanged known exceptions; their repair remains in the work list.
+After GPU capacity opened, exporter capture passed rendering and teardown in 4 seconds on lane-M's cff40d127 fix.
+This lane made no shutdown change. API reports match and public core/stage size numbers are unchanged.

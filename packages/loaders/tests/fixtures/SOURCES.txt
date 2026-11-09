@@ -3,9 +3,12 @@ Fixtures for tests/loaders.test.js (each under 1 MB).
 Missing fixtures now fail; they never skip a comparison. fetch-fixtures.js pins and SHA-256 checks PCL at
 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d and PyVista data at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3.
 PyVista's data repository LICENSE is Apache-2.0. Fetch hashes are source bytes before Git CRLF conversion.
-The libigl README attributes cube.off to libigl and decimated-knight.off to Cosmic Blobs but states no explicit
-licence. Those already tracked files are not re-fetched by the script; restore them with git restore. This audit
-does not assert a new redistribution grant for them. See docs/work-lists/missing-test-items.md, E07.
+The OFF parser comparisons use box.off and mctri.off from John Burkardt's standard Geomview data collection:
+https://people.sc.fsu.edu/~jburkardt/data/off/off.html explicitly grants GNU LGPL for its code and data.
+The upstream page does not state a version; the accompanying LGPL-3.0 and GPL-3.0 texts are supplied.
+box.off is the cube example; mctri.off credits its MC-letter mesh to MC. Both are unchanged downloads.
+The legacy decimated-knight.off is retained for held physics tests and the existing benchmark workload only;
+its libigl/Cosmic Blobs attribution has no verified licence grant and it is not fetched or used by this loader comparison.
 
 Margo-made, written by scripts/make-fixtures.js (procedural shapes, deterministic bytes, no third-party data):
   torus.ply, torus_be.ply, torus_le.ply, torus_colored.ply, gears.3mf, face_colors.3mf, corner_colors.3mf,
@@ -19,5 +22,21 @@ Point Cloud Library test data, test/bunny.pcd (BSD-3-Clause, https://github.com/
   Copyright (c) 2009-2012 Willow Garage, Inc., Copyright (c) 2012- Open Perception, Inc.; licence text:
   https://github.com/PointCloudLibrary/pcl/blob/master/LICENSE.txt), a subsampled scan of the Stanford bunny
   (Stanford 3D Scanning Repository): bunny.pcd, the same bytes as packages/points/tests/fixtures/bunny.pcd
-libigl tutorial data (https://github.com/libigl/libigl-tutorial-data): cube.off, decimated-knight.off
+John Burkardt Geomview standard data (GNU LGPL, https://people.sc.fsu.edu/~jburkardt/data/off/off.html): box.off, mctri.off
+Legacy held physics/workload data: decimated-knight.off, libigl tutorial data/Cosmic Blobs, licence unresolved
 PyVista vtk-data (https://github.com/pyvista/vtk-data): fran_cut.vtk, polyEx.vtk
+
+OpenVDB sphere.vdb (861,072 bytes), standard level-set sample, unchanged:
+https://media.githubusercontent.com/media/AcademySoftwareFoundation/openvdb-website/3d8fd4d3f2d670464f4390e2775cfc87274233dc/download/models/sphere.vdb
+SHA-256 bb884a9a38354e47191c4ece4a11d1e051594a910fde56501cfc51ff52b171ab
+CC-BY-4.0, Academy Software Foundation/OpenVDB website contributors, under the repository's LICENSE.txt:
+https://github.com/AcademySoftwareFoundation/openvdb-website/blob/3d8fd4d3f2d670464f4390e2775cfc87274233dc/LICENSE.txt
+The test compares all 1,451 decoded leaf blocks' finiteness, the 270,638 active voxels and the active bounds
+with the independently stored metadata. It also checks signed interior/exterior background values.
+The OFF MC-letter sample has trailing per-face RGBA; OFF currently reads its geometry, not per-face colour.
+
+empty-full.vdb and empty-half.vdb are original Margo-authored two-voxel grids, Apache-2.0, written through
+OpenVDB 13.0 in Blender 5.3.0 Beta ecaf39c37b28 by make-vdb-empty.py (no OpenVDB implementation copied).
+The same native writer saves both precisions; vdb-empty-oracle.json is what native OpenVDB reads back.
+Full-precision empty streams retain a compressed empty block; the half-value stream omits that block.
+These paired controls distinguish precision from file version. Reproduction command is in make-vdb-empty.py.

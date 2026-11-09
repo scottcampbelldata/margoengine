@@ -1362,6 +1362,12 @@ compares WebGPU/WebGL2 values after device/context loss. No renderer resources a
 `build:poisson`; native tests use `test:poisson-kernel`. SIMD is enabled without an acceleration claim.
 Authored meshes, spectral quality, maximal covering and cross-platform bit identity remain unmeasured (LIM-621).
 
+A pinned, required CC-BY-4.0 OpenVDB sphere now catches empty half-value node alignment: zero half values have no
+compressed-size prefix. ZIP/Blosc synthetic cases and the outside sphere exercise the fix without changing values
+or tolerances. Its 1,451 leaves, 270,638 active voxels and bounds match the file metadata; no new codec/version
+coverage or renderer quality follows. The OFF parser uses explicitly LGPL-licensed standard samples; held physics
+and benchmark knight workloads are unchanged. See the required-input inventory.
+
 The required-input audit also exercised the newly landed SQL-store restart test. The unit watchdog caught a
 Windows `EBUSY` folder hook before database closure, followed by a leaked server and generator workers. Its
 test-body `AsyncDisposableStack` now closes resources before directory removal, including failed setup; the

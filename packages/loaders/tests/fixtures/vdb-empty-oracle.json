@@ -1,0 +1,44 @@
+[
+  {
+    "file": "empty-full.vdb",
+    "half": false,
+    "active": 2,
+    "box": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        16,
+        8,
+        0
+      ]
+    ],
+    "values": [
+      1.5,
+      2.25
+    ]
+  },
+  {
+    "file": "empty-half.vdb",
+    "half": true,
+    "active": 2,
+    "box": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        16,
+        8,
+        0
+      ]
+    ],
+    "values": [
+      1.5,
+      2.25
+    ]
+  }
+]

@@ -301,7 +301,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
-    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl at 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d; Stanford bunny scan); PyVista data fran_cut.vtk and polyEx.vtk (Apache-2.0, at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3); fetch-fixtures.js pins source hashes. Existing libigl tutorial cube.off and decimated-knight.off have attribution only, no explicit licence located; not newly redistributed or fetched by the script',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl at 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d; Stanford bunny scan); PyVista data fran_cut.vtk and polyEx.vtk (Apache-2.0, at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3); fetch-fixtures.js pins source hashes. OFF parser comparisons: John Burkardt Geomview box.off and MC-authored mctri.off, GNU LGPL (off.html explicitly covers data; upstream version unspecified), hashes pinned by fetch-fixtures.js; licence texts in fixtures/OFF-LGPL-3.0.txt and OFF-GPL-3.0.txt. Legacy decimated-knight.off remains only for held physics and the existing workload, libigl/Cosmic Blobs attribution but no verified licence, not re-fetched. OpenVDB website sphere.vdb at 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0 (repository LICENSE.txt), source and pinned digest in SOURCES.txt',
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',

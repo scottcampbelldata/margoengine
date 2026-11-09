@@ -26,7 +26,7 @@ fails the test/browser command even without an environment flag.
 | E04 | same, corruption loop's formerly omitted file | AllHalfValues.exr, same pinned fetch | BSD-3-Clause | Same |
 | E05 | same, RGBE digest | sun_sky.hdr; `node packages/environment/scripts/make-hdr-fixture.js` | Margo-authored | Present; strict CPU rerun passed |
 | E06 | loaders/tests/loaders.test.js, PLY fixture comparison | torus.ply, torus_be.ply, torus_le.ply, torus_colored.ply; `node packages/loaders/scripts/make-fixtures.js` | Margo-authored | Present; strict CPU rerun passed |
-| E07 | same, OFF files | cube.off, decimated-knight.off; restore exact tracked files with `git restore -- packages/loaders/tests/fixtures/cube.off packages/loaders/tests/fixtures/decimated-knight.off` | libigl data README attributes cube to libigl, knight to Cosmic Blobs; no explicit licence located | Existing files tested; outside downloads retained only in ignored logs; licensing remains unresolved |
+| E07 | loaders/tests/loaders.test.js, OFF files | box.off and mctri.off; `npm run fixtures --workspace @margoengine/loaders`; John Burkardt Geomview standard collection | GNU LGPL, explicitly granted to data by off.html; full licence texts supplied | Downloaded; full vertex/triangle comparisons pass. Legacy knight retained for held physics and existing workloads only |
 | E08 | same, XYZ file | helix.xyz; make-fixtures.js | Margo-authored | Present; strict CPU rerun passed |
 | E09 | same, PCD files | rose.pcd, spiral.pcd (make-fixtures.js), bunny.pcd (`npm run fixtures --workspace @margoengine/loaders`) | Margo-authored; PCL BSD-3-Clause | PCL file downloaded; strict CPU rerun passed |
 | E10 | same, VTK files | fran_cut.vtk, polyEx.vtk; loaders fixture fetch | PyVista data Apache-2.0 | Downloaded; strict CPU rerun passed |
@@ -66,7 +66,7 @@ Windows checkout; download hashes refer to source bytes, before Git line-ending 
 | BrightRings.exr, AllHalfValues.exr | [OpenEXR images e38ffb0790f62f05a6f083a6fa4cac150b3b7452](https://github.com/AcademySoftwareFoundation/openexr-images/tree/e38ffb0790f62f05a6f083a6fa4cac150b3b7452/TestImages) | BSD-3-Clause; existing environment fixture NOTICE |
 | bunny.pcd | [PCL 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d](https://github.com/PointCloudLibrary/pcl/blob/3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d/test/bunny.pcd) | BSD-3-Clause; Stanford scan attribution in SOURCES.txt |
 | fran_cut.vtk, polyEx.vtk | [PyVista data 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3](https://github.com/pyvista/data/tree/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data) | Apache-2.0, repository LICENSE |
-| cube.off, decimated-knight.off | [libigl tutorial data 644dd4104843b6d736745d9dafbd70bf8d175648](https://github.com/libigl/libigl-tutorial-data/tree/644dd4104843b6d736745d9dafbd70bf8d175648) | Attribution only found; no new copy is added to the repository; do not label these freely licensed |
+| box.off, mctri.off | [John Burkardt Geomview standard data](https://people.sc.fsu.edu/~jburkardt/data/off/off.html) | Explicit GNU LGPL data grant, version unspecified; unchanged source bytes with hashes in fetch-fixtures.js and full licence texts. Old cube removed; old knight preserved solely for held physics/workloads |
 
 ## Remaining missing-file proof work
 
@@ -93,7 +93,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P17 | limits images, LIM-285 | public glTF with MSFT_texture_dds | Microsoft glTF sample assets, per-model licence | Pending |
 | P18 | limits Draco points | public point cloud with generic attributes | Google Draco standard test data, Apache-2.0 to verify | Pending; encoder-created proof remains labelled |
 | P19 | limits long-tail loaders, LIM-195 | rigged LWO with bones and weight maps | Freely licensed LightWave model corpus | Pending source/licence |
-| P20 | limits real files | real big-endian PLY | Public point cloud corpus with explicit licence | Pending |
+| P20 | limits real files | valid real big-endian PLY | John Burkardt cow.binary.ply has an LGPL grant, but is malformed: 75,670 bytes instead of its declared 75,673; face 5,008 contains out-of-range index 3,587 | Downloaded and correctly refused. Valid-file proof remains pending; no parser tolerance or refusal changed |
 | P21 | same | LDraw MPD | LDraw models; verify model-specific CC licence | Pending |
 | P22 | same | zipped AMF | Public 3MF/AMF consortium or slicer sample data; per-file licence | Pending |
 | P23 | same | PTS with intensity and colour | Public survey dataset, CC0/CC-BY/public domain | Pending |
@@ -104,7 +104,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P28 | limits video/material and /360 | real movie and stereo panorama | Blender Foundation movies CC-BY; panorama-specific licence | Pending; headset proof needs device |
 | P29 | limits video/codecs, LIM-575 | real AVC movie with B-frames | Same, retain source codec metadata and licence | Pending |
 | P30 | private batch-110 report and known-bugs README 404 history | pointer-show.glb and the other missing example asset | Margo-authored pointer-show now exists; current README runner selects both examples | Scoped README command rerun: 62/94 ran, 32 allowed failures; further sample work remains; do not duplicate batch 160 fix |
-| P31 | loaders README VDB entry labelled example: in known list | real OpenVDB volume accepted by the example | OpenVDB public volume data, per-file licence to verify | Pending; not included in the 85 sample-labelled rows below |
+| P31 | loaders README VDB example | smoke.vdb with a density grid | OpenVDB website repository 3d8fd4d3f2d670464f4390e2775cfc87274233dc, explicit CC-BY-4.0 LICENSE.txt | Sphere and smoke downloaded; real files exposed empty-half-value-block alignment bug, fixed with sphere and synthetic regressions. README runner mapping still pending |
 | P32 | headless README image-sequences-and-video-37bcc7 | discoverable ffmpeg binary | FFmpeg official download links, LGPL/GPL build configuration to record | Pending tool/path audit; not a hardware gap |
 | H01 | physics/scripts/test-browser.js | outside Rapier runtime named by MARGOENGINE_RAPIER | npm @dimforge/rapier3d-compat, Apache-2.0 | Physics on hold; list only, no change/rerun |
 | H02 | limits ragdoll/getup | authored get-up clips, not reversed Death_A/B | Public motion-capture dataset, verify data licence | Physics on hold; list only |
@@ -129,8 +129,8 @@ gate is a guard against the audited patterns; it is not a proof of arbitrary pro
 
 ## README exceptions caused by missing or misserved files
 
-The previous scoped command ran 62/94 examples, with 32 accepted failures. The known list has
-102 exceptions. These 57 entries name missing files/tools or received incompatible fallback bytes
+The previous scoped command ran 62/94 examples, with 32 accepted failures. The baseline known list had
+102 exceptions. Upstream `418849c4a` subsequently closed the voxel-pathtracer introduction (101 left at first landing). These 57 entries name missing files/tools or received incompatible fallback bytes
 (including Vite HTML). Each needs a format-correct, licensed input and a real rerun. Existing package
 fixture notices are the first source; no arbitrary tiny fixture or renamed rig proves a README example.
 
@@ -243,7 +243,7 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | splats/readme-ply-captures-editing-and-level-o-73481e | /capture.spz, /capture.sog | sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz. | Deferred to later README job |
 | stage/readme-feature-entries-a6844a | See named example | example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro | Deferred to later README job |
 | voxel-net/readme-margoengine-voxel-net-b6eba6 | See named example | example: Error: Module "node:http" has been externalized for browser compatibility: a server and a page in one example | Deferred to later README job |
-| voxel-pathtracer/readme-margoengine-voxel-pathtracer-af6ce0 | See named example | sample: TypeError: VoxelPathTracer scene.models[0].voxels has 151 entries; a 32x24x32 model needs 24576 (index = x + sx * (z + sz * y)) | Deferred to later README job |
+| voxel-pathtracer/readme-margoengine-voxel-pathtracer-af6ce0 | See named example | sample: TypeError: VoxelPathTracer scene.models[0].voxels has 151 entries; a 32x24x32 model needs 24576 (index = x + sx * (z + sz * y)) | Closed upstream by 418849c4a |
 | voxel/readme-codecs-and-chunk-stores-codec-st-7e6699 | See named example | sample: InvalidStateError: Failed to execute 'send' on 'WebSocket': Still in CONNECTING state. | Deferred to later README job |
 | worker/readme-margoengine-worker-b56e85 | See named example | example: MargoError: Worker failed before it took the canvas: bad message; see https://margoengine.com/errors#worker | Deferred to later README job |
 | xr/readme-ar-hit-testing-f7eedf | See named example | example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session. | Deferred to later README job |
@@ -273,3 +273,43 @@ and makes no shutdown change. The old full verify had no result file and its sup
 were gone at continuation, so it is not counted as passing. A fresh verify has a 40-minute tree limit
 and uses batch 160's downloaded sample directory. The initial scoped README command accepted
 32 existing failures; its zero exit code is not evidence those examples passed.
+
+## Licensed OFF and real VDB follow-up
+
+The OFF comparison now uses the LGPL box and MC-letter samples. Every vertex and triangle is compared;
+MC's trailing per-face RGBA is outside this reader's vertex-colour support. The old cube is removed.
+The legacy knight is still read by held physics tests and the unchanged benchmark workload, so replacing or
+removing that shared file would alter work Scott put on hold. It is not fetched or used by the loader comparison.
+
+P31 uncovered a real VDB reader defect: a zero-length half-precision value array has no eight-byte size field.
+Reading one stole the next node's bytes, producing unknown value kind -1 on the outside sphere and smoke files.
+The owning reader now returns an empty view without consuming input. The test writer had mirrored the same
+incorrect prefix and is corrected too. Both ZIP and Blosc empty-node regressions and the independently authored
+sphere pass; the sphere has 1,451 leaves, 270,638 active voxels and bounds matching its embedded metadata.
+This proves that file, not every OpenVDB version or codec. A malformed PLY probe did not close P20.
+
+Additional downloaded README inputs remain in engine-bench/readme-samples: ten previously recorded standard
+assets (3DS, LWO, MD2, AMF, PDB, KMZ, OBJ, TMX, Lottie and PTS), OBJ/MTL companions and seven textures,
+the CC-BY-4.0 OpenVDB density smoke, and the GPLv3 FFmpeg 8.1.2 binary/archive with the publisher's SHA-256.
+Their original manifest licences and SHA-256 records are retained in this lane's ignored logs. Download alone is
+not a README pass. Wiring the exact files into the README runner and rerunning them remains outstanding.
+
+
+The first full verify of this follow-up caught an overbroad empty-block change in the existing Blender
+volume regression. Native OpenVDB 13 then wrote/read the same grid twice, once at each precision: full
+storage retains its empty compressed block; half storage omits it. The final fix follows that distinction,
+without a version/input special case. Paired native version-225 fixtures/oracles and the existing Blender
+volume test preserve the full-precision path; ZIP/Blosc synthetic cases cover empty internal and leaf nodes
+at both precisions. No assertion or numeric tolerance changed. The outside half sphere remains the independent
+real-file regression, rather than being replaced by the generated control grids.
+
+
+Final follow-up validation: lint and hygiene passed; full verify passed 13,233 tests with zero failures/skips
+(294.4 s). The focused loader/VDB/Blender run passed 70 tests. Both loader browser suites passed (6.3/20.5 s),
+and the required loader README command ran 11/27 examples with 16 pre-existing known exceptions, zero fresh
+failures. Those missing inputs/other causes remain outstanding, not all-examples-passed proof. Pinned fixture
+fetch succeeded. Public exports and size numbers did not change. The raw upstream MC-letter OFF ends in an
+extra blank line; it is preserved with the verified source bytes rather than silently rewriting the standard asset.
+
+Once a GPU slot became available, the exporter capture rerun passed all checks in 4 seconds, including teardown,
+on lane-M's root fix cff40d127. This lane made no browser shutdown change. The earlier acquisition timeout ran no test.

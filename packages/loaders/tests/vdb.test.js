@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { parseVDB } from '../dist/vdb.js';
 import { LoaderError } from '../dist/common.js';
 
@@ -152,6 +153,7 @@ const ZIP = 1,
 
 /** Wraps value bytes as the file's compression does. */
 function packed(data, compression, typeSize) {
+  if (data.length === 0 && typeSize === 2) return data;
   if (compression & BLOSC) {
     if (data.length < 48) return Buffer.concat([i64(-data.length), data]);
     const chunk = blosc(data, typeSize);
@@ -824,7 +826,10 @@ test('each grid follows its own descriptor, as in a file OpenVDB wrote, and two 
     { grids } = await parseVDB(file([one('first', 1), one('second', 2)]));
   assert.deepEqual(
     grids.map((grid) => [grid.name, grid.at(0, 0, 0)]),
-    [['first', 1], ['second', 2]],
+    [
+      ['first', 1],
+      ['second', 2],
+    ],
   );
 });
 
@@ -852,4 +857,74 @@ test('counts and offsets that claim more than the file holds are refused before 
   await refuses(parseVDB(broken), 'syntax');
   const roots = Buffer.concat([u32(0), metaBlock(), uniform(), i32(1), f32(0), u32(0xffffff), u32(0xffffff)]);
   await refuses(parseVDB(file([{ name: 'r', raw: roots }])), 'truncated');
+});
+
+test('empty half and full compressed streams keep the following node aligned', async () => {
+  for (const [half, compression] of [false, true].flatMap((half) => [ZIP | MASK, BLOSC | MASK].map((c) => [half, c]))) {
+    const {
+      grids: [grid],
+    } = await parseVDB(
+      file([
+        {
+          name: 'empty internal values',
+          half,
+          compression,
+          leaves: [leaf([0, 0, 0], [0, 1], (i) => i + 7, { kind: 0 }), leaf([8, 0, 0], [], () => 0, { kind: 0 })],
+        },
+      ]),
+    );
+    assert.equal(grid.activeVoxels, 2);
+    assert.equal(grid.at(0, 0, 0), 7);
+    assert.equal(grid.at(0, 0, 1), 8);
+    assert.equal(grid.at(8, 0, 0), 0);
+  }
+});
+
+test('the real OpenVDB level-set sphere reads every leaf and matches its independently stored metadata', async () => {
+  const bytes = requiredFixture(
+    new URL('./fixtures/sphere.vdb', import.meta.url),
+    'npm run fixtures --workspace @margoengine/loaders',
+  );
+  const { version, grids, skipped } = await parseVDB(bytes);
+  assert.equal(version, 223);
+  assert.deepEqual(skipped, []);
+  assert.equal(grids.length, 1);
+  const [grid] = grids;
+  assert.equal(grid.name, 'ls_sphere');
+  assert.equal(grid.half, true);
+  assert.equal(grid.leaves.length, 1451);
+  assert.equal(grid.activeVoxels, 270638);
+  assert.equal(grid.activeVoxels, grid.meta.file_voxel_count);
+  assert.deepEqual(grid.box, [...grid.meta.file_bbox_min, ...grid.meta.file_bbox_max]);
+  assert.equal(grid.at(0, 0, 0), -grid.background);
+  assert.equal(grid.at(100, 100, 100), grid.background);
+  for (const leaf of grid.leaves) for (const value of leaf.values) assert.ok(Number.isFinite(value));
+});
+
+test('the same native OpenVDB 13 writer preserves full and half empty-stream layouts', async () => {
+  const oracle = JSON.parse(
+    requiredFixture(
+      new URL('./fixtures/vdb-empty-oracle.json', import.meta.url),
+      'git restore -- packages/loaders/tests/fixtures/vdb-empty-oracle.json',
+    ).toString(),
+  );
+  for (const expected of oracle) {
+    const bytes = requiredFixture(
+      new URL('./fixtures/' + expected.file, import.meta.url),
+      'git restore -- packages/loaders/tests/fixtures/' + expected.file,
+    );
+    const {
+      version,
+      library,
+      grids: [grid],
+    } = await parseVDB(bytes);
+    assert.equal(version, 225);
+    assert.deepEqual(library, [13, 0]);
+    assert.equal(grid.half, expected.half);
+    assert.equal(grid.activeVoxels, expected.active);
+    assert.deepEqual(grid.box, expected.box.flat());
+    assert.deepEqual([grid.at(0, 0, 0), grid.at(16, 8, 0)], expected.values);
+    assert.equal(grid.at(8, 0, 0), 0);
+    for (const leaf of grid.leaves) for (const value of leaf.values) assert.ok(Number.isFinite(value));
+  }
 });
