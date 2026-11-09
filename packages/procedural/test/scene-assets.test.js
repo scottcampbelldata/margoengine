@@ -14,11 +14,11 @@ import { pbrVertexStream } from '@margoengine/geometry';
 test('cabin samples its supplied world position and validates every foundation sample', () => {
   const flat = generateCabinMesh(() => 2),
     shifted = generateCabinMesh((x, z) => 2 + (x - 50) * 0.02 + (z + 20) * 0.01, [50, -20]);
-  assert.ok(Math.abs(flat.floor - 2.28) < 1e-9);
-  assert.ok(shifted.floor > flat.floor);
+  assert.ok(Math.abs(flat.floorElevation - 2.28) < 1e-9);
+  assert.ok(shifted.floorElevation > flat.floorElevation);
   for (const part of ['siding', 'roof', 'foundation', 'glass']) {
-    assert.equal(pbrVertexStream(shifted[part]).byteLength, (shifted[part].positions.length / 3) * 80);
-    assert.ok(shifted[part].positions.every(Number.isFinite));
+    assert.equal(pbrVertexStream(shifted.parts[part]).byteLength, (shifted.parts[part].positions.length / 3) * 80);
+    assert.ok(shifted.parts[part].positions.every(Number.isFinite));
   }
   assert.throws(() => generateCabinMesh(() => NaN), /terrain/);
   assert.throws(() => generateCabinMesh(() => 0, [Infinity, 0]), /position/);
@@ -27,12 +27,12 @@ test('cabin samples its supplied world position and validates every foundation s
 
 test('cabin plank seams are closed and roof/corner surfaces do not share depth planes', () => {
   const cabin = generateCabinMesh(() => 0),
-    p = cabin.siding.positions;
+    p = cabin.parts.siding.positions;
   const frontDepths = (x, y, side = 1) => {
     const depths = [];
-    for (let t = 0; t < cabin.siding.indices.length; t += 3) {
-      const [a, b, c] = cabin.siding.indices.subarray(t, t + 3).map((v) => v * 3);
-      if (cabin.siding.normals[a + 2] * side < 0.99) continue;
+    for (let t = 0; t < cabin.parts.siding.indices.length; t += 3) {
+      const [a, b, c] = cabin.parts.siding.indices.subarray(t, t + 3).map((v) => v * 3);
+      if (cabin.parts.siding.normals[a + 2] * side < 0.99) continue;
       const determinant = (p[b + 1] - p[c + 1]) * (p[a] - p[c]) + (p[c] - p[b]) * (p[a + 1] - p[c + 1]);
       if (Math.abs(determinant) < 1e-10) continue;
       const u = ((p[b + 1] - p[c + 1]) * (x - p[c]) + (p[c] - p[b]) * (y - p[c + 1])) / determinant;
@@ -65,19 +65,19 @@ test('cabin plank seams are closed and roof/corner surfaces do not share depth p
     }
   const corner = frontDepths(-2.92, 1.1);
   assert.ok(Math.max(...corner) > 4.13, 'Corner trim stands clear of the siding');
-  for (let t = 0; t < cabin.siding.indices.length; t += 3) {
-    const ids = cabin.siding.indices.subarray(t, t + 3),
+  for (let t = 0; t < cabin.parts.siding.indices.length; t += 3) {
+    const ids = cabin.parts.siding.indices.subarray(t, t + 3),
       x = ids.reduce((sum, v) => sum + p[v * 3] / 3, 0),
       y = ids.reduce((sum, v) => sum + p[v * 3 + 1] / 3, 0),
       z = ids.reduce((sum, v) => sum + p[v * 3 + 2] / 3, 0);
     if (x > -2.8 && x < -2.1 && y > 0.1 && y < 2.9 && z > 3.88 && z < 4.12)
       assert.ok(
-        Math.abs(cabin.siding.normals[ids[0] * 3 + 1]) < 0.99,
+        Math.abs(cabin.parts.siding.normals[ids[0] * 3 + 1]) < 0.99,
         'Internal plank caps must not rasterize through the wall',
       );
   }
   const planes = new Set(),
-    roof = cabin.roof;
+    roof = cabin.parts.roof;
   for (let v = 0; v < roof.positions.length / 3; v++)
     if (roof.normals[v * 3] > 0.5 && roof.normals[v * 3 + 1] > 0.8)
       planes.add(
@@ -91,8 +91,8 @@ test('cabin plank seams are closed and roof/corner surfaces do not share depth p
 test('porch beam follows the roof underside and both posts stay below it on sloping ground', () => {
   for (const height of [() => 0, (x, z) => 2 + x * 0.02 + z * 0.01]) {
     const cabin = generateCabinMesh(height, [30, -20]),
-      roof = cabin.roof,
-      siding = cabin.siding;
+      roof = cabin.parts.roof,
+      siding = cabin.parts.siding;
     const v = Array.from({ length: roof.positions.length / 3 }, (_, i) => i).find(
       (i) => roof.normals[i * 3 + 1] < -0.95 && roof.positions[i * 3 + 1] > 2 && roof.positions[i * 3 + 1] < 3,
     );

@@ -58,20 +58,27 @@ export function createProceduralSettlement(engine: EngineKernel, shadows: Shadow
     const cabin = generateCabinMesh(height, CABIN_POSITION),
       [cx, cz] = CABIN_POSITION;
     porchLightPosition[0] = cx + 0.9;
-    porchLightPosition[1] = cabin.floor + 2.35;
+    porchLightPosition[1] = cabin.floorElevation + 2.35;
     porchLightPosition[2] = cz + 5.3;
-    const foundation = instanceTransforms([[cx, cabin.floor, cz, 1, 0]]);
-    const groundContact = (x: number, y: number, z: number) => contactAO(y + cabin.floor, height(cx + x, cz + z));
+    const foundation = instanceTransforms([[cx, cabin.floorElevation, cz, 1, 0]]);
+    const groundContact = (x: number, y: number, z: number) =>
+      contactAO(y + cabin.floorElevation, height(cx + x, cz + z));
     add(
       'Cabin cedar siding and recessed frames',
-      cabin.siding,
+      cabin.parts.siding,
       foundation,
       'siding',
       (x, y, z) => groundContact(x, y, z) * (y >= 2.7 && y <= 3 ? 0.35 + (0.65 * (3 - y)) / 0.3 : 1),
     );
-    add('Cabin 35 degree slate roof', cabin.roof, foundation, 'roof');
-    add('Cabin terrain-sunk stone foundation and porch', cabin.foundation, foundation, 'foundation', groundContact);
-    add('Cabin recessed glass panes', cabin.glass, foundation, 'glass');
+    add('Cabin 35 degree slate roof', cabin.parts.roof, foundation, 'roof');
+    add(
+      'Cabin terrain-sunk stone foundation and porch',
+      cabin.parts.foundation,
+      foundation,
+      'foundation',
+      groundContact,
+    );
+    add('Cabin recessed glass panes', cabin.parts.glass, foundation, 'glass');
     batches[batches.length - 1].emissive = [1.5, 1.08, 0.45];
     add(
       'Warm porch lantern',

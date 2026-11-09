@@ -58,8 +58,8 @@ function check(data) {
 
 test('cabin has hard face normals, UV-derived tangent frames, recessed openings and a grounded 35 degree roof', () => {
   const cabin = generateCabinMesh(terrainHeight, CABIN_POSITION);
-  for (const data of [cabin.siding, cabin.roof, cabin.foundation, cabin.glass]) check(data);
-  for (const data of [cabin.roof, cabin.foundation, cabin.glass]) {
+  for (const data of [cabin.parts.siding, cabin.parts.roof, cabin.parts.foundation, cabin.parts.glass]) check(data);
+  for (const data of [cabin.parts.roof, cabin.parts.foundation, cabin.parts.glass]) {
     for (let i = 0; i < data.indices.length; i += 3) {
       const ids = data.indices.subarray(i, i + 3);
       for (const v of ids)
@@ -68,21 +68,21 @@ test('cabin has hard face normals, UV-derived tangent frames, recessed openings 
   }
   const corners = new Map();
   let hardCorners = 0;
-  for (let v = 0; v < cabin.siding.positions.length / 3; v++) {
-    const key = Array.from(cabin.siding.positions.subarray(v * 3, v * 3 + 3)).join(','),
-      n = Array.from(cabin.siding.normals.subarray(v * 3, v * 3 + 3));
+  for (let v = 0; v < cabin.parts.siding.positions.length / 3; v++) {
+    const key = Array.from(cabin.parts.siding.positions.subarray(v * 3, v * 3 + 3)).join(','),
+      n = Array.from(cabin.parts.siding.normals.subarray(v * 3, v * 3 + 3));
     if (corners.has(key) && Math.abs(corners.get(key).reduce((sum, value, k) => sum + value * n[k], 0)) < 1e-5)
       hardCorners++;
     else corners.set(key, n);
   }
   assert.ok(hardCorners > 100, 'Architectural corners retain split face normals');
-  assert.ok(cabin.floor > 3);
+  assert.ok(cabin.floorElevation > 3);
   assert.equal(MATERIALS.siding.roughness, 0.88);
-  assert.ok(Array.from(cabin.roof.normals).some((n) => Math.abs(n - Math.cos(ROOF_PITCH)) < 1e-6));
+  assert.ok(Array.from(cabin.parts.roof.normals).some((n) => Math.abs(n - Math.cos(ROOF_PITCH)) < 1e-6));
   // Door and front window are true gaps in the outer siding plane.
-  for (let i = 0; i < cabin.siding.indices.length; i += 3) {
-    const ids = cabin.siding.indices.subarray(i, i + 3),
-      p = cabin.siding.positions;
+  for (let i = 0; i < cabin.parts.siding.indices.length; i += 3) {
+    const ids = cabin.parts.siding.indices.subarray(i, i + 3),
+      p = cabin.parts.siding.positions;
     const x = ids.reduce((s, v) => s + p[v * 3] / 3, 0),
       y = ids.reduce((s, v) => s + p[v * 3 + 1] / 3, 0),
       z = ids.reduce((s, v) => s + p[v * 3 + 2] / 3, 0);
@@ -91,17 +91,17 @@ test('cabin has hard face normals, UV-derived tangent frames, recessed openings 
       assert.ok(!(x > -1.89 && x < -1.11 && y > 1.36 && y < 2.34), 'Window opening');
     }
   }
-  const p = cabin.glass.positions;
+  const p = cabin.parts.glass.positions;
   assert.equal(p.length / 3, 6 * 24, 'Six recessed panes');
   assert.ok(
     Array.from(p).some((v, i) => i % 3 === 2 && Math.abs(v - 4.03) < 1e-5),
     'Pane lies 8 cm behind siding',
   );
   assert.ok(
-    Math.max(...Array.from(cabin.roof.positions).filter((_v, i) => i % 3 === 0)) >= 3.51,
+    Math.max(...Array.from(cabin.parts.roof.positions).filter((_v, i) => i % 3 === 0)) >= 3.51,
     'Roof overhang is at least 40 cm beyond siding',
   );
-  assert.ok(Math.max(...Array.from(cabin.roof.positions).filter((_v, i) => i % 3 === 2)) >= 4.51);
+  assert.ok(Math.max(...Array.from(cabin.parts.roof.positions).filter((_v, i) => i % 3 === 2)) >= 4.51);
   assert.throws(() => generateCabinMesh(() => NaN), /terrain/);
 });
 
@@ -117,7 +117,7 @@ test('settlement uploads baked AO and calibrated materials, registers shadows an
   assert.deepEqual(casters, [{ source: scatter, options: undefined }]);
   assert.deepEqual(porchLightPosition, [
     CABIN_POSITION[0] + 0.9,
-    generateCabinMesh(terrainHeight, CABIN_POSITION).floor + 2.35,
+    generateCabinMesh(terrainHeight, CABIN_POSITION).floorElevation + 2.35,
     CABIN_POSITION[1] + 5.3,
   ]);
   assert.ok(exclusions.length > 30, 'Landscape rocks reserve the building and plant footprints');
@@ -264,7 +264,7 @@ test('fixed rocks clear the whole foundation and fern crowns clear rocks at thei
         'Asset families share occupied space',
       );
     }
-  const foundation = generateCabinMesh(terrainHeight, CABIN_POSITION).foundation.positions;
+  const foundation = generateCabinMesh(terrainHeight, CABIN_POSITION).parts.foundation.positions;
   for (let i = 0; i < foundation.length; i += 3)
     assert.ok(
       CABIN_EXCLUSIONS.some((bounds) => distance([foundation[i] - 10, foundation[i + 2] + 23], bounds) === 0),

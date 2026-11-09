@@ -23,7 +23,7 @@ export {
   type TreeMesh,
 } from './plants.js';
 export { generateJettyMesh, generateBoatMesh, type JettyOptions, type BoatOptions } from './waterfront.js';
-export { generateCabinMesh, ROOF_PITCH, type HeightField } from './cabin.js';
+export { generateCabinMesh, ROOF_PITCH, type HeightField, type CabinMesh } from './cabin.js';
 export { createHumanoid, poseHumanoid } from './humanoid.js';
 /** Scalar field sampled by `marchingCubes` at world position (x, y, z); must return finite values. */
 export type DensityField = (x: number, y: number, z: number) => number;

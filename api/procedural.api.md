@@ -13,6 +13,16 @@ export interface BoatOptions extends MeshDetailOptions {
     seed?: number;
 }
 
+export interface CabinMesh {
+    floorElevation: number;
+    parts: {
+        siding: GeometryData;
+        roof: GeometryData;
+        foundation: GeometryData;
+        glass: GeometryData;
+    };
+}
+
 export type DensityField = (x: number, y: number, z: number) => number;
 
 export interface FractalOptions {
@@ -96,13 +106,7 @@ export function generateBirchMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateBoatMesh(options?: BoatOptions): GeometryData;
 
-export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): {
-    floor: number;
-    siding: GeometryData;
-    roof: GeometryData;
-    foundation: GeometryData;
-    glass: GeometryData;
-};
+export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): CabinMesh;
 
 export function generateCactusMesh(): GeometryData;
 

@@ -6,8 +6,10 @@ For minimum-spaced placement, import the optional [`/poisson` entry](#poisson-di
 
 `generateCabinMesh(height, position = [0,0])` builds a 6 × 8 m timber cabin,
 35° roof, recessed windows/door and terrain-sunk stone/porch supports. `position`
-is the world XZ origin used for terrain sampling. It returns `floor`, `siding`,
-`roof`, `foundation` and `glass`; geometry remains local to that origin and floor.
+is the world XZ origin used for terrain sampling. It returns `floorElevation` (world Y) and `parts` containing `siding`,
+`roof`, `foundation` and `glass` geometry. Every value in `parts` is geometry;
+geometry remains local to that origin and floor. The old scalar `floor` field and
+flat part fields are replaced by this explicit placement/parts contract.
 Supply your own PBR materials and instance transform. Every terrain sample is
 validated, and split architectural normals and UV-derived tangents are preserved.
 Plank seams are closed, exterior window/door casings sit flush with the siding,
@@ -19,6 +21,19 @@ plank caps are omitted; trim closes the wall skin. Enterable cabin interiors wou
 need dedicated wall returns.
 Porch post heights and the pitched crossbeam derive from the canopy underside,
 keeping the supports below the roof while their bases follow terrain.
+
+```ts
+import { Engine, Geometry } from '@margoengine/core';
+import { generateCabinMesh } from '@margoengine/procedural';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const position = [10, 20] as const;
+const cabin = generateCabinMesh(() => 2, position);
+for (const data of Object.values(cabin.parts)) {
+  engine.createMesh().setGeometry(new Geometry(data.positions, data.normals, data.indices))
+    .setPosition([position[0], cabin.floorElevation, position[1]]);
+}
+engine.dispose();
+```
 
 `createIslandHeight(seed = 731)` returns the coastal island preset's world-height
 sampler. `generateGrassMesh(blades = 3)` returns crossed, tapered grass ribbons;

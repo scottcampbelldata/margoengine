@@ -6,6 +6,13 @@ import { mergeGeometries, computeTangents, applyMatrix4, type GeometryData } fro
 import type { HeightField } from '@margoengine/math';
 
 export type { HeightField };
+/** Cabin placement metadata and independently materialled geometry parts. */
+export interface CabinMesh {
+  /** World Y of the local floor origin. Apply [position.x, floorElevation, position.z] to every part. */
+  floorElevation: number;
+  /** Every value is GeometryData, safe to iterate without filtering metadata. */
+  parts: { siding: GeometryData; roof: GeometryData; foundation: GeometryData; glass: GeometryData };
+}
 /** Roof slope of `generateCabinMesh` in radians (35 degrees). */
 export const ROOF_PITCH = (35 * Math.PI) / 180;
 
@@ -45,7 +52,7 @@ function placed(
 }
 
 /** Split box faces and gables preserve area-weighted face normals at every architectural edge. */
-export function generateCabinMesh(height: HeightField, position: readonly [number, number] = [0, 0]) {
+export function generateCabinMesh(height: HeightField, position: readonly [number, number] = [0, 0]): CabinMesh {
   const timber: GeometryData[] = [],
     slate: GeometryData[] = [],
     stone: GeometryData[] = [],
@@ -223,10 +230,12 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
     block(stone, 0.9, (top + bottom) / 2, z, 1.55, Math.max(0.12, top - bottom), 0.4);
   }
   return {
-    floor,
-    siding: computeTangents(mergeGeometries(timber)),
-    roof: computeTangents(mergeGeometries(slate)),
-    foundation: computeTangents(mergeGeometries(stone)),
-    glass: computeTangents(mergeGeometries(glass)),
+    floorElevation: floor,
+    parts: {
+      siding: computeTangents(mergeGeometries(timber)),
+      roof: computeTangents(mergeGeometries(slate)),
+      foundation: computeTangents(mergeGeometries(stone)),
+      glass: computeTangents(mergeGeometries(glass)),
+    },
   };
 }
