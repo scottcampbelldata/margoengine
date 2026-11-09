@@ -181,6 +181,7 @@
       "install",
       "probeWebGL2",
       "uninstall",
+      "waitFor",
       "webgl2Capabilities"
     ]
   },

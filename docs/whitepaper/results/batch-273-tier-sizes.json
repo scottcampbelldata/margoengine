@@ -136,5 +136,94 @@
     "Extension masks on NVIDIA RTX A6000 D3D11, not physical lower-tier hardware",
     "Full package image/refusal and real browser matrix not complete",
     "No speed measurements or rival performance claims"
-  ]
+  ],
+  "rebased": {
+    "baseCommit": "68a03f32c5d6705e8885a5915dd9e4c444b75ca9",
+    "commit": "21e79c6d4a03bf6cf0f4972d57c0ea8edaf5cc23",
+    "method": "Vite minified es2022 source entries, bare package imports external, all dynamic chunks included, gzip",
+    "rows": [
+      {
+        "entry": "index",
+        "before": 103008,
+        "after": 105011,
+        "delta": 2003,
+        "distAfter": 105105
+      },
+      {
+        "entry": "device",
+        "before": 103402,
+        "after": 105553,
+        "delta": 2151,
+        "distAfter": 105160
+      },
+      {
+        "entry": "compute",
+        "before": 48320,
+        "after": 48320,
+        "delta": 0,
+        "distAfter": 48345
+      },
+      {
+        "entry": "glsl",
+        "before": 42833,
+        "after": 42833,
+        "delta": 0,
+        "distAfter": 42833
+      },
+      {
+        "entry": "wgsl",
+        "before": 26482,
+        "after": 26482,
+        "delta": 0,
+        "distAfter": 26482
+      },
+      {
+        "entry": "xr",
+        "before": 101060,
+        "after": 105409,
+        "delta": 4349,
+        "distAfter": 104956
+      },
+      {
+        "entry": "preview",
+        "before": 3532,
+        "after": 3532,
+        "delta": 0,
+        "distAfter": 3533
+      },
+      {
+        "entry": "pick",
+        "before": 4883,
+        "after": 4883,
+        "delta": 0,
+        "distAfter": 4886
+      },
+      {
+        "entry": "restore",
+        "before": 850,
+        "after": 850,
+        "delta": 0,
+        "distAfter": 850
+      },
+      {
+        "entry": "auto",
+        "before": 3809,
+        "after": 3809,
+        "delta": 0,
+        "distAfter": 3810
+      },
+      {
+        "entry": "tiers",
+        "before": 0,
+        "after": 105513,
+        "delta": 105513,
+        "distAfter": 104842
+      }
+    ],
+    "coreStage": {
+      "raw": 59077,
+      "gzip": 23924
+    },
+    "note": "Current-main integration; original checkpoint measurements retained above. Same unchanged core and current math dependencies for both sides."
+  }
 }

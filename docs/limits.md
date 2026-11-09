@@ -2570,8 +2570,12 @@ whitepaper/results/batch-273-tier-packages-standalone*.json.
 
 Tracked follow-up **T273-COVERAGE** (batch 273, after the 26 full-tier compat
 failures): remaining post effects and standalone Tonemap, TAA, DOF, transitions,
-glTF/glTF-pro, selection, sciviz, lines, points, text, environment, VFX, scatter,
-LOD, terrain, sky, scenery, OIT, splats, voxel, React and XR require per-feature
+animation, BVH, cameras, clustered, compute, creative, environment, geometry,
+glTF/glTF-pro, headless, HTML, inspector, lighting2d, lines, points, text, pixel,
+procedural, quality, React, scatter, sciviz, selection, shader, sky, splats,
+sprites, staging, stats, terrain, tilemap, toon, VFX, video, voxel,
+voxel-pathtracer, water, weather, XR, UI, biomes, scenery, stage, controls, LOD
+and OIT require per-feature
 half-float/LDR images and measured attach-time refusals. Other optional rendering
 entries remain uncovered until included. The landed scope is the device entry
 plus ten scenes (17 accepted lower-tier images and three measured LDR refusals),

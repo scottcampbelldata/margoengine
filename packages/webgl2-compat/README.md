@@ -199,9 +199,12 @@ allocation; both pass half-float (SSAO maximum channel difference 1). Standalone
 FXAA is identical on both lower tiers. These ten scenes are the proven scope.
 
 Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,
-TAA, DOF, transitions, glTF/glTF-pro, selection, sciviz, lines, points, text,
-environment, VFX, scatter, LOD, terrain, sky, scenery, OIT, splats, voxel,
-React and XR still need feature-by-feature half-float/LDR images and measured
+TAA, DOF, transitions, animation, BVH, cameras, clustered, compute, creative,
+environment, geometry, glTF/glTF-pro, headless, HTML, inspector, lighting2d,
+lines, points, text, pixel, procedural, quality, React, scatter, sciviz,
+selection, shader, sky, splats, sprites, staging, stats, terrain, tilemap, toon,
+VFX, video, voxel, voxel-pathtracer, water, weather, XR, UI, biomes, scenery,
+stage, controls, LOD and OIT still need feature-by-feature half-float/LDR images and measured
 attach-time refusals. Other optional rendering entries are uncovered until added
 to that matrix. Full-tier compat failures are tracked separately in known-bugs.md
 and are repaired before this follow-up. Physical lower-tier hardware and the

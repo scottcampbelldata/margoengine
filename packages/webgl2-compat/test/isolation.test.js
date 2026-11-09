@@ -24,6 +24,7 @@ const ENTRIES = [
   '/pick',
   '/restore',
   '/auto',
+  '/tiers',
 ];
 const UMBRELLA = ENTRIES.map((e) => `packages/margoengine/src/webgl2-compat${e}.ts`);
 const ALIASED = ENTRIES.map((e) => NAME + e);
@@ -72,8 +73,7 @@ test('no other package imports the compatibility layer', () => {
     .split('\n')
     .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file));
   const offenders = files.filter((file) => {
-    if (file.startsWith('packages/webgl2-compat/') || UMBRELLA.includes(file))
-      return false;
+    if (file.startsWith('packages/webgl2-compat/') || UMBRELLA.includes(file)) return false;
     return moduleImports(readFileSync(join(root, file), 'utf8'), file).some((specifier) =>
       /(?:^|\/)webgl2-compat(?:\/|$)/.test(specifier),
     );

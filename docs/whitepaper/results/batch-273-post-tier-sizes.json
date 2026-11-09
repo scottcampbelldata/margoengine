@@ -312,5 +312,237 @@
       "after": 8577,
       "ceiling": 8835
     }
-  ]
+  ],
+  "rebased": {
+    "baseCommit": "68a03f32c5d6705e8885a5915dd9e4c444b75ca9",
+    "method": "Vite es2022 minified source, bare imports external; before from origin/main archive, after from worktree; gzip. distBefore: the same multi-entry Vite es2022/compactOutput build followed by the canonical size bundler; distAfter: current package build, same method. Core quality dependency uses the unchanged built core in both.",
+    "rows": [
+      {
+        "entry": ".",
+        "before": 41286,
+        "after": 41568,
+        "delta": 282,
+        "distBefore": 41746,
+        "distAfter": 41995,
+        "distDelta": 249
+      },
+      {
+        "entry": "./bloom",
+        "before": 6771,
+        "after": 6973,
+        "delta": 202,
+        "distBefore": 6775,
+        "distAfter": 6972,
+        "distDelta": 197
+      },
+      {
+        "entry": "./ssao",
+        "before": 9239,
+        "after": 9433,
+        "delta": 194,
+        "distBefore": 9593,
+        "distAfter": 9785,
+        "distDelta": 192
+      },
+      {
+        "entry": "./scene-fade",
+        "before": 2878,
+        "after": 2878,
+        "delta": 0,
+        "distBefore": 2876,
+        "distAfter": 2876,
+        "distDelta": 0
+      },
+      {
+        "entry": "./stack",
+        "before": 4000,
+        "after": 4231,
+        "delta": 231,
+        "distBefore": 3998,
+        "distAfter": 4225,
+        "distDelta": 227
+      },
+      {
+        "entry": "./fxaa",
+        "before": 4667,
+        "after": 4667,
+        "delta": 0,
+        "distBefore": 4658,
+        "distAfter": 4658,
+        "distDelta": 0
+      },
+      {
+        "entry": "./decals",
+        "before": 4832,
+        "after": 4832,
+        "delta": 0,
+        "distBefore": 5268,
+        "distAfter": 5268,
+        "distDelta": 0
+      },
+      {
+        "entry": "./ssr",
+        "before": 12541,
+        "after": 12769,
+        "delta": 228,
+        "distBefore": 12905,
+        "distAfter": 13133,
+        "distDelta": 228
+      },
+      {
+        "entry": "./gtao",
+        "before": 11560,
+        "after": 11814,
+        "delta": 254,
+        "distBefore": 11920,
+        "distAfter": 12167,
+        "distDelta": 247
+      },
+      {
+        "entry": "./ssgi",
+        "before": 12310,
+        "after": 12532,
+        "delta": 222,
+        "distBefore": 12678,
+        "distAfter": 12892,
+        "distDelta": 214
+      },
+      {
+        "entry": "./motion-blur",
+        "before": 7415,
+        "after": 7645,
+        "delta": 230,
+        "distBefore": 7761,
+        "distAfter": 7990,
+        "distDelta": 229
+      },
+      {
+        "entry": "./lens-flare",
+        "before": 6538,
+        "after": 6770,
+        "delta": 232,
+        "distBefore": 6532,
+        "distAfter": 6761,
+        "distDelta": 229
+      },
+      {
+        "entry": "./image",
+        "before": 11823,
+        "after": 12075,
+        "delta": 252,
+        "distBefore": 11876,
+        "distAfter": 12120,
+        "distDelta": 244
+      },
+      {
+        "entry": "./smaa",
+        "before": 6203,
+        "after": 6203,
+        "delta": 0,
+        "distBefore": 6198,
+        "distAfter": 6198,
+        "distDelta": 0
+      },
+      {
+        "entry": "./glitch",
+        "before": 6195,
+        "after": 6428,
+        "delta": 233,
+        "distBefore": 6192,
+        "distAfter": 6418,
+        "distDelta": 226
+      },
+      {
+        "entry": "./afterimage",
+        "before": 5605,
+        "after": 5831,
+        "delta": 226,
+        "distBefore": 5600,
+        "distAfter": 5825,
+        "distDelta": 225
+      },
+      {
+        "entry": "./outline",
+        "before": 6036,
+        "after": 6264,
+        "delta": 228,
+        "distBefore": 6031,
+        "distAfter": 6257,
+        "distDelta": 226
+      },
+      {
+        "entry": "./mrt",
+        "before": 3643,
+        "after": 3643,
+        "delta": 0,
+        "distBefore": 3631,
+        "distAfter": 3631,
+        "distDelta": 0
+      },
+      {
+        "entry": "./depth",
+        "before": 3773,
+        "after": 3773,
+        "delta": 0,
+        "distBefore": 3764,
+        "distAfter": 3764,
+        "distDelta": 0
+      },
+      {
+        "entry": "./contact-shadows",
+        "before": 5947,
+        "after": 6179,
+        "delta": 232,
+        "distBefore": 6366,
+        "distAfter": 6594,
+        "distDelta": 228
+      },
+      {
+        "entry": "./sss",
+        "before": 6556,
+        "after": 6788,
+        "delta": 232,
+        "distBefore": 6978,
+        "distAfter": 7208,
+        "distDelta": 230
+      },
+      {
+        "entry": "./anamorphic",
+        "before": 6296,
+        "after": 6529,
+        "delta": 233,
+        "distBefore": 6298,
+        "distAfter": 6529,
+        "distDelta": 231
+      },
+      {
+        "entry": "./blur",
+        "before": 5957,
+        "after": 6188,
+        "delta": 231,
+        "distBefore": 5951,
+        "distAfter": 6183,
+        "distDelta": 232
+      },
+      {
+        "entry": "./lens",
+        "before": 6632,
+        "after": 6866,
+        "delta": 234,
+        "distBefore": 6635,
+        "distAfter": 6865,
+        "distDelta": 230
+      },
+      {
+        "entry": "./material-decals",
+        "before": 7843,
+        "after": 8078,
+        "delta": 235,
+        "distBefore": 8328,
+        "distAfter": 8562,
+        "distDelta": 234
+      }
+    ],
+    "note": "Current-main integration; original checkpoint measurements retained above. Same unchanged core and current math dependencies for both sides."
+  }
 }
