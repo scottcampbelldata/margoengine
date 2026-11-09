@@ -1,5 +1,22 @@
 # Claims and evidence
 
+Sciviz update safety (2026-11-10): overlapping isosurface extractions publish matching vertices, level and
+triangle count in request order; failed or aborted extractions keep the displayed surface. Bricked frame
+requests resolve for their own step. Timeline disposal prevents late index/event publication.
+Figure disposal during isosurface creation cannot register a late layer or leak its resources. Proof:
+`packages/sciviz/tests/updates.test.js` holds completions deterministically, `sciviz-browser.js` compares
+overlapping levels with the CPU triangle count and original rendered surface, and `bricks-browser.js` checks
+overlapping steps and final pixels. Volume/isosurface single-slice errors identify the insufficient axis and
+point to a 2D heatmap; mismatched value counts retain their separate error (same unit test).
+
+`Figure.replace(old, next)` supports scatter, quiver, streamlines and histogram trace rebuilds without an empty
+frame when called immediately after awaiting the new layer. `entries-browser.mjs` checks queued seeks, lit
+pixels, one remaining layer and export on native WebGPU and forced WebGL2, then compares final images with
+the existing parity bars. The new image also equals a fresh draw; removing the trace leaves no stale pixels.
+Removal detaches points and lines synchronously, and attached figure disposal frees those traces (unit tests).
+It rebuilds resources and briefly holds both layers. These are correctness claims;
+no speed or official-demo presentation claim is made. Reproduction commands are in reproduce.md.
+
 The lane-Q README repair (2026-11-09) runs all 40 examples in React, Stage, text and worker with zero failures.
 This closes five runtime exceptions: React CommonJS conversion, a self-hosted asynchronous picking test, Stage's
 static glTF selection, a generated OFL ASCII atlas and the worker companion source. It proves these examples on

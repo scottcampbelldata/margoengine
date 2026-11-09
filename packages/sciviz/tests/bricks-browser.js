@@ -478,6 +478,13 @@ window.runBrickTests = async () => {
       const back = compare(first, await capture(figure));
       numbers.frame0Again = back;
       assert(back.max === 0, JSON.stringify(back));
+      const observed = [];
+      const toOne = layer.setFrame(1).then(() => observed.push(layer.frame));
+      const toZero = layer.setFrame(0).then(() => observed.push(layer.frame));
+      await pump(figure, Promise.all([toOne, toZero]));
+      assert(observed.join(',') === '1,0', `each overlapping request resolves for its own frame: ${observed}`);
+      const final = compare(first, await capture(figure));
+      assert(final.max === 0, `overlapping frames end on the original data: ${JSON.stringify(final)}`);
       gone(figure);
     },
   );

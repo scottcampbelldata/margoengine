@@ -156,7 +156,6 @@ export class IsosurfaceLayer implements Drawable {
   #level = 0;
   #triangles = 0;
   #vertices: GPUBuffer | undefined;
-  #capacity = 0;
   #uniform: GPUBuffer | undefined;
   #layout: GPUBindGroupLayout | undefined;
   #group: GPUBindGroup | undefined;
@@ -165,6 +164,8 @@ export class IsosurfaceLayer implements Drawable {
   #model = new Float32Array(16);
   readonly #values = new Float32Array(36);
   #disposed = false;
+  #updates: Promise<unknown> = Promise.resolve();
+  readonly #lifetime = new AbortController();
 
   /** @internal Use `figure.isosurface()`. */
   constructor(renderer: SciRenderer, gpu: ComputeContext, data: DataSource, options: IsosurfaceLayerOptions = {}) {
@@ -175,7 +176,12 @@ export class IsosurfaceLayer implements Drawable {
       shape = isGpuArray(data) ? data.shape : undefined,
       side = Math.round(Math.cbrt(size));
     const dims = options.dims ?? (shape?.length === 3 ? [shape[2], shape[1], shape[0]] : [side, side, side]);
-    if (dims.some((d) => !Number.isInteger(d) || d < 2) || dims[0] * dims[1] * dims[2] !== size)
+    if (dims.some((d) => !Number.isInteger(d) || d < 2))
+      throw rangeError(
+        `Isosurface dims [${dims.join(', ')}] need an integer of at least 2 samples on each axis; a single slice is an image, use a 2D figure.heatmap(values, { nx, ny })`,
+        'sciviz',
+      );
+    if (dims[0] * dims[1] * dims[2] !== size)
       throw rangeError(
         `Isosurface dims [${dims.join(', ')}] do not hold ${size} values; pass dims: [nx, ny, nz]`,
         'sciviz',
@@ -229,11 +235,24 @@ export class IsosurfaceLayer implements Drawable {
 
   /**
    * Extracts the surface at `level` (values above it are inside). Resolves the triangle count once the vertices are
-   * on the GPU.
+   * on the GPU. Overlapping calls run in request order. The previous surface stays visible until the new vertices
+   * and count are ready together; an aborted or failed extraction leaves it unchanged.
    */
   async update(level: number, options: { readonly signal?: AbortSignal } = {}): Promise<number> {
     if (this.#disposed) throw typeError('Isosurface disposed; create a new one', 'sciviz');
     if (!Number.isFinite(level)) throw rangeError(`Isosurface level must be finite, got ${level}`, 'sciviz');
+    const signal = options.signal ? AbortSignal.any([options.signal, this.#lifetime.signal]) : this.#lifetime.signal;
+    signal.throwIfAborted();
+    const run = this.#updates.then(() => {
+      signal.throwIfAborted();
+      return this.#extract(level, signal);
+    });
+    // Only the queue tail recovers; each caller receives its own failure.
+    this.#updates = run.catch(() => {});
+    return run;
+  }
+
+  async #extract(level: number, signal: AbortSignal): Promise<number> {
     const gpu = this.#gpu,
       [nx, ny, nz] = this.dims,
       cells = (nx - 1) * (ny - 1) * (nz - 1);
@@ -249,29 +268,31 @@ export class IsosurfaceLayer implements Drawable {
       .run({ field: this.#field, caseCounts: this.#tables.counts, counts, cases, grid: params }, { workgroups });
     const offsets = gpu.scan(counts, { exclusive: true });
     const total = counts.sum();
+    let vertices: GPUBuffer | undefined;
     try {
-      const triangles = await total.item({ signal: options.signal });
+      const triangles = await total.item({ signal });
+      signal.throwIfAborted();
       if (triangles * 3 * 32 > this.#renderer.device!.limits.maxStorageBufferBindingSize)
         throw rangeError(
           `Isosurface of ${triangles} triangles is over this GPU's storage limit; use a coarser grid`,
           'sciviz',
         );
-      if (triangles > this.#capacity) {
-        this.#vertices?.destroy();
-        // Room to grow by half, so nearby levels reuse the buffer.
-        this.#capacity = Math.ceil(triangles * 1.5);
-        this.#vertices = this.#renderer.device!.createBuffer({
-          size: Math.max(32, this.#capacity * 3 * 32),
+      // Never generate into the displayed buffer: draws can run while done() is pending, even without overlap.
+      if (triangles) {
+        vertices = this.#renderer.device!.createBuffer({
+          size: triangles * 3 * 32,
           usage: GPUBufferUsage.STORAGE,
         });
-        this.#group = this.#renderer.device!.createBindGroup({
-          layout: this.#layout!,
-          entries: [
-            { binding: 0, resource: { buffer: this.#uniform! } },
-            { binding: 1, resource: { buffer: this.#vertices } },
-          ],
-        });
       }
+      const group = vertices
+        ? this.#renderer.device!.createBindGroup({
+            layout: this.#layout!,
+            entries: [
+              { binding: 0, resource: { buffer: this.#uniform! } },
+              { binding: 1, resource: { buffer: vertices } },
+            ],
+          })
+        : undefined;
       if (triangles)
         gpu.kernel(generateShader(this.#tables.stride)).run(
           {
@@ -280,16 +301,22 @@ export class IsosurfaceLayer implements Drawable {
             cases,
             counts,
             offsets,
-            vertices: this.#vertices!,
+            vertices: vertices!,
             grid: params,
           },
           { workgroups },
         );
-      await gpu.done({ signal: options.signal });
+      await gpu.done({ signal });
+      signal.throwIfAborted();
+      this.#vertices?.destroy();
+      this.#vertices = vertices;
+      vertices = undefined;
+      this.#group = group;
       this.#triangles = triangles;
       this.#level = level;
       return triangles;
     } finally {
+      vertices?.destroy();
       for (const a of [counts, cases, offsets, total]) a.dispose();
     }
   }
@@ -346,6 +373,7 @@ export class IsosurfaceLayer implements Drawable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#lifetime.abort(typeError('Isosurface disposed; create a new one', 'sciviz'));
     this.#renderer.remove(this);
     this.#vertices?.destroy();
     this.#uniform?.destroy();

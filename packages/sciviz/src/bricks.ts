@@ -298,6 +298,7 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
   readonly #slices = new Set<BrickedSliceLayer>();
   readonly #scratch: Uint16Array<ArrayBuffer>;
   #disposed = false;
+  #frames: Promise<void> = Promise.resolve();
 
   /** @internal Use {@link brickedVolume}. */
   constructor(renderer: SciRenderer, source: BrickSource, options: BrickedVolumeOptions = {}) {
@@ -529,18 +530,25 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
 
   /**
    * Moves to time step `index`. The old step stays on screen until the new step's bricks for the view are loaded, then
-   * they swap in one frame. Use it from `figure.timeline()`: playback waits for the returned promise.
+   * they swap in one frame. Overlapping requests run in order and each resolves for its own step.
+   * Use it from `figure.timeline()`: playback waits for the returned promise.
    */
   setFrame(index: number, options: { readonly signal?: AbortSignal } = {}): Promise<void> {
     if (!Number.isInteger(index) || index < 0 || index >= this.frames)
       return Promise.reject(
         rangeError(`Bricked volume frame must be an integer in [0, ${this.frames - 1}], got ${index}`, 'sciviz'),
       );
-    if (index !== this.#frame) {
-      this.#frame = index;
-      this.#selected = false;
-    }
-    return this.ready(options);
+    const run = this.#frames.then(() => {
+      if (this.#disposed) throw fault('disposed', 'Bricked volume disposed; create a new one', 'sciviz');
+      options.signal?.throwIfAborted();
+      if (index !== this.#frame) {
+        this.#frame = index;
+        this.#selected = false;
+      }
+      return this.ready(options);
+    });
+    this.#frames = run.catch(() => {});
+    return run;
   }
 
   // Keys carry the time step, so going back to a step finds what is still cached.

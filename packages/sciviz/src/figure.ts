@@ -1222,12 +1222,14 @@ export class Figure extends EventTarget {
     const gpu = await (this.#compute ??= import('@margoengine/compute').then(({ createCompute }) =>
       createCompute({ engine: this.engine }),
     ));
+    this.#check();
     const layer = new IsosurfaceLayer(this.renderer, gpu, data, {
       ...options,
       color: options.color ?? levelColour(level, options.range, options.colormap),
     });
     try {
       await layer.update(level, { signal: options.signal });
+      this.#check();
     } catch (error) {
       layer.dispose();
       throw error;
@@ -1586,21 +1588,43 @@ export class Figure extends EventTarget {
     return bar;
   }
 
+  /**
+   * Swaps a layer for a ready layer made by this figure, without an empty frame. Build the new layer first:
+   * `trace = fig.replace(trace, await fig.scatter(data))`. Both layers must belong to this figure; the replacement
+   * takes the old layer's place in `layers` and the legend. Its own styling is kept. Returns the new layer.
+   */
+  replace<L extends Layer>(old: Layer, next: L): L {
+    this.#check();
+    if (!this.#layers.has(old) || !this.#layers.has(next))
+      throw typeError('replace needs two layers belonging to this figure', 'sciviz');
+    if (old === next) return next;
+    const layers = [...this.#layers].filter((layer) => layer !== next).map((layer) => (layer === old ? next : layer));
+    this.remove(old);
+    this.#layers.clear();
+    for (const layer of layers) this.#layers.add(layer);
+    this.#updateLegend();
+    return next;
+  }
+
   /** Removes a layer and frees it. */
   remove(layer: Layer): void {
     if (!this.#layers.delete(layer)) return;
-    if ('kind' in layer && layer.kind === 'scatter') void this.#points?.then((p) => p.remove(layer.cloud));
-    else if ('kind' in layer && layer.kind === 'line') void this.#lines?.then((l) => l.remove(layer.line));
-    else layer.dispose();
+    this.#free(layer);
     this.#refit();
     this.#updateLegend();
+  }
+
+  #free(layer: Layer): void {
+    if ('kind' in layer && layer.kind === 'scatter') layer.cloud.dispose();
+    else if ('kind' in layer && layer.kind === 'line') layer.line.dispose();
+    else layer.dispose();
   }
 
   /** Frees every layer, the axes and colour bars, and the engine when the figure created it. */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    for (const layer of [...this.#layers]) if (!('kind' in layer)) layer.dispose();
+    for (const layer of [...this.#layers]) this.#free(layer);
     this.#layers.clear();
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();

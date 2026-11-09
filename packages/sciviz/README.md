@@ -75,6 +75,16 @@ Data may be TypedArrays, plain arrays, or `GpuArray`s from `@margoengine/compute
 figure's engine with `createCompute({ engine: fig.engine })`. A surface, volume or isosurface reads a GPU array on
 the GPU; give such layers a `range`, since their min and max are not read back for you.
 
+Volumes and isosurfaces need an integer of at least two samples on every axis. A single slice is a 2D image:
+use `fig.heatmap(values, { nx, ny })` on a `mode: '2d'` figure. Invalid axes and a mismatched value count report
+different `RangeError` messages.
+
+Overlapping `isosurface.update(level, { signal })` calls run in request order. Each resolves its own triangle
+count, and the displayed vertices, count and level change together after extraction completes. An abort or failure
+keeps the previous surface. Disposal aborts active and queued extractions. During extraction, GPU memory holds
+the displayed surface and one new surface (96 bytes per triangle each); no extraction speed improvement is claimed.
+Disposing the figure while `fig.isosurface` is pending rejects creation and frees the unfinished layer.
+
 ```ts
 import { Figure } from '@margoengine/sciviz';
 import { createCompute } from '@margoengine/compute';
@@ -212,6 +222,37 @@ for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) x.push(i / 7 - 0.5), y.p
 await fig.quiver({ x, y, u: x.map((xi, k) => -y[k] + 0.3 * xi), v: x.map((xi, k) => xi + 0.3 * y[k]) }, { color: '#ffffff' });
 ```
 
+## Replacing trace data
+
+`fig.replace(old, next)` swaps in a ready layer from the same figure and frees the old layer. For scatter,
+quiver, streamlines and histograms, build the replacement before removing anything:
+`trace = fig.replace(trace, await fig.scatter(newData, options))`. The previous trace stays visible while data
+is read and the new layer is built. Call `replace` immediately after `await`, without another wait or render in
+between, so there is no rendered frame with both traces. A failed build leaves the old trace in place.
+
+The new layer keeps its own options, name and style and takes the old layer's place in `fig.layers` and the legend.
+Bounds, picking and exports follow the new data. Both layers must belong to this figure; replacing a layer with
+itself is a no-op. This builds a new layer and briefly holds both layers' resources.
+
+`fig.remove(layer)` detaches its resources synchronously, so a render immediately afterward cannot draw the
+removed points or lines. Disposing an attached figure also detaches its traces from the engine's shared plugins.
+
+Use a timeline to serialize asynchronous control changes and playback:
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const fig = await Figure.create(canvas, { mode: '2d', limits: [0, 3, 0, 3] });
+let trace = await fig.scatter({ x: [0, 1, 2], y: [0, 1, 2] }, { size: 8 });
+const timeline = fig.timeline([0, 1, 2], async (index) => {
+  trace = fig.replace(trace, await fig.scatter(
+    { x: [0, 1, 2], y: [index, 1, 2] }, { size: 8 },
+  ));
+}, { controls: false });
+await timeline.seek(2);
+```
+
 ## Time series
 
 `fig.timeline(times, frame, options)` gives a figure a time series: `frame(index, time)` updates your layers for one
@@ -222,6 +263,8 @@ time (`controls: false` hides them; `format` sets the time text). A 2D chart mak
 frame's update before the next, so slow updates never overlap. It resolves at the last frame or on `fig.pause()`,
 and rejects with the signal's reason when `signal` aborts. The timeline's `seek(index)`, `index`, `time` and `time`
 event follow the current frame.
+Concurrent `seek` calls also run in request order. Disposing a timeline prevents a pending callback from
+publishing another index or `time` event; it does not cancel work inside your callback.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
@@ -241,6 +284,10 @@ await fig.play({ fps: 30, signal: AbortSignal.timeout(10_000) });
 ```
 
 ## Bricked volumes
+
+`layer.setFrame(index, { signal })` requests on bricked volumes run in order, including overlapping calls. Each
+promise resolves for its own time step; an aborted queued request never selects a step. Ordinary `VolumeLayer`
+has no asynchronous `setFrame` method.
 
 `brickedVolume(fig, source, options)` from `@margoengine/sciviz/bricks` draws a grid larger than one 3D texture or
 than you want in GPU memory. Bricks of a level-of-detail pyramid load by view into one atlas texture: the coarsest

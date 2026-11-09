@@ -1351,6 +1351,31 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Sciviz asynchronous updates and trace replacement (2026-11-10)
+
+Isosurface extractions run in request order and build a separate vertex buffer. The vertices, bind group,
+triangle count and level publish together after GPU completion; abort, failure and disposal cannot publish a
+partial surface. Bricked `setFrame` requests serialize their own readiness instead of sharing whichever step
+was selected last. Timeline seeks already serialize callbacks; disposal now suppresses a pending callback's
+index and event publication. Ordinary volumes have no asynchronous frame setter.
+Figure isosurface creation also checks disposal after compute loading and after extraction, freeing an unregistered
+layer rather than adding it after the figure has been disposed.
+`packages/sciviz/tests/updates.test.js` deterministically holds completions to check overlap, buffer identity,
+counts, cancellation, disposal and queue recovery, plus the distinct single-slice validation errors. These tests
+join the existing package test closure in `check:merge`, guarding asynchronous publication as a class.
+`sciviz-browser.js` checks overlapping levels against the original GPU surface and CPU triangle count;
+`bricks-browser.js` checks overlapping frame promises and final pixels.
+
+`Figure.replace(old, next)` keeps the existing layer until its replacement is built; callers replace immediately
+after awaiting the builder. `entries-browser.mjs` exercises scatter, quiver, streamlines and histograms through
+queued seeks with lit-pixel checks, one-layer checks and SVG export on native WebGPU and forced WebGL2, and
+compares final pixels across backends. Replacement is resource rebuild rather than in-place buffer reuse;
+the new image must also match a fresh draw of the same data, and removal must leave no stale pixels.
+Point and line removal now calls the resource's owner-aware disposal synchronously rather than waiting on an
+already-loaded plugin promise; attached figure disposal frees its traces through the same path.
+Isosurfaces hold both the displayed and pending vertex buffer. No speed, other-hardware or official-demo
+presentation claim is added by these checks.
+
 ### Draco clean-room replacement (batch 133, 2026-11-09)
 
 The complete published specification and five figures were reviewed before code.

@@ -201,6 +201,16 @@ window.runSciVizTests = async () => {
       assert(luminance(image.at(image.width / 2, image.height / 2)) > 80, 'the surface is lit at the centre');
       const fewer = await iso.update(0.6);
       assert(fewer > 0 && fewer < expected, `a higher level gives a smaller surface (${fewer})`);
+      const small = iso.update(0.7),
+        large = iso.update(level);
+      const counts = await Promise.all([small, large]);
+      assert(counts[0] > 0 && counts[0] < expected && counts[1] === expected, `overlapping levels: ${counts}`);
+      assert(iso.level === level && iso.triangles === expected, 'last requested surface and count published together');
+      const updated = await pixels(figure);
+      assert(
+        updated.lit(BACKGROUND) === image.lit(BACKGROUND),
+        'same level draws the original surface after overlapping updates',
+      );
       figure.dispose();
     },
   );

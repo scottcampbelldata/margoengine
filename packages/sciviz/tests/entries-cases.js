@@ -6,7 +6,87 @@ import { tileLayer } from '@margoengine/sciviz/geo';
 
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
-const addCase = (name, run) => cases.push({ name, run });
+const addCase = (name, run, mode = '3d') => cases.push({ name, run, mode });
+
+for (const kind of ['scatter', 'quiver', 'streamlines', 'histogram']) {
+  addCase(
+    `replace-${kind}`,
+    async (figure, { pixels, lit, assert }) => {
+      figure.engine.stop?.();
+      figure.setLimits([0, 4, 0, 4]);
+      const x = [],
+        y = [];
+      for (let j = 0; j < 10; j++) for (let i = 0; i < 10; i++) x.push(0.5 + i / 10), y.push(0.5 + j / 10);
+      const make = (offset) => {
+        const shifted = x.map((v) => v + offset);
+        const style = { color: '#ffffff', name: `Frame ${offset}` };
+        if (kind === 'scatter') return figure.scatter({ x: shifted, y }, { ...style, size: 10 });
+        if (kind === 'quiver')
+          return figure.quiver(
+            { x: shifted, y, u: x.map(() => 1), v: x.map(() => 0) },
+            { ...style, scale: 0.3, width: 3 },
+          );
+        if (kind === 'histogram') return figure.histogram(shifted, { ...style, bins: 4, density: true });
+        return figure.streamlines(
+          { u: [1, 1, 1, 1], v: [0, 0, 0, 0], dims: [2, 2], bounds: [0, 4, 0, 4] },
+          {
+            ...style,
+            width: 3,
+            seeds: y.slice(0, 10).map((v, i) => [0.5 + offset, v + i / 5, 0]),
+            maxSteps: 12,
+            step: 0.03,
+            direction: 'forward',
+          },
+        );
+      };
+      let trace = await make(0);
+      const timeline = figure.timeline(
+        [0, 1, 2],
+        async (index) => {
+          // Data preparation can span rendered frames. The previous trace stays drawn throughout.
+          assert(lit(await pixels()) > 500, `${kind}: old trace vanished while preparing data`);
+          await new Promise(requestAnimationFrame);
+          const old = trace;
+          trace = figure.replace(trace, await make(index));
+          assert(
+            figure.layers.length === 1 && figure.layers[0] === trace && !figure.layers.includes(old),
+            `${kind}: duplicate or stale trace`,
+          );
+          assert(lit(await pixels()) > 500, `${kind}: replacement is empty`);
+        },
+        { controls: false },
+      );
+      await Promise.all([timeline.seek(1), timeline.seek(2)]);
+      assert(timeline.index === 2 && trace.name === 'Frame 2', 'latest seek committed');
+      assert(figure.replace(trace, trace) === trace, 'self replacement is a no-op');
+      let refused = false;
+      try {
+        figure.replace({}, trace);
+      } catch (error) {
+        refused = error instanceof TypeError;
+      }
+      assert(refused && figure.layers.length === 1, 'foreign layer rejected without mutation');
+      const svg = await figure.toSVG();
+      assert(svg.includes('<svg'), 'replacement exports');
+      const image = await pixels();
+      const plugin = [...figure.engine.plugins.values()].find(
+        (p) => p.name === (kind === 'scatter' ? 'points' : 'lines'),
+      );
+      if (kind === 'scatter') assert(plugin.pointClouds.size === 1, 'only the replacement cloud is registered');
+      else if (kind !== 'histogram') assert(plugin.lines.size === 1, 'only the replacement line is registered');
+      figure.remove(trace);
+      assert(lit(await pixels()) === 0, 'removing the replacement leaves no stale drawn layers');
+      trace = await make(2);
+      const reference = await pixels();
+      assert(
+        image.data.every((v, i) => v === reference.data[i]),
+        'replacement matches the same data drawn alone',
+      );
+      return { lit: lit(image), layers: figure.layers.length };
+    },
+    '2d',
+  );
+}
 
 // The figure puts data x along scene x, data y along scene -z and data z up, so a flat (z = 0) layer is seen from
 // above: TOP looks down with data y up the screen.

@@ -291,7 +291,12 @@ export class VolumeLayer implements Drawable {
       shape = isGpuArray(data) ? data.shape : undefined;
     const side = Math.round(Math.cbrt(size));
     const dims = options.dims ?? (shape?.length === 3 ? [shape[2], shape[1], shape[0]] : [side, side, side]);
-    if (dims.some((d) => !Number.isInteger(d) || d < 2) || dims[0] * dims[1] * dims[2] !== size)
+    if (dims.some((d) => !Number.isInteger(d) || d < 2))
+      throw rangeError(
+        `Volume dims [${dims.join(', ')}] need an integer of at least 2 samples on each axis; a single slice is an image, use a 2D figure.heatmap(values, { nx, ny })`,
+        'sciviz',
+      );
+    if (dims[0] * dims[1] * dims[2] !== size)
       throw rangeError(
         `Volume dims [${dims.join(', ')}] do not hold ${size} values; pass dims: [nx, ny, nz]`,
         'sciviz',

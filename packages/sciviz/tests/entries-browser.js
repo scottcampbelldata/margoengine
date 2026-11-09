@@ -31,7 +31,11 @@ const lit = (image) => {
   const b = at(image, 1, 1);
   let n = 0;
   for (let p = 0; p < image.data.length; p += 4)
-    if (Math.max(Math.abs(image.data[p] - b[0]), Math.abs(image.data[p + 1] - b[1]), Math.abs(image.data[p + 2] - b[2])) > 24) n++;
+    if (
+      Math.max(Math.abs(image.data[p] - b[0]), Math.abs(image.data[p + 1] - b[1]), Math.abs(image.data[p + 2] - b[2])) >
+      24
+    )
+      n++;
   return n;
 };
 const encode = (image) => {
@@ -39,7 +43,6 @@ const encode = (image) => {
   for (let i = 0; i < image.data.length; i += 8192) s += String.fromCharCode(...image.data.subarray(i, i + 8192));
   return btoa(s);
 };
-
 
 window.runEntryChecks = async () => {
   if (params.get('compat') === '1') {
@@ -49,9 +52,11 @@ window.runEntryChecks = async () => {
   const { Figure } = await import('@margoengine/sciviz');
   const canvas = document.querySelector('#view');
   const report = { checks: [], images: {} };
-  for (const { name, run } of cases) {
-    const figure = await Figure.create(canvas, { axes: false, controls: false });
-    figure.renderer.device.addEventListener('uncapturederror', (event) => errors.push(`${name}: ${event.error.message}`));
+  for (const { name, run, mode } of cases) {
+    const figure = await Figure.create(canvas, { mode, axes: false, controls: false });
+    figure.renderer.device.addEventListener('uncapturederror', (event) =>
+      errors.push(`${name}: ${event.error.message}`),
+    );
     try {
       const facts = await run(figure, { pixels: () => pixels(figure), at, lit, assert });
       const image = await pixels(figure);

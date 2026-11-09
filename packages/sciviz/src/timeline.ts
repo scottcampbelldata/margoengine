@@ -130,6 +130,7 @@ export class Timeline extends EventTarget {
     const run = this.#queue.then(async () => {
       if (this.#disposed) return;
       await this.#onFrame(k, this.times[k]);
+      if (this.#disposed) return;
       this.#index = k;
       if (this.#slider) this.#slider.value = String(k);
       if (this.#label) this.#label.textContent = this.#format(this.times[k]);

@@ -285,6 +285,7 @@ class Figure extends EventTarget {
     play(options?: PlayOptions): Promise<void>;
     pause(): void;
     colorbar(colormap: ColormapSource, range: readonly [number, number], options?: ColorBarOptions): ColorBar;
+    replace<L extends Layer>(old: Layer, next: L): L;
     remove(layer: Layer): void;
     dispose(): void;
     [Symbol.dispose](): void;

@@ -1161,3 +1161,20 @@ against a 512-sample reference and asserts each emission hit against [2,1,0.5], 
 pixel identity, empty/invalid/cancelled updates, capture, disposal and a real replacement device.
 Compositor screenshots establish displayed pixels. Raw report: test-results/staging-pathtrace.json;
 committed scope/device/value evidence: results/batch-56-pathtrace.json. No speed result.
+
+## Sciviz asynchronous update and replacement regression checks (2026-11-10)
+
+From a built checkout, run:
+
+```sh
+npm test --workspace @margoengine/sciviz
+node scripts/gpu-lock.mjs run --owner=sciviz-updates --max=15 --wait-max=10 -- npm run test:browser --workspace @margoengine/sciviz
+npm run check:readme-run -- --packages=sciviz
+npm run measure:size
+```
+
+The unit suite holds extraction and frame completions to check atomic publication, request ordering, aborts,
+failures and disposal. It also distinguishes single-slice dimensions from mismatched value counts.
+The browser suite checks actual overlapping isosurfaces, bricked time steps and trace replacement on native
+WebGPU and forced WebGL2. Results are written to `test-results/sciviz-browser.json`,
+`test-results/bricks-browser.json` and `test-results/sciviz-entries.json`. No speed claim follows.
