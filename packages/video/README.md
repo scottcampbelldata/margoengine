@@ -82,32 +82,40 @@ these stand in for decoded movie files. Codec files and other GPUs are not cover
 
 `recordCanvas` from `margoengine/video/record` (or `@margoengine/video/record`) records a
 page canvas in real time using MediaRecorder. WebGPU, WebGL2 and 2D canvases use the same
-capture API. This example records one second of a generated canvas and tone:
+capture API. Click the button to record one second of a generated canvas and tone.
+Creating and resuming audio stays inside that user gesture, so module initialization
+can finish on pages that block autoplay:
 
 ```ts
 import {recordCanvas} from 'margoengine/video/record';
 
-const canvas = document.createElement('canvas');
-canvas.width = canvas.height = 64;
-document.body.append(canvas);
-const drawing = canvas.getContext('2d')!;
-drawing.fillStyle = '#336699';
-drawing.fillRect(0, 0, 64, 64);
-const audio = new AudioContext();
-const destination = audio.createMediaStreamDestination();
-const tone = audio.createOscillator();
-tone.connect(destination);
-tone.start();
-await audio.resume(); // Run from a user gesture on pages that restrict audio playback.
-const recording = recordCanvas(canvas, {audio: destination.stream, format: 'webm'});
-// Media time: let one second of picture and sound reach the recorder.
-await new Promise<void>(resolve => setTimeout(resolve, 1000));
-const file = await recording.stop(); // Blob, ready for URL.createObjectURL(file) or saving.
-console.log(file.type, file.size);
-tone.stop();
-destination.stream.getTracks().forEach(track => track.stop());
-await audio.close();
-canvas.remove();
+const start = document.createElement('button');
+start.textContent = 'Record one second';
+start.addEventListener('click', async () => {
+  start.disabled = true;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  document.body.append(canvas);
+  const drawing = canvas.getContext('2d')!;
+  drawing.fillStyle = '#336699';
+  drawing.fillRect(0, 0, 64, 64);
+  const audio = new AudioContext();
+  const destination = audio.createMediaStreamDestination();
+  const tone = audio.createOscillator();
+  tone.connect(destination);
+  tone.start();
+  await audio.resume(); // The click supplies the required user activation.
+  const recording = recordCanvas(canvas, {audio: destination.stream, format: 'webm'});
+  // Media time: let one second of picture and sound reach the recorder.
+  await new Promise<void>(resolve => setTimeout(resolve, 1000));
+  const file = await recording.stop(); // Blob, ready for URL.createObjectURL(file) or saving.
+  console.log(file.type, file.size);
+  tone.stop();
+  destination.stream.getTracks().forEach(track => track.stop());
+  await audio.close();
+  canvas.remove();
+});
+document.body.append(start);
 ```
 
 `format` defaults to `'webm'`; `'mp4'` requests MP4. Codecs depend on the browser;

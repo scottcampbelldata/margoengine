@@ -1471,3 +1471,5 @@ After `npm run build:packages`, run `npm run check:preview-contract` and `node -
 The package-tier browser gate also covers Gemini entries 21, 22, 26, 29, 30, 31, 33 and the missing-fallback diagnostic (28). Run webgl2-compat/test/device.test.js after the package build for the native-retained install warning (27). The procedural preview route must finish without loading the compatibility layer.
 
 Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the shared GPU phase only; the three cutout-caster timing scripts are deferred in [the speed-phase record](../work-lists/speed-phase.md).
+
+Recording example activation: run `node --test --test-timeout=30000 packages/video/test/readme-record.test.js` and `npm run check:readme-run -- --packages=video` under the shared GPU lock. Click the README example's Record button to capture its generated picture and tone. [Research and the regression's scope](recording-example-research.md).

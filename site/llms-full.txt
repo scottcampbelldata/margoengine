@@ -4729,6 +4729,8 @@ The small `/preview` engine has backend `webgl2` and no GPU device; the full Web
 
 Explicit install() retains an available native WebGPU adapter with a linked MargoError state warning, unless force is true. The full layer needs backend webgpu (or auto), while backend webgl2 requires a preview fallback. The added Gemini GPU attachments refuse preview and escalate; Lighting2D and LayerCompositor use the full device. The current procedural native fragment baker is a real preview route. No new hardware or performance claim is made.
 
+Canvas recording with audio remains subject to user activation. Its README example initializes a Record button and creates/resumes audio from the click; it does not await permission during module setup. This changes the example, with no new recording, timing or cross-browser capability claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
