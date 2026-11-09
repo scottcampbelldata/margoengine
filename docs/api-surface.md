@@ -73,7 +73,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./autorig` 3, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 47 |  | 7,631 |
 | @margoengine/road | `.` 3, `./junctions` 4, `./banking` 2, `./terrain` 3, `./repair` 2, `./markings` 3, `./graph` 3 | 4 |  | 1,723 |
 | @margoengine/save | `.` 42, `./node` 1, `./engine` 9, `./slots` 9, `./remote` 6, `./safe` 5 | 29 |  | 6,728 |
-| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3, `./pick` 7, `./interact` 5, `./imposter` 3 | 30 |  | 19,098 |
+| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3, `./pick` 7, `./interact` 5, `./imposter` 3 | 30 |  | 19,100 |
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2 | 5 |  | 1,713 |
 | @margoengine/scenery | `.` 2, `./sky` 2, `./presets` 10, `./scenes` 6, `./stars` 4, `./aurora` 6 | 6 |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./formats` 18, `./geo` 12, `./graph` 8, `./grids` 15, `./maths` 37, `./nrrd` 10, `./fallback` 3, `./webgl2` 2, `./flow` 5 | 435 |  | 36,916 |
@@ -104,7 +104,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 15, `./bot` 4, `./file-store` 1, `./entities` 14, `./shards` 12, `./webtransport` 6, `./chat` 16, `./rewind` 8, `./sql-store` 4 | 92 |  | 8,446 |
-| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 81,091 |
+| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 81,092 |
 | @margoengine/water | `.` 8 |  |  | 19,846 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
 | @margoengine/webgl2-compat | `.` 15, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2 | 145 |  | 102,804 |

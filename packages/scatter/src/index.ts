@@ -764,7 +764,7 @@ export class Scatter implements EnginePlugin {
         }
         this.values[71] = this.time;
         if (this.options.follow) this.followCamera(c.camera.position);
-        this.beforeDistribute(c);
+        this.beforeDistribute(c, terrain);
         this.values.set(c.camera.matrix);
         this.values.set(c.camera.position, 16);
         this.values.set(c.camera.planes, 44);
@@ -865,7 +865,7 @@ export class Scatter implements EnginePlugin {
   }
 
   /** Runs before the frame values are uploaded (the tiles entry uploads new tiles here). */
-  protected beforeDistribute(_c: ScatterPassContext): void {}
+  protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void {}
 
   /** Moves `center` to the camera in whole grid cells and stores the cell offset for the world-cell hashes. */
   private followCamera(eye: ArrayLike<number>): void {

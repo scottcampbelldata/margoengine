@@ -486,8 +486,9 @@ from them, in the colour and the shadow passes alike.
 
 ```ts
 import { Engine, box } from '@margoengine/core';
-import { TrampledScatter } from '@margoengine/scatter/interact';
-const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+import { TrampledScatter, type Interactor } from '@margoengine/scatter/interact';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
 const grass = TrampledScatter.attach(
   engine,
   box(0.06, 1, 0.02),
@@ -495,9 +496,13 @@ const grass = TrampledScatter.attach(
   { size: 32, resolution: 64, recover: 1.5, bend: 1.2 },
 );
 const player = { position: [0, 0, 0] as [number, number, number], radius: 0.8 };
+const blasts: Interactor[] = [];
+// The app's explosion event supplies a world centre and radius. This demo uses a click.
+canvas.addEventListener('click', () => blasts.push({ position: [4, 0, -2], radius: 4, strength: 1 }));
 engine.onFrame(() => {
   player.position[0] += 0.02; // the app moves its player
-  grass.setInteractors([player, { position: [4, 0, -2], radius: 2.5, strength: 0.7 }]); // feet and a wheel
+  grass.setInteractors([player, { position: [4, 0, -2], radius: 2.5, strength: 0.7 }, ...blasts]);
+  blasts.length = 0; // explosions stamp once; the field then recovers on its own
 });
 engine.start();
 ```
@@ -509,9 +514,11 @@ engine.start();
 | `recover` | 1.5 | seconds for a push to fall to 5% once nothing presses it |
 | `bend` | 1.2 | turn of fully pressed grass about its root, radians, at most pi / 2 |
 
-- An interactor is `{ position, radius, strength? }`: within `radius` of `position` (x and z; the field is flat) the
+- An interactor is `{ position, radius, strength? }`: within a sphere of `radius` around the world `position` the
   push points away from it with amount `strength * (1 - (d / radius)^2)`, and a cell keeps the stronger of its own
-  push and the new one, so grass under a standing player stays down. Up to 4,096 interactors a frame.
+  push and the new one, so grass under a standing player stays down. Distance `d` includes the centre's height above
+  the bilinearly sampled heightmap plus `center[1]` (or that flat height without a map). An airborne explosion whose
+  sphere misses the ground adds no push. Direction is horizontal, away from the sphere centre. Up to 4,096 interactors a frame.
 - Positions must have all three finite GPU float components. Radius, bend, size and cells per unit must fit positive
   normal GPU floats (at least 2^-126); strength is a number from 0 to 1. A rejected list preserves the last successful
   list. A camera teleport with no field overlap clears the old pushes, including shifts beyond signed 32-bit cells.
@@ -523,8 +530,10 @@ engine.start();
   cull radii still hold.
 - Cost: 8 bytes a cell (128 KB at the default 128 cells) twice, one thread a cell that loops over the interactors, and
   five storage reads a vertex.
-- Limits: the field is flat (an interactor's height is not read; pass only the ones on the ground) and moves with the
-  camera, so grass more than `size / 2` from it is not pushed and a push is lost once its cell leaves the field. The
+- Explosions are one-frame interactors: include the blast on its event frame, then omit it. Existing pushes decay over
+  `recover`; a later airborne blast does not clear a previous ground push. Players and wheels stay in the list while pressing.
+- Limits: the field stores horizontal pushes on the heightfield and moves with the camera, so grass more than
+  `size / 2` from it is not pushed and a push is lost once its cell leaves the field. The
   push field is not shared between scatters: give each its own interactors.
 - Real-GPU proof: `npm run test:browser:interact --workspace @margoengine/scatter` (build the packages first).
 
@@ -571,10 +580,56 @@ f32 values. Bounds must stay ordered after conversion. A tile side must be posit
 65,535 must fit f32 (the packed-coordinate shader intermediate), and its endpoint sums must fit f32. Invalid input
 throws before replacing held records.
 
-Stream clumped grass with the same entry: use `generateGrassMesh(7)`, `(3)` and `(1)` from
-`@margoengine/procedural` as the three geometries, with `blades: {}` and the usual `lod` distances. Each record
-places a clump; adding and removing tiles manages the held area.
+Stream clumped grass on terrain with `generateGrassMesh(7)`, `(3)` and `(1)` as the three LOD meshes. This complete
+WebGPU example shares one height function between a visible terrain mesh and scatter's cell-centred height texture.
+Sixteen held 64 m chunks contain 1,024 clumps each. It makes no huge-area or frame-rate claim.
+
+```ts
+import { Engine, PbrMaterial } from '@margoengine/core';
+import { ScatterTiles } from '@margoengine/scatter/tiles';
+import { generateGrassMesh } from '@margoengine/procedural';
+import { toGeometry } from '@margoengine/geometry';
+import { heightfieldGeometry, TerrainHeightmap } from '@margoengine/terrain';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: { position: [0, 12, 30], target: [0, 0, 0] },
+});
+const height = (x: number, z: number) => 2 * Math.sin(x / 35) * Math.cos(z / 40);
+const ground = { size: [256, 256] as const, origin: [-128, -128] as const };
+engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(height, { ...ground, resolution: 128 })))
+  .setMaterial(new PbrMaterial({ color: [0.18, 0.3, 0.08] }));
+const map = TerrainHeightmap.attach(engine, height, { ...ground, resolution: 256 });
+const grass = ScatterTiles.attach(engine, [
+  toGeometry(generateGrassMesh(7)), toGeometry(generateGrassMesh(3)), toGeometry(generateGrassMesh(1)),
+], {
+  bounds: [-128, -128, 128, 128], heightmap: () => map.texture,
+  slots: 16, slotSize: 1024, lod: [20, 50, 100], lodFade: 4, blades: {},
+});
+const records = new Uint8Array(1024 * 8), words = new DataView(records.buffer);
+for (let i = 0; i < 1024; i++) {
+  words.setUint16(i * 8, ((i % 32 + 0.5) / 32) * 65536, true); // tile-local X
+  words.setUint16(i * 8 + 2, ((Math.floor(i / 32) + 0.5) / 32) * 65536, true); // Z
+  records[i * 8 + 5] = 128; // log scale: 128 is scale 1
+  records[i * 8 + 6] = (i * 73) % 256; // yaw, 256 steps per turn
+}
+for (let z = -2; z < 2; z++) for (let x = -2; x < 2; x++)
+  grass.setTile(`${x},${z}`, [x * 64, z * 64], 64, records);
+engine.start();
+// When a chunk streams out: grass.removeTile('1,1'); replace/setTile when one arrives.
+// On teardown: engine.dispose(); it owns the terrain map and scatter resources.
+```
+
+Each record places a clump; the GPU picks the near, middle and far mesh by distance and fades between them. Manage
+the held set with `setTile` and `removeTile`; the coordinate range alone does not allocate records for unheld chunks.
 
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+### Interaction entry size
+
+The optional interaction entry keeps its numerical safety explanation in
+TypeScript comments, outside shipped shader strings. This removes runtime
+comment text while preserving the shader token sequence, heightfield sampling,
+extreme-coordinate guards, recovery and all defaults. The CPU interaction and
+scatter tests run unchanged; real-GPU coverage remains a separate gate.

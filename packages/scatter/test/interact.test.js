@@ -85,3 +85,36 @@ test('options and interactors are checked; the field is made with the first fram
   effect.dispose();
   assert.equal(effect.field, undefined);
 });
+
+test('interaction uploads height and samples the same validated terrain and world rectangle as placement', () => {
+  const h = optionalGPU();
+  let texture = h.engine.gpu.createTexture({ size: [2, 2], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING });
+  let reads = 0;
+  const effect = new TrampledScatter(box(), {
+    count: 64, center: [3, 2, -5], bounds: [-8, -8, 8, 8],
+    heightmap: () => { reads++; return texture; },
+  });
+  try {
+    effect.setInteractors([{ position: [1, 7, -2], radius: 3, strength: 0.6 }]);
+    h.engine.use(effect);
+    h.frame();
+    assert.equal(reads, 1, 'one heightmap snapshot serves both field and placement');
+    const kernel = h.pipelines.find((p) => p.compute?.module.code.includes('var<storage,read> movers'));
+    assert.match(kernel.compute.module.code, /surface-m.xyz/);
+    const bound = h.groups.find((g) => g.entries[4]?.resource.texture === texture);
+    assert.ok(bound, 'the interaction compute pass reads the terrain texture');
+    const uniform = new Float32Array(bound.entries[0].resource.buffer.data);
+    assert.equal(uniform[9], 2, 'the same height offset as placement');
+    assert.deepEqual([...uniform.slice(12, 16)], [-8, -8, 8, 8]);
+    const mover = new Float32Array(bound.entries[3].resource.buffer.data);
+    assert.deepEqual([...mover.slice(0, 4)], [1, 7, -2, 3], 'the interactor retains Y');
+    assert.equal(mover[4], Math.fround(0.6));
+    texture = h.engine.gpu.createTexture({ size: [2, 2], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING });
+    h.frame();
+    assert.equal(reads, 2);
+    assert.ok(h.groups.some((g) => g.entries[4]?.resource.texture === texture), 'a replacement map rebinds');
+  } finally {
+    effect.dispose();
+    h.cleanup();
+  }
+});

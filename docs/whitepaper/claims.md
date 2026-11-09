@@ -2012,3 +2012,13 @@ Evidence: [root GPU values](results/review-99-root-glass-20261109.json);
 reproduce with the package test:gpu script or browser-check.mjs glassfurnace.
 This is a generated-scene energy regression, not a new spectral, nested-volume
 or performance claim.
+
+
+Height-aware grass interaction (batch 77): each cell samples the placement
+heightfield and compares a spherical interactor in XYZ; only its push direction
+is horizontal. The CPU regression proves Y reaches the GPU, one heightmap
+snapshot serves both passes and replacement maps rebind. Both parent and repair
+were exercised. interact.browser.mjs has unchanged 1e-5 numeric bars, extended
+to a sloped heightfield, explicit/implicit rectangles and airborne explosions;
+Real-GPU execution passes. The README's terrain chunks example demonstrates
+16 held chunks and 7/3/1-blade LOD meshes without a huge-area or speed claim.

@@ -34,14 +34,15 @@ const differing = (a, b) => {
 // The field's header (origin, cells per unit, resolution) and the push the update kernel gives one cell centre.
 const header = (f) => ({ origin: [f[0], f[1]], cells: f[2], n: f[3], bend: f[4] });
 const f32 = Math.fround;
-function push(x, z, movers) {
+function push(x, z, movers, ground = 0) {
   let v = [0, 0];
   for (const m of movers) {
     const o = [x - m.position[0], z - m.position[2]],
-      d = Math.hypot(o[0], o[1]);
-    if (d < m.radius && d > 1e-6) {
+      horizontal = Math.hypot(o[0], o[1]),
+      d = Math.hypot(o[0], ground - m.position[1], o[1]);
+    if (d < m.radius && horizontal > 1e-6) {
       const s = (m.strength ?? 1) * (1 - (d / m.radius) ** 2);
-      if (s > Math.hypot(v[0], v[1])) v = [(o[0] / d) * s, (o[1] / d) * s];
+      if (s > Math.hypot(v[0], v[1])) v = [(o[0] / horizontal) * s, (o[1] / horizontal) * s];
     }
   }
   return Math.hypot(v[0], v[1]) < 1e-3 ? [0, 0] : v;
@@ -146,6 +147,30 @@ await runSuite(
         assert.ok(Math.abs(extreme[at] - want[0]) < 1e-5 && Math.abs(extreme[at + 1] - want[1]) < 1e-5,
           `finite extreme push at ${i},${j}: ${extreme[at]},${extreme[at + 1]} != ${want}`);
       }
+    }
+    // Heightfields: a blast whose sphere does not reach the ground must leave every cell upright.
+    // Check both an explicit texture rectangle and the area/centre rectangle, including the placement Y offset.
+    for (const ground of [
+      { heights: [1, 3, 5, 7], bounds: [-8, -8, 8, 8], center: [0, 2, 0] },
+      { heights: [1, 3, 5, 7], center: [3, 2, -5] },
+    ]) {
+      await call('make', 'trampled', ground);
+      const airborne = await call('step', 0, [{ position: [0, 20, 0], radius: 3 }]);
+      assert.ok(airborne.slice(6).every((v) => v === 0), 'airborne explosion misses terrain');
+      const movers = [{ position: [0.3, 6, 0.1], radius: 4 }];
+      const field = await call('step', 0, movers), h = header(field);
+      const bounds = ground.bounds ?? [ground.center[0]-20,ground.center[2]-20,ground.center[0]+20,ground.center[2]+20];
+      let touched = 0;
+      for (let j=0;j<h.n;j++) for(let i=0;i<h.n;i++) {
+        const x=f32(h.origin[0]+(i+0.5)/h.cells),z=f32(h.origin[1]+(j+0.5)/h.cells);
+        const u=Math.max(0,Math.min(1,(x-bounds[0])/(bounds[2]-bounds[0])*2-0.5));
+        const v=Math.max(0,Math.min(1,(z-bounds[1])/(bounds[3]-bounds[1])*2-0.5));
+        const y=(1-u)*(1-v)*ground.heights[0]+u*(1-v)*ground.heights[1]+(1-u)*v*ground.heights[2]+u*v*ground.heights[3]+ground.center[1];
+        const want=push(x,z,movers,y),at=6+(j*h.n+i)*2;
+        assert.ok(Math.abs(field[at]-want[0])<1e-5&&Math.abs(field[at+1]-want[1])<1e-5,`heightfield stamp ${i},${j}`);
+        if(field[at]||field[at+1])touched++;
+      }
+      assert.ok(touched>20,'ground-level sphere bends grass on the sampled slope');
     }
     assert.deepEqual(pageErrors, []);
     console.log('ok scatter trample', JSON.stringify({ touched, worst, bentPixels: differing(bent, plain) }));

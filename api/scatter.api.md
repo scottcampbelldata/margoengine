@@ -54,7 +54,7 @@ export class Scatter implements EnginePlugin {
     protected poseEntries(): {
         buffer: GPUBuffer;
     }[];
-    protected beforeDistribute(_c: ScatterPassContext): void;
+    protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void;
     protected drawsRing(_ring: number): boolean;
     protected drawn(_c: ScatterPassContext): void;
     prepareShadow({ context, matrices, cascades }: {

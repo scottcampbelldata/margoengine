@@ -59,3 +59,27 @@ These sources do not establish a speed ratio: deterministic parent regressions
 prove work counts and identical answers, while the historical timing loss stays
 open. The measurement-bias study reinforces keeping counts separate from elapsed
 speed claims. GPU equivalence must pass independently.
+
+## Item 4: terrain grass and interaction
+
+- Kevin Boulanger, *Real-time Realistic Rendering of Nature Scenes with Dynamic
+  Lighting*, doctoral dissertation, University of Central Florida, 2008,
+  https://stars.library.ucf.edu/etd/3508/.
+- Haeberli and Akeley 1990, above, spatial filtering motivation.
+- W3C GPU for the Web Working Group, *WebGPU Shading Language*, 2026 working draft,
+  https://www.w3.org/TR/WGSL/.
+
+Boulanger's research surveys grass geometry, lighting and levels of detail; that
+does not prove Margo's chunk scale or speed. Margo reuses its own clumps and LOD.
+For interaction, independently derived Euclidean sphere distance is evaluated at
+the bilinearly sampled placement surface. Four explicit loads preserve the existing
+heightmap convention without requiring float texture filtering. Scaled norms avoid
+overflow. The same CPU oracle and unchanged 1e-5 GPU bar check the result. No
+physical blast simulation or huge-area performance claim follows.
+
+The CPU checkpoint's packaging follow-up moves WGSL comments to TypeScript
+comments, following the same W3C WGSL language/comment rules. It changes no
+algorithm or instruction token: the update token SHA-256 stays
+593e1aa2c641ac2f4614ca86365da5300db58a82cb12987c563c6eaf0ae27733.
+The interaction entry drops from 3,664 to 3,345 B gzip below its existing
+3,574 B ceiling; no ceiling rises and the same 73 scatter unit tests pass.

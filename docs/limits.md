@@ -2269,3 +2269,21 @@ controls use frozen, independently quality-validated replacement hashes;
 older controls remain strict prebuilt/specification hashes. Each seed records
 input, adapter and Wasm hashes; source remained unchanged. This is bounded
 subset evidence, not completed fuzz acceptance or a peak-memory/speed claim.
+
+### Height-aware grass interaction (batch 77 jobs 3 and 4)
+
+Interactor radius is a sphere in world units, tested at each push-field cell's
+bilinearly sampled heightmap height plus the scatter centre Y. Airborne spheres
+that miss the surface add no push. The field still stores horizontal vectors,
+interpolated at roots, over a camera-centred square; overhangs and multiple
+surfaces at one XZ are outside this heightfield representation. Ground sampling
+adds four textureLoad reads per field cell; each interactor upload is 32 bytes.
+An explosion is a one-frame stamp; existing pushes recover with the usual rate.
+The terrain chunks README example holds 16 chunks with 1,024 clumps each and
+7/3/1-blade LOD meshes. It makes no huge-area or frame-rate claim.
+
+Measured entry sizes for this follow-up: scatter/interact 3,345 B gzip,
+under its unchanged 3,574 B ceiling; scatter root 19,100 B. Moving numerical
+comments outside shader strings preserves every non-comment WGSL token.
+Core plus stage remains 23,924 B gzip, below 25,000 B. No ceiling is raised.
+Full record: examples/package-benchmarks/results/entry-sizes.json.

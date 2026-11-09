@@ -4857,6 +4857,24 @@ older controls remain strict prebuilt/specification hashes. Each seed records
 input, adapter and Wasm hashes; source remained unchanged. This is bounded
 subset evidence, not completed fuzz acceptance or a peak-memory/speed claim.
 
+### Height-aware grass interaction (batch 77 jobs 3 and 4)
+
+Interactor radius is a sphere in world units, tested at each push-field cell's
+bilinearly sampled heightmap height plus the scatter centre Y. Airborne spheres
+that miss the surface add no push. The field still stores horizontal vectors,
+interpolated at roots, over a camera-centred square; overhangs and multiple
+surfaces at one XZ are outside this heightfield representation. Ground sampling
+adds four textureLoad reads per field cell; each interactor upload is 32 bytes.
+An explosion is a one-frame stamp; existing pushes recover with the usual rate.
+The terrain chunks README example holds 16 chunks with 1,024 clumps each and
+7/3/1-blade LOD meshes. It makes no huge-area or frame-rate claim.
+
+Measured entry sizes for this follow-up: scatter/interact 3,345 B gzip,
+under its unchanged 3,574 B ceiling; scatter root 19,100 B. Moving numerical
+comments outside shader strings preserves every non-comment WGSL token.
+Core plus stage remains 23,924 B gzip, below 25,000 B. No ceiling is raised.
+Full record: examples/package-benchmarks/results/entry-sizes.json.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -7726,6 +7744,43 @@ equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
 second full verify or timing benchmark is claimed. Current selection: 20,833 B
 gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
 Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
+
+### Physics hold: batch 101 job 2, non-square tile collider merging
+
+Repro: a TileMapSource layer containing adjacent slope or half-tile collision
+shapes passed to `tileMapColliders` produces one collider per shape, rather
+than merged runs. Cause: packages/physics2d/src/tilemap.ts collects whole-cell
+solid squares into mergeable grids and emits all other shapes independently.
+Scott's skip-gaps brief explicitly holds physics work. This gap remains open;
+no physics source or tests are changed. Batch 17 job 3's mixed core/package
+render-pass hook separately awaits Scott's approval for a core change.
+
+### Closed: grass height interaction (batch 77)
+
+Cause: interact.ts packed only interactor X/Z, radius and strength, and never
+read its height or the placement heightmap. A blast above terrain could stamp
+the same field as a ground blast. The interaction pass now retains XYZ and
+samples the same validated texture and rectangle as placement. CPU upload,
+texture replacement and single-snapshot regressions pass and fail on the parent.
+The real-GPU regression checks every field cell against a 3D distance oracle,
+explicit and implicit texture rectangles, terrain Y offset, airborne explosions
+and ground effects; all pass on the real GPU in a shared slot. No tolerance
+or behavioral bar is relaxed. The README documents one-frame explosions and
+contains a complete terrain chunks/LOD example.
+
+Item 4 final proof: all ten registered scatter GPU suites and all 14 README
+examples pass in one shared slot (70.2 s combined). The package CPU regressions,
+lint and hygiene pass. Entry and basic-scene records genuinely measure
+419b34508 with dirty=true, the same source state; five network requests, no extra
+files. API generation follows measurement. Completed full verify evidence is
+retained from the earlier continuation; no extra full verify or timing loop ran.
+Logs: test-results/skip-gaps/item4-*.log; sources: skip-gaps-research.md.
+
+Final rebase inherited only the independent voxel-pathtracer glass correction.
+Scatter sources and passing proof inputs are unchanged. Its changed package was
+rebuilt and the paired entry/network records regenerated from 21ff80d28,
+dirty=false; scatter/interact stays 3345 B and core + stage 23924 B.
+The pre-rebase GPU/README proof above remains the scatter execution evidence.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

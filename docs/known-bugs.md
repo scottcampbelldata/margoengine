@@ -2865,3 +2865,40 @@ equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
 second full verify or timing benchmark is claimed. Current selection: 20,833 B
 gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
 Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
+
+### Physics hold: batch 101 job 2, non-square tile collider merging
+
+Repro: a TileMapSource layer containing adjacent slope or half-tile collision
+shapes passed to `tileMapColliders` produces one collider per shape, rather
+than merged runs. Cause: packages/physics2d/src/tilemap.ts collects whole-cell
+solid squares into mergeable grids and emits all other shapes independently.
+Scott's skip-gaps brief explicitly holds physics work. This gap remains open;
+no physics source or tests are changed. Batch 17 job 3's mixed core/package
+render-pass hook separately awaits Scott's approval for a core change.
+
+### Closed: grass height interaction (batch 77)
+
+Cause: interact.ts packed only interactor X/Z, radius and strength, and never
+read its height or the placement heightmap. A blast above terrain could stamp
+the same field as a ground blast. The interaction pass now retains XYZ and
+samples the same validated texture and rectangle as placement. CPU upload,
+texture replacement and single-snapshot regressions pass and fail on the parent.
+The real-GPU regression checks every field cell against a 3D distance oracle,
+explicit and implicit texture rectangles, terrain Y offset, airborne explosions
+and ground effects; all pass on the real GPU in a shared slot. No tolerance
+or behavioral bar is relaxed. The README documents one-frame explosions and
+contains a complete terrain chunks/LOD example.
+
+Item 4 final proof: all ten registered scatter GPU suites and all 14 README
+examples pass in one shared slot (70.2 s combined). The package CPU regressions,
+lint and hygiene pass. Entry and basic-scene records genuinely measure
+419b34508 with dirty=true, the same source state; five network requests, no extra
+files. API generation follows measurement. Completed full verify evidence is
+retained from the earlier continuation; no extra full verify or timing loop ran.
+Logs: test-results/skip-gaps/item4-*.log; sources: skip-gaps-research.md.
+
+Final rebase inherited only the independent voxel-pathtracer glass correction.
+Scatter sources and passing proof inputs are unchanged. Its changed package was
+rebuilt and the paired entry/network records regenerated from 21ff80d28,
+dirty=false; scatter/interact stays 3345 B and core + stage 23924 B.
+The pre-rebase GPU/README proof above remains the scatter execution evidence.

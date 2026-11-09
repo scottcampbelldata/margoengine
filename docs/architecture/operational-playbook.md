@@ -3914,3 +3914,30 @@ each seed pins input/adapter/Wasm. Its388s diagnostic duration is not a timing
 proof. Remaining encoders, public integration and all final acceptance bars stay
 open. Browser repair cf699846f is now rebased from origin/main; fresh shared
 correctness gates and voxel-first landing remain pending.
+
+### Section 5 evidence: height-aware scatter interaction
+
+The owning scatter package supplies its already validated height texture to the
+interaction hook before distribution. Interaction bilinearly samples the same
+rectangle and adds the same centre Y, then tests a 3D sphere with scaled norms
+and overflow guards. Direction and the retained recovery field remain horizontal.
+CPU upload/rebinding regressions pass and fail on the parent. GPU tests compare
+all cells on a synthetic sloped heightfield, with both texture coordinate modes,
+plus flat-field recovery, shadow pose and finite-extreme checks; all ten scatter
+browser suites pass on the real GPU. Additional cost: four texture reads per field cell and 32 bytes per
+interactor. No core/stage change. Copy-paste terrain chunks and LOD guidance is
+in scatter's README, linked from creative. No huge-area or frame-rate claim.
+
+Item 4 final proof: all ten registered scatter GPU suites and all 14 README
+examples pass in one shared slot (70.2 s combined). The package CPU regressions,
+lint and hygiene pass. Entry and basic-scene records genuinely measure
+419b34508 with dirty=true, the same source state; five network requests, no extra
+files. API generation follows measurement. Completed full verify evidence is
+retained from the earlier continuation; no extra full verify or timing loop ran.
+Logs: test-results/skip-gaps/item4-*.log; sources: skip-gaps-research.md.
+
+Final rebase inherited only the independent voxel-pathtracer glass correction.
+Scatter sources and passing proof inputs are unchanged. Its changed package was
+rebuilt and the paired entry/network records regenerated from 21ff80d28,
+dirty=false; scatter/interact stays 3345 B and core + stage 23924 B.
+The pre-rebase GPU/README proof above remains the scatter execution evidence.

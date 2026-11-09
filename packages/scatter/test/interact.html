@@ -16,7 +16,7 @@ engine.createMesh().setGeometry(box(200,0.1,200)).setPosition([0,-0.05,0]);
 const options={count:40000,area:[40,40],lod:[30,60,90],blades:{},color:[0.3,0.6,0.2]};
 const blade=box(0.06,1,0.02);
 const trample={size:32,resolution:64,recover:1.5,bend:1.2};
-let current;
+let current,terrain;
 const read=async(buffer)=>{
  const out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
  e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
@@ -24,9 +24,17 @@ const read=async(buffer)=>{
 };
 window.check={
  // kind 'plain' or 'trampled': a fresh scatter, one frame at delta 0.
- async make(kind){
+ async make(kind,ground){
   current?.dispose();
-  current=kind==='plain'?Scatter.attach(engine,blade,options):TrampledScatter.attach(engine,blade,options,trample);
+  terrain?.destroy();terrain=undefined;
+  const settings={...options};
+  if(ground){
+   terrain=device.createTexture({size:[2,2],format:'r32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+   device.queue.writeTexture({texture:terrain},new Float32Array(ground.heights),{bytesPerRow:8},[2,2]);
+   settings.heightmap=()=>terrain;settings.center=ground.center??[0,0,0];
+   if(ground.bounds)settings.bounds=ground.bounds;
+  }
+  current=kind==='plain'?Scatter.attach(engine,blade,settings):TrampledScatter.attach(engine,blade,settings,trample);
   device.pushErrorScope('validation');
   await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
   const e=await device.popErrorScope();if(e)errors.push(e.message);

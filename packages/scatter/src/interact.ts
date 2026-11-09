@@ -29,7 +29,7 @@ export interface TrampleOptions {
 
 /** Something that pushes grass: a player's feet, an animal, a vehicle's wheel. */
 export interface Interactor {
-  /** World position; x and z place the push (the field is flat, so y is not read). */
+  /** World centre of the spherical influence; height is measured against the scatter's ground surface. */
   position: readonly [number, number, number];
   /** Radius of the push in world units, above 0. */
   radius: number;
@@ -50,12 +50,10 @@ export function trampleCode(group: number, binding: number): string {
   return `
 @group(${group}) @binding(${binding}) var<storage,read> trample:array<vec2f>;
 fn trampleCell(c:vec2i,n:i32)->vec2f {if(any(c<vec2i(0))||any(c>=vec2i(n))){return vec2f(0);}return trample[${HEAD}+c.y*n+c.x];}
-// The push at a root, bilinear between cell centres; 0 outside the field.
 fn tramplePush(root:vec2f)->vec2f {
  let n=i32(trample[1].y);let t=(root-trample[0])*trample[1].x-0.5;let c=vec2i(floor(t));let f=t-floor(t);
  return mix(mix(trampleCell(c,n),trampleCell(c+vec2i(1,0),n),f.x),mix(trampleCell(c+vec2i(0,1),n),trampleCell(c+vec2i(1,1),n),f.x),f.y);
 }
-// v turned about the horizontal axis that tips +Y toward the push, by the push's amount times the field's bend.
 fn trampleTurn(v:vec3f,push:vec2f)->vec3f {
  let amount=length(push);if(amount<=0.0){return v;}
  let a=min(amount,1.0)*trample[2].x;let d=push/amount;let k=vec3f(d.y,0,-d.x);
@@ -86,32 +84,41 @@ export function trampledPoseCode(code: string, group: number, binding: number): 
   );
 }
 
+// Overflow checks precede subtraction. Scale before length to avoid overflow/underflow.
+// Shift the same cell, apply recovery, stamp spheres, then clear recovered pushes.
 const update = `
-struct Update {origin:vec2f,shift:vec2i,cells:f32,n:u32,keep:f32,count:u32,bend:f32}
+struct Update {origin:vec2f,shift:vec2i,cells:f32,n:u32,keep:f32,count:u32,bend:f32,base:f32,bounds:vec4f}
 @group(0) @binding(0) var<uniform> u:Update;
 @group(0) @binding(1) var<storage,read> field:array<vec2f>;
 @group(0) @binding(2) var<storage,read_write> next:array<vec2f>;
 @group(0) @binding(3) var<storage,read> movers:array<vec4f>;
+@group(0) @binding(4) var ground:texture_2d<f32>;
+fn groundHeight(p:vec2i)->f32 {return textureLoad(ground,clamp(p,vec2i(0),vec2i(textureDimensions(ground))-1),0).r;}
+fn groundAt(w:vec2f)->f32 {
+ let t=(w-u.bounds.xy)/(u.bounds.zw-u.bounds.xy)*vec2f(textureDimensions(ground))-0.5;
+ let c=vec2i(floor(t));let f=t-floor(t);
+ return mix(mix(groundHeight(c),groundHeight(c+vec2i(1,0)),f.x),mix(groundHeight(c+vec2i(0,1)),groundHeight(c+vec2i(1,1)),f.x),f.y)+u.base;
+}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) g:vec3u){
  let n=u.n;if(g.x>=n||g.y>=n){return;}
  if(g.x==0u&&g.y==0u){next[0]=u.origin;next[1]=vec2f(u.cells,f32(n));next[2]=vec2f(u.bend,0);}
- // The same world cell last frame (the field moves with the camera in whole cells), recovering toward upright.
  let old=vec2i(g.xy)+u.shift;var v=vec2f(0);
  if(all(old>=vec2i(0))&&all(old<vec2i(i32(n)))){v=field[${HEAD}u+u32(old.y)*n+u32(old.x)]*u.keep;}
  let w=u.origin+(vec2f(g.xy)+0.5)/u.cells;
+ let surface=vec3f(w.x,groundAt(w),w.y);
  for(var i=0u;i<u.count;i++){
-  let m=movers[i];
-  // An overflowing component difference is outside every finite radius. Detect it before subtracting.
-  let bound=vec2f(3.4028234663852886e38)-abs(m.xy);
-  if(((w.x<0)!=(m.x<0)&&abs(w.x)>=bound.x)||((w.y<0)!=(m.y<0)&&abs(w.y)>=bound.y)){continue;}
-  let o=w-m.xy;let a=max(abs(o.x),abs(o.y));
-  if(a<m.z&&a>0){
-   // Normalize before length: squaring a large but finite offset would overflow, or a tiny ratio would underflow.
-   let axis=o/a;let norm=length(axis);let d=(a/m.z)*norm;
-   if(d<1.0&&a>1e-6/norm){let s=m.w*(1.0-d*d);if(s>length(v)){v=axis/norm*s;}}
+  let m=movers[i*2u];let strength=movers[i*2u+1u].x;
+  let bound=vec3f(3.4028234663852886e38)-abs(m.xyz);
+  if(((surface.x<0)!=(m.x<0)&&abs(surface.x)>=bound.x)||((surface.y<0)!=(m.y<0)&&abs(surface.y)>=bound.y)||((surface.z<0)!=(m.z<0)&&abs(surface.z)>=bound.z)){continue;}
+  let o=surface-m.xyz;let a=max(max(abs(o.x),abs(o.y)),abs(o.z));
+  if(a<m.w&&a>0){
+   let axis=o/a;let norm=length(axis);let d=(a/m.w)*norm;
+   let horizontal=max(abs(o.x),abs(o.z));
+   if(d<1.0&&horizontal>0){let direction=o.xz/horizontal;let length2=length(direction);
+    if(horizontal>1e-6/length2){let s=strength*(1.0-d*d);if(s>length(v)){v=direction/length2*s;}}
+   }
   }
  }
- // Fully recovered at last, so a field nothing presses draws as plain grass.
  if(length(v)<1e-3){v=vec2f(0);}
  next[${HEAD}u+g.y*n+g.x]=v;
 }`;
@@ -129,7 +136,7 @@ export class TrampledScatter extends Scatter {
   readonly #n: number;
   readonly #recover: number;
   readonly #bend: number;
-  #movers = new Float32Array(4);
+  #movers = new Float32Array(8);
   #count = 0;
   #delta = 0;
   #origin?: [number, number];
@@ -139,7 +146,8 @@ export class TrampledScatter extends Scatter {
   #uniform?: GPUBuffer;
   #kernel?: GPUComputePipeline;
   #group?: GPUBindGroup;
-  readonly #words = new ArrayBuffer(48);
+  #ground?: GPUTexture;
+  readonly #words = new ArrayBuffer(64);
 
   constructor(
     geometry: Geometry | readonly [Geometry, Geometry, Geometry],
@@ -192,10 +200,10 @@ export class TrampledScatter extends Scatter {
       if (!(Number.isFinite(strength) && strength >= 0 && strength <= 1))
         throw rangeError('An interactor strength is a number from 0 to 1', 'scatter');
     }
-    if (this.#movers.length < interactors.length * 4)
-      this.#movers = new Float32Array(Math.max(4, 2 ** Math.ceil(Math.log2(interactors.length))) * 4);
+    if (this.#movers.length < interactors.length * 8)
+      this.#movers = new Float32Array(Math.max(4, 2 ** Math.ceil(Math.log2(interactors.length))) * 8);
     interactors.forEach(({ position: p, radius, strength = 1 }, i) => {
-      this.#movers.set([p[0], p[2], radius, strength], i * 4);
+      this.#movers.set([p[0], p[1], p[2], radius, strength, 0, 0, 0], i * 8);
     });
     this.#count = interactors.length;
     return this;
@@ -219,8 +227,8 @@ export class TrampledScatter extends Scatter {
     return [...super.poseEntries(), { buffer: this.#fieldBuffer() }];
   }
 
-  protected override beforeDistribute(c: Context): void {
-    super.beforeDistribute(c);
+  protected override beforeDistribute(c: Context, terrain: GPUTexture): void {
+    super.beforeDistribute(c, terrain);
     const d = c.device,
       n = this.#n,
       cells = n / this.#size,
@@ -242,6 +250,11 @@ export class TrampledScatter extends Scatter {
     floats[6] = Math.exp((-3 * this.#delta) / this.#recover);
     words[7] = this.#count;
     floats[8] = this.#bend;
+    floats[9] = this.values[30];
+    floats.set(this.options.bounds ?? [
+      this.values[22] - this.values[20] / 2, this.values[23] - this.values[21] / 2,
+      this.values[22] + this.values[20] / 2, this.values[23] + this.values[21] / 2,
+    ], 12);
     this.#delta = 0;
     if (!this.#moverBuffer || this.#moverBuffer.size < this.#movers.byteLength) {
       this.#moverBuffer?.destroy();
@@ -251,15 +264,20 @@ export class TrampledScatter extends Scatter {
       });
       this.#group = undefined;
     }
-    d.queue.writeBuffer(this.#moverBuffer, 0, this.#movers as Float32Array<ArrayBuffer>, 0, Math.max(4, this.#count * 4));
-    this.#uniform ??= d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    d.queue.writeBuffer(this.#moverBuffer, 0, this.#movers as Float32Array<ArrayBuffer>, 0, Math.max(8, this.#count * 8));
+    this.#uniform ??= d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     d.queue.writeBuffer(this.#uniform, 0, this.#words);
     this.#kernel ??= compute(d, update);
+    if (this.#ground !== terrain) {
+      this.#ground = terrain;
+      this.#group = undefined;
+    }
     this.#group ??= group(d, this.#kernel, [
       { buffer: this.#uniform },
       { buffer: field },
       { buffer: this.#next! },
       { buffer: this.#moverBuffer },
+      terrain.createView(),
     ]);
     dispatch(c, this.#kernel, this.#group, Math.ceil(n / 8), Math.ceil(n / 8));
     c.encoder.copyBufferToBuffer(this.#next!, 0, field, 0, field.size);
@@ -283,5 +301,6 @@ export class TrampledScatter extends Scatter {
     for (const b of [this.#field, this.#next, this.#moverBuffer, this.#uniform]) b?.destroy();
     this.#field = this.#next = this.#moverBuffer = this.#uniform = undefined;
     this.#kernel = this.#group = this.#origin = undefined;
+    this.#ground = undefined;
   }
 }

@@ -28,7 +28,7 @@ test('a rejected interactor list preserves all of the last successful upload', (
   ]);
   h.engine.use(effect);
   h.frame();
-  const moverBuffer = h.resources.find(r => r.size === 64 && new Float32Array(r.data)[0] === 2);
+  const moverBuffer = h.resources.find(r => r.size === 128 && new Float32Array(r.data)[0] === 2);
   assert.ok(moverBuffer, 'the mover upload');
   const before = Array.from(new Float32Array(moverBuffer.data));
   assert.throws(() => effect.setInteractors([
@@ -46,7 +46,7 @@ test('camera moves with no field overlap cannot wrap through a signed 32-bit shi
   h.engine.camera.position[0] = 2 ** 31;
   h.engine.camera.position[2] = -(2 ** 31);
   h.frame();
-  const uniform = h.resources.find(r => r.size === 48 && new Int32Array(r.data)[5] === 16);
+  const uniform = h.resources.find(r => r.size === 64 && new Int32Array(r.data)[5] === 16);
   assert.ok(uniform);
   const words = new Int32Array(uniform.data);
   assert.deepEqual(Array.from(words.subarray(2, 4)), [16, -16]);
@@ -63,9 +63,9 @@ test('interaction restoration retains valid interactors and terminal disposal re
   assert.ok(oldField.destroyed);
   h.frame();
   assert.notEqual(effect.field, oldField);
-  const uploads = h.resources.filter(r => r.size === 16 && new Float32Array(r.data)[0] === 2);
+  const uploads = h.resources.filter(r => r.size === 32 && new Float32Array(r.data)[0] === 2);
   assert.equal(uploads.length, 2);
-  assert.deepEqual(Array.from(new Float32Array(uploads[1].data)), [2, 3, 4, 1]);
+  assert.deepEqual(Array.from(new Float32Array(uploads[1].data)), [2, 0, 3, 4, 1, 0, 0, 0]);
   effect.dispose();
   effect.dispose();
   assert.ok(h.resources.every(r => r.destroyed));
