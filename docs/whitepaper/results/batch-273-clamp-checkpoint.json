@@ -150,5 +150,20 @@
       ]
     },
     "verificationPlan": "All chains completed; original API failure and four unit failures retained, repaired and checked in their owning files. No second full verification on unchanged runtime."
+  },
+  "rebase": {
+    "onto": "234f94fdb",
+    "docs": "Both appended evidence sections retained",
+    "build": "Complete repository rebuild passed",
+    "failedCommandsRetained": "Animator has no npm build script; initial ensuing tests read stale dist. An attempted nonexistent tests directory ran zero tests and is not acceptance evidence.",
+    "acceptance": [
+      "clamp-rebase-build-corrected",
+      "clamp-rebase-units-corrected",
+      "clamp-rebase-animator-root-units",
+      "clamp-rebase-api-current",
+      "clamp-rebase-lint",
+      "clamp-rebase-final-size"
+    ],
+    "coreStageGzip": 23924
   }
 }
