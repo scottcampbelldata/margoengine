@@ -2281,3 +2281,13 @@ guard converted absent argv[1] to a file URL. It now checks for the argument
 before comparison. An actual eval-process regression fails before and passes
 after repair, without starting a GPU suite. The package-GPU request expired in
 the queue, not in a test; execution remains pending with per-test budgets intact.
+
+
+Latest integration follow-up: full verify now passes 13,499/13,499 tests with
+zero failures/skips. The API work repair, prefetch entry contract and GPU planner
+import regression are included. The current short-path report finishes in 38.8 s
+at its unchanged 280 s bound and performs one snapshot-list request. The API
+integration blocker is satisfied. Browser teardown still awaits batch 160's actual
+repair despite passing catalog controls. The 7.4 ms diagnostic frame remains an
+open attribution task, not a busy exemption or accepted limit. Real README/GPU
+validation remains queued. No dependent push has occurred.

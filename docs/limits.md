@@ -1862,3 +1862,10 @@ earlier 280 s child timeout still requires the full integration gate. Paired bio
 slow-send round minima do not show a regression beyond the spread, but a 7.4 ms
 current diagnostic frame exceeds twice the unchanged 3.5 ms gate and remains open,
 not accepted or busy-exempted. See whitepaper/results/biomes-slow-send-paired-20261109.json.
+
+
+The latest full integration passes 13,499 tests with zero failures/skips, including
+the repaired API and prefetch-entry contracts. The 8.3 report finishes in 38.8 s
+at its unchanged 280 s bound. No performance limit changed. The 7.4 ms diagnostic
+frame remains open, and browser teardown and queued GPU/README evidence still
+block landing; the earlier failed runs are retained as historical records.

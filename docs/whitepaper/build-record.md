@@ -4478,3 +4478,30 @@ the queue without starting any test; it is rescheduled with a 20-minute queue
 allowance and separate shared/exclusive groups, preserving each registered test's
 budget. The stale ownership-gpu-package-results.json from the unsuccessful request
 is not evidence for this group; use the rescheduled logs/results only.
+
+
+### Latest continuation validation (2026-11-09)
+
+Source checkpoint 257af82e7: full verify passes 13,499 tests with zero failures
+and zero skips in 396.1 s (396 s supervisor). The full API check matches all 886
+reports / 8,631 exports; the actual 8.3 CLI passes in 38.8 s with exactly one
+snapshot list query. The new prefetch-entry and GPU planner import regressions
+are included and pass. Lint/hygiene pass after the package rebuild; the earlier
+missing environment declaration was a scheduling overlap with that rebuild, not
+a package defect. All 476 biome and 311 effect-package CPU tests pass. The final
+verify disables only shadow-cache bookkeeping (MARGO_RESULT_CACHE=off); every
+normal build/check/test runs and no result is served or test omitted.
+
+Real README and registered package-GPU validation remain queued, each supervised
+with hard limits and unchanged per-test/page budgets. The initial two queue
+expirations ran zero tests. These CPU results alone do not satisfy landing requirements:
+batch 160's browser repair must arrive on main, then catalog/prefetch must be
+confirmed, and the over-2x 7.4 ms diagnostic frame still needs attribution. No
+quiet-machine speed number, busy exemption or new accepted limit is claimed.
+
+
+GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
+22.5 s under its exclusive hold (302.4 s supervisor including queue), with no
+driver-reset rerun. Its rescheduled result file is current and contains exactly
+that selected test. The remaining 15 shared package scripts and the two README
+requests are still supervised and queued; none is claimed passed.

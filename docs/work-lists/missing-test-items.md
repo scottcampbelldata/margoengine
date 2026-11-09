@@ -41,22 +41,27 @@ runtime pass. Current landing checks and their exact outcomes are recorded in th
 
 ### Current landing blockers
 
-The final full verify ran 13,483 tests: 13,480 passed, zero skipped, three failed. The new
-BiomeView disposal message was absent from its error-help entry; that documentation is now
-added and tests/errors-page.test.js passes. The two remaining failures need root-cause work:
-api-report-short-path.test.js timed out its child at 280 s, and catalog.test.js hit the unchanged
-30 s browser close bound. An instrumented short-path control later completed all 885 reports
-in 46.7 s; it did not establish the cause of the earlier hang and is not a replacement gate pass.
-The registered prefetch proof also completed every output assertion before the same browser
-shutdown failure. No hang is classified as a busy-machine exemption.
+The current full verify passes all 13,499 tests with zero failures/skips (396.1 s).
+Both API gates pass with one snapshot file-list query; the short-path CLI completes
+in 38.8 s under the full run. Existing prefetch chain/plan/exit checks and the new
+GPU-planner eval-import regression pass. Lint/hygiene, 476 biome CPU tests and all
+311 shadows/quality/post CPU tests pass. Source checkpoint: 257af82e7.
 
-The current scoped CPU run passes 1,035 tests and the complete biomes/loaders README run
-passes 64/64 with zero exceptions. Biome view/water, objects, shadows and objects-frame GPU
-suites pass. Backend and placement hardware proofs initially refused the uncommitted tree. Both now pass
-from clean checkpoint 5ee6138db (14.8 s and 33.1 s, zero skips); both loader GPU suites also pass. Flythrough's slow-send frame is 5.4 ms versus 3.5 ms, with one send,
-no texture writes and 3.3 ms inside real postMessage. This is unresolved: obtain the interleaved
-parent/current evidence before treating a small loaded-machine miss as a busy retest. No timing
-budget changed. These checks block the push; this continuation is not yet landed.
+Real execution of the three repaired README examples and all registered GPU tests
+of shadows/quality/post is still queued; the known list is 42, but no runtime pass
+for those repairs is claimed yet. Initial README/package-GPU requests expired
+before acquiring the lock; zero workloads ran. Rescheduling changes only the queue
+allowance, with shared/exclusive groups separated and existing test budgets intact.
+The original 64/64 biome/loader run and prior hardware proofs remain historical
+source evidence. A current biome README confirmation is also queued.
+
+The new slow-send paired record has no minimum-time regression beyond round spread,
+but its 7.4 ms current outlier exceeds twice the unchanged 3.5 ms gate and remains
+open, not busy-exempted. Batch 160 still owns the browser pipe-lifecycle repair:
+the latest fetched main has no such repair. Despite two later passing catalog
+controls, the earlier cleanup defect is not declared fixed. Do not rerun the
+failed prefetch GPU proof or push this dependent group until that mainline repair
+is rebased and the catalog/prefetch confirmations pass. No timing budget changed.
 
 ## README five ownership (2026-11-09)
 
@@ -809,3 +814,10 @@ the queue without starting any test; it is rescheduled with a 20-minute queue
 allowance and separate shared/exclusive groups, preserving each registered test's
 budget. The stale ownership-gpu-package-results.json from the unsuccessful request
 is not evidence for this group; use the rescheduled logs/results only.
+
+
+GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
+22.5 s under its exclusive hold (302.4 s supervisor including queue), with no
+driver-reset rerun. Its rescheduled result file is current and contains exactly
+that selected test. The remaining 15 shared package scripts and the two README
+requests are still supervised and queued; none is claimed passed.

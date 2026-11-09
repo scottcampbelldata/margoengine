@@ -1716,3 +1716,9 @@ Three README examples release their old owner before replacement, with a failing
 before strict execution regression; real README/GPU validation remains pending.
 The loaded paired slow-send record does not close its gate: a 7.4 ms current
 outlier exceeds twice the unchanged 3.5 ms budget and remains unclassified.
+
+
+Latest integration evidence: full verify passes 13,499 tests, zero failures/skips,
+including the real short-path query-count regression, prefetch entry contract and
+GPU planner eval import. Real README/GPU evidence remains queued, so no rendering
+or runtime closure is inferred from these CPU checks.
