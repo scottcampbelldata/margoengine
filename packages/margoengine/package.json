@@ -1754,6 +1754,10 @@
       "types": "./dist/mixer/worklet.d.ts",
       "import": "./dist/mixer/worklet.js"
     },
+    "./mixer/reflections": {
+      "types": "./dist/mixer/reflections.d.ts",
+      "import": "./dist/mixer/reflections.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"

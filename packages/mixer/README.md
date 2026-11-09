@@ -79,7 +79,7 @@ The reverb room is synthetic by default: seeded noise that falls 60 dB over `dec
 - Web Audio cannot be interrupted mid-render: an aborted `renderOffline` rejects when the render ends and drops the result.
 - Web Audio cannot loop faster than 128 samples (2.7 ms at 48 kHz), so that is the shortest delay `time`, and it is fixed when the effect is created; build a new effect to change it.
 - The root entry has manual ducking; automatic detection is in the optional `mixer/sidechain` entry.
-- The reverb is a synthetic noise tail (no early reflections) unless you give it a recorded impulse. It runs on the audio thread as a convolution, so a long `seconds` costs CPU.
+- The root reverb is a synthetic noise tail unless you give it a recorded impulse; the optional reflections entry adds geometric early arrivals. It runs on the audio thread as a convolution, so a long `seconds` costs CPU.
 - Offline checks run in a browser (`npm run test:browser` in this package). The Node tests cover the maths and the graph wiring and scheduling through a fake context, not rendered sound.
 
 Apache-2.0. Optional, tree-shakable package; no core dependency.
@@ -204,3 +204,45 @@ published 48 kHz/4x design; other rates use the same relative reconstruction mod
 meter-certification profiles. Quiet input below the bound is an exact copy delayed by 11 samples.
 WebGPU and WebGL2 use the same audio path, tested beside both in Edge. Generated signals prove
 curve/envelope/ceiling; other browsers, real recordings, perceptual quality and speed are unmeasured.
+
+## Early room reflections
+
+`margoengine/mixer/reflections` (or `@margoengine/mixer/reflections`) combines six first-order
+image-source wall reflections with the existing seeded late reverb tail. Geometry uses metres,
+with width/height/depth along x/y/z. `roomReflections(options)` exposes arrival delay/gain per ear;
+`roomImpulseResponse(sampleRate, options)` returns mono/stereo PCM; `createRoomReverb` returns
+the usual disposable effect with input/output and wet/dry params.
+
+```ts
+import { createRoomReverb, roomReflections } from 'margoengine/mixer/reflections';
+const context = new OfflineAudioContext(2, 144000, 48000);
+using room = createRoomReverb(context, { room: [6,3,8], source: [1,1.5,2], listener: [3,1.5,5] });
+const source = new ConstantSourceNode(context, { offset: 0.2 });
+source.connect(room.input); room.output.connect(context.destination);
+source.start(0); source.stop(0.05);
+console.log(roomReflections().length); // 12: six paths for each of two ears
+await context.startRendering();
+```
+
+Defaults and bounds: `room` [6,3,8], each 0.5..100 m; `source` [0.35*width,0.5*height,0.25*depth];
+`listener` [0.6*width,0.5*height,0.7*depth]; positions and ears stay at least 0.01 m inside each wall.
+`reflection` 0.7 (0..1 pressure coefficient); `channels` 2 (1 or 2); `earSpacing` 0.18 m (0..1,
+stereo ears along x, ignored for mono); `speedOfSound` 343 m/s (200..400); late `seconds` 2
+(0.05..20), `decay` seconds/2 (RT60, 0.01..20 s), `tailGain` 0.35 (0..1), integer `seed` 1
+(0..4294967295), `mix` 0.25 (0..1). Pure PCM generation accepts integer sample rates 8000..192000.
+
+Each wet arrival is delayed by (reflected path minus direct path) / speed, so the separate dry
+signal stays undelayed. Gain is reflection / path length relative to one-metre source pressure;
+close walls can boost the signal. Early gains are not normalized away. Fractional arrivals use
+two adjacent samples with linear weights, preserving gain and delay centroid, with interpolation
+colouration. The unit-energy noise tail starts 10 ms after the last early arrival, at least 30 ms
+from input; total impulse length includes that offset plus the requested tail duration. `tailGain: 0`
+omits noise and ends the buffer after the last reflection.
+
+Static rectangular geometry, six specular paths only: no higher orders, diffraction, occlusion,
+frequency-dependent absorption or HRTF/head rotation. Stereo models path differences, not binaural
+head filtering. Recreate the effect when geometry changes. Convolution uses normalize=false and
+can clip for loud inputs/close walls; lower levels or use the optional limiter. WebGPU and WebGL2
+share the same audio graph, tested beside both in Edge. Missing Web Audio throws code `unsupported`
+with a help link. Node geometry and real convolution use generated impulses, not measured rooms;
+real room recordings, listening comparisons, other browsers and timing are unmeasured.

@@ -1459,3 +1459,11 @@ for the soft-knee curve and one-pole gain smoothing. The lookahead absolute-sum 
 here by the triangle inequality, documented in architecture/mixer-true-peak.md. Web Audio processor
 registration/channel rules follow the W3C Recommendation cited above. No library/engine source or
 paper-linked code was read or reused. No external assets; generated signals are stand-ins.
+
+## Mixer early reflections (batch 111)
+
+Written from the image-source theory in Allen and Berkley, [Image method for efficiently simulating small-room acoustics, JASA 65(4), 1979, first-page model](https://jontalle.web.engr.illinois.edu/Public/AllenBerkley79.pdf).
+Only the paper's theory/description was consulted, not its FORTRAN appendix or any implementation.
+Six first-order mirror points, inverse path length, excess propagation delay and two-tap fractional
+placement are derived here. The existing Margo tail and Web Audio convolution are reused.
+No engine/library source or external assets. Generated impulses are stand-ins.

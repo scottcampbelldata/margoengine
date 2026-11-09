@@ -42,6 +42,10 @@
     "./worklet": {
       "types": "./dist/worklet.d.ts",
       "import": "./dist/worklet.js"
+    },
+    "./reflections": {
+      "types": "./dist/reflections.d.ts",
+      "import": "./dist/reflections.js"
     }
   },
   "files": [

@@ -1618,3 +1618,12 @@ The browser fixture now awaits rendering before leaving its using scope. No core
 change. Real recordings, other browsers, perceptual quality and timing remain unmeasured. LIM-589.
 Both worklet factories also check cancellation at the post-registration allocation boundary.
 Microtask-order regressions fail before the fix and confirm no node allocation after an abort.
+
+### Mixer early reflections (batch 111): section 5 evidence
+
+The optional entry combines first-order image-source geometry with the existing synthetic tail
+and ConvolverNode; no core/stage or rendering maths change. Closed-form six-wall symmetry,
+fractional tap placement, stereo paths, seed repeatability and malformed geometry have Node
+coverage. A real Edge convolution matches the computed stereo IR beside WebGPU and WebGL2,
+including early arrivals before the late tail. Geometry is static and first-order; no measured
+room, binaural-head model, other-browser or performance evidence. LIM-591.

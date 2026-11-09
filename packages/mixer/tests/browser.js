@@ -14,6 +14,7 @@ import {
 import { createSidechain } from '@margoengine/mixer/sidechain';
 import { captureSnapshot, recallSnapshot } from '@margoengine/mixer/snapshots';
 import { createDynamics, measureTruePeak } from '@margoengine/mixer/worklet';
+import { createRoomReverb, roomImpulseResponse } from '@margoengine/mixer/reflections';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -323,6 +324,21 @@ export async function runChecks() {
     assert(peak <= dbToGain(-6), `true peak ${peak} exceeds ceiling`);
     assert(peak > 0.05, 'limiter is audible');
     assert(limited.getChannelData(0).slice(0, 11).every((v) => v === 0), '11-sample lookahead');
+  });
+  await check('room early reflections and seeded late tail render as the computed stereo impulse', async () => {
+    const context = new OfflineAudioContext(2, 12000, rate);
+    const settings = { room: [6,3,8], source: [1,1.5,2], listener: [3,1.5,5], seconds: 0.1, mix: 1, seed: 17 };
+    using reverb = createRoomReverb(context, settings);
+    play(context, impulse(0.25)).connect(reverb.input);
+    reverb.output.connect(context.destination);
+    const out = await context.startRendering();
+    const reference = roomImpulseResponse(rate, settings);
+    for (let c = 0; c < 2; c++) {
+      let worst = 0;
+      for (let i = 0; i < reference[c].length; i++) worst = Math.max(worst, Math.abs(out.getChannelData(c)[i] - reference[c][i]));
+      assert(worst < 2e-5, `convolution error ${worst}`);
+      assert(measure(out.getChannelData(c), 0, Math.round(0.03 * rate)).peak > 0.01, 'discrete early arrivals precede the tail');
+    }
   });
   device?.destroy();
   return { checks, backend };

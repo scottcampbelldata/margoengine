@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-590). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-591). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -819,3 +819,18 @@ AudioWorklet renders pass beside WebGPU and WebGL2. Other browsers, real recordi
 latency, perceptual comparisons and speed are unmeasured. See the finite-FIR proof. LIM-589.
 Worklet entry: 2,574 B gzip, budget 2,825 B.
 Both worklet factories recheck AbortSignal after cached registration, before allocating nodes; microtask-order regressions cover this boundary.
+
+## Mixer early reflections (batch 111)
+
+Optional mixer/reflections computes six first-order rectangular-wall paths per ear, extra delay
+relative to the dry path, and pressure gain reflection/path length (one-metre reference).
+Dimensions 0.5..100 m; source/listener/ears at least 1 cm inside. Stereo ears are x-aligned;
+no HRTF, diffraction, occlusion, higher orders or frequency-dependent wall model. Linear fractional
+taps preserve gain/centroid but colour the spectrum. Early gains are not energy-normalized and
+close walls may boost/clip. The existing seeded unit-energy noise tail starts at least 30 ms in,
+10 ms after the last reflection; its requested duration is 0.05..20 s, RT60 0.01..20 s, gain 0..1.
+Tail gain zero omits it. Total IR includes the computed onset plus tail. Integer rates 8..192 kHz,
+mono/stereo; static geometry changes need recreation. Default/range table is in the package README.
+Pure Node geometry and real Edge convolution beside WebGPU/WebGL2 use generated stand-ins;
+real measured rooms, other browsers, listening quality and timing remain unmeasured. LIM-591.
+Reflections entry: 3,227 B gzip, budget 3,483 B.

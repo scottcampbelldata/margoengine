@@ -1262,3 +1262,6 @@ Conservative attenuation and unmeasured converter/listening/browser coverage are
 The browser fixture lifetime issue is fixed by awaiting rendering inside the using scope.
 The cached-registration cancellation race is fixed in both factories: each checks the signal
 immediately before allocating nodes. Regression: sidechain.test.js and worklet.test.js final tests.
+
+Early reflections have no known open defect in tested static rectangular rooms. First-order
+geometry, interpolation colouration and unmeasured room/listening coverage are documented limits.
