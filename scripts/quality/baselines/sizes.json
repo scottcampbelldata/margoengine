@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11925513,
+  "total": 11928623,
   "history": [
     {
       "date": "2026-10-24",
@@ -5240,6 +5240,12 @@
       "commit": "7f791d68f",
       "grew": 10,
       "reason": "Size restoration finding 10, optional stage diagnostics: @margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517. Preserve precise fit guidance, package name, npm install command and restart advice in the error itself. Optional bytes are worth actionable diagnostics; splitting message data would add loading complexity. Core plus stage root remains 23924 B."
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-171-tracer",
+      "grew": 2,
+      "reason": "New optional tubes 2533 B gzip, ceiling 2789; error-controlled critical-point solver maths 5389->5703 B, ceiling 5638->5959, root 50303->50599 within 51813, grids 23599->23735 within 24307. Keep the synchronous solver rather than split for optional bytes. LIC 23461 and core/stage 23924 unchanged."
     }
   ],
   "items": {
