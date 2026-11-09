@@ -1,11 +1,12 @@
 {
   "source": {
-    "commit": "a58dda187",
+    "commit": "2518dd32e",
     "packagesDirty": false,
     "records": [
       "entry-sizes.json",
       "basic-scene-network.json"
-    ]
+    ],
+    "previousAudit": "a58dda187"
   },
   "fullVerify": {
     "ranOnce": true,
@@ -112,6 +113,15 @@
     },
     "gpu-readme": {
       "passed": true
+    },
+    "final-merge-quality": {
+      "passed": true
+    },
+    "final-wait-class": {
+      "passed": true
+    },
+    "final-incoming-build": {
+      "passed": true
     }
   },
   "rebasedGpu": [
@@ -141,6 +151,7 @@
     "No benchmark, timing-only assertion or exclusive GPU lease ran.",
     "Each real GPU command used one shared lane slot and wait-max 60.",
     "The compute-owner loop annotation preserves its original four-step work and every exact assertion.",
-    "The initial raw build omitted the separate Wasm-copy step; restored package assets closed the affected CPU/GPU failures."
+    "The initial raw build omitted the separate Wasm-copy step; restored package assets closed the affected CPU/GPU failures.",
+    "The later main rebase preserves compute GPU registration and voxel composition; fresh entry/network records include both. The composition bitmask-loop annotation preserves all 32 inputs and every assertion."
   ]
 }

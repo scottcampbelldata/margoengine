@@ -90,7 +90,9 @@ Landing closure: the one full verify ran 13,769 tests, with 13,765 passed and fo
 corrected by generating the umbrella alias, adding error help and fixing the async playback-wait predicate.
 The affected checks pass. All sciviz GPU suites and 24 sciviz plus three umbrella README examples pass.
 After rebase, the LIC analytical/curved/demo cases also pass against the updated backend. The final full-build
-entry/network records both name their actual clean source `a58dda187`; no record is relabelled to a later commit.
+entry/network checkpoint records named their actual clean source `a58dda187`, retained on its private audit
+branch. After main's compute registration and voxel composition landed, both records were regenerated from
+the new clean source `2518dd32e`, including those packages. No record is relabelled to a later commit.
 New optional entry: 10,210 B gzip,
 10,517 B ceiling; core + stage remains 23,924 B. No quality or functionality was removed for optional size.
 
@@ -120,6 +122,11 @@ misclassified that counted workload. Its supported explanatory annotation now re
 no loop, assertion, timing bound or budget changed. This follows the separation of tasks/results from
 scheduling in the build-system papers above and the batch's deterministic-work rule. The scanner regression
 and the real compute-owner test still run, with the exact original array/count assertions.
+
+The next main rebase added a voxel composition loop over all 32 feature-subset bitmasks. That is a test-input
+matrix, not a warm-up: each mask changes features and the browser runner asserts every returned row. Its
+existing supported fixed-wait annotation now states that distinction. No iterations, renders, assertion,
+threshold or timeout changed; the class scanner still tests the actual wait rules.
 
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
