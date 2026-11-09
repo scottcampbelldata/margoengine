@@ -176,5 +176,14 @@
     "api": "899 entries/8702 exports match",
     "corePlusStageGzip": 23924,
     "notes": "Generated guides retain upstream Animator and sciviz changes. No second full verification on unchanged clamp runtime."
+  },
+  "lastIntegration": {
+    "base": "79dbd81d1",
+    "build": "complete repository rebuild passes",
+    "units": "66/66 Video, Zstd destination, ViewCube, guide and owner-contract checks pass",
+    "api": "900 entries/8710 exports match",
+    "lint": "pass",
+    "coreStageGzip": 23924,
+    "receiptPrefix": "test-results/batch-273-clamp-video-zstd-"
   }
 }
