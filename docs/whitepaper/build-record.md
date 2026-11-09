@@ -3500,3 +3500,24 @@ The finish adds real-GPU restoration cancellation, far-plane boundary and wholly
 Finish sizes (min+gzip B): VFX root 31,435 (budget 32,070), base 11,191 (11,336), shadows 3,055 (3,061), nodes 3,238 (3,349); ExactOIT 4,663. Core + stage stays 23,626 B, below 25,000. Reproduce with the package tests, `test:gpu` for VFX both normally and with `MARGO_COMPAT=1`, `test:gpu` for OIT, and the runnable README checks for both packages, all GPU work under `node scripts/gpu-lock.mjs run --owner=codex-79 -- ...`. Tests use the RTX A6000 only; timings and other GPUs remain unproved.
 
 Repository gates additionally caught the handoff's fixed 100 ms cancellation-test sleep, the new error anchor's digits, and stale generated site text. The cancellation check now observes actual mapping-promise settlement and yields one MessageChannel task for unhandled-rejection reporting; removing the production cancellation handler still fails on both backends. The help anchor is `vfx-float`, matching the existing anchor-name rule, and error/help text is generated from its owning sources. The existing fixed-wait, error-page and llms regression tests pass without any baseline or rule change.
+
+## Batch 55: lighting2d
+
+Six optional 2D lighting entries, built in order on the dev PC, with no core or stage changes.
+The initial all-package search and per-job README/export checks found none already implemented.
+Hard shadows, point/spot/directional lights, normal maps and occluder edge chains existed and
+are extended or built over. No job was skipped.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Soft shadows | DONE | bd077aba4 | lighting2d/soft | soft.test.js, browser-check.js (LIM-592) |
+| 2 | Light textures | DONE | 626df964d | lighting2d/cookie | cookie.test.js, browser-check.js (LIM-593) |
+| 3 | Light masks and layers | DONE | 13cf4d7ac | lighting2d | masks-layers.test.js, browser-check.js (LIM-597) |
+| 4 | 2D global illumination | DONE | c54726b11 | lighting2d/gi | gi.test.js, browser-check.js (LIM-599) |
+| 5 | Self shadows and height | DONE | 3b9fb5df3 | lighting2d/height | height.test.js, browser-check.js (LIM-600) |
+| 6 | Emissive sprites and bloom hookup | DONE | 664b7531d | lighting2d/emissive | emissive.test.js, browser-check.js (LIM-601) |
+
+- **Built from:** Published specs and papers: Fernando 2005 (PCSS 2D area light penumbra estimation) and Akenine-Moller & Assarsson 2002 (penumbra wedges) for soft shadows; Segal et al. 1992 (projective texture masks) for cookies; Franklin 1970 (PNPOLY Jordan curve theorem point-in-polygon) for light masks; Alexander Sannikov 2023 ("Radiance Cascades: A Novel Approach to Calculating Global Illumination") for 2D radiance cascade GI; standard 3D perspective/directional ray-slab and ray-cylinder projection geometry along height intervals for 2.5D height and self-shadowing; and standard polynomial distance attenuation with luminance thresholding for emissive sprites and bloom hookup.
+- **Slips and bugs:** In radiance cascade testing, segment endpoints exactly on the 45-degree ray diagonal passing through pixel centers caused float32 boundary rounding differences against double float64, resolved by extending wall segments past grid diagonals. In direct pass with blending, alpha was initially cleared to 0, resolved by writing alpha 1.0 (255). Concurrent pushes from other lanes required ordinary rebases; no force-push, skipped checks or loosened bars.
+- **Docs per job:** 1, 2, 3, 4, 5 and 6 each update packages/lighting2d/README.md, docs/limits.md, docs/whitepaper/claims.md, docs/clean-room.md, plus generated API surface and LLM records. Job 6 adds this record and marks list-2 row 55 done.
+- **Final entry sizes (gzip B):** root 4,896 B; soft 4,778 B; cookie 4,213 B; gi 6,432 B; height 5,310 B; emissive 4,685 B. Core plus stage stays 23,626 B, well under the 25,000 B freeze gate.

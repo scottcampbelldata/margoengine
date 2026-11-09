@@ -11,7 +11,7 @@ For the second account. Start now.
 | D | lighting | 52 | clustered | 8 | todo |
 | D | lighting | 53 | clustered | 2 | todo |
 | D | lighting | 54 | lightmap | 8 | todo |
-| D | lighting | 55 | lighting2d | 6 | list 1 (dev PC) |
+| D | lighting | 55 | lighting2d | 6 | done |
 | D | lighting | 56 | staging | 7 | todo |
 | E | post and effects | 70 | post | 8 | done |
 | E | post and effects | 71 | post | 1 | done |
