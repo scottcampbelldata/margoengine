@@ -113,11 +113,11 @@ test('Animator constructor, transition, layer and foot IK errors name their fix'
     TypeError,
     /Invalid foot IK; pass hip/,
   );
-  throwsFix(
-    () => f.animator.addFootIK({ hip: 0, knee: 0, ankle: 1, pole: [0, 0, 1], raycast() {} }),
-    TypeError,
-    /IK requires a direct hip\/knee\/ankle chain; pass/,
-  );
+  assert.throws(() => f.animator.addFootIK({ hip: 0, knee: 0, ankle: 1, pole: [0, 0, 1], raycast() {} }), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /IK requires ordered hip\/knee\/ankle ancestry; pass.*https:\/\/margoengine.com\/errors#geometry/,
+  });
   // The Animation is not an engine plugin yet, so setup fails with a coded state error.
   assert.throws(
     () => f.animator.setup(f.engine),

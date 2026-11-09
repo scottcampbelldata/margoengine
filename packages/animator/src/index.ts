@@ -5,6 +5,7 @@ import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extensi
 import { finiteVector } from '@margoengine/math/validate';
 import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/quat';
 import { MargoError } from '@margoengine/math/errors';
+import { fault } from '../../shared/errors.js';
 import { blend1D, blend2D, quaternionBlend, treeWeights } from './blend.js';
 import { solveTwoBoneIK, rotationBetween } from './ik.js';
 export { blend1D, blend2D } from './blend.js';
@@ -117,7 +118,7 @@ export interface GroundHit {
   /** Unit surface normal; when given the ankle's local +Y aligns with it. Default: no alignment. */
   normal?: Vec3;
 }
-/** One leg for {@link Animator.addFootIK}: a direct hip, knee, ankle chain that plants the foot on the ground. */
+/** One leg for {@link Animator.addFootIK}: ordered hip/knee/ankle ancestors, including intermediate bones. */
 export interface FootIK {
   /** glTF node index of the hip. */
   hip: number;
@@ -460,9 +461,16 @@ export class Animator implements EnginePlugin {
       );
     finiteVector(foot.pole, 3, 'IK pole');
     const parents = nodes[0].engine.store.parents;
-    if (parents[nodes[foot.knee].id] !== nodes[foot.hip].id || parents[nodes[foot.ankle].id] !== nodes[foot.knee].id)
-      throw new TypeError(
-        'IK requires a direct hip/knee/ankle chain; pass a knee that is a child of the hip and an ankle that is a child of the knee',
+    const descendant = (child: number, ancestor: number): boolean => {
+      for (let id = parents[child], depth = 0; id !== -1 && depth < 64; id = parents[id], depth++)
+        if (id === ancestor) return true;
+      return false;
+    };
+    if (!descendant(nodes[foot.knee].id, nodes[foot.hip].id) || !descendant(nodes[foot.ankle].id, nodes[foot.knee].id))
+      throw fault(
+        'unsupported',
+        'IK requires ordered hip/knee/ankle ancestry; pass a knee descended from the hip and an ankle descended from the knee',
+        'geometry',
       );
     this.feet.add(foot);
     return () => this.feet.delete(foot);
@@ -642,7 +650,8 @@ export class Animator implements EnginePlugin {
         follow = clock?.follow?.(f.from, this.time),
         from = follow === undefined ? undefined : this.treePose(f.from, follow);
       if (from)
-        for (let i = 0; i < this.fadeSteps.length; i++) this.fadeSteps[i](from.position, from.rotation, f.from, follow!);
+        for (let i = 0; i < this.fadeSteps.length; i++)
+          this.fadeSteps[i](from.position, from.rotation, f.from, follow!);
       f.elapsed += step;
       pose = this.mix(from ?? clone(f.pose), pose, Math.min(1, f.elapsed / f.duration));
       if (f.elapsed >= f.duration) this.fade = undefined;

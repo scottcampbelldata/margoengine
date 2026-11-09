@@ -26,7 +26,11 @@ engine.start();
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
 
-`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
+`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires hip, knee and ankle in that order along one ancestry line. Twist or
+helper bones between the three endpoints retain their local pose and move with
+the solved endpoints; only the hip, knee and optional ankle orientation are
+written. Disconnected, duplicated or reversed endpoints reject before installation
+with code `unsupported` and a help link. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
 
 ## CCD chains (any length)
 
