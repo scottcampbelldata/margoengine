@@ -202,3 +202,11 @@ netcode/tests/testpage-burst.test.js verifies 50 accepted before the first tick,
 state after stepping, and immediate slot reuse after a disconnect. Its initial
 state checks include the arena fixture's four pre-existing crates. No timer or
 wall-clock tolerance is used.
+
+Entry 37 is FIXED: disabled range inputs inherited the browser's range midpoint
+instead of an authored value. Inspector now initializes every material/effect
+range after setting its bounds. Missing exposure/bloom bindings display zero;
+unselected material sliders display core defaults 0.5/0. The new real-Engine/jsdom
+case in inspector/test/inspector.test.js fails on main and covers omitted, empty
+and partial effects plus refresh. The reported literal undefined console warning
+is not produced by this code path: disabled controls already skip refresh writes.

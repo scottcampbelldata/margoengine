@@ -308,6 +308,7 @@ export class Inspector implements EnginePlugin {
       input.min = String(min);
       input.max = '1';
       input.step = '0.005';
+      input.value = key === 'roughness' ? '0.5' : '0';
       input.addEventListener('input', () =>
         this.edit(input, () => {
           const value = input.valueAsNumber;
@@ -363,6 +364,7 @@ export class Inspector implements EnginePlugin {
       input.min = String(min);
       input.max = String(max);
       input.step = '0.05';
+      input.value = String(this.effects?.[key] ?? 0);
       input.addEventListener('input', () =>
         this.edit(input, () => {
           const value = input.valueAsNumber;

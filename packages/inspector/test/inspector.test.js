@@ -19,6 +19,30 @@ async function scene(t) {
   return { engine, inspector, dom, effects };
 }
 const field = (inspector, key) => inspector.root.querySelector(`[data-property="${key}"]`);
+
+test('test-page 37: unbound ranges start with explicit finite neutral values', async (t) => {
+  for (const effects of [undefined, {}, { bloom: 1.5 }]) {
+    const dom = new JSDOM('<body><canvas width="200" height="200"></canvas></body>');
+    const engine = new Engine(
+      dom.window.document.querySelector('canvas'),
+      await TransformStore.create(4),
+      { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+      undefined,
+      null,
+    );
+    t.after(() => { engine.dispose(); dom.window.close(); });
+    const inspector = Inspector.attach(engine, { parent: dom.window.document.body, ...(effects ? { effects } : {}) });
+    for (const key of ['exposure', 'bloom']) {
+      const input = field(inspector, key);
+      assert.equal(input.valueAsNumber, effects?.[key] ?? 0);
+      assert.equal(input.disabled, effects?.[key] === undefined);
+    }
+    assert.equal(field(inspector, 'roughness').valueAsNumber, 0.5);
+    assert.equal(field(inspector, 'metallic').valueAsNumber, 0);
+    inspector.refresh();
+    assert.equal(field(inspector, 'exposure').valueAsNumber, 0);
+  }
+});
 function edit(dom, input, value, event = 'change') {
   input.value = value;
   input.dispatchEvent(new dom.window.Event(event, { bubbles: true }));

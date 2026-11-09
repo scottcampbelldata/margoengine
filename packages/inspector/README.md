@@ -17,7 +17,9 @@ function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}
 ```
 
 Pass the mutable options object of your attached post-processing effect to
-`effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled.
+`effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled
+and initially display zero. With no selected entity, roughness/metallic sliders
+initially display the core material defaults, 0.5/0, while disabled.
 
 ## Place the panel in your page layout
 
