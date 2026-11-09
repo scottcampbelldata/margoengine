@@ -89,15 +89,23 @@ export async function junctions(
       import('@margoengine/geometry/utils'),
     ]);
   signal?.throwIfAborted();
-  const regions = polygonUnion(
+  const united = polygonUnion(
     checked.map(({ points, width }) => polygonStroke(points, width, { join: 'bevel', cap: 'butt' })),
   );
-  if (!regions.length)
+  if (!united.length)
     throw fault(
       'failed',
       'Road footprint vanished at the polygon grid resolution; increase its width or reduce its coordinate span',
       'geometry',
     );
+  // Triangulate the coordinates the renderer actually stores. Rounding after ear clipping can invert a thin ear
+  // even at a local origin. The existing triangulator can instead choose valid diagonals on this exact boundary.
+  const regions = united.map(({ contour, holes }) => ({
+    contour: contour.map(([x, y]): [number, number] => [Math.fround(x), Math.fround(y)]),
+    holes: holes.map((ring) => ring.map(([x, y]): [number, number] => [Math.fround(x), Math.fround(y)])),
+  }));
+  if (regions.some(({contour, holes}) => [contour, ...holes].some(ring => !(polygonArea([{contour:ring,holes:[]}]) > 0))))
+    throw fault('failed', 'Road boundary collapsed at float32 precision; move the roads closer to their local origin or increase their width', 'geometry');
   const data = applyMatrix4(shapeGeometry(polygonShapes(regions)), [
     1,
     0,

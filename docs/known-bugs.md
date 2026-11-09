@@ -1886,3 +1886,9 @@ is hidden by a generic fallback, and no full-capture or encoder-accuracy claim f
 ### Batch 65 job 3: Terrain fit audit
 
 No open defect found within the documented contract. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim.
+
+### Batch 65 job 4: Self intersection repair audit
+
+No open defect found within the documented contract. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes.
+
+Closed precision defect: a local 8 m wide hairpin previously rejected after two thin ears inverted on float32 conversion. junction-bends.test.js failed before the correction and passes after rounding boundaries before choosing diagonals. The final face/boundary guards remain in force.

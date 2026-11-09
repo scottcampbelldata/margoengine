@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'banking', 'terrain']) {
+  for (const feature of ['junctions', 'banking', 'terrain', 'repair']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -61,7 +61,12 @@ try {
         throw e;
       };
       let data;
-      if (feature === 'terrain') {
+      if (feature === 'repair') {
+        const {repairRoad} = await import('/packages/road/dist/repair.js');
+        const {Spline} = await import('/packages/splines/dist/index.js');
+        data=await repairRoad(new Spline([[-2,0,-8],[-2,0,8],[0,0,9],[2,0,8],[2,0,-8]]),{width:8});
+        if (!(data.area>100)) throw new Error('Repair area oracle');
+      } else if (feature === 'terrain') {
         const {road} = await import('/packages/road/dist/index.js');
         const {fitTerrain} = await import('/packages/road/dist/terrain.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
@@ -132,7 +137,7 @@ try {
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of (feature === 'banking' ? [[64,64],[64,24],[64,104]] : [
+    for (const [x, y] of (['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],

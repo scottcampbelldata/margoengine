@@ -2366,6 +2366,10 @@
       "types": "./dist/road/terrain.d.ts",
       "import": "./dist/road/terrain.js"
     },
+    "./road/repair": {
+      "types": "./dist/road/repair.d.ts",
+      "import": "./dist/road/repair.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

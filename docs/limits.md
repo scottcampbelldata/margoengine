@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-635). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-636). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1480,7 +1480,7 @@ Entry JS is 1,559 B gzip (new ceiling 1,815 B); sdf.wasm is 40,594 B raw /
 
 ### Batch 65 job 1: road junction surface (LIM-633)
 
-The optional road/junctions entry is 1021 B min+gzip with bare package imports external. Polygon, triangulation and geometry utility dependencies load only on invocation and are additional downloads. Core plus stage remains below 25,000 B. Supports 1..64 constant-elevation roads and at most 4096 total points, width above 0 through 1000 m, coordinates/elevation within +/-1,000,000 m, bevel joins and butt caps. Geometry's shared snap grid is about 2^26 steps across the footprint; sub-two-step features may vanish. Output positions are float32; triangles that collapse or reverse at that precision reject with a coded help-linked error, as do UV scales that overflow float32. No grades, curb stitching, civil turn radii or overpass classification. Aborts are checked around lazy imports, not during synchronous polygon work. Native WebGPU and WebGL2 compatibility pixel/lifecycle checks use generated roads only; no speed or surveyed-geometry claim.
+The optional road/junctions entry is 1114 B min+gzip with bare package imports external. Polygon, triangulation and geometry utility dependencies load only on invocation and are additional downloads. Core plus stage remains below 25,000 B. Supports 1..64 constant-elevation roads and at most 4096 total points, width above 0 through 1000 m, coordinates/elevation within +/-1,000,000 m, bevel joins and butt caps. Geometry's shared snap grid is about 2^26 steps across the footprint; sub-two-step features may vanish. Output positions are float32; triangles that collapse or reverse at that precision reject with a coded help-linked error, as do UV scales that overflow float32. No grades, curb stitching, civil turn radii or overpass classification. Aborts are checked around lazy imports, not during synchronous polygon work. Native WebGPU and WebGL2 compatibility pixel/lifecycle checks use generated roads only; no speed or surveyed-geometry claim.
 
 ### Batch 76 review corrections (LIM-625, LIM-627, LIM-629)
 
@@ -1515,3 +1515,9 @@ complete-capture quality and throughput are separate; no codec/render or size bu
 ### Batch 65 job 3: Terrain fit (LIM-635)
 
 Optional road/terrain: 887 B min+gzip with bare package imports external; dependencies are additional downloads. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim. Analytic cut/fill, shoulder/end distance, banked grades, curbs, ownership, hostile inputs and aborts; actual fitted heightfield pixels and value oracles, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.
+
+### Batch 65 job 4: Self intersection repair (LIM-636)
+
+Optional road/repair: 605 B min+gzip with bare package imports external; dependencies are additional downloads. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes. A generated hairpin demonstrably folds and double-covers in the root sweep; repaired faces all have positive area and single coverage, with polygon/mesh area agreement. Closed courtyard, hostile inputs, grade rejection, ownership and aborts; real WebGPU/WebGL2 road pixels, exact reboot and disposal. No speed claim.
+
+Batch 65 job 4 also changes road/junctions to 1114 B min+gzip: the float32 boundary, rather than the pre-rounding boundary, defines triangulation and reported area.
