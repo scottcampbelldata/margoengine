@@ -28,6 +28,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/sdf.wasm',
+    label: 'sdf.wasm',
+    kind: 'Rust Wasm dual contouring',
+    measure: 'file',
+    when: '`createSdfModeler()`, only from the optional /sdf entry',
+  },
+  {
+    package: '@margoengine/procedural',
     file: 'packages/procedural/dist/trees.wasm',
     label: 'trees.wasm',
     kind: 'Rust Wasm space-colonisation skeletons',

@@ -2402,3 +2402,16 @@ The existing studio GPU oracle verifies source-cube values and projected SH, wit
 oracle gives identical off/on contact RGB [80,80,80]/[70,70,70] on both paths, preserves product/outside
 pixels, clears removed casters and restores after actual device destruction. Stand-in box and generated
 image only; no photographic-product, local-light falloff, physical soft shadow or speed claim.
+
+### Procedural dual contouring (batch 68, job 5)
+
+The optional procedural/sdf factory loads its own Rust/Wasm asset. Uniform-grid
+Hermite edge roots are shared among adjacent cells; analytic box/sphere normals
+feed a mass-point QEF solved with symmetric Jacobi eigenvectors and all 27 bounded
+constraint sets. World-space unit normals preserve rank in anisotropic cells.
+The renderer receives owned geometry data and does not own the modeler. No core,
+stage, CAD kernel or physics source changes. Real WebGPU and WebGL2 tests assert
+sharp corner values, lazy loading, disposal and generation after device/context
+loss. Native QEF rank/constraint tests and a required downloaded Khronos Box fixture
+prove corner, plane, volume and closed-edge values. CSG and scale controls remain
+generated stand-ins; arbitrary topology and render quality are unproven (LIM-632).

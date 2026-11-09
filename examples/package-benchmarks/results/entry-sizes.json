@@ -1,6 +1,6 @@
 {
-  "commit": "a891a111a",
-  "dirty": true,
+  "commit": "44f7a3fe3",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -2278,6 +2278,10 @@
       "./trees": {
         "raw": 2963,
         "gzip": 1540
+      },
+      "./sdf": {
+        "raw": 3126,
+        "gzip": 1559
       }
     },
     "@margoengine/quality": {
@@ -2926,8 +2930,12 @@
     },
     "@margoengine/staging": {
       ".": {
-        "raw": 22060,
-        "gzip": 8036
+        "raw": 22307,
+        "gzip": 8129
+      },
+      "./accumulate": {
+        "raw": 26471,
+        "gzip": 9314
       }
     },
     "@margoengine/stats": {
@@ -3752,6 +3760,11 @@
       "gzip": 9596,
       "brotli": 8153
     },
+    "packages/procedural/dist/sdf.wasm": {
+      "raw": 40594,
+      "gzip": 17183,
+      "brotli": 14927
+    },
     "packages/procedural/dist/trees.wasm": {
       "raw": 39113,
       "gzip": 16393,
@@ -3808,9 +3821,9 @@
       "brotli": 469813
     },
     "packages/staging/dist/index.js": {
-      "raw": 22060,
-      "gzip": 8036,
-      "brotli": 7260
+      "raw": 22307,
+      "gzip": 8129,
+      "brotli": 7342
     },
     "packages/tonemap/dist/index.js": {
       "raw": 35619,

@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-631). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-632). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1454,3 +1454,26 @@ solver. The staging contact cue is separate. Both WebGPU and WebGL2 compatibilit
 SH and staging contact pixels, including real device replacement. Native WebGL2 remains unsupported.
 No new runtime code or size increase; staging root 8,129 B and core plus stage 23,797 B gzip.
 All scene geometry is generated stand-in data. No photographic quality or speed claim.
+
+## Sharp SDF models (LIM-632)
+
+Optional procedural/sdf uses a feature-local Rust/Wasm uniform-grid dual contourer.
+Default is an axis-aligned box of half size .75 in bounds [-1.5,1.5]^3, 24 cells
+per axis. Resolution is 4..64; at most 63 sphere/box/binary CSG nodes; coordinates
+within +/-10000, sizes .0001..10000, bounds extent .0001..10000 per axis. All sampled
+boundary values must be positive or generation throws, never silently clips.
+Analytical primitive gradients, 40 root bisections, mass-point QEF pseudoinverse
+with absolute 1e-10 eigenvalue cutoff, 27 active constraint sets. Returns owned
+Float64 vertices and outward Uint32 triangles, no normals, UVs or materials.
+Min/max CSG fields need not be exact distances. No sampled fields, arbitrary
+callbacks, rotated primitives, adaptive octrees, topology repair or exact CAD.
+Subcell components, multiple edge crossings, tangencies and disconnected patches
+inside one cell can be missed or nonmanifold; touching CSG can produce degenerate
+triangles. CPU generation is synchronous with pre-abort; worker required in flight.
+The independent asset is lazy; output survives real WebGPU/WebGL2 loss and disposal.
+Khronos Box (Cesium, CC-BY-4.0) is the external corner/plane/volume/topology reference;
+other sphere, CSG, scale and hostile controls are generated stand-ins. No visual,
+production-scene, elapsed-time or SIMD claim. Cached edge roots have four cell uses
+per solve, a deterministic reduction in root work with identical Hermite data.
+Entry JS is 1,559 B gzip (new ceiling 1,815 B); sdf.wasm is 40,594 B raw /
+17,183 B gzip. Core plus stage is unchanged at 23,797 B gzip, strictly below 25,000 B.

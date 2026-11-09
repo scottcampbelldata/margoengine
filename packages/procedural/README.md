@@ -391,3 +391,60 @@ guarantees. Procedural evidence is stand-in only (LIM-631).
 The Poisson, dungeon and tree factories preserve the caller's exact AbortSignal reason. Other loading
 failures use code `failed` with a help link and the original error as `cause`; existing HTTP and CSP
 faults retain their specific help. This covers file reads, fetch/body errors and malformed Wasm bytes.
+
+## Sharp SDF models
+
+`@margoengine/procedural/sdf` contours a bounded signed-distance expression with
+uniform-grid dual contouring. Tangent planes place one vertex per active cell;
+their constrained quadratic error minimum retains box corners and sharp CSG edges.
+The default model is a box, so no user-supplied field or asset is required.
+
+```ts
+import { createSdfModeler } from '@margoengine/procedural/sdf';
+using modeler = await createSdfModeler();
+const mesh = modeler.mesh({
+  type: 'difference',
+  a: { type: 'box', halfSize: [0.8, 0.7, 0.6] },
+  b: { type: 'sphere', center: [0.5, 0, 0], radius: 0.4 },
+}, { resolution: 32 });
+console.log(mesh.positions.length / 3, mesh.indices.length / 3);
+```
+
+`mesh(shape?, options?)` returns owned Float64 XYZ `positions` and Uint32 triangle
+`indices`, in outward order. For sharp shading, expand indexed triangles and compute
+one normal per face before passing Float32 data to a renderer. No normals, UVs or
+material assignments are generated. `edgeSolves` counts unique sign-changing grid
+edges; `cellEdgeUses` counts the four cell uses per edge on an enclosed surface.
+Sharing Hermite roots removes three of four root solves with identical inputs and
+output, without a wall-time or SIMD speed claim.
+
+Shapes are spheres (`radius`, optional `center`, default [0,0,0]), axis-aligned boxes
+(`halfSize`, optional `center`, default [0,0,0]), and binary `union`, `intersection`
+or `difference` (`a` and `b`, difference subtracts b from a). At most 63 nodes are
+accepted. All coordinates must be finite within +/-10000; radii and half sizes are
+0.0001..10000. CSG uses min/max, whose zero surfaces are correct but whose field
+values need not be exact distances. Arbitrary callbacks, imported sampled fields,
+rotated primitives, adaptive octrees and manifold repair are not implemented.
+
+Options: `resolution` is cells per axis, integer 4..64, default 24; `bounds` is two
+strictly increasing XYZ corners, default [[-1.5,-1.5,-1.5],[1.5,1.5,1.5]], with
+extent 0.0001..10000 per axis and coordinates within +/-10000. A nonpositive sampled
+boundary value throws code `failed` and asks for larger bounds. An empty sampled
+field returns empty arrays. Features smaller than the grid, multiple crossings of
+one edge, tangent surfaces and disconnected components inside one cell may be lost
+or become nonmanifold. CSG may produce zero-area triangles where surfaces touch;
+there is no topology guarantee for arbitrary expressions. Normals are analytical
+primitive gradients selected through CSG, with deterministic axis ties on box edges.
+Roots use 40 bisections; rank-deficient QEFs use the Hermite mass point with a 1e-10
+absolute eigenvalue cutoff on the unit-normal system and bounded face/edge/corner
+minimization. These are approximation rules, not exact CAD operations.
+
+The factory lazily loads one independent Rust/Wasm asset, accepts `signal`, and
+has no import-time work. Generation checks `signal` before synchronous work; use a
+worker for in-flight interruption. `dispose()` and `Symbol.dispose` are idempotent;
+owned results survive disposal. Errors carry codes and help links. CPU output is
+identical on WebGPU and WebGL2, including after real device/context loss.
+`npm run build:sdf` rebuilds the committed asset; `npm run test:sdf-kernel` runs
+native tests. The external Khronos Box proves all eight sharp corners, planar
+surface, winding, closed edges and volume; sphere/CSG/extreme controls are generated
+stand-ins. No production model, render-quality or timing claim (LIM-632).

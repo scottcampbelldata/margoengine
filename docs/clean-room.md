@@ -1851,3 +1851,25 @@ and [Ramamoorthi and Hanrahan's irradiance environment maps](https://vis.stanfor
 the rig is distant incident radiance, with low-frequency diffuse SH and prefiltered specular response.
 These papers explain the lighting route and its limits; the preset values remain Margo design values.
 Only Margo's source/tests and public papers were read. No external source code or assets were added.
+
+## Batch 68 job 5: sharp SDF dual contouring
+
+Read public research only, no external engine or library implementation:
+- Ju, Losasso, Schaefer, Warren (2002), Dual Contouring of Hermite Data,
+  https://www.cs.rice.edu/~jwarren/papers/dualcontour.pdf, section 2, uniform-grid
+  dual vertices, tangent-plane QEF and one quad per sign-changing edge.
+- Schaefer and Warren (2003), Dual Contouring: The Secret Sauce,
+  https://people.eecs.berkeley.edu/~jrs/meshpapers/SchaeferWarren2.pdf, rank-deficient
+  QEFs, absolute singular thresholds and Hermite mass-point centering. Our bounded
+  solver enumerates active cell constraints and diagonalizes the symmetric system.
+- Carrera et al. (2026), Dual Contouring of Signed Distance Data,
+  https://www.cs.columbia.edu/~silviasellan/pdf/papers/dcsdd.pdf, distinction between
+  sampled SDF and exact Hermite information. We implement analytic primitive/CSG
+  gradients, not its progressive reconstruction algorithm or published speed claims.
+
+The original 2002 and 2003 PDFs were downloaded for reference, outside shipped
+files. Khronos glTF Sample Assets Box.glb was downloaded as an unchanged small
+standard test asset, with Cesium CC-BY-4.0 attribution through supply-chain.mjs.
+The private CAD API checkout was absent and the supplied private repository URL
+returned HTTP 404; no supported API could be inspected or reused. This isolated
+implicit polygon mesher adds no boundary-representation tooling or paid package.

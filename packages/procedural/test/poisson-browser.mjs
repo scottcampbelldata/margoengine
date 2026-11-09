@@ -19,8 +19,9 @@ try {
     `import {createPoissonSampler} from '@margoengine/procedural/poisson';
      import {createDungeonGenerator} from '@margoengine/procedural/dungeon';
      import {createTreeGenerator} from '@margoengine/procedural/trees';
+     import {createSdfModeler} from '@margoengine/procedural/sdf';
      window.makeSampler = createPoissonSampler; window.makeDungeon = createDungeonGenerator;
-     window.makeTree = createTreeGenerator;`,
+     window.makeTree = createTreeGenerator; window.makeSdf = createSdfModeler;`,
   );
   await build({
     root: dir,
@@ -32,6 +33,7 @@ try {
         '@margoengine/procedural/poisson': fileURLToPath(new URL('../dist/poisson.js', import.meta.url)),
         '@margoengine/procedural/dungeon': fileURLToPath(new URL('../dist/dungeon.js', import.meta.url)),
         '@margoengine/procedural/trees': fileURLToPath(new URL('../dist/trees.js', import.meta.url)),
+        '@margoengine/procedural/sdf': fileURLToPath(new URL('../dist/sdf.js', import.meta.url)),
       },
     },
     build: { outDir: join(dir, 'dist') },
@@ -71,6 +73,9 @@ try {
       const sampler = await window.makeSampler();
       const dungeon = await window.makeDungeon();
       const trees = await window.makeTree();
+      const sdf = await window.makeSdf();
+      const sdfShape = { type: 'box', halfSize: [0.7, 0.6, 0.5] };
+      const sdfMesh = sdf.mesh(sdfShape, { resolution: 17 });
       const treeOptions = { seed: 7, attractionCount: 64, maxNodes: 256, maxIterations: 64 };
       const tree = trees.generate(treeOptions);
       const dungeonOptions = { width: 32, height: 24, maxRooms: 12, seed: 7 };
@@ -92,6 +97,16 @@ try {
       const after = sampler.rectangle([-2, -2, 2, 2], options);
       const dungeonAfter = dungeon.generate(dungeonOptions);
       const treeAfter = trees.generate(treeOptions);
+      const sdfAfter = sdf.mesh(sdfShape, { resolution: 17 });
+      sdf.dispose();
+      sdf.dispose();
+      let sdfDisposed = false;
+      try {
+        sdf.mesh();
+      } catch (e) {
+        sdfDisposed = e.code === 'disposed';
+      }
+      if (!sdfDisposed) throw new Error('Disposed SDF modeler accepted work');
       trees.dispose();
       trees.dispose();
       let treeDisposed = false;
@@ -121,6 +136,8 @@ try {
       if (!disposed) throw new Error('Disposed sampler accepted work');
       output.push({
         route,
+        sdf: { positions: [...sdfMesh.positions], indices: [...sdfMesh.indices] },
+        sdfAfter: { positions: [...sdfAfter.positions], indices: [...sdfAfter.indices] },
         points: [...a.positions],
         surface: [...surface.positions],
         after: [...after.positions],
@@ -140,11 +157,26 @@ try {
     }
     return output;
   });
-  assert.equal(new Set(wasmRequests).size, 3, 'one independent lazy asset per feature');
+  assert.equal(new Set(wasmRequests).size, 4, 'one independent lazy asset per feature');
+  assert.deepEqual(result[0].sdf, result[1].sdf);
   assert.deepEqual(result[0].points, result[1].points);
   assert.deepEqual(result[0].dungeon, result[1].dungeon);
   assert.deepEqual(result[0].tree, result[1].tree);
   for (const r of result) {
+    assert.deepEqual(r.sdf, r.sdfAfter);
+    assert.ok(r.sdf.indices.length > 100);
+    assert.ok(r.sdf.positions.every(Number.isFinite));
+    for (const x of [-0.7, 0.7])
+      for (const y of [-0.6, 0.6])
+        for (const z of [-0.5, 0.5]) {
+          let nearest = Infinity;
+          for (let i = 0; i < r.sdf.positions.length; i += 3)
+            nearest = Math.min(
+              nearest,
+              Math.hypot(r.sdf.positions[i] - x, r.sdf.positions[i + 1] - y, r.sdf.positions[i + 2] - z),
+            );
+          assert.ok(nearest < 1e-9);
+        }
     assert.deepEqual(r.treeAfter, r.tree);
     const { positions, parents } = r.tree;
     assert.ok(parents.length > 20 && parents.length <= 256);
@@ -206,6 +238,7 @@ try {
       surfacePoints: result[0].surface.length / 3,
       dungeonRooms: result[0].dungeon.rooms.length,
       treeNodes: result[0].tree.parents.length,
+      sdfVertices: result[0].sdf.positions.length / 3,
       lazyWasm: true,
       deviceLossIndependent: true,
       errors,

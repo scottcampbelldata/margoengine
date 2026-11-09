@@ -919,3 +919,16 @@ Run `node packages/staging/test/ground-browser.mjs --studio` on both paths too. 
 oracle checks all four softboxes' source directions, SH and irradiance ordering; staging checks off/on
 contact pixels, unchanged product/outside pixels, removal, disposal and real replacement-device
 recovery. [Frozen evidence](results/batch-56-rigs.json). No external assets or speed comparison.
+
+### Batch 68 job 5: sharp SDF models
+
+`npm run test:sdf-kernel --workspace @margoengine/procedural` runs the native QEF
+rank, rotated-plane, anisotropic and shared-root controls. `npm test --workspace
+@margoengine/procedural` reads the actual Khronos Box.glb position accessor and
+asserts every reference corner, planar surface, outward winding, closed edges and
+volume. The committed small standard fixture has a pinned SHA-256 and attribution
+in test/fixtures/sdf/NOTICE.md. Other controls are generated stand-ins.
+`npm run test:gpu --workspace @margoengine/procedural` checks identical geometry
+values on real WebGPU and WebGL2 before and after loss, disposal and independent
+lazy loading. `cellEdgeUses == 4 * edgeSolves` proves shared-root work reduction;
+there is no elapsed-time or SIMD speed claim (LIM-632).

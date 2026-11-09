@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { runBuild } from './run-build.mjs';
+import { copyFileSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('../', import.meta.url));
+if (process.argv.includes('--test')) {
+  await runBuild('cargo', ['test', '--locked', '--manifest-path', root + 'sdf-kernel/Cargo.toml']);
+} else {
+  await runBuild(
+    'cargo',
+    [
+      'build',
+      '--locked',
+      '--release',
+      '--target',
+      'wasm32-unknown-unknown',
+      '--manifest-path',
+      root + 'sdf-kernel/Cargo.toml',
+    ],
+    { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' },
+  );
+  const artifact = root + 'sdf-kernel/target/wasm32-unknown-unknown/release/margo_procedural_sdf.wasm';
+  assert.ok(WebAssembly.validate(readFileSync(artifact)));
+  copyFileSync(artifact, root + 'src/sdf.wasm');
+}

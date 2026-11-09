@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/procedural/test/fixtures/sdf/NOTICE.md',
+    'Dual-contouring reference: unmodified Khronos glTF Sample Assets Box.glb, copyright 2017 Cesium, CC-BY-4.0; source, licence and SHA-256 in the linked notice. Test-only standard asset, never shipped.',
+  ],
+  [
     'scripts/fetch-readme-assets.mjs',
     'README runner external standard samples, downloaded outside the repository with SHA-256 checks: fifteen families reuse the source/author/licence records in packages/loaders/tests/real-files/manifest.json (NASA public domain; dolphin MD2 sample-file grant; AMF MIT; PDB CC0; KMZ CC-BY-4.0; Lottie Apache-2.0; STL BSD-3-Clause; SVG and TMX public domain; 3MF BSD-2-Clause; COLLADA Khronos MIT-style; OBJ/MTL and seven PNG companions Apache-2.0; LAS/WDP BSD-2-Clause; Pillow PCX MIT-CMU). OBJ PNG sources/hashes in scripts/support/readme-companions.json, PyVista vtk-data commit 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3. OpenVDB smoke.vdb, OpenVDB website 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0, repository LICENSE.txt. Brotli Alice stream from google/brotli d89c4b1c52e25ddafe047bc78bbee5c1e24b1809, MIT test-data grant and public-domain Lewis Carroll text. Optional Windows FFmpeg 8.1.2 GPL-3.0 tool from Gyan; publisher-hash-checked archive stays in the external cache. Innerscene authored room-scan-two-stations.e57, 108,000 points in two scans, CC0-1.0 dedication at https://www.innerscene.com/tools/library/3d-parts/room-scan-two-stations-cfa3398f, SHA-256 5c2d803ad56c83b689d9d9b9801e2f64d5a7ee6c58bad7d5a902337d2d3211fa; this standard E57 sample remains outside Margo. No implementation files or FFmpeg binaries ship in Margo.',
   ],
