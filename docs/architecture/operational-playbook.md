@@ -1362,6 +1362,17 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Retained core transform references (test-page 36)
+
+Core Mesh defines non-configurable accessors for its position, rotation and scale
+refs at construction. Replacement throws a coded TypeError before any transform
+store write. No optional package can enforce this for every mesh. Camera tuples
+remain assignable; core has no retained quaternion ref. The regression in
+`packages/core/tests/transform-refs.test.js` fails on the writable-field parent
+and covers array/object/self/null/number assignment, Reflect.set, store growth,
+component/set/setAll mutation and inspector snapshot/restore with ref identity.
+Core + stage measures 23,837 B before and 23,924 B after (+87 B); no speed claim.
+
 ### Sciviz asynchronous updates and trace replacement (2026-11-10)
 
 Real-data demo evidence: `packages/sciviz/tests/demos-browser.mjs` runs the OpenNeuro head MRI, million-source

@@ -1,5 +1,12 @@
 # Claims and evidence
 
+Test-page 36: mesh position, rotation and scale retain their refs and reject assignment
+with a coded TypeError before store writes. Proof: core/tests/transform-refs.test.js
+fails on the writable-field parent, passes with the guard, and preserves inspector
+snapshot/restore and ref identity through store growth. Core + stage: 23,837 to
+23,924 B gzip (+87 B); core alone 21,553 B, below its unchanged 21,587 B cap.
+No throughput or cross-hardware claim.
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699

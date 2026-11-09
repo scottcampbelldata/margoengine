@@ -1353,3 +1353,10 @@ with npm run check:readme-run -- --packages=shadows,quality,post. The retained p
 slow-send record uses the existing unmodified flythrough fixture, three rounds of
 two flights per version, alternating version order, slowSends(2, 0.02). It is
 diagnostic evidence under load, not a published speed ratio or a passing timing gate.
+
+Test-page 36: after `npm run build:packages`, run
+`node --test --test-timeout=120000 packages/core/tests/transform-refs.test.js`
+and `npm run measure:size`. The parent fails replacement rejection; the repaired
+build preserves mutation and inspector restoration. Package GPU and README checks
+use `npm run test:gpu --workspace=@margoengine/core` and
+`npm run check:readme-run -- --packages=core` under the shared GPU lock.

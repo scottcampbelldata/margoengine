@@ -14,6 +14,11 @@ export const typeError = (message, anchor) => new TypeError(linked(message, anch
 /** RangeError whose message links to `anchor` on the error help page. */
 export const rangeError = (message, anchor) => new RangeError(linked(message, anchor));
 
+/** Reject replacement of a retained transform vector, including from non-module callers. */
+export const vectorAssignment = () => {
+  throw Object.assign(typeError('Retained vector: use a transform setter', 'transform'), { code: 'transform' });
+};
+
 /** Translate only policy-blocked Wasm initialization, including Emscripten's wrapped abort. Keep other failures intact. */
 export function wasmError(error) {
   if (

@@ -13,7 +13,7 @@ import {
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { checkLayers, layerRegistry, meshLayers, validateRectangle } from '../../shared/view-rect.js';
-import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError, vectorAssignment } from '../../shared/errors.js';
 
 const DISPOSED = 'Engine disposed',
   WEBGPU = 'WebGPU required';
@@ -210,9 +210,9 @@ export class Mesh {
   name = '';
   /** @internal Ids of this mesh's children, so removing it unparents them without scanning every slot. */
   declare kids?: Set<number>;
-  readonly position = new VectorRef(this, 'position');
-  readonly rotation = new VectorRef(this, 'rotation');
-  readonly scale = new VectorRef(this, 'scale');
+  declare readonly position: VectorRef;
+  declare readonly rotation: VectorRef;
+  declare readonly scale: VectorRef;
   /** World matrix view into the store. `createMesh` replaces it when the store grows, so read it, never keep it. */
   declare readonly matrix: Float32Array;
   geometry: Geometry | null = null;
@@ -241,6 +241,10 @@ export class Mesh {
     /** The scene this mesh belongs to, fixed at creation. */
     readonly scene: Scene = engine.scene,
   ) {
+    for (const kind of ['position', 'rotation', 'scale'] as const) {
+      const ref = new VectorRef(this, kind);
+      Object.defineProperty(this, kind, { get: () => ref, set: vectorAssignment, enumerable: true });
+    }
     views(this);
   }
   get visible(): boolean {

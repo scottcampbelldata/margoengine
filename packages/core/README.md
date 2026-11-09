@@ -12,6 +12,24 @@ Static scenes cost little per frame: the kernel recomputes only entities whose p
 
 Entity capacity grows on demand: `Engine.create(canvas, {capacity})` sets the initial number of slots (default 1,024) and `createMesh` doubles the transform store when it is full, up to 8,388,608 (2^23). Growing re-creates the kernel at the same Wasm address, re-binds every `store` view and `mesh.matrix`, and recomputes every entity once on the next tick; a growth that cannot allocate throws and leaves the store unchanged. Store views and `mesh.matrix` taken before a `createMesh` may be stale afterwards (detached, or aliasing the new layout): re-read them, never keep them. Memory per slot: 344 B of kernel columns plus 7 B of flags (351 B; 352 MB of Wasm memory at 1,048,576 slots) and 5 B in the engine; each drawn instance adds 96 B on the CPU and 96 B on the GPU.
 
+Mesh `position`, `rotation` and `scale` are retained live refs. Replacing one throws
+`TypeError` with code `transform`: `Retained vector: use a transform setter`, followed by the help link.
+Use `.set(x, y, z)`, `.setAll(value)`, individual components, or the mesh setters:
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh();
+mesh.position.set(1, 2, 3);
+mesh.setRotation([0, Math.PI / 2, 0]);
+mesh.scale.setAll(2);
+engine.render();
+engine.dispose();
+```
+
+Camera `position`, `target` and `up` are tuple values and remain assignable.
+
 Camera controls are not in core: `CADCameraControls` is in `@margoengine/stage` (since 2026-11-07), and `@margoengine/controls` has orbit, map, fly and the rest.
 
 Package name: `@margoengine/core`, version `1.0.0`. Build from source or install a local tarball until the package is published.

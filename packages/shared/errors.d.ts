@@ -9,5 +9,8 @@ export function typeError(message: string, anchor: string): TypeError;
 /** RangeError whose message links to `anchor` on margoengine.com/errors. */
 export function rangeError(message: string, anchor: string): RangeError;
 
+/** Throws a TypeError with code `transform` and the retained-vector help message. */
+export function vectorAssignment(): never;
+
 /** Coded error with CSP help for policy-blocked Wasm initialization; other errors pass through. */
 export function wasmError(error: unknown): unknown;

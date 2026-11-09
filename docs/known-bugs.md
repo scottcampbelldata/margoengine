@@ -24,26 +24,15 @@ The coordinator requires the existing local test-page follow-ups to land first;
 entry 45 is retained for subsequent owning-package triage, alongside 42-44 in
 testpage-bugs.md. No core change is implied by this report.
 
-### Open: test-page 36 writable mesh transform references; 32 assignment consistency
+### Fixed: test-page 36 retained mesh transforms; open 32 Label diagnostic
 
-On main 6ebbd1aa4, create a mesh, assign `mesh.position = [0, -2.5, 0]`
-(`rotation` and `scale` behave the same), then call `snapshotMeshes(engine, [mesh])`
-and `restoreSnapshot(engine, snapshot)`. Assignment replaces the VectorRef without
-updating the transform store. Snapshot components become undefined and restore
-rejects them as non-finite. Cause: core Mesh declares TypeScript readonly instance
-fields, which remain writable properties in JavaScript. No optional package can
-guard all mesh construction and assignment; an inspector-only repair would leave
-rendering transforms stale. Fixing the property contract belongs in core.
-
-Label.position is getter-only and the corresponding array assignment throws a raw
-TypeError; setPosition currently works. Scott's latest ruling in the private
-brief approves the core repair for 36: retained transform references reject
-assignment; users mutate them with `.set()` or `.copy()`. Label keeps its
-getter-only contract and will report the same coded TypeError wording. This
-supersedes the earlier proposed copy-on-assignment rule. The coordinator requires
-landing the other local follow-ups first; implementation and regression proof
-for 32/36 remain pending. The bounded real-Engine/JSDOM reproduction is retained
-in this lane's test-results/testpage-32-36-repro.mjs and .log.
+Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs
+without updating the store and corrupted inspector snapshots. Core now guards
+all three refs at construction with a coded TypeError. No optional package can
+guard every mesh. `core/tests/transform-refs.test.js` fails before, passes after,
+and checks store growth, identity, supported mutations and snapshot restoration.
+Core + stage: 23,837 to 23,924 B gzip. Label.position still throws a raw getter-only
+TypeError; entry 32's matching coded diagnostic is the next separate piece.
 
 ### Fixed 2026-11-09: decoder Node Basis README example
 

@@ -316,3 +316,22 @@ are retained and LLM indexes regenerated. The rebased focused documentation,
 error-page and export-target suite passes 16 tests with zero failures/skips.
 Core and stage remain unchanged in this landing. Approved entries 32/36 and
 untriaged entries 42-45 remain next, after this required first follow-up push.
+
+### Approved entry 36: retain core transform refs
+
+Current main c00218aaf reproduces silent assignment and inspector corruption.
+The persistent `packages/core/tests/transform-refs.test.js` fails before with
+Missing expected exception, then passes with construction-time accessor guards.
+Arrays, objects, self-assignment, null, numbers and Reflect.set all throw the same
+TypeError with code transform; retained refs, supported mutations, store growth
+and inspector snapshot/restore remain intact. Core has no quaternion ref; Camera
+position/target/up are assignable tuples. No optional package can guard all meshes.
+Core + stage measured 23,837 B before, 23,924 B after (+87 B), under 25,000 B.
+The class regression is also in check:testpage-contracts (check:merge).
+
+Entry 36 landing evidence: core units passed (8.5 s), lint passed (4.6 s),
+hygiene passed (26 s). Initial verify passed 13,545 tests and found one stale
+umbrella README size; that number is corrected and the existing size regression
+passes. Repaired full verify passed all 13,546 tests, zero failures/skips, in
+400.4 s. Core-only measured 21,553 B, below 21,587 B. GPU and executable README
+checks are queued under codex-testpage; the local commit is not pushed yet.

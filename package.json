@@ -172,7 +172,7 @@
     "check:depth": "node scripts/test-depth-browser.mjs",
     "check:merge": "node scripts/check-merge.mjs",
     "check:road-invariants": "node --test --test-timeout=120000 packages/road/test/review65.test.js packages/road/test/testpage.test.js packages/splines/test/periodic.test.js packages/geometry/tests/periodic-sweep.test.js",
-    "check:testpage-contracts": "node --test --test-timeout=120000 packages/procedural/test/testpage*.test.js packages/core/tests/empty.test.js packages/animator/test/testpage.test.js packages/water/test/testpage.test.js packages/wfc/test/testpage.test.js packages/animation/tests/testpage.test.js packages/selection/test/picking.test.js packages/voxel-edit/tests/testpage-contracts.test.js",
+    "check:testpage-contracts": "node --test --test-timeout=120000 packages/procedural/test/testpage*.test.js packages/core/tests/empty.test.js packages/animator/test/testpage.test.js packages/water/test/testpage.test.js packages/wfc/test/testpage.test.js packages/animation/tests/testpage.test.js packages/selection/test/picking.test.js packages/voxel-edit/tests/testpage-contracts.test.js packages/core/tests/transform-refs.test.js",
     "check:text-extrude": "node --test --test-timeout=240000 packages/text/tests/extrude*.test.js",
     "check:readmes": "node scripts/check-readme-types.mjs",
     "check:readme-run": "node scripts/run-readme-examples.mjs",

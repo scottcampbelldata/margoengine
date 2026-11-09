@@ -18,7 +18,8 @@ export interface VectorRef {
 /**
  * A drawable node in an engine's transform hierarchy, created by {@link EngineKernel.createMesh}. Positions are world
  * units relative to the parent, rotations are Euler radians, and parents nest at most 64 deep. Methods throw Error
- * 'Mesh disposed' once the mesh or its engine is disposed.
+ * 'Mesh disposed' once the mesh or its engine is disposed. The three transform refs are retained: assigning a
+ * replacement throws TypeError with code `transform`; use their `.set()` or the mesh transform setters.
  */
 export interface Mesh {
   name: string;
