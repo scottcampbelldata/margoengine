@@ -4,7 +4,7 @@ import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
 import { AnimatedText } from '@margoengine/text/animate';
 import { parseFontOutlines, extrudeText } from '@margoengine/text/extrude';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { buildColorFont, COLOR_FONT_FAMILY } from './color-font.js';
 
 /** The class of a GPU object (WebGPU's, or the WebGL2 compatibility layer's), from one probe it then destroys. */

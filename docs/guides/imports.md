@@ -58,7 +58,7 @@ stage.onTick((delta) => {
 | Keyboard, mouse, gamepad and touch | `Input` from `margoengine/input` |
 | Voxel worlds | `margoengine/voxel`, `margoengine/voxel-edit`, `margoengine/voxel-net` |
 | React components | `margoengine/react`, and `npm i react react-dom` |
-| A WebGL2 fallback for browsers without WebGPU | `margoengine/webgl` |
+| A WebGL2 fallback for browsers without WebGPU | `margoengine/webgl2-compat/preview` |
 
 Every package and entry is in the [package catalog](../README.md); each package's README shows its entries as
 `margoengine/<name>/<entry>` imports.

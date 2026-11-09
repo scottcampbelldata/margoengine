@@ -8,7 +8,7 @@ try {
   const result = await browser.page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Engine } = await import('/packages/core/dist/extension.js');
-    const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+    const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { ScatterTiles } = await import('/packages/scatter/dist/tiles.js');
     const { generateGrassMesh } = await import('/packages/procedural/dist/index.js');
     const { toGeometry } = await import('/packages/geometry/dist/index.js');

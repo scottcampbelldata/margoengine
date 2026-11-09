@@ -1,6 +1,6 @@
 import { createStage, box, PbrMaterial } from '/packages/stage/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
-import { webglRenderer } from '/packages/webgl/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 import { Splats } from '/packages/splats/dist/index.js';
 import { VFX } from '/packages/vfx/dist/index.js';
 import { Terrain } from '/packages/terrain/dist/index.js';

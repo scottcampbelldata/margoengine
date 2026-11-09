@@ -54,7 +54,7 @@ try {
       mobile: false,
     });
     const identity = await page.evaluate(async (backend) => {
-      const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+      const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
       document.body.style.margin = '0';
       const host = document.createElement('div');
       host.style.cssText = 'width:100vw;height:100vh';
@@ -235,7 +235,7 @@ try {
     Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
   });
   const fallback = await page.evaluate(async () => {
-    const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+    const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const c = document.createElement('canvas');
     c.style.cssText = 'width:320px;height:240px';
     document.body.append(c);
@@ -269,7 +269,7 @@ try {
   for (const backend of ['webgpu', 'webgl2']) {
     console.log(`${vendor}/${backend}: recording 30 seconds of continuous rotation`);
     await page.evaluate(async (backend) => {
-      const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+      const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
       const host = document.createElement('div');
       host.style.cssText = 'width:100vw;height:100vh';
       document.body.append(host);

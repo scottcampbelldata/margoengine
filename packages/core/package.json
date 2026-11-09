@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/core",
   "version": "1.0.0",
-  "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.",
+  "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package.",
   "keywords": [
     "margoengine",
     "webgpu",

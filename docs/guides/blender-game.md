@@ -32,7 +32,7 @@ audio and navigation steps below go further than the demo does.
 
 ## What you need
 
-- A browser with WebGPU. Everything in this guide needs it; the optional `@margoengine/webgl` fallback draws plain
+- A browser with WebGPU. Everything in this guide needs it; the optional `@margoengine/webgl2-compat/preview` fallback draws plain
   core meshes only (flat PBR, one light), so treat it as a basic preview, not a way to run the game.
 - Blender 4.2 or later (the menu names below are from its built-in glTF 2.0 exporter).
 - The packages are not on npm yet. Build them from source (`npm run build:packages` in this repository) and link

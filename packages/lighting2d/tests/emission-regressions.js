@@ -1,4 +1,4 @@
-import { webglRenderer } from '/packages/webgl/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 import { Bloom } from '/packages/post/dist/bloom.js';
 import { EngineKernel } from '/packages/core/dist/index.js';
 import { Lighting2D } from '/packages/lighting2d/dist/index.js';

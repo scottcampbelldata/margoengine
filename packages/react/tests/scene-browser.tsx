@@ -510,7 +510,7 @@ async function preview() {
     <StrictMode>
       <Canvas
         backend="webgl2"
-        loadFallback={() => import('@margoengine/webgl/pick')}
+        loadFallback={() => import('@margoengine/webgl2-compat/pick')}
         style={{ width: 256, height: 256 }}
         camera={{ position: [0, 0, 4], target: [0, 0, 0], near: 0.1, far: 40 }}
         onCreated={(stage) => {

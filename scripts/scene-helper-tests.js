@@ -7,7 +7,7 @@ import { openBrowser } from './browser.js';
 export async function sceneHelperBrowserChecks(page) {
   return page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
-    const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+    const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
     const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
     const { loadGLTF: loadBasicGLTF } = await import('/packages/gltf/dist/index.js');

@@ -14,7 +14,7 @@ export async function runMusicTests() {
     document.body.append(canvas);
     let engine;
     try {
-      const fallback = backend === 'webgl2' ? (await import('@margoengine/webgl')).webglRenderer : undefined;
+      const fallback = backend === 'webgl2' ? (await import('@margoengine/webgl2-compat/preview')).webglRenderer : undefined;
       engine = await Engine.create(canvas, {backend:backend === 'webgl2' ? 'webgl2' : 'webgpu', fallback});
       if (compat) {
         const {isCompatDevice} = await import('@margoengine/webgl2-compat/device');

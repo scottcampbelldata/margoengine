@@ -108,11 +108,11 @@ export interface CanvasProps extends EngineOptions {
    */
   maxDpr?: number;
   /**
-   * Loads the renderer factory for browsers without WebGPU, for example `() => import('margoengine/webgl')`. The Canvas
+   * Loads the renderer factory for browsers without WebGPU, for example `() => import('margoengine/webgl2-compat/preview')`. The Canvas
    * checks for WebGPU itself (`navigator.gpu` and a successful `requestAdapter()`) before it creates the engine and
    * calls this only when WebGPU is missing (or `backend` is `'webgl2'`), so WebGPU visitors download none of the
    * fallback package. It resolves to the factory (`webglRenderer`) or to a module exporting it as `webglRenderer`. A
-   * module that also exports `webglPicking` (`margoengine/webgl/pick`) gives the preview working pointer handlers.
+   * module that also exports `webglPicking` (`margoengine/webgl2-compat/pick`) gives the preview working pointer handlers.
    * `signal` aborts when the Canvas unmounts or recreates its engine while the load is still pending. A rejection
    * becomes a `MargoError` with code `unsupported`, sent to `onError` and shown as `fallbackContent` or the plain
    * message. Ignored when `fallback` is given or `backend` is `'webgpu'`; read when the engine is created, so a new
@@ -138,7 +138,7 @@ export interface CanvasProps extends EngineOptions {
    */
   fallbackContent?: ReactNode;
 }
-/** A renderer factory for `fallback`, such as `webglRenderer` from `@margoengine/webgl`. */
+/** A renderer factory for `fallback`, such as `webglRenderer` from `@margoengine/webgl2-compat/preview`. */
 export type RendererFactory = NonNullable<EngineOptions['fallback']>;
 /** Props of the MargoCanvas component; every prop is optional unless noted. */
 export type MargoCanvasProps = CanvasProps;

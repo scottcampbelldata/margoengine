@@ -4,7 +4,7 @@
 //      nothing), and throws no uncaught error, both with navigator.gpu missing and with requestAdapter() answering
 //      null; with WebGL2 missing as well, each demo shows the shared "needs WebGPU" message instead;
 //   2. with WebGPU, no page downloads any of the layer (a browser with WebGPU gets zero bytes of it);
-//   3. the @margoengine/webgl preview draws a basic scene (two coloured boxes, one light): pixels are read back.
+//   3. the @margoengine/webgl2-compat/preview preview draws a basic scene (two coloured boxes, one light): pixels are read back.
 // How each demo looks on the layer against native WebGPU is scripts/visual-compat.mjs's job.
 // Part of `npm run check:merge`, after `npm run build:site`. Takes the GPU lock itself:
 //   npm run check:no-webgpu
@@ -203,7 +203,7 @@ try {
   await page.goto(`${new URL(dev.resolvedUrls.local[0]).origin}/site/webgpu.html`);
   const drawn = await page.evaluate(async () => {
     const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js');
-    const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+    const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const canvas = document.createElement('canvas');
     canvas.width = 96;
     canvas.height = 64;

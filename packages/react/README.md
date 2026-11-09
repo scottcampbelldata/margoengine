@@ -261,7 +261,7 @@ every handler:
 - **Pointer capture.** `event.setPointerCapture()` in `onPointerDown` sends the pointer's later events to that mesh
   without picking, until the release or `event.releasePointerCapture()`, as for a drag handle.
 - **On the WebGL2 fallback.** Handlers fire when the engine has `webglPicking`, and the plain way to give it that is
-  `<Canvas loadFallback={() => import('margoengine/webgl/pick')}>`: that entry holds the renderer and the picking. With a
+  `<Canvas loadFallback={() => import('margoengine/webgl2-compat/pick')}>`: that entry holds the renderer and the picking. With a
   `fallback` prop, attach it yourself in `onCreated`. Only core meshes are picked there. Without it no handler fires,
   and nothing counts as missed: in development the Canvas prints one `MargoError` (code `unsupported`) the first time a
   handler is registered, and nothing in a production build.
@@ -654,7 +654,7 @@ alert.
 
 `loadFallback` fetches the WebGL2 renderer only when the browser has no WebGPU, and `fallbackContent` is what the
 canvas shows when no renderer is usable (like a Suspense fallback, it can be an SVG, a skeleton or a pre-rendered image).
-WebGPU visitors never run the loader, so they download none of `@margoengine/webgl`.
+WebGPU visitors never run the loader, so they download none of `@margoengine/webgl2-compat/preview`.
 
 ```tsx
 import { Canvas } from '@margoengine/react';
@@ -662,7 +662,7 @@ import { Canvas } from '@margoengine/react';
 export function Viewer() {
   return (
     <Canvas
-      loadFallback={() => import('@margoengine/webgl')}
+      loadFallback={() => import('@margoengine/webgl2-compat/preview')}
       fallbackContent={<img src="/scene.png" alt="Pre-rendered view of the scene" />}
       onError={(error) => console.warn(error)}
     />
@@ -682,7 +682,7 @@ A scene that uses more than plain meshes wants `loadCompat`: the preview draws c
 import { Canvas } from '@margoengine/react';
 
 export function Viewer() {
-  return <Canvas loadCompat={() => import('@margoengine/webgl2-compat')} loadFallback={() => import('@margoengine/webgl')} />;
+  return <Canvas loadCompat={() => import('@margoengine/webgl2-compat')} loadFallback={() => import('@margoengine/webgl2-compat/preview')} />;
 }
 ```
 
@@ -783,7 +783,7 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
 ## Troubleshooting
 
 - **The canvas is blank and has no height.** Give `<Canvas>` a height: `style={{ height: 400 }}`.
-- **No WebGPU, graceful fallback.** `<Canvas loadFallback={() => import('margoengine/webgl')} fallbackContent={<img src="/scene.png" alt="Scene preview" />}>`: the Canvas checks `navigator.gpu` and `requestAdapter()` itself before creating the engine and calls `loadFallback` only when WebGPU is missing, so WebGPU visitors download none of `@margoengine/webgl` (it is a separate chunk). The loader gets an `AbortSignal` (aborted on unmount) and may resolve the renderer factory or a module with `webglRenderer`; a rejection reaches `onError` as a `MargoError` with code `unsupported`. When no renderer is usable, `fallbackContent` (an SVG, skeleton or image) replaces the default text, a bit like a Suspense fallback, and `onError` still gets the coded error. `fallback` (a factory you import yourself) works as before and wins over `loadFallback`.
+- **No WebGPU, graceful fallback.** `<Canvas loadFallback={() => import('margoengine/webgl2-compat/preview')} fallbackContent={<img src="/scene.png" alt="Scene preview" />}>`: the Canvas checks `navigator.gpu` and `requestAdapter()` itself before creating the engine and calls `loadFallback` only when WebGPU is missing, so WebGPU visitors download none of `@margoengine/webgl2-compat/preview` (it is a separate chunk). The loader gets an `AbortSignal` (aborted on unmount) and may resolve the renderer factory or a module with `webglRenderer`; a rejection reaches `onError` as a `MargoError` with code `unsupported`. When no renderer is usable, `fallbackContent` (an SVG, skeleton or image) replaces the default text, a bit like a Suspense fallback, and `onError` still gets the coded error. `fallback` (a factory you import yourself) works as before and wins over `loadFallback`.
 - **"WebGPU unavailable".** The browser has no WebGPU. Pass an `onError` handler to show your own message.
 - **A component does nothing.** React treats a bare lowercase `<mesh>` as a DOM element. Use `<Mesh>`, or the
   namespace form `<Margo.mesh>`. In development the Canvas prints a warning that names the component to use.
@@ -840,6 +840,7 @@ export function App() {
   such as "Box in Part". Safari and other WebKit browsers drop a component that ends in `return <Mesh ... />` from that name, as
   their engine replaces the frame of a tail call: give the mesh a `name`, or assign the element first
   (`const mesh = <Mesh ... />; return mesh;`).
+
 
 Strict consumers can use `skipLibCheck: false` with optional engine peers absent.
 Declaration packaging keeps parameter annotations while removing implementation

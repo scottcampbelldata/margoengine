@@ -53,7 +53,7 @@ await runSuite(
     await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
     await page.evaluate(async () => {
       const { Engine, box } = await import('/packages/core/dist/index.js');
-      const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+      const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
       const { TrampledScatter } = await import('/packages/scatter/dist/interact.js');
       const fallback = await Engine.create(document.createElement('canvas'), { backend: 'webgl2', fallback: webglRenderer });
       let refused = false;

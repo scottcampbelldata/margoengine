@@ -26,17 +26,17 @@ that.
   both no-WebGPU modes (the layer must install, no uncaught error) and with WebGL2 removed too (the message must show).
   How each demo looks on the layer is [webgl2-compat-demos.md](webgl2-compat-demos.md).
 - **Apps on the engine.** `Engine.create` (and `createStage`) reject with `WebGPU unavailable` unless the app passes
-  `fallback: webglRenderer` from `@margoengine/webgl`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
+  `fallback: webglRenderer` from `@margoengine/webgl2-compat/preview`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
   mesh's constant colour, one directional light plus ambient, no textures or effects). Packages that need
   WebGPU throw `MargoError` code `unsupported` naming themselves; core's `engine.pick` throws `WebGPU required` unless
-  the app adds `webglPicking` from `@margoengine/webgl/pick`, which also carries `Picking` from `selection` and the React
+  the app adds `webglPicking` from `@margoengine/webgl2-compat/pick`, which also carries `Picking` from `selection` and the React
   Canvas's pointer handlers.
   Covered by [webgl-preview.test.js](../tests/webgl-preview.test.js) in `npm run verify` and by the pixel readback in
   `check:no-webgpu`.
 
 ## Summary
 
-Visitors whose browser has no WebGPU get only the `@margoengine/webgl` preview today: plain core meshes, untextured,
+Visitors whose browser has no WebGPU get only the `@margoengine/webgl2-compat/preview` preview today: plain core meshes, untextured,
 one light, no effects. This roadmap replaces that with a full fallback, without adding a byte to core or the stage
 facade.
 
@@ -63,7 +63,7 @@ compute shaders and no storage buffers; it has two indirect draw calls (`rendere
 ## Decision record
 
 - "WebGL beyond core" was closed as won't-do for v1.0 on 2026-10-14 (gap 8), because the alternative was a second
-  renderer for every package. v1.0 keeps that decision and ships `@margoengine/webgl` as the preview.
+  renderer for every package. v1.0 keeps that decision and ships `@margoengine/webgl2-compat/preview` as the preview.
 - On 2026-10-21 a complete roadmap was requested to implement the full fallback in the next version. This document is
   that roadmap. The core freeze and the 25,000-byte core + stage gzip gate stay in force: the plan needs zero core bytes.
 - The translation-layer design replaces "a WebGL2 version of every package" (36 packages with WGSL shaders today). One
@@ -295,15 +295,15 @@ budgets and GPU-driven culling on WebGL2.
 ## Decisions (M0, 2026-10-27)
 
 1. **Name.** The package is `@margoengine/webgl2-compat` (`margoengine/webgl2-compat` in the umbrella, like every
-   package). It names what it does, WebGL2 compatibility for the WebGPU API, and stays apart from `@margoengine/webgl`,
-   which is a different thing: a second, small renderer. **`@margoengine/webgl` stays** as the preview until the layer
+   package). It names what it does, WebGL2 compatibility for the WebGPU API, and stays apart from `@margoengine/webgl2-compat/preview`,
+   which is a different thing: a second, small renderer. **`@margoengine/webgl2-compat/preview` stays** as the preview until the layer
    replaces it: it is 3,021 B gzip and draws plain meshes on any WebGL2, including devices below the layer's minimum
    tier. Decided with the end of M8 (2026-10-31): it stays for v1.0 (3,154 B gzip, `entry-sizes.json`), and the layer is
    documented as the site's fallback; its retirement is for after v1.0. Today its code users are the React `loadFallback`
    and one benchmark page.
 2. **Minimum tier: `EXT_color_buffer_float` and `highp` fragment shaders are required** (the `full` tier of
    `webgl2Capabilities`). Below it, `install()` (M2) will reject with `MargoError` code `unsupported` naming what is
-   missing, and the app keeps the `@margoengine/webgl` preview. Reasons: Margo's HDR path renders to `rgba16float`
+   missing, and the app keeps the `@margoengine/webgl2-compat/preview` preview. Reasons: Margo's HDR path renders to `rgba16float`
    (91 mentions in the packages) and float data targets (`r32float`, `rgba32float`), so a half-float or LDR tier would
    need a second render path in many packages and double the test matrix; and every WebGL2 configuration this PC can
    run reaches `full`. Measured with `npm run capabilities --workspace @margoengine/webgl2-compat` (2026-10-27):

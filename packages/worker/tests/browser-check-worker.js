@@ -2,7 +2,7 @@
 import { box, Engine, PbrMaterial } from '/packages/core/dist/index.js';
 import { OrbitControls } from '/packages/controls/dist/index.js';
 import { Stage } from '/packages/stage/dist/index.js';
-import { webglRenderer } from '/packages/webgl/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 import { receiveCanvas } from '/packages/worker/dist/canvas.js';
 
 // Requests wait here: a message with no listener at the moment it arrives is lost.

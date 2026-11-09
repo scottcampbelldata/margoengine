@@ -1,10 +1,10 @@
-// The WebGL2 preview (@margoengine/webgl) for visitors without WebGPU: a basic scene draws through it, and the features
+// The WebGL2 preview (@margoengine/webgl2-compat/preview) for visitors without WebGPU: a basic scene draws through it, and the features
 // that need WebGPU refuse with a MargoError that names them. The real-browser half (navigator.gpu removed, pixels read
 // back) is scripts/test-no-webgpu-browser.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, PbrMaterial, box } from '../packages/core/dist/index.js';
-import { webglRenderer } from '../packages/webgl/dist/index.js';
+import { webglRenderer } from '../packages/webgl2-compat/dist/preview.js';
 import { PostProcessing } from '../packages/creative/dist/post.js';
 import { GPUParticles } from '../packages/creative/dist/particles.js';
 import { SkyMoon } from '../packages/scenery/dist/sky.js';

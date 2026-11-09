@@ -49,7 +49,7 @@ node --test tests/catalog.test.js
 | --- | --- |
 | [`margoengine`](../packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 | [`@margoengine/stage`](../packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
-| [`@margoengine/core`](../packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package. |
+| [`@margoengine/core`](../packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
 
 ### Setup and diagnostics (7)
 

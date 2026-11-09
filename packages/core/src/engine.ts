@@ -18,7 +18,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 const DISPOSED = 'Engine disposed',
   WEBGPU = 'WebGPU required';
 
-/** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
+/** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl2-compat/preview. */
 export interface EngineOptions {
   /** Initial mesh capacity, 1..8388608; the store doubles when full. Default 1024. */
   capacity?: number;

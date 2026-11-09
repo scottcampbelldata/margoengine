@@ -1,7 +1,7 @@
 import { Engine, PbrMaterial, box as cube } from '@margoengine/core';
 import { HTML } from '@margoengine/html';
 import { HTMLTexture } from '@margoengine/html/texture';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);

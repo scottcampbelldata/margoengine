@@ -1,6 +1,6 @@
 import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { alphaChecks } from './alpha-browser.js';
 import { gpuBuildChecks } from './gpu-build-browser.js';
 import { gpuChecks } from './gpu-browser.js';

@@ -53,7 +53,7 @@ function App({ mode }: { mode: Mode }) {
     <StrictMode>
       <Canvas
         backend={mode === 'hints-webgl2' ? 'webgl2' : 'webgpu'}
-        loadFallback={mode === 'hints-webgl2' ? () => import('@margoengine/webgl') : undefined}
+        loadFallback={mode === 'hints-webgl2' ? () => import('@margoengine/webgl2-compat/preview') : undefined}
         camera={
           mode === 'voxels' ? { position: [6, 70, 9], target: [0, 64, 0] } : { position: [0, 0, 7], target: [0, 0, 0] }
         }

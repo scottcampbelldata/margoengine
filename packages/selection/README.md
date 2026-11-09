@@ -167,7 +167,7 @@ hover shows through `onHover`:
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {HoverHighlight, Picking} from 'margoengine/selection';
-import {webglPicking, webglRenderer} from 'margoengine/webgl/pick';
+import {webglPicking, webglRenderer} from 'margoengine/webgl2-compat/pick';
 
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});

@@ -500,11 +500,11 @@ The WebGL2 preview path.
 
 | # | Job | Status | Commit | New entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Picking on the preview path | DONE | `f8d478366` | `@margoengine/webgl/pick` | LIM-142 |
+| 1 | Picking on the preview path | DONE | `f8d478366` | `@margoengine/webgl2-compat/pick` | LIM-142 |
 | 2 | Device restore on the preview path | DONE | `131d30ca8` | `/restore` | LIM-144 |
 | 3 | Automatic escalation to the compatibility layer | DONE | `c1e669bcb` | `/auto` | LIM-146 |
 
-- **Proved:** real WebGL2 in a browser (`packages/webgl/test/browser-check.mjs`). A real `WEBGL_lose_context` loss came back
+- **Proved:** real WebGL2 in a browser (`packages/webgl2-compat/test/preview-browser-check.mjs`). A real `WEBGL_lose_context` loss came back
   with identical pixels. Chromium only.
 - **Limits:** core refuses `engine.pick` and `engine.rebootDevice` on other renderers before any plugin hook, so the
   plugins replace those methods on that one engine. Escalating replaces the canvas and runs `setup` twice, so listeners on
@@ -3185,7 +3185,7 @@ the batch).
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Smooth partial occlusion | DONE | f00b169f0 | `HTML` `fade` option | LIM-550 |
-| 2 | Occlusion on WebGL2 | DONE | e8dd163b5 | `HTML` on `@margoengine/webgl` | LIM-552 |
+| 2 | Occlusion on WebGL2 | DONE | e8dd163b5 | `HTML` on `@margoengine/webgl2-compat/preview` | LIM-552 |
 | 3 | DOM drawn into the scene | DONE | ff3903e25 | `@margoengine/html/texture` (`HTMLTexture`) | LIM-556 |
 | 4 | More than 4,096 anchors | DONE | this commit | `HTML` `capacity` up to 1,048,576 | LIM-559 |
 

@@ -3,7 +3,7 @@ import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
 import { Callouts } from '@margoengine/labels/callouts';
 import { projectPoint } from '@margoengine/math/mat4';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);

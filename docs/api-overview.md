@@ -39,7 +39,7 @@ stage.dispose();
 ```ts
 import { Engine, box } from '@margoengine/core';
 
-// WebGPU; pass { fallback } from @margoengine/webgl to fall back to WebGL2
+// WebGPU; pass { fallback } from @margoengine/webgl2-compat/preview to fall back to WebGL2
 const engine = await Engine.create(canvas, { camera: { position: [0, 2, 5], target: [0, 0, 0] } });
 const cube = engine.createMesh().setGeometry(box()).setPosition([0, 0.5, 0]);
 engine.start();

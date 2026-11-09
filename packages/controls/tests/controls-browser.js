@@ -1,7 +1,7 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls, TransformControls } from '@margoengine/controls';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { ArcballControls, ArcballGizmo } from '@margoengine/controls/arcball';
 
 const state = { errors: [] };

@@ -7,7 +7,7 @@
  * - `full`: renderable float colour targets (`EXT_color_buffer_float`) and high precision in fragment shaders. The
  *   only tier the compatibility layer renders on.
  * - `half-float`: half-float targets only (`EXT_color_buffer_half_float`). Below the minimum: use the
- *   `@margoengine/webgl` preview on these devices.
+ *   `@margoengine/webgl2-compat/preview` preview on these devices.
  * - `ldr`: 8-bit targets only, or no high precision in fragment shaders. Below the minimum, as above.
  */
 export type CompatTier = 'full' | 'half-float' | 'ldr';
@@ -194,7 +194,7 @@ let device: typeof import('./device.js') | undefined;
  * @param options See {@link InstallOptions}.
  * @returns What was done; see {@link InstallResult}.
  * @throws MargoError code `unsupported` when the browser has no WebGL2 at the `full` tier (the message names what is
- *   missing); keep the `@margoengine/webgl` preview for those browsers.
+ *   missing); keep the `@margoengine/webgl2-compat/preview` preview for those browsers.
  */
 export async function install(options: InstallOptions = {}): Promise<InstallResult> {
   device ??= await import('./device.js');

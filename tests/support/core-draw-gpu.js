@@ -1,5 +1,5 @@
 import { GPURenderer } from '../../packages/core/dist/renderer.js';
-import { GLRenderer } from '../../packages/webgl/dist/index.js';
+import { GLRenderer } from '../../packages/webgl2-compat/dist/preview.js';
 import { Camera } from '../../packages/core/dist/camera.js';
 import { FrameGraph } from '../../packages/core/dist/plugin.js';
 import { box } from '../../packages/core/dist/geometry.js';

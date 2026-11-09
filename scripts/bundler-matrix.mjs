@@ -164,7 +164,7 @@ function Spinner() {
   });
   return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh>;
 }
-createRoot(document.getElementById('root')).render(<Canvas label="cube" loadFallback={() => import('${specifier === '@margoengine/react' ? '@margoengine/webgl' : 'margoengine/webgl'}')}><Spinner /><OrbitControls /></Canvas>);
+createRoot(document.getElementById('root')).render(<Canvas label="cube" loadFallback={() => import('${specifier === '@margoengine/react' ? '@margoengine/webgl2-compat/preview' : 'margoengine/webgl2-compat/preview'}')}><Spinner /><OrbitControls /></Canvas>);
 `,
     );
     const { build } = await load('vite');
@@ -254,7 +254,7 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube" loadFall
             dependencies: {
               '@margoengine/react': packed['@margoengine/react'],
               '@margoengine/controls': packed['@margoengine/controls'],
-              '@margoengine/webgl': packed['@margoengine/webgl'],
+              '@margoengine/webgl2-compat': packed['@margoengine/webgl2-compat'],
               react: installed('react'),
               'react-dom': installed('react-dom'),
               // The strict type check below: the repository's TypeScript and React types.
@@ -386,9 +386,9 @@ ${result.stdout}${result.stderr}`,
           ['react alone', scoped],
           ['margoengine', umbrella],
         ]) {
-          // `loadFallback={() => import('.../webgl')}`: the WebGL fallback is its own chunk, outside the initial load, so a
+          // `loadFallback={() => import('.../webgl2-compat/preview')}`: the WebGL fallback is its own chunk, outside the initial load, so a
           // WebGPU visitor downloads none of it (the loader runs only without WebGPU).
-          const webgl = /node_modules\/@margoengine\/webgl\//;
+          const webgl = /node_modules\/@margoengine\/webgl2-compat\//;
           assert.ok(
             app.modules.some((id) => webgl.test(id)),
             `${label}: the lazy webgl import is emitted`,

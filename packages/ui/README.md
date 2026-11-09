@@ -549,7 +549,7 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { Button, Ui, UiRenderer } from '@margoengine/ui';
 
 const canvas = document.querySelector('canvas')!;

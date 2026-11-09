@@ -69,7 +69,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/procedural | `.` 40, `./poisson` 4, `./standin` 1, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 12,594 |
 | @margoengine/quality | `.` 27, `./warm` 3, `./ssaa` 6, `./features` 11, `./power` 8 | 4 | 2 | 3,686 |
 | @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 7,173 |
-| @margoengine/react | `.` 46, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 10, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 33, `./xr` 12, `./ui` 16, `./lines` 2, `./devtools` 2, `./helpers` 8, `./jsx-runtime` 4, `./jsx-dev-runtime` 3 | 62 |  | 9,565 |
+| @margoengine/react | `.` 46, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 10, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 33, `./xr` 12, `./ui` 16, `./lines` 2, `./devtools` 2, `./helpers` 8, `./jsx-runtime` 4, `./jsx-dev-runtime` 3 | 62 |  | 9,569 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./autorig` 3, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 47 |  | 7,631 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1, `./engine` 9, `./slots` 9, `./remote` 6, `./safe` 5 | 29 |  | 6,728 |
@@ -77,7 +77,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2 | 5 |  | 1,713 |
 | @margoengine/scenery | `.` 2, `./sky` 2, `./presets` 10, `./scenes` 6, `./stars` 4, `./aurora` 6 | 6 |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./formats` 18, `./geo` 12, `./graph` 8, `./grids` 15, `./maths` 37, `./nrrd` 10 | 353 |  | 35,812 |
-| @margoengine/selection | `.` 27 | 5 |  | 20,733 |
+| @margoengine/selection | `.` 27 | 5 |  | 20,740 |
 | @margoengine/shader | `.` 189, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 7, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,473 |
 | @margoengine/shadows | `.` 14, `./virtual` 3, `./light-function` 6, `./vsm` 3, `./transmission` 3, `./distance` 3, `./style` 3, `./rt` 5 | 45 |  | 18,456 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 9, `./sun` 19, `./volumetric-clouds` 7, `./cloud-shadows` 5, `./aerial` 6, `./hillaire` 5, `./shafts` 4, `./astro` 25, `./weather-fx` 5, `./presets` 4 | 105 |  | 17,694 |

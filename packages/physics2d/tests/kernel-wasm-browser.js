@@ -4,7 +4,7 @@
 // kernel, in Rapier 2D's Wasm build and, when the run names one, in a Box2D v3 Wasm build (a black box built outside
 // the repository, docs/whitepaper/reproduce.md), side by side in one page. Run by scripts/physics2d-kernel-browsers.mjs.
 import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
-import { webglRenderer } from '/packages/webgl/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 
 const DT = 1 / 60;
 

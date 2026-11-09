@@ -2,7 +2,7 @@
 
 Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth and picking. Materials are color, roughness, and metalness.
+WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl2-compat/preview`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth and picking. Materials are color, roughness, and metalness.
 
 Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an Intel Arc 140V laptop cut the island demo's GPU frame from about 20 to 10 ms (particles off) compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
 
@@ -35,7 +35,7 @@ engine.start();
 | `capacity` | `1024` | Initial mesh slots, 1 to 8,388,608; the store doubles when full. |
 | `backend` | `'auto'` | `'auto'` tries WebGPU, then `fallback`; `'webgpu'` fails without WebGPU; `'webgl2'` uses `fallback`. |
 | `camera` | `Camera` defaults | Initial camera settings (`position`, `target`, `fov`, ...). |
-| `fallback` | none | Builds the non-WebGPU renderer, for example `webglRenderer` from `@margoengine/webgl`. |
+| `fallback` | none | Builds the non-WebGPU renderer, for example `webglRenderer` from `@margoengine/webgl2-compat/preview`. |
 | `features` | `[]` | Extra WebGPU features to request when the adapter offers them, such as `['timestamp-query']`. |
 | `exactSize` | `false` | `[width, height]` or `true`: pixel-exact backbuffer with no pixel-ratio scaling and no MSAA ([Pixel-perfect rendering](#pixel-perfect-rendering)). |
 
@@ -220,7 +220,7 @@ const engine = await Engine.create(canvas, {
 engine.start();
 ```
 
-- With `backend: 'auto'` (the default) and a `fallback` (`webglRenderer` from `@margoengine/webgl`), a `timeout`
+- With `backend: 'auto'` (the default) and a `fallback` (`webglRenderer` from `@margoengine/webgl2-compat/preview`), a `timeout`
   falls back to WebGL2 like any other WebGPU failure; `engine.fallbackReason` says why. An abort never falls back.
 - A device that arrives after the limit is destroyed, not leaked; the warning is printed at most once per step.
 - The cause is the driver, not the page. A page that shows many engines (a gallery) should start them one at a time,

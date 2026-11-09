@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Engine, box, PbrMaterial, type Mesh as CoreMesh } from '@margoengine/core/extension';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial as ReactMaterial, useFrame } from '@margoengine/react';
 import { GPUParticles, PostProcessing, ToonShading } from '@margoengine/creative';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 const state: {
   core?: Engine;
   react?: Engine;

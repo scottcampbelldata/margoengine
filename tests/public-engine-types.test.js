@@ -52,7 +52,7 @@ test('regression: importing scene leaves plugins fitting engine.use, and public 
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { CulledModels } from '@margoengine/culling/models';
 import { storage } from '@margoengine/shader';
-import { webglPicking } from '@margoengine/webgl/pick';
+import { webglPicking } from '@margoengine/webgl2-compat/pick';
 declare const engine: EngineKernel;
 declare const wall: Mesh;
 engine.use(webglPicking());

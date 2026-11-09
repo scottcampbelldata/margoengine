@@ -93,7 +93,7 @@ Every option, including clear coat, sheen, transparency and node materials, is i
 - **A texture is gone after `dispose()`.** Textures belong to you, not to the material. Dispose one only after no
   material uses it.
 - **Nothing appears on a phone browser with no WebGPU.** Textured materials need WebGPU; the
-  [WebGL2 fallback](../../packages/webgl/README.md) draws plain meshes only.
+  [WebGL2 fallback](../../packages/webgl2-compat/README.md) draws plain meshes only.
 
 ## Next
 

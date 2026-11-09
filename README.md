@@ -184,7 +184,7 @@ The scene is about 60 lines. Three things to know about it:
 
 **WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
 in. Without WebGPU the page shows a message and stops. The site's demos run on WebGL2 without WebGPU through the optional
-[`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) layer. The small [`@margoengine/webgl`](packages/webgl/README.md)
+[`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) layer. The small [`@margoengine/webgl2-compat/preview`](packages/webgl2-compat/README.md)
 preview renders plain meshes with flat shading on WebGL2, with no textures, shadows or effects, so it cannot run this
 quickstart. Details are under [Browser support](#browser-support).
 
@@ -248,7 +248,7 @@ More examples are in [examples/](examples/README.md).
 
 Margo Engine needs WebGPU. Without it, the optional `@margoengine/webgl2-compat` layer runs the WebGPU code of core and the
 packages on WebGL2 (every site demo loads it; [docs/webgl2-compat-demos.md](docs/webgl2-compat-demos.md) lists how each one compares with native).
-Or pass the `@margoengine/webgl` fallback to get a basic WebGL2 preview of plain meshes (no textures or effects; picking is its optional `/pick` entry),
+Or pass the `@margoengine/webgl2-compat/preview` fallback to get a basic WebGL2 preview of plain meshes (no textures or effects; picking is its optional `/pick` entry),
 which stays for v1.0.
 
 | Browser | Status |
@@ -306,7 +306,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`margoengine`](packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 | [`@margoengine/stage`](packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
-| [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package. |
+| [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
 
 ### Setup and diagnostics (7)
 
@@ -464,7 +464,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 ## Roadmap
 
 - Publish 1.0.0 to npm.
-- The WebGL2 compatibility layer is an optional package that WebGPU users never load ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)); the voxel path tracer refuses it. `@margoengine/webgl` is the small preview; in the React Canvas, `loadFallback` loads it and `fallbackContent` replaces the plain message.
+- The WebGL2 compatibility layer is an optional package that WebGPU users never load ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)); the voxel path tracer refuses it. `@margoengine/webgl2-compat/preview` is the small preview; in the React Canvas, `loadFallback` loads it and `fallbackContent` replaces the plain message.
 - Testing on more hardware: Apple silicon, AMD, Android, Firefox and macOS Safari.
 - Published benchmark comparisons with their method and raw results.
 

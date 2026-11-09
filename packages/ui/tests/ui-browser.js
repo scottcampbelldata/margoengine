@@ -3,7 +3,7 @@
 // themes, resolution scaling, dialog scrims and the pixel ratio.
 import { Engine } from '@margoengine/core';
 import { Button, HealthBar, Inventory, Label, List, Panel, Ui, UiRenderer, themes, parseRgba } from '@margoengine/ui';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
 const checks = [];
 const assert = (condition, message) => {

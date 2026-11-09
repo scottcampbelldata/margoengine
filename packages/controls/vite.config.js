@@ -14,7 +14,7 @@ export default defineConfig({
       { find: /^@margoengine\/controls$/, replacement: resolve(root, 'dist/index.js') },
       { find: /^@margoengine\/controls\/walk$/, replacement: resolve(root, 'dist/walk.js') },
       { find: /^@margoengine\/controls\/arcball$/, replacement: resolve(root, 'dist/arcball.js') },
-      { find: /^@margoengine\/webgl$/, replacement: resolve(repository, 'packages/webgl/dist/index.js') },
+      { find: /^@margoengine\/webgl2-compat\/preview$/, replacement: resolve(repository, 'packages/webgl2-compat/dist/preview.js') },
     ],
   },
   server: { host: '127.0.0.1', fs: { allow: [repository] } },

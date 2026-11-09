@@ -47,7 +47,7 @@ struct Out { @builtin(position) clip:vec4f, @location(0) uv:vec2f }
 
 export const builders = {
   async 'p-webgl2'(canvas, data, marks) {
-    const { webglRenderer } = await import('@margoengine/webgl'),
+    const { webglRenderer } = await import('@margoengine/webgl2-compat/preview'),
       engine = await engineWith(canvas, data.camera, data.items.length + 8, marks, {
         backend: 'webgl2',
         fallback: webglRenderer,
@@ -57,7 +57,7 @@ export const builders = {
     done(marks, s);
     const gl = canvas.getContext('webgl2');
     return {
-      ...app(engine, () => {}, { camera: data.camera, note: `core meshes on ${engine.backend} (@margoengine/webgl)` }),
+      ...app(engine, () => {}, { camera: data.camera, note: `core meshes on ${engine.backend} (@margoengine/webgl2-compat/preview)` }),
       gl,
       idle: () => glIdle(gl),
     };

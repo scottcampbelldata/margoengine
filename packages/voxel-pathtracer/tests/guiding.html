@@ -3,7 +3,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
 import {GuidedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/guiding.js';
-import {webglRenderer} from '/packages/webgl/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
 window.run=async(compat=false)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,0]}});

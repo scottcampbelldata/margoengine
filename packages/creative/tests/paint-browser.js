@@ -1,7 +1,7 @@
 import { Painterly } from '../dist/paint.js';
 import { reference } from './paint-reference.js';
 import { Engine } from '/packages/core/dist/extension.js';
-import { webglRenderer } from '/packages/webgl/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 import { PostStack } from '/packages/post/dist/stack.js';
 
 // Generated noise/step images are stand-ins. Every comparison runs on the real browser GPU.

@@ -24,7 +24,10 @@ applications use dynamic loaders. The umbrella exposes each new entry under
 
 1. Move implementations and tests into the combined package. The old workspace
    temporarily delegates to those entries until its consumers are switched.
-2. Switch consumers and documentation to the new entries.
+2. Switch consumers and documentation to the new entries. React loaders,
+   selection advice, examples and browser fixtures now use the combined entries;
+   physics2d changes only its test import, as approved. Isolation checks parse real
+   module edges, so comments and loader advice cannot produce false dependencies.
 3. Remove the old workspace and umbrella paths. There is no released deprecation shim.
 
 The core and stage feature freeze and the 25,000 B combined gzip ceiling remain unchanged.

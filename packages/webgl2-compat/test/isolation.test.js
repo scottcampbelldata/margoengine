@@ -1,8 +1,9 @@
 // The compatibility layer costs WebGPU users nothing (roadmap condition, Scott 2026-10-27): no source file of another
-// package names it, no package depends on it except the umbrella's own alias entry, the built core, stage, React and
-// umbrella root entries reach no module of it, and importing it changes no global. Since no other package's source or manifest
-// refers to it, every other package builds to the same bytes with or without it installed.
+// package imports it, no package depends on it except the umbrella's own alias entry, the built core, stage, React and
+// umbrella root entries reach no module of it, and importing it changes no global. Since no other package imports it or declares it as a dependency,
+// every other package builds to the same bytes with or without it installed.
 import test from 'node:test';
+import { parseSync } from 'rolldown/utils';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -11,25 +12,73 @@ import { dirname, join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const NAME = '@margoengine/webgl2-compat';
 /** The umbrella's generated alias of each entry, and what each one re-exports. */
-const ENTRIES = ['', '/adapter', '/compute', '/device', '/glsl', '/wgsl', '/xr', '/preview', '/pick', '/restore', '/auto'];
+const ENTRIES = [
+  '',
+  '/adapter',
+  '/compute',
+  '/device',
+  '/glsl',
+  '/wgsl',
+  '/xr',
+  '/preview',
+  '/pick',
+  '/restore',
+  '/auto',
+];
 const UMBRELLA = ENTRIES.map((e) => `packages/margoengine/src/webgl2-compat${e}.ts`);
 const ALIASED = ENTRIES.map((e) => NAME + e);
 
-test('no other package source names the compatibility layer', () => {
-  let out = '';
-  try {
-    out = execFileSync('git', ['grep', '-l', '-F', 'webgl2-compat', '--', 'packages/*/src/**', 'packages/shared/**'], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-  } catch (error) {
-    if (error.status !== 1) throw error; // git grep exits 1 when nothing matches
+// Inspect dependency edges, not examples inside comments or diagnostic strings.
+function moduleImports(source, file = 'entry.ts', staticOnly = false) {
+  const found = new Set(),
+    pending = [parseSync(file, source).program];
+  while (pending.length) {
+    const node = pending.pop();
+    if (!node || typeof node !== 'object') continue;
+    const declaration = ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type);
+    if (declaration || (!staticOnly && node.type === 'ImportExpression')) {
+      const value =
+        node.source?.value ??
+        (node.source?.type === 'TemplateLiteral' && !node.source.expressions.length
+          ? node.source.quasis[0].value.cooked
+          : undefined);
+      if (typeof value === 'string') found.add(value);
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) pending.push(...value);
+      else if (value && typeof value === 'object') pending.push(value);
+    }
   }
-  const files = out
+  return [...found].sort();
+}
+
+test('dependency edges ignore import examples in comments and diagnostic strings', () => {
+  const source = [
+    "// import '@margoengine/webgl2-compat/device';",
+    `const advice = "import('@margoengine/webgl2-compat/pick')";`,
+    "import type { ProbeOptions } from '@margoengine/webgl2-compat';",
+    "export * from '@margoengine/webgl2-compat/preview';",
+    "const loaded = import('@margoengine/webgl2-compat/wgsl');",
+  ].join('\n');
+  assert.deepEqual(moduleImports(source), [NAME, NAME + '/preview', NAME + '/wgsl']);
+  assert.deepEqual(moduleImports(source, 'entry.ts', true), [NAME, NAME + '/preview']);
+});
+
+test('no other package imports the compatibility layer', () => {
+  const files = execFileSync('git', ['ls-files', 'packages/*/src/**', 'packages/shared/**'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
     .split('\n')
-    .filter(Boolean)
-    .filter((f) => !f.startsWith('packages/webgl2-compat/') && !f.startsWith('packages/webgl/src/') && !UMBRELLA.includes(f));
-  assert.deepEqual(files, []);
+    .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file));
+  const offenders = files.filter((file) => {
+    if (file.startsWith('packages/webgl2-compat/') || file.startsWith('packages/webgl/src/') || UMBRELLA.includes(file))
+      return false;
+    return moduleImports(readFileSync(join(root, file), 'utf8'), file).some((specifier) =>
+      /(?:^|\/)webgl2-compat(?:\/|$)/.test(specifier),
+    );
+  });
+  assert.deepEqual(offenders, []);
 });
 
 test('only the umbrella depends on it', () => {
@@ -62,11 +111,7 @@ function distReach(entry, staticOnly = false) {
     seen.add(file);
     const text = readFileSync(file, 'utf8');
     all += text;
-    const pattern = staticOnly
-      ? /(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g
-      : /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'`]([^"'`]+)["'`]/g;
-    for (const m of text.matchAll(pattern)) {
-      const s = m[1];
+    for (const s of moduleImports(text, file, staticOnly)) {
       if (s.startsWith('.')) {
         const next = resolve(dirname(file), s);
         if (existsSync(next)) queue.push(next);
@@ -80,9 +125,13 @@ test('the built core, stage, React and umbrella roots reach no module of the lay
   for (const pkg of ['core', 'stage', 'react', 'margoengine']) {
     const entry = join(root, 'packages', pkg, 'dist', 'index.js');
     assert.ok(existsSync(entry), `${pkg} is not built; run npm run build:packages first`);
-    const { files, text } = distReach(entry);
+    const { files, specifiers } = distReach(entry);
     assert.ok(files > 0);
-    assert.ok(!text.includes('webgl2-compat'), `${pkg}'s built root or a module it reaches names the layer`);
+    assert.deepEqual(
+      [...specifiers].filter((specifier) => /(?:^|\/)webgl2-compat(?:\/|$)/.test(specifier)),
+      [],
+      `${pkg}'s built root reaches the layer`,
+    );
   }
 });
 

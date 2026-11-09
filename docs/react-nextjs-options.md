@@ -138,7 +138,7 @@ through StrictMode and Suspense; optional features are subpaths you install.
 
 ## 7. Browsers without WebGPU
 
-`loadFallback={() => import('@margoengine/webgl')}` fetches the basic WebGL2 preview only when WebGPU is missing
+`loadFallback={() => import('@margoengine/webgl2-compat/preview')}` fetches the basic WebGL2 preview only when WebGPU is missing
 (3,021 B gzip; coloured core meshes, one light, no textures, picking or effects). `fallbackContent` replaces the default
 message (image, SVG, skeleton). A failed fallback reaches `onError` as a `MargoError` with code `unsupported`. WebGPU
 visitors download none of it. Click handlers, PBR models, IBL and shadows do not run on the fallback.

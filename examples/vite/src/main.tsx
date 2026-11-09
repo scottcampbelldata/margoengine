@@ -2,7 +2,7 @@ import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
 import { CADCameraControls } from 'margoengine';
-import { webglRenderer } from '@margoengine/webgl';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Engine } from '@margoengine/core/extension';
 import type { PostProcessing } from '@margoengine/creative';

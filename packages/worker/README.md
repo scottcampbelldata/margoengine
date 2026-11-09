@@ -1,6 +1,6 @@
 # @margoengine/worker
 
-Runs the engine inside a Web Worker on an `OffscreenCanvas`, so a heavy scene never blocks the page's main thread and a busy page never stalls the scene. The helper moves the canvas and keeps the worker told of the page's canvas: its size, position, pixel ratio and visibility, and the input events the worker listens for. Core needs no change and no option: `Engine.create`, `engine.pick`, the frame loop, control packages and the `@margoengine/webgl` fallback run on the received canvas as they do on the page.
+Runs the engine inside a Web Worker on an `OffscreenCanvas`, so a heavy scene never blocks the page's main thread and a busy page never stalls the scene. The helper moves the canvas and keeps the worker told of the page's canvas: its size, position, pixel ratio and visibility, and the input events the worker listens for. Core needs no change and no option: `Engine.create`, `engine.pick`, the frame loop, control packages and the `@margoengine/webgl2-compat/preview` fallback run on the received canvas as they do on the page.
 
 Two entries, one per side. `@margoengine/worker` goes in the page and `@margoengine/worker/canvas` in the worker, so neither side downloads the other's code.
 

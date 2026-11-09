@@ -244,7 +244,7 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       area: 'renderer',
       rows: ['2.2'],
       title: 'WebGL2 fallback',
-      draws: '10,000 catalog boxes through the WebGL2 path (Margo: @margoengine/webgl; three: WebGLRenderer).',
+      draws: '10,000 catalog boxes through the WebGL2 path (Margo: @margoengine/webgl2-compat/preview; three: WebGLRenderer).',
       params: {},
       data: () => boxes(10_000),
     },

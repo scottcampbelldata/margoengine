@@ -93,7 +93,7 @@ export const entries = [
     ],
     cause:
       'The browser or GPU driver never answered a step of `Engine.create`: the adapter or device request, or a pipeline compile. Seen on an Intel Arc 140V when 3 or 4 WebGPU pages were alive at once in one browser process: each new page got slower to get a device, and the 4th never did, with no error. The engine warns once after `startupWarning` ms (default 8000) and rejects after `startupTimeout` ms (default 30000).',
-    fix: 'Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With `backend: "auto"` and `fallback: webglRenderer` from `@margoengine/webgl` the page draws on WebGL2 instead. Raise `startupTimeout` for a slow first compile; pass `signal` to cancel creation yourself. Branch on `error.code === "timeout"`.',
+    fix: 'Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With `backend: "auto"` and `fallback: webglRenderer` from `@margoengine/webgl2-compat/preview` the page draws on WebGL2 instead. Raise `startupTimeout` for a slow first compile; pass `signal` to cancel creation yourself. Branch on `error.code === "timeout"`.',
   },
   {
     id: 'webgpu',
@@ -102,7 +102,7 @@ export const entries = [
     messages: ['WebGPU required', 'WebGPU unavailable', 'WebGPU adapter unavailable', 'No WebGPU canvas'],
     cause:
       '`engine.pick` and `engine.rebootDevice` need the WebGPU backend; on the WebGL2 fallback they reject unless the app adds `webglPicking` and `webglRestore`. `Engine.create` found no `navigator.gpu`, no adapter, or a canvas that already has another context.',
-    fix: 'Use a browser with WebGPU (current Chrome, Edge or Safari; margoengine.com/webgpu), turn on hardware acceleration, or pass `{backend: "auto", fallback: webglRenderer}` from `@margoengine/webgl`. Give the engine a fresh canvas that has no 2D or WebGL context.',
+    fix: 'Use a browser with WebGPU (current Chrome, Edge or Safari; margoengine.com/webgpu), turn on hardware acceleration, or pass `{backend: "auto", fallback: webglRenderer}` from `@margoengine/webgl2-compat/preview`. Give the engine a fresh canvas that has no 2D or WebGL context.',
   },
   {
     id: 'device-restore',
@@ -847,7 +847,7 @@ export const entries = [
     messages: [],
     cause:
       'A MargoError with code `unsupported` from the WebGL2 compatibility layer: a shader or a call needs something the layer does not map onto WebGL2, and the message names it: something WebGL2 cannot do at all (subgroups, cube array textures, vertex strides above 255 bytes, render shaders that write storage buffers or textures), or something the CPU tier of compute cannot run (multisampled or external textures, or a cube texture in a built-in other than `textureSampleLevel`, `textureDimensions` and `textureNumLevels`, read by a kernel with atomics, workgroup memory or barriers; a page whose Content-Security-Policy forbids JavaScript compiled at run time). `install()` throws the same code when the browser has no WebGL2 at the full tier, naming what is missing. Packages refuse the layer with the same code where a part needs WebGPU itself: the voxel path tracer (the WebGL2 shader compiler takes from 20 seconds to minutes per kernel) and XR (WebXR on WebGL2 needs `XRWebGLLayer`); each message names what it needs. The margoengine.com demos, which load the layer only when WebGPU is missing, show such a refusal over the scene with its code instead of a blank view (docs/webgl2-compat-demos.md). A `GPUInternalError` with code `failed` that names the work budget is a CPU-tier dispatch that ran past `cpuWorkBudget` invocations and loop iterations (default 100,000,000): an endless loop, or more work than the CPU can do in one dispatch; nothing it stored lands. Code `failed` with "a bug: report it" is an internal fault of the layer.',
-    fix: 'On a browser with WebGPU, do not install the layer (install() leaves WebGPU alone unless `force` is set). Without WebGPU, keep the feature off on compatibility devices (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), or use the `@margoengine/webgl` preview below the full tier. For the work budget, make the dispatch smaller or raise `cpuWorkBudget` in `install()` or on the device. Report any other `failed` error with the shader that caused it.',
+    fix: 'On a browser with WebGPU, do not install the layer (install() leaves WebGPU alone unless `force` is set). Without WebGPU, keep the feature off on compatibility devices (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), or use the `@margoengine/webgl2-compat/preview` preview below the full tier. For the work budget, make the dispatch smaller or raise `cpuWorkBudget` in `install()` or on the device. Report any other `failed` error with the shader that caused it.',
   },
   {
     id: 'wgsl-syntax',

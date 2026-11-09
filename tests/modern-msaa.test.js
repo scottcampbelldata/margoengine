@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GPURenderer } from '../packages/core/dist/renderer.js';
-import { GLRenderer } from '../packages/webgl/dist/index.js';
+import { GLRenderer } from '../packages/webgl2-compat/dist/preview.js';
 import { SceneTarget } from '../packages/shared/msaa.js';
 import { gpuHarness } from './support/postfx-gpu.js';
 import { Camera } from '../packages/core/dist/camera.js';

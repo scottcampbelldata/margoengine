@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 import { Engine } from '../packages/core/dist/index.js';
 import { GPURenderer } from '../packages/core/dist/renderer.js';
 import { createStage } from '../packages/stage/dist/index.js';
-import { webglRenderer } from '../packages/webgl/dist/index.js';
+import { webglRenderer } from '../packages/webgl2-compat/dist/preview.js';
 import { glDrawHarness } from './support/core-draw-gpu.js';
 
 const never = () => new Promise(() => {});

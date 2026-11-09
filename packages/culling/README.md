@@ -207,7 +207,7 @@ A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInst
   core mesh, a model, a materials mesh or a Terrain. Give it the large things: an occluder draws depth-only every frame,
   so it hides at once, in the frame it moves. Cut-out, blended, displaced and clipped primitives and back faces do not
   occlude. With no occluder nothing is built and nothing is paid. `culled.removeOccluder(wall)` stops it.
-- WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl` renderer
+- WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl2-compat/preview` renderer
   is not supported (`MargoError` `'unsupported'`).
 
 ## Shadows per cascade: `CascadeParts` and `CascadeInstances`
@@ -350,7 +350,7 @@ replay of it (SSAO, outline, post) with core's own shader and every shader patch
 - Mirrored matrices need `mirrored: true` (single-sided instances otherwise draw back-face culled, and `setMatrixAt`
   refuses a mirror). Rows with non-finite values draw nothing.
 - WebGL2 compatibility layer: the same test runs on the CPU from the rows (O(n) per frame), the records are uploaded.
-  The `@margoengine/webgl` renderer is not supported (`MargoError` `'unsupported'`).
+  The `@margoengine/webgl2-compat/preview` renderer is not supported (`MargoError` `'unsupported'`).
 
 Pixel checks on the GPU (`npm run test:gpu -w @margoengine/culling`): `test/gpu/parts-check.mjs` compares `CulledInstances`
 with core meshes through hides, hierarchy moves, removes, adds and shadows, and compares picks with `engine.pick`.

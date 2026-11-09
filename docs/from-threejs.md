@@ -35,7 +35,7 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 
 ## What is different
 
-- **WebGPU first.** Core renders with WebGPU. The WebGL2 fallback is the optional `@margoengine/webgl` package and
+- **WebGPU first.** Core renders with WebGPU. The WebGL2 fallback is the optional `@margoengine/webgl2-compat/preview` package and
   draws core meshes only (flat PBR, one light, no textures or effects). Most optional packages need WebGPU.
 - **No `Scene` object.** One `Engine` owns one canvas, one camera and one implicit scene. Meshes are created by the
   engine (`engine.createMesh()`), and features (shadows, lights, post effects, controls) are plugins you attach with
@@ -74,7 +74,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | You use in three.js | Margo package |
 | --- | --- |
 | `WebGLRenderer`, `PerspectiveCamera`, `Mesh`, `MeshStandardMaterial` (colour only) | `@margoengine/core` |
-| WebGL fallback | `@margoengine/webgl` |
+| WebGL fallback | `@margoengine/webgl2-compat/preview` |
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
 | `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
 | `GLTFLoader` (textured, extensions) | `@margoengine/gltf-pro` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
@@ -136,7 +136,7 @@ renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
 ```ts
 import {Engine} from '@margoengine/core';
-import {webglRenderer} from '@margoengine/webgl'; // optional: only if you want a WebGL2 fallback
+import {webglRenderer} from '@margoengine/webgl2-compat/preview'; // optional: only if you want a WebGL2 fallback
 
 const canvas = document.querySelector('canvas'); // give it a CSS size, e.g. width: 100%; height: 100vh
 const engine = await Engine.create(canvas, {
@@ -170,7 +170,7 @@ A transparent canvas over HTML and CSS, like `new THREE.WebGLRenderer({alpha: tr
 ```ts
 import {Engine} from '@margoengine/core';
 import {TransparentCanvas} from '@margoengine/environment';
-import {webglRenderer} from '@margoengine/webgl';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
 
 const overlay = await Engine.create(canvas, {fallback: c => webglRenderer(c, {transparent: true})}); // WebGL fallback: transparent too
 TransparentCanvas.attach(overlay); // WebGPU: premultiplied canvas, alpha 0 where nothing is drawn

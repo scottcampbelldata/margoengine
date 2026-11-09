@@ -5,7 +5,7 @@
 // renderer. 'restore' reboots the GPU device after attaching; 'removed' attaches then disposes (opaque again). 'old:*' scenarios use the post package built before the alpha fixes
 // (test-results/post-before, copied by the runner's caller) to prove opaque output is unchanged.
 import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
-import {webglRenderer} from '/packages/webgl/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
 import * as post from '/packages/post/dist/index.js';
 import * as before from '/test-results/post-before/index.js';
 import {Tonemap} from '/packages/tonemap/dist/index.js';

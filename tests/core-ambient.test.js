@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore, Camera, FrameGraph } from '../packages/core/dist/extension.js';
 import { GPURenderer } from '../packages/core/dist/renderer.js';
-import { GLRenderer } from '../packages/webgl/dist/index.js';
+import { GLRenderer } from '../packages/webgl2-compat/dist/preview.js';
 import { wgsl } from '../packages/core/src/shaders.ts';
 import { SSAO } from '../packages/post/dist/index.js';
 import { lighting as skyLighting } from '../packages/sky/dist/lighting.js';
