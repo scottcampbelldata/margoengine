@@ -89,6 +89,7 @@ unless stated.
 | client → server | `hello` | protocol version, wanted view distance, name |
 | client → server | `input` | first step number, then runs of (step count, key bits, yaw u16, pitch u8), then the position the client predicted after the last step (3 x f64) |
 | client → server | `edit` | request number, cell x, y, z (zigzag), block state (0 breaks) |
+| client → server | `app` | the game's own bytes, 0 to 16,384, from `VoxelNetClient.sendApp`, to `VoxelServer.onApp` in order with the inputs and edits; at most `appRate` per second (default 20, burst `appBurst` 20), the rest dropped. Kind byte 4, protocol 6 |
 | server → client | `welcome` | player id, tick rate, granted view, simulation and player distances, block table hash |
 | server → client | `chunk` | cx, cy, cz (zigzag), then `encodeChunk` bytes (one-block-type chunks sent undeflated: 5 bytes for air) |
 | server → client | `unload` | cx, cy, cz |
@@ -98,7 +99,7 @@ unless stated.
 | server → client | `names` | count, then (player id, name length, UTF-8 bytes, at most 32) for each named player coming into range, just before its first `players` state |
 | server → client | `loaded` | marks the first time the whole view has been sent (used to measure join time) |
 | server → client | `heartbeat` | empty; sent only to a client that got no other message for `heartbeatInterval` |
-| server → client | `app` | the game's own bytes, 0 to 16,384 (`MAX_APP_BYTES`), from `VoxelServer.send` or `broadcast`; the package never reads them. Kind byte 25. A client may not send one |
+| server → client | `app` | the game's own bytes, 0 to 16,384 (`MAX_APP_BYTES`), from `VoxelServer.send` or `broadcast`; the package never reads them. Kind byte 25 |
 
 The connection is TCP, so every message arrives, in order. That lets `EntityCodec` use "the last state I sent you" as
 its baseline with no acknowledgements.
@@ -184,6 +185,13 @@ Clients never ask for chunks; the server decides. A client cannot make the serve
 - The client pushes each player's positions into a `SnapshotBuffer` (packages/net/src/index.ts) keyed by server time
   (tick / 20 s), with velocity taken from successive positions, and draws them 100 ms behind the newest snapshot.
 
+## Chat and inventory (`./chat`, 2026-11-09)
+
+Chat and inventory messages are app messages that start with `MCH` and format byte 1, so they sit beside the game's
+own and the shard handoffs (`MSH`). The server owns everything: a client says a line or asks to move items between its
+own slots, and the server cleans, rate-limits and filters lines and checks each move, answering with the slots as they
+are so a client that guessed shows the truth. A client that sends unreadable chat bytes is closed with 4002.
+
 ## Interest management (defaults)
 
 | Distance | Default | Meaning |
@@ -240,7 +248,7 @@ Bots: four bots for two seconds with no errors.
 
 ## Not in the prototype
 
-Chat, inventories, TLS. (Login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
+TLS. (Chat and inventories through `./chat`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
 several server processes for one world through `./shards` and WebTransport datagrams through `./webtransport` have
 since been added; see the README.)
 

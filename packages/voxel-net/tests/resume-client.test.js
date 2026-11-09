@@ -335,7 +335,7 @@ test('five tries on the schedule, then onError and onClose with the first drop a
 
 for (const [code, reason] of [
   [1008, 'resume-unknown'],
-  [1008, 'protocol 4, server speaks 5'],
+  [1008, 'protocol 5, server speaks 6'],
   [1008, 'not authorized'],
   [1011, 'auth-failed'],
   [1001, 'server closing'],

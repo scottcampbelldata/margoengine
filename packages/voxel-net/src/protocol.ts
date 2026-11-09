@@ -8,7 +8,7 @@ import type { VoxelMoveIntent } from '@margoengine/voxel/query';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Bytes of the token that resumes a dropped connection. */
 export const RESUME_TOKEN_BYTES = 16;
@@ -16,7 +16,10 @@ export const RESUME_TOKEN_BYTES = 16;
 /** Most chunks a resuming client may ask to have sent again for its own edits. */
 export const MAX_STALE_CHUNKS = 64;
 
-/** Most bytes of an `app` message's payload, on the wire and for `VoxelServer.send` and `broadcast`. */
+/**
+ * Most bytes of an `app` message's payload, on the wire, for `VoxelServer.send` and `broadcast`, and for
+ * `VoxelNetClient.sendApp`.
+ */
 export const MAX_APP_BYTES = 16384;
 
 /** Most UTF-8 bytes of a player's display name, on the wire and after {@link cleanPlayerName}. */
@@ -86,7 +89,9 @@ export type ClientMessage =
    */
   | { type: 'input'; step: number; acked: number; runs: InputRun[]; position: Vec3 }
   /** Set cell (x, y, z) to block state `state` (0 breaks). */
-  | { type: 'edit'; x: number; y: number; z: number; state: number };
+  | { type: 'edit'; x: number; y: number; z: number; state: number }
+  /** Bytes the game running on the client sent with `VoxelNetClient.sendApp`, at most {@link MAX_APP_BYTES}. */
+  | { type: 'app'; data: Uint8Array };
 
 /** A message from the server to a client. */
 export type ServerMessage =
@@ -146,6 +151,7 @@ export type ServerMessage =
 const HELLO = 1,
   INPUT = 2,
   EDIT = 3,
+  CLIENT_APP = 4,
   WELCOME = 16,
   CHUNK = 17,
   UNLOAD = 18,
@@ -325,6 +331,14 @@ export function encodeClientMessage(message: ClientMessage): Uint8Array {
       w.varint(zigzag(cell('edit z', message.z)));
       w.varint(integer('edit state', message.state, 0, 2 ** 32 - 1));
       break;
+    case 'app': {
+      const data = bytesOf('app data', message.data);
+      if (data.length > MAX_APP_BYTES)
+        throw new RangeError(`App data is ${data.length} bytes; send at most ${MAX_APP_BYTES} per message`);
+      w.u8(CLIENT_APP);
+      w.raw(data);
+      break;
+    }
     default:
       throw new TypeError(
         `Unknown client message type ${String((message as { type?: unknown })?.type)}; use one of the ClientMessage types`,
@@ -379,6 +393,10 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
       state = r.varint();
     if (![x, y, z].every((v) => (v | 0) === v)) throw r.fail(`edits cell (${x}, ${y}, ${z}), outside the 32-bit cells`);
     message = { type: 'edit', x, y, z, state };
+  } else if (type === CLIENT_APP) {
+    const data = new Uint8Array(r.rest()); // a plain copy: a Node Buffer's slice would share the socket's memory
+    if (data.length > MAX_APP_BYTES) throw r.fail(`has ${data.length} bytes of app data, over ${MAX_APP_BYTES}`);
+    message = { type: 'app', data };
   } else throw r.fail(`has unknown type ${type}`);
   r.end();
   return message;

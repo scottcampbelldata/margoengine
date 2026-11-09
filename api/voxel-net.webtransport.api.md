@@ -148,6 +148,7 @@ class VoxelNetClient {
     receive(bytes: Uint8Array): void;
     update(dt: number, controls: VoxelNetControls): void;
     flush(): void;
+    sendApp(data: Uint8Array): boolean;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
     get detached(): boolean;
@@ -223,6 +224,7 @@ class VoxelServer {
     send(player: VoxelServerPlayer, data: Uint8Array): boolean;
     broadcast(data: Uint8Array): number;
     onTick(listener: (tick: number, dt: number) => void): () => void;
+    onApp(listener: (player: VoxelServerPlayer, data: Uint8Array) => void): () => void;
     sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;
     disconnect(player: VoxelServerPlayer, code?: number, reason?: string): boolean;
     accept(connection: VoxelServerConnection, request?: IncomingMessage, address?: string): void;
@@ -284,6 +286,8 @@ interface VoxelServerMetrics {
     chunksResent: number;
     fullResends: number;
     stepsLost: number;
+    appsReceived: number;
+    appsDropped: number;
 }
 
 interface VoxelServerOptions {
@@ -302,6 +306,8 @@ interface VoxelServerOptions {
     reach?: number;
     editRate?: number;
     editBurst?: number;
+    appRate?: number;
+    appBurst?: number;
     spawn?: (id: number) => readonly [x: number, z: number];
     cacheBytes?: number;
     origins?: readonly string[] | '*';

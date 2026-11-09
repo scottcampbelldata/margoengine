@@ -1,4 +1,5 @@
-// The generic app message: bytes the game on the server sends to one player or all, over real sockets, and hostile input.
+// The generic app message: bytes the game on the server sends to one player or all, bytes a client sends to the game on
+// the server, over real sockets, and hostile input.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
@@ -48,7 +49,7 @@ const closeOf = (conn) => new Promise((done) => (conn.onclose = (code, reason) =
 const listed = (server, n) => () => server.players.length === n;
 
 test('an app message round-trips through the codec, at every size up to the limit', () => {
-  assert.equal(PROTOCOL_VERSION, 5);
+  assert.equal(PROTOCOL_VERSION, 6);
   assert.equal(MAX_APP_BYTES, 16384);
   for (const data of [
     new Uint8Array(0),
@@ -77,9 +78,80 @@ test('hostile app messages throw instead of reading or sending past their end', 
   assert.deepEqual(decodeServerMessage(Uint8Array.of(25)).data, new Uint8Array(0));
   assert.throws(() => decodeServerMessage(new Uint8Array(0)), RangeError);
   assert.throws(() => decodeServerMessage(Uint8Array.of(26, 1)), RangeError);
-  // A client may not send one: kind 25 is not a ClientMessage.
+  // The server's kind 25 is not a ClientMessage; a client's app message is kind 4, with the same limit.
   assert.throws(() => decodeClientMessage(Uint8Array.of(25, 1, 2)), RangeError);
-  assert.throws(() => encodeClientMessage({ type: 'app', data: new Uint8Array(1) }), TypeError);
+  assert.throws(() => encodeClientMessage({ type: 'app', data: new Uint8Array(MAX_APP_BYTES + 1) }), RangeError);
+  assert.throws(() => decodeClientMessage(Uint8Array.of(4, ...new Uint8Array(MAX_APP_BYTES + 1))), RangeError);
+  assert.throws(() => encodeClientMessage({ type: 'app', data: [1] }), TypeError);
+});
+
+test('a client app message round-trips through the codec as kind 4, its payload a copy', () => {
+  for (const data of [
+    new Uint8Array(0),
+    Uint8Array.of(9, 8),
+    Uint8Array.from({ length: MAX_APP_BYTES }, (_, i) => i),
+  ]) {
+    const bytes = encodeClientMessage({ type: 'app', data });
+    assert.equal(bytes[0], 4);
+    assert.equal(bytes.length, data.length + 1);
+    const message = decodeClientMessage(bytes);
+    assert.deepEqual(message, { type: 'app', data });
+    assert.notEqual(message.data.buffer, bytes.buffer);
+  }
+});
+
+test('sendApp reaches server.onApp in order with the edits, and the rate limit drops the rest', async (t) => {
+  const server = new VoxelServer({
+      blocks,
+      workers: 1,
+      generator: flat,
+      spawn: (id) => [31, 4 + id * 4],
+      appRate: 1,
+      appBurst: 3,
+    }),
+    { port } = await server.listen(0);
+  t.after(() => server.close());
+  const a = await join(`ws://127.0.0.1:${port}`, 'Ada'),
+    got = [],
+    errors = [];
+  server.onError = (e) => errors.push(e);
+  // A listener that throws goes to onError; the others still get every message.
+  const stopBad = server.onApp(() => {
+      throw new Error('game bug');
+    }),
+    stop = server.onApp((player, data) => got.push([player.name, [...data]]));
+  assert.throws(() => server.onApp('no'), TypeError);
+  assert.equal(a.client.sendApp(Uint8Array.of(1)), false, 'not before spawning');
+  await until('spawned', () => a.client.spawned);
+  assert.throws(() => a.client.sendApp(new Uint8Array(MAX_APP_BYTES + 1)), RangeError);
+  for (let i = 1; i <= 5; i++) assert.equal(a.client.sendApp(Uint8Array.of(i, 0)), true);
+  await until('three delivered and two dropped', () => server.metrics.appsDropped === 2);
+  assert.deepEqual(got, [
+    ['Ada', [1, 0]],
+    ['Ada', [2, 0]],
+    ['Ada', [3, 0]],
+  ]);
+  assert.equal(server.metrics.appsReceived, 3);
+  assert.equal(errors.length, 3);
+  assert.equal(errors[0].message, 'game bug');
+  stopBad();
+  stop();
+});
+
+test('a client that sends the server kind 25 is closed as unreadable, and the others are not', async (t) => {
+  const { server, url } = await start(t),
+    a = await join(url, 'Ada'),
+    rude = await connectWebSocket(url),
+    closed = closeOf(rude);
+  rude.send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view: 2, name: 'rude' }));
+  await until('both joined', listed(server, 2));
+  rude.send(Uint8Array.of(25, 1, 2, 3));
+  const { code, reason } = await closed;
+  assert.equal(code, 1002);
+  assert.equal(reason, 'unreadable message');
+  await until('rude gone', listed(server, 1));
+  assert.equal(server.send(server.players[0], Uint8Array.of(1)), true);
+  await until('delivered', () => a.apps.length === 1);
 });
 
 test('send reaches one player and broadcast all, in the order sent', async (t) => {
@@ -167,22 +239,6 @@ test('sending to a player who has left returns false and breaks nothing', async 
   assert.equal(other.send(server.players[0], Uint8Array.of(3)), false);
 });
 
-test('a client that sends an app message to the server is closed, and the others are not', async (t) => {
-  const { server, url } = await start(t),
-    a = await join(url, 'Ada'),
-    rude = await connectWebSocket(url),
-    closed = closeOf(rude);
-  rude.send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view: 2, name: 'rude' }));
-  await until('both joined', listed(server, 2));
-  rude.send(Uint8Array.of(25, 1, 2, 3));
-  const { code, reason } = await closed;
-  assert.equal(code, 1002);
-  assert.equal(reason, 'unreadable message');
-  await until('rude gone', listed(server, 1));
-  assert.equal(server.send(server.players[0], Uint8Array.of(1)), true);
-  await until('delivered', () => a.apps.length === 1);
-});
-
 test('a client on protocol 2 is refused with a reason naming both versions', async (t) => {
   const { server, url } = await start(t),
     old = await connectWebSocket(url),
@@ -190,7 +246,7 @@ test('a client on protocol 2 is refused with a reason naming both versions', asy
   old.send(encodeClientMessage({ type: 'hello', version: 2, view: 2, name: 'old page' }));
   const { code, reason } = await closed;
   assert.equal(code, 1008);
-  assert.equal(reason, 'protocol 2, server speaks 5');
+  assert.equal(reason, 'protocol 2, server speaks 6');
   assert.equal(server.players.length, 0);
 });
 

@@ -69,6 +69,13 @@ export interface VoxelServerOptions {
   editRate?: number;
   /** Edits a player may make at once. Default 5. */
   editBurst?: number;
+  /**
+   * App messages per second a player may send with `VoxelNetClient.sendApp` on average; one over the rate is dropped
+   * and counted in `metrics.appsDropped`. Default 20.
+   */
+  appRate?: number;
+  /** App messages a player may send at once. Default 20. */
+  appBurst?: number;
   /** Spawn column (x, z) of player `id`. Default a random column within 64 blocks of the origin. */
   spawn?: (id: number) => readonly [x: number, z: number];
   /** Bytes of finished chunk messages to keep. Default 256 MiB. */
@@ -282,6 +289,10 @@ export interface VoxelServerMetrics {
   fullResends: number;
   /** Input steps lost over datagrams with every copy, filled with the last keys held. */
   stepsLost: number;
+  /** App messages from players handed to the {@link VoxelServer.onApp} listeners. */
+  appsReceived: number;
+  /** App messages from players dropped over `appRate` and `appBurst`. */
+  appsDropped: number;
 }
 
 // A chunk position; `d` orders a view nearest first.
@@ -354,6 +365,8 @@ interface Client extends VoxelServerPlayer {
   baseline: Map<number, PreparedEntity>;
   tokens: number;
   tokenTime: number;
+  appTokens: number;
+  appTime: number;
   bytesIn: number;
   timer: ReturnType<typeof setTimeout> | undefined;
   // conn.bytesIn when last looked at, ticks since it last grew, and ticks since the last message to this client.
@@ -632,6 +645,9 @@ export class VoxelServer {
   readonly #reach: number;
   readonly #editRate: number;
   readonly #editBurst: number;
+  readonly #appRate: number;
+  readonly #appBurst: number;
+  readonly #appListeners = new Set<(player: VoxelServerPlayer, data: Uint8Array) => void>();
   readonly #spawn: (id: number) => readonly [number, number];
   readonly #cacheBudget: number;
   readonly #origins: readonly string[] | '*' | undefined;
@@ -709,6 +725,8 @@ export class VoxelServer {
     this.#reach = positive('reach', o.reach ?? 6);
     this.#editRate = positive('editRate', o.editRate ?? 10);
     this.#editBurst = positive('editBurst', o.editBurst ?? 5);
+    this.#appRate = positive('appRate', o.appRate ?? 20);
+    this.#appBurst = positive('appBurst', o.appBurst ?? 20);
     this.#cacheBudget = positive('cacheBytes', o.cacheBytes ?? 256 * 1024 * 1024);
     if (o.spawn !== undefined && typeof o.spawn !== 'function')
       throw new TypeError('VoxelServer spawn must be a function (id) => [x, z]');
@@ -830,6 +848,18 @@ export class VoxelServer {
       throw new TypeError('VoxelServer.onTick needs a function; pass (tick, dt) => {}');
     this.#tickListeners.add(listener);
     return () => this.#tickListeners.delete(listener);
+  }
+  /**
+   * Calls `listener(player, data)` with each app message a playing player sent with `VoxelNetClient.sendApp`, in order
+   * with its inputs and edits, on the tick that moves them; `data` is the player's own copy. Messages over `appRate`
+   * and `appBurst` are dropped first. A throw goes to {@link VoxelServer.onError}. Returns an unsubscribe.
+   * `@margoengine/voxel-net/chat` runs on it.
+   */
+  onApp(listener: (player: VoxelServerPlayer, data: Uint8Array) => void): () => void {
+    if (typeof listener !== 'function')
+      throw new TypeError('VoxelServer.onApp needs a function; pass (player, data) => {}');
+    this.#appListeners.add(listener);
+    return () => this.#appListeners.delete(listener);
   }
   /**
    * Queues an `entities` message (`EntityCodec` bytes of `ENTITY_SCHEMA`) for a playing, connected player, sent with the
@@ -1114,6 +1144,8 @@ export class VoxelServer {
       chunksResent: 0,
       fullResends: 0,
       stepsLost: 0,
+      appsReceived: 0,
+      appsDropped: 0,
     };
   }
 
@@ -1168,6 +1200,8 @@ export class VoxelServer {
       baseline: new Map(),
       tokens: this.#editBurst,
       tokenTime: performance.now(),
+      appTokens: this.#appBurst,
+      appTime: performance.now(),
       bytesIn: 0,
       timer: undefined,
       heardBytes: 0,
@@ -1343,6 +1377,7 @@ export class VoxelServer {
       this.metrics.editsDenied++;
       return;
     }
+    if (m.type === 'app') return void this.metrics.appsDropped++;
     if (m.type !== 'input') return;
     let total = 0;
     for (const run of m.runs) total += run.steps;
@@ -1962,6 +1997,12 @@ export class VoxelServer {
         this.#edit(c, m, now);
         continue;
       }
+      if (m.type === 'app') {
+        c.queue.shift();
+        this.#app(c, m.data, now);
+        if (c.phase !== 'playing') return; // a listener disconnected the player
+        continue;
+      }
       if (m.type !== 'input' || !this.#around(c)) {
         c.held = true; // wait for the chunks around the player
         return;
@@ -2026,6 +2067,20 @@ export class VoxelServer {
     }
     if (ready) c.verified = key;
     return ready;
+  }
+  // An app message from a player, in order with its inputs and edits, to every listener; over the rate it is dropped.
+  #app(c: Client, data: Uint8Array, now: number): void {
+    c.appTokens = Math.min(this.#appBurst, c.appTokens + ((now - c.appTime) / 1000) * this.#appRate);
+    c.appTime = now;
+    if (c.appTokens < 1) return void this.metrics.appsDropped++;
+    c.appTokens--;
+    this.metrics.appsReceived++;
+    for (const listener of [...this.#appListeners])
+      try {
+        listener(c, data);
+      } catch (error) {
+        this.onError(error);
+      }
   }
   #edit(c: Client, m: Extract<ClientMessage, { type: 'edit' }>, now: number): void {
     const { x, y, z, state } = m,

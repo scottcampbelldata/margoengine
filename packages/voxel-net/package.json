@@ -50,6 +50,10 @@
     "./webtransport": {
       "types": "./dist/webtransport.d.ts",
       "import": "./dist/webtransport.js"
+    },
+    "./chat": {
+      "types": "./dist/chat.d.ts",
+      "import": "./dist/chat.js"
     }
   },
   "files": [

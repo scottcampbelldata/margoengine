@@ -38,6 +38,7 @@ export class VoxelServer {
     send(player: VoxelServerPlayer, data: Uint8Array): boolean;
     broadcast(data: Uint8Array): number;
     onTick(listener: (tick: number, dt: number) => void): () => void;
+    onApp(listener: (player: VoxelServerPlayer, data: Uint8Array) => void): () => void;
     sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;
     disconnect(player: VoxelServerPlayer, code?: number, reason?: string): boolean;
     accept(connection: VoxelServerConnection, request?: IncomingMessage, address?: string): void;
@@ -99,6 +100,8 @@ export interface VoxelServerMetrics {
     chunksResent: number;
     fullResends: number;
     stepsLost: number;
+    appsReceived: number;
+    appsDropped: number;
 }
 
 export interface VoxelServerOptions {
@@ -117,6 +120,8 @@ export interface VoxelServerOptions {
     reach?: number;
     editRate?: number;
     editBurst?: number;
+    appRate?: number;
+    appBurst?: number;
     spawn?: (id: number) => readonly [x: number, z: number];
     cacheBytes?: number;
     origins?: readonly string[] | '*';

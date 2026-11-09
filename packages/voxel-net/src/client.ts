@@ -408,6 +408,20 @@ export class VoxelNetClient {
     this.#pending = 0;
   }
   /**
+   * Sends `data` to the game on the server as an `app` message, after this client's earlier inputs and edits, on the
+   * reliable stream; the server hands it to its `VoxelServer.onApp` listeners. The bytes are copied. Returns false (and
+   * sends nothing) before spawning, between a drop and its resume, or after close. The server drops messages over its
+   * `appRate` and `appBurst` (default 20 per second).
+   * @throws TypeError when `data` is not a Uint8Array; RangeError over `MAX_APP_BYTES` (16,384).
+   */
+  sendApp(data: Uint8Array): boolean {
+    const bytes = encodeClientMessage({ type: 'app', data });
+    if (!this.spawned || this.#closed || this.detached) return false;
+    this.flush();
+    this.#send(bytes);
+    return true;
+  }
+  /**
    * Sets cell (x, y, z) to `state` at once and asks the server to make it so; the server answers with the cell's real
    * state if it refuses. Returns false (and changes nothing) before spawning, between a drop and its resume, or when the
    * cell's chunk is not loaded.

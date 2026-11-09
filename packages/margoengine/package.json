@@ -3298,6 +3298,10 @@
       "types": "./dist/voxel-net/webtransport.d.ts",
       "import": "./dist/voxel-net/webtransport.js"
     },
+    "./voxel-net/chat": {
+      "types": "./dist/voxel-net/chat.d.ts",
+      "import": "./dist/voxel-net/chat.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

@@ -31,6 +31,10 @@ export type ClientMessage =
     y: number;
     z: number;
     state: number;
+}
+ | {
+    type: 'app';
+    data: Uint8Array;
 };
 
 export interface InputRun {
@@ -62,7 +66,7 @@ export const PLAYER_SCHEMA: {
     readonly rotation: 'rotation';
 };
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export interface PlayerName {
     id: number;
@@ -185,6 +189,7 @@ export class VoxelNetClient {
     receive(bytes: Uint8Array): void;
     update(dt: number, controls: VoxelNetControls): void;
     flush(): void;
+    sendApp(data: Uint8Array): boolean;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
     get detached(): boolean;

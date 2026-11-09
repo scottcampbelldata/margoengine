@@ -166,6 +166,7 @@ class VoxelNetClient {
     receive(bytes: Uint8Array): void;
     update(dt: number, controls: VoxelNetControls): void;
     flush(): void;
+    sendApp(data: Uint8Array): boolean;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
     get detached(): boolean;

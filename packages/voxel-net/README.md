@@ -146,14 +146,15 @@ await server.importEdits(deserialize(await readFile('world.snapshot')));
 await server.close();
 ```
 
-Breaking change (2026-11-08): `PROTOCOL_VERSION` is 5 (2 added names, 3 app messages, 4 resuming a dropped
-connection, 5 entities messages). Server and clients must be
+Breaking change (2026-11-09): `PROTOCOL_VERSION` is 6 (2 added names, 3 app messages, 4 resuming a dropped
+connection, 5 entities messages, 6 app messages from clients). Server and clients must be
 built from the same version; a client on another one is closed with 1008 and a reason naming both, which
 `connectVoxelNet` passes to `onError`.
 
 ## App messages
 
-Your game can send its own bytes along the connection, one player or all, without a second socket. The package never
+Your game can send its own bytes along the connection, one player or all, and players can send theirs to the game on
+the server, without a second socket. The package never
 reads them: the format is yours, and they arrive in order with the chunks, edits and players.
 
 | Method or constant | What it does |
@@ -161,10 +162,13 @@ reads them: the format is yours, and they arrive in order with the chunks, edits
 | `server.send(player, data)` | Queues `data` (a `Uint8Array`) for one player of `server.players`, sent with the next tick's other messages. Works from the player's welcome on, before it has spawned too. Returns `true` when queued and `false` when the player has already left (a connection can drop between your lookup and the call, so this is not an error). Throws `TypeError` for a `player` that is not one or `data` that is not a `Uint8Array`, and `RangeError` over `MAX_APP_BYTES`. |
 | `server.broadcast(data)` | The same for every player that has joined; returns how many it was queued for. |
 | `client.onApp` | `(data) => void`, called with a copy of each payload. A throw goes to `onError` and closes the connection, like any handler. Default does nothing. |
-| `MAX_APP_BYTES` | 16,384: the largest payload, on the wire and in `send`. A frame over it is refused by the decoder. |
+| `client.sendApp(data)` | Sends `data` to the game on the server, after this client's earlier inputs and edits, on the reliable stream. Returns `false` (and sends nothing) before spawning, between a drop and its resume, or after close. Throws `TypeError` for `data` that is not a `Uint8Array` and `RangeError` over `MAX_APP_BYTES`. |
+| `server.onApp(listener)` | Calls `listener(player, data)` with each app message of a playing player, in order with its inputs and edits, on the tick that moves them. Several listeners may listen (`./chat` is one); each gets every message, so give yours a prefix of your own. A throw goes to `server.onError`. Returns an unsubscribe. |
+| `appRate`, `appBurst` | Server options: app messages per second a player may send on average (default 20) and at once (default 20). One over them is dropped and counted in `server.metrics.appsDropped`; `appsReceived` counts the rest. |
+| `MAX_APP_BYTES` | 16,384: the largest payload, on the wire, in `send` and in `sendApp`. A frame over it is refused by the decoder. |
 
-A client cannot send one: the server closes a connection that tries with 1002. `server.metrics.bytesOut.app` and
-`client.stats.received.app` count the bytes. The server has no event for "a player spawned"; read `player.spawned` on
+A client app message is client message type 4; the server's own app message (type 25) from a client is unreadable
+and closed with 1002. `server.metrics.bytesOut.app` and `client.stats.received.app` count the bytes the server sent. The server has no event for "a player spawned"; read `player.spawned` on
 your own tick, as below.
 
 ```ts
@@ -415,6 +419,68 @@ if ('WebTransport' in globalThis) {
   stream holds over `dropUnreliableAbove`. A snapshot bigger than a datagram goes on the stream. The tests run over a
   stand-in link in memory (a third of datagrams lost, some reordered); the session itself is netcode's, proved there
   against a real HTTP/3 server.
+
+## Chat and inventory (`./chat`)
+
+Ready-made chat and inventory messages on the app channel, beside your own app messages. On the server `VoxelChat`
+takes each player's line, cleans it (`cleanChatText`: no controls, bidi overrides or zero widths, whitespace collapsed,
+at most `MAX_CHAT_BYTES`, 256), rate-limits it (`rate` 1 per second, `burst` 5), runs your `filter`, and sends it to
+every player within `distance` (default everyone), or to one player as a whisper. `VoxelInventories` keeps one
+inventory per player on the server (`size` 36 slots, `stackLimit` 64): the server gives and takes items, each client
+gets its whole inventory when it spawns and each changed slot after, and a client may only ask to move items between
+its own slots, which the server checks (and your `canMove`). On the client `VoxelChatClient` takes these messages out
+of `client.onApp` and passes your other app messages on.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet } from 'margoengine/voxel-net';
+import { VoxelChat, VoxelChatClient, VoxelInventories } from 'margoengine/voxel-net/chat';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+const PICKAXE = 1,
+  TORCH = 2;
+
+// Server: chat heard within 64 blocks, no swearing, and a starter kit for everyone.
+const server = new VoxelServer({ blocks });
+await server.listen(8787, '0.0.0.0');
+const chat = new VoxelChat(server, { distance: 64, filter: (text) => text.replaceAll('darn', '****') });
+chat.onLine = (player, text) => console.log(`${player.name}: ${text}`);
+const inventories = new VoxelInventories(server, { size: 9 });
+server.onTick(() => {
+  for (const player of server.players)
+    if (player.spawned && inventories.count(player, PICKAXE) === 0) {
+      inventories.give(player, PICKAXE, 1);
+      inventories.give(player, TORCH, 16);
+      chat.system(`Welcome, ${player.name}`, player);
+    }
+});
+
+// Client: show the lines, say hello, and move the torches to the last slot.
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }), { name: 'Ada' });
+const talk = new VoxelChatClient(client);
+talk.onChat = ({ name, text, whisper }) => console.log(whisper ? `${name} whispers: ${text}` : `${name}: ${text}`);
+talk.onSystem = (text) => console.log(text);
+talk.onInventory = (slots) => console.log(slots.map((s) => (s ? `${s.count}x${s.item}` : '-')).join(' '));
+client.onSpawn = () => {
+  talk.say('hello there');
+  talk.move(1, 8);
+};
+```
+
+- **Server.** `VoxelChat`: `system(text, player?)`, `onLine(player, text, to)`, `stats` (`said`, `dropped`: over the
+  rate, empty, filtered out or a whisper to nobody), `whispers` (default true). `VoxelInventories`: `give(player, item,
+  count)` (returns what did not fit), `take(player, item, count)` (all or nothing), `count`, `set(player, index,
+  stack)`, `slots(player)` to save and `load(player, slots)` to restore. Item ids are yours (1 or more). Both stop with
+  `dispose()` (or `using`).
+- **Client.** `say(text, to?)` (a player id whispers), `move(from, to, count?)` (0 or none moves the whole stack: onto
+  an empty slot, onto the same item, or swapped with another whole stack; a count splits), `inventory`, `onChat`,
+  `onSystem`, `onInventory(slots, index)`; dispose puts the old `client.onApp` back.
+- **Wire.** Each message is an app message starting with `CHAT_PREFIX` (`MCH` and 1), then a kind byte, varints and
+  UTF-8 text; `encodeChatMessage` and `decodeChatMessage` (undefined for an app message that is not one) are exported.
+  A client that sends unreadable chat bytes is closed with 4002 `'unreadable-chat'`. Show lines as text, never as
+  HTML: angle brackets stay.
 
 ## Limits of the prototype
 
