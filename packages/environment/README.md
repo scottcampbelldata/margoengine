@@ -311,13 +311,60 @@ live probe (256 samples) and a magenta box moved into its +x view, frames render
 - For comparison, a bake of the same probe (six faces and the full-source convolution) spent 23-95 ms of GPU time in
   the prefilter over three runs.
 
+### Terrain, sky and other plugins in probe captures
+
+Captures draw core meshes and the models added with `probes.add`. `probes.addCapture(plugin, options)` adds a plugin's
+own render passes too: every bake, live and on-demand capture replays them into each probe face, after the meshes and
+models, so the terrain and the sky show in the reflections and the bounce light. The passes run with the face's
+context (its camera, encoder, `rgba16float` color and depth, one sample) on the real device, and draw as they draw in the
+frame, with their own fog. By default the passes ordered after the main pass (the drawing passes) replay; `passes`
+names them instead. Terrain uploads its camera in `'<name>:prepare'`, which runs before the capture: name it, and after
+the capture it runs once more with the frame's context, so the frame's terrain draw sees the main camera again. Never name a
+pass that advances a simulation: it would advance once per face. `addCapture` returns a remover.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { LightProbes } from 'margoengine/environment/probes';
+import { Sky } from 'margoengine/sky';
+import { Terrain } from 'margoengine/terrain';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+// A flat green terrain; replace the tiny demo maps with your heightmap and layers (see @margoengine/terrain).
+const terrain = Terrain.attach(engine, {
+  resolution: 16, levels: 3, origin: [-50, -50], size: [100, 100], heightScale: 1,
+  layers: [0, 1, 2, 3].map(() => ({ height: [-100, 100], slope: [0, 1], scale: 1 })),
+  textures(device) {
+    const heightmap = device.createTexture({ size: [4, 4], format: 'r32float', usage: 6 }); // TEXTURE_BINDING | COPY_DST
+    device.queue.writeTexture({ texture: heightmap }, new Float32Array(16), { bytesPerRow: 16 }, [4, 4]);
+    const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
+    device.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(40).map((v, i) => (i % 4 === 1 ? 200 : i % 4 === 3 ? 255 : v)), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+    return { heightmap, layers };
+  },
+});
+const sky = Sky.attach(engine);
+const probes = LightProbes.attach(engine, {
+  reflections: [{ position: [0, 2, 0], min: [-10, -1, -10], max: [10, 10, 10] }],
+});
+probes.addCapture(terrain, { passes: [terrain.name + ':prepare', terrain.name] });
+probes.addCapture(sky); // 'sky:atmosphere' and 'sky:fog'
+await probes.bake();
+```
+
+Checked on an Apple M6 (Metal, Chromium 156; `npm run test:probe-capture:browser`): a probe over flat green terrain
+under a `Sky`, with no environment, bakes black without the hook; with it, its downward texels average linear
+(0.029, 0.47, 0.029) and its upward ones (0.27, 0.42, 0.81). During live capture the terrain's camera upload replays
+once per face with the probe's position, and the frame's last upload before its submit holds the main camera.
+
+Not yet replayable: `Water` (its surface reads the frame's viewport-sized scene depth and throws in a probe face) and
+`VFX` particle systems (their draw reads the camera their simulation pass uploaded, so they would draw the frame's view
+into every face, and their visible list is culled for the main camera). Both need a change in their own package.
+
 Limits: the irradiance volume is static: a moving object or light needs a re-bake (CPU encode plus GPU, see above);
 reflection probes can follow the scene with live capture, a few frames behind (see Live capture); no visibility per probe, so
 light leaks through walls thinner than the probe spacing (place volume boxes per room); one volume per LightProbes;
 reflection probes are box- or sphere-projected (no other shapes); the receiver's normal map and occlusion shade the probe
 light (terrain takes the core-style patch like EnvironmentLighting); core meshes and models with a `draw` method
-(gltf-pro, materials) are captured, terrain, water, sky backgrounds, particles and other custom pipelines are not (the
-environment fills in where nothing was drawn); GPU-culled
+(gltf-pro, materials) are captured, terrain, sky and other plugins only through `addCapture` (above; not water or VFX
+particles yet), and the environment fills in where nothing was drawn; GPU-culled
 (`CulledMeshes`) parts use the main camera's culling in the capture. WebGPU only.
 
 ## Blending two environments
@@ -734,6 +781,8 @@ OpenEXR images at pinned hashes. Restore other tracked fixtures with `git restor
 `node packages/environment/scripts/make-hdr-fixture.js` regenerates the Margo HDR file.
 
 `npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images (sources in `tests/fixtures/NOTICE.md`) and the Margo-made `sun_sky.hdr` (written by `scripts/make-hdr-fixture.js`), matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; `tests/hdr.test.js`: all eight Radiance scan orders, RGB output, bounds before allocation, FORMAT and XYZE refusals, located damage, Margo Voxel Studio's own HDR fixtures and a 600-file generated corpus whose SHA-256 digest Studio's decoder produced; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
+
+`tests/probes-capture.test.js` checks `addCapture` on a mock GPU: only the drawing passes replay by default, once per captured face, with the face's context (real device, `rgba16float`, no frame attachment), named passes in order, the restore with the frame's context, validation, removal and disposal. `npm run test:probe-capture:browser` checks it on a real GPU (section above).
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
 

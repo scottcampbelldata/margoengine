@@ -154,6 +154,7 @@ class LightProbes extends ShaderEffect {
     protected patch(source: string, group: number): string;
     protected hooks(group: number): PBRHooks;
     add(model: LightingTarget): () => void;
+    addCapture(plugin: ProbeCapturePlugin, options?: ProbeCaptureOptions): () => void;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
@@ -194,6 +195,15 @@ interface PBRHooks {
 interface ProbeBakeOptions {
     bounces?: number;
     samples?: number;
+}
+
+interface ProbeCaptureOptions {
+    passes?: readonly string[];
+}
+
+interface ProbeCapturePlugin {
+    readonly name: string;
+    registerPasses?(graph: FrameGraph): void;
 }
 
 interface ReflectionProbe {

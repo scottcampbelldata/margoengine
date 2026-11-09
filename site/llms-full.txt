@@ -2590,6 +2590,18 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 204 job 2: optional exporters/textures is 10015 B gzip (new from 0 B),
+ceiling 10316 B. Resize accepts at most 16384 per side and 16777216 pixels for
+input, output and horizontal intermediate (Float64 RGBA, at most 512 MiB).
+WebP/AVIF/JPEG encoding requires the requested platform canvas encoder;
+unsupported or silently substituted formats reject with a coded error naming
+the missing MIME. Chromium 157 encoded WebP but lacked AVIF encoding in both
+backend checks. PNG works without canvas for RGBA input. Native encode timeout
+is 30 seconds; native quality and low-alpha canvas rounding are platform-defined.
+AVIF byte input currently needs caller-decoded RGBA. AVIF uses the published
+draft glTF extension contract, with optional PNG/JPEG fallback; no ratification
+or portable AVIF encoder claim. Details and defaults: exporter-textures.md.
+
 Batch 256 migration: `@margoengine/netcode/migrate` exports HostMigration and its
 typed options/state. Give each peer the same schema, initial state, frame and
 host (default lowest id), and reliable full-mesh Connection links. It owns and
@@ -3212,7 +3224,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-643). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-644). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3272,6 +3284,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Screen-space reflections | Enforced by method: only what is on screen reflects. Core meshes and models passed to `ssr.add(model)` (gltf-pro, materials, terrain, water) show reflections; other custom shaders are reflected but do not reflect. Cost measured on a worst-case glossy floor ([ssr-gpu.json](../examples/package-benchmarks/results/ssr-gpu.json), quiet-gated): 2.2-2.3 ms at 1280×720, 5.8-5.9 ms at 1920×1080. | Reusing depth and colour that are already rendered avoids a second scene pass. Each custom pipeline needs its own capture into SSR's targets. | Reflections fade at screen edges and miss off-screen objects (reflection probes fill in where attached); water and terrain not added keep their own sky reflection. | `@margoengine/post/ssr` (9,068 B gzip) is itself the opt-in. Off-screen reflections: reflection probes in `@margoengine/environment/probes`; SSR removes the probes' own specular only where its ray hits on screen and keeps the probe's reflection elsewhere ([probes-gpu.json](../examples/package-benchmarks/results/probes-gpu.json): off screen the floor equals the frame without SSR, 95th percentile 0/255). Limits in the [post README](../packages/post/README.md). |
 | Volumetric fog | Enforced by design: one froxel grid (default 160 × 90 × 64) whatever the screen size, so shadow edges in the fog are about one froxel wide (8 × 8 px at 1280 × 720). Effects measured in [volumetric-gpu.json](../examples/package-benchmarks/results/volumetric-gpu.json). | A froxel volume makes light shafts follow real shadows at a fixed cost per frame. | Particles, VFX, splats and transparent surfaces are fogged only when added with `fog.add` (additive, multiply and transmission surfaces never); nothing beyond `range`; local fog volumes only from `/fog-volumes`; no multiple scattering. Errors: `RangeError: Volumetric grid exceeds device limit`; `VolumetricFog replaces environment Fog '<name>': set its enabled = false or remove it`; `VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth`. | `@margoengine/environment/volumetric` (6,923 B gzip) is itself the opt-in: a finer `grid` sharpens edges at a higher cost; `fog.texture` lets custom shaders (particles) sample the fog. Limits in the [environment README](../packages/environment/README.md). |
 | Light probes (indirect light) | Enforced ([probes.ts](../packages/environment/src/probes.ts), [probes.test.js](../packages/environment/tests/probes.test.js)): one irradiance volume of at most 4,096 L1/L2 probes (64 per axis) and at most 16 box-projected reflection probes per `LightProbes`. The volume is baked; reflection probes are baked or captured live a few cube faces per frame (`setLive`; a moved box shows in a 128 px probe 7-11 frames later at one face per frame, capture GPU time per frame 0.066 ms or less and a median 0.20 ms on the prefilter frame, RTX A6000, [probes-live-gpu.json](../examples/package-benchmarks/results/probes-live-gpu.json)). Measured bake of 8 volume probes and one 128 px reflection probe 114-121 ms (diagnostic: other jobs running; [probes-gpu.json](../examples/package-benchmarks/results/probes-gpu.json)). Accuracy in the same file: volume SH within 1.7% of DC against an analytic room. | Baking turns the scene's light into lookups (no ray tracing per frame) and keeps them in one storage buffer, so no texture binding is spent. | Volume light stays as baked until `bake()` runs again; live reflection probes lag the scene by up to (probes + 1) refreshes of 6 / `facesPerFrame` frames and see only what the frame draws (render with `culling: false`); light leaks through walls thinner than the probe spacing (no visibility per probe); mirror-sharp reflections show texel-sized steps near wall edges at the default 128 px. Errors: `RangeError: Invalid irradiance volume: min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0`, `RangeError: Expected at most 16 reflection probes`, `RangeError: Light probe buffer exceeds device limit`, `light-probes replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`. | `@margoengine/environment/probes` (14,984 B gzip) is itself the opt-in: re-bake on demand or capture reflections live, one volume box per room against leaks, a finer `resolution` for sharper reflections. Dynamic GI: none yet. |
+| Plugins in probe captures (`LightProbes.addCapture`, 2026-11-09) | Enforced: a plugin with `registerPasses`; `passes`, when given, names passes it registers; at least one pass to replay. By method: the passes replay into every probe face with the face's context, and those ordered before the capture run again with the frame's context; on an Apple M6 (Metal) terrain and a sky show in a baked probe (LIM-644). | Terrain, sky and any plugin that draws from the context's camera show in reflections and the bounce light with no capture code of their own. | Water throws in a probe face (it reads the frame's viewport-sized scene depth); VFX particles would draw the frame's view (their camera is uploaded by the simulation pass); replayed passes draw their own fog; a pass that advances a simulation must not be named. Errors: `TypeError: LightProbes addCapture needs a plugin with registerPasses()`, `RangeError: LightProbes addCapture: <name> has no pass '<pass>'`. | Draw water and particles into probes once their packages draw from the context's camera; until then leave them out of the capture (the environment fills in). |
 | Ambient diffuse under `KHR_materials_specular` | Enforced by method ([ibl.ts](../packages/environment/src/ibl.ts)): direct light and `Transmission` weight the base by one number, `1 - max(F)`, as the spec writes it. The split-sum ambient hooks (`EnvironmentLighting`, `LightProbes`, sky) keep what the specular term leaves per channel, so a coloured `specularColorFactor` tints their diffuse slightly. | The spec's scalar would change partly metallic texels of every plain material. | A faint complement tint on diffuse light from an environment, only with a coloured specular. | Light the surface directly, or use a grey specular colour. |
 | Environment blend (`@margoengine/environment/blend`, 2026-11-07) | By method: a linear crossfade of two environments' radiance, `(1 - t) x from + t x to`, in the source cube, every prefiltered specular mip and the SH; on an Apple M6 (Metal) every texel of every mip equals the weighted sources within 3 x 2^-11 relative (rgba16float rounding of two inputs and the output; worst seen 9.5e-4) and a quarter-turned source lands texel for texel (LIM-493). Each source's `rotation` and `intensity` are baked in at each `update()`. | Prefiltering and SH projection are linear, so blending their results equals processing the blended image without prefiltering again on each change. | The output holds the memory of a third environment (its own source and specular cubes); the background shows the blended cube, not a source's sharper equirect; changing a source's rotation or intensity needs `update()`; not a time-of-day model. Cost not timed. | Use `@margoengine/sky` for a moving sun; call `update()` after changing a source. |
 | Ground projected environment (`@margoengine/environment/ground`, 2026-11-08) | By method: per pixel the view ray meets the floor plane at `center`'s height or the dome (a sphere of `radius`), and the environment is read along the direction from the photo camera (`height` above `center`) to that point; on an Apple M6 (Metal) every pixel from two cameras equals a CPU mirror of that geometry within 0.15% and a floor point seen from the second camera keeps its colour within 0.13% (a plain background: over 3x) (LIM-498). `height` above 0 and below `radius`, `radius` finite, `center` three finite numbers. | Exact analytic geometry in the background's fragment shader; no extra pass. | The floor is flat and the dome a sphere, so walls and objects in the photo bend as the camera moves; the camera must stay inside the dome and above the floor; no contact shadow; cost not timed. | Pick `height` as the photo's tripod height; add `@margoengine/shadows` for contact shadows. |
@@ -5880,7 +5893,7 @@ checkpoint; this is not a pass of failure 10 or a suite closure.
 Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
 batch-273-clamp-{before,after,render-state} logs under test-results.
 
-Clamp entry sizes (minified gzip, bare imports external): {"index":{"beforeSource":105011,"afterSource":105099,"afterDist":105179},"device":{"beforeSource":105553,"afterSource":105646,"afterDist":105227},"xr":{"beforeSource":105409,"afterSource":105502,"afterDist":105134},"tiers":{"beforeSource":105513,"afterSource":105607,"afterDist":104916}}. Source before/after uses the parent versions of only the two owned changed source files through a build plugin. Dist uses the real package build. No ceiling changes.
+Clamp entry sizes (minified gzip, bare imports external): {"index":{"beforeSource":105011,"afterSource":105099,"afterDist":105179},"device":{"beforeSource":105553,"afterSource":105646,"afterDist":105227},"xr":{"beforeSource":105409,"afterSource":105502,"afterDist":105134},"tiers":{"beforeSource":105619,"afterSource":105607,"afterDist":104916}}. Source before/after uses the parent versions of only the two owned changed source files through a build plugin. Dist uses the real package build. No ceiling changes.
 
 ### Video overlay lifetime and view bounds (batch 56)
 
@@ -6570,7 +6583,7 @@ New html/texture-gl entry: 0 to 6,238 B min+gzip, ceiling 0 to 6,494 B. It inclu
 
 - XR locomotion: smooth translation defaults to 2 m/s, yaw to pi/2 rad/s, radial dead zone 0.15, thumbstick axes 2/3, delta cap 0.1 s. Comfort defaults to a 90-degree angular opening, 0.2 rad feather, 0.15 s exponential response. Reattach after each immersive session. This does not establish clinical sickness reduction; physical-device proof remains blocked by unavailable Quest/Android hardware.
 
-- xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains 23950 B.
+- xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains at the current main baseline of 24209 B; this job changes neither package.
 
 | Optional entry | Limits (batch 267 job 1) |
 | --- | --- |
@@ -6767,7 +6780,7 @@ Blending uses premultiplied colour in the target's blend space. Add sums colour 
 
 Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8464 B), sprites root 7480 to 7613 B, slice 8614 to 8760 B; existing root/slice ceilings hold. The blend entry retains the shared renderer rather than copying it or splitting a cohesive operator API. Skeletal is 7436 B after the upstream guard; pick remains 1933 B. Core plus stage is 24209 B, including the guard already on main. This job does not change their source.
 
-Batch 245 skeleton JSON import is not shipped: full current Spine runtime parity includes physics constraints, while physics remains on hold. Scott must resolve the required import/runtime scope or resume that work; no partial importer is advertised.
+Batch 245 job 4 scope is resolved: skeletal JSON import is shipped as `@margoengine/sprites/spine`. Physics constraints are parsed, validated, retained and round-tripped. Each one emits `spine-physics-deferred` with its name when the document loads. Posing never simulates them; evaluation waits for Scott's physics phase.
 Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.
 
 SNORM compute storage uses the existing CPU route and native signed-byte textures for r8snorm, rg8snorm and rgba8snorm. Channel bytes remain 1, 2 and 4 per texel. Stores clamp to [-1, 1] and encode at scale 127; only written spans upload, with existing mip/layer synchronization. This does not add framebuffer renderability or change core/stage size. Exact signed-byte regression covers 9 format/dimension combinations. No speed claim.
@@ -6944,6 +6957,448 @@ Entry size: textures-pbr is 4946 bytes min+gzip (previously absent, 0 bytes), wi
 ### Batch273 external bitmap copy scope and size
 A bitmap copy creates one temporary drawable canvas sized to the requested rectangle, retaining2D/cube/array destination mip/layer behavior and existing GL flag reset. No JavaScript pixel loop or generic image-source replacement. Complete canonical normal-map and round-trip comparisons pass on native and full compatibility.
 Min+gzip before -> after: compatibility root106041 ->106142 B; device106095 ->106204 B; XR105981 ->105977 B; tiers105802 ->105902 B. No optional ceiling increase. Core plus stage24209 B unchanged. The incoming main-owned inspector/alias repairs remain in their owners.
+
+Batch 249 parallel: SharedWorld has fixed capacity and numeric/tag fields; object/reference components remain on the main thread. SharedComponent adds one 4-byte-per-slot sparse row table beside existing storage. ParallelSchedule defaults to two workers (1 to 32), a 30000 ms per-system deadline (1 to 2147483647), default export and no implicit accesses. Explicit dependencies order systems, physical buffer conflicts serialize, and independent groups execute in bounded worker batches. Modules must be loadable worker ESM, with dependencies resolved by the app bundler; no function source is serialized/evaluated. Isolation requires COOP same-origin and COEP require-corp. Workers must honor read/write declarations, must not alter entities/row metadata, and must settle all work before returning. Applications await update before raw shared-field reads/writes. Main structural operations reject in flight. Failures/abort can leave partial numeric writes, close the schedule and terminate all workers without replay; failed host termination leaves the world structurally locked and requires discarding it after stopping the host. Written components are touched once per physical store after successful updates. No GPU work or Wasm numerical kernel is introduced.
+ecs/parallel new entry: 4938 B min+gzip; separate lazy worker: 494 B. Both were absent (0 B); ceilings add 256 B headroom each. Keeping the shared store/scheduler together preserves memory identity and cancellation ownership, while the worker remains a separate on-demand asset. Core plus stage currently measures 24209 B on rebased main, below 25000 B; this entry changes neither source.
+
+Batch 249 final current entries (min+gzip): objects 1332 B, relation-query 1023 B, reactive 1228 B, serialize 4004 B, parallel 4938 B, lazy parallel worker 494 B. Current core plus stage is 24209 B after upstream main changes, below 25000 B. Earlier per-job figures above are measurements at those jobs, not current core/stage budgets.
+### Selection hit details (batch 199 job 1)
+`@margoengine/selection/hit-details` exports HitDetails and DetailedPickHit. Attach HitDetails instead of Picking. Every triangle mesh hit has world `position`, unit world `normal`, camera `distance` and interpolated `uv` (UV0). Core geometry has no UV channel, so it returns `[0, 0]`. Approximate LOD proxies and non-mesh overlays retain their existing contracts. Normals are interpolated geometry normals, without material normal mapping. Deformed GPU buffers and displacement/clipping/cutout replay are shared with Picking. The helper uses the 3x3 pass even when a frame capture exists. It stores two extra 3x3 textures (rgba32float and rg32float), and 2304 aligned staging bytes per point, with one map per batch. Calls accept AbortSignal after the view; abort releases the caller while submitted GPU work completes safely. Device restoration recreates attachments. Core/stage sources are unchanged.
+
+Batch 199 job 1 sizes (min+gzip, bare imports external): selection root 21061 -> 21308 B, ceiling 21142 -> 21948 B; new hit-details 15002 B, ceiling 15453 B. The entry includes its shared picker implementation; splitting would duplicate query/resource ownership and GPU replay. Core plus stage remains 24209 B.
+Batch 208 job 3 closes the previous Node-only prefetch/throttle and service worker RangeCache evidence gaps. The Chromium browser gate checks real HTTP, IndexedDB, native requestIdleCallback in a window, its absence and task fallback in a service worker, exact persisted model hashes, and offline 206 bytes from a replacement worker instance. Throttle's requested deadlines are checked with a controlled clock against actual network chunks, not elapsed-time budgets. Registration replacement is scoped to this test's origin. No new entry. The background range-fill regression below changes cache root 3,005 to 3,014 B, cache/stream 3,398 to 3,409 B and cache/decoded 4,284 to 4,291 B gzip, all within existing ceilings; core + stage stays 24,209 B. Browser throughput and other browser engines remain speed/portability work, not claims of this gate.
+### UI curved panels (batch 259)
+`@margoengine/ui/curved` exports `CurvedPanel` and `layoutPanels`. Import `WorldPanels` from `@margoengine/ui/world-gl` for both backends, or `/world` for native WebGPU. Panel dimensions are arc metres; default cylinder radius 2 m, 64 segments per curved axis (4..512 allowed). Width is less than 2*pi*radius; spherical height is less than pi*radius. Analytic ray hits are independent of tessellation; visual surfaces are chordal approximations. Poses are rigid. Double-sided backs mirror text. Panels retain the inherited mipmapped texture, depth, input capture and XR controller behavior. Layout defaults: plane, ceil(sqrt(count)) columns, spacing [1.2,.8] metres, radius 2, origin [0,0,0], outward facing; inward orientation is available. Incomplete rows are centred. No wall-clock speed claim.
+
+Batch 259 entry sizes (min+gzip, bare imports external): curved 1,436 B (new), world 9,549 B (ceiling 9,277 to 9,836 B), world-gl 7,560 B (ceiling 7,556 to 7,816 B). The optional renderer bytes preserve shared texture/input ownership instead of splitting it. Core plus stage remains 24,209 B.
+
+## Batch 210 job 1: animation/mixer
+New optional entry: 4158 B min+gzip, ceiling 4414 B, previously absent (0 B). It contains action scheduling, binding and blending together; splitting these would add lifetime coordination and async loading to a small synchronous API. Core/stage source and their 25000 B limit are unchanged.
+AnimationMixer accepts an existing Animation, PBRModel (creates and owns an Animation in the model scene), or Skeleton; existing Animation clocks are paused and stay paused on release. Clips may be names/indices on glTF roots, parsed glTF clips, or createKeyframeClip results. Actions cache by clip identity, root and blend mode. Defaults: time=0, timeScale=1, weight=1, enabled=true, paused=false, LoopRepeat, repetitions=Infinity, clampWhenFinished=false. Mixer defaults time=0, timeScale=1. Replacement weights below one retain original properties and above one normalize. Additive clips contain deltas (translation/property offset, unit-relative scale, quaternion delta). Property accessor tracks need get/read so original values can be restored. Warps use rates evaluated at each update endpoint, matching the action contract; no frame-partition invariant integration is claimed.
+Fades/warps/crossfades take finite nonnegative seconds; zero applies at the next update. Crossfade schedules envelopes, and callers play the destination action. Roots must have compatible track targets; no automatic retargeting or contact-preserving motion alignment is implied. clipAction supports code property bindings and already-bound pointer channels. Uncache releases bindings; stopping the last action immediately restores originals. update(delta) or engine.use(mixer) drives it; do not also drive a borrowed Animation clock.
+
+The mixer intentionally shares the existing animation root and its transitive gltf-pro/model runtime (recorded dependency allowance), rather than duplicating model/deformation ownership or making synchronous model/action construction asynchronous. The 4158 B entry measurement leaves shared bare package imports external; it is not a standalone all-dependencies download size.
+
+## Batch mesh booleans (batch 224 job 2)
+@margoengine/mesh-edit/boolean-batch exports batchBooleanMeshes(meshes, operation = 'union', options = {}). Intersection is n-ary; difference is the first solid minus the union of every later solid. Empty list gives an empty mesh. Empty union/subtraction operands are identities; an empty intersection operand absorbs. Inputs are closed outward consistently wound PolygonMesh solids (empty meshes allowed), up to the existing per-mesh limits and 400000 combined input vertices plus faces. Result faceMap is indexed by operand; sources use original operand index and face ID. Inputs may reuse IDs; surviving faces retain original IDs when unique, with createId (default crypto.randomUUID) for collisions. UVs interpolate from original faces, not intermediate results. Output owns all arrays.
+All operands and internal shell unions use one exact space; balanced reductions do not materialize intermediate meshes. Rational corners round once, followed by the existing validity-preserving thin-face fold and junction closure. collapsedFaces and nonManifoldEdges retain binary-exact semantics. work records exactSpaces, materializations and treeBuilds, without elapsed-time claims. AbortSignal is checked during traversal and assembly. Existing limitations on unresolved float64 output and single-surface self-intersection remain. No core/stage bytes are added.
+Entry sizes: boolean-batch 0 to 10461 gzip bytes (10775-byte ceiling); binary boolean-exact remains 10308 bytes by the same entry measurement. The combined implementation shares exact clipping and final repair rather than duplicating either. Core plus stage remains 24209 bytes.
+### Batch 226 job 3: scene/tags
+tags(mesh) is a stable DOM EventTarget TagSet, with add/remove/clear/list/size/has and add/remove/change events. Tags are unique nonempty arbitrary strings, insertion ordered; mutation inputs validate before changes. has/findByTag use OR between arguments, AND within nonempty arrays. matchesTags/queryTags accept !, &&, ||, parentheses, quoted tags and unquoted true/false constants, maximum 16384 characters and 64 nested operators. Quoted true/false remain literal tags. An empty boolean expression matches all; empty has alternatives match nothing. Queries include the supplied root, preserve depth-first attach order and stay in its scene. Clone copies independent tag sets without subscribing copied listeners.
+
+new SceneEvents(engine) explicitly observes successful createMesh/setParent/remove calls on existing and future meshes of that engine, with one active observer per engine. Existing parent relationships are not replayed. added is creation or attachment; removed is detachment from a parent or removal from a scene, parent=null meaning scene root; disposed follows mesh removal. Disposing a parent detaches its children under existing core rules. Subscriptions support mesh/scene filters, once, signal and idempotent unsubscribe. Events are immutable snapshots and synchronous after compound attach/clone commit. Failed clone allocation publishes no transient lifecycle events. Listener exceptions reach engine.onError in a microtask. Dispose/Symbol.dispose removes subscriptions and restores only instance wrappers it still owns; external replacement wrappers are preserved. Calls through method references saved before observation or direct private-store writes cannot be observed. Tag mutation listeners follow native DOM dispatch semantics. Batch 226 tags: measured {"@margoengine/scene/graph":2098,"margoengine/scene/graph":58,"@margoengine/scene/clone":1144,"margoengine/scene/clone":58,"@margoengine/scene/tags":2676,"margoengine/scene/tags":57} B gzip; prior ceilings {"@margoengine/scene/graph":2254,"margoengine/scene/graph":314,"@margoengine/scene/clone":1295,"margoengine/scene/clone":314,"@margoengine/scene/tags":0,"margoengine/scene/tags":0}. New or exceeded optional entries use measured +256 B. Per-engine lifecycle, complete tag queries and shared commit-time notifications are worth the bytes; splitting would duplicate transaction/rollback ownership. Core and stage source unchanged, root combined 24209 B.
+
+Graph changes from 1998 B and clone from 1039 B to the measurements above add shared notification transactions and tag-state copying, preserving the fully initialized observer view. Core/stage remain untouched.
+### Loader face groups (batch 202)
+`@margoengine/loaders/ply` and `/off` expose the same parsers as the root without unrelated formats. Groups retain each original face's triangulated index range and optional sRGB RGBA. PLY `group.properties` owns raw scalar/list face properties other than the connectivity list. OFF keeps colormap indices as `properties.colorIndex`; mapping them requires the caller's external palette. Binary OFF uses big-endian int32 counts/indices and float32 attributes, four vertex color components and 0/1/3/4 face color components. Existing non-3D OFF variants remain unsupported. Face lists are capped at 65,536 corners; vertex and triangle limits retain their existing defaults.
+`/ply`: 3,702 to 3,973 B min+gzip; `/off`: 2,201 to 2,736 B. These now-public optional entries include owned face metadata and binary OFF validation. Their separate budgets include standard headroom; sharing the existing reader avoids duplicate parsers. Loader root: 52,087 to 52,868 B; core plus stage: 24,209 B unchanged.
+
+### Batch 245 skeletal JSON reader
+
+The optional sprites/spine entry covers bones with shear/inheritance, slots,
+skins, region/mesh/linked/weighted attachments, bounds/points/clipping/paths,
+IK/transform/path constraints, events, bone/slot/deform/sequence/constraint keys
+and curves. Newer unified constraint lists and transform property mappings are
+accepted alongside the documented legacy layouts. See docs/skeletal-json.md
+for public APIs, defaults, coordinate conversion, atlas ownership and evidence.
+Physics definitions and animation/reset keys round-trip unchanged, with one
+named coded warning per constraint; evaluation waits for the physics phase.
+
+Default reader budgets: 1,000,000 JSON values and explicit source mesh/path
+vertices, 64 JSON levels, and text length <= maxValues * 128. Event queries allow
+at most 10,000 crossed loops and 1,000,000 candidate events. Rendering uses one
+caller-provided loaded atlas; image page loading/packing and event audio playback
+belong to the consuming app. No binary skeleton reader or editor UI is claimed.
+Constant-speed path inversion uses 128 chord intervals per cubic. Collapsed
+clipping polygons draw no area; clipping expects simple polygons, as the format
+does. No full editor/runtime API parity, arbitrary accumulation error bound or
+speed result is claimed.
+
+Measured optional gzip: skeletal 7436 -> 7952 B, ceiling 7625 -> 8208 B; new
+spine reader 0 -> 16427 B, ceiling 16920 B. The skeletal growth buys direct
+bone-local bind positions, two-color tint and ordered blend runs needed by the
+reader, including correct transparent multiply. The cohesive reader retains
+validation, round-trip data and posing together; splitting would duplicate the
+schema, attachment maps and constraint/pose state. Core plus stage remains
+24209 B, below the unchanged 25000 B limit, with no core/stage source changes.
+
+### Pulsing x-ray outlines (batch 199 job 2)
+`@margoengine/selection/xray` exports XRaySelection, XRaySelectionOptions and OutlinePulse. It supports the Selection mesh/model/source protocol, current-pose hidden and visible outlines, dashed or solid hidden lines, both distance algorithms and existing multisample support. Pulse defaults on, with two-second period and minimum 0.25; false disables it. The bounded cosine modulates linear outline brightness. `time = seconds` selects manual deterministic time; `play()` resumes frame-delta time, advanced once across multiple views. Options are mutable per frame. The helper owns its outline targets only; source buffers and meshes remain caller-owned. No new GPU passes beyond the existing Selection pipeline; one CPU style pass precedes it. Core and stage remain unchanged.
+
+Batch 199 job 2: new xray entry 12322 B min+gzip, ceiling 12692 B. The entry retains the existing Selection pipeline and its model/mask providers; splitting it would duplicate lifecycle and masks. Core plus stage remains 24209 B.
+
+
+## Batch 265 useFrame priorities
+
+`useFrame(callback, priority = 0)` orders finite priorities ascending; equal values retain subscription order. Negative values only order work. Any positive live subscription owns rendering, even when it draws nothing; removing the last restores automatic rendering. Demand mode still advances only on invalidate. Callback additions start next frame and removals apply immediately. The optional XR manager accepts `onFrame` returning false and `renderFrame()` inside that callback; React manual full-scene draws use the tracked eyes, while inline sessions retain the desktop loop. Core and stage are unchanged.
+
+Frame priority bytes: React root 10243 B gzip (ceiling 9852 -> 10551 B); React XR 4159 B (ceiling 3818 -> 4415 B). The bytes keep stable callback order, explicit render ownership, native callback behavior and tracked XR eye rendering together. Splitting the scheduler from the Canvas would require a second clock or a new core hook. Core + stage remains 23950 B.
+### UI virtual keyboard (batch 259)
+`@margoengine/ui/keyboard` exports VirtualKeyboard. Default QWERTY rows include number/punctuation shifts, backspace, Enter, caps lock, space, arrows and delete. keyWidth defaults to 44 UI pixels; custom nonempty rows accept strings or {key,label,shifted,width}. connect(field|null) binds an explicit TextInput/TextArea, including a separate UI on an XR panel; same-UI TextInput focus reconnects automatically. Shift is one-shot; CapsLock persists. Editing preserves selection, grapheme boundaries and maxLength, emits normal field change/submit events, and refuses disabled/read-only/composing fields. Virtual keys are ordinary engine-rendered Buttons, using inherited keyboard/gamepad and XR ray routing. No prediction, dictionary or separate virtual IME; native IME retains ownership during composition.
+
+Batch 259 keyboard entry: 1,514 B min+gzip (bare imports external), ceiling 1,770 B; core plus stage unchanged at 24,209 B.
+
+
+
+
+### Review 99 mesh build checkpoint limits
+
+Exactly zero-area triangles are skipped and counted; all submitted triangles,
+including skipped ones, still count toward the 1,000,000 input limit. Input
+indices, coordinates and packet size retain their previous rejection rules.
+IDs count original mesh/index-triplet order. Each retained triangle still takes
+64 bytes and each BVH node 32 bytes. All axes use 16 centroid bins and actual
+triangle bounds. At 32 SAH split levels or coincident centroids a balanced
+median partition bounds recursion; at most 20 additional levels are needed
+for the accepted input count. No new GPU intersection tolerance is introduced.
+
+Entry min+gzip before/after: mesh 23021 -> 25754 B, compose 1333 -> 1402 B,
+root unchanged at 81091 B. Mesh ceiling 23559 -> 26527 B under Scott's optional
+package ruling. Exact classification and SAH share the existing feature-local
+Wasm; a split would add a fetch/instance or duplicate geometry ownership.
+The installed mesh module is 4937 B gzip, with Wasm 39317 B raw / 15331 B gzip.
+Do not add its asset-inclusive entry gate figure to the artifact twice. Core
+plus stage stays 23924 B. The continuation passes standalone mesh GPU validation on both backends and its exact README example; additional composed native acceptance is blocked by the recorded timeout. Full-scene work stays open.
+
+Review 99 checkpoint validation: standalone mesh passes native and
+WebGL2/Vulkan with the original assertions, and its exact README example passes.
+Full composed native acceptance is blocked by its recorded twelve-minute
+pipeline-readiness timeout. The earlier unattributed WebGL2 timeout is not
+attributed by this native failure. Full-scene transport remains open.
+
+### Review 99 local vertex-attribute checkpoint
+
+Optional mesh `normals` are Float32 xyz values, one nonzero finite vector per
+position; `uvs` are finite Float32 pairs within +/-1e8. Rust normalizes/gathers
+indexed attributes for retained faces. Their record adds 64 bytes per attributed
+triangle; un-attributed triangles retain their 64-byte record. UV textures use
+one numeric material texture index, repeat wrapping and nearest RGBA8 texels,
+sRGB RGB, and linear alpha. Base/metal colour is textured; emission is not.
+Alpha cutouts, shared BLAS/instances and triangle NEE/RIS remain open. Shading
+normals keep geometric offsets and sidedness; mismatched directions are null
+samples. Coarse shading normals can lose energy at the geometric terminator.
+This is not a displacement or conservation guarantee.
+
+Mesh entry 25754 -> 28206 B min+gzip, ceiling 26527 -> 29053 B under Scott's
+optional-entry ruling. The extra validation and barycentric transport share the
+existing lazy Wasm and triangle state. A split adds another asset/build boundary
+or duplicates ownership. Installed mesh module is 5892 B gzip; Wasm 41886 B raw,
+16400 B gzip. Root 81091 B and core plus stage 23924 B remain unchanged. Canonical
+paired entry/network provenance is still pending; do not relabel old records.
+paired entry/network provenance was pending at that checkpoint. The r6 records
+were genuinely recaptured together on 3e1b3bc13/dirty=true, with those same mesh,
+root and core-plus-stage figures; no old provenance field was relabeled. The
+complete pair is archived in [the measurement receipt](whitepaper/results/review-99-size-pair-20261109.json).
+The final rebase retains the newer upstream canonical pair whole. Refresh those
+canonical files genuinely together when the remaining mesh source is stable.
+
+Review 99 composed browser diagnostics retain the existing 720-second per-backend
+hard budget, with 30 seconds reserved for owned-child-tree termination. The
+host snapshots logical phase, subset and individually pending module, pipeline,
+compilation-report, queue and readback operations without querying a hung page.
+Native acceptance still fails in accumulated pipeline readiness; the native
+compiler subphase and the earlier WebGL2 timeout remain unresolved. The test
+supervisor adds no shipped engine bytes and proves no performance improvement.
+
+The full-package runtime README check currently blocks checkpoint landing:
+the resampled-lighting example misses its unchanged 20-second module deadline.
+The composed example passes first; the mesh example is not reached in that run.
+Earlier isolated example passes do not waive this failure or identify its cause.
+
+### Review 99 explicit mesh-instance limits
+
+Without meshInstances the existing world-space packet and ids are unchanged.
+An explicit array draws only those placements; [] draws none. One BLAS per mesh
+id is retained in each tracer's last prepared scene. Content changes invalidate
+all references, including mutations with an unchanged scene revision. Each
+nonempty placement takes 128 bytes, each TLAS node 32 bytes (at most 2N-1).
+Both unique and instanced input triangle counts are bounded at 1,000,000,
+including degenerate holes. Input and assembled geometry are bounded at 128 MiB,
+and root scene storage must fit the device binding limit. Transforms default to
+identity, are column-major affine 4x4, invertible in Float32 with finite matrix,
+inverse and transformed bounds within +/-1e8. No mesh motion blur, skinning,
+cutouts, nested/overlapping mesh media or triangle emitter sampler is claimed.
+Unique geometry counts and explicit instance/build/reuse stats are documented
+in the package README; legacy scenes report zero for the three new counters.
+Mesh entry grows 28206 -> 32933 B min+gzip; its optional ceiling grows
+29053 -> 33913 B. Compose grows 1402 -> 1461 B (within its existing ceiling).
+The added bytes retain one lazy Wasm, share BLAS across placements and preserve
+one transactional tracer lifecycle. A split would introduce another asset/cache
+boundary or duplicate packet/traversal ownership. Installed mesh module is
+7659 B gzip; the Wasm asset is 46898 B raw / 18402 B gzip. Asset-inclusive entry
+size must not be added to that asset a second time. Root stays 81091 B and
+core plus stage 23924 B, below its unchanged 25000 B gate. No speed claim.
+
+BLAS landing: the combined mesh entry is 32,933 B min+gzip (before 23,021 B), optional ceiling 23,559 to 33,913 B. The increase includes the required SAH/attributes prerequisites and shared affine BLAS/TLAS ownership; splitting would duplicate the geometry packet and tracer lifetime. Core plus stage is 24,209 B on the rebased main; this job changes neither source.
+Batch 172 grid contours: optional /contour accepts tetrahedra, convex planar-faced hexahedra, wedges, pyramids, triangles and quads. Piecewise-linear pulling triangulations, not trilinear hexahedron fields. Up to 1000000 points, 256 levels and 10000000 output vertices; finite f32 zero or magnitude 1e-18 to 1e18. CPU topology/gradient preparation is shared; the GPU computes edge positions, followed by bounded readback. Coordinate envelope, equality convention, cancellation and memory contracts: docs/sciviz-analysis.md. No speed claim; core and stage source are unchanged.
+
+Batch 172 job 2 size: sciviz/contour 0 to 3067 B min+gzip, new ceiling 3323 B. The entry retains shared topology, precision, cancellation and intersection ownership together. Core + stage remains 24209 B under the unchanged 25000 B limit. NASA both-backend correctness: 2352 isoline segments, maximum coordinate difference 5.960464477539063e-8 against computed absolute envelope 0.0037318677496081375; 7407 visible pixels. The conservative arithmetic bound is not an observed error or a physical accuracy claim.
+
+
+## Batch 265 adaptive performance
+
+The optional @margoengine/react/performance entry exports PerformanceMonitor, AdaptiveDpr, usePerformanceMonitor and PerformanceController. Defaults: 250 ms windows, 10 windows per decision, 0.75 required fraction, factor 1, step 0.1, unlimited direction reversals, fallbackFactor 0. Bounds default to [50,57] FPS, or [50,90] when a measured window exceeds 90 Hz. A 60 Hz presentation can therefore recover quality. FPS is frames divided by summed measured milliseconds; observed refresh is a high window average, not a display capability query. It is cadence, not GPU execution time. A sample prop accepts measured milliseconds or null from an application's collector; default intervals use the monotonic performance clock without the engine's delta cap. Hidden tabs and unsampled demand frames discard incomplete windows. Active slow frames remain measurements. Snapshots retain at most 4096 frame intervals per window while all intervals count toward the average. A direction reversal beyond flipflops fixes the factor at fallbackFactor until reset.
+
+AdaptiveDpr defaults to min 0.5, max 1, pixelated false. Fractions apply to the Canvas's native resolution, not CSS layout. A package-owned target scales scene raster dimensions; native MSAA stays intact. Reduced frames add one full-canvas presentation triangle. Scale 1 returns to the original renderer, allowing exact restored pixels. Multiple holds use the lowest scale and nearest presentation if any requests it. Named Scenes and Canvas views retain their scene, camera, layers, clear and scissor. Explicit offscreen targets and tracked XR eye targets retain their owner's resolution. Picking uses original Canvas view coordinates. Removing the last hold destroys its texture immediately and retains only logical picking until the next Canvas draw; engine disposal always releases the adapter. Resources recreate after device restore. WebGPU and the WebGL2 compatibility layer are supported; native preview reports unsupported. No timing or throughput gain is claimed during the build phase.
+
+Adaptive performance size: optional entry 0 -> 5619 B minified gzip, ceiling 5769 B. Keeping measurement, presentation and picking in one optional entry avoids duplicate lifetime and asynchronous render boundaries. Core + stage stays 24209 B on the current main baseline.
+
+Adaptive diagnostics use stable MargoError codes and help links. The final React root is 10259 B gzip, React XR 4159 B; the performance entry above includes coded presentation-owner diagnostics.
+Batch 219 job 1: optional geometry/nurbs-edit supports immutable rational curve/surface knot insertion and degree elevation on either surface axis; knot parameters and interior multiplicity/continuity are preserved. Unclamped inputs are restricted to the same active domain with clamped endpoints for elevation. Default insertion/elevation count is 1; zero copies, invalid counts and excess multiplicity reject. Trimming accepts retained UV polygons or closed 2D rational curves, holes and multiple islands; regions outside [0,1] are clipped. Default slices/stacks=32, trimTolerance=0.0001 UV units. Surface tessellation has explicit resolution, no model-space error guarantee. Trim curve sampling inherits the existing 12-level subdivision limit. Polygon intersection snaps to its 2^26 grid and features below two steps may disappear; cell pieces retain separate vertices and normals from their own side of knot creases. Degree elevation uses floating-point homogeneous arithmetic, not symbolic arithmetic. Surface file parsing remains in loaders. New entry absent -> 11646 B gzip, ceiling 11996 B; refinement and trim operations share surface evaluation, clipping and triangulation, so splitting would fragment the editing workflow. Core + stage unchanged at 24209 B gzip.
+
+Batch 219: NurbsSurface.derivatives(u,v,leftU=false,leftV=false) exposes the exact side of a repeated knot on either axis. Trimmed cell endpoints take their own side, so fully discontinuous surfaces retain their separate sheets rather than stretching across the jump. No extra approximation is introduced for crease normals; only a genuinely degenerate pole uses an inward normal sample. The generated margoengine/geometry/nurbs-edit alias and current umbrella alias completeness ship with the same job.
+
+
+## Mesh repair (batch 224 job 3)
+The optional mesh-edit/repair entry exports repairMesh(input, options). Input is a polygon soup with unique nonempty face IDs, xyz vertices and index loops; corner UVs are optional. Defaults: distance 0 (exact duplicates), fillHoles true, maxHoleEdges 256. Up to 200000 input vertices and faces and 4096 corners per input face; output remains within standard PolygonMesh limits. Near welding is non-chaining and keeps the earliest eligible position. Nonfinite positions and invalid-index faces are discarded and named; structural array/ID errors reject. Missing or invalid UV corners reset to [0,0] with diagnostics. Concave/warped polygons split through existing mesh editing rules; unresolved, pinched and degenerate polygons are discarded.
+When more than two faces compete for an edge, descending face area then input order select the retained manifold subset. A contradictory orientation constraint removes the encountered conflicting face and reports it. Disconnected vertex fans split identities. Existing hole filling uses triangles, refine false and fair false, so it adds a closure without moving surviving scan vertices; holes above maxHoleEdges stay open and are reported. Nested closed shells orient by solid-angle containment (cavities inward). Self-intersections and intersecting-shell intent are not reconstructed or certified. readyForBoolean checks closed opposing edge incidences and positive volume, followed by the actual solid validator; it is false for empty, open or zero-volume output. It does not promise valid geometric self-intersection behavior for arbitrary damaged scans. Result fields include every removed face/vertex, flipped/filled face, weld/fan counts and source face/vertex maps. Source and output arrays are independent. Cooperative AbortSignal checks bound work between traversal steps; no interactive latency claim.
+Repair entry size: 0 to 9631 gzip bytes, with a 9920-byte ceiling. The optional entry includes the established hole filler and topology validation so repair stays complete; splitting them would add API complexity without reducing bytes when closure is needed. Core plus stage remains 24209 bytes.
+### Legacy VTK datasets (batch 202)
+`@margoengine/loaders/vtk-legacy` adds `parseVTKLegacy` independently of the root parser. All five legacy geometric dataset types support ASCII and big-endian binary, old packed cells and explicit OFFSETS/CONNECTIVITY. Source connectivity, offsets, cell types, point/cell/global FIELD data and source cell IDs for every drawn primitive survive. Numeric arrays retain float64 precision; rendering positions remain float32. Structured coordinates are x-fastest; ORIGIN defaults to [0,0,0] and SPACING/ASPECT_RATIO to [1,1,1]. `maxCells` defaults to maxTriangles; existing vertex/triangle bounds remain. `surface: 'outer'` suppresses shared volume faces; `'all'` retains them. Both readers reject inexact 64-bit integer values. Binary native `long` is eight bytes, matching the existing legacy reader. ASCII bit arrays and MSB-first packed binary bit arrays are decoded; polyhedron type 42 retains its original face stream in connectivity. Higher-order cell drawing retains corner points and warns; intact source topology is always returned for supported cells. Global FIELD arrays with tuple counts unlike the active association are kept in fieldData. No core or stage changes.
+The optional /vtk-legacy entry is 6,336 B min+gzip (new, previously absent). Its 6,592 B ceiling retains the shared reader and complete dataset metadata instead of splitting user-facing APIs. Root loaders: 52,868 to 53,022 B; existing /vtk-xml: 7,514 B. Core plus stage remains 24,209 B.
+### Pixel-exact area queries (batch 199 job 3)
+`@margoengine/selection/area` exports AreaPicking and AreaPickingOptions. Attach instead of Picking, retaining ordinary pick/pickMany and add(source). `rect({x,y,width,height}, view?, signal?)` accepts CSS pixels and normalizes negative dimensions; `polygon(points, view?, signal?)` accepts 3-4096 finite xy vertices and uses even-odd filling. Only included raster pixel centres count, including fractional CSS/DPR boundaries; empty/fully clipped regions return no hits. Results are unique visible triangle IDs, preserving model, primitive and instance identity, in first raster occurrence order. Fully occluded geometry, unrendered bounding spheres, approximate proxies and non-mesh overlays are excluded. Opacity, clipping, sidedness and current deformation use the same replay as point queries. With multiple views, pass the desired view; omitted view uses the engine camera/scene across the canvas. Queries honor viewport, scissor and layers.
+Each area query owns one cropped r32uint target, one depth32float target and a 256-byte-pitched staging buffer. Default maxPixels is 16777216, additionally bounded by device texture dimensions and maxBufferSize. AbortSignal is checked before queued work and after mapping; pending GPU resources remain alive through completion and are destroyed in finally. Point capture defaults false and may be enabled separately. Concurrent area and ordinary point calls retain separate operations through the engine queue. New entry 15287 B min+gzip, ceiling 15719 B; selection root 21308 -> 21464 B and hit-details 15002 -> 15152 B remain inside existing ceilings. The entry includes its common picker rather than duplicating replay/resource ownership. Core plus stage stays 24209 B.
+## Batch 210 job 2: animation/playback
+New optional entry 1817 B min+gzip (previously 0), ceiling 2073 B. It intentionally imports the existing Animation root/model runtime; the reported size leaves shared bare package imports external. Core/stage source stays unchanged, below 25000 B.
+Import Animation (alias of PlaybackAnimation) from animation/playback for plain play/pause/seek and existing deformation with loop/finished events, finished promise, loop modes and total traversal counts. Defaults inherit loop=true and speed=1; loopMode defaults LoopRepeat (LoopOnce with loop=false), repetitions=Infinity, timeScale=1, no signal. LoopOnce always uses one traversal. Negative timeScale plays backward; play starts negative-rate clips at their end. Ping-pong counts each traversal. A multi-boundary update emits one loop event with signed loopDelta, while the final boundary emits finished once after the terminal pose.
+play renews completion, rejecting an interrupted run with AbortError. dispose and constructor signal abort reject pending completion; waitForFinished accepts independent cancellation without stopping playback. seek accepts nonnegative total seconds, emits no events and resets traversal counting; use play to renew a finished run. Events use on or EventTarget-style listeners; listener signal cancellation is supported. Loop counts must be safe positive integers or Infinity, and boundary jumps must be countable as safe integers. A zero-duration clip finishes once, without an infinite loop.
+
+
+
+## Batch 207 job 1: Blender objects
+The optional blender/objects entry is 4945 gzip bytes (new, before 0; ceiling 5201), including the existing anim converter. The umbrella alias is 62 bytes (new, before 0; ceiling 318). Core plus stage stays 24209 bytes. Sharing the existing animation converter avoids a second runtime representation.
+Export object_animation=True (dialog Object actions and hierarchy, default false) keeps exported objects, hidden ancestors and visible empty pivots as parent-relative Y-up metre TRS. Active and NLA-referenced object actions become per-frame LINEAR clips alongside bones and shape keys; quaternion signs stay continuous. Constraints and bone/vertex parenting are evaluated into child-local transforms. Lights/cameras retain their local forward axis. Local shear/singular transforms fail by object name, including at a sampled frame; composed world shear is valid. No curve/volume plus animation file combination. Generated dependency-graph instances retain their evaluated export-frame placement; their own per-frame generated transforms are not sampled. No subframe-exact Bezier or constraint interpolation is claimed between sampled frames.
+CPU comparison covers 1728 world matrix components across three object actions and every frame, bound 3e-6; native WebGPU and WebGL2 compatibility playback compare the same 1728 components with largest error 4.77e-7 and zero GPU validation errors. Scene action slots, NLA flags and fractional export frame restore after export.
+
+
+### Headless tiled stills (batch 209)
+Optional @margoengine/headless/tiles is 2,210 B min+gzip (previously absent), with a 2,466 B entry ceiling. Core plus stage remains 24,209 B, below 25,000 B. renderTiles streams row-major RGBA tiles; renderTiled collects them in CPU memory. Output dimensions are positive safe integers; the assembled buffer must fit the runtime. Samples 1..1024, default 1; tileSize defaults to min(1024, device maxTextureDimension2D); padding defaults to 0 and must leave a positive interior. GPU allocation never exceeds tileSize in either dimension. WebGPU on createHeadlessCanvas only, as the headless readback contract requires. WebGL2 refuses with unsupported. Camera projection and canvas dimensions are preserved. Do not render concurrently on the same engine. Temporal/nonlocal effects need disabling, and local filters need sufficient guard pixels; arbitrary postprocessing cannot be made tile-independent automatically. No performance claim.
+The full WebGL2 compatibility layer runs the WebGPU capture contract and passes the same exact tile proof; the unsupported route above means the small backend=webgl2 preview.
+### UI localization tables (batch 259)
+`@margoengine/ui/i18n` exports Localization. Constructor accepts locale-to-flat-key tables; locale and fallback default to the first table or en. Lookup tries canonical exact locale, progressively less specific parents, then the configured fallback and its parents. Messages are strings or cardinal plural objects with required other; exact =count wins, then Intl.PluralRules in the resolved table locale. Named {parameters} interpolate as text. Missing policy defaults to key (unresolved placeholders remain literal); error is opt-in. bind(ui, bindings, {signal}) updates text/label/placeholder setters and Ui.direction automatically; layout runs next frame. refresh re-evaluates dynamic parameters. Direction metadata overrides Intl.Locale.getTextInfo or Unicode-script inference. RTL switching affects text direction and alignment through existing Ui semantics; spatial arrangement remains explicitly authored by the application. Tables are copied and frozen. Dispose/unsubscribe/abort detach live bindings.
+
+
+Batch 259 i18n entry: 1,680 B min+gzip (bare imports external), ceiling 1,936 B; core plus stage unchanged at 24,209 B.
+
+
+
+### Batch 243 mesh PBR channels
+Optional mesh-pbr supports normals, four UV sets, RGBA vertex colours, base-colour, tangent normal, metallic/roughness and emissive RGBA8 maps, explicit affine instances and OPAQUE/MASK coverage. Mesh material ids are independent of the 255-entry voxel palette. Surface/texture/vertex packets share the existing 128 MiB geometry limit. Samplers support repeat, mirrored repeat, clamp, nearest and linear-light bilinear reconstruction at the base mip. Normal XY scale can be negative; finite UV/transform/tangent values stay within +/-1e8. Colours are linear factors; base/emissive image RGB decodes sRGB before interpolation, data maps and alpha stay linear. BLEND coverage is explicitly refused. The glTF adapter reads current geometry and source material definitions, with an explicit imagePixels callback for compressed/streamed images. It preserves borrowed-image ownership and rejects merged primitives without source identity. No new core or stage feature is added.
+
+Entry size: mesh-pbr 0 to 37,233 B min+gzip, with a new 38,350 B optional ceiling. This includes the existing geometry Wasm/traversal and the material, sampler and glTF snapshot boundary; splitting the surface channels would duplicate the same packet/frame/lifetime coupling. The existing mesh entry is 32,933 B. Core plus stage remains 24,209 B, below 25,000 B.
+### Batch 233 job 1: road intersections
+Optional intersections builds rounded/mitered joins, rounded caps, tangent circular curb returns and separate raised sidewalks on shared sloping ground. Defaults, precision, input bounds, radius-fit rejection, height sampling, cancellation and ownership: [road-design.md](road-design.md). No core/stage change or speed claim.
+Batch 219 job 2: geometry/extras adds geodesicGeometry and goldbergGeometry with m=1,n=0,radius=1,smooth=false; both nonnegative integer chiralities are accepted, T=m*m+m*n+n*n <=10000. Geodesics have 20*T triangular faces; Goldberg duals have 12 pentagons first then 10*(T-1) hexagons. Spherical centroid duals can have nonplanar faces, matching the spherical web-library construction; these are not claimed as equilateral planar Goldberg solids. Face-addressable output exposes faces, paired adjacentFaces, centers, normals and one material group per face, with per-face UVs. hemisphereGeometry(radius=1,segments=32,rings=16,cap=true) lies above y=0 with a hard downward flat cap. Tiled planes default width/height=1,tileSize=1,centered alignments,pattern=none,side=front,UV rectangles=[0,0,1,1]. Seven tile/row reflection and rotation patterns and all three axis alignments retain physical texture scale through cropped edge tiles. Side can be back or double, with independent front/back UV rectangles. Tiled boxes add depth=1, six face groups (+x,-x,+y,-y,+z,-z), and per-face option overrides. Normals/winding and exact bounds are tested. Optional extras grows 5570 -> 9031 B gzip; ceiling 5826 -> 9302 B. Shared hull, lattice and face emission stay together rather than fragmenting this optional primitive collection. Core + stage unchanged at 24209 B.
+
+### Optional CPU occlusion on the full WebGL2 layer
+
+`@margoengine/culling/webgl2` supplies `WebGL2Culling` for opaque core meshes on
+both the full WebGL2 layer and native WebGPU. It rebuilds a 128 by 128 CPU depth
+buffer each view using actual triangles, then redirects compacted 96-byte rows.
+Resolution accepts integers 1 through 2048. It uses no hardware queries, no GPU
+readback and no previous-frame visibility. `readCounts()` returns the last view's
+counts synchronously. Use one redirect owner per batch. Picking and shadow data
+stay complete. Surface-changing core shaders disable occlusion for that frame.
+The preview renderer is unsupported. Models and dynamic GPU-only geometry retain
+their existing cullers; this entry culls core batches. Near-plane-crossing triangles,
+triangle seams and partially covered cells can retain hidden objects. This is
+conservative excess drawing, never an excuse to cull visible surfaces. CPU work
+scales with occluder triangles and covered software cells; no speed claim is made.
+
+Batch 223 job 1 size: culling/webgl2 new entry, 0 to 2442 B gzip. Its CPU depth
+and upload code stay together because both implement this one optional feature.
+Core plus stage remains 24,209 B gzip (under 25,000); no frozen code changed.
+### FBX optional texture formats (batch 205)
+
+`@margoengine/fbx/textures` exports `textures`, passed in `FBXOptions.extensions`. It routes embedded
+and external TGA, DDS, TIFF/TIF and BMP through decoder entries, lazily, then encodes PNG. Default
+FBX byte and pixel budgets still apply. DDS material images must be 2D; only the base mip is embedded
+in GLB, whose runtime generates its mips. Float TIFF/DDS values clamp to 0..1 and encode to sRGB PNG. The decoder entries define
+format support; damaged recognized inputs reject instead of silently dropping a texture. Unknown
+formats and missing files retain the existing missing-texture record. Multiple image hooks are tried
+in extension order, and the first successful conversion wins.
+
+`@margoengine/decoders/bmp` exports `parseBMP`, `BMPOptions`, `DecodedBMP`. Default maxPixels is
+67,108,864. OS/2 core and Windows 40/52/56/108/124-byte DIB headers, indexed 1/4/8-bit, RGB 16/24/32-bit,
+RGB/alpha bitfields, RLE4/RLE8 and top-down uncompressed rows are supported. BI_RGB 32-bit spare bytes
+are opaque. JPEG/PNG-in-BMP, OS/2 v2 compression and embedded colour-profile transforms are not supported.
+
+The texture-rgba decoder entry shares the existing textureFileToRGBA implementation with decoders/image, without container/transcoder imports. BMP and texture bridge defaults do not add a core/stage feature.
+
+Batch 205 min+gzip entry sizes: fbx/textures 586 B (new, ceiling 751 B), decoders/bmp 1,518 B (new, ceiling 1,774 B), decoders/texture-rgba 4,446 B (new, ceiling 4,702 B). The FBX worker grows from 83,143 B (ceiling 85,638 B) to 97,769 B (ceiling 100,703 B), buying all four image decoders in the classic worker. Splitting classic-worker codec delivery would add a second asset loader/protocol for this small optional feature. Core plus stage remains 16,769 B.
+
+
+
+
+
+### Batch 243 optional learned denoiser
+`voxel-pathtracer/denoise-ml` exposes DenoiseML.create(engine, {signal}), denoise(image, {signal}), whenIdle, dispose and Symbol.dispose. It requires an engine WebGPU compute device (the existing WebGL2 compatibility device is supported), finite RGB Float32 color/albedo/normal guides from renderImage with aovs:true, positive integer dimensions totaling at most 16,777,216 pixels, positive samples and optional coverage in [0,1]. Color is nonnegative through the Float32 representation of 1e16, albedo [0,1], normal components [-1,1]. Device binding/buffer/grid limits apply in addition. Device changes rebuild weights and the pipeline; each request snapshots every input AOV, owns its output and preserves alpha, albedo, normal, depth, instance and palette arrays. Cancellation rejects queued/active waits promptly and disposal releases owned buffers. GPU failures use coded failed errors with their platform cause.
+The 321-parameter, two-hidden-layer network predicts a single 3x3 positive reconstruction kernel; it is spatial, with no temporal history, downloaded weights or external inference runtime. Input guides are required. HDR normalization and softmax preserve finite constant fields and bound reconstructed RGB by observed neighbor radiance. Synthetic training and the licensed Box holdout are narrow correctness/quality evidence, not a claim of universal image-quality superiority.
+The new entry measures 6,767 B min+gzip (ceiling 7,023 B), previously absent. Root/core/stage gain no code. Core plus stage is 24,209 B on this main base, unchanged by the entry and below 25,000 B. The difference from earlier 23,950 B batch records is the upstream version guard. No speed or wall-clock claim is made.
+
+
+### GPU-free stage (batch 209)
+Optional @margoengine/headless/null is 2,721 B min+gzip (previously absent), ceiling 2,977 B. Core plus stage remains 24,209 B. createNullStage defaults to a 1x1 logical viewport, capacity 1024, normal core camera defaults, no signal or custom onError. It creates real engine scenes through renderer injection without a DOM, graphics context, GPU binding or global mutation. NullStage.step(delta=0) accepts finite seconds in 0..1 and advances global ticks, onFrame callbacks and every live scene's plugins once. Successful steps accumulate in time. Reentrant steps and stepping after disposal reject. The dispatch label engine.backend is webgl2 because that is the existing injection path; isNull identifies the stage and gpu/renderTarget are null. CPU property/skeleton animation works; GPU deformation, render passes, capture and GPU-specific packages require a rendering stage. No timing or rendering equivalence claim.
+Batch 172 job 3: optional sciviz/clip supplies scalar/plane/box/sampled-sphere cuts, iso-volume, whole-cell crinkle, point/cell threshold and Cartesian/curvilinear structured subsets. imageGrid supports 2D/3D topology and up to 1000000 samples. Sphere boundaries are piecewise-linear sampled implicit values; coarse cells can miss an interior sphere. Structured cell tuples sample the source lower cell, not aggregate across strides. Inputs stay borrowed until async operations settle; validation/materialization/compaction are synchronous. Tuple arrays and source cell IDs are retained in f64 output. See docs/sciviz-analysis.md for full conventions. No speed claim or core/stage source change.
+
+Batch 172 job 3 size: sciviz/clip 0 to 5140 B min+gzip, new ceiling 5396 B. A shared owner for cut geometry, tuple interpolation, provenance and the four pipeline operations avoids duplicated array/topology code. Core + stage remains 24209 B under 25000 B. CPU gate: 505 affected sciviz/react/umbrella tests pass, including 11 clip cases. No timing claim.
+Batch 206 PointInstancer: /instancer expands a selected time into ordinary glTF nodes sharing prototype meshes. Default added-node ceiling 100000, override maxNodes. Optional timeCode selects a stage pose; this entry does not turn point arrays into playback channels. OpenUSD 26.11 oracle: five time codes, masks, prototype transforms and nonuniform scale within 1e-5. No wall-clock claims. Core/stage unchanged.
+
+Batch 206 entry size: usdz/instancer 0 -> 2229 B gzip, ceiling 2451 B; optional node expansion and schema evaluation warrant these bytes. Keeping it in one entry avoids fragmenting the API.
+
+### Selection glow and fill (batch 199 job 4)
+`@margoengine/selection/highlight` exports Highlight and HighlightOptions. Attach an effect, then set live core meshes, loader nodes or whole models, or register caller-owned custom PickingSources. Only visible selected surfaces contribute, including the existing current-pose, alpha, clipping, sidedness, MSAA and mask-provider contracts. Empty selection stops compositing. Default colour is linear orange `[1, 0.5, 0]`; fillOpacity 0.15, glowOpacity 0.85, radius 8 drawing pixels, innerGlow and outerGlow true. Separate fillColor/glowColor default to color; colours and opacities are finite 0-1. Radius may be fractional, 1-64, with sigma radius/3 and support ceil(radius). Options are mutable each frame. Separate named effects style independent mesh groups.
+Two single-sample r16float blur targets cost four bytes per drawing pixel, in addition to Selection's r8unorm visible mask and its MSAA mask when needed. The mask-only consumer creates no JFA distance targets, jump buffers or compute pipelines, and performs no distance-field dispatch. It adds horizontal/vertical blur and one blended composite. View/scissor bounds are zero padded; cached target views and bind groups survive steady frames, with uniform copies for multiple views. Resize/device restore recreate resources; dispose owns targets/passes only, and models/source buffers remain caller-owned. Preview-only WebGL2 refuses through Selection's coded unsupported guard; native WebGPU and full compatibility are supported.
+New highlight entry 13082 B min+gzip, ceiling 13475 B. Selection root 21464 -> 21514 B and xray 12322 -> 12374 B stay within existing ceilings. Keeping the existing mask replay and coherent glow/fill resource owner avoids a duplicate renderer or mask-lifetime protocol. Core plus stage remains 24209 B, below 25000 B.
+
+### Geospatial vector formats (batch 202)
+The optional `@margoengine/loaders/geo` provides parseGeoJSON, parseShapefile, parseGPX, parseKML and parseMVT. All return source features, owned double xyz positions, explicit point indices, line-segment indices, polygon rings with holes, and a float32 triangle mesh with feature groups. Per-primitive feature arrays keep attributes addressable after tessellation. Coordinates stay in source units: GeoJSON/GPX/KML use CRS84 lon/lat/altitude; Shapefile preserves supplied .prj text without guessing a projection; MVT defaults to tile-local y-down coordinates. Its optional tile address converts to lon/lat. Geographic dateline cuts are expected in the source geometry, as in GeoJSON. No implicit globe/terrain projection is promised.
+Defaults: maxFeatures 100,000, maxBytes 256 MiB, maxDepth 64, existing maxVertices 8,000,000/maxTriangles 16,000,000. Parsers accept AbortSignal. Polygon fill uses existing Margo hole-aware planar triangulation; boundaries are also line segments. Source geometry retains Shapefile Z/M ordinates, while draw coordinates use xyz. Shapefile points, multipoints, polylines, polygons and multipatches are covered; optional dBASE rows retain record alignment, null geometries and deletion flags (deleted rows omitted unless includeDeleted). Its encoding defaults to windows-1252 and is configurable; unsafe numeric integer attributes remain strings. Sidecars are supplied directly rather than fetched implicitly.
+GPX keeps waypoint metadata, route/track elevations and timestamps, with no segment-spanning line; empty/singleton paths become null/points. KML reads placemark Point/LineString/Polygon/MultiGeometry and gx tracks, IDs and ExtendedData; styles remain source attributes rather than an automatic map style engine, and external links/models are not fetched. MVT retains layer/extent, tags, repeated point commands and polygon holes; 64-bit IDs and integer attributes outside exact Number precision remain decimal strings. Unknown protobuf fields are skipped by wire type, and truncated payloads/illegal geometry commands reject.
+New /geo: 8,246 B min+gzip, ceiling 8,502 B. It leaves the shared geometry triangulator as its existing optional dependency (6,805 B ceiling), rather than duplicating that implementation. Loader root remains 53,022 B and core plus stage remains 24,209 B.
+### Batch 233 job 2: lane paint
+road/lanes builds curved lane/edge lines and lane-relative straight/turn arrows with arc-distance dashes, grades, junction ranges and connector phase continuity. Exact defaults, bounds, ownership and chord/float32 limits: [road-design.md](road-design.md). No automatic lane routing or traffic-artwork certification.
+### UI visual layout editor (batch 259)
+`@margoengine/ui/editor` exports LayoutDocument and LayoutEditor. Browser page: `examples/ui-editor/`. The document edits markup and style sheets live, validates both before committing, retains the previous valid preview on errors, supports text/attributes, insertion/removal, hierarchy moves and bounded undo/redo (default 100 edits, configurable positive historyLimit). Project JSON version 1 saves exact markup/styles; markup/XML and CSS can also download separately. Invalid drafts visibly prevent save/export. Visual property edits normalize markup whitespace and drop comments; source-only edits preserve exact text. Stable ids are required for property and hierarchy selection. The palette offers panel/label/button/slider/toggle; source supports every tag of the markup owner. Open respects AbortSignal and editor lifetime. Named action handlers are explicit constructor options and never loaded from JSON. The caller owns Ui, renderer and engine; the editor restores its canvas and adjacent accessibility mirror on disposal. The example scales a 640 by 360 design to fit narrow displays. No native file-system permission, external hosting or runtime code execution is needed.
+
+Batch 259 editor entry: 4,650 B min+gzip (bare imports external), ceiling 4,906 B; core plus stage unchanged at 24,209 B.
+
+## Batch 210 job 3: animation/discrete-tracks
+New standalone entry 0 -> 2280 B min+gzip, ceiling 2536 B. Mixer categorical binding/selection and safe original-value restoration increase mixer 4158 -> 4805 B; ceiling 4414 -> 5061 B. Keep one shared clock, action cache and property lifetime rather than splitting categorical actions into a parallel scheduler. The existing intentional mixer/model dependency remains; discrete-tracks itself has no rendering-runtime dependency. Core/stage source stays unchanged and their combined gzip limit stays 25000 B.
+BooleanKeyframeTrack and StringKeyframeTrack take name, strictly increasing finite times and one exact typed value per key. They hold the previous key through the next key, clamp outside, and select a key at its exact time. Times use owned Float64Array data; values are frozen ordinary arrays. Default and only interpolation is InterpolateDiscrete (2300); sample returns its boolean/string type, and createInterpolant reuses a plain array. clone, shift, nonzero signed scale, inclusive trim with held boundary samples, optimize (keeps duration endpoints), validate and JSON round trips are supplied. Do not mutate retained times directly; bind/create the clip again after editing keys.
+track.bind resolves leading-dot, dot-name, numeric bracket and quoted-key paths once, or accepts explicit get/set. Unsafe prototype paths reject. createDiscreteClip produces a bound clip for AnimationMixer, which also accepts plain property-root objects. Per-property categorical output chooses the highest effective action contribution; leftover original weight competes when the sum is below one, and ties select the later action. Strings/booleans are never numerically averaged; additive arithmetic rejects. Keep a property in one value family across its tracks. Last-stop/dispose restores original values on live roots, cache eviction releases writes, and dead model roots release bindings without invoking disposed Mesh setters. A default infinite-repeat single-key action holds its constant value.
+Batch 239 job 4: tiles/fade covers meshes, i3dm, pnts and globally sorted Gaussian splats. Ordered 4 by 4 screen-door coverage has 16 ranks; it is spatial coverage with ordinary material opacity/depth behavior preserved. Default full replacement duration is 0.3 seconds with a monotonic performance clock; a supplied simulation clock makes replay deterministic. Hierarchical intervals preserve complementary masks through reversal and nested replacement; ADD content keeps additive semantics. A fade temporarily retains both drawable levels and their budget bytes. Point coverage uses two spare existing uniform slots; a splat cloud lazily adds four bytes per original splat, restored on device recovery, and tile splat budgets include those bytes. Mesh extension factors add 16 bytes per primitive. Completed hidden REPLACE parents no longer remain permanently wanted just to provide an unused fallback; pre-eviction selection observation protects visible outgoing content until completion. Core and stage source and their 25000 B combined limit are unchanged.
+
+Batch 239 job 4 optional entry sizes (min+gzip bytes, parent to completed job): points/surfels 14674 to 14933, points/pick 5267 to 5759, splats/index 30679 to 31291, splats/lod 29246 to 29793, splats/set 28036 to 28564, tiles/splats 1580 to 2060, tiles/fade 0 to 1766. The added bytes retain cohesive material validation, original-ID splat masks and shared tile ownership; splitting would duplicate that lifecycle. Point root is 24520 B; core plus stage remains 24209 B.
+
+
+
+
+
+### Batch 243 sampled mesh emitters and spot/IES lights
+`voxel-pathtracer/mesh` adds world-area/power-selected emissive triangle NEE with reciprocal path-hit MIS. Affine placements have independent world areas and lookup records over shared BLAS geometry. Emissive PBR maps, alpha masks and one-sided material visibility are evaluated at the sampled UV; textured power selection uses the material factor as a proposal, without changing radiance or its exact proposal PDF. Zero-probability CDF entries retain full path-hit weight. Triangle metadata remains inside the existing 128 MiB geometry packet limit.
+`MeshTraceScene.spotLights` accepts up to 4096 delta spot/IES sources. Positions use world units, color is linear RGB, intensity uses candela (or multiplies absolute IES candela), direction defaults down, range defaults infinite. Ordinary spots default inner 0 and outer pi/4 radians, inner strictly below outer and outer at most pi/2. With IES and no explicit angles, the full photometric sphere is used without a cone envelope. Type C profiles retain horizontal and vertical tables, 90/180-degree symmetry or full 360-degree azimuth, nearest boundary values in tilt, bilinear intensity interpolation and explicit lamp tilt degrees (default 0). Unrepresented vertical angles emit zero. External tilt text is caller-resolved; there is no implicit fetch. Type A/B profiles require conversion to Type C and reject with coded unsupported. Up must not be parallel to direction.
+The Rust scan and shader additions increase mesh from 32,933 to 40,351 B and mesh-pbr from 37,233 to 43,550 B min+gzip. Ceilings rise from 33,913 to 41,562 B and 38,350 to 44,857 B, respectively. The bytes buy sampling, file parsing and reciprocal PDF correctness in the existing optional entry; a split would duplicate geometry feature ownership and prevent the requested mesh entry from accepting these lights directly. Core plus stage remains 24,209 B. No timing or speed claim is made.
+
+## Batch 207 job 2: exported and imported lightmaps
+Blender lightmap entry 0 to 4636 gzip bytes (ceiling 4892); lightmap/imported 0 to 1279 bytes (ceiling 1535). The former briefly bundled the latter and its texture runtime (14642 B); externalizing the owning API keeps one shared runtime rather than paying twice. Required bare dependencies are image decode and the existing PBR model; lightmap/imported uses materials for managed linear textures and the PBR model for extension-slot rendering. Core plus stage remains 24209 B. These are per-entry sizes, not all-dependency download totals.
+lightmap_size defaults to 0 (off), otherwise integer 16..4096. Static visible meshes need node materials and Object Mode. UV0 remains the material coordinates, UV1 is retained or generated with four-texel chart margin, and temporary mesh copies/images/nodes/selection/render engine are restored, also after export errors. Cycles uses CPU, scene sample count, direct and indirect diffuse passes, excludes material colour and specular, then converts its E/pi to physical irradiance. Nonnegative finite HDR RGB is normalized by one scale >=1 into linear RGBA8; row orientation is flipped with the exported UV1. Quantization error is bounded by scale/255 per channel. Bake lighting is fixed at export time. Geometry instances and animated illumination are outside the current bake path.
+readLightmap copies RGBA8 data, checks width/height 1..4096 and scale 1..1e20. applyLightmap uses UV1, the free material extension slot, and replaces direct and ambient illumination while preserving material colour, metalness and emission. It owns its texture, restores the previous slot on disposal and rebuilds on device restoration. Existing custom material extensions must be removed first. The three analytic irradiance channels (0.5,1,2) import within quantization bounds; both backends draw (56,56,56) through the existing PBR Neutral display curve, invariant under a large increase in engine light. No Cycles film/BSDF or speed equivalence claim.
+Batch 219 job 3: optional geometry/teapot exports teapotGeometry(size=1,segments=10,options={}). Y-up, centered, size is the half-height with familiar Blinn proportions. Positive size must remain representable after scaling into Float32 positions; overflow and complete underflow reject. segments is an integer 2..175, keeping all 32 patch grids below core's million-vertex limit. options.body/lid/bottom default true; body includes handle and spout. fitLid=true expands the lid horizontally by 14/13 to meet the inner rim; blinn=true uses the familiar historical squashed shape, false restores 4/3 height. UVs cover [0,1] per patch, normals use analytic derivatives and inverse-transpose scaling, and degenerate pole normals sample derivatives 0.000001 inward. Material indices are body=0,lid=1,bottom=2. Cusp triangles are omitted; the full shape has 32*(segments+1)^2 vertices and 64*segments^2-8*segments triangles. The historical model retains intersecting handle/spout/body surfaces and a separate lid, without a solid interior. Very coarse tip/knob facet chords can oppose exact corner normals because of high curvature; default and dense resolutions agree at every corner. New entry 0 -> 2339 B min+gzip, ceiling 2595 B; model data, validation, parts and shared patch evaluation belong together rather than duplicating the evaluator across part entries. Core + stage remains 24209 B. The margoengine/geometry/teapot alias is generated from the same entry.
+
+
+
+### Batch 246 job 1: ordered tile-map layers
+The optional objects entry draws all map layers in map order, cells in renderOrder (orthogonal) or geometric painter order, and objects by stable y or explicit index. Collection images retain native dimensions, animation and flip bits. Tile-object size, anchor, rotation and scaled tileset offset are respected. Image layers support either-axis repeat, offsets, parallax, tint and opacity. Text and non-tile objects remain data. Images must be supplied by source path; missing dimensions come from the supplied texture. Uses one instance (48 B) per visible quad and one draw per consecutive texture run. WebGPU and WebGL2 compatibility are checked. No core/stage change. Optional objects entry: 0 to 7038 B min+gzip, ceiling 7294 B; keeping texture ownership and ordered batching together avoids duplicated resources. Core plus stage stays 24,209 B.
+
+
+### Headless GIF and exporter palette (batch 209)
+Entry bytes (min+gzip, bare package imports external): headless/gif 118 B (new, ceiling 374 B), exporters/palette 2,597 B (new, ceiling 2,853 B), exporters/capture 6,944 -> 7,667 B (ceiling 7,241 -> 7,923 B). The 118 B wrapper requires the optional exporters peer; its codec bytes are in the capture entry, sharing palette quantization. These bytes retain one writer, stream cancellation, explicit duration/repeat policies and correct rounding. Splitting another codec would duplicate LZW and quantization or add lazy-loader plumbing. Core plus stage stays 24,209 B.
+encodeGIF accepts sync/async RGBA8 frames; only one raw frame is retained plus the compressed result. fps defaults to 30, in 100/65535..50. dither defaults false; loop defaults 0 (forever), -1 plays once, 1..65535 repeats. Per-frame duration overrides fps and accepts 0.02..655.35 seconds. Sizes are consistent and <=65,535 per side; data must fit memory. Alpha <128 is transparent, otherwise opaque, as GIF supports one-bit alpha. Each frame has a local <=256-colour RGB palette (255 opaque colours with transparency). Exact colours are preserved when they fit; other frames use shared median cut and optional ordered Bayer dithering. The signal interrupts waiting for the next frame; producers must also observe it to release their own pending work. No CPU speed claim or speculative Wasm rewrite.
+
+## Mesh convex hull and Minkowski sum (batch 224 job 4)
+geometry/hull exports convexHullTriangles(points, {signal}) with outward indices into the original flat/nested xyz positions. Empty or lower-dimensional sets return empty indices. The existing Quickhull predicates use a translated unit frame and a 1e-10 coordinate-scale tolerance; this is a floating hull, not an exact predicate claim. Source coordinates are never narrowed to float32. Legacy geometry/extras convexGeometry retains its original errors and float32 rendering buffers.
+mesh-edit/hull exports convexMeshHull(oneMeshOrArray, {createId, signal}) and minkowskiSumMeshes(a, b, options). Hull includes all supplied positions (including loose vertices), emits newly generated triangle IDs/planar UVs, and returns an owned empty solid for empty/flat input. Maximum hull input is 200000 positions and normal output mesh limits apply. Minkowski inputs are closed outward consistently wound solids or empty; output has mesh, cells [a,b], convexPairs, planeTriples, collapsedFaces and diagnostics. Empty operands absorb. Concavity, disconnected components and cavities are supported by BSP interior cells and union of convex pair sums. Every output face has a new ID; caller corner attributes are not meaningful under the sum and UVs are planar.
+Minkowski defaults: maxCells 2048 per operand, maxPairs 65536, maxPlaneTriples 2000000 per operand. A convex pair may contribute at most 200000 vertex sums; the batch input/output limits also apply. Budgets are positive safe integers and exceeding them rejects with guidance, not partial geometry. Cell decisions/intersections use the existing exact representation, but exported cell coordinates and additions are float64 and Quickhull uses its documented tolerance; a positive cell too thin for that hull rejects explicitly. The final union's validity-preserving thin-face folds are counted. This is not exact arithmetic Minkowski output or a geometric self-intersection repair API; normalize intersecting component soups first. AbortSignal is checked throughout. Worst-case BSP decomposition and pair enumeration can be large, so no interactive or speed claim is made. Core/stage remain unchanged.
+Entry sizes: mesh-edit/hull 0 to 11992 gzip bytes (12352-byte ceiling); geometry/hull 0 to 2071 bytes (2327-byte ceiling). Shared Quickhull keeps geometry/extras growth at 5570 to 5617 bytes within its existing ceiling. The optional bytes cover nonconvex and cavity-capable sums rather than a convex-only partial API. Core plus stage remains 24209 bytes.
+
+
+### Batch 265 texture bindings
+
+The optional React textures entry supports URL, array and record images and KTX2; videos accept URL or MediaStream and use browser-supported codecs and streaming protocols. The KTX2 decoder is automatic or caller-supplied. Resources loaded by a hook are cached per Canvas and disposed with it; borrowed textures and source materials remain caller-owned. TextureMaterial accepts any native Material class. Shape components preserve UVs; arbitrary core Geometry needs an explicit UV-bearing geometry prop. Root PbrMaterial map props require TextureProvider from the optional textures entry, preserving standalone root bundling without optional peers. Normal, green-channel roughness and emissive maps use native material sampling on both backends. No core or stage change.
+
+Texture entry bytes measured with bare peers external: @margoengine/react/textures 0 -> 4684 B gzip, ceiling 4940 B. The recorded draft was 4067 B. Final geometry is 5402 B (draft 4806 B), materials 6705 B (draft 6114 B), JSX runtime 2731 B and development JSX runtime 2736 B. React root grows from landed job 5 at 10259 B to 10570 B. Final ceilings for root, geometry and materials are 10888, 5658 and 6961 B. The added bytes preserve per-Canvas loader lifetime, separate green roughness without losing borrowed blue metalness, UV geometry and Scene-owned native materials. Splitting mapped material ownership again would duplicate mesh and resource cleanup; decoder assets remain isolated from the umbrella root. Core + stage remains 24209 B. Native transmission capture and material installations are isolated and disposed by Scene.
+Batch 206 implicit shapes: first-pose Cube/Sphere/Cylinder/Capsule/Cone tessellation. Resolution defaults 32 radial, 16 latitude; limits 256 radial and 128 latitude, with maxTriangles/maxVertices enforced before allocation and by the complete mesh walk. Surface curves are polygonal approximations with analytic normals and UVs. /shapes 0 -> 1201 B min+gzip; worker measured 118236 B (prior ceiling 117288 B). Optional worker ceiling rises only if needed to retain the geometry and parse lifecycle together. Core/stage unchanged, 24209 B combined gzip.
+### FBX large entry (batch 205)
+
+`@margoengine/fbx/large` exports `largeFBX(overrides)` and `FBXImportLimits`. Pass the returned
+immutable extension in `extensions` to convertFBX, parseFBX, loadFBX or their worker forms. One
+limit configuration per import; unknown names and nonpositive/noninteger/unsafe values reject.
+Ordinary imports keep every existing default. All figures below are caps, never reservations.
+
+| Field | Ordinary | largeFBX default |
+| --- | ---: | ---: |
+| inputBytes | 64 MiB | 512 MiB |
+| decodedBytes | 128 MiB | 2 GiB |
+| arrayBytes | 64 MiB | 512 MiB |
+| nodes | 100,000 | 1,000,000 |
+| properties | 2,000,000 | 16,000,000 |
+| parseWork | 128,000,000 | 2,000,000,000 |
+| sceneBytes | 128 MiB | 2 GiB |
+| sceneWork | 128,000,000 | 2,000,000,000 |
+| morphBytes | 64 MiB | 512 MiB |
+| vertices | 1,000,000 | 8,000,000 |
+| corners | 3,000,000 | 24,000,000 |
+| geometryWork | 40,000,000 | 320,000,000 |
+| textureBytes | 64 MiB | 64 MiB |
+| texturePixels | 16,000,000 | 16,000,000 |
+| outputBytes | 128 MiB | 512 MiB |
+
+MiB = 1,048,576 bytes; GiB = 1,073,741,824 bytes. `vertices` bounds control points,
+expanded vertices and the cumulative scene vertices (including instances); `corners` bounds
+polygon corners and triangulated indices. Allocation/work accounting remains conservative,
+so dense seams/instances may need higher caps. Raising a cap cannot create available memory.
+The 4,096-corner polygon, hierarchy depth, animation/key/sample limits and GLB uint32 format
+limits are unchanged. Imported meshes are never decimated or truncated to meet these caps.
+
+Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker is 98,112 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage stays 16,769 B.
+
+The large configuration also reaches GLTFAsset attachment and worker prepareGLTF: the converted GLB uses outputBytes and nodes as its downstream caps. Ordinary attachment retains the pre-existing 64 MiB glTF cap. The 2,500,002-vertex test produces a buffer above 64 MiB and attaches both directly and from prepared worker output.
+
+Large material partitions are emitted as additional child mesh nodes at triangle boundaries, with at most 1,000,000 vertices per primitive, matching the existing PBR storage-binding safety cap. Every triangle and layer is retained; control-point maps still drive skin and morph remapping. Shared vertices on a chunk boundary may be duplicated and count against the configured vertex cap. This adds draw calls rather than reducing geometry. The 2,500,002-vertex independent-triangle fixture emits three full primitives and retains every position/index.
+
+### Batch 233 job 3: road network import
+road/geojson imports standard line GeoJSON and OSM XML/Overpass ways with lane/width tags, split at-grade graph connectivity, explicit OSM topology and local WGS84 projection. Bounds, policy defaults, warnings, precision, unsupported PBF/restriction relations and ownership: [road-design.md](road-design.md).
+
+Batch 172 job 4: sciviz/probe accepts up to 8000000 points/snapshot and 1000000 profile samples. Uniform cell buckets max 32 per axis; cells spanning over 128 buckets use a separate candidate list. Hex inverse mapping takes at most 24 Newton steps with the documented f64 coordinate residual; inputs must be convex, finite and nonfolded. Non-hexa mixed cells use pulling-linear fields, while hexa/image sampling is trilinear. Field integrals are exact for these declared field models to f64 arithmetic precision, not for unknown continuous physical fields. Resampling masks outside points and keeps sampled source cell fields separate from point fields; no conservative cell-average remap or label-nearest policy is claimed. See docs/sciviz-analysis.md. Core and stage source unchanged; no speed claim.
+
+Batch 172 job 4 sizes: probe 0 to 6588 B min+gzip, ceiling 6844 B. Explicit lower-dimensional cell support in shared optional analysis logic changes contour 3067 to 3101 B and clip 5140 to 5176 B, within their existing 3323/5396 B ceilings. One owner retains tuple interpolation, masks, locator and linked-plot lifecycle; splitting would duplicate that ownership. Core + stage remains 24209 B. Both GPU backends render the four probe views, retain 32768 MRI samples and 101 valid NASA samples, and produce zero profile/dataset resampling difference. No speed claim.
+
+### Oriented box culling subclasses
+
+`@margoengine/culling/bounds` exports BoxCulledMeshes, BoxCulledModels and
+BoxDynamicInstances. They inherit the corresponding ordinary culler's options
+and methods, retaining stable compaction, picking and complete shadow lists.
+Frustum tests use transformed local boxes, including shear and reflection;
+BoxCulledMeshes and native BoxCulledModels also use them for Hi-Z occlusion.
+Model padding expands each local half-extent. Deformed model primitives still
+retain their original conservative bypass. Ordinary sphere cullers do not load
+box mathematics. BoxCulledModels runs box frustum/size culling on the full WebGL2
+layer; its Hi-Z remains native-only. BoxCulledMeshes uses current CPU depth there.
+BoxDynamicInstances adds box frustum tests on both backends; its base class has
+no occlusion option. Geometry position arrays are treated as immutable, as for
+ordinary core Geometry; model array replacement refreshes cached bounds.
+
+Batch 223 job 2 also joins exactly coplanar convex triangle pairs before CPU
+depth rasterization, using exact dyadic predicates for the float32 positions.
+This removes their internal seam while preserving real holes, folds and back
+faces. Larger triangulations may still retain extra candidates. Snapshot
+validation refreshes cached patches when software geometry changes in place.
+The software entry's earlier 28-of-81 figure is job 1's historical measurement;
+the current entry can reject additional hidden rows with the same pixels.
+
+Batch 223 job 2 minified gzip entry measurements (parent-source rebuild to final build, bare peer imports external):
+
+| Entry | Before B | After B |
+| --- | ---: | ---: |
+| @margoengine/culling | 13871 | 13961 |
+| @margoengine/culling/dynamic | 7336 | 7452 |
+| @margoengine/culling/parts | 14778 | 14180 |
+| @margoengine/culling/models | 9455 | 9540 |
+| @margoengine/culling/shadows | 20611 | 20302 |
+| @margoengine/culling/lod | 3878 | 3878 |
+| @margoengine/culling/meshlets | 17708 | 17117 |
+| @margoengine/culling/webgl2 | 2442 | 3028 |
+| @margoengine/culling/bounds | 0 | 19447 |
+
+Optional /bounds groups the three subclasses so they share the existing cullers and one set of box mathematics. The software entry grows from 2,442 to 3,028 B for exact convex-patch coverage and cache validation. Splitting these predicates into another entry would duplicate their state or add a needless asynchronous boundary. Core plus stage remains 24,209 B.
+
+
+## Batch 207 job 3: meshopt .margo geometry
+New blender/meshopt is 8304 gzip bytes (before 0, ceiling 8560), including optional variant validation paths. Blender root changes 4340 to 4397 B for a named meshopt-file refusal; KTX2 is 5270 B after sharing the existing container writer; its pre-job entry size was not measured separately. Core plus stage remains 24209 B. Existing budgets still cover changed entries; no root/core budget increase.
+compressMargoMeshopt losslessly encodes packed 24/80-byte vertices and 16/32-bit indices with existing meshopt version-0 attribute streams. Indices are encoded as raw four-byte groups (zero padding is discarded), preserving every index and provoking vertex rather than rotating triangles. Small/uncompressible sections remain native; the entire original file is returned if it is smaller. expandMargoMeshopt supports static, animated, shapes and KTX2 containers without changing metadata/image/animation bytes; decodeMargoMeshopt is the static prepared reader. parse/load default to parseMargo; use options.parse for compatible PBRModel parsers such as parseAnimatedMargo, parseMargoKTX2 or parseMargoLightmap. Shapes can use the expanded bytes with the curves loader. AbortSignal is checked between sections, before allocation and before load; a single existing synchronous codec call cannot be interrupted.
+Expanded file and aggregate section allocation are bounded at 256 MiB before decode; vertex count per section at 1 million, original table/manifest limits retained. PNG/KTX2/animation sections stay uncompressed. No lossy quantization, triangle reordering or geometry simplification. Seven own fixtures keep every section byte and manifest value; anim 28924 to 19516 B, objects 13940 to 12348 B, lightmap 1396 to 1276 B, curves 18180 to 17988 B. Native/compat frames are identical for original and compressed static/animated models, with zero validation errors. These are deterministic byte counts, not timing benchmarks.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11349,6 +11804,98 @@ Outside batch 239: an extra forced-compat run of scripts/gltf-pro-materials-gpu-
 ImageBitmap uploads ignored requested unpack flip/alpha settings at the WebGL boundary, making flipped mesh normal domes appear dented while unflipped glTF remained raised. Cropped drawable-source normalization fixes the owning upload path. The complete canonical native/compatibility normal-map matrix and round-trip exact images pass unchanged; external-image.test.js fails the parent.
 Incoming main61b17b70d independently repairs the inspector isolation blocker with its native-context observation, local compiler and regressions. Main also supplies the missing exporters/materials alias. Preserve those owner fixes and the existing isolation/import-equivalence tests; no duplicate implementation lands with this group.
 The final dependent check exposed the incoming exporters/sparse umbrella alias missing as well; regenerate it with the owning script and retain the original full import-equivalence regression. Quality was initially run beside React's source-fixture tests, so its file snapshot caught a temporary consumer.tsx that the test then removed. Run that gate after fixture-producing CPU tests finish; no engine failure, ignored file or tolerance change is claimed.
+Fixed in batch 208: StreamingAssetCache range misses left the background full-file body unread after its new response hook returned, so flush never finished and an offline full-file visit missed. Background fills now explicitly request complete buffered consumption. Regression: packages/cache/test/stream.test.js, background whole-file fill (5 s timeout before repair, exact 100-byte offline response afterward). Caller-facing streaming stays pull-driven.
+- Batch 259 tooling follow-up: `node scripts/gpu-package-tests.mjs --no-build --only=ui/` fails before selection because browser discovery classifies `packages/webgl2-compat/test/support/firefox-bidi.mjs` and `packages/worker/tests/browser-matrix.mjs` as unregistered suites. Cause: global discovery precedes scoped selection. UI GPU suites run directly under the shared GPU lock instead; tooling repair waits for its owner.
+
+Batch 210 job 1: requested action operations pass mixer.test.js and analytical/real-rig GPU checks. Cache lookup follow-up for the fix phase (under the 5% rule): existingAction on an unknown clip throws instead of returning null, and a fresh optional root can create an unnecessary player because the lookup calls resolve/player; repro new AnimationMixer(skeleton).existingAction("missing"), or existingAction(clip, anotherModel). The umbrella generator also restores the already-exported but missing exporters/splats alias; the existing umbrella consistency test covers that generated-file gap. Optional-root pointer rebinding and reverse-time scheduled starts receive broader fix-phase coverage in private/handoffs/finish-later.md; all requested mixer operations are built.
+
+### Fixed while generating batch 224 aliases
+Origin/main 43e08376d added exporters/sparse without its umbrella facade. The ordinary umbrella generator needed for mesh-edit/boolean-batch also restores that upstream alias. Regression: tests/umbrella.test.js (manifest, identity and import-map checks). No exporter implementation changes.
+### Batch 226 tags and lifecycle
+Fixed during integration: synchronous parent/creation notifications could expose attach transforms or clone metadata before initialization. Optional graph/clone now batch notifications until commit; the tags.test.js attach/clone listener and failed-allocation regression fails without that boundary. Failed observer installation restores any already-installed wrappers. No open defect found in the requested row; pre-saved method references and private-store mutation are documented observation limits.
+`check:gpu-packages --no-build --only=sprites --serial` cannot plan on main 59061a16b: packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs drive browsers but have no matching registered package script. The planner checks unrelated unregistered leaves before filtering. Batch 245 runs every sprites GPU leaf directly under the shared GPU lock, both backends; no assertions or scripts are weakened. Planner registration repair waits for its owning lanes.
+
+- XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21).
+
+
+
+### Open: review 99 composed native validation exceeds its twelve-minute lease
+
+Repro at mesh checkpoint 4a40f2e29, rebased as 3c9a4f8f8 onto main 0ba1d4f94:
+build packages, then run `node scripts/gpu-lock.mjs run --owner=review-99-mesh-compose-native
+--wait-max=60 --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs
+--backend=native` with MARGO_GPU_SLOTS=1. On the RTX A6000 / native Edge WebGPU,
+the lock kills the process tree at 12 minutes. Subsets 0..30 finish; subset 31
+(all five features) starts at page time 707653.5 ms and remains in tracer-ready-wait.
+The last flushed event is preview pipeline-ready at 710230.1 ms. That subset's
+trace pipeline has started but has no pipeline-ready event. Reflected-light and
+atomic-update cases have not run. Thirty-one completed trace pipeline creations
+account for 704992.5 ms (6179..40723.3 ms each), so accumulated pipeline readiness
+consumes the lease. The underlying native compiler cause remains unresolved;
+these records do not establish a permanently stuck compile or attribute bug 45.
+No assertion, feature subset, readiness wait or lease was changed, and the failed
+command was not retried. This is an open bug, not a busy-machine waiver or pass.
+
+Owned receipts: .review/mesh-checkpoint-compose-native.log and process snapshots
+mesh-checkpoint-native-processes[-late|-deadline].json, including full command
+lines and parent PIDs. At the deadline the GPU lock reported this as its sole
+active holder, with lane-U's bug45-dawn-localize and lane-A's mipmap probe queued.
+The process tree was killed and the lock released. Raw process snapshots remain
+private in this worktree. Durable summary: [mesh checkpoint receipt](whitepaper/results/review-99-mesh-build-checkpoint-20261109.json).
+The earlier unattributed WebGL2 timeout remains a distinct bug; this native run
+cannot supply its missing phase attribution. The separate unchanged compatibility run passes all 32 subsets, reflected RGB RIS shadows and atomic update on WebGL2/Vulkan; page completion is 12589.7 ms. The earlier WebGL2 timeout did not recur.
+
+The later local vertex-attribute shader passes the same complete composed
+WebGL2/Vulkan suite under the unchanged twelve-minute lease. The earlier
+WebGL2 timeout did not recur on either checkpoint or attribute inputs. Native
+composition was not retried; its readiness failure remains open.
+- Bug 45 PARKED (rule 21): native path-tracing compiler pressure and CPU/GPU camera rounding remain unresolved; native split work retained on bug45-native-split at 333a02a44 for the fix phase.
+- BLAS landing dependent-gate repair: controls/globe had a manually ordered umbrella export and lacked its generator banner; node scripts/umbrella.mjs restores canonical output, covered by tests/umbrella.test.js.
+- Outside batch 243: direct serial scripts/gpu-package-tests.mjs requests use owner check:gpu-packages for every worktree; ownerLane collapses them to check, so unrelated runners block admission. Repro: two direct serial runners on different worktrees. Use the brief-required outer named shared lock for this lane; tooling repair waits for the fix phase.
+- BLAS dependent-gate repair: React bindings/instances commands served rooted fixture URLs from the package directory and returned navigation errors. Commands now select the repository root; packages/react/tests/browser-scripts.test.js fails before repair and checks the browser fixture class.
+
+Batch 243 outside scope: the package GPU planner rejects webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs as unregistered browser leaves on main. Cause: planning scans support runners without matching their registered parent script. Changed mesh/React GPU fixtures run directly under this lane's named shared lock; planner repair waits for the fix phase.
+- Batch 172 extra diagnostic: node packages/sciviz/tests/atmosphere-browser.mjs passes native WebGPU but WebGL2 restoration differs after GPU flow replay (same 45444 lit pixels; RGB sum 24011098 before versus 24010912 after, hashes 398236242 versus -975829982). The contour entry is absent from this test's import graph; no atmosphere, flow or sky source changed. Owner: retained atmosphere/GPU flow replay or its rendering state on compatibility device recreation; exact source of the numerical divergence remains unlocalized. Preserve the exact restoration assertion; investigate in the fix phase under lane rules 21/22.
+
+Batch 265 integration observation: on main baseline 298227511, scripts/gpu-package-tests.mjs rejects its complete plan before selecting React because packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs have no registered starter recognized by that planner. Cause: global browser reachability validation runs before --select filtering. React browser leaves are run directly under the same shared GPU lock; planner registration repair belongs to the owning tooling lane.
+
+### Mesh repair validation boundary (batch 224)
+The repair entry sanitizes invalid soup positions/faces and compacts discarded vertices before calling the strict hole-fill API. The nonfinite-position fixture in packages/mesh-edit/tests/repair.test.js retains the regression; validation is not weakened. Remaining open borders, zero volume and geometric reconstruction limits are explicitly reported and documented in docs/limits.md.
+
+Batch 210 job 2: no open playback defect found by the loop, endpoint, event, promise, subscriber/owner cancellation and failed-attachment regressions. The umbrella generator restores the pre-existing missing selection/hit-details alias; the existing umbrella test guards generated consistency.
+
+
+Batch 207 object actions: generated dependency-graph instances still use export-frame world placement (objects.py keeps these as roots); animating the generating collection/pivot does not yet resample instance transforms. Repro: animate a collection-instancing empty and export with object_animation=True; ordinary mesh/empty object actions and hierarchy are covered.
+Batch 205 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=decoders` fails during plan construction because packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs are not registered in the runner; direct changed-package commands cover this job. Owning runner registration waits for its lane/fix phase.
+
+Fixed within batch 205: FBX previously selected only the first image hook, so an image converter later in extensions was unreachable. The reader now tries registered converters in order; packages/fbx/test/textures.test.js covers PBR plus textures in either order.
+
+Batch 206 PointInstancer build: no open static-expansion defect in the schema oracle and array/budget tests. Playback channels for vectorized instance arrays are outside the static expansion entry.
+
+Batch 206 capture regression: scripts/modern-usdz-tests.js used to read the rigged frame before the compatibility queue had loaded compute and replayed its commands, yielding identical images. Each animation capture now awaits queue.onSubmittedWorkDone, without extra renders, retries or altered assertions. The existing three-pose check fails before this change and passes on WebGL2 after it; native WebGPU also passes. The USD suite uses a free port so a different suite cannot occupy its dev server port.
+
+Batch 259 editor: moving only a rendered canvas left its accessibility mirror in the old parent and produced page overflow after viewport changes. The optional editor now moves/restores the adjacent mirror with its canvas, uses a positioned preview container and preserves the original sibling location. editor.test.js covers early/late mirror creation and repeated cleanup; editor-browser.mjs covers desktop-to-320px resizing, invalid-draft save rejection and real download/open.
+
+Batch 210 job 3: repaired default-loop zero-duration actions dropping one-key state, sparse categorical values bypassing Array.some validation, numeric result-buffer coercion, and restoration into a disposed model Mesh. Repros and regressions are in packages/animation/tests/discrete.test.js; before logs are test-results/batch210-discrete-{unit,lifetime}-before.log. No additional open categorical-track defect found by the typed sampling, editing, binding, weighted-action, disposal and real-Fox visibility/text checks.
+
+
+
+
+
+Batch 243 job 2 historical compatibility timeout: the earlier renderImage call rejected at its unchanged 120000 ms AbortSignal, without per-case phase evidence. The rebased canonical native-then-compatibility suite and separate instrumented/cache-disabled compatibility diagnostics now pass every original case and bound. Cause remains unisolated; the shutdown fix was already in the failed checkpoint. Phase messages are retained for the next natural reproduction. No runtime repair or timing waiver is claimed; follow-up remains in private finish-later tracking under rule 22.
+
+Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked: export real mesh objects for spatially distinct irradiance (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects).
+
+- Batch 246 gate inventory finding: `node scripts/gpu-package-tests.mjs --no-build --only=tilemap` rejects existing unregistered browser drivers headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs before selecting tilemap. Cause: global driver inventory runs before selection; tilemap uses its registered leaf commands directly. Deferred to the owning lanes.
+
+### Fixed: repair alias during batch 224 rebase
+The job 3 shared-manifest conflict resolution took the upstream umbrella manifest, leaving the new repair source facade without its export mapping. Regenerate the umbrella from all package exports after resolving the manifest, before the rebase commit, rather than accepting one side's generated JSON. Job 4 restores the mapping together with the new hull entries. Regression: tests/umbrella.test.js validates manifests, binding identities and import maps; the lane's local merge helper now regenerates before continuing a rebase.
+
+- Batch 265 dispersion follow-up: the full native grid passes; the full compat grid reproduces main failure 9 at the unchanged exact-zero bound (4x live reset, max 0.000244140625). Individual complete clean-main 6ab64e777 and exact-parent adc342df4 runs passed, while historical main 2a74c14e3 has the same recorded failure. Across the complete 57-render 4x prefix through reset, parent and feature have identical GL call counts and paired command-input hashes, and both traced runs pass. This is still state-sensitive and its backend root cause remains unresolved; it is not a feature-only GPU-work difference. Proof and limitations: whitepaper/results/batch-265-dispersion-parent-trace.json. Retain the exact test and finish the pre-existing defect in the fix phase under rules 21/22.
+Batch 206 implicit shapes: no open defect in 22 OpenUSD extent cases, analytic normals/winding, attribute preservation and preallocation budget checks. Dimension time samples are read at the first pose, as documented for static geometry.
+Batch 205 large: existing default byte-budget errors retain their exact wording, while enabled custom caps report the configured range. packages/fbx/test/errors.test.js and worker.test.js retain page/worker error identity; large.test.js covers caps without reducing imported geometry.
+
+Batch 207 meshopt: no open defect found in the requested compression row. Existing synchronous codec calls only observe cancellation between sections; files need the optional reader, with bounds/stream regressions in meshopt.test.js.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

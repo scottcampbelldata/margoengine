@@ -6,7 +6,14 @@
 // storage buffer, so the probes add no sampled texture: with an Environment fallback the binding count matches
 // EnvironmentLighting's (gltf-pro's physical material with every light still fits WebGPU's 16).
 import type { EngineKernel } from '@margoengine/core';
-import { Camera, engineRuntime, type FrameGraph, type PassContext, type Vec3 } from '@margoengine/core/extension';
+import {
+  Camera,
+  engineRuntime,
+  type FrameGraph,
+  type FramePass,
+  type PassContext,
+  type Vec3,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Environment } from './environment.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
@@ -183,6 +190,27 @@ export interface ProbeBakeOptions {
   /** Optional GGX importance samples per rough reflection texel (power of two, 64-4096). Omit for full-source convolution. Sharp level 0 and volume SH are unchanged. */
   samples?: number;
 }
+
+/**
+ * A plugin whose render passes light probe captures replay ({@link LightProbes.addCapture}): terrain, water, sky, VFX
+ * particle systems or any plugin attached to the same engine that draws in its `registerPasses` passes.
+ */
+export interface ProbeCapturePlugin {
+  readonly name: string;
+  registerPasses?(graph: FrameGraph): void;
+}
+/** Which passes of a {@link ProbeCapturePlugin} a capture replays. */
+export interface ProbeCaptureOptions {
+  /**
+   * Names of the plugin's passes to replay, in their own order. Default: every pass ordered after the main pass (order
+   * above 0), its drawing passes. Name a pass that runs before the capture only when it just uploads what the draw reads
+   * (terrain's `'<name>:prepare'`); never a pass that advances a simulation (it would advance once per face).
+   */
+  passes?: readonly string[];
+}
+type ReplayedPlugin = { passes: FramePass[]; restore: FramePass[] };
+// Passes ordered before this one ran with the frame's camera ahead of the capture: re-run after it to upload that again.
+const CAPTURE_ORDER = -0.5;
 
 /** Reflection probes per LightProbes. */
 export const MAX_REFLECTION_PROBES = 16;
@@ -589,6 +617,8 @@ export class LightProbes extends ShaderEffect {
   private readonly texelCount: number;
   private readonly offsets: number[] = [];
   private readonly captured = new Set<CaptureModel>();
+  private readonly replayed = new Set<ReplayedPlugin>();
+  private restorePending = false;
   private snapshot?: Uint32Array;
   private snapshotExposed = false;
   private pending = false;
@@ -943,6 +973,54 @@ export class LightProbes extends ShaderEffect {
       release();
     };
   }
+  /**
+   * Draws `plugin`'s render passes into every probe capture (bake, live and refresh), after core meshes and the added
+   * models: terrain, water, sky and particles then show in reflections and the irradiance the probes bake. The plugin
+   * must be attached to the same engine; its passes run with the probe face's context (camera, encoder, `rgba16float`
+   * color and depth, no multisampling) and draw as they draw in the frame, own fog included. A replayed pass ordered
+   * before the capture runs again with the frame's context once the capture is done. Returns a remover.
+   * @example probes.addCapture(terrain, { passes: [terrain.name + ':prepare', terrain.name] }); probes.addCapture(water);
+   * @throws TypeError for a plugin without `registerPasses`; RangeError for a pass name it does not register or none to replay.
+   */
+  addCapture(plugin: ProbeCapturePlugin, options: ProbeCaptureOptions = {}): () => void {
+    if (this.disposed) throw new MargoError('disposed', `${this.name} is disposed; create new LightProbes`);
+    if (!plugin || typeof plugin.registerPasses !== 'function')
+      throw new TypeError(
+        'LightProbes addCapture needs a plugin with registerPasses(); pass terrain, water, a sky or a VFX system',
+      );
+    const names = options.passes;
+    if (names !== undefined && (!Array.isArray(names) || !names.every((n) => typeof n === 'string')))
+      throw new TypeError('LightProbes addCapture `passes` must be an array of pass names');
+    const collected: FramePass[] = [];
+    // A graph of its own: the plugin's pass objects, without touching the engine's graph.
+    const graph = {
+      revision: 0,
+      add(pass: FramePass) {
+        collected.push(pass);
+        return () => {};
+      },
+      withOwner(_owner: string, register: () => void) {
+        register();
+      },
+      removeOwner() {},
+    } as unknown as FrameGraph;
+    plugin.registerPasses(graph);
+    for (const name of names ?? [])
+      if (!collected.some((p) => p.name === name))
+        throw new RangeError(
+          `LightProbes addCapture: ${plugin.name} has no pass '${name}'; its passes are ${collected.map((p) => `'${p.name}'`).join(', ')}`,
+        );
+    const passes = collected
+      .filter((p) => (names ? names.includes(p.name) : p.order > 0))
+      .sort((a, b) => a.order - b.order);
+    if (!passes.length)
+      throw new RangeError(`LightProbes addCapture: ${plugin.name} has no pass to replay; name them in \`passes\``);
+    const entry: ReplayedPlugin = { passes, restore: passes.filter((p) => p.order < CAPTURE_ORDER) };
+    this.replayed.add(entry);
+    return () => {
+      this.replayed.delete(entry);
+    };
+  }
   override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
@@ -1018,16 +1096,24 @@ export class LightProbes extends ShaderEffect {
     // land after the capture's submits.
     graph.add({
       name: this.name + ':capture',
-      order: -0.5,
+      order: CAPTURE_ORDER,
       execute: (c) => {
         if (c.backend !== 'webgpu' || c.device !== this.gpu) return;
-        if (this.pending) {
-          this.pending = false;
-          // The bake re-captures every face into the shared targets: a live refresh in progress starts over.
-          this.jobFace = 0;
-          this.captureAll(c);
-        } else if (this.job !== -1 || this.refreshQueue.length || this.liveOptions || this.liveVolumeOptions)
-          this.captureSlice(c);
+        try {
+          if (this.pending) {
+            this.pending = false;
+            // The bake re-captures every face into the shared targets: a live refresh in progress starts over.
+            this.jobFace = 0;
+            this.captureAll(c);
+          } else if (this.job !== -1 || this.refreshQueue.length || this.liveOptions || this.liveVolumeOptions)
+            this.captureSlice(c);
+        } finally {
+          // Replayed passes that ran before this one uploaded the probe camera last: upload the frame's again.
+          if (this.restorePending) {
+            this.restorePending = false;
+            for (const entry of this.replayed) for (const pass of entry.restore) pass.execute(c);
+          }
+        }
       },
     });
   }
@@ -1630,6 +1716,20 @@ export class LightProbes extends ShaderEffect {
         model.draw(view, 'beauty', color, depth);
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
       }
+      if (this.replayed.size) {
+        // Plugin passes on the real device (their pipeline caches are not keyed by it) and with no frame attachment
+        // to join or resolve.
+        view.device = device;
+        view.attach = undefined;
+        view.last = view.joins = view.only = false;
+        for (const entry of this.replayed) {
+          if (entry.restore.length) this.restorePending = true;
+          for (const pass of entry.passes) {
+            pass.execute(view);
+            if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+          }
+        }
+      }
       if (this.visibilityOffset && reflectionIndex === -1 && volumeIndex >= 0)
         this.measureDepth(resources, target, encoder, camera, position, volumeIndex, face, size);
       if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
@@ -1785,6 +1885,7 @@ export class LightProbes extends ShaderEffect {
     super.dispose();
     this.release();
     this.captured.clear();
+    this.replayed.clear();
     this.liveOptions = null;
     this.liveVolumeOptions = null;
     this.rejectRefreshes(new MargoError('disposed', `${this.name} was disposed before the refresh finished`));

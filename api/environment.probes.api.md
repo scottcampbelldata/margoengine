@@ -57,6 +57,7 @@ export class LightProbes extends ShaderEffect {
     protected patch(source: string, group: number): string;
     protected hooks(group: number): PBRHooks;
     add(model: LightingTarget): () => void;
+    addCapture(plugin: ProbeCapturePlugin, options?: ProbeCaptureOptions): () => void;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
@@ -84,6 +85,15 @@ export const PROBE_BINDING = 26;
 export interface ProbeBakeOptions {
     bounces?: number;
     samples?: number;
+}
+
+export interface ProbeCaptureOptions {
+    passes?: readonly string[];
+}
+
+export interface ProbeCapturePlugin {
+    readonly name: string;
+    registerPasses?(graph: FrameGraph): void;
 }
 
 export interface ReflectionProbe {
