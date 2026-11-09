@@ -3809,6 +3809,28 @@ orchestration: JSON.stringify traverses device.queue.device before any caller
 comparison can finish. Receipt: test-results/batch-273-dispersion-before.log.
 This is a fixture failure, not evidence of a rendering mismatch.
 
+### Batch 273 compatibility failure 10: render-state await observation
+
+Before probing, compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (depth/stencil state, dynamic stencil reference
+and queue ordering); Khronos WebGL Working Group, WebGL 2.0 Specification
+(2026), https://registry.khronos.org/webgl/specs/latest/2.0/ (depth/stencil
+attachments, inheriting polygon offset and stencil state from OpenGL ES);
+Khronos Group, OpenGL ES 3.2 Specification (2022),
+https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf;
+and Jeff A. Stuart and John D. Owens, Efficient Synchronization Primitives for
+GPUs (2011), https://arxiv.org/abs/1110.4623. API state transitions and completion
+awaits are separate contracts; none justifies changing stencil arithmetic,
+pixel expectations or synchronization to make a deadline pass.
+
+The owned batch-273-render-state-probe.mjs is generated from the complete
+canonical leaf. Imports resolve back to the original scripts; only ready,
+render/read labels and evaluate start/return markers are added. All case grids,
+optional legacy-baseline logic, pixel/arithmetic checks and resource/restore
+assertions are retained. A shared 75-second GPU hold gives the prior 60-second
+failure a bounded observation margin. No runtime repair, timeout waiver or
+rendering pass is inferred from a marker. No companion/rival code was read.
+
 ## Batch 171 LIC landing integration
 
 Main's full published-precision colormap restoration changes shared data, not LIC tracing or shader source.
