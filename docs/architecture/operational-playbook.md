@@ -1351,6 +1351,18 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Draco clean-room replacement (batch 133, 2026-11-09)
+
+The complete published specification and five figures were reviewed before code.
+Required decoding paths are missing; [the source ledger](../clean-room.md#draco-replacement-specification-review-batch-133-2026-11-09)
+records the evidence. The private specification-only plan preserves Rust/Wasm,
+the existing TypeScript API, one lazy decoder asset, hostile-input bounds, full
+external-corpus bit comparisons and paired A/B gates. Scott's 2026-11-10 ruling
+allows crafted-input black-box inference for omitted rules, with experiments in
+the source ledger and private plan; codec and wrapper source remain unread.
+No replacement was built or benchmarked. The prebuilt decoders remain pending
+all five jobs; existing tests do not prove a clean-room replacement.
+
 ### Procedural space colonisation (batch 68, job 4)
 
 The optional trees entry owns its Rust crate and lazy Wasm asset. Attraction assignment and growth are

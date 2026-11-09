@@ -26,6 +26,18 @@ import { join } from 'node:path';
 
 const samples = { byName: new Map(), byExtension: new Map() };
 
+test('the Node Basis example has a Node host and any execution failure fails the gate', () => {
+  const example = collectExamples(workspacePackages()).find(
+    ({ name, code }) => name === 'decoders' && /nodeKTX2/.test(code) && /loadGLTF/.test(code),
+  );
+  assert.ok(example, 'the documented Node Basis load must remain an executable example');
+  assert.equal(placeOf(example.code), 'node', 'a Node example cannot depend on a page canvas');
+  assert.deepEqual(askedElements(example.code), []);
+  const known = JSON.parse(readFileSync('scripts/support/readme-run-known.json', 'utf8'));
+  const result = judge([{ id: example.id, result: 'fail' }], known, true);
+  assert.equal(result.fresh.length, 1, 'a failure must not be grandfathered as a passing check');
+});
+
 test('an example that throws fails, with its error as the reason', async () => {
   const result = await runInNode({ id: 'runner-test/throws', code: "throw new RangeError('wrong size');" }, samples);
   assert.equal(result.result, 'fail');

@@ -153,15 +153,19 @@ console.log(width, height, data.length); // 1 1 4
 
 A JPEG and AVIF are refused with code `unsupported`, as are native ETC, EAC and ASTC blocks. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
 
-In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too:
+In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install `webgpu` and `@margoengine/headless` for the Node GPU binding and canvas in this example. It loads Khronos's published StainedGlassLamp sample and transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too:
 
 ```ts
 import {Engine} from 'margoengine/core';
+import {createHeadlessCanvas, installGPU} from '@margoengine/headless';
+import {create} from 'webgpu';
 import {nodeKTX2} from 'margoengine/decoders/image';
 import {loadGLTF} from 'margoengine/gltf-pro';
-const engine = await Engine.create(document.querySelector('canvas')!);
+const gpu = create([]);
+using installed = installGPU({gpu});
+using engine = await Engine.create(createHeadlessCanvas({width: 640, height: 480}), {backend: 'webgpu'});
 
-const model = await loadGLTF(engine, 'https://example.com/helmet.gltf', {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29});
+const model = await loadGLTF(engine, 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/StainedGlassLamp/glTF-KTX-BasisU/StainedGlassLamp.gltf', {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29});
 ```
 
 ## Texture upload (`@margoengine/decoders/texture`)

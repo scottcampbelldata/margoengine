@@ -1,5 +1,81 @@
 # Clean room
 
+## Draco replacement specification review (batch 133, 2026-11-09)
+
+The [published Draco bitstream specification](https://google.github.io/draco/spec/),
+Version 2,2, was read in full, including all five figures, before implementation.
+The retrieved HTML SHA-256 is
+`beda7f5ff1e7ac3d54b11c22f06e84ff1a58b785e8a1fa74a7af6a80e743f6d0`.
+No codec implementation source was opened or used. The required specification-only
+plan is retained in the private batch handoff.
+
+This source does not fully specify the requested replacement. Its
+[connectivity dispatch](https://google.github.io/draco/spec/#decodeconnectivitydata)
+has no point-cloud path. The generic attribute encoding is enumerated without a
+payload decoder; [portable attribute decoding](https://google.github.io/draco/spec/#decodeportableattributes)
+skips no-prediction payloads, and [integer decoding](https://google.github.io/draco/spec/#sequentialintegerattributedecoder_decodeintegervalues)
+has no uncompressed payload read.
+
+Scott's ruling of 2026-11-10 permits missing rules to be inferred by feeding crafted
+inputs to the prebuilt decoder and comparing its outputs. The oracle runs outside
+this repository; its implementation source and wrapper source remain unread. Every
+inferred rule must cite the input, observed output and distinguishing experiment
+here and in the private plan before implementation relies on it. An untested
+hypothesis is not an inferred rule. The prior requirement to wait for published
+errata is superseded. Both prebuilt decoders remain until implementation, complete
+external-corpus bit identity, hostile-input, speed and size gates pass. The review
+and revised plan alone make no replacement or performance claim.
+
+### Batch 133 black-box inference ledger
+
+The unchanged full decoder Wasm SHA-256 is
+`c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2`.
+Our original harness executes the opaque build in the private oracle directory
+outside the worktree and queries only public decode/metadata/array APIs. No codec
+source, disassembly or internal state is inspected. The following experiments
+establish rules omitted by the published specification, for version 2.2 only:
+
+| Experiment | Distinguishing inputs and observation | Inferred rule and held-out confirmation |
+| --- | --- | --- |
+| E3/E4 | 45 one-triangle files sweep semantics 0..4 and scalar types 1..6, 9..11. Each contains a second float attribute `[11.5,-3.25,17.75]`; every canary and first attribute decodes exactly. | Semantic bytes 0/1/2/3/4 mean POSITION/NORMAL/COLOR/TEX_COORD/GENERIC. Types 1/2/3/4/5/6/9/10/11 mean i8/u8/i16/u16/i32/u32/f32/f64/bool. Generic payloads are unframed, interleaved little-endian scalars with no prediction byte. Six further signed, boundary and fractional cases preserve the following canary. 64-bit integer types remain untested. |
+| E5/E6 | NONE (`fe`) followed by `00`, width 1/2/3/4 and unsigned symbols `[4,13,22]` returns `[2,-7,11]` at every width, then the intact canary. Alternative plain signed hypotheses predict different values. | NONE still consumes the compression flag; zero consumes a byte width and that many little-endian bytes per zigzag symbol. Four held-out cases cover the signed minima/maxima of each width, including int32. |
+| E14 | Point-cloud headers followed by LE u32 counts 0/1/2/127/128/257 and sequential attribute descriptors return the exact count/values. Varint candidates reject or return a different count. | Sequential point clouds store a fixed LE u32 point count immediately after the header, then the sequential attribute stream. Held-out counts 3 and 129 with three asymmetric components confirm row order. |
+| E1/E2 | Four encodings of nine 3-bit symbols distinguish high/low bit order and per-row/whole-stream alignment. Only continuous low-bit-first data returns the intended values and intact canary. | Tagged values consume low bits first without alignment between component groups; align once at the end. Held-out 3/5-bit streams with changing row widths confirm. Six independently emitted raw ANS cases exercise precision 12/18/20 bits and reverse-byte refill, agreeing with the published entropy algorithm. |
+| E7 | Two decoder groups with attribute counts 1+1, 1+2 and 1+3 return every distinct attribute. Quantized three-component values use unequal minima `[-13,2,0.125]`. | Each group uses its own attribute count; each minimum belongs to its component. This corrects the specification's last-group-count and minimum-index typos. |
+| E11 | Normal NONE payloads with two portable components succeed and preserve a following canary; three-component candidates reject. A 512-point grid at 4/8/12/16 quantization bits distinguishes arithmetic forms, float widths and signed zero. | Portable normals always use two components. The equivalent octahedral unfolding below matches all 1,536 output scalars; 903 held-out points at 2/3/6/10/20/24/30 bits also match exactly. |
+| E12 | The specification's two successive quantization multiplies differ from the oracle by one ULP on the value 8 at 8 bits, range 7.25, minimum 0.125. | Compute the float32 scale as `range / ((1 << bits) - 1)`, then float32 `value * scale + minimum`, rounding after multiply and add. Sixteen held-out files at 4/8/12/20 bits and four unequal ranges match all 6,192 scalars. |
+
+E11's arithmetic is derived from the published octahedral geometry and selected
+by experiments, not another implementation: round every operation to float32;
+set `scale = 2 / ((1 << bits) - 2)`, `y = s * scale - 1`,
+`z = t * scale - 1`, `x = (1 - abs(y)) - abs(z)`. When `x < 0`,
+use the original y/z to set y to `abs(z) - 1` if y is negative, otherwise
+`1 - abs(z)`, and z to `abs(y) - 1` if z is negative, otherwise
+`1 - abs(y)`. Normalize using float32 `((x*x + y*y) + z*z)`, float32 square
+root, reciprocal and component multiplies. The subtraction order explains the
+positive zeros on folds without a special case for any tested input.
+
+Exact crafted inputs and complete public outputs are retained under the worktree's
+private `batch-133` directory and identified in the private plan. First input/output
+SHA-256: `63e27af6ebace23d29dd7021efc44113f3962666456829b72d953049ce5332f1` /
+`01a877c87cfe8cc3a9f9f474bb85cd88b8499884cc230ff0400db9e933469ebd`.
+Held-out input/output SHA-256:
+`3856c35a56aebe880cd0b37ea157a3fc77b462223695dac073694394ae3e34e0` /
+`389324c2ddabb179c85d05756c530d8235774cc0178fa3397440b927bc6bd171`.
+Additional exact input/output SHA-256 pairs, with filenames in the private plan:
+
+- Tagged alignment: `3f653ae154d708fedd34de095a8bac8dff73007a1339175c307a9d1517437d63` / `76ed3e1577ceb8a9f28867ee6bfc974a28739ba17e327fd42c71e686e4989957`.
+- Held-out entropy: `fa201d4dacc9f5c08237156c9cefb9fac2236852fff01fc0aa867abbf43fa25b` / `b72bbc85aea219d05e3adc1dbaa2d774e9fa2353ed9fb3ed9247a18634e2b02b`.
+- Groups/transforms: `18441ab21e20d9080a27128319dd5544670ad66bbe394a1e6cc303dfb757dad9` / `b89cf48ee97dbaffe8b2f1e2adf671c97bb0c541d424ffb00973f8c4ca995cd3`.
+- Normal discovery: `cbe1c84e47ac1b463e27418fcff029c8b7b4d3da61f6c55cf261e5cb1ea7040f` / `5527ebec575391d2cc402cc0a4060464dc5a340d8ad6a1f0004f96808f0a94f7`.
+- Held-out transforms: `c515b914f800c4f8511621cb932909942f4753ff737cc0546f4c2dd6372cbebe` / `db8f0721c6662db0d01202e7043f98084f83c6b12c58afd4c70647df7ac8ffd4`.
+
+These are synthetic syntax experiments, not an external compatibility corpus.
+Version-byte mutations do not establish historical syntax. Other point-cloud
+methods, predictive EdgeBreaker and the remaining planned experiments are still
+unproven. A private sequential Rust prototype exercises these rules; no shipped
+decoder or public entry changes in the specification-review job.
+
 ## Creative texture targets (batch 77)
 
 Cube/array texture views, mip extents and 3D render attachment depthSlice follow the

@@ -1,5 +1,30 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: decoder Node Basis README example
+
+The Node `nodeKTX2` example used a page's `document` and fetched the placeholder
+`example.com/helmet.gltf`. Its grandfathered fetch failure let the README runner
+exit successfully without executing that example. It now creates a real Node GPU
+binding and headless canvas, disposes both scopes, and loads the pinned published
+StainedGlassLamp Basis sample. The exception is removed. The scoped decoder/glTF
+README run executes all 43 examples with zero failures; the runner regression test
+requires this example to select Node and treats any execution failure as a gate
+failure. No decoder algorithm changed in this documentation repair.
+
+### Open: batch 133 clean-room Draco replacement is not implemented
+
+This is a replacement prerequisite, not a newly observed failure of the shipped decoder.
+Reproduce the source gap by following the published specification's connectivity
+dispatch for header encoder type 0, or its attribute decoder for generic,
+no-prediction and uncompressed integer payloads. These paths lack complete decoding
+rules; the [source review](clean-room.md#draco-replacement-specification-review-batch-133-2026-11-09)
+records the exact sections. Cause: the permitted specification does not define all
+required behavior. Scott's 2026-11-10 ruling authorizes crafted-input black-box
+experiments to infer the missing rules, with each rule and experiment recorded in
+the source ledger and private plan. No implementation source may be read or used.
+The remedy is the full Rust/Wasm decoder followed by all comparison and quality
+gates. The existing prebuilt files remain and batch 133 stays open.
+
 ### Fixed 2026-11-09: batch 76 transition review
 
 Built-in/custom composites used viewport-local UVs to address full-target captures, reading uncaptured pixels in offset views. They now derive capture UVs from absolute fragment positions. viewport-browser.js compares spatial colors against baseline at idle/0/0.5/1 across all built-in kinds, custom and mask, at 1x/4x, including preservation outside a stacked scissor. Live target validation omitted the fragment output's format domain, so integer/depth targets could advance source scenes before invalid GPU work. A shared float-color/resolve check now rejects those formats before live allocation or updates and also guards frozen-frame capture. live.test.js, live-browser.js and transitions.test.js cover this class, including non-resolvable 32-bit float 4x outputs. README and limits document custom WGSL's trusted-author requirement and fixed resource interface; real-compiler regressions accept costly code without dispatch, reject reachable extra resources and distinguish unused declarations. No core/stage change.
