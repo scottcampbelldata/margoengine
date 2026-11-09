@@ -1,5 +1,14 @@
 # Claims and evidence
 
+Pixel's readable palette shader preserves the prior operations, literals and
+binding positions after identifier normalization. The real GPU palette suite
+passes 20 exact checks with zero wrong pixels or validation errors; both palette
+shader modules compile. All five pixel GPU suites and all seven README examples
+pass, including device replacement and the other pixel entries. Field/range diagnostic regressions pass,
+and mutable infinite spread is rejected before GPU work. This does not change
+the colour model or make a speed claim. Method, sources and shader-text
+minifier evaluation: [size restoration](../size-restore.md).
+
 Lighting2d validation names failing scalar fields, mask constraints and allowed
 enum values directly in linked RangeErrors. Evidence:
 `packages/lighting2d/tests/diagnostics.test.js` fails on the shortened diagnostics

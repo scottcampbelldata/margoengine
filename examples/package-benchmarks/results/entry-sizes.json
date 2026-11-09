@@ -1,6 +1,6 @@
 {
-  "commit": "2a6972562",
-  "dirty": false,
+  "commit": "8ca1632cb",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59077,
@@ -2090,8 +2090,8 @@
         "gzip": 4416
       },
       "./palette": {
-        "raw": 10470,
-        "gzip": 4656
+        "raw": 11493,
+        "gzip": 4945
       },
       "./render3d": {
         "raw": 8891,

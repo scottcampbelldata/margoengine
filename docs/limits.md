@@ -2427,3 +2427,16 @@ Entry gzip: 2,393 B, below the unchanged 2,652 B ceiling; Wasm is a separate
 31,905 B raw / 13,036 B gzip lazy asset. Existing erosion entry:
 3,014 B, below its unchanged 3,202 B ceiling; biome root 16,516 / 16,819 B.
 Production-browser, all biomes GPU and all biomes/umbrella README gates pass.
+
+### Palette source and diagnostics restoration (audit finding 4, 2026-11-10)
+
+Measured from 2e8ebc506 and the restoration build by the entry-size method:
+`@margoengine/pixel/palette` 4656 to 4945 B min+gzip;
+ceiling 4860 to 5201 B (256 B headroom). Other pixel entries do not grow.
+Core plus stage remains 23924 B. The extra bytes retain readable WGSL
+settings, texture and entry-point names, indentation, and full field/range
+guidance in the owning entry. A split would add shader-loading state or async
+diagnostics to a synchronous pass. All matching, alpha, dithering and swap
+operations are preserved. Spread must be finite and non-negative; infinity is
+now rejected before GPU work instead of being uploaded as a shader parameter.
+Research, normalization proof and minifier evaluation: [size restoration](size-restore.md).

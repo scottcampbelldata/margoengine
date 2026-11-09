@@ -4087,3 +4087,15 @@ The spectral GPU suite now requires exact zero channel spread and exact root ima
 white diffuse scene at 1 and 64 spp, with an inactive dispersive lens and an achromatic open aperture.
 The existing interface, slab, lens disk-edge, furnace and lifecycle bounds remain unchanged.
 No timing, spectral upsampling or production-lens fidelity claim follows.
+
+### Section 5 evidence: readable palette WGSL
+
+Size-restoration finding 4 restores descriptive identifiers and layout in pixel's
+palette shader. Normalization against the prior Margo shader proves that only
+identifiers and whitespace changed; constants, operations, ordering and binding
+positions are identical. The owner rejects infinite spread before shader
+creation/writes and names each failing argument and allowed range. CPU regression
+and research are in size-restore.md. All five pixel GPU suites pass; the palette
+suite has 20 exact checks with zero wrong pixels or validation errors and two
+shader modules compile. No build-time shader transformation or speed claim is
+introduced. All seven README examples run in the browser with zero failures.

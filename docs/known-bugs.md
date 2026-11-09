@@ -11,6 +11,16 @@ its own coherent `b5822d106`/dirty pair. Those newer package measurements are
 retained in full, with another passing size-page check. Successful verification
 steps are retained; no metadata was relabeled and no second full verify is claimed.
 
+### Fixed 2026-11-10: palette diagnostics and infinite spread
+
+Palette helpers and pass options shared `Invalid palette value`; WGSL identifiers
+and layout had also been shortened for size. The owning palette entry restores
+readable names/layout and full field/range guidance. A mutable `pass.spread =
+Infinity` previously passed the non-negative check and reached GPU parameters;
+it now throws a linked RangeError before GPU work. Regressions:
+`packages/pixel/tests/palette-diagnostics.test.js`. Research and measured bytes:
+[size-restore.md](size-restore.md). Valid matching/dithering arithmetic is unchanged.
+
 ### Fixed 2026-11-10: README runner did not drive Blender's live-link lifecycle
 
 The harness waited for a continuing module without supplying its live service

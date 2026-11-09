@@ -134,3 +134,78 @@ entry sizes. Regenerated both from the measured build; only those two failed
 test files were rerun, both pass (9 tests total). All other verify steps pass
 and are retained. The network fixture makes five requests with no unused build
 files. API summary and paired size/network records are committed together.
+
+## Pixel palette source and diagnostics (audit finding 4)
+
+Verified on 2e8ebc506: the WGSL still uses S/s/n/lab/lin/near/noise/vs/fs and
+unindented blocks, and eight argument checks still share one generic message.
+Restore Settings/settings/count/oklab/linear/candidates/pattern/vertexMain/
+fragmentMain and readable layout. Keep the dither lookup table and unknown-mode
+RangeError. Restore field/range and accepted-value guidance, including the
+unreadable palette colour's index. No matching or dither algorithm changes.
+The audit also exposed spread accepting positive infinity: reject non-finite
+spread before shader creation or GPU writes, with its own regression.
+
+Research compared these primary descriptions and specifications:
+
+- W3C GPU for the Web Working Group (editors Alan Baker, Mehmet Oguz Derin and
+  David Neto), *WebGPU Shading Language*, 2026,
+  [tokenization](https://www.w3.org/TR/WGSL/#tokenization) and
+  [comments](https://www.w3.org/TR/WGSL/#comment). Whitespace and comments can
+  separate tokens; block comments nest. A general minifier must preserve lexical
+  boundaries, not just remove text.
+- Bjorn Ottosson, *A perceptual color space for image processing*, 2020,
+  [Oklab description](https://bottosson.github.io/posts/oklab/). Retain the existing
+  conversion constants and operation order rather than replace the colour model.
+- W3C CSS Working Group (editors Tab Atkins Jr., Chris Lilley and Lea Verou),
+  *CSS Color Module Level 4*, 2026,
+  [Oklab](https://www.w3.org/TR/css-color-4/#ok-lab). This independently specifies
+  the named lightness/opponent coordinates; no new colour-space claim is made.
+
+The existing WCAG error-identification/suggestion and ECMAScript RangeError
+research above applies to the palette diagnostics too. No foreign engine or
+companion code was read or copied. One-time normalization against the pre-change
+Margo shader proves every operation, literal and binding position unchanged
+after mapping the restored identifiers and ignoring whitespace; GPU pixel parity
+remains the runtime acceptance bar.
+
+Minifier evaluation (LF-normalized shader text, default gzip): shortened 802 B,
+readable 903 B; a whitespace-only collapse saves 35 B (868 B). That experiment
+does not prove a repository-wide transform sound for nested comments, operator
+boundaries or composed shaders. Keep readable WGSL verbatim and raise the optional
+ceiling; the evidence does not meet the brief's sound, identical-output condition
+for adding a generic build transform. No shader parser/minifier is added.
+
+Regression: packages/pixel/tests/palette-diagnostics.test.js covers every restored
+argument error and rejects infinite/NaN/negative mutable spread before GPU work.
+The old diagnostics fail it. Existing palette GPU tests compare every pixel
+exactly with the CPU form across both distances, all patterns, alpha, swaps and
+device replacement. Measured entry and ceiling changes are in limits.md.
+
+Validation: 45 existing package tests pass, as do all three diagnostics tests
+after supplying the engine's sceneOf method in their fixture. Only the failed
+file was rerun; the infinite-spread regression has its own case. All five real
+GPU suites pass. Palette has 20 exact checks with no wrong pixels or validation
+errors and two shader modules compile; the compositor has 48 exact-pixel checks
+and six shader modules compile. The lock initially refused the unclassified
+palette-check filename before launching it; its explicit real-GPU reason was
+supplied, and only that failed/remaining sequence ran. No successful GPU suite
+rerun. Lint and hygiene pass. All seven README examples run in the browser with
+zero failures. Fresh entry and basic-scene network records measure the same
+2e8ebc506 dirty build; the basic scene has five requests and no unused build
+files. api:update produced no public export changes.
+
+Before rebase, full verify passes all 13756 unit tests, API, quality, sizes,
+documentation, proofs and sandbox builds/tests. No failed step remains. The
+successful package, GPU and README results are retained across the rebase.
+Rebase onto 2ab71bef2 preserves the independent biomes erosion feature and
+decoder documentation. Pixel source and its proof inputs have no conflict or
+change. The combined packages are rebuilt; entry and network records genuinely
+measure 2ab71bef2 with package changes, followed by api:update and size measurement.
+Palette remains 4945 B and core plus stage 23924 B. No source or metadata relabeling.
+The merged sizes gate, size-page/llms/API-short-path tests and documentation links
+all pass. No successful pixel GPU, README or full verify run was repeated.
+Current-main fetch then included 8ca1632cb's independent deferred spectral fix.
+Preserved it and its documentation; rebuilt the changed spectral package and
+remeasured the combined entries/network pair from 8ca1632cb with package changes,
+then regenerated the API. Pixel source and its passing proof inputs stay unchanged.

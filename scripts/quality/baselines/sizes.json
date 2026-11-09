@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11648879,
+  "total": 11649220,
   "history": [
     {
       "date": "2026-10-24",
@@ -5138,6 +5138,12 @@
       "commit": "1a1bbe648",
       "reason": "New optional biomes/erosion-wasm entry only: 2396 B measured plus 256 B headroom; no existing ceiling raised",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "2e8ebc506",
+      "grew": 1,
+      "reason": "Size restoration finding 4: pixel/palette 4656 to 4945 B gzip, ceiling 4860 to 5201 B with standard headroom. Restore descriptive WGSL names and layout, field/range diagnostics, and reject infinite spread before GPU writes. Keep all matching, alpha, dither and swap work. A separate shader/diagnostic entry would complicate a single synchronous pass for no API benefit. Core plus stage unchanged at 23924 B."
     }
   ],
   "items": {
@@ -5635,7 +5641,7 @@
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 3072,
-    "@margoengine/pixel/palette": 4860,
+    "@margoengine/pixel/palette": 5201,
     "@margoengine/pixel/render3d": 3866,
     "@margoengine/pixel/scale": 3367,
     "@margoengine/points": 23954,

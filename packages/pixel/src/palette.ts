@@ -15,8 +15,6 @@ export type PaletteDistance = 'oklab' | 'srgb';
 /** The pattern that nudges colours before matching. `'none'` matches each colour as it is. */
 export type PaletteDither = 'none' | 'bayer2' | 'bayer4' | 'bayer8' | 'blue-noise';
 
-const invalid = () => rangeError('Invalid palette value', 'pixel-palette');
-
 /** A palette as sRGB values from 0 to 1, `[r, g, b]` per colour. */
 export type PaletteRGB = readonly (readonly [number, number, number])[];
 
@@ -24,14 +22,15 @@ export type PaletteRGB = readonly (readonly [number, number, number])[];
 export function readPalette(colors: readonly PaletteColor[]): [number, number, number][] {
   if (!Array.isArray(colors) || !colors.length || colors.length > 256)
     throw rangeError('A palette holds 1 to 256 colours', 'pixel-palette');
-  return colors.map((color) => {
+  return colors.map((color, index) => {
     const rgb =
       typeof color === 'string'
         ? hexColor(color)?.slice(0, 3)
         : Array.isArray(color) && color.length === 3 && color.every((v) => v >= 0 && v <= 255)
           ? color.map((v) => v / 255)
           : undefined;
-    if (!rgb) throw rangeError('Invalid palette colour', 'pixel-palette');
+    if (!rgb)
+      throw rangeError(`Invalid palette colour at index ${index}: use #rrggbb or three RGB bytes in [0, 255]`, 'pixel-palette');
     return rgb as [number, number, number];
   });
 }
@@ -78,7 +77,7 @@ const hex = (rgb: readonly number[]) =>
 
 /** Turns each colour's hue by `degrees` in Oklab, keeping its lightness and chroma as far as sRGB can. Returns `#rrggbb`. */
 export function shiftPaletteHue(colors: readonly PaletteColor[], degrees: number): string[] {
-  if (!Number.isFinite(degrees)) throw invalid();
+  if (!Number.isFinite(degrees)) throw rangeError('Invalid degrees: must be finite', 'pixel-palette');
   const cos = Math.cos((degrees * Math.PI) / 180),
     sin = Math.sin((degrees * Math.PI) / 180);
   return readPalette(colors).map(([r, g, b]) => {
@@ -89,7 +88,8 @@ export function shiftPaletteHue(colors: readonly PaletteColor[], degrees: number
 
 /** `steps` colours from `from` to `to`, evenly spaced in Oklab, ends included. Returns `#rrggbb`. */
 export function paletteRamp(from: PaletteColor, to: PaletteColor, steps: number): string[] {
-  if (!Number.isInteger(steps) || steps < 2) throw invalid();
+  if (!Number.isInteger(steps) || steps < 2)
+    throw rangeError('Invalid steps: must be an integer of at least 2', 'pixel-palette');
   const [start, end] = readPalette([from, to]).map(([r, g, b]) => oklabFromSRGB(r, g, b));
   return Array.from({ length: steps }, (_, i) => {
     const t = i / (steps - 1);
@@ -181,7 +181,7 @@ export function mixPalettes(a: readonly PaletteColor[], b: readonly PaletteColor
  * above 0 and below 1. @throws RangeError for another size.
  */
 export function bayerMatrix(size: 2 | 4 | 8): Float32Array {
-  if (![2, 4, 8].includes(size)) throw invalid();
+  if (![2, 4, 8].includes(size)) throw rangeError('Invalid Bayer size: use 2, 4 or 8', 'pixel-palette');
   const out = new Float32Array(size * size);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
@@ -198,7 +198,8 @@ export function bayerMatrix(size: 2 | 4 | 8): Float32Array {
  * seed, same matrix. Each value is `(rank + 0.5) / size^2`.
  */
 export function blueNoise(size = 64, seed = 1): Float32Array {
-  if (!Number.isInteger(size) || size < 4 || size > 256) throw invalid();
+  if (!Number.isInteger(size) || size < 4 || size > 256)
+    throw rangeError('Invalid blue-noise size: must be an integer in [4, 256]', 'pixel-palette');
   const count = size * size,
     kernel = new Float64Array(count),
     energy = new Float64Array(count),
@@ -270,7 +271,8 @@ const SIDES: Record<string, number> = { none: 0, bayer2: 2, bayer4: 4, bayer8: 8
 /** The threshold matrix of a dither mode and its side, or undefined for `'none'`. @throws RangeError for another mode. */
 export function ditherMatrix(mode: PaletteDither): { size: number; values: Float32Array } | undefined {
   const size = SIDES[mode];
-  if (!(size >= 0)) throw invalid();
+  if (!(size >= 0))
+    throw rangeError('Invalid dither: use none, bayer2, bayer4, bayer8 or blue-noise', 'pixel-palette');
   return size ? { size, values: size > 8 ? blueNoise() : bayerMatrix(size as 2 | 4 | 8) } : undefined;
 }
 
@@ -305,48 +307,65 @@ export function nearestPaletteIndex(
 }
 
 const shader = /* wgsl */ `
-struct S{n:u32,side:u32,lab:u32,straight:u32,spread:f32}
-@group(0) @binding(0) var<uniform> s:S;
-@group(0) @binding(1) var image:texture_2d<f32>;
-@group(0) @binding(2) var near:texture_2d<f32>;
-@group(0) @binding(3) var shown:texture_2d<f32>;
-@group(0) @binding(4) var noise:texture_2d<f32>;
-@vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
-return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);
+struct Settings {
+  count: u32,
+  side: u32,
+  oklab: u32,
+  straight: u32,
+  spread: f32
 }
-fn lin(v:f32)->f32{
-if(v<=0.04045){return v/12.92;}
-return pow((v+0.055)/1.055,2.4);
+@group(0) @binding(0) var<uniform> settings: Settings;
+@group(0) @binding(1) var image: texture_2d<f32>;
+@group(0) @binding(2) var candidates: texture_2d<f32>;
+@group(0) @binding(3) var shown: texture_2d<f32>;
+@group(0) @binding(4) var pattern: texture_2d<f32>;
+
+@vertex fn vertexMain(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(f32(i & 1u) * 4 - 1, f32(i >> 1u) * 4 - 1, 0, 1);
 }
-fn oklab(c:vec3f)->vec3f{
-let r=lin(c.r);
-let g=lin(c.g);
-let b=lin(c.b);
-let l=pow(0.4122214708*r+0.5363325363*g+0.0514459929*b,1.0/3.0);
-let m=pow(0.2119034982*r+0.6806995451*g+0.1073969566*b,1.0/3.0);
-let k=pow(0.0883024619*r+0.2817188376*g+0.6299787005*b,1.0/3.0);
-return vec3f(0.2104542553*l+0.793617785*m-0.0040720468*k,1.9779984951*l-2.428592205*m+0.4505937099*k,0.0259040371*l+0.7827717662*m-0.808675766*k);
+
+fn linear(v: f32) -> f32 {
+  if (v <= 0.04045) { return v / 12.92; }
+  return pow((v + 0.055) / 1.055, 2.4);
 }
-@fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{
-let t=vec2i(p.xy);
-if(any(t>=vec2i(textureDimensions(image)))){return vec4f(0);}
-let a=textureLoad(image,t,0);
-if(a.a==0){return vec4f(0);}
-var c=a.rgb;
-if(s.straight==0u){c/=a.a;}
-if(s.side>0u){c+=s.spread*(textureLoad(noise,vec2u(t)%s.side,0).r-0.5);}
-c=clamp(c,vec3f(0),vec3f(1));
-if(s.lab==1u){c=oklab(c);}
-var best=0u;
-var least=1e30;
-for(var i=0u;i<s.n;i++){
-let d=c-textureLoad(near,vec2u(i,0u),0).rgb;
-let e=dot(d,d);
-if(e<least){least=e;best=i;}
+
+fn oklab(c: vec3f) -> vec3f {
+  let r = linear(c.r);
+  let g = linear(c.g);
+  let b = linear(c.b);
+  let l = pow(0.4122214708*r + 0.5363325363*g + 0.0514459929*b, 1.0/3.0);
+  let m = pow(0.2119034982*r + 0.6806995451*g + 0.1073969566*b, 1.0/3.0);
+  let k = pow(0.0883024619*r + 0.2817188376*g + 0.6299787005*b, 1.0/3.0);
+  return vec3f(
+    0.2104542553*l + 0.793617785*m - 0.0040720468*k,
+    1.9779984951*l - 2.428592205*m + 0.4505937099*k,
+    0.0259040371*l + 0.7827717662*m - 0.808675766*k
+  );
 }
-let o=textureLoad(shown,vec2u(best,0u),0).rgb;
-if(s.straight==1u){return vec4f(o,a.a);}
-return vec4f(o*a.a,a.a);
+
+@fragment fn fragmentMain(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  let t = vec2i(p.xy);
+  if (any(t >= vec2i(textureDimensions(image)))) { return vec4f(0); }
+  let source = textureLoad(image, t, 0);
+  if (source.a == 0) { return vec4f(0); }
+  var c = source.rgb;
+  if (settings.straight == 0u) { c /= source.a; }
+  if (settings.side > 0u) {
+    c += settings.spread * (textureLoad(pattern, vec2u(t) % settings.side, 0).r - 0.5);
+  }
+  c = clamp(c, vec3f(0), vec3f(1));
+  if (settings.oklab == 1u) { c = oklab(c); }
+
+  var best = 0u;
+  var least = 1e30;
+  for (var i = 0u; i < settings.count; i++) {
+    let d = c - textureLoad(candidates, vec2u(i, 0u), 0).rgb;
+    let e = dot(d, d);
+    if (e < least) { least = e; best = i; }
+  }
+  let color = textureLoad(shown, vec2u(best, 0u), 0).rgb;
+  if (settings.straight == 1u) { return vec4f(color, source.a); }
+  return vec4f(color * source.a, source.a);
 }`;
 
 const SETTINGS_BYTES = 32;
@@ -365,7 +384,7 @@ export interface PaletteQuantizeOptions {
   distance?: PaletteDistance;
   /** Read each frame. Default `'none'`. */
   dither?: PaletteDither;
-  /** How far the pattern moves a colour, in sRGB values, read each frame. Default 0.125. */
+  /** Finite, non-negative pattern strength in sRGB values, read each frame. Default 0.125. */
   spread?: number;
   /** Colours in `source` are multiplied by alpha, as in a pixel layer, and stay so in `target`. Default true. */
   premultiplied?: boolean;
@@ -416,12 +435,13 @@ export class PaletteQuantize implements EnginePlugin {
     if (!options?.palette || !options.source || !options.target)
       throw typeError('PaletteQuantize needs a palette, a source and a target', 'pixel-palette');
     const order = options.order ?? 20;
-    if (!Number.isFinite(order)) throw invalid();
+    if (!Number.isFinite(order)) throw rangeError('Invalid palette order: must be finite', 'pixel-palette');
     this.#source = options.source;
     this.#target = options.target;
     this.#order = order;
     this.#distance = options.distance ?? 'oklab';
-    if (this.#distance !== 'oklab' && this.#distance !== 'srgb') throw invalid();
+    if (this.#distance !== 'oklab' && this.#distance !== 'srgb')
+      throw rangeError('Invalid distance: use oklab or srgb', 'pixel-palette');
     this.dither = options.dither ?? 'none';
     this.spread = options.spread ?? 0.125;
     this.#straight = options.premultiplied === false;
@@ -552,7 +572,8 @@ export class PaletteQuantize implements EnginePlugin {
     if (c.view?.index) return;
     const device = c.device,
       mode = this.dither;
-    if (!(this.spread >= 0)) throw invalid();
+    if (!Number.isFinite(this.spread) || this.spread < 0)
+      throw rangeError('Invalid spread: must be finite and non-negative', 'pixel-palette');
     this.#prepare(device);
     const pick = (texture: GPUTexture | (() => GPUTexture)) => (typeof texture === 'function' ? texture() : texture),
       source = pick(this.#source),

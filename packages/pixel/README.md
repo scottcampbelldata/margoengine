@@ -215,12 +215,20 @@ engine.render({delta: 1 / 60});
 | `source`, `target` | required | Different textures, or functions returning them; `target` is cleared first |
 | `distance` | `'oklab'` | `'oklab'` or `'srgb'` |
 | `dither` | `'none'` | `'none'`, `'bayer2'`, `'bayer4'`, `'bayer8'`, `'blue-noise'`, read each frame |
-| `spread` | `0.125` | How far the pattern moves a colour, in sRGB values, read each frame |
+| `spread` | `0.125` | Finite, non-negative pattern strength in sRGB values, read each frame |
 | `premultiplied` | `true` | Colours are multiplied by alpha, as in a pixel layer |
 | `order` | `20` | Frame-graph order, after sprites and maps and before the compositor |
 | `name` | `palette-1`, ... | Plugin name, unique per scene |
 
 The pattern is fixed to the target's pixels. `shiftPaletteHue(colors, degrees)` and `paletteRamp(from, to, steps)` make palettes in Oklab; `bayerMatrix`, `blueNoise` and `nearestPaletteIndex` are the CPU forms the pass uses.
+
+Palette validation names the failing field, its allowed range or enum choices
+and a help link. Hue-shift degrees and pass order must be finite, ramp steps an
+integer of at least 2, Bayer size 2/4/8, and blue-noise size an integer in
+`[4, 256]`. An unreadable colour identifies its palette index. Mutable `spread`
+is checked before GPU work, including rejection of infinity. The shader retains
+descriptive settings, texture and entry-point names, with readable layout;
+matching, dithering, alpha and palette-swap calculations are unchanged.
 
 ### Palette cycling and ramps
 
