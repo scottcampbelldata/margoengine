@@ -2940,6 +2940,34 @@ test-design inference from those descriptions. No external implementation was
 read or copied. All 512 rays per blend mode, f32/f16 comparisons, tolerances,
 blend-difference checks and the real room bake remain unchanged.
 
+### Batch 56 compatibility capture investigation
+
+Research compared Jon Leech and Benj Lipchak (editors), OpenGL ES 3.0.6
+(Khronos, 2019), sections 2.1.2 (binary16), 4.1.9 (dithering), 4.3.2
+(multisample resolve) and appendix A.3 (invariance),
+https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf ; Robert J.
+Simpson (editor), The OpenGL ES Shading Language 3.00, revision 6 (2016),
+section 4.3.9 (interpolation),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf ;
+and the Khronos WebGL Working Group, WebGL 2.0 Specification (current revision
+read 2026-11-09), https://registry.khronos.org/webgl/specs/latest/2.0/ .
+The scientific comparison is Sanjif Shanmugavelu, Mathieu Taillefumier,
+Christopher Culver, Oscar Hernandez, Mark Coletti and Ada Sedova,
+Impacts of floating-point non-associativity on reproducibility for HPC and deep
+learning applications (2024), https://arxiv.org/abs/2408.05148 . Its reduction
+results motivate examining arithmetic order; they do not attribute this raster
+failure to a parallel reduction or permit changing an exact assertion.
+
+Our diagnostic inference: 2^-12 is also one binary16 ULP in the interval
+[0.25, 0.5); the maximum difference alone cannot identify the format or cause.
+The compatibility capture uses RGBA16F, reads FLOAT and encodes binary16 on
+the CPU. The standards distinguish that conversion from implementation-defined
+multisample resolution and varying interpolation. The investigated glass uses
+zero roughness, so its capture does not run the optional reflection blur chain.
+Diagnostics retain the original assertion while recording raw component values,
+GL draws, resolve operations and readbacks. No mismatching component has yet
+been reproduced. No foreign implementation or companion code was read or used.
+
 ### Batch 56 review repairs: HDR direction, view state and temporal cameras
 
 The optional staging/ground entry uses the real first-band basis published by

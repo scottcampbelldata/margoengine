@@ -4338,3 +4338,17 @@ suite stops on a 4x-MSAA refractor exact-value mismatch of 0.000244140625. Its
 root cause remains open in known-bugs.md; fresh and full-prefix diagnostics that
 produce exact equality do not clear that failure. Later mirror/review-pixel,
 fog and runtime README steps were not executed. No repair is accepted or pushed.
+
+Batch 56 coordinator follow-up: rebuilt plain origin/main 7289abf3b passes all
+65 compatibility mirror checks. The first three repairs also pass the full
+65-check suite; the scene-ownership and all-five checkpoints pass the unchanged
+exact 4x glass assertion with its complete prefix. An instrumented capture on
+the full local branch passes and retains 97 GL calls/readback diagnostics.
+These passing diagnostic checkpoints do not clear the earlier 2^-12 failure:
+no differing texel or causal commit has yet been reproduced. After autosquashing
+the reflection-shapes fixture repair and rebasing onto 9b62132bb, a new 64-pair
+diagnostic reached its 105-second shared-lock limit, was killed and released
+the slot. It has no completed result and cannot support acceptance. The limit
+is not a speed budget; no existing assertion, tolerance or gate was changed.
+Fresh post-rebase CPU checks and remaining package GPU/README gates are still
+required. No core/stage edit, exclusive hold or push is included.

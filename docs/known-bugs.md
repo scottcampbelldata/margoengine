@@ -3279,3 +3279,34 @@ nor prior-state contamination is yet proved. These diagnostics do not clear the
 failed gate. Retain its exact assertion and capture differing texel coordinates,
 raw values and backend state on a reproduction before changing the owner.
 No test, tolerance, timeout or production source was changed for this failure.
+
+Coordinator baseline and bisection (2026-11-09): plain origin/main 7289abf3b,
+rebuilt in this lane, passes all 65 unchanged compatibility mirror assertions
+in 106.893 seconds including teardown. The retained report is
+test-results/56fix/main-baseline-compat-mirror-report.json. Prefix fe38730b6
+(finite studio direction, temporal camera and view state repairs) passes all
+65 assertions, with zero differing raw glass components at both 4x and 1x.
+The exact original 4x capture assertion and its full preceding render sequence
+also pass at c8a6a45f5 and 5547d516e (all five original repairs). On full local
+061bd5e82, an instrumented version passes that same assertion and records 97 GL
+calls plus unchanged readback values. Evidence: bisect-prefix-compat-mirror,
+bisect-owning-compat-capture, bisect-five-compat-capture and
+bisect-head-state-capture logs/JSON in test-results/56fix.
+
+No tested checkpoint reproduces the earlier difference, so these observations
+do not establish a causal commit or close the defect. A new 64-pair diagnostic
+on 9043ebaee, rebased onto 9b62132bb, exceeded its 105-second shared-lock limit
+and its process tree was killed (coordinator-repeat-capture.log, exit 124).
+It persisted no completed comparison report or per-pair progress, so it proves
+neither completion nor a particular engine hang. Do not count it as passed or
+retry it as an acceptance gate. The capture diagnostics need progress evidence
+to distinguish finite readback work from a stalled operation.
+
+Bounded follow-up on 9043ebaee completed all 12 paired captures in 80.780
+seconds, without a timeout. One pair failed (pair 0, immediately after the
+negative clip-bias controls), with 24 changed components distributed across
+the image and a maximum difference of 2^-12. The other eleven pairs were
+identical. Both images, exact coordinates and component values are preserved
+in test-results/56fix/mirror-repeat/capture.json, with durable per-pair progress
+and the failing process result in resume-bounded-repeat.log/.json. This is a
+measured value failure (1/12), not an acceptance run or a retry to green.
