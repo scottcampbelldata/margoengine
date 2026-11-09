@@ -22,6 +22,23 @@ Original harnesses, complete trial arrays and per-image hashes are retained
 in lane M's private `batch-134/measure` folder; a portable public runner and
 complete source-quality/licensing evidence remain work for the later jobs.
 
+## Real-data scientific demos (2026-11-10)
+
+Pull Git LFS assets and build packages, then run the sciviz unit and browser tests:
+
+```sh
+git lfs pull
+npm run build:packages
+npm test --workspace @margoengine/sciviz
+node scripts/gpu-lock.mjs run --owner=sciviz-real-data --max=12 --wait-max=5 -- node packages/sciviz/tests/demos-browser.mjs
+```
+
+The runner checks all three real-data demos and four retained synthetic test pages on WebGPU and forced WebGL2,
+at 1440 x 900 and 390 x 844, exercises controls and exports, checks rendered structure and selected histogram
+counts, and observes live frames during trace updates. Results and screenshots are under
+`test-results/sciviz-demos/`. Source data, exact reduction, hashes, projection and subset biases are recorded in
+`examples/assets/sciviz/README.md` and adjacent JSON manifests. This is functional evidence, not a speed measurement.
+
 ## Five executable README repairs (2026-11-09)
 
 After `npm run build:packages`, run

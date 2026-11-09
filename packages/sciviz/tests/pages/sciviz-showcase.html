@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Margo Engine · Scientific Visualisation Suite (@margoengine/sciviz)</title>
+  <meta name="description" content="Showcase of scientific visualization projects built on @margoengine/sciviz: medical imaging, vector aerodynamics, and multi-modal astrophysical surveys.">
+  <link rel="stylesheet" href="../../../../examples/gallery/gallery.css">
+  <style>
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 24px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .tag {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 3px 10px;
+      background: #1f6feb26;
+      color: #58a6ff;
+      border: 1px solid #388bfd4d;
+      border-radius: 20px;
+    }
+    .lead {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #8b949e;
+      max-width: 850px;
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .showcase-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      text-decoration: none;
+      color: inherit;
+    }
+    .showcase-card:hover {
+      transform: translateY(-3px);
+      border-color: #58a6ff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .card-icon {
+      font-size: 36px;
+      line-height: 1;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin: 0;
+    }
+    .card-desc {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #8b949e;
+      margin: 0;
+      flex: 1;
+    }
+    .features-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: #7ee787;
+    }
+    .features-list li::before {
+      content: " ";
+      color: #3fb950;
+    }
+    .card-btn {
+      display: inline-block;
+      text-align: center;
+      padding: 10px 16px;
+      background: #238636;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .card-btn:hover {
+      background: #2ea043;
+    }
+    .sub-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 24px;
+    }
+    .sub-section h2 {
+      font-size: 18px;
+      margin: 0 0 12px 0;
+      color: #f0f6fc;
+    }
+    .quick-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .quick-link {
+      padding: 6px 14px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .quick-link:hover {
+      background: #30363d;
+      border-color: #58a6ff;
+    }
+  </style>
+<style>*{box-sizing:border-box}canvas{max-width:100%}input,select{max-width:100%}@media(max-width:640px){body{padding:12px}.header-row{display:block}.app-layout,.main-layout,.dashboard-grid,.workspace{display:flex;flex-direction:column}.sidebar,.controls-panel,.panel{width:100%;min-width:0;max-width:100%}.viewport-container,.viewport-wrap{width:100%;min-width:0}.quick-links{flex-wrap:wrap}}</style>
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <p>Package test page. Synthetic data unless a fixture is explicitly selected.</p>
+  <div class="container">
+    <header>
+      <h1>
+        Margo Engine Scientific Suite
+        <span class="tag">@margoengine/sciviz</span>
+      </h1>
+      <p class="lead">
+        Synthetic package test pages for volume rendering, slices, streamlines, point selection and charts. These exercises test the package APIs and are not scientific models.
+      </p>
+    </header>
+
+    <div class="grid">
+      <!-- Project 1: Volume test page -->
+      <a class="showcase-card" href="./sciviz-medical.html">
+        <div class="card-icon"></div>
+        <h2 class="card-title">Volume test page: Medical Volume Suite</h2>
+        <p class="card-desc">
+          Interactive intensity workstation for CT and MRI neuroimaging. Ingests NIfTI (.nii.gz) and DICOM series directly with intensity transfer functions, multi-planar reconstruction (MPR) orthogonal slices, real-time 3D cutaways, and GPU marching-cubes isosurface extraction.
+        </p>
+        <ul class="features-list">
+          <li>Real NIfTI fMRI & DICOM slice ingestion</li>
+          <li>Transfer functions: Brain MRI, Bone CT, Angiography, PET</li>
+          <li>Axial (Z), Coronal (Y), and Sagittal (X) MPR slices</li>
+          <li>Real-time GPU marching-cubes isosurface extraction</li>
+          <li>Composite ray-marching & Maximum Intensity Projection (MIP)</li>
+        </ul>
+        <span class="card-btn">Launch Volume test page →</span>
+      </a>
+
+      <!-- Project 2: Synthetic wind test page -->
+      <a class="showcase-card" href="./sciviz-aeroflow.html">
+        <div class="card-icon"></div>
+        <h2 class="card-title">Synthetic wind test page: Fluid Dynamics Observatory</h2>
+        <p class="card-desc">
+          Geophysical vortex and aerodynamic flow exploration. Computes atmospheric mesocyclone and von Kármán vortex streets with 4th-order Runge-Kutta streamlines, 3D quiver vector grids, dynamic isobaric contour surfaces, and full timeline playback.
+        </p>
+        <ul class="features-list">
+          <li>Runge-Kutta 4th-order (RK4) streamline integration</li>
+          <li>3D Quiver directional vector arrows with arrowheads</li>
+          <li>Isobaric ground surface with 15 contour lines</li>
+          <li>Time-dependent vortex meander & interactive timeline</li>
+          <li>Publication-grade vector SVG and PNG snapshot export</li>
+        </ul>
+        <span class="card-btn">Launch Synthetic wind test page →</span>
+      </a>
+
+      <!-- Project 3: Synthetic star test page -->
+      <a class="showcase-card" href="./sciviz-astrometrics.html">
+        <div class="card-icon"></div>
+        <h2 class="card-title">Synthetic star test page: Galactic Analytics Dashboard</h2>
+        <p class="card-desc">
+          Deep-sky astrophysical survey exploring 1,200,000 stars. Combines 3D point cloud rendering with Eye-Dome Lighting (EDL), interactive spatial lasso cross-filtering, 2D Freedman-Diaconis Doppler histograms, date/log light curves, and Hertzsprung-Russell density heatmaps.
+        </p>
+        <ul class="features-list">
+          <li>1,200,000 stellar point cloud with Eye-Dome Lighting (EDL)</li>
+          <li>Spatial lasso & box selection with reactive cross-filtering</li>
+          <li>Freedman-Diaconis velocity dispersion histogram</li>
+          <li>Hertzsprung-Russell density heatmap with OKLab colorbar</li>
+          <li>UTC Date and Logarithmic Flux scales for Cepheid light curves</li>
+        </ul>
+        <span class="card-btn">Launch Synthetic star test page →</span>
+      </a>
+    </div>
+
+    <div class="sub-section">
+      <h2>Foundational Sciviz Examples</h2>
+      <div class="quick-links">
+        <a class="quick-link" href="../../../../examples/sciviz-points.html">Millions of Points (sciviz-points.html)</a>
+        <a class="quick-link" href="../../../../examples/sciviz-surface.html">GPU Surface Waves (sciviz-surface.html)</a>
+        <a class="quick-link" href="../../../../examples/sciviz-volume.html">Ray-Marched Volume (sciviz-volume.html)</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

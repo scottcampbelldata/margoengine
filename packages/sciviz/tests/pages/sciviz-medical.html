@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volume test page: Medical Volumetric & Volume Suite · Margo Engine</title>
+  <meta name="description" content="Interactive 3D volumetric medical imaging with @margoengine/sciviz: multi-planar slicing, NIfTI/DICOM parsing, GPU marching-cubes isosurfaces, and intensity transfer functions.">
+  <link rel="stylesheet" href="../../../../examples/multi-view.css">
+  <style>
+    body {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 16px 24px;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #1c2b3e;
+      color: #64b5f6;
+      border: 1px solid #2a4768;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 18px;
+      margin-top: 12px;
+    }
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #131924;
+      border: 1px solid #222d3d;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #798ba3;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #1e2838;
+      padding-bottom: 4px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-row label {
+      color: #b0c2db;
+      font-weight: 500;
+    }
+    select, input[type="range"], button {
+      font: inherit;
+    }
+    select {
+      background: #1c2636;
+      color: #edf2fa;
+      border: 1px solid #364963;
+      border-radius: 6px;
+      padding: 5px 8px;
+      width: 100%;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: #4da3ff;
+    }
+    .btn {
+      background: #1f334d;
+      color: #8cc8ff;
+      border: 1px solid #3a577d;
+      border-radius: 6px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+      text-align: center;
+    }
+    .btn:hover {
+      background: #274266;
+      border-color: #5580b8;
+    }
+    .btn:active {
+      background: #1a2c42;
+    }
+    .viewport-container {
+      position: relative;
+      height: 76vh;
+      min-height: 520px;
+      background: #090d14;
+      border: 1px solid #222d3d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .viewport-container canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(13, 19, 29, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #2a3a50;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: #a4b8d4;
+      line-height: 1.5;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-title {
+      color: #4da3ff;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .slice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .slice-btn {
+      padding: 5px;
+      font-size: 11px;
+      text-align: center;
+      background: #1c2636;
+      border: 1px solid #2e3e54;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #b0c2db;
+    }
+    .slice-btn.active {
+      background: #2a4768;
+      border-color: #64b5f6;
+      color: #fff;
+      font-weight: 600;
+    }
+    .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      background: #1c2636;
+      border: 1px solid #2e3e54;
+      border-radius: 12px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: #b0c2db;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: #1f3d63;
+      border-color: #4da3ff;
+      color: #64b5f6;
+      font-weight: 600;
+    }
+    .val-tag {
+      font-family: ui-monospace, monospace;
+      color: #798ba3;
+      font-size: 11px;
+      min-width: 42px;
+      text-align: right;
+    }
+  </style>
+<style>*{box-sizing:border-box}canvas{max-width:100%}input,select{max-width:100%}@media(max-width:640px){body{padding:12px}.header-row{display:block}.app-layout,.main-layout,.dashboard-grid,.workspace{display:flex;flex-direction:column}.sidebar,.controls-panel,.panel{width:100%;min-width:0;max-width:100%}.viewport-container,.viewport-wrap{width:100%;min-width:0}.quick-links{flex-wrap:wrap}}</style>
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <p>Package test page. Synthetic data unless a fixture is explicitly selected.</p>
+  <div class="header-row">
+    <div>
+      <h1 style="margin:0 0 4px 0; font-size:24px;">Volume test page: Medical Volumetric & Volume Suite</h1>
+      <p style="margin:0; color:#8ba0be; font-size:13px;">
+        Powered by <code>@margoengine/sciviz</code> · Multi-Planar Reconstruction (MPR), GPU Marching Cubes, NIfTI/DICOM Medical Pipeline
+      </p>
+    </div>
+    <span class="badge">WebGPU Clinical Viz</span>
+  </div>
+
+  <div class="workspace">
+    <aside class="panel">
+      <!-- Dataset Selection -->
+      <div class="control-group">
+        <span class="section-title">1. Volume Data Source</span>
+        <select id="datasetSelect">
+          <option value="phantom" selected>Anatomical Brain Phantom (128³ float32)</option>
+          <option value="nifti">NIfTI Neuroimaging Scan (zstat1.nii.gz)</option>
+          <option value="head">OpenNeuro T1w head MRI (CC0)</option>
+        </select>
+      </div>
+
+      <!-- Clinical Transfer Functions -->
+      <div class="control-group">
+        <span class="section-title">2. Clinical Transfer Function Preset</span>
+        <div class="preset-chips" id="tfPresets">
+          <button type="button" class="chip active" data-preset="mri">Brain Soft Tissue (MRI)</button>
+          <button type="button" class="chip" data-preset="bone">Skeletal Density (CT)</button>
+          <button type="button" class="chip" data-preset="angio">Angiography / Vessels</button>
+          <button type="button" class="chip" data-preset="pet">PET / SPECT Activity</button>
+        </div>
+      </div>
+
+      <!-- Colormap & Render Mode -->
+      <div class="control-group">
+        <span class="section-title">3. Visual Presentation</span>
+        <div class="control-row">
+          <label for="colormapSelect">Color Map:</label>
+          <select id="colormapSelect" style="width:140px;">
+            <option value="gray">Gray (Anatomical)</option>
+            <option value="aurora">Aurora (Default)</option>
+            <option value="ember" selected>Ember (CT Bone)</option>
+            <option value="magma">Magma (Contrast)</option>
+            <option value="coolwarm">Coolwarm (PET Diverging)</option>
+            <option value="viridis">Viridis (Perceptual)</option>
+            <option value="glacier">Glacier (Cryo)</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="renderModeSelect">Render Mode:</label>
+          <select id="renderModeSelect" style="width:140px;">
+            <option value="composite" selected>Composite (Alpha)</option>
+            <option value="mip">Maximum Intensity (MIP)</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="densityRange">Optical Density:</label>
+          <input type="range" id="densityRange" min="0.2" max="3.0" step="0.1" value="1.2">
+          <span class="val-tag" id="densityVal">1.2x</span>
+        </div>
+      </div>
+
+      <!-- Multi-Planar Reconstruction (MPR) Slices -->
+      <div class="control-group">
+        <span class="section-title">4. Orthogonal Slices (MPR)</span>
+        <div class="slice-grid">
+          <button type="button" class="slice-btn" id="btnAxial">Axial (Z)</button>
+          <button type="button" class="slice-btn" id="btnCoronal">Coronal (Y)</button>
+          <button type="button" class="slice-btn" id="btnSagittal">Sagittal (X)</button>
+        </div>
+        <div class="control-row" id="slicePosRow" style="display:none; margin-top:4px;">
+          <label id="slicePosLabel">Slice Pos:</label>
+          <input type="range" id="slicePosRange" min="0" max="100" value="50">
+          <span class="val-tag" id="slicePosVal">50%</span>
+        </div>
+      </div>
+
+      <!-- 3D Cutaway Clipping Plane -->
+      <div class="control-group">
+        <span class="section-title">5. 3D Cutaway Clipping Plane</span>
+        <div class="control-row">
+          <label for="cutRange">Cutaway Depth:</label>
+          <input type="range" id="cutRange" min="0" max="100" value="55">
+          <span class="val-tag" id="cutVal">Off</span>
+        </div>
+      </div>
+
+      <!-- GPU Marching-Cubes Isosurface -->
+      <div class="control-group">
+        <span class="section-title">6. GPU Isosurface Extraction</span>
+        <div class="control-row">
+          <label><input type="checkbox" id="isoCheck"> Enable Isosurface</label>
+          <span class="val-tag" id="isoTriangles">0 Δ</span>
+        </div>
+        <div class="control-row" id="isoRow" style="display:none;">
+          <label for="isoThreshold">Threshold:</label>
+          <input type="range" id="isoThreshold" min="5" max="95" value="45">
+          <span class="val-tag" id="isoVal">0.45</span>
+        </div>
+      </div>
+
+      <!-- Volume Snapshot Export -->
+      <div class="control-group" style="margin-top:auto;">
+        <span class="section-title">7. Clinical Export</span>
+        <button type="button" class="btn" id="btnExportPNG"> Export High-Res Volume (PNG)</button>
+      </div>
+    </aside>
+
+    <main class="viewport-container">
+      <div class="hud" id="hud">
+        <div class="hud-title">VOLUME TEST PAGE</div>
+        <div id="hudVoxelInfo">Grid: Initializing...</div>
+        <div id="hudRangeInfo">Scalar Range: --</div>
+        <div id="hudModeInfo">Mode: Composite Ray-Marching</div>
+        <div id="hudSlicesInfo">Active Slices: None</div>
+        <div id="hudIsoInfo">Isosurface: Disabled</div>
+      </div>
+      <canvas id="viewport" aria-label="3D Medical Volume Visualization"></canvas>
+    </main>
+  </div>
+
+  <p id="status" data-webgpu-status role="status">Initializing WebGPU medical workstation…</p>
+
+  <script type="module">
+    import { needsWebGPU } from '../../../../examples/needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-medical.ts'));
+  </script>
+</body>
+</html>

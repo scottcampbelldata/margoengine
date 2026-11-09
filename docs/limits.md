@@ -1,5 +1,14 @@
 # Design envelope
 
+The real-data sciviz demos keep a 2 mm, 88 x 128 x 128 CC0 head MRI, one million public-domain 2MASS sources,
+and eight daily North Atlantic NOAA wind fields locally in Git LFS. The 2MASS axes are observed RA, Dec and J-Ks
+colour, with no inferred distance. Its systematic, truncated sample is biased and not a complete survey.
+The wind fields are daily means at 0.995 sigma, not 10 m observations or trajectories; the equirectangular
+projection and speed-preserving direction conversion are documented in `examples/assets/sciviz/README.md`.
+The MRI intensities are arbitrary scan units. The four older synthetic pages are package test fixtures only.
+The demo checks cover 1440 x 900 and 390 x 844 on native WebGPU and forced WebGL2 in Chromium; they do not
+establish a new frame-rate, clinical, forecast, browser-family or hardware-tier claim.
+
 Sciviz volume and isosurface grids require integer dimensions of at least two samples per axis; single slices
 belong in a 2D `Figure.heatmap`. Axis errors are reported separately from mismatched sample counts.
 Overlapping isosurface extractions and bricked frame requests run in request order. An isosurface extraction

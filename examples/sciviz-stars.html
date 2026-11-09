@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Star catalogue | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html" aria-current="page">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a></nav>
+  <header><h1>Star catalogue</h1><p>One million real sources from the 2MASS Point Source Catalog. The cloud plots sky position and near-infrared colour: right ascension, declination and J minus Ks magnitude. Height shows colour, with no distance estimate.</p></header>
+  <div class="controls">
+    <label>Drag <select id="drag"><option value="orbit">Orbit</option><option value="box">Box selection</option><option value="lasso">Lasso selection</option></select></label>
+    <label><input id="edl" type="checkbox" checked> Eye-dome lighting</label>
+    <button id="reset" type="button">Show all sources</button>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="catalogue">
+    <div class="view"><canvas id="viewport" aria-label="One million 2MASS sources in sky position and colour space"></canvas></div>
+    <div class="view"><canvas id="histogram" aria-label="J minus Ks magnitude histogram for the selected sources"></canvas></div>
+  </div>
+  <p id="status" role="status" data-webgpu-status>Loading 2MASS catalogue...</p>
+  <footer><a href="https://irsa.ipac.caltech.edu/Missions/2mass.html">2MASS</a>, a joint project of the University of Massachusetts and IPAC/Caltech, funded by NASA and NSF. Public domain. Sample: one million rows with quality AAA, contamination flags 000 and catalogue key divisible by 100. This is a demonstration subset with a selection bias. Unresolved sources can include galaxies. <a href="./assets/sciviz/README.md">Query and data preparation</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-stars.ts'));
+  </script>
+</body>
+</html>

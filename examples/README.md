@@ -16,10 +16,17 @@ npm run dev:examples
 # http://127.0.0.1:5173/examples/flight-helmet.html
 ```
 
-All pages need a browser with WebGPU. A page shows a short notice when WebGPU is missing.
+Pages use WebGPU, with a WebGL2 compatibility fallback where supported. A page shows a short notice when neither
+backend can run it.
 
 | Page | What it shows |
 | --- | --- |
+| [sciviz-head.html](sciviz-head.html) | CC0 OpenNeuro head MRI: volume cutaway, three slice axes and a GPU isosurface |
+| [sciviz-stars.html](sciviz-stars.html) | One million public-domain 2MASS sources in observed sky position and colour space, with EDL and selection linked to a histogram |
+| [sciviz-wind.html](sciviz-wind.html) | Eight real NOAA daily wind fields with streamlines, arrows and gap-free trace replacement |
+| [sciviz-volume.html](sciviz-volume.html) | Synthetic volume rendering and GPU-generated scalar data |
+| [sciviz-points.html](sciviz-points.html) | Synthetic Gaussian point clusters with a point budget |
+| [sciviz-surface.html](sciviz-surface.html) | GPU-generated wave surface |
 | [boulder.html](boulder.html) | A robot climbs a wall: IK that keeps its arms clear of the wall and itself ([details](boulder/README.md)) |
 | [animation-formats.html](animation-formats.html) | Collada skins and glTF animation pointers |
 | [batched-mesh.html](batched-mesh.html) | Many shapes drawn in one call |
@@ -69,3 +76,8 @@ These are separate npm workspaces with their own dev server.
 | --- | --- |
 | [package-benchmarks/](package-benchmarks/) | Workloads that measure individual packages ([details](package-benchmarks/README.md)) |
 | [assets/](assets/) | Models and textures used by the examples, with their credits |
+
+The real-data scientific demos keep local, licensed assets and their reproducible preparation notes in
+[assets/sciviz](assets/sciviz/README.md). Their browser checks cover WebGPU and the WebGL2 fallback at desktop
+and phone sizes, fast control changes and PNG downloads. The earlier four synthetic sciviz pages are retained
+only as [package browser test pages](../packages/sciviz/tests/pages/README.md).

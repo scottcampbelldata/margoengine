@@ -185,6 +185,10 @@ const ASSETS = [
     'test fixtures: pydicom test data CT_small and MR_small in four transfer syntaxes (MIT-licensed project; no restriction on the files stated) and the NIfTI-1 sample zstat1.nii.gz (NIMH, public domain); real Zarr stores: the zarr_implementations v2 astronaut (MIT, Copyright 2021 Zarr Developers; image NASA, public domain), zarrs array_gzip.zarr (MIT OR Apache-2.0) and two GDAL autotest v3 arrays (GDAL MIT-style licence); commits and sha256 there',
   ],
   [
+    'examples/assets/sciviz/README.md',
+    'real scientific demo data: OpenNeuro ds000030 UCLA CNP sub-10159 T1w MRI (CC0), one million 2MASS All-Sky Point Source Catalog rows from NASA/IPAC IRSA (public domain), and eight January 2024 daily NCEP-NCAR Reanalysis 1 near-surface wind fields from NOAA PSL (public domain); exact source URLs, queries, reductions, binary layouts and SHA-256 manifests beside the assets',
+  ],
+  [
     'packages/physics/tests/fixtures/thingi10k/NOTICE.md',
     'test points for @margoengine/physics convex hulls: the distinct vertices of Thingi10K meshes 40261 and 41940 (Zhou and Jacobson 2016; Public Domain on Thingiverse; never shipped)',
   ],

@@ -2587,6 +2587,15 @@ features add no core or stage functionality.
 
 # Design envelope
 
+The real-data sciviz demos keep a 2 mm, 88 x 128 x 128 CC0 head MRI, one million public-domain 2MASS sources,
+and eight daily North Atlantic NOAA wind fields locally in Git LFS. The 2MASS axes are observed RA, Dec and J-Ks
+colour, with no inferred distance. Its systematic, truncated sample is biased and not a complete survey.
+The wind fields are daily means at 0.995 sigma, not 10 m observations or trajectories; the equirectangular
+projection and speed-preserving direction conversion are documented in `examples/assets/sciviz/README.md`.
+The MRI intensities are arbitrary scan units. The four older synthetic pages are package test fixtures only.
+The demo checks cover 1440 x 900 and 390 x 844 on native WebGPU and forced WebGL2 in Chromium; they do not
+establish a new frame-rate, clinical, forecast, browser-family or hardware-tier claim.
+
 Sciviz volume and isosurface grids require integer dimensions of at least two samples per axis; single slices
 belong in a 2D `Figure.heatmap`. Axis errors are reported separately from mismatched sample counts.
 Overlapping isosurface extractions and bricked frame requests run in request order. An isosurface extraction
@@ -12946,6 +12955,13 @@ import { createCompute } from '@margoengine/compute';
 
 # @margoengine/sciviz
 
+Real-data examples: [MRI head volume](../../examples/sciviz-head.html) (OpenNeuro, CC0),
+[Star catalogue](../../examples/sciviz-stars.html) (one million public-domain 2MASS sources in observed sky position
+and colour space, selection linked to a histogram), and [Wind field](../../examples/sciviz-wind.html)
+(eight NOAA daily fields, streamlines and arrows replaced through `Figure.replace`).
+[Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
+Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
+
 Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Scientific visualisation for Margo Engine, WebGPU:
@@ -13016,14 +13032,6 @@ lines at the ticks and HTML tick labels.
 | `brickedVolume(fig, source, options)` from `/bricks` | a volume larger than one texture or the memory budget, loaded by view ([below](#bricked-volumes)) |
 | `await fig.isosurface(data, level, { dims, bounds, color })` | GPU marching cubes; `layer.update(level)` re-extracts |
 | `fig.colorbar(colormap, range, { label, ticks })` | HTML colour bar at the canvas edge |
-
-Data may be TypedArrays, plain arrays, or `GpuArray`s from `@margoengine/compute`. Make GPU arrays on the
-figure's engine with `createCompute({ engine: fig.engine })`. A surface, volume or isosurface reads a GPU array on
-the GPU; give such layers a `range`, since their min and max are not read back for you.
-
-Volumes and isosurfaces need an integer of at least two samples on every axis. A single slice is a 2D image:
-use `fig.heatmap(values, { nx, ny })` on a `mode: '2d'` figure. Invalid axes and a mismatched value count report
-different `RangeError` messages.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 
@@ -13203,6 +13211,12 @@ createRoot(document.getElementById('root')!).render(<App />);
 
 ## Example pages
 
+- `examples/sciviz-head.html`: CC0 OpenNeuro head MRI: volume cutaway, three slice axes and a GPU isosurface
+- `examples/sciviz-stars.html`: One million public-domain 2MASS sources in observed sky position and colour space, with EDL and selection linked to a histogram
+- `examples/sciviz-wind.html`: Eight real NOAA daily wind fields with streamlines, arrows and gap-free trace replacement
+- `examples/sciviz-volume.html`: Synthetic volume rendering and GPU-generated scalar data
+- `examples/sciviz-points.html`: Synthetic Gaussian point clusters with a point budget
+- `examples/sciviz-surface.html`: GPU-generated wave surface
 - `examples/boulder.html`: A robot climbs a wall: IK that keeps its arms clear of the wall and itself
 - `examples/animation-formats.html`: Collada skins and glTF animation pointers
 - `examples/batched-mesh.html`: Many shapes drawn in one call

@@ -53,3 +53,7 @@ packages/weather/tests/fixtures/metar/*.txt -text
 
 # Downloaded standard CityJSON sample: preserve publisher bytes for the pinned SHA-256.
 packages/procedural/test/fixtures/buildings/twobuildings.city.json -text
+
+# Real scientific demo data. Provenance and decompressed layout: examples/assets/sciviz/README.md.
+examples/assets/sciviz/*.nrrd filter=lfs diff=lfs merge=lfs -text
+examples/assets/sciviz/*.bin filter=lfs diff=lfs merge=lfs -text

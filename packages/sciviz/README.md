@@ -1,5 +1,12 @@
 # @margoengine/sciviz
 
+Real-data examples: [MRI head volume](../../examples/sciviz-head.html) (OpenNeuro, CC0),
+[Star catalogue](../../examples/sciviz-stars.html) (one million public-domain 2MASS sources in observed sky position
+and colour space, selection linked to a histogram), and [Wind field](../../examples/sciviz-wind.html)
+(eight NOAA daily fields, streamlines and arrows replaced through `Figure.replace`).
+[Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
+Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
+
 Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Scientific visualisation for Margo Engine, WebGPU:

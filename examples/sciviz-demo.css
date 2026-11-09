@@ -1,0 +1,23 @@
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#101418;color:#edf2f6}
+*{box-sizing:border-box}
+body{max-width:1280px;margin:auto;padding:24px}
+header{max-width:76ch;margin-bottom:20px}
+h1{font-size:clamp(28px,4vw,44px);font-weight:550;letter-spacing:-.035em;margin:8px 0}
+p{margin:8px 0;color:#c3cdd6}
+a{color:#9bd9d0;text-underline-offset:3px}
+nav{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px}
+.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:16px 0}
+label{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,button{font:inherit;border:1px solid #5d6a72;background:#1c272e;color:inherit;padding:6px 12px;border-radius:4px}
+button{cursor:pointer}button:hover{background:#30424b}
+input{accent-color:#9bd9d0;max-width:100%}
+label:has(:disabled){opacity:.5}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #9bd9d0;outline-offset:3px}
+.view{position:relative;min-width:0}
+canvas{display:block;width:100%;height:520px;background:#101418;touch-action:none}
+.catalogue{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px}
+.catalogue canvas{height:500px}
+output{font-variant-numeric:tabular-nums}
+#status{min-height:1.5em;font-size:14px}
+footer{margin-top:20px;font-size:13px;max-width:95ch}
+@media(max-width:640px){body{padding:16px}.catalogue{grid-template-columns:minmax(0,1fr)}canvas,.catalogue canvas{height:360px}.catalogue #histogram{height:240px}.controls{gap:12px}label{max-width:100%}}

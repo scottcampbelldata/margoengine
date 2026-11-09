@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wind field | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html" aria-current="page">Wind field</a></nav>
+  <header><h1>Wind field</h1><p>Eight daily wind fields over the North Atlantic, January 1-8, 2024. Streamlines trace each day's flow; arrows show its direction and speed. These are daily mean reanalysis fields, not particle trajectories.</p></header>
+  <div class="controls">
+    <button id="play" type="button">Play</button>
+    <label>Day <input id="day" type="range" min="0" max="7" step="1" value="0"><output id="date">2024-01-01</output></label>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="North Atlantic wind streamlines and arrows"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <footer>NCEP-NCAR Reanalysis 1 data provided by <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. Public domain. Near-surface 0.995 sigma winds on the native 2.5 degree grid, 100 W to 20 E, 20 N to 65 N. Equirectangular projection centred at 42.5 N. Colour and arrow length show speed in m/s; directions follow the projection. <a href="./assets/sciviz/README.md">Data preparation</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-wind.ts'));
+  </script>
+</body>
+</html>

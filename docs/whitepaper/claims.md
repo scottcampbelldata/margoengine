@@ -1,5 +1,15 @@
 # Claims and evidence
 
+Real-data sciviz examples (2026-11-10): the MRI page renders a CC0 OpenNeuro T1w volume, slices and isosurface;
+the catalogue page plots one million public-domain 2MASS measurements with EDL, box/lasso selection and a linked
+colour histogram; the wind page replaces streamlines and arrows over eight real NOAA daily fields.
+`packages/sciviz/tests/demo-data.test.js` pins asset hashes, checks interior MRI tissue variation in three axes,
+all one million finite catalogue records, and wind signs and temporal variation. `demos-browser.mjs` checks
+the controls and downloads, structured rendered pixels, exact selected histogram counts, no empty wind frames
+and no duplicate traces under rapid seeks. It also runs the four retained synthetic API test pages, at
+1440 x 900 and 390 x 844 on WebGPU and forced WebGL2. Dataset biases, units, projections and source terms are
+in `examples/assets/sciviz/README.md`. No performance or scientific inference claim accompanies these examples.
+
 Sciviz update safety (2026-11-10): overlapping isosurface extractions publish matching vertices, level and
 triangle count in request order; failed or aborted extractions keep the displayed surface. Bricked frame
 requests resolve for their own step. Timeline disposal prevents late index/event publication.

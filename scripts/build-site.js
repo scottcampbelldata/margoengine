@@ -55,6 +55,9 @@ const pages = [
   'sciviz-volume',
   'sciviz-points',
   'sciviz-surface',
+  'sciviz-head',
+  'sciviz-stars',
+  'sciviz-wind',
   'ui-game',
   'weather',
   'dual-viewport',
@@ -111,6 +114,7 @@ for (const name of ['scifi-helmet.glb', 'flight-helmet.glb', 'robot-expressive.g
   await cp(`examples/assets/${name}`, `${out}/bench/assets/${name}`);
 for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS.md'])
   await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);
+await cp('examples/assets/sciviz/README.md', `${out}/demos/assets/sciviz/README.md`);
 // Boulder keeps its audited optional-package build and local asset paths intact.
 execFileSync(process.execPath, [resolve('scripts/build-boulder.mjs')], { stdio: 'inherit' });
 await cp('test-results/boulder-site', `${out}/demos/boulder`, { recursive: true });

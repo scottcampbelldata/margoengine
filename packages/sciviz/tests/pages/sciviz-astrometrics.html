@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synthetic star test page: Deep-Sky Galactic Survey & Multi-Modal Analytics · Margo Engine</title>
+  <meta name="description" content="Million-star astrophysical survey and cross-filtering dashboard with @margoengine/sciviz: 3D point cloud with EDL, box/lasso selection, 2D distribution histograms, log/date charts, and HR heatmaps.">
+  <link rel="stylesheet" href="../../../../examples/multi-view.css">
+  <style>
+    body {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px 24px;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #2a1b38;
+      color: #df94f6;
+      border: 1px solid #482a63;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+      margin-top: 10px;
+    }
+    @media (max-width: 1080px) {
+      .dashboard { grid-template-columns: 1fr; }
+    }
+    .panel-3d {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-2d {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card {
+      background: #121521;
+      border: 1px solid #23283d;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #929bb4;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1c2235;
+      padding-bottom: 4px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+      background: #141824;
+      border: 1px solid #252b42;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+    .toolbar label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #b5bfd6;
+    }
+    select, button {
+      font: inherit;
+    }
+    select {
+      background: #1d2235;
+      color: #edf2fa;
+      border: 1px solid #3c4569;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+    .btn {
+      background: #2b2144;
+      color: #d8b2f8;
+      border: 1px solid #4a3473;
+      border-radius: 6px;
+      padding: 5px 11px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    .btn:hover {
+      background: #3c2a63;
+      border-color: #6c4ca8;
+    }
+    .btn-secondary {
+      background: #1b1e2c;
+      color: #9ea8c2;
+      border-color: #2f364f;
+    }
+    .viewport-3d-wrap {
+      position: relative;
+      height: 64vh;
+      min-height: 480px;
+      background: #060810;
+      border: 1px solid #23283d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .viewport-3d-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .chart-canvas-wrap {
+      position: relative;
+      height: 190px;
+      background: #090c14;
+      border: 1px solid #1c2235;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .chart-canvas-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(10, 13, 22, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid #262e47;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: #aeb8d4;
+      line-height: 1.5;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-title {
+      color: #b97cf5;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .val-tag {
+      font-family: ui-monospace, monospace;
+      color: #df94f6;
+    }
+    .selection-active {
+      animation: pulse 1.5s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { border-color: #4a3473; }
+      100% { border-color: #a86bf5; }
+    }
+  </style>
+<style>*{box-sizing:border-box}canvas{max-width:100%}input,select{max-width:100%}@media(max-width:640px){body{padding:12px}.header-row{display:block}.app-layout,.main-layout,.dashboard-grid,.workspace{display:flex;flex-direction:column}.sidebar,.controls-panel,.panel{width:100%;min-width:0;max-width:100%}.viewport-container,.viewport-wrap{width:100%;min-width:0}.quick-links{flex-wrap:wrap}}</style>
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <p>Package test page. Synthetic data unless a fixture is explicitly selected.</p>
+  <div class="header-row">
+    <div>
+      <h1 style="margin:0 0 4px 0; font-size:24px;">Synthetic star test page: Deep-Sky Galactic Survey & Analytics</h1>
+      <p style="margin:0; color:#8e9ab8; font-size:13px;">
+        Powered by <code>@margoengine/sciviz</code> · 1.2M+ Stellar Cloud with Eye-Dome Lighting, Spatial Lasso Cross-Filtering, 2D Freedman-Diaconis Histograms, Date/Log Light Curves & HR Heatmap
+      </p>
+    </div>
+    <span class="badge">WebGPU Big-Data Science</span>
+  </div>
+
+  <div class="toolbar">
+    <label>Stars:
+      <select id="starCountSelect">
+        <option value="300000">300,000</option>
+        <option value="600000">600,000</option>
+        <option value="1200000" selected>1,200,000 (Full Survey)</option>
+      </select>
+    </label>
+
+    <label>Color By:
+      <select id="colorBySelect">
+        <option value="temp" selected>Effective Temperature (B - V)</option>
+        <option value="doppler">Radial Doppler Velocity (km/s)</option>
+      </select>
+    </label>
+
+    <label>Selection Mode:
+      <select id="dragModeSelect">
+        <option value="orbit" selected>Orbit Camera</option>
+        <option value="box">Box Select (Drag)</option>
+        <option value="lasso">Lasso Select (Draw)</option>
+      </select>
+    </label>
+
+    <label><input type="checkbox" id="edlCheck" checked> Eye-Dome Lighting (EDL)</label>
+    <button type="button" class="btn btn-secondary" id="btnResetSelection">Clear Selection</button>
+    <button type="button" class="btn" id="btnExport3D" style="margin-left:auto;"> Snapshot (PNG)</button>
+  </div>
+
+  <div class="dashboard">
+    <!-- Left: 3D Galaxy View -->
+    <div class="panel-3d">
+      <div class="viewport-3d-wrap" id="viewportWrap">
+        <div class="hud" id="hud3d">
+          <div class="hud-title">GALACTIC POINT CLOUD (3D)</div>
+          <div id="hudTotalStars">Catalog: 1,200,000 stars</div>
+          <div id="hudSelectedStars">Selection: All Stars (Global Population)</div>
+          <div id="hudVelocityDisp">Velocity Dispersion σ_v: 68.4 km/s</div>
+          <div id="hudHoverInfo">Hover: Inspect celestial body</div>
+        </div>
+        <canvas id="canvas3d" aria-label="3D Galactic Point Cloud Survey"></canvas>
+      </div>
+    </div>
+
+    <!-- Right: Synchronized 2D Scientific Charts -->
+    <div class="panel-2d">
+      <!-- Chart 1: Radial Velocity Histogram -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. Radial Velocity Distribution (Doppler Profile)</span>
+          <span class="val-tag" id="histBadge">Freedman-Diaconis</span>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="canvasHist" aria-label="Doppler Radial Velocity Histogram"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: HR Density Heatmap -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Hertzsprung-Russell Stellar Density (Heatmap)</span>
+          <span class="val-tag">OKLab Gradient</span>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="canvasHeatmap" aria-label="Hertzsprung-Russell Color-Magnitude Heatmap"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 3: Variable Star Pulsation Light Curve -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Cepheid Variable Light Curve (Multi-Band Photometry)</span>
+          <span class="val-tag">Date (X) & Log (Y) Scales</span>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="canvasCurve" aria-label="Photometric Multi-Band Light Curve Time Series"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="status" data-webgpu-status role="status">Initializing AstroMetrics survey workstation…</p>
+
+  <script type="module">
+    import { needsWebGPU } from '../../../../examples/needs-webgpu.js';
+    needsWebGPU('#canvas3d').then((ok) => ok && import('./sciviz-astrometrics.ts'));
+  </script>
+</body>
+</html>

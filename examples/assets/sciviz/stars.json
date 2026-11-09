@@ -1,0 +1,33 @@
+{
+  "source": "https://irsa.ipac.caltech.edu/TAP/sync?QUERY=SELECT+TOP+1000000+ra%2Cdec%2Cj_m%2Ck_m%2Ccntr+FROM+fp_psc+WHERE+ph_qual%3D%27AAA%27+AND+cc_flg%3D%27000%27+AND+MOD%28cntr%2C100%29%3D0&FORMAT=csv&LANG=ADQL&MAXREC=1000000",
+  "query": "SELECT TOP 1000000 ra,dec,j_m,k_m,cntr FROM fp_psc WHERE ph_qual='AAA' AND cc_flg='000' AND MOD(cntr,100)=0",
+  "sourceSHA256": "c0d6ba6bcfdfaefe1f8325e9ce39a06dec53b344749f59640153775f4b06cf5f",
+  "sha256": "a763023bb321890c705f11b149fac79523b2ad41ab749b3e32a24e1690575c93",
+  "count": 1000000,
+  "license": "public domain",
+  "columns": [
+    "ra_deg",
+    "dec_deg",
+    "j_minus_ks_mag",
+    "ks_mag"
+  ],
+  "ranges": [
+    [
+      0.001158999977633357,
+      359.9976501464844
+    ],
+    [
+      -89.9768295288086,
+      89.91126251220703
+    ],
+    [
+      -0.27000001072883606,
+      7.443999767303467
+    ],
+    [
+      4.25600004196167,
+      15.262999534606934
+    ]
+  ],
+  "bytes": 11234668
+}

@@ -1,0 +1,21 @@
+{
+  "source": "https://s3.amazonaws.com/openneuro.org/ds000030/sub-10159/anat/sub-10159_T1w.nii.gz",
+  "sourceSHA256": "0cb8a28928917b452b516e4e4694b3b79eb96b4c558f47ac63603035d0072e8b",
+  "sha256": "59bfa8adba2815acd43999424765be86390126fe7a772a94e3419a751dd9c0c8",
+  "license": "CC0-1.0",
+  "dims": [
+    88,
+    128,
+    128
+  ],
+  "spacing": [
+    2.0,
+    2.0,
+    2.0
+  ],
+  "range": [
+    0,
+    715
+  ],
+  "bytes": 1210539
+}

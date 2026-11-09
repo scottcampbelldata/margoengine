@@ -187,7 +187,15 @@
    "status": "same",
    "exact": true
   },
+  "sciviz-head": {
+   "status": "same",
+   "exact": true
+  },
   "sciviz-points": {
+   "status": "same",
+   "exact": true
+  },
+  "sciviz-stars": {
    "status": "same",
    "exact": true
   },
@@ -196,6 +204,10 @@
    "exact": true
   },
   "sciviz-volume": {
+   "status": "same",
+   "exact": true
+  },
+  "sciviz-wind": {
    "status": "same",
    "exact": true
   },

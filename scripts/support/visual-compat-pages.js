@@ -29,7 +29,16 @@ export const withQuery = (path, query) => (query && path.includes('?') ? `${path
 // same, so every demo on the site runs on the layer. The dual viewport page runs both paths itself.
 // mask: live readouts painted over (sciviz points' status line states the plot time).
 export const extraDemos = [
-  ...['compute-lab', 'sciviz-volume', 'sciviz-points', 'sciviz-surface', 'ui-game'].map((id) => ({
+  ...[
+    'compute-lab',
+    'sciviz-volume',
+    'sciviz-points',
+    'sciviz-surface',
+    'sciviz-head',
+    'sciviz-stars',
+    'sciviz-wind',
+    'ui-game',
+  ].map((id) => ({
     id,
     path: `demos/${id}.html`,
     ready: "document.querySelector('canvas')?.dataset.ready==='true'",

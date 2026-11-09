@@ -1353,6 +1353,15 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ### Sciviz asynchronous updates and trace replacement (2026-11-10)
 
+Real-data demo evidence: `packages/sciviz/tests/demos-browser.mjs` runs the OpenNeuro head MRI, million-source
+2MASS catalogue and NOAA daily wind pages, plus the four retained synthetic API exercise pages. The package's
+browser script includes it in the normal GPU quality gate. It covers native WebGPU and forced WebGL2 at
+1440 x 900 and 390 x 844, actual box/lasso drags, exact selected histogram counts, exports, rapid control changes,
+trace counts and structured pixels. Live wind frames must retain both traces and nonempty pixels during playback
+and seeking. `demo-data.test.js` pins the real asset hashes and tests MRI interior structure, catalogue count and
+wind temporal variation. The assets and source terms are documented under `examples/assets/sciviz/` and use Git LFS.
+This adds Chromium correctness evidence; other browser families and new speed or hardware-tier claims remain unproven.
+
 Isosurface extractions run in request order and build a separate vertex buffer. The vertices, bind group,
 triangle count and level publish together after GPU completion; abort, failure and disposal cannot publish a
 partial surface. Bricked `setFrame` requests serialize their own readiness instead of sharing whichever step

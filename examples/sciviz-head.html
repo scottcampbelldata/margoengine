@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MRI head volume | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-head.html" aria-current="page">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a></nav>
+  <header><h1>MRI head volume</h1><p>A real T1-weighted head MRI from OpenNeuro. Look through the volume, move a slice, or extract a surface at an intensity threshold.</p></header>
+  <div class="controls">
+    <label>View <select id="view"><option value="volume">Volume cutaway</option><option value="slice">Slice</option><option value="surface">Isosurface</option></select></label>
+    <label>Slice axis <select id="axis"><option value="x">Right / left</option><option value="y">Front / back</option><option value="z" selected>Top / bottom</option></select></label>
+    <label>Slice position <input id="position" type="range" min="0" max="100" value="50"><output id="position-out">50%</output></label>
+    <label>Surface intensity <input id="level" type="range" min="100" max="500" value="300"><output id="level-out">300</output></label>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="MRI volume, slice or isosurface"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading MRI data...</p>
+  <footer><a href="https://openneuro.org/datasets/ds000030/versions/1.0.0">UCLA Consortium for Neuropsychiatric Phenomics, ds000030</a>, subject 10159, T1w. CC0. Reoriented to RAS and sampled at 2 mm: 88 x 128 x 128 voxels. Intensity is in the scan's arbitrary units. <a href="https://doi.org/10.1038/sdata.2016.110">Poldrack et al., 2016</a>. <a href="./assets/sciviz/README.md">Data preparation</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-head.ts'));
+  </script>
+</body>
+</html>

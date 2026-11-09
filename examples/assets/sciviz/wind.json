@@ -1,0 +1,29 @@
+{
+  "sources": [
+    "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.dailyavgs/surface/uwnd.sig995.2024.nc",
+    "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.dailyavgs/surface/vwnd.sig995.2024.nc"
+  ],
+  "sourceSHA256": [
+    "d6e65f8dee2ea1c8b193d252cd468031c6f6553c3f9544170fabad17a9848f8e",
+    "4c16e3dacb1c0b35477e5bccc9db6b0b6118de10226a64b1753902fb652378b1"
+  ],
+  "sha256": "e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd",
+  "license": "public domain (US government)",
+  "dims": [
+    49,
+    19
+  ],
+  "bounds": [
+    -100,
+    20,
+    20,
+    65
+  ],
+  "days": 8,
+  "start": "2024-01-01",
+  "range": [
+    -28.749998092651367,
+    28.375003814697266
+  ],
+  "bytes": 37123
+}

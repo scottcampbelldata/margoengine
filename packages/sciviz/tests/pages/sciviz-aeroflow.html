@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synthetic wind test page: Geophysical Vortex & Fluid Dynamics Observatory · Margo Engine</title>
+  <meta name="description" content="Interactive 3D fluid dynamics and atmospheric flow visualization with @margoengine/sciviz: Runge-Kutta 4th-order streamlines, 3D quiver arrows, dynamic contour surfaces, and timeline animation.">
+  <link rel="stylesheet" href="../../../../examples/multi-view.css">
+  <style>
+    body {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 16px 24px;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #19332e;
+      color: #5cdbb5;
+      border: 1px solid #235447;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 18px;
+      margin-top: 12px;
+    }
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #111a1f;
+      border: 1px solid #1c2e36;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6a8c88;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #192b30;
+      padding-bottom: 4px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-row label {
+      color: #acc7c3;
+      font-weight: 500;
+    }
+    select, input[type="range"], button {
+      font: inherit;
+    }
+    select {
+      background: #18262b;
+      color: #edf7f5;
+      border: 1px solid #28444a;
+      border-radius: 6px;
+      padding: 5px 8px;
+      width: 100%;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: #38c9a5;
+    }
+    .btn {
+      background: #183a38;
+      color: #79ebd0;
+      border: 1px solid #2a615a;
+      border-radius: 6px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+      text-align: center;
+    }
+    .btn:hover {
+      background: #23524f;
+      border-color: #3ea194;
+    }
+    .btn:active {
+      background: #14302e;
+    }
+    .btn-secondary {
+      background: #162429;
+      color: #a0c2bd;
+      border-color: #274147;
+    }
+    .viewport-container {
+      position: relative;
+      height: 76vh;
+      min-height: 520px;
+      background: #080f12;
+      border: 1px solid #1c2e36;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .viewport-container canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(10, 20, 24, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #1e3c3f;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: #97c2bb;
+      line-height: 1.5;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-title {
+      color: #38c9a5;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .val-tag {
+      font-family: ui-monospace, monospace;
+      color: #6a8c88;
+      font-size: 11px;
+      min-width: 42px;
+      text-align: right;
+    }
+    .button-bar {
+      display: flex;
+      gap: 8px;
+    }
+    .button-bar .btn {
+      flex: 1;
+    }
+  </style>
+<style>*{box-sizing:border-box}canvas{max-width:100%}input,select{max-width:100%}@media(max-width:640px){body{padding:12px}.header-row{display:block}.app-layout,.main-layout,.dashboard-grid,.workspace{display:flex;flex-direction:column}.sidebar,.controls-panel,.panel{width:100%;min-width:0;max-width:100%}.viewport-container,.viewport-wrap{width:100%;min-width:0}.quick-links{flex-wrap:wrap}}</style>
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <p>Package test page. Synthetic data unless a fixture is explicitly selected.</p>
+  <div class="header-row">
+    <div>
+      <h1 style="margin:0 0 4px 0; font-size:24px;">Synthetic wind test page: Geophysical Vortex & Fluid Dynamics Observatory</h1>
+      <p style="margin:0; color:#7ca19b; font-size:13px;">
+        Powered by <code>@margoengine/sciviz</code> · 4th-Order Runge-Kutta Streamlines, Quiver Vector Arrays, Isobaric Surface Contours & Timeline
+      </p>
+    </div>
+    <span class="badge">WebGPU Vector Physics</span>
+  </div>
+
+  <div class="workspace">
+    <aside class="panel">
+      <!-- Vector Field Model -->
+      <div class="control-group">
+        <span class="section-title">1. Fluid Dynamics Regimes</span>
+        <select id="modelSelect">
+          <option value="tornado" selected>Atmospheric Mesocyclone / Tornado Vortex</option>
+          <option value="karman">von Kármán Vortex Street & Wake</option>
+          <option value="dipole">Geophysical Dipole Eddies</option>
+        </select>
+      </div>
+
+      <!-- Streamlines RK4 -->
+      <div class="control-group">
+        <span class="section-title">2. RK4 Streamline Integration</span>
+        <div class="control-row">
+          <label><input type="checkbox" id="streamlinesCheck" checked> Show Streamlines</label>
+          <span class="val-tag" id="streamlineStatus">Active</span>
+        </div>
+        <div class="control-row">
+          <label for="seedsSelect">Seed Density:</label>
+          <select id="seedsSelect" style="width:140px;">
+            <option value="4">Coarse (4³ grid)</option>
+            <option value="6" selected>Standard (6³ grid)</option>
+            <option value="8">Dense (8³ grid)</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="directionSelect">Direction:</label>
+          <select id="directionSelect" style="width:140px;">
+            <option value="both" selected>Bidirectional</option>
+            <option value="forward">Forward Only</option>
+            <option value="backward">Backward Only</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="lineWidthRange">Line Width:</label>
+          <input type="range" id="lineWidthRange" min="1" max="6" step="0.5" value="2.5">
+          <span class="val-tag" id="lineWidthVal">2.5 px</span>
+        </div>
+      </div>
+
+      <!-- Quiver Vector Arrows -->
+      <div class="control-group">
+        <span class="section-title">3. Quiver Directional Arrows</span>
+        <div class="control-row">
+          <label><input type="checkbox" id="quiverCheck" checked> Show Quiver Grid</label>
+          <span class="val-tag" id="quiverStatus">Active</span>
+        </div>
+        <div class="control-row">
+          <label for="quiverScaleRange">Arrow Scale:</label>
+          <input type="range" id="quiverScaleRange" min="0.02" max="0.15" step="0.01" value="0.06">
+          <span class="val-tag" id="quiverScaleVal">6%</span>
+        </div>
+      </div>
+
+      <!-- Surface Topography & Isobaric Contours -->
+      <div class="control-group">
+        <span class="section-title">4. Ground Topography & Pressure Surface</span>
+        <div class="control-row">
+          <label><input type="checkbox" id="surfaceCheck" checked> Show Isobaric Surface</label>
+        </div>
+        <div class="control-row">
+          <label for="contourCount">Contour Lines:</label>
+          <input type="range" id="contourCount" min="0" max="30" step="5" value="15">
+          <span class="val-tag" id="contourVal">15</span>
+        </div>
+      </div>
+
+      <!-- Visual Color Mapping -->
+      <div class="control-group">
+        <span class="section-title">5. Scientific Colormap</span>
+        <select id="colormapSelect">
+          <option value="glacier" selected>Glacier (Cryo Fluid)</option>
+          <option value="viridis">Viridis (Standard Flow)</option>
+          <option value="plasma">Plasma (High Energy)</option>
+          <option value="aurora">Aurora (Margo Default)</option>
+          <option value="coolwarm">Coolwarm (Diverging)</option>
+        </select>
+      </div>
+
+      <!-- Simulation Timeline -->
+      <div class="control-group">
+        <span class="section-title">6. Spatiotemporal Simulation</span>
+        <div class="button-bar">
+          <button type="button" class="btn" id="btnPlay">Play</button>
+          <button type="button" class="btn btn-secondary" id="btnPause">Pause</button>
+        </div>
+        <div class="control-row" style="margin-top:4px;">
+          <label for="timeScrubber">Time:</label>
+          <input type="range" id="timeScrubber" min="0" max="59" value="0">
+          <span class="val-tag" id="timeVal">0.0 s</span>
+        </div>
+      </div>
+
+      <!-- Vector Export -->
+      <div class="control-group" style="margin-top:auto;">
+        <span class="section-title">7. Publication Graphics</span>
+        <div class="button-bar">
+          <button type="button" class="btn" id="btnExportSVG">Vector SVG</button>
+          <button type="button" class="btn btn-secondary" id="btnExportPNG">PNG Snapshot</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="viewport-container">
+      <div class="hud" id="hud">
+        <div class="hud-title">SYNTHETIC WIND TEST PAGE OBSERVATORY</div>
+        <div id="hudModelInfo">Regime: Atmospheric Mesocyclone</div>
+        <div id="hudStreamlinesInfo">Streamlines: RK4 Integrated</div>
+        <div id="hudVelocityRange">Velocity Peak: 54.2 m/s</div>
+        <div id="hudPressureInfo">Core Depression: -48.0 hPa</div>
+        <div id="hudTimeInfo">Simulation Frame: 0 / 60 (t = 0.00 s)</div>
+      </div>
+      <canvas id="viewport" aria-label="3D Fluid Dynamics and Vector Field Simulation"></canvas>
+    </main>
+  </div>
+
+  <p id="status" data-webgpu-status role="status">Initializing WebGPU vector field observatory…</p>
+
+  <script type="module">
+    import { needsWebGPU } from '../../../../examples/needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-aeroflow.ts'));
+  </script>
+</body>
+</html>
