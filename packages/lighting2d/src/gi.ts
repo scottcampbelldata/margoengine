@@ -136,6 +136,12 @@ function parse(scene: GIScene2D, distance: number): Scene {
   return { patches, emitters, lights, layer };
 }
 // Opaque analytic intersections. An emitter owns its nearest hit, including when the ray starts inside it.
+/**
+ * Endpoint tolerance, as a fraction of the patch, for a ray meeting a surface patch. A ray through a
+ * patch endpoint counts as a hit within this margin, so the CPU (f64) and the GPU (f32, where Metal may
+ * land either side of an exact endpoint) agree on rays that pass exactly through a wall's end.
+ */
+const PATCH_END = 1e-4;
 function trace(p: Point2D, d: Point2D, length: number, scene: Scene, surfaces: Float32Array): Interval {
   let nearest = length,
     side = -1,
@@ -151,7 +157,7 @@ function trace(p: Point2D, d: Point2D, length: number, scene: Scene, surfaces: F
       dy = e.a[1] - p[1],
       t = (dx * vy - dy * vx) / den,
       u = (dx * d[1] - dy * d[0]) / den;
-    if (t > 1e-4 && t <= nearest && u >= 0 && u <= 1) {
+    if (t > 1e-4 && t <= nearest && u >= -PATCH_END && u <= 1 + PATCH_END) {
       nearest = t;
       hit = true;
       side = i * 2 + (d[0] * e.n[0] + d[1] * e.n[1] > 0 ? 1 : 0);
@@ -448,7 +454,7 @@ fn trace(p:vec2f,d:vec2f,length:f32)->vec4f {
   let e=patches[i];let v=e.b-e.a;let den=d.x*v.y-d.y*v.x;
   if(abs(den)<1e-7){continue;}
   let w=e.a-p;let t=(w.x*v.y-w.y*v.x)/den;let s=(w.x*d.y-w.y*d.x)/den;
-  if(t>1e-4&&t<=nearest&&s>=0&&s<=1){nearest=t;hit=true;rgb=surfaces[i*2u+select(0u,1u,dot(d,e.n)>0)].rgb;}
+  if(t>1e-4&&t<=nearest&&s>=-1e-4&&s<=1.0001){nearest=t;hit=true;rgb=surfaces[i*2u+select(0u,1u,dot(d,e.n)>0)].rgb;}
  }
  for(var i=0u;i<u.counts.y;i++){
   let e=emitters[i];let w=p-e.p;var near=0.0;var far=length;

@@ -111,6 +111,14 @@ export function createHeightOccluder(options: HeightOccluder2D): HeightOccluder2
   };
 }
 
+/**
+ * Contact tolerance (world units) for box slabs and the occluder height interval. A ray that grazes a
+ * box corner or an occluder's top or base within this distance counts as touching it. The CPU (f64) and
+ * the GPU (f32, where division may be off by a few ULP and Metal lands either side of an exact edge)
+ * then make the same choice on exact edges.
+ */
+const HEIGHT_CONTACT = 1e-3;
+
 /** Helper for 2D ray against an occluder footprint. Returns [tEnter, tExit] along ray, or null if no hit. */
 function rayOccluderFootprint(
   px: number,
@@ -155,7 +163,7 @@ function rayOccluderFootprint(
       return null;
     }
 
-    if (tMin > tMax || tMax < 1e-4 || tMin > maxDist) return null;
+    if (tMin > tMax + HEIGHT_CONTACT || tMax < 1e-4 || tMin > maxDist) return null;
     return [Math.max(0, tMin), Math.min(maxDist, tMax)];
   } else if (o.shape === 'circle') {
     const rad = o.radius ?? 8,
@@ -247,7 +255,10 @@ export function inHeightShadow(
       }
       if (!selfShadow) continue;
       const exitZ = getRayZ(t1);
-      if (Math.max(receiverElevation, exitZ) >= baseZ && Math.min(receiverElevation, exitZ) <= topZ) {
+      if (
+        Math.max(receiverElevation, exitZ) >= baseZ - HEIGHT_CONTACT &&
+        Math.min(receiverElevation, exitZ) <= topZ + HEIGHT_CONTACT
+      ) {
         return true;
       }
     } else {
@@ -256,7 +267,7 @@ export function inHeightShadow(
         minRayZ = Math.min(z0, z1),
         maxRayZ = Math.max(z0, z1);
 
-      if (maxRayZ >= baseZ && minRayZ <= topZ) {
+      if (maxRayZ >= baseZ - HEIGHT_CONTACT && minRayZ <= topZ + HEIGHT_CONTACT) {
         return true;
       }
     }
@@ -398,7 +409,7 @@ tMax=min(tMax,max(t1,t2));
 else if(abs(ply)>occ.size.y){
 return vec2f(-1.0,-1.0);
 }
-if(tMin>tMax||tMax<1e-4||tMin>maxDist){
+if(tMin>tMax+1e-3||tMax<1e-4||tMin>maxDist){
 return vec2f(-1.0,-1.0);
 }
 return vec2f(max(0.0,tMin),min(maxDist,tMax));
@@ -517,7 +528,7 @@ if(rcvElev>=topZ - 1e-3){
 continue;
 }
 if(selfShadow==1u){
-if(max(z0,z1)>=baseZ&&min(z0,z1)<=topZ){
+if(max(z0,z1)>=baseZ - 1e-3&&min(z0,z1)<=topZ+1e-3){
 inShadow=true;
 break;
 }
@@ -526,7 +537,7 @@ break;
 else{
 let minRayZ=min(z0,z1);
 let maxRayZ=max(z0,z1);
-if(maxRayZ>=baseZ&&minRayZ<=topZ){
+if(maxRayZ>=baseZ - 1e-3&&minRayZ<=topZ+1e-3){
 inShadow=true;
 break;
 }

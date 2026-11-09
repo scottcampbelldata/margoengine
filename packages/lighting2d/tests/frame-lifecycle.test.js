@@ -35,6 +35,22 @@ test('F19 floating volume intersects the entire height interval, not only its en
   assert.equal(inHeightShadow(light, [{ ...volume, selfShadow: false }], 0, 0), false);
 });
 
+test('a ray that touches a height occluder within f32 rounding is shadowed, as on Metal', () => {
+  // F19 on the GPU: pixel (2, 7) sees the light past the floating box's corner at exactly its top.
+  // f32 on Metal lands either side of that edge, so both forms count a touch within the contact tolerance.
+  const corner = createHeightOccluder({ shape: 'box', width: 10, depth: 10, elevation: 5, height: 5 });
+  const light = new HeightLight2D({ x: 10, height: 30, radius: 100 });
+  assert.equal(inHeightShadow(light, [corner], 2.5, 7.5), true);
+  assert.equal(inHeightShadow(light, [corner], 2.5, 7.5 + 1e-5), true, 'grazes the corner just outside');
+  assert.equal(inHeightShadow(light, [corner], 2.5, 7.6), false, 'a clear miss stays lit');
+  const far = new HeightLight2D({ x: 20, height: 20, radius: 100 });
+  const below = createHeightOccluder({ shape: 'box', offset: [10, 0], width: 2, depth: 2, height: 9 - 1e-5 });
+  const above = createHeightOccluder({ shape: 'box', offset: [10, 0], width: 2, depth: 2, elevation: 11 + 1e-5, height: 1 });
+  assert.equal(inHeightShadow(far, [below], 0, 0), true, 'ray enters just over the top');
+  assert.equal(inHeightShadow(far, [above], 0, 0), true, 'ray leaves just under the base');
+  assert.equal(inHeightShadow(far, [{ ...below, height: 8.9 }], 0, 0), false);
+});
+
 test('F23 rejects invalid bloom, rotation, mutated lights and fractional soft samples', () => {
   for (const field of ['bloomStrength', 'bloomThreshold']) {
     for (const value of [NaN, Infinity, -1]) {
