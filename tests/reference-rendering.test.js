@@ -101,3 +101,21 @@ test('clearcoat has frozen all-pixel budgets on both supported PBR backends', ()
   assert.equal(baseline.metrics.absolute, 1321922);
   assert.equal(baseline.compat.metrics.absolute, 1321925);
 });
+
+test('sheen has measured budgets for its entire twenty-primitive scene on both backends', () => {
+  const baseline = JSON.parse(
+    readFileSync(new URL('../docs/whitepaper/results/batch-160-sheen.json', import.meta.url)),
+  );
+  for (const row of [baseline, baseline.compat]) {
+    assert.equal(row.metrics.absolute, 1120735);
+    assert.equal(row.metrics.square, 33927045);
+    assert.equal(row.metrics.max, 167);
+    assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+    assert.equal(row.margo.primitives, 20);
+    assert.equal(row.nativeWebGL2.code, 'unsupported');
+    assert.equal(row.sourceSha256, referenceCase('sheen').sourceSha256);
+  }
+  assert.equal(baseline.referenceSha256, baseline.compat.referenceSha256);
+  assert.equal(baseline.sceneSha256, baseline.compat.sceneSha256);
+  assert.equal(baseline.compat.hardware.webgpu.vendor, 'margo-webgl2');
+});

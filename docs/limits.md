@@ -1128,3 +1128,9 @@ formulation differences recorded separately from its unisolated complete cause.
 ## WFC global constraints (batch 69)
 
 Optional wfc/constraints 2,337 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
+
+Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
+512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
+1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
+Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
+The full residual remains open; this does not prove physical equivalence.

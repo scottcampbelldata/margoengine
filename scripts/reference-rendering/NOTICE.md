@@ -37,3 +37,8 @@ The skip audit downloader reads only test assets: Khronos glTF-Test-Assets-Inter
 (MIT, Niantic Labs, 2024); the already-documented Cesium tower; and eoineoineoin/glTF_Physics
 9dc61cb3474ff9a51f58d3592f79d5c9e572056a (no stated licence, retained outside only).
 The outside skip-audit-provenance.json records every downloaded URL and SHA-256.
+
+Job 3: Khronos SheenTestGrid at 8f492390ddc7a2ae221a1369ef560589cf8c70fb, source GLB
+SHA-256 b3d82dde0ae6b93bef1a8085ec05540b21139f9917bfe771135c5aed9ba1c101.
+CC0-1.0, Eric Chadwick, 2023. Original GLB/legal README, matched GLB and rendered reference
+remain outside under engine-bench/batch-160; the result records their hashes.

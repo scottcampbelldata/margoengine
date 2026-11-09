@@ -18,6 +18,16 @@ export const cases = {
       camera: { position: [-1.5, 0.3, 25], target: [-1.5, 0.3, 0], fov: 35, near: 0.1, far: 100 },
     },
   },
+  sheen: {
+    model: 'SheenTestGrid',
+    license: 'CC0-1.0, Eric Chadwick, 2023',
+    sourceSha256: 'b3d82dde0ae6b93bef1a8085ec05540b21139f9917bfe771135c5aed9ba1c101',
+    scale: 1,
+    settings: {
+      ...SETTINGS,
+      camera: { position: [-0.18, 0, 1.8], target: [-0.18, 0, 0], fov: 35, near: 0.01, far: 100 },
+    },
+  },
 };
 
 export function referenceCase(name) {

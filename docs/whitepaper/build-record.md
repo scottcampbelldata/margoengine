@@ -3642,7 +3642,7 @@ primitives, adds a shared camera/sun, and keeps every pixel in the score. RTX A6
 rejects PBR. Measured integer error budgets are exact, with comparison-contract tests and a real-GPU
 runner. The known image loss remains open. No core or shader change; the package README's obsolete
 ACES statement is corrected to the already-implemented Khronos PBR Neutral transform.
-Jobs 3 through 8 and the final list-1 completion mark remain outstanding.
+Jobs 4 through 8 and the final list-1 completion mark remain outstanding.
 
 The required README run found that pointer-show.glb was missing. Added a Margo-authored public-example
 fixture with animated camera, material and sun, a README download link and a regression test of the
@@ -3670,3 +3670,17 @@ Job 2 final checks: lint, hygiene, full verify (13,064 pass, zero failures/skips
 unit tests and its 96-module GPU browser suite, 11 WFC unit tests, both WFC browser backends,
 WFC README 3/3, 22 teardown/llms regressions, six reference-contract tests, both clearcoat
 picture budgets and the unchanged job 1 WebGPU budget. No exported API changed.
+
+### Job 3: sheen
+
+Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
+512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
+1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
+Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
+Reference: hosted Sample Viewer public UI only, original CC0 SheenTestGrid by Eric Chadwick.
+All source geometry, materials and textures are retained. The image loss is open, with known
+formulation choices distinguished from its unisolated full cause. No package/core shader change.
+
+Job 3 checks: lint, hygiene, full verify (13155 pass, zero failures/skips), 402 materials
+unit tests, its 96-module GPU suite, seven reference-contract tests, and both frozen
+sheen picture budgets. No package README or public API changed.

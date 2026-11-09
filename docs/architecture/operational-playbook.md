@@ -1983,3 +1983,10 @@ llms outputs from the authored source documentation.
 ### WFC global constraint evidence (batch 69)
 
 The optional CPU constraints solver combines arc consistency, group lower/upper counts and possible-cell breadth-first reachability. Undo restores every ban from all propagators; a connected group is nonempty. Section 5 evidence: all 112 combinations of binary 3x2 count bounds, connectivity and corner paths agree with exhaustive 64-assignment truth; generated 3D and tile ID 256 cases, backtracking and browser WebGPU/WebGL2 parity also run. Logical authored traversability only, no physical-clearance or performance proof. Root WFC also rejects finite weights whose entropy arithmetic overflows, with a constructor regression.
+
+Batch 160 job 3 extends outside evidence to all 20 SheenTestGrid primitives, at 512 x 512
+with no IBL and a matched camera/sun. Both WebGPU and actual compatibility WebGL2 have frozen
+all-pixel budgets; native WebGL2 rejects PBR. The sheen BRDF is shared by materials and
+gltf-pro, but this picture measures default glTF import only. The unresolved image loss,
+simplified visibility and albedo/roughness choices are recorded separately in known-bugs.
+No core or shader math was changed and batch 168 measurements were not repeated.

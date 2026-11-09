@@ -1488,3 +1488,17 @@ The root tile solver accepted finite weights such as 1e308 even when weight time
 ### Fixed 2026-11-09: WFC browser harness teardown
 
 The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.
+
+### Batch 160 sheen picture loss (open)
+
+Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
+512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
+1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
+Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
+Repro: locked scripts/reference-rendering/run.mjs --case=sheen, as in whitepaper/reproduce.md.
+The full cause is not isolated. Known formulation choices: Margo uses the Charlie distribution
+with clamped Neubelt visibility and a fitted directional albedo; the glTF shader also floors
+sheen roughness at .03. The ratified extension permits simplified visibility, while documenting
+its energy-conservation tradeoff. No ablation yet attributes the complete picture loss to these
+choices; base shading, silhouettes and texture filtering remain included. No shader was tuned
+to this reference or changed without a demonstrated small root cause.

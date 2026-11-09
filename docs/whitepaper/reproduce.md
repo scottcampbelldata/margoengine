@@ -646,3 +646,14 @@ Frozen reference 49a82f5e1990209481b28f3bf64afc390e407e2eb9ab3571cb904a28ab4bdd0
 The recorded outside legal README credits Ed Mackey / Analytical Graphics, Inc. under CC-BY-4.0.
 `--measure` now refuses an established result file, preventing accidental budget replacement.
 See [the skip audit](../work-lists/batch-160-skips.md) for all 14 former missing-data skips and setup.
+
+### Batch 160 sheen
+
+Use the metallic-roughness commands with `--case=sheen`, including fetch, capture and both
+backend comparisons. This is Khronos SheenTestGrid (the sample asset name, rather than the
+plan's shorthand SheenTest), pinned at 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
+The legal README credits Eric Chadwick, 2023, CC0-1.0. Every source primitive and material
+is preserved. Camera [-0.18, 0, 1.8] targets [-0.18, 0, 0], 35 degrees, near .01, far 100,
+scale 1; the same sun as job 1. Frozen reference PNG SHA-256: 240715ff0a53416190448056a5aa7eeb767a0d7b2f52aa0a0a77e4ca17dc529a.
+The default gltf-pro physical path is measured; shared/sheen.js is also used by materials.
+No standalone material or IBL equivalence follows from this direct-light picture.

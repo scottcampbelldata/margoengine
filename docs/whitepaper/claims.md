@@ -1283,3 +1283,9 @@ constant-preserving bilinear/mean arithmetic provide this fixture invariant; no 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
 | RGB-byte MAE 1.6809107462565105 WebGPU; 1.6809145609537761 WebGL2 compatibility | [Exact result and frozen hashes](results/batch-160-clearcoat.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=clearcoat` | Entire ClearCoatTest, 27 primitives, 512 x 512, shared embedded camera/sun, no IBL, neutral/sRGB, all pixels. Native WebGL2 rejects PBR. Picture loss stays open; no physical-equivalence claim. |
+
+### Sheen, job 3
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| RGB-byte MAE 1.4250882466634114 on WebGPU and WebGL2 compatibility | [Frozen result](results/batch-160-sheen.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=sheen` | Entire 20-primitive SheenTestGrid; all pixels at 512 x 512, matched camera/sun, no IBL, neutral/sRGB. Native WebGL2 rejects PBR. Open image loss, not physical equivalence. |
