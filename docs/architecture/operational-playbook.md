@@ -1842,6 +1842,25 @@ D3D11 compilation defect and this context-loss interaction remain open. There is
 no runtime repair, native WebGPU failure claim or new speed measurement. A staged
 route must retain identical tracing work and output; its correctness is unproved.
 
+The continuation rules out large uniform indexing as a sufficient repair:
+the existing data-texture path for two large blocks, then for every block,
+still reaches the same hard limit. A uniform-dependent direct-light loop bound
+does not repair the complete program. Engine ownership remains the submitted
+trace representation in the optional tracer route, despite the raw-browser
+repro. Parallel compilation offers completion polling, not cancellation or a
+native compiler deadline. Core and browser teardown are not changed here.
+
+Smaller dependency-tree diagnostics now link, including precise camera maths,
+traversal, surface sampling, shadows, glass candidates and one direct-light
+kind per invocation. The last fixture returns from context loss after all its
+programs link. The complete lighting-loop diagnostic still hangs on loss while
+pending. CPU f32 comparison of five ordered light steps preserves every saved
+radiance/reservoir/RNG bit in 144 non-geometry cases. This is decomposition
+evidence only; GPU output, full transport and state-texture correctness remain
+missing. A conservative inventory finds 98 scalar words across path-loop
+variables and private globals before phase scratch, liveness or bool packing;
+the older approximate 18-vec4 state estimate must not become an allocation.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for

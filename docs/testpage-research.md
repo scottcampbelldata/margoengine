@@ -108,3 +108,102 @@ and driver compilation; Laine et al. describe splitting transport work while
 preserving its state. None permits removing materials, traversal or precise
 maths. A future staged route must keep the same work, random sequence and output
 and prove correctness before any performance claim. No companion code was read.
+
+### Bug 45 continuation: compilation inputs and ownership
+
+The current-main check still reaches `loseContext` after 61 raster frames and
+does not return before the unchanged 180 s GPU command deadline. Raw WebGL
+isolation establishes a browser/compiler interaction, but Margo still owns the
+program it submits. The following sources were compared before testing a new
+input representation; no Chromium, ANGLE or companion source was opened.
+
+- ANGLE project contributors, *Dynamic Shader Compilation*, living design
+  document, accessed 2026-11-09,
+  [document](https://chromium.googlesource.com/angle/angle/+/HEAD/doc/DynamicShaderCompilation.md).
+  HLSL compilation can occur at link and draw boundaries, and target changes
+  can cause further compilation. A returned `compileShader` call is not proof
+  that native compilation has completed.
+- Khronos WebGL Working Group, Jie Chen and Geoff Lang, *WebGL
+  KHR_parallel_shader_compile Extension Specification*, revision 6, 2020,
+  [specification](https://registry.khronos.org/webgl/extensions/KHR_parallel_shader_compile/).
+  Completion polling is nonblocking; the extension supplies no cancellation or
+  compiler-thread control. A JavaScript promise timeout cannot cancel native
+  compilation or interrupt a synchronous context-loss call.
+- Khronos WebGL Working Group, *WEBGL_lose_context Extension Specification*,
+  revision 15, 2020,
+  [specification](https://registry.khronos.org/webgl/extensions/WEBGL_lose_context/).
+  Context loss should destroy the graphics context and resources. Omitting it
+  indefinitely would preserve the resource problem instead of repairing it.
+- Chromium GPU/ANGLE contributors, *Shader compilation in WebGL blocks the
+  thread even when KHR_parallel_shader_compile is used*, issue 40890686, 2023,
+  [report](https://issues.chromium.org/issues/40890686).
+  Reports describe stalls despite parallel compilation, across platforms. This
+  is supporting evidence for the boundary, not proof of the same internal lock.
+- ANGLE project and Microsoft HLSL team contributors, *Slow fxc compile
+  performance with dynamic uniform indexing*, issue 40096608 (formerly 3682),
+  2019,
+  [report](https://issues.angleproject.org/issues/40096608).
+  The reported shader inputs make native compilation pathological; changing
+  uniform data representation improves those cases. Margo's captured shader
+  has dynamically indexed blocks of 2,048 and 2,312 uvec4 rows. The existing
+  compatibility data-texture path is therefore a hypothesis worth isolating;
+  the report does not establish that it repairs Margo's shader.
+- Lewis Crawford and Michael O'Boyle, *A Cross-platform Evaluation of Graphics
+  Shader Compiler Optimization*, ISPASS 2018,
+  [author manuscript](https://www.pure.ed.ac.uk/ws/files/56917122/A_Cross_platform_Evaluation_of_Graphics_Shader_Compiler_Optimization.pdf),
+  [publication](https://doi.org/10.1109/ISPASS.2018.00035).
+  Optimization effects vary by shader and platform. In contrast to a presumed
+  loop-unrolling cure, the test must exercise the actual D3D11 input and retain
+  all arithmetic and material work. The prior native-trig and loop-attribute
+  experiments did not resolve compilation and are not repeated.
+
+Decision boundary: the browser owns native compilation and context shutdown;
+the tracer/compatibility packages own the submitted representation. Test the
+existing data-texture representation before attempting a larger wavefront
+split. Neither a renderer-name rejection nor a timeout followed by endless
+deferred destruction supplies the required working route. No runtime fix or
+speed result is claimed at this checkpoint.
+
+- Tom Wiltzius, Vangelis Kokkevis and the Chrome Graphics team, *GPU Accelerated
+  Compositing in Chrome*, updated 2014,
+  [design document](https://www.chromium.org/developers/design-documents/gpu-accelerated-compositing-in-chrome/).
+  The client/server command-buffer explanation distinguishes submitting a GL
+  command from executing its native work. This historical architecture document
+  supplies context, not evidence of the current hang's internal locking cause.
+
+Observed comparison on the same RTX A6000/D3D11 host, correctness diagnostics
+only, each actual GPU command holding one shared slot:
+
+| Input representation | Observed boundary |
+| --- | --- |
+| Current trace pipeline, dispose one second after submission | Tracer disposal returns; context loss reaches the unchanged 180 s kill limit. |
+| Large uniform blocks as existing data textures, 134,927-byte fragment | Completion false after one second; context loss reaches the same limit. |
+| All uniform blocks as data textures, 135,096-byte fragment | Still pending after 120 s of polling; context loss reaches the same limit. |
+| All textures and a uniform-dependent five-light loop bound, zero added to its authored count | Still pending after the same poll; context loss reaches the same limit. |
+| Isolated camera, closest-hit and surface trees, 18,742 / 30,216 / 14,195 bytes | Each links. The combined lighting tree in that context remains pending; its loss reaches the limit. |
+| Isolated shadow, glass candidates and one-light evaluation, 27,612 / 20,184 / 60,201 bytes | All link; context loss returns. All five light-kind branches remain in the one-light shader and every Walk field is exposed. |
+
+The one-light fixture is not a feature-reduced tracer: it is a compile probe of
+one possible stage boundary, with no drawing or complete path loop. Separately,
+the compatibility CPU f32 executor compares the original direct loop against
+five ordered light steps that retain the partial lighting sum and Walk state.
+All 144 non-geometry fixtures match radiance, all 22 Walk words and RNG exactly.
+Of those, 99 have nonzero radiance and 3 have populated reservoirs. Sun, area,
+environment, ground-shadow and fog controls are covered; emitter geometry,
+glass traversal, GPU numerical parity and texture serialization are not.
+
+This changes the decision from an untested split proposal to evidence that
+smaller constituent programs can link. It does not prove a full repair or
+impossibility of engine prevention. The owning optional route must preserve
+sample order, RNG, material/transport work and precision while replacing the
+monolithic submission. No native compiler flag or timeout is changed. A
+conservative typed-IR inventory counts 98 scalar words of persistent locals
+and private globals before liveness/bool packing, plus phase scratch; allocate
+from an actual liveness/serialization design, not the earlier 18-vec4 estimate.
+
+Local reproducibility files are `test-results/testpage-45-uniform-context.mjs`
+and its supervisor (`large`, `all --ready`, `dynamic --ready`),
+`testpage-45-stages.mjs`, `testpage-45-split-light.mjs` and their supervisors,
+plus `testpage-45-light-equivalence.mjs` and `testpage-45-state-budget.mjs`.
+Sources, logs and result JSON files retain the inputs and observed boundaries.
+These diagnostics do not replace the failing real-engine disposal regression.

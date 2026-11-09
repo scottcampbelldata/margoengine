@@ -251,6 +251,36 @@ completed fix. No runtime change or weakened test is claimed. Evidence and
 research comparisons are in testpage-bugs.md and testpage-research.md. Browser
 process teardown remains with its dedicated owner; no core change is implied.
 
+Current-main continuation (20375ea56 plus the documentation checkpoint): the
+same disposal sequence still hits the 180 s process-tree limit. Replacing the
+two large uniform blocks with the existing data-texture representation does
+not resolve it. Replacing every uniform block also leaves compilation pending
+after a 120 s poll, followed by the same context-loss hang. Making the direct
+lighting loop's bound uniform-dependent, with its engine-authored value
+unchanged, does not resolve that full program either. None of these diagnostic
+transformations is installed in the runtime.
+
+Ownership decision: raw reproduction does not make this browser-only work.
+Margo owns submission of the monolithic trace program followed by context loss
+while native compilation is pending. A smaller representation belongs in the
+optional voxel-pathtracer compatibility route; there is no evidence that an
+engine-side prevention is impossible. The browser owns native compiler and
+context shutdown internals, whose exact blocking mechanism remains unproved.
+There is no cancellation API that would turn a promise timeout into bounded
+native cleanup. Do not close this defect by omitting context destruction,
+rejecting a renderer by name, removing tracing work or raising a timeout.
+
+New compile diagnostics link the isolated camera, closest-hit, surface,
+shadow and glass-candidate trees. A one-light direct evaluation, retaining all
+five light-kind branches and exposing every Walk member, also links and the
+context-loss call returns. The original combined lighting tree stays pending
+at the same poll deadline. A CPU f32 diagnostic compares the combined loop
+against five ordered light steps: all 144 cases preserve radiance, the 22-word
+reservoir and RNG bits exactly (99 nonzero radiances, 3 populated reservoirs).
+These fixtures have no voxel geometry and do not prove glass traversal, a full
+staged route, state-texture serialization or GPU output parity. That repair and
+the actual failing lifecycle regression remain required; bug 45 stays OPEN.
+
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
 Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs
@@ -1053,15 +1083,19 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   | One path iteration | Over 280 s |
 
   A stub that zeroes `cameraRay` folds the whole shader to 1,132 bytes, so that timing says nothing.
-- **Cause:** `D3DCompile` inlines every function, and its time grows worse than linearly with the inlined size. The
-  shader has no function small enough to help: with traversal, direct light, shadow, glass and precise maths all removed
-  it still takes 125 s, so no single feature accounts for the time, and no flag or loop attribute reaches it from WebGL.
+- **Cause boundary:** the earlier standalone HLSL experiments localize the compilation failure below WGSL/GLSL
+  translation, in native `D3DCompile`. Its inlining/optimization of the combined program is implicated; the exact
+  pathological compiler pass has not been identified. The stub results do not establish that every constituent
+  shader is unmanageable: the bug-45 continuation above now links isolated dependency trees, including one direct
+  light at a time. The original combined program still fails its bounded check.
 - **Ruled out:** native trig (the numbers above, and it would change the output); leaving features out per scene (the
   third row drops glass candidates and the shadow walk and still does not finish).
-- **Needed to close:** a wavefront split of `radiance` into several fragment passes: first hit, direct light, surface
-  sampling, with the path state in float targets. The state is about 18 `vec4` a pixel and a pass has 8 targets, so
-  each stage also needs more than one pass or a packed state. Every stage must keep the same maths and output. By the
-  stub timings a stage would still take minutes to compile. It is a rewrite of the path loop and was not attempted.
+- **Needed to close:** a wavefront split of `radiance` into bounded fragment programs, preserving first hits,
+  ordered direct-light evaluation, surface sampling and all transport state. The typed-IR inventory has 98 scalar
+  words of persistent locals/private globals before phase scratch and liveness/bool packing, so the former
+  approximate 18-vec4 estimate is not an allocation contract. Integer/RNG state needs exact serialization as well
+  as float precision. Constituent compile probes and the CPU light-step comparison do not establish a working
+  staged path loop. Actual GPU output parity and disposal-during-compilation regressions remain required.
 - **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
   it, and ANGLE Vulkan works.
 

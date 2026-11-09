@@ -511,3 +511,28 @@ takes one shared codex-testpage slot, wait-max 60 and max 3; nothing else holds
 the lock. Research and the candidate staged transport repair are documented in
 testpage-research.md. No runtime change, completed fix or performance claim is
 made. Browser teardown stays with its dedicated owner. BUGS.md still ends at 45.
+
+### Entry 45 continuation: engine input ownership and split evidence
+
+Current-main reproduction after the browser-helper repair still blocks inside
+loseContext at the unchanged 180 s deadline. The optional tracer route owns the
+monolithic input and therefore the prevention work, even though raw WebGL
+reproduces it. No evidence establishes that engine prevention is impossible.
+The browser's exact internal lock remains unknown; its public parallel-compile
+extension has no cancellation or compiler deadline.
+
+New data-texture and uniform-loop-bound probes retain the full trace program
+and still fail at that deadline. They are not runtime changes or repairs.
+In contrast, isolated camera/closest-hit/surface/shadow/glass-candidate programs
+link. A one-light evaluation with all light-kind branches and every Walk field
+exposed also links and returns from context loss. The combined lighting loop
+remains pending at the poll deadline. Research, input sizes and precise scope
+are in testpage-research.md; all raw GPU runs used one shared slot and max 3.
+
+A bounded CPU f32 diagnostic preserves all radiance/reservoir/RNG bits across
+144 cases when evaluating the five lights as ordered steps. It includes no
+voxel geometry. A state inventory and the generated shader probes are retained
+locally for the staged-route implementation. Full transport, GPU output parity,
+state serialization and an actual passing lifecycle regression are still owed.
+No runtime package, README or export changed. Bug 45 remains OPEN, with no
+FIXED or NOT A BUG claim and no speed measurement.
