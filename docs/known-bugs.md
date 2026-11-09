@@ -3433,3 +3433,15 @@ examples and API update (891 entries/8,651 exports). Core plus stage remains
 23,924 B; no new ceiling is raised. These are local results, not landing or
 combined hunter acceptance. Full verify remains the inherited result recorded
 in the [gate receipt](whitepaper/results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
+### Batch 56 authorized partial landing
+
+The coordinator lifted the push hold for the five review repairs and the proven
+owner/compute fixes. The intentionally failing capture-stability regression is
+retained as the final local commit on batch-56-fixes and is excluded from main,
+including its package-script wiring. The capture defect remains open with the
+independent capture-msaa-hunt owner; its branch was not changed. The permanent
+regression description above records local evidence, not mainline gate wiring.
+The wider owner audit remains open. The post-rebase receipt records the checks
+affected by merged documentation, API metadata and GPU-lock tooling; the unchanged
+package execution proofs and historical full verify are retained honestly.

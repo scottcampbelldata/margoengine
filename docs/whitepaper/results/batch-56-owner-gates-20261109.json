@@ -1,5 +1,5 @@
 {
-  "status": "Local only. No push or overall acceptance.",
+  "status": "Authorized repairs ready for fast-forward landing; capture regression excluded; wider owner audit open.",
   "sourceCommit": "85d33051bdfb90954a17600db1a9feece5f69578",
   "historicalVerify": {
     "receipt": "test-results/56fix/coordinator-current-verify.json",
@@ -1258,5 +1258,111 @@
       "compute-close-readme-types.log: requested nonexistent npm alias; direct check-readme-types.mjs passes",
       "compute-close-corpus.log: unintended recorder terminated while queued; use build-llms.mjs for text corpus"
     ]
+  },
+  "authorizedLanding": {
+    "base": "09777e77bd027a77900d3396ee9d3e9d3573ff75",
+    "repairsTip": "e0d046aec",
+    "excludedRegression": "5072698c0",
+    "inheritedPackageProofInputs": "Unchanged from cb5045b61, except removal of the deliberately red capture regression/script wiring. Upstream changes are unrelated optional packages, metadata, documentation and GPU-lock mutex resolution.",
+    "cpu": {
+      "landing-build": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 16.307,
+        "log": "test-results/56fix/landing-build.log"
+      },
+      "landing-lint": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 2.573,
+        "log": "test-results/56fix/landing-lint.log"
+      },
+      "landing-hygiene": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 12.768,
+        "log": "test-results/56fix/landing-hygiene.log"
+      },
+      "landing-api": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 17.023,
+        "log": "test-results/56fix/landing-api.log"
+      },
+      "landing-quality": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 34.806,
+        "log": "test-results/56fix/landing-quality.log"
+      },
+      "landing-doclinks": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 1.156,
+        "log": "test-results/56fix/landing-doclinks.log"
+      },
+      "landing-metadata": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 34.92,
+        "log": "test-results/56fix/landing-metadata.log"
+      },
+      "landing-readme-types": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 3.16,
+        "log": "test-results/56fix/landing-readme-types.log"
+      }
+    },
+    "gpu": [
+      {
+        "id": "environment-test-gpu-mirror-13",
+        "words": [
+          "node",
+          "packages/environment/tests/review56-browser.mjs"
+        ],
+        "cwd": ".",
+        "max": 0.75,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.756,
+        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-lock-environment-test-gpu-mirror-13.log"
+      },
+      {
+        "id": "view-compat",
+        "words": [
+          "node",
+          "packages/environment/tests/review56-browser.mjs",
+          "--compat"
+        ],
+        "max": 0.75,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 30.385,
+        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-view-compat.log"
+      },
+      {
+        "id": "umbrella-readme",
+        "words": [
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=margoengine"
+        ],
+        "max": 1,
+        "code": 0,
+        "timedOut": false,
+        "seconds": 140.439,
+        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-umbrella-readme.log"
+      }
+    ],
+    "api": {
+      "entries": 892,
+      "exports": 8664
+    },
+    "readmeTypeExamples": 1137,
+    "metadataTests": 62,
+    "qualityEntries": 975,
+    "fullVerify": "Reused historical once-run result with sole failure already fixed on main and focused regression passing; no new full verify claimed.",
+    "coreStageGzip": 23924
   }
 }
