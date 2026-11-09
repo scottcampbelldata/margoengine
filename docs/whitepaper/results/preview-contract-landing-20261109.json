@@ -3,8 +3,8 @@
   "coreStageSourceChanged": false,
   "coreStageGzip": 23924,
   "api": {
-    "entries": 889,
-    "exports": 8643
+    "entries": 890,
+    "exports": 8648
   },
   "verify": {
     "passed": 13632,
@@ -14,7 +14,7 @@
     "repair": "docs/work-lists/gpu-lock-report.md reworded; tests/no-private-paths.test.js unchanged"
   },
   "finalFocused": {
-    "passed": 326,
+    "passed": 358,
     "failed": 0,
     "skipped": 0
   },
@@ -54,5 +54,10 @@
     "resumedMissing": 54,
     "ownership": "Parity batch 273; retained in docs/known-bugs.md"
   },
-  "timingMeasurementsAccepted": false
+  "timingMeasurementsAccepted": false,
+  "finalFocusedDetail": {
+    "overlapSuite": 350,
+    "pairedSizeNetwork": 8,
+    "includes": "latest voxel admission, sciviz flow and Rust gate regressions"
+  }
 }
