@@ -60,6 +60,31 @@ engine.dispose();
 
 Accepts 8-bit ImageData (copied immediately) or an ImageBitmap, such as one decoded with `createImageBitmap(blob)`. Keep a borrowed bitmap open until transition disposal so device restoration can reupload it; the transition never closes your bitmap. Closed images are refused. Image dimensions are 1..min(4096, device maxTextureDimension2D); capture dimensions are at most 65,535, also within the device's limit. The mask stretches across the full capture with nearest sampling, top-left origin. Integer pixel-center addressing makes exact texel ties stable through odd-size resizes. ImageData bytes have no color conversion; bitmap upload uses WebGPU's default sRGB destination encoding. `softness` is a threshold half-width, default 0.02: zero gives hard edges; otherwise use 0.000001..1. Exact endpoints bypass the threshold. Call `start('wipe', seconds)`; kind and displacement do not alter the mask. Resize retains history/progress. Device replacement reuploads the mask and cancels unavailable scene history. Native WebGL2 gives linked code `unsupported`.
 
+Two live scenes use the optional `@margoengine/transitions/live` (also `margoengine/transitions/live`) entry:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { LiveTransitions } from 'margoengine/transitions/live';
+const engine = await Engine.create(document.querySelector('canvas')!, { exactSize: true });
+const before = engine.createScene('before');
+const after = engine.createScene('after');
+before.background = '#ff0000';
+after.background = '#0000ff';
+const transition = LiveTransitions.attach(engine, before, after);
+transition.start(1);
+transition.render({ delta: 0.25 });
+before.background = '#00ff00'; // The outgoing scene remains live too.
+transition.render({ delta: 0.25 });
+transition.dispose();
+before.dispose();
+after.dispose();
+engine.dispose();
+```
+
+Call `transition.render({delta})` for each transition frame instead of `engine.render()`; it renders each source scene once and then its owned composite scene. Both scenes receive the same delta, and a shared camera advances once through core's view handling. `beforeCamera` and `afterCamera` default to engine.camera; pass separate Camera instances to animate views independently. Scenes must be distinct live scenes of the same engine. They and their cameras are borrowed. Duration defaults to 1 second, finite (0,60]; frame delta defaults to 0, finite [0,1]. Initial progress is 1; call start to reset it. Completion still renders both scenes until you stop calling render or dispose.
+
+This entry cross-fades two resolved RGBA8 images with exact endpoints. It does not select built-in wipes, custom shaders or masks. Source scene effects run normally before composition; the two scenes have independent depths, with no cross-scene occlusion. Captures use the canvas drawing-buffer dimensions at call time, or the optional borrowed output `target` texture's dimensions. Nearest full-frame stretch follows any automatic canvas resize during that render; captures match the new drawing buffer on the next call. For caller-controlled resolution use engine exactSize, as above. Width/height must be positive integers within the device's texture limit. Output target must be a separate single-sample 2D render attachment. The optional `culling` defaults to true. Capture storage is two RGBA8 textures (8 bytes per pixel), plus core's ordinary per-view render attachments. No HDR or extra color conversion is claimed. Both capture textures are rebuilt on resize or device replacement, retaining progress because both images are live. Dispose removes only the owned composite scene and resources. Engine disposal also disposes the transition. Native WebGL2 attachment throws linked `unsupported`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/transitions

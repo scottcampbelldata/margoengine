@@ -2962,6 +2962,10 @@
       "types": "./dist/transitions.d.ts",
       "import": "./dist/transitions.js"
     },
+    "./transitions/live": {
+      "types": "./dist/transitions/live.d.ts",
+      "import": "./dist/transitions/live.js"
+    },
     "./tween": {
       "types": "./dist/tween.d.ts",
       "import": "./dist/tween.js"

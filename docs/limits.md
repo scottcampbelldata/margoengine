@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-628). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-629). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1368,3 +1368,9 @@ disposal and actual device replacement are tested on WebGPU and the WebGL2 compa
 the native WebGL2 engine remains unsupported. No staging/ground alias or new runtime bytes are added.
 The fixture is a licensed real EXR image, the product a generated box stand-in; no photographic-product
 quality or performance claim. Existing root staging size and core plus stage size are unchanged.
+
+## Two live scenes (LIM-629)
+
+Optional transitions/live cross-fades two independently rendered current RGBA8 images with exact endpoints. Requires two distinct live scenes of one WebGPU engine. No cross-scene depth, HDR, custom shader or mask composition. render replaces engine.render for transition frames; both scenes update once with the same delta, including at completion. Cameras and scenes are borrowed. Duration finite (0,60], default 1; delta finite [0,1], default 0; culling default true. Captures follow output texture dimensions, otherwise drawing-buffer dimensions at call time; an automatic canvas resize is fully reflected in captures on the next call, with nearest stretch meanwhile. Use exactSize for explicit backing resolution. Dimensions 1..device maxTextureDimension2D. Two RGBA8 captures cost 8 bytes per pixel plus ordinary core render attachments. Output target must be a separate single-sample 2D render attachment. Device replacement and resize rebuild live images and retain progress; disposal removes its owned composite scene, leaving borrowed inputs alive. WebGL2 is linked unsupported. Measured entry 2501 B min+gzip, budget 2757 B; umbrella re-export 65 B, budget 321 B. Core plus stage stays 23797 B. Single RTX A6000 correctness evidence, generated scenes only, no speed or quality measurement.
+
+Current transitions entry measurements after the owner-scene repair and live entry: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B min+gzip. Earlier batch-76 measurements above describe the corresponding earlier commits. Each umbrella feature re-export measures 65 B.

@@ -1742,3 +1742,7 @@ in the composition tests on WebGPU or the WebGL2 compatibility layer, including 
 replacement. The uniform-blur catcher's physical-picture loss recorded under batch 168 remains open;
 this audit does not infer HDR light directions or claim that loss is fixed. Native WebGL2 and Y-up
 scope remain explicit limits. The generated box is a stand-in.
+
+### Batch 76 job 3: live scene lifecycle
+
+The previously open non-default-scene disposal defect was fixed separately in 1823a741e before this entry. Live transitions own a composite scene and remove it through the same identity-based owner lookup; borrowed scenes survive. Partial texture allocation failures release every created image and propagate the original error, with live.test.js regression coverage. New draft declarations initially omitted GPU constant types; the package build exposed them and the declarations were supplied before delivery. No open defect was found in the live GPU proof; its bounded RGBA8 behavior and resize sampling are limits rather than unproved HDR claims.

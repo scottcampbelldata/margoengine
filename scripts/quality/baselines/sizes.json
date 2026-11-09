@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11543802,
+  "total": 11546880,
   "history": [
     {
       "date": "2026-10-24",
@@ -4976,6 +4976,12 @@
       "commit": "batch-76-scene-disposal",
       "reason": "Owner-scene disposal correctness adds 7 B to the 4300 B transitions root; restore standard 256 B headroom above measured 4307 B. No core or stage change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-76-job-3",
+      "reason": "Optional two-live-scene RGBA8 cross-fade: measured 2501 B plus 256 B headroom; 65 B umbrella re-export plus headroom. No core or stage modification.",
+      "grew": 2
     }
   ],
   "items": {
@@ -5931,6 +5937,8 @@
     "@margoengine/voxel-pathtracer/sky": 468,
     "@margoengine/transitions/mask": 5522,
     "margoengine/transitions/mask": 321,
-    "@margoengine/procedural/dungeon": 1479
+    "@margoengine/procedural/dungeon": 1479,
+    "@margoengine/transitions/live": 2757,
+    "margoengine/transitions/live": 321
   }
 }

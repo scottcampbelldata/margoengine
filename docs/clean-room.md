@@ -1777,3 +1777,7 @@ The composition test and example are Margo-authored. Research consulted before t
 - Steve Marschner, [Soft shadows](https://www.cs.cornell.edu/courses/cs569/2008sp/notes/09softshad-notes.pdf), 2008: planar shadow textures and accumulated light samples; informs the next job, not a claim about this composition.
 Only papers and existing Margo code were read. No other renderer or library implementation was opened.
 BrightRings is an already recorded standard test image; no third-party implementation files are introduced.
+
+## Two live scene images (batch 76 job 3)
+
+A wide public-reference search combined [Porter and Duff, Compositing Digital Images (1984)](https://keithp.com/~keithp/porterduff/p253-porter.pdf), [W3C Compositing and Blending Level 1](https://www.w3.org/TR/compositing-1/) on separately rendered groups, and [W3C WebGPU texture usage](https://www.w3.org/TR/webgpu/#texture-usage). The entry renders independent current images before a separate sampling pass, avoiding simultaneous writable/sampled texture usage, then linearly interpolates all four channels. This is a cross-fade rather than a claim of full Porter-Duff operators. It reuses Margo's existing multi-scene views; no external source read or adapted. The only CPU loop allocates/releases two textures, so no CPU-heavy kernel or Wasm is needed.

@@ -823,3 +823,7 @@ compare shadow-on/off pixels, assert unchanged product/outside pixels, destroy a
 device, remove the caster and dispose the scene. The product geometry is a stand-in. The README's
 order 0.25 is essential: a backdrop at its default order 1 covers a depth-read-only contact plane at 0.5.
 No new projection or shadow algorithm, physical HDR-shadow claim or timing measurement is added.
+
+### Batch 76 two live scenes
+
+Run transitions unit tests and the package GPU suite through gpu-lock as for jobs 1 and 2. live-browser.js uses two real Engine scenes, whose update plugins change generated backgrounds. It changes both colors at fixed progress and reads every output pixel, 374 total across 1x/4x, with exact endpoints and at most one UNORM code for blends. It resizes 8x4 to 7x3 and 5x7, destroys a real device, awaits engine recovery and proves progress continues. It also renders to canvas, disposes twice and renders a borrowed scene afterward. Native WebGL2 must give linked unsupported. Results are in results/batch-76-live.json, stand-in correctness, not performance.

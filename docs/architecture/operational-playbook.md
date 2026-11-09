@@ -2270,3 +2270,7 @@ generated box: on/off contact pixels, unchanged product/outside pixels, caster r
 actual device replacement pass on WebGPU and the WebGL2 compatibility layer. Native WebGL2 remains
 unsupported. The photo's lighting is not reconstructed by the contact cue; the existing physical-picture
 loss remains open. No new core, stage, CPU geometry loop or shader is introduced.
+
+### Live transitions: section 5 evidence (batch 76 job 3)
+
+The optional entry uses existing core scenes and render views: two full-frame RGBA8 texture targets followed by a private composite scene's order-50 pass. No recursive render, core or stage modification. Scenes update once each, shared cameras once, with independent depths. Progress survives resize and replacement because no historical image is required. Owned images and the composite scene are removed on disposal; borrowed scenes/cameras survive. Actual WebGPU tests check 374 generated-background pixels at 1x/4x, both scenes changing at fixed progress, resize, destroyed-device recovery, canvas output and subsequent borrowed-scene rendering. Native WebGL2 refuses with a help link. Unit checks cover hostile values, foreign/same/disposed scenes, partial allocation cleanup and disposal. No performance, HDR or artistic-quality evidence is claimed.
