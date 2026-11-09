@@ -3895,6 +3895,30 @@ representable escape probability in the geometric-series LUT. Minimum observer c
 2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
 discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
 
+## WFC review input and loading bounds (batch 69 fixes)
+
+The overlapping extractor rejects the 4097th distinct pattern before retaining it; the 1,048,576-value input cap
+and existing output limits remain. All entries reject sparse dimensions/coordinates/rules/constraint lists.
+Socket sources must contain six strings; variant counts are checked before retaining orientations. Source weight
+division by 1, 4 or 24 must remain positive in float64. Quotients that round to zero throw RangeError; representable
+subnormal weights remain supported, with ordinary floating-point rounding of source totals.
+Wasm network, response-body, local-file and instantiation failures throw coded failed with a help link and cause;
+AbortSignal reasons are preserved. Worker transport retains the failure code and help link. Legacy exhaustion now
+also includes its help link. These are synthetic hostile-input regressions, not a new performance claim.
+Current bare-peer entry sizes: root 1,868 B, overlapping 2,457 B, constraints 2,484 B, sockets 776 B, chunks 3,647 B,
+worker 1,331 B min+gzip; bundled worker 3,399 B gzip. Earlier batch sizes above are historical.
+Core plus stage remains 23,797 B gzip against its unchanged strict 25,000-byte gate.
+
+## Scatter uploaded LOD boundaries (batch 69 cross-package audit)
+
+All three LOD distances must remain positive normal f32 values (at least 2^-126 after conversion), no greater
+than 100,000 in the authored input, and strictly increasing after upload. Sparse lists, underflow to zero,
+subnormal GPU values and distinct float64 boundaries that become equal in f32 throw RangeError before setup.
+This also applies to ScatterTiles, TrampledScatter and ImposterScatter through the shared Scatter constructor.
+The inclusive outer rejection and conservative f32 tile-distance budget remain unchanged; ordered compaction
+and indirect counts retain the explicit capacity cap. Scatter root currently measures 19,094 B min+gzip;
+other scatter entries are unchanged. No speed or new rendering-quality claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9354,7 +9378,9 @@ const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry],
 
 A single Geometry can be supplied for all rings; the package does not auto-decimate meshes. heightmap returns a sampleable red-channel height texture covering area around center, one height per texel centre (as `TerrainHeightmap` writes it). Each instance takes the bilinear interpolation of the four texel centres around it, and the ground normal (for `maxSlope`) is that patch's gradient, so roots follow slopes between texels. Heights are world units plus center Y; absent heightmap is flat. Rules are fixed at construction and distribution is evaluated on GPU each frame. Output uses random Y rotation and scale with a simple diffuse material. Three storage buffers reserve count instances each, so account for GPU memory; device limits are checked. No core geometry/material feature additions are needed.
 
-The default LOD distances are `[25,60,120]` world units. `lodFade` defaults to a
+The default LOD distances are `[25,60,120]` world units. All three distances must fit positive normal f32 values
+(at least 2^-126 after conversion) and remain strictly increasing after GPU upload; values that collapse to zero
+or equal boundaries are rejected with RangeError, including in ScatterTiles. `lodFade` defaults to a
 2-unit overlap centered on each of the first two distances. Compute emits both
 adjacent meshes inside that band; complementary 4x4 Bayer masks cross-fade them
 in both diffuse and PBR rendering, without alpha blending or per-frame history.
@@ -9372,13 +9398,6 @@ instances appear one by one, each at its own hashed distance. Both are measured 
 3D like the LOD distances, and `inner` must be below the last one. Instances beyond
 `inner + innerFade` are the very same ones as without the option, and without it the
 distribute shader stays the same text.
-
-```ts
-import { Scatter } from '@margoengine/scatter';
-import { planeGeometry, toGeometry } from '@margoengine/geometry';
-import {Engine} from '@margoengine/core';
-const engine = await Engine.create(document.querySelector('canvas')!);
-```
 
 [README continues: https://margoengine.com/llms/packages/scatter.md]
 
@@ -9671,7 +9690,7 @@ const cells = generator.solve(123);
 
 Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
 
-## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
+## Overlapping model (`@margoengine/wfc/overlapping`, 2,457 B min+gzip)
 
 Learns N x N patterns from a sample image and generates outputs in which every N x N window appears in the sample.
 
@@ -9691,7 +9710,8 @@ latest choice is undone from the trail and forbidden in its cell (chronological 
 attempt restarts from scratch with the seed stream continuing; when the attempts run out `solve` throws. Every loop is
 bounded by the budgets, so an unsatisfiable sample fails instead of hanging (the tests run one in a child process with a
 timeout). A 7 x 7 maze sample with `symmetry: 1` fails every seed without backtracking and solves them all with it.
-Limits: at most 4096 patterns and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
+Limits: at most 4096 patterns, rejected during extraction before retaining a 4097th distinct pattern,
+and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
 min-entropy scan is O(cells) per choice, fine to about 128 x 128; CPU only; works identically beside WebGPU and WebGL2 (tested in a real browser).
 Example: `examples/overlapping.html`.
 
@@ -9723,7 +9743,7 @@ throws its reason; synchronous checkpoints cannot receive new events while JavaS
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
 Heap/chunk backend selection and the paired Rust/Wasm SIMD measurement are documented below. Pattern extraction and the existing overlapping solver remain TypeScript.
 
-## Global constraints (`@margoengine/wfc/constraints`, 2,460 B min+gzip)
+## Global constraints (`@margoengine/wfc/constraints`, 2,484 B min+gzip)
 
 [README continues: https://margoengine.com/llms/packages/wfc.md]
 
