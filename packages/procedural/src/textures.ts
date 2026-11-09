@@ -53,6 +53,7 @@ export interface WebGLBakedTexture {
   dispose(): void;
   [Symbol.dispose](): void;
 }
+/** Owned native texture handle, discriminated by its rendering backend. */
 export type BakedTexture = WebGPUBakedTexture | WebGLBakedTexture;
 /** A baker bound to one device. Create a new one after device replacement. */
 export interface TextureBaker<T extends BakedTexture = BakedTexture> {
