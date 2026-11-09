@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { deferSpeed } from '../support/speed-phase.mjs';
 
 const budgets = {
+  'quality-triangle': ({ milliseconds }) => {
+    assert.ok(milliseconds > 0 && milliseconds < 7, `read ${milliseconds} ms`);
+  },
   'biomes-copy-packing': ({ pack }) => {
     assert.equal(pack.short, 0, `${pack.short} frames stopped copying with budget left and copy steps waiting`);
   },

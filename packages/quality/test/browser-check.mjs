@@ -4,6 +4,9 @@
 // canvas), and needs no timestamps; this proves the real queries work, leave no validation errors and are removed.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { FAST_GPU_MS } from '../dist/index.js';
+import { speedBudget } from '../../../scripts/speed/budgets.mjs';
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
 
 setTimeout(() => {
   console.error('quality browser check: stopped at its time limit');
@@ -19,7 +22,9 @@ page.on('console', (m) => {
 });
 const key = `margoQuality:${PATH}`;
 const visit = async (search) => {
-  await page.goto(new URL(`${PATH}${search}`, page.url()).href);
+  const query = new URLSearchParams(search);
+  if (speedEnabled()) query.set('speed', '');
+  await page.goto(new URL(`${PATH}?${query}`, page.url()).href);
   await page.waitForFunction(() => window.feature !== undefined, null, { timeout: 30_000 });
   return page.evaluate(async () => ({
     tier: window.tier,
@@ -54,16 +59,27 @@ try {
     assert.equal(first.tier, 'light');
     assert.equal(first.asking, true);
     assert.equal(first.feature, true);
-    assert.ok(first.milliseconds > 0 && first.milliseconds < 7, `read ${first.milliseconds} ms`);
-    assert.equal(first.stored, 'high', 'the next load of this page gets the full tier');
+    assert.ok(Number.isFinite(first.milliseconds) && first.milliseconds > 0, 'real timestamp reading');
+    speedBudget('quality-triangle', { milliseconds: first.milliseconds });
+    const promoted = first.milliseconds < FAST_GPU_MS;
+    assert.equal(first.stored, promoted ? 'high' : null, 'storage follows the measured tier rule');
     assert.equal(first.allBack, true, 'everything wrapped is put back');
     assert.deepEqual(first.errors, [], 'no validation errors from the queries');
 
     await page.goto(new URL(PATH, page.url()).href);
     await page.waitForFunction(() => window.feature !== undefined, null, { timeout: 30_000 });
     const second = await page.evaluate(() => ({ tier: window.tier, asking: window.asking, feature: window.feature }));
-    assert.deepEqual(second, { tier: 'high', asking: false, feature: false }, 'a measured page does not ask at all');
-    console.log('ok one triangle reads', first.milliseconds, 'ms; the old rule read', first.oldRule, 'ms');
+    assert.deepEqual(
+      second,
+      {
+        tier: promoted ? 'high' : 'light',
+        asking: !promoted,
+        feature: !promoted,
+      },
+      'next load follows storage and only an unmeasured light page asks',
+    );
+    if (speedEnabled())
+      console.log('ok one triangle reads', first.milliseconds, 'ms; the old rule read', first.oldRule, 'ms');
   }
   await page.evaluate((name) => localStorage.removeItem(name), key);
   assert.deepEqual(problems, []);

@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL_REPAIR_NOT_PUSHED_ACCEPTANCE_PENDING",
+  "status": "HISTORICAL_LOCAL_CHECKPOINT_ACCEPTANCE_NOW_RECORDED",
   "base": "02e0f5d8a",
   "parent": {
     "pass": 0,
@@ -14,13 +14,7 @@
     "after": 3714,
     "ceiling": 3942
   },
-  "pending": [
-    "full once-run verify",
-    "all quality GPU correctness commands and new helper rendering proof",
-    "quality runtime README examples",
-    "route inherited timestamp 7ms speed assertion and old-rule wall-clock measurement to deferred suite, preserve all correctness and original release budget",
-    "rebase and fast-forward push"
-  ],
+  "pending": [],
   "gpuRun": false,
   "coreStageChanged": false,
   "localChecks": {
@@ -33,5 +27,6 @@
     "hygienePassed": true,
     "hygienePrerequisiteFailure": "new upstream sciviz/dist/lic.d.ts missing; built sciviz, then hygiene passed; failed receipt retained",
     "generatedCorpusUpdated": true
-  }
+  },
+  "acceptanceReceipt": "batch-56-quality-owner-20261109.json"
 }

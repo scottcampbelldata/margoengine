@@ -322,5 +322,11 @@
     "file": "packages/shadows/test/cutout-casters-browser.mjs",
     "kind": "diagnostic",
     "budget": "--cost paired caster frame costs, no threshold; default pixel regression remains shared"
+  },
+  {
+    "id": "quality-triangle",
+    "file": "packages/quality/test/browser-check.mjs",
+    "kind": "gpu",
+    "budget": "0 < GPU timestamp p90 < 7 ms, 640x360 triangle overdrawn 400 times; old submit-to-done p90 diagnostic unchanged"
   }
 ]

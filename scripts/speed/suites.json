@@ -538,5 +538,10 @@
     "id": "examples/package-benchmarks/parts/scale-node.mjs",
     "command": "node examples/package-benchmarks/parts/scale-node.mjs",
     "limitMinutes": 20
+  },
+  {
+    "id": "packages/quality/test/browser-check.mjs",
+    "command": "node scripts/gpu-lock.mjs run --owner=quality-speed --max=2 --wait-max=60 -- node packages/quality/test/browser-check.mjs",
+    "limitMinutes": 63
   }
 ]

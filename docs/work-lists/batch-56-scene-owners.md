@@ -112,3 +112,10 @@ The two Save calls are proved by its accepted 16-case runtime suite, not waived
 by receiver syntax. Quality's helper-created registration now has ten reproduced
 owner/lifetime failures and a local repair passing all 93 package units. Its
 remaining acceptance gates are open; no wider-owner completion is claimed.
+
+Quality acceptance is complete: 95 package units, seven speed-policy checks,
+five GPU leaves and seven runtime README examples pass. The real helper proof
+covers default/secondary pixels and before/between-frame cancellation. The
+inherited 7 ms assertion remains in the deferred named speed suite. Only
+affected checks were rerun; no second full verify. See the [Quality receipt](../whitepaper/results/batch-56-quality-owner-20261109.json).
+The wider audit remains open. Controls wrappers are the next runtime candidates.

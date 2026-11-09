@@ -4734,12 +4734,16 @@ old implementation. No core, GPU math or reversed-Z convention changes.
 Research and size evidence: [size restoration](../size-restore.md).
 
 
-### Section 5 pending evidence: Quality redraw helper
+### Section 5 evidence: Quality redraw helper
 
 The owner inventory now covers factory-created setup objects as well as explicit
 plugin classes. Ten real-engine Quality regressions fail on the parent and all
 91 package units pass with the local registration-identity and cancellation fix.
 The normal package suite brings this class check into check:merge/verify. No
-core change. Full gates, GPU and README runtime remain owed, including separating
-the inherited 7 ms speed proof from timestamp/tier-selection correctness under
-the build-phase policy. This is a local repair, not a landed GPU proof.
+core change. The five GPU leaves now pass, including eight real helper lifetime
+cases with two successful redraws and 484 red pixels in each live scene. Seven
+runtime README examples pass. The exact 7 ms assertion and old-rule diagnostic
+are retained in the deferred named suite while timestamp validity, tier decisions
+and wrapper cleanup remain live. Affected checks pass (102 tests, lint, hygiene,
+documentation, types, API and size); the single earlier full verify is retained
+without repeating unaffected code, per Scott's instruction. No capture fix changed.

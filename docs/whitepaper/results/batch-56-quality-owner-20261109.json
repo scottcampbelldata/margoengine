@@ -1,0 +1,157 @@
+{
+  "status": "ACCEPTED_AFFECTED_CHECKS",
+  "originalFix": "96e476cad",
+  "rebasedFix": "c7b7273aa",
+  "base": "7f791d68f",
+  "parent": {
+    "pass": 0,
+    "fail": 10
+  },
+  "packageUnits": {
+    "pass": 95,
+    "fail": 0
+  },
+  "affectedTests": {
+    "pass": 102,
+    "fail": 0,
+    "skipped": 0
+  },
+  "sizes": {
+    "before": 3686,
+    "after": 3714,
+    "ceiling": 3942,
+    "coreStage": 23924
+  },
+  "gpu": [
+    {
+      "name": "timestamps",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.4
+    },
+    {
+      "name": "ssaa",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5.1
+    },
+    {
+      "name": "features",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 7.4
+    },
+    {
+      "name": "power",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 26.3
+    },
+    {
+      "name": "owner",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 12.4
+    },
+    {
+      "name": "readme",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 20.1
+    }
+  ],
+  "helperGpu": {
+    "cases": 8,
+    "liveSceneRedPixels": [
+      484,
+      484
+    ],
+    "liveRedraws": [
+      2,
+      2
+    ],
+    "errors": 0
+  },
+  "readme": {
+    "pass": 7,
+    "browser": 7,
+    "node": 0
+  },
+  "verify": {
+    "inherited": "batch-56-save-owner-20261109.json",
+    "fullRunRepeated": false,
+    "reason": "Scott requested affected checks only; retain the accepted single earlier full verify"
+  },
+  "speed": {
+    "phase": "deferred",
+    "budget": "0 < p90 < 7 ms",
+    "workload": "640x360, 400-instance triangle",
+    "oldRuleDiagnosticRetained": true
+  },
+  "coreStageSourceChanged": false,
+  "hunterCaptureChanged": false,
+  "checks": [
+    {
+      "name": "lint",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.7
+    },
+    {
+      "name": "hygiene",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 18.7
+    },
+    {
+      "name": "links",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1.6
+    },
+    {
+      "name": "quality",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 63.2
+    },
+    {
+      "name": "readme-types",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 25.5
+    },
+    {
+      "name": "api",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 30.2
+    },
+    {
+      "name": "size",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1
+    },
+    {
+      "name": "gpu-policy",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1.1
+    }
+  ]
+}

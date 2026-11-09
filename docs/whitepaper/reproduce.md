@@ -2019,12 +2019,20 @@ coastal face-flux oracle and lifecycle/edit invalidation are correctness
 checks. The detailed results are `batch234-water-query-*.json` in `results/`.
 
 
-### Quality redraw helper pending acceptance
+### Quality redraw helper acceptance
 
-Run npm run test --workspace @margoengine/quality for all 93 units; the ten
-cases in test/scene-owner.test.js fail on parent 02e0f5d8a. The current local fix
-passes those cases. Before GPU acceptance, retain the original timestamp workload
-and exact 7 ms speed assertion in the named deferred suite, and keep all clock,
-wrapper restoration and tier-selection correctness live. Then run every package
-GPU command, README examples and the required once-run full gates. No quality GPU
-run or all-green full acceptance has yet been recorded for this continuation.
+Run the complete Quality package units and tests/speed-phase.test.js with a
+120-second per-test limit. Its ten scene-owner cases fail on the pre-fix parent.
+After building packages, run each of the five leaves in the package test:gpu
+script separately through scripts/gpu-lock.mjs run --owner=codex-56fix, shared,
+--wait-max=60 and measured duration plus margin. scene-owner-browser.mjs proves
+two real redraws and red canvas pixels for default/secondary scenes, cancellation
+before and between frames, detachment and same-name isolation. Run
+npm run check:readme-run -- --packages=quality through a shared slot. The
+acceptance receipt records results and limits. The inherited single full verify
+is retained; this continuation reruns affected gates only.
+
+The original 640x360 triangle overdrawn 400 times and its exact 7 ms p90 budget
+remain in scripts/speed/suites.json. Do not run that speed assertion or the
+old submit-to-done wall-clock diagnostic until Scott ends the build phase.
+Timestamp validity, tier storage/next-load and wrapper cleanup stay live.

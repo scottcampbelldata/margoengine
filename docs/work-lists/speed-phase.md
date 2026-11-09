@@ -362,3 +362,13 @@ and sum and 256-cubed matmul (warmup plus three rounds); 256-square Poisson CG
 16M-element tuning of reduce/scan/sort, chosen-minimum consistency and the final
 5,000-element sum. There is no new speed target or raised budget. Only Scott
 ends deferral; the full named suite remains required before release.
+
+
+### Quality triangle timestamp acceptance
+
+Named suite: packages/quality/test/browser-check.mjs. Retain the exact
+0 < p90 < 7 ms GPU timestamp budget, 640x360 canvas and 400-instance triangle,
+plus the old submit-to-done p90 diagnostic on the same frames. Wall-clock
+instrumentation and the 7 ms assertion run only in the active speed phase.
+Real timestamps, tier storage/next-load selection and wrapper cleanup remain
+live correctness. No speed run occurred during this continuation.

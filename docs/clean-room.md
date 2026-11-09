@@ -3805,7 +3805,7 @@ flux oracle instead reads the existing sampleable texture in a compute pass.
 
 
 
-### Quality redraw helper ownership and cancellation (local batch 56 continuation)
+### Quality redraw helper ownership and cancellation (batch 56 continuation)
 
 Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
 Representation Independence for Object-Oriented Programs* (2002),
@@ -3824,4 +3824,27 @@ The local optional-package repair retains the object, resolves its actual scene
 with sceneOf, and guards both queued callbacks with the registration lifetime.
 A stop invoked inside the first render prevents scheduling a second. All ten
 new real-engine regressions fail on the parent; repaired package units pass 93.
-GPU, README runtime and full acceptance for this continuation remain pending.
+All five GPU leaves and seven runtime README examples now pass; 95 Quality
+units and seven speed-phase policy checks pass. See the acceptance receipt.
+
+
+### Quality browser correctness and deferred speed policy
+
+Compared W3C GPU for the Web Working Group, *WebGPU*, editors Kai Ninomiya,
+Brandon Jones and Jim Blandy (2026), https://www.w3.org/TR/webgpu/; Andy Georges,
+Dries Buytaert and Lieven Eeckhout, *Statistically Rigorous Java Performance
+Evaluation* (2007), https://dri.es/files/oopsla07-georges.pdf; and Todd Mytkowicz,
+Peter F. Sweeney, Matthias Hauswirth and Amer Diwan, *Observer Effect and
+Measurement Bias in Performance Analysis* (2008),
+https://sape.inf.usi.ch/publications/cu-cs-1042-08.html. WebGPU defines the
+query and queue timelines; the papers explain runtime variability and the
+effect of instrumentation. Our design inference separates real-query validity
+and storage decisions from speed acceptance, with wall-clock instrumentation
+opted in only by the active speed suite. No companion source was read.
+
+The exact positive p90 below 7 ms assertion and original 640x360, 400-instance
+triangle remain in the named release suite. The live gate validates a finite
+positive query, uses FAST_GPU_MS to check storage and next-load tier, verifies
+wrapper restoration and reports validation errors. No speed budget is raised.
+The helper GPU proof renders the owning scene twice and checks red canvas pixels,
+then exercises cancellation before and between frames with same-name isolation.

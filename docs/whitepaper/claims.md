@@ -2475,11 +2475,14 @@ reproduce with the points unit suite. Sources: [size restoration](../size-restor
 No performance or cross-runtime floating-point claim is added.
 
 
-### Quality redraw ownership: local CPU proof only
+### Quality redraw ownership: CPU and GPU proof
 
 Ten real-engine failures reproduce default/secondary cleanup, pending
 callbacks after stop/removal/scene or engine disposal, same-name preservation and
 stop during the first redraw. The local optional-package fix passes all 93 units;
-root entry grows 3686 to 3714 B within its unchanged ceiling. Runtime GPU,
-README and full acceptance are pending; no current-main acceptance claim for
-this repair. Sources: [clean-room record](../clean-room.md).
+root entry grows 3686 to 3714 B within its unchanged ceiling. All five GPU leaves,
+95 package units, seven speed-phase policy checks and seven runtime README
+examples pass. Both default and secondary scenes draw 484 red pixels on their
+two live redraws; stopping/removal cancels queued work with identity isolation.
+[Acceptance receipt](results/batch-56-quality-owner-20261109.json). Sources:
+[clean-room record](../clean-room.md). No speed claim is added.

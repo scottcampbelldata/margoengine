@@ -3670,21 +3670,10 @@ and three passing default controls. Callback effects outside saved state remain
 the binding author's responsibility. The wider owner audit remains open.
 
 
-### Quality redraw helper lifetime: local repair awaiting acceptance
+### Quality redraw helper lifetime: resolved
 
-Repro: call redrawAfterRestore during a secondary scene's setup, then invoke its
-stop function outside setup. It removes from the default scene, retaining the
-secondary helper and potentially removing a default same-name plugin. Queue a
-restoration callback, then stop/remove the plugin or dispose its scene/engine:
-the pending callback still renders; stopping from the first render also allows
-the second. Cause: name-only cleanup and callbacks without lifetime state.
-Ten real-engine cases in packages/quality/test/scene-owner.test.js fail before
-the local repair; all 93 package units pass after it. The repair is not accepted
-or pushed until its remaining GPU, README and full gates pass.
-
-The inherited quality/test/browser-check.mjs GPU gate also contains a 7 ms
-performance assertion and an old-rule wall-clock measurement in its HTML fixture.
-Those speed proofs must be routed to the deferred speed suite while preserving
-the clock, tier-selection and wrapper-cleanup correctness checks. No quality GPU
-command was run in this continuation; no performance budget was raised or test
-removed. This gate-policy repair is still owed before package acceptance.
+The optional-package repair binds cleanup to the actual registration and cancels
+both queued frames after stop or disposal. Ten parent failures are covered by
+the real-engine suite. All 95 Quality units, its five GPU commands and seven
+runtime README examples pass. The exact inherited 7 ms speed budget remains
+in the named deferred suite. See the [acceptance receipt](whitepaper/results/batch-56-quality-owner-20261109.json).
