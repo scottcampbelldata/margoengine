@@ -102,3 +102,30 @@ Measured bare-peer min+gzip: new `/query` 4,463 B (ceiling 4,719 B), root
 The root additions are an internal resource bridge; neither imports query
 implementation. Core + stage remains 23,924 B. All capture/query code stays
 optional and no optional ceiling increase is needed.
+
+## Landing acceptance
+
+The round invoked full `npm run verify` exactly once, without a GPU lease.
+Its water-SSR preservation failure identified the unnecessary flux texture
+COPY_SRC addition made for the test oracle. That addition was removed entirely;
+the independent oracle now extracts the existing sampleable flux by compute.
+The unchanged preservation proof then passes. Successful verify steps were
+retained; interrupted API, quality, voxel-sandbox and full-unit steps resumed
+separately. The new entry's budget total was corrected to the exact item sum,
+with no other ceiling or numeric test changed.
+
+The resumed full suite ran 13,945 cases: 13,944 passed and one pre-existing
+fixed-wait classification/compute-fixture check failed. Current main already
+contains the owning checker and fixture repairs. After rebasing and rebuilding
+the affected stats/sciviz/umbrella outputs, all 175 affected checks and 51
+generated-doc/umbrella/supply-chain/size-record integration checks pass. An
+initial concurrent post-rebase test attempt read stale stats output; acceptance
+uses the subsequent run after the rebuild completed. No second full verify or
+full post-rebase suite is claimed.
+
+All 38 water unit cases pass. Sixteen package GPU runs (all eight water drivers,
+native and full compatibility) pass; the query driver passes again on both
+backends after removing the unnecessary usage flag. All nine water/umbrella
+README examples execute with zero known failures. Lint, hygiene, API, docs links
+and the size gate pass; research, evidence, API report and generated docs are
+in the same landing. No GPU job remains held or queued by this lane.
