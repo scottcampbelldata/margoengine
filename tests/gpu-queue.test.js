@@ -29,25 +29,31 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
   const jobs = [],
     held = [];
   let later;
-  const cli = (args) =>
-    spawnSync(process.execPath, ['scripts/gpu-lock.mjs', ...args], {
+  const cli = (args, cwd = process.cwd()) =>
+    spawnSync(process.execPath, [resolve('scripts/gpu-lock.mjs'), ...args], {
       env: process.env,
+      cwd,
       encoding: 'utf8',
       timeout: 30_000,
       windowsHide: true,
     });
   const readJob = (ticket) => readGpuQueueRecord(join(`${lock}-jobs`, `${ticket}.json`));
   const queue = (label) => {
-    const result = cli([
-      'enqueue',
-      `--owner=${label}`,
-      '--max=2',
-      '--',
-      process.execPath,
-      'tests/fixtures/gpu-queue-command.mjs',
-      folder,
-      label,
-    ]);
+    const cwd = join(folder, `worktree-${label}`);
+    mkdirSync(join(cwd, '.git'), { recursive: true });
+    const result = cli(
+      [
+        'enqueue',
+        `--owner=${label}`,
+        '--max=2',
+        '--',
+        process.execPath,
+        resolve('tests/fixtures/gpu-queue-command.mjs'),
+        folder,
+        label,
+      ],
+      cwd,
+    );
     assert.equal(result.status, 0, result.stderr);
     const job = JSON.parse(result.stdout);
     jobs.push(job);
@@ -56,7 +62,11 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
   };
   try {
     const gpu = await import('../scripts/gpu-lock.mjs?queue-test');
-    for (let i = 0; i < 3; i++) held.push(await gpu.acquire({ owner: `occupied-${i}`, max: 2, log() {} }));
+    for (let i = 0; i < 3; i++) {
+      const worktree = join(folder, `held-${i}`);
+      mkdirSync(join(worktree, '.git'), { recursive: true });
+      held.push(await gpu.acquire({ owner: `occupied-${i}`, worktree, max: 2, log() {} }));
+    }
     const first = queue('first'),
       second = queue('second');
     assert.equal(first.state, 'waiting');
@@ -77,7 +87,7 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
         '--wait-max=1',
         '--',
         process.execPath,
-        'tests/fixtures/gpu-queue-command.mjs',
+        resolve('tests/fixtures/gpu-queue-command.mjs'),
         folder,
         'later',
       ],
@@ -137,7 +147,7 @@ test('a detached command failure is retained for wait and never reported as a pa
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('MARGO_GPU_')));
   env.MARGO_GPU_LOCK = join(folder, 'gpu.lock');
   const run = (args) =>
-    spawnSync(process.execPath, ['scripts/gpu-lock.mjs', ...args], {
+    spawnSync(process.execPath, [resolve('scripts/gpu-lock.mjs'), ...args], {
       env,
       encoding: 'utf8',
       timeout: 30_000,
@@ -147,6 +157,7 @@ test('a detached command failure is retained for wait and never reported as a pa
     const queued = run([
       'enqueue',
       '--owner=fails',
+      '--gpu=CPU-only failed-command fixture',
       '--max=0.2',
       '--wait-max=1',
       '--',

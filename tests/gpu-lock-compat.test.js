@@ -81,6 +81,7 @@ test('an ambient MARGO_GPU_* setting does not reach the locks under test, and is
 const takeNew = (gpu, owner, mode) =>
   gpu.acquire({
     owner,
+    worktree: join(gpu.lockDir, '..', `fake-worktree-${owner}`),
     mode,
     ...(mode === 'exclusive' ? { timing: 'CPU-only scheduler regression' } : {}),
     poll: 10,
@@ -102,7 +103,7 @@ test('an old-style holder blocks new shared and exclusive requests until it rele
     assert.equal(await settled(bench), 'waiting');
     sharedRelease();
     (await bench)();
-    assert.equal(now.status(), null);
+    assert.equal(now.status().mode, 'idle');
   }));
 
 test('new shared holders block an old client until the last one releases; then it gets the lock', () =>
@@ -172,7 +173,7 @@ test('old and new clients take turns: no two holders overlap where one is old', 
     }
     await Promise.all(jobs);
     assert.equal(overlap, false);
-    assert.equal(now.status(), null);
+    assert.equal(now.status().mode, 'idle');
   }));
 
 test('a waiting request leaves no empty lock folder behind, which would make old clients wait forever', () =>

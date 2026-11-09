@@ -8,6 +8,34 @@ import test from 'node:test';
 import { createGpuQueue } from '../scripts/gpu-queue.mjs';
 import { windowsCommandLine } from '../scripts/gpu-lock.mjs';
 
+test('waiting for a terminal ticket drains its detached owner before returning completion', {
+  timeout: 5000,
+}, async () => {
+  const folder = fs.mkdtempSync(resolve('test-results/gpu-queue-drain-'));
+  const lock = join(folder, 'gpu.lock');
+  const ticket = '001794250000000-123-drain';
+  const record = { state: 'passed', pid: 123, finishedAt: 42, options: {} };
+  fs.mkdirSync(`${lock}-jobs`);
+  fs.writeFileSync(join(`${lock}-jobs`, `${ticket}.json`), JSON.stringify(record));
+  let drained = false;
+  try {
+    const queue = createGpuQueue({
+      lockDir: lock,
+      settleOwner: async (pids, bound, since) => {
+        assert.deepEqual(pids, [123]);
+        assert.equal(bound, 30_000);
+        assert.equal(since, 42);
+        drained = true;
+        return [];
+      },
+    });
+    assert.equal((await queue.waitForTicket(ticket, 0.01)).state, 'passed');
+    assert.equal(drained, true);
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test('a detached owner that exits before admission reports its exit, never a fictitious 30-second timeout', {
   timeout: 5000,
 }, async () => {
@@ -15,6 +43,9 @@ test('a detached owner that exits before admission reports its exit, never a fic
   try {
     const queue = createGpuQueue({
       lockDir: join(folder, 'gpu.lock'),
+      validateRequest() {},
+      validateGpuCommand() {},
+      defaultMaxMinutes: () => 1,
       launch: () => Object.assign(new EventEmitter(), { exitCode: 13, signalCode: null, unref() {} }),
     });
     await assert.rejects(queue.enqueue([process.execPath, '-e', ''], { mode: 'shared' }), (error) => {
@@ -35,7 +66,11 @@ test('a detached bootstrap failure retains the original stderr and exit in its t
   try {
     const queue = createGpuQueue({
       lockDir: join(folder, 'gpu.lock'),
-      launch: (file, _args, options) => spawn(file, ['-e', `console.error(${JSON.stringify(evidence)}); process.exit(19)`], options),
+      validateRequest() {},
+      validateGpuCommand() {},
+      defaultMaxMinutes: () => 1,
+      launch: (file, _args, options) =>
+        spawn(file, ['-e', `console.error(${JSON.stringify(evidence)}); process.exit(19)`], options),
     });
     await assert.rejects(queue.enqueue([process.execPath, '-e', ''], { mode: 'shared' }), (error) => {
       assert.equal(error.code, 'ERR_GPU_QUEUE_OWNER_EXIT');

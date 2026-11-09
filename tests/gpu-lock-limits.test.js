@@ -80,7 +80,18 @@ test('run: a command past --max is killed with its children, the lock is freed, 
     const started = Date.now();
     const run = spawnSync(
       process.execPath,
-      ['scripts/gpu-lock.mjs', 'run', '--max=0.04', '--owner=hang', '--', process.execPath, '-e', hang, pidFile],
+      [
+        'scripts/gpu-lock.mjs',
+        'run',
+        '--gpu=CPU-only hold-timeout tree fixture',
+        '--max=0.04',
+        '--owner=hang',
+        '--',
+        process.execPath,
+        '-e',
+        hang,
+        pidFile,
+      ],
       // This test is about the wrapper's own limit. With FAST's 200 ms grace the detached heartbeat process reached
       // the same deadline while the wrapper was still ending the tree (taskkill can take longer than that on Windows),
       // killed it too and appended gpu-lock-timeouts.log to this folder during the rmSync below (ENOTEMPTY). A long
@@ -104,7 +115,7 @@ test('run: a command past --max is killed with its children, the lock is freed, 
       encoding: 'utf8',
       env: { ...process.env, MARGO_GPU_LOCK: lock },
     });
-    assert.equal(JSON.parse(next.stdout), null);
+    assert.equal(JSON.parse(next.stdout).mode, 'idle');
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -309,6 +320,6 @@ test('a request that gave up leaves nothing in the queue', () =>
     );
     assert.equal(gpu.status().waiting, undefined);
     // Shared requests are not stuck behind the withdrawn exclusive one.
-    (await gpu.acquire({ owner: 'second', poll: 10, log: quiet }))();
+    (await gpu.acquire({ owner: 'second', worktree: join(lock, '..', 'second-worktree'), poll: 10, log: quiet }))();
     reader();
   }));

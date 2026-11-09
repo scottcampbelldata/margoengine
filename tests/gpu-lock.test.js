@@ -11,10 +11,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const run = (lock, args, env = {}, flags = []) =>
-  spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'run', ...flags, '--owner=test', '--', ...args], {
-    encoding: 'utf8',
-    env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...env },
-  });
+  spawnSync(
+    process.execPath,
+    [
+      'scripts/gpu-lock.mjs',
+      'run',
+      '--gpu=CPU-only argument and scheduler fixture',
+      ...flags,
+      '--owner=test',
+      '--',
+      ...args,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...env },
+    },
+  );
 
 test('a quoted multi-word argument reaches the command intact', () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
@@ -56,7 +68,7 @@ test('the nested marker excuses only the held lock: a different lock is still ta
     // A child of the GPU lock's own run: already held, not taken again.
     const same = acquireUnder(gpu, join(gpu, 'nested'));
     assert.equal(same.status, 0, same.stderr);
-    assert.equal(JSON.parse(same.stdout.trim()), null);
+    assert.equal(JSON.parse(same.stdout.trim()).mode, 'idle');
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -141,6 +153,7 @@ const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid;
 const take = (gpu, owner, mode) =>
   gpu.acquire({
     owner,
+    worktree: join(gpu.lockDir, '..', `fake-worktree-${owner}`),
     mode,
     ...(mode === 'exclusive' ? { timing: 'CPU-only scheduler regression' } : {}),
     poll: 10,
@@ -172,9 +185,9 @@ test('shared FIFO tickets preserve arrival order when timestamps tie and owner n
   withLock(async (gpu) => {
     const held = [await take(gpu, 'hold-1'), await take(gpu, 'hold-2'), await take(gpu, 'hold-3')];
     const options = { queuedAt: 123, poll: 1, waitMax: 0.2, max: 1, log: quiet };
-    const first = gpu.acquire({ ...options, owner: 'z-first' });
+    const first = gpu.acquire({ ...options, owner: 'z-first', worktree: join(gpu.lockDir, '..', 'fake-z') });
     while (!gpu.status()?.waiting?.length) await sleep(1);
-    const second = gpu.acquire({ ...options, owner: 'a-second' });
+    const second = gpu.acquire({ ...options, owner: 'a-second', worktree: join(gpu.lockDir, '..', 'fake-a') });
     assert.equal(await settled(second), 'waiting');
     assert.deepEqual(
       gpu.status().waiting.map((w) => w.owner),
@@ -200,7 +213,7 @@ test('shared holders share: up to the slot count at once, the next waits for a f
     (await fourth)();
     held[0]();
     held[2]();
-    assert.equal(gpu.status(), null);
+    assert.equal(gpu.status().mode, 'idle');
   }));
 
 test('MARGO_GPU_SLOTS sets the slot count; a bad value is refused', async () => {
@@ -237,7 +250,7 @@ test('an exclusive request waits until no shared holder is left', () =>
     assert.equal(release.mode, 'exclusive');
     assert.equal(gpu.status().mode, 'exclusive');
     release();
-    assert.equal(gpu.status(), null);
+    assert.equal(gpu.status().mode, 'idle');
   }));
 
 test('an exclusive request cannot starve: new shared holders queue behind it, though slots are free', () =>
@@ -320,7 +333,7 @@ test('holders and waiters whose process is gone are removed; live ones stay', ()
     );
     live();
     (await bench)();
-    assert.equal(gpu.status(), null);
+    assert.equal(gpu.status().mode, 'idle');
   }));
 
 test('a legacy owner.json holder blocks until it is released or its process is gone', () =>
@@ -357,12 +370,12 @@ test('nested: a child of a shared hold takes nothing and refuses to wait on its 
   });
   await withLock(async (gpu) => {
     (await take(gpu, 'child'))();
-    assert.equal(gpu.status(), null, 'nothing was taken');
+    assert.equal(gpu.status().mode, 'idle', 'nothing was taken');
     await assert.rejects(take(gpu, 'bench', 'exclusive'), /run --exclusive/);
   }, nested('shared'));
   await withLock(async (gpu) => {
     (await take(gpu, 'bench', 'exclusive'))();
-    assert.equal(gpu.status(), null, 'nothing was taken');
+    assert.equal(gpu.status().mode, 'idle', 'nothing was taken');
   }, nested('exclusive'));
 });
 

@@ -1,5 +1,24 @@
 # Design envelope
 
+GPU `run` and `enqueue` accept GPU leaves only; known CPU aggregators cannot be
+overridden, and unclassified GPU leaves require a logged `--gpu` reason. New
+clients hold one slot per canonical worktree or owner lane prefix. Admission is
+FIFO among eligible lanes, bypassing requests whose lane already holds a slot.
+Old clients interoperate, but their missing lane metadata limits enforcement.
+Windows WDDM GPU Engine snapshots cover the holder process tree every 30 seconds
+with uint64 strings/BigInt, a 45-second query limit and 5-second termination
+allowance. Three minutes of stable complete idle samples trigger confirmed,
+identity-pinned tree termination and own-token release. Unknown data, resets,
+PID reuse or gaps above 90 seconds prevent idle reclaim; other platforms retain
+the normal hold timeout. Sampling can miss short-lived GPU children between
+observations. Status distinguishes busy, idle and unknown; slotsUsed/3 counts
+leases, not GPU utilization. Free-slot wait totals integrate scheduler-observed
+transitions, including requests blocked by the lane rule; they do not trace
+legacy events continuously. CPU-only regressions and owned Windows sleeper
+termination prove policy and lifecycle, not GPU speed or continuous tracing.
+Queue terminal observation bounds owner handle draining at 30 seconds; waiter
+withdrawal has a separate 30-second mutex cleanup bound to close wait accounting.
+
 GPU exclusive policy is checked before verify builds: tracked production source
 and package scripts are scanned for literal CLI/environment/API requests.
 Computed commands are checked at runtime; the syntax gate does not evaluate
@@ -61,7 +80,7 @@ Detached `gpu-lock.mjs enqueue` submissions retain the 60-minute default gate
 wait; `wait <ticket>` observes the same request and never cancels it on timeout.
 Status records persist beside the lock, and command logs stay in the submitting
 worktree. Older clients remain interoperable but keep their older ordering;
-FIFO applies only to new clients. A shared head request needs one free slot,
+Eligible-lane FIFO applies only to new clients. A shared eligible head request needs one free slot,
 not an empty GPU. Commands and observers each have a hard time limit.
 
 Exclusive GPU holds are reserved for classified speed commands or an explicit,

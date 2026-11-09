@@ -36,9 +36,18 @@ async function pendingMutex(t, body) {
   syncBuiltinESMExports();
   try {
     const gpu = await import(`../scripts/gpu-lock.mjs?integration=${imports++}`);
-    const take = (owner) => gpu.acquire({ owner, mode: 'shared', poll: 1, waitMax: 0.1, max: 1, log() {} });
+    const take = (owner) =>
+      gpu.acquire({
+        owner,
+        worktree: join(gpu.lockDir, '..', `fake-worktree-${owner}`),
+        mode: 'shared',
+        poll: 1,
+        waitMax: 0.1,
+        max: 1,
+        log() {},
+      });
     await body(gpu, take);
-    assert.equal(gpu.status(), null);
+    assert.equal(gpu.status().mode, 'idle');
     assert.deepEqual(fs.readdirSync(folder), [], 'release removes all retired names and the empty lock');
   } finally {
     t.mock.restoreAll();

@@ -1,11 +1,19 @@
 // Detached GPU gate jobs keep their place while the submitting agent does CPU work.
 // Holder and waiting entries use gpu-lock's existing format, including for older clients.
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { runLimited } from './support/run-limited.mjs';
-import { endTree } from './support/shutdown.mjs';
-import { speedEnabled } from './support/speed-phase.mjs';
+import { endTree, waitSignaled } from './support/shutdown.mjs';
 
 /** Status revisions are immutable: Windows readers may keep the previous name open. */
 export function readGpuQueueRecord(file) {
@@ -24,8 +32,10 @@ export function createGpuQueue({
   measuresSpeed,
   resolveMode,
   validateRequest,
+  validateGpuCommand,
   windowsCommandLine,
   launch = spawn,
+  settleOwner = process.platform === 'win32' ? waitSignaled : undefined,
 }) {
   const MIN = 60_000;
   const jobsDir = `${lockDir}-jobs`;
@@ -56,9 +66,13 @@ export function createGpuQueue({
 
   /** Queue a bounded command; return only once its detached owner has queued or been admitted. */
   async function enqueue(command, options) {
-    if (basename(lockDir) === 'gpu.lock' && options.mode === 'exclusive' && !speedEnabled()) {
-      validateRequest({ ...options, maxMinutes: options.max ?? defaultMaxMinutes(), command: command.join(' ') });
-    }
+    validateRequest({
+      ...options,
+      maxMinutes: options.max ?? defaultMaxMinutes(),
+      command: command.join(' '),
+      auditTiming: false,
+    });
+    validateGpuCommand(command, options);
     const queuedAt = Date.now();
     const ticket = `${String(queuedAt).padStart(15, '0')}-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
     const log = resolve('test-results', 'gpu-queue', `${ticket}.log`);
@@ -126,6 +140,7 @@ export function createGpuQueue({
       const { command, options } = record;
       release = await acquire({
         ...options,
+        worktree: record.cwd,
         command: command.join(' '),
         queuedAt: record.queuedAt,
         onQueued: () => update({ state: 'waiting' }),
@@ -169,7 +184,19 @@ export function createGpuQueue({
     const bound = positive(minutes, (initial.options.waitMax ?? 60) + (initial.options.max ?? 20) + 1, 'wait-max');
     for (const deadline = Date.now() + bound * MIN; ; ) {
       const record = read(ticket);
-      if (record.state === 'passed' || record.state === 'failed') return record;
+      if (record.state === 'passed' || record.state === 'failed') {
+        // Terminal status is written just before owner exit. Windows keeps its cwd open
+        // until process handles close; a completed gate must be safe to clean up.
+        if (record.pid && record.pid !== process.pid && settleOwner) {
+          const survivors = await settleOwner([record.pid], 30_000, record.finishedAt ?? Date.now());
+          if (survivors.length)
+            throw Object.assign(
+              new Error(`ERR_GPU_QUEUE_OWNER_DRAIN: completed owner ${record.pid} did not close within 30 seconds`),
+              { code: 'ERR_GPU_QUEUE_OWNER_DRAIN' },
+            );
+        }
+        return record;
+      }
       if (Date.now() > deadline)
         throw new Error(
           `ERR_GPU_QUEUE_WAIT_TIMEOUT: ${ticket} is ${record.state}; its place is retained, run wait ${ticket} again`,
@@ -222,6 +249,7 @@ export function createGpuQueue({
       owner: ownFlag('owner'),
       mode,
       timing: ownFlag('timing'),
+      gpu: ownFlag('gpu'),
       waitMax: positive(
         ownFlag('wait-max'),
         positive(process.env.MARGO_GPU_WAIT_MAX_MIN, 60, 'MARGO_GPU_WAIT_MAX_MIN'),

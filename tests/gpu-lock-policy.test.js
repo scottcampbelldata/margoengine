@@ -20,7 +20,16 @@ function fixture(t) {
   ) =>
     spawnSync(
       process.execPath,
-      ['scripts/gpu-lock.mjs', 'run', '--owner=policy-test', '--wait-max=0.05', ...flags, '--', ...command],
+      [
+        'scripts/gpu-lock.mjs',
+        'run',
+        '--gpu=CPU-only exclusive policy fixture',
+        '--owner=policy-test',
+        '--wait-max=0.05',
+        ...flags,
+        '--',
+        ...command,
+      ],
       {
         env: { ...env, ...extra },
         encoding: 'utf8',

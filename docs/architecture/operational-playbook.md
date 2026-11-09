@@ -298,9 +298,74 @@ and [CreateFileW function, sharing modes](https://learn.microsoft.com/en-us/wind
 rather than retrying or hiding a refused replacement. Only status metadata
 changes; shared/exclusive holder and FIFO lock entry formats stay unchanged.
 
+Job 6 admission applies to `run` and `enqueue` before any ticket or holder is
+created: CPU aggregators (verify, lint, hygiene, unit tests, builds, tsc and
+shell wrappers) fail with `ERR_GPU_COMMAND_NOT_GPU`. GPU npm leaves
+`test:gpu`, `test:browser`, `test:xr`, `check:readme-run`, and named GPU/browser/
+pixel/capture/render/XR scripts are recognized. An unclassified GPU leaf needs
+`--gpu=<reason>`, recorded in `gpu-lock-reasons.log`; that flag cannot override
+a known CPU command. Imported GPU suites keep calling `acquire` themselves.
+
+New holders and tickets record their canonical worktree and owner lane prefix.
+At most one slot is held for either identity. Requests from an occupied lane
+queue while unrelated eligible lanes fill the other two slots. FIFO applies
+among eligible requests and within a lane; a blocked same-lane ticket does not
+block unrelated work. Legacy entries still participate using their owner
+prefix when present; an old client with no worktree metadata cannot enforce the
+new rule itself. Nested acquisition in the same held lock remains a no-op.
+
+An independent heartbeat samples the complete Windows WDDM GPU Engine raw
+counter set and Win32_Process identities every 30 seconds, outside the mutex.
+RunningTime and Timestamp_Sys100NS remain uint64 strings and are compared with
+BigInt over the holder's process tree, retaining known descendants after an
+intermediate exits. The provider has a 45-second hard limit and a 5-second
+tree-kill bound. Missing providers, errors, empty/incomplete samples, counter
+resets, PID reuse and gaps beyond 90 seconds reset the idle window to unknown.
+Three minutes of stable complete samples with no increasing GPU counter trigger
+an identity-confirming second observation, process-tree termination and an
+`ERR_GPU_IDLE_RECLAIM` record in `gpu-lock-idle.log`. Only that lease token is
+released after successful termination. Birth times use CIM's microsecond
+representation, including the native termination check; handles stay open during
+taskkill and the bounded exit wait so PIDs cannot be reused during termination.
+The detached heartbeat uses the checkout cwd, and ticket completion waits for
+the owner to close its Windows handles before returning, so a command's temporary
+directory can be removed after completion (30-second owner drain bound).
+Withdrawal removes its ticket and closes wait accounting under the mutex, with
+a separate 30-second cleanup bound. An incomplete first append is unpublished;
+the next writer discards only the unfinished tail under the mutex before appending.
+failed confirmation telemetry is observed/published as unknown and resets idle.
+
+`status` reports holder lane, command, heldMinutes, and GPU busy/idle/unknown,
+plus slotsUsed/slots (default 3). Activity logs are append-only sidecars and do
+not rewrite a released holder. `usage.freeSlotWaitMs` is elapsed time with at
+least one free slot while requests wait; `freeSlotWaitSlotMs` sums free slots
+over that time. Both integrate scheduler-observed transitions, including
+same-lane ineligibility, rather than continuous GPU occupancy or legacy events.
+A 3/3 count means admitted leases, not hardware saturation. Sampled counters
+can miss GPU children born and exited between snapshots; this is not continuous
+tracing. Other platforms report unknown and retain the existing hold timeout.
+
+Evidence: CPU fake-lock tests in `tests/gpu-admission.test.js` and
+`tests/gpu-activity.test.js` and `tests/gpu-monitor-edges.test.js`, plus existing mixed-client, queue, timeout and
+nested regressions. The native Windows terminator test uses owned CPU sleepers,
+including a deliberately mismatched birth identity. No benchmark or second
+GPU-heavy proof run was started. Research compared Mellor-Crummey and Scott's
+reader/writer fairness with Mahajan et al., [Themis: Fair and Efficient GPU Cluster Scheduling](https://arxiv.org/abs/1907.01484)
+(2019), and Yu and Chowdhury, [Salus: Fine-Grained GPU Sharing Primitives for Deep Learning Applications](https://arxiv.org/abs/1902.04610)
+(2019): eligible CI lanes use shared capacity; their ML allocation algorithms
+are not imported. Telemetry follows Steve Pronovost, posted by Bryan Langley,
+[GPUs in the Task Manager](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/)
+(2017), and Microsoft, [Collecting Performance Data](https://learn.microsoft.com/en-us/windows/win32/perfctrs/collecting-performance-data)
+(2021). NVIDIA, [nvidia-smi documentation](https://docs.nvidia.com/deploy/nvidia-smi/index.html)
+(2026), limits pmon to Linux; unsupported Windows metrics are never zero.
+Microsoft, [PROCESS_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-process_information)
+(2024) and [CIM_DATETIME](https://learn.microsoft.com/en-us/windows/win32/wmisdk/cim-datetime)
+(2021), specify process-object lifetime and six-digit fractional timestamps.
+No companion code or other repository source was read.
+
 All new shared and exclusive requests keep FIFO tickets in the existing
 `gpu.lock-waiting/` format. Shared admission requires a free slot and the head
-ticket; it does not wait for other shared holders to finish. Old reader/writer
+eligible ticket; it does not wait for other shared holders to finish. Old reader/writer
 clients conservatively treat these tickets as exclusive waiters, preserving
 exclusion but not providing FIFO guarantees for old clients. Old one-holder
 clients also retain their own ordering. Worktrees must rebase to get the new

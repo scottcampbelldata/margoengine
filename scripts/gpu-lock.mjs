@@ -57,6 +57,16 @@ import { pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { exitOnHelp } from './support/help.mjs';
 import { speedEnabled } from './support/speed-phase.mjs';
+import { gpuCommand } from './support/gpu-command.mjs';
+import {
+  firstEligible,
+  observeUsage,
+  ownerLane,
+  readUsage,
+  sameLane,
+  worktreeIdentity,
+} from './support/gpu-admission.mjs';
+import { GpuActivity, monitorGpuLease, terminateGpuTree } from './support/gpu-activity.mjs';
 
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
@@ -82,6 +92,8 @@ const sharedDir = join(lockDir, 'shared'),
   exclusiveFile = join(lockDir, 'exclusive.json'),
   legacyFile = join(lockDir, 'owner.json');
 const isGpuLock = basename(lockDir) === 'gpu.lock';
+const usageFile = `${lockDir}-usage.jsonl`;
+const activityFile = (token) => join(`${lockDir}-activity`, `${token.replace(/[^\w.-]/g, '_')}.jsonl`);
 const MIN = 60_000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const alive = (pid) => {
@@ -226,7 +238,8 @@ function reclaimDeadMutex() {
  */
 export function killTree(pid) {
   if (!pid) return;
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32')
+    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', timeout: 10_000, windowsHide: true });
   else
     try {
       process.kill(-pid, 'SIGKILL');
@@ -332,7 +345,7 @@ function refusal(code, message, request) {
 }
 
 /** Validate exclusive GPU use before waiting or entering an outer holder. Other locks are unaffected. */
-export function validateRequest({ owner, mode, maxMinutes, command, timing }) {
+export function validateRequest({ owner, mode, maxMinutes, command, timing, auditTiming = true }) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
   if (!Number.isFinite(maxMinutes) || maxMinutes <= 0)
     throw new RangeError('gpu-lock: max must be a finite positive number of minutes');
@@ -356,7 +369,7 @@ export function validateRequest({ owner, mode, maxMinutes, command, timing }) {
       'all exclusive GPU requests are refused during the build phase; only an exact, unexpired coordinator allowlist entry approved by Scott may proceed.',
       request,
     );
-  if (approval) {
+  if (approval && auditTiming) {
     mkdirSync(dirname(lockDir), { recursive: true });
     appendFileSync(
       join(dirname(lockDir), 'gpu-lock-timing.log'),
@@ -369,10 +382,30 @@ export function validateRequest({ owner, mode, maxMinutes, command, timing }) {
       `exclusive GPU holds cannot exceed ${EXCLUSIVE_MAX_MINUTES} minutes; split the speed suite into bounded measurements.`,
       request,
     );
-  if (timing) {
+  if (timing && auditTiming) {
     mkdirSync(dirname(lockDir), { recursive: true });
     appendFileSync(
       join(dirname(lockDir), 'gpu-lock-timing.log'),
+      JSON.stringify({ at: new Date().toISOString(), ...request }) + '\n',
+    );
+  }
+}
+
+/** CLI and detached jobs must name an actual GPU leaf before creating any ticket or holder. */
+export function validateGpuCommand(words, { owner, gpu } = {}) {
+  if (!isGpuLock) return;
+  const classification = gpuCommand(words);
+  const request = { owner, command: words.join(' '), gpu };
+  if (classification === 'cpu' || (classification !== 'gpu' && !(typeof gpu === 'string' && gpu.trim())))
+    refusal(
+      'ERR_GPU_COMMAND_NOT_GPU',
+      'GPU-only rule: run/enqueue accept GPU leaves only. verify, lint, hygiene, unit tests, builds, type checks and waits run without a GPU lock; their GPU steps acquire their own slot. An unclassified GPU leaf needs --gpu=<reason>.',
+      request,
+    );
+  if (gpu) {
+    mkdirSync(dirname(lockDir), { recursive: true });
+    appendFileSync(
+      join(dirname(lockDir), 'gpu-lock-reasons.log'),
       JSON.stringify({ at: new Date().toISOString(), ...request }) + '\n',
     );
   }
@@ -537,14 +570,39 @@ export function status() {
   const waiting = files(waitingDir)
     .map((name) => read(join(waitingDir, name)))
     .filter((entry) => entry && (!entry.pid || alive(entry.pid)));
+  const decorate = (entry) => {
+    let activity;
+    if (entry.token) {
+      try {
+        activity = JSON.parse(readFileSync(activityFile(entry.token), 'utf8').trim().split('\n').at(-1));
+      } catch (error) {
+        if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
+      }
+    }
+    if (!activity || Date.now() - activity.observedAt > 90_000)
+      activity = { state: 'unknown', reason: 'no recent complete GPU counter sample' };
+    return {
+      ...entry,
+      lane: entry.lane ?? ownerLane(entry.owner),
+      heldMinutes: Math.max(0, (Date.now() - Date.parse(entry.takenAt)) / MIN) || 0,
+      gpu: activity.state,
+      activity,
+    };
+  };
   const exclusive = liveEntry(exclusiveFile) ?? liveEntry(legacyFile);
   const holders = files(sharedDir)
     .map((name) => liveEntry(join(sharedDir, name)))
-    .filter(Boolean);
-  const extra = waiting.length ? { waiting } : {};
-  if (exclusive) return { ...exclusive, mode: 'exclusive', ...extra };
+    .filter(Boolean)
+    .map(decorate);
+  const extra = {
+    ...(waiting.length ? { waiting } : {}),
+    slotsUsed: exclusive ? slots() : holders.length,
+    slots: slots(),
+    usage: readUsage(usageFile),
+  };
+  if (exclusive) return { ...decorate(exclusive), mode: 'exclusive', ...extra };
   if (holders.length) return { mode: 'shared', holders, slots: slots(), ...extra };
-  return waiting.length ? { mode: 'idle', ...extra } : null;
+  return { mode: 'idle', ...extra };
 }
 
 const describe = (entry) =>
@@ -554,6 +612,8 @@ const describe = (entry) =>
 
 const spawnBeat = (verb, args) =>
   spawn(process.execPath, [import.meta.filename, verb, ...args], {
+    // The independent heartbeat must not pin a GPU command's temporary working directory after release.
+    cwd: resolve(import.meta.dirname, '..'),
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
@@ -582,6 +642,7 @@ export async function acquire({
   max,
   waitMax = number('MARGO_GPU_WAIT_MAX_MIN', 60),
   command = process.argv.slice(1).join(' ').slice(0, 300),
+  worktree = process.cwd(),
   timing,
   queuedAt = Date.now(),
   onQueued,
@@ -602,6 +663,9 @@ export async function acquire({
     noop.mode = mode;
     return noop;
   }
+  worktree = worktreeIdentity(worktree);
+  const lane = ownerLane(owner);
+  const requestedAt = Date.now();
   const token = `${owner.replace(/[^\w.-]/g, '_')}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     entry = (beats = true) => {
       const now = Date.now();
@@ -611,6 +675,9 @@ export async function acquire({
         token,
         mode,
         command,
+        worktree,
+        lane,
+        requestedAt,
         ...(timing ? { timing } : {}),
         takenAt: new Date(now).toISOString(),
         maxMinutes,
@@ -625,13 +692,29 @@ export async function acquire({
     startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
     const release = () => {
       if (read(file)?.token === token) rmSync(file, { force: true });
+      if (existsSync(lockDir)) {
+        const unlock = tryMutex();
+        if (unlock) {
+          try {
+            observeUsage(usageFile, snapshot(undefined), slots());
+          } finally {
+            unlock();
+          }
+        }
+      }
+      rmSync(activityFile(token), { force: true });
       tidy();
     };
     release.mode = mode;
     return release;
   };
-  const giveUp = (held) => {
-    if (queued) rmSync(join(waitingDir, ticket), { force: true });
+  const giveUp = async (held) => {
+    // Withdrawal is a scheduler transition too. Publish it under the mutex so
+    // the last waiter cannot leave a free-slot wait clock running indefinitely.
+    await locked(() => {
+      if (queued) rmSync(join(waitingDir, ticket), { force: true });
+      observeUsage(usageFile, snapshot(undefined), slots());
+    }, Date.now() + 30_000);
     tidy();
     return new Error(
       `gpu-lock: gave up after ${Math.round((Date.now() - waitStart) / MIN)} min waiting for the GPU (${mode} request by ${owner}); it is held by ${held.map(describe).join('; ')}. Wait longer with --wait-max=<min>, or look at the holder: node scripts/gpu-lock.mjs status`,
@@ -644,19 +727,26 @@ export async function acquire({
           others = state.waiting.filter((w) => w.token !== token);
         // An old client's release removes the whole folder, our ticket with it: queue again, in the same place.
         if (queued && others.length === state.waiting.length) queued = false;
-        const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
+        const holders = [state.exclusive, ...state.shared].filter(Boolean);
+        const candidate = firstEligible(state.waiting, holders);
+        const blocked = isGpuLock && holders.some((holder) => sameLane({ owner, lane, worktree }, holder));
+        const first = isGpuLock
+          ? !blocked && (candidate?.token === token || (!queued && !candidate))
+          : state.waiting[0]?.token === token || (!queued && others.length === 0);
         if (mode === 'shared') {
           if (!state.exclusive && first && state.shared.length < slots()) {
             if (queued) rmSync(join(waitingDir, ticket), { force: true });
             mkdirSync(sharedDir, { recursive: true });
             const file = join(sharedDir, `${token}.json`);
             writeFileSync(file, entry());
+            observeUsage(usageFile, snapshot(undefined), slots());
             return { file };
           }
         }
         if (mode === 'exclusive' && !state.exclusive && !state.shared.length && first) {
           if (queued) rmSync(join(waitingDir, ticket), { force: true });
           writeFileSync(exclusiveFile, entry());
+          observeUsage(usageFile, snapshot(undefined), slots());
           return { file: exclusiveFile };
         }
         if (!queued) {
@@ -668,12 +758,13 @@ export async function acquire({
           queued = true;
           onQueued?.();
         }
+        observeUsage(usageFile, snapshot(undefined), slots());
         return { held: [state.exclusive, ...state.shared, ...others].filter(Boolean) };
       },
       waitStart + waitMax * MIN,
     );
     if (result.file) return take(result.file);
-    if (Date.now() - waitStart > waitMax * MIN) throw giveUp(result.held);
+    if (Date.now() - waitStart > waitMax * MIN) throw await giveUp(result.held);
     if (Date.now() - announced >= 10 * MIN || announced === 0) {
       announced = Date.now();
       log(`gpu-lock: ${mode} request waiting for ${result.held.map(describe).join('; ')}`);
@@ -716,11 +807,12 @@ export const USAGE = `usage: node scripts/gpu-lock.mjs run [--exclusive] [--max=
 
 Runs a command while holding the GPU lock (test-results/gpu.lock of the main checkout), or prints the holders.
 enqueue returns a ticket after queueing a detached command. Do CPU work, then wait for its result without losing its place.
-Shared and exclusive requests retain FIFO order. wait timing out does not cancel the queued command.
+Requests retain FIFO order among eligible lanes; a lane already holding a slot queues. wait timing out does not cancel the queued command.
 
 Options:
   --exclusive                hold the whole GPU for speed measurement only
   --timing=<reason>          classify an otherwise unrecognized timing command (logged)
+  --gpu=<reason>             explain an unclassified GPU leaf (logged; cannot override a CPU command)
   --max=<min>                hold limit in minutes (default 20; exclusive GPU maximum 20)
   --wait-max=<min>           give up waiting after this many minutes (default 60)
   --owner=<id>              name shown to other waiters
@@ -739,8 +831,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   else if (verb === 'beat') {
     // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms> [<starter pid>]
     const [file, token, parent, deadline, starter] = rest;
+    const original = read(file);
+    const activity = new GpuActivity({ bornBefore: original?.requestedAt ?? Date.now() });
+    let sampling = false;
+    let lastSampleAt = performance.now();
     const grace = Number(process.env.MARGO_GPU_GRACE_MS ?? 15_000);
-    setInterval(() => {
+    const tick = () => {
       const entry = read(file);
       if (!entry || entry.token !== token) process.exit(0); // released
       if (!alive(Number(parent))) {
@@ -765,7 +861,59 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         const now = new Date();
         utimesSync(file, now, now);
       } catch {}
-    }, beatMs());
+      if (isGpuLock && !sampling && performance.now() - lastSampleAt >= 30_000) {
+        sampling = true;
+        lastSampleAt = performance.now();
+        void monitorGpuLease({
+          activity,
+          pid: Number(parent),
+          token,
+          readEntry: () => read(file),
+          publish: (result) => {
+            mkdirSync(`${lockDir}-activity`, { recursive: true });
+            appendFileSync(activityFile(token), JSON.stringify(result) + '\n');
+          },
+          terminate: async (tracked) => {
+            // A Windows starter must have exited before terminating our original ancestor.
+            if (starter && alive(Number(starter)))
+              throw new Error('ERR_GPU_MONITOR_STARTER_LIVE: cannot safely reclaim while starter lives');
+            await terminateGpuTree(tracked);
+          },
+          report: (result) =>
+            appendFileSync(
+              join(dirname(lockDir), 'gpu-lock-idle.log'),
+              JSON.stringify({
+                at: new Date().toISOString(),
+                code: 'ERR_GPU_IDLE_RECLAIM',
+                owner: entry.owner,
+                command: entry.command,
+                idleMs: result.idleMs,
+                token,
+              }) + '\n',
+            ),
+          release: () => {
+            if (read(file)?.token === token) rmSync(file, { force: true });
+            process.exit(0);
+          },
+        })
+          .catch((error) => {
+            appendFileSync(
+              join(dirname(lockDir), 'gpu-lock-idle.log'),
+              JSON.stringify({
+                at: new Date().toISOString(),
+                code: error.code ?? 'ERR_GPU_MONITOR',
+                owner: entry.owner,
+                token,
+                error: error.message,
+              }) + '\n',
+            );
+          })
+          .finally(() => {
+            sampling = false;
+          });
+      }
+    };
+    setInterval(tick, beatMs());
   } else if (['enqueue', 'wait', 'queue-run'].includes(verb)) {
     const { createGpuQueue } = await import('./gpu-queue.mjs');
     await createGpuQueue({
@@ -775,6 +923,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       measuresSpeed,
       resolveMode,
       validateRequest,
+      validateGpuCommand,
       windowsCommandLine,
     }).queueCli(verb, rest);
   } else if (verb === 'run') {
@@ -802,6 +951,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       text = command.join(' ');
     let release;
     try {
+      validateRequest({
+        owner,
+        mode: resolveMode(mode),
+        timing: flag('timing'),
+        maxMinutes: given('max') ?? defaultMaxMinutes(),
+        command: text,
+        auditTiming: false,
+      });
+      validateGpuCommand(command, { owner, gpu: flag('gpu') });
       release = await acquire({
         owner,
         mode,

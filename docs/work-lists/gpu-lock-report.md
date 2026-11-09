@@ -78,8 +78,8 @@ the UTF-8 correction, encoding regression and report itself.
 Private helper instructions were updated in the excluded author workspace;
 they are not part of a clone. No engine/core/stage implementation changed.
 Combined core + stage remains 23,924 bytes gzip, below the unchanged 25,000-byte
-ceiling. Job 6 (real GPU-use classification, one lane per slot, sampled activity,
-idle termination and status metrics) follows this report.
+ceiling. Job 6 adds real GPU-use classification, one lane per slot, sampled
+activity, idle termination and status metrics, as recorded below.
 
 ## Validation and correction
 
@@ -100,3 +100,50 @@ from 7289abf3b, retains only the intended GPU paragraphs, and regenerates llms.
 The new tests/docs-encoding.test.js detects this class of corruption in the
 limits guide and generated copy, including a red proof against b7af6646a.
 The correction and this report land together after focused docs checks.
+
+## Urgent queue follow-up and job 6
+
+Urgent follow-up d2e8310ef landed on its own before job 6. Lane-C's failing
+7289abf3b run predates b7af6646a's immutable publication root repair. Detached
+owner stdout/stderr now persists separately from command output, including
+bootstrap errors before the first ticket read. An early exit reports the actual
+error and exit/signal, rather than a fictitious startup timeout. The new test
+fails on the preceding code; six queue regressions pass with verify's recorder.
+
+Job 6's files are `scripts/gpu-lock.mjs`, `scripts/gpu-queue.mjs`, five new
+support files (`gpu-command.mjs`, `gpu-admission.mjs`, `gpu-activity.mjs`,
+`gpu-activity.ps1`, `gpu-terminate.ps1`), three new CPU regression files
+(`gpu-admission`, `gpu-activity`, `gpu-monitor-edges`), and the existing lock,
+queue, policy and publication regressions. Playbook, limits, generated LLM docs,
+this report and the untracked coordinator helper brief document the change.
+No package, core or stage implementation or export changed.
+
+CLI/queue GPU-leaf classification refuses CPU aggregators before artifacts.
+One slot per canonical worktree or lane prefix and FIFO among eligible lanes
+allow unrelated work to fill all three slots. Status reports admitted leases
+separately from sampled GPU busy/idle/unknown, plus observed free-slot wait.
+The complete read-only Windows counter probe returned 923 processes and 933
+engine rows, with every raw counter preserved as a string. That is provider
+evidence, not a GPU load or speed measurement. Three-minute idle reclamation
+uses complete process-tree counter deltas and a confirming sample; native
+handles pin birth identities through tree termination. Unknown data resets idle.
+Sampling can miss short-lived children between snapshots; no continuous tracing
+or physical GPU-saturation claim is made. Research and method are in the playbook.
+
+One full job 6 verify ran: 13,624/13,625 tests passed, zero skips/cancellations;
+the sole failure was the earlier report's private-path pointer, now reworded.
+All other verify steps passed, including quality, API, size and README types.
+Lint and hygiene (7.7) passed. Focused repairs cover the failed pointer and three
+review regressions: failed confirmation resets/publishes unknown, withdrawal
+closes wait accounting under the mutex, and an initial incomplete append is not
+parsed as a published record. Their red proofs are retained in test-results.
+No second full verify was run. The original native sleeper test hit its hard
+limit because CIM truncates birth times to microseconds; owned fixture trees
+were killed, native timestamps were canonicalized to that same representation,
+and its unchanged regression passes. Heartbeat cwd and owner handle draining
+also fix temporary-worktree cleanup; no tolerance or budget was raised.
+
+Reproduce policy without GPU work: `node --test tests/gpu-admission.test.js
+tests/gpu-activity.test.js tests/gpu-monitor-edges.test.js`. Native Windows
+termination uses owned CPU sleeper stand-ins. Logs use the gpu-lock-job6 prefix;
+the one full run is gpu-lock-job6-verify.log. Core + stage stays 23,924 B gzip.
