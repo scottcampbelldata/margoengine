@@ -1604,6 +1604,11 @@ and covers array/object/self/null/number assignment, Reflect.set, store growth,
 component/set/setAll mutation and inspector snapshot/restore with ref identity.
 Core + stage measures 23,837 B before and 23,924 B after (+87 B); no speed claim.
 
+Final sciviz validation remains incomplete (2026-11-10): CPU verification passed 13,481 tests, but the full GPU
+command stopped after its 30 passing base assertions on browser teardown, and the large bricked README module
+exceeded its completion limit. The causes and remaining current screenshots are pending; see known-bugs.md and
+the private handoff. Earlier targeted restoration, cancellation and label checks do not replace the final gate.
+
 GPU coordination on Windows (2026-11-10): a real delete-pending directory handle reproduces `EPERM` on the
 shared lock's parent or mutex name. `makeLockDirectory` handles this as bounded acquisition contention (10 seconds
 per name), including older clients' in-place deletion; live ownership is never changed. Native Windows and

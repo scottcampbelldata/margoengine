@@ -4644,6 +4644,21 @@ setPosition behaviour. labels/tests/testpage-position.test.js fails before and
 passes after; it also pins use of the declared shared math dependency. Labels
 measure 5,450 B gzip, below the unchanged 5,546 B entry budget.
 
+### Open validation blockers: sciviz final GPU and README run (2026-11-10)
+
+The final package GPU run passed all 30 base browser assertions, then failed its unchanged 30-second browser
+shutdown limit before the subsequent package suites ran. Reproduce with the owner-wrapped sciviz `test:browser`.
+A separately instrumented run passed: Windows owned-process termination took 15.9 seconds, client disconnect
+2 ms and server cleanup 0.38 seconds. The original failed subphase was not traced, so its deeper cause remains
+unconfirmed. No engine repair or timing waiver is claimed. Evidence stays in
+`test-results/sciviz-fixes/gpu.log` and `trace.log`; the native process tree was subject to forced termination.
+
+The final `check:readme-run -- --packages=sciviz` also hit its unchanged 20-second module-completion limit in
+`readme-bricked-volumes-739d75`. Its completion cause is not yet isolated. A parent/current comparison using the
+actual 320 x 200 canvas fixture is queued in `bricks-paired-small.mjs`; an earlier 800 x 600 diagnostic is not valid
+for that budget. Neither failure has been classified as a busy-machine exception. Final GPU suites, updated
+colour-bar spacing screenshots and the README gate must finish before landing; these are not release waivers.
+
 ### Fixed 2026-11-10: GPU lock directory deletion contention on Windows
 
 A sciviz validation waiter failed with `EPERM` creating `gpu.lock/mutex`. Mutex-name retirement already prevents
