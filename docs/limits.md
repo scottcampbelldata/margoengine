@@ -10,6 +10,15 @@ All original-source/channel/mip/order/arithmetic bars remain unchanged and
 against report 15. See every image and remaining failure in
 the [current checkpoint](whitepaper/results/batch-134-scalar-exact-edge.json).
 
+Batch 134 gate maintenance: the basic-scene network record named `21ff80d28`
+while the entry-size record named dirty `3822a22f5`, so the strict size-page
+test rejected the pair. Both records were regenerated from the same built
+`94118d9e7` revision with clean packages. The network capture rendered the
+actual scene under its internal shared GPU lease; entry sizing held no lease.
+At rebase, main's lighting repair had landed a coherent `b5822d106`/dirty pair;
+those newer package measurements are retained instead of replacing them with
+the local capture. No timing comparison, relabeling or validation change was used.
+
 Batch 134 report 15 scalar refinement remains unaccepted: 86/98 original-source quality
 pairs pass, 12 fail; both conventional and mapped R/alpha bars remain unchanged.
 Draft Wasm is 168,906 B raw / 60,673 B gzip9, compared with the initial scalar

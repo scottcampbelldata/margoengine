@@ -1,5 +1,16 @@
 # Known bugs and unverified features
 
+### Refreshed: incoherent size-page evidence (2026-11-09)
+
+The full batch 134 verify passed 13,727 tests and failed `sizes-page.test.js`
+because the network and entry-size records named different measured revisions
+and package-dirty states. Regenerating both records from built `94118d9e7`
+produced a coherent local pair and the strict size-page regression passed.
+The subsequent rebase found that main's lighting repair had already landed
+its own coherent `b5822d106`/dirty pair. Those newer package measurements are
+retained in full, with another passing size-page check. Successful verification
+steps are retained; no metadata was relabeled and no second full verify is claimed.
+
 ### Fixed 2026-11-10: README runner did not drive Blender's live-link lifecycle
 
 The harness waited for a continuing module without supplying its live service

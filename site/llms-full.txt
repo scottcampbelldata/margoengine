@@ -2600,6 +2600,15 @@ All original-source/channel/mip/order/arithmetic bars remain unchanged and
 against report 15. See every image and remaining failure in
 the [current checkpoint](whitepaper/results/batch-134-scalar-exact-edge.json).
 
+Batch 134 gate maintenance: the basic-scene network record named `21ff80d28`
+while the entry-size record named dirty `3822a22f5`, so the strict size-page
+test rejected the pair. Both records were regenerated from the same built
+`94118d9e7` revision with clean packages. The network capture rendered the
+actual scene under its internal shared GPU lease; entry sizing held no lease.
+At rebase, main's lighting repair had landed a coherent `b5822d106`/dirty pair;
+those newer package measurements are retained instead of replacing them with
+the local capture. No timing comparison, relabeling or validation change was used.
+
 Batch 134 report 15 scalar refinement remains unaccepted: 86/98 original-source quality
 pairs pass, 12 fail; both conventional and mapped R/alpha bars remain unchanged.
 Draft Wasm is 168,906 B raw / 60,673 B gzip9, compared with the initial scalar
@@ -4993,6 +5002,17 @@ regression evidence: [size restoration](size-restore.md).
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Refreshed: incoherent size-page evidence (2026-11-09)
+
+The full batch 134 verify passed 13,727 tests and failed `sizes-page.test.js`
+because the network and entry-size records named different measured revisions
+and package-dirty states. Regenerating both records from built `94118d9e7`
+produced a coherent local pair and the strict size-page regression passed.
+The subsequent rebase found that main's lighting repair had already landed
+its own coherent `b5822d106`/dirty pair. Those newer package measurements are
+retained in full, with another passing size-page check. Successful verification
+steps are retained; no metadata was relabeled and no second full verify is claimed.
 
 ### Fixed 2026-11-10: README runner did not drive Blender's live-link lifecycle
 
