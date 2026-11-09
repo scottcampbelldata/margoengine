@@ -86,7 +86,7 @@ export interface ScatterOptions {
   maxSlope?: number;
   /** Random uniform scale range [min, max], 0 < min <= max <= 100. Default [0.7, 1.3]. */
   scale?: readonly [number, number];
-  /** Increasing distances where the near, middle and far meshes end; the third is the culling distance. Default [25, 60, 120]. */
+  /** Positive normal f32 distances, strictly increasing after upload; the third is the culling distance. Default [25, 60, 120]. */
   lod?: readonly [number, number, number];
   /**
    * Width of the dithered cross-fade between LOD meshes, in world units (default 2). 0 switches hard and compiles the
@@ -538,7 +538,13 @@ export class Scatter implements EnginePlugin {
       scale.some((v) => !Number.isFinite(v) || v <= 0 || v > 100) ||
       scale[0] > scale[1] ||
       lod.length !== 3 ||
-      lod.some((v, i) => !Number.isFinite(v) || v <= 0 || v > 100000 || (i > 0 && v <= lod[i - 1])) ||
+      Array.from(lod).some(
+        (v, i) =>
+          !Number.isFinite(v) ||
+          Math.fround(v) < 2 ** -126 ||
+          v > 100000 ||
+          (i > 0 && Math.fround(v) <= Math.fround(lod[i - 1])),
+      ) ||
       !Number.isInteger(seed) ||
       seed < 0 ||
       seed > 0xffffffff ||
@@ -547,7 +553,7 @@ export class Scatter implements EnginePlugin {
       (options.heightmap !== undefined && typeof options.heightmap !== 'function')
     )
       throw new RangeError(
-        'Invalid scatter rules; check density 0-1, minHeight <= maxHeight, maxSlope 0-90, scale [min, max] up to 100, three increasing lod distances, an integer seed, color 0-1 and a heightmap function.',
+        'Invalid scatter rules; check density 0-1, minHeight <= maxHeight, maxSlope 0-90, scale [min, max] up to 100, three positive normal f32 lod distances increasing after upload, an integer seed, color 0-1 and a heightmap function.',
       );
     if (options.material !== undefined && !(options.material instanceof PbrMaterial))
       throw new TypeError('Expected a PBR scatter material');

@@ -2218,3 +2218,13 @@ to zero while retaining representable subnormals. Loading tests cover network/bo
 exact abort reasons and unsupported SIMD; actual shipped worker tests preserve coded missing-asset failures.
 All regressions are in verify's package-test glob and therefore check:merge. No new gate or reduced budget.
 Core/stage, Rust SIMD artifact, solver algorithms and benchmark workloads are unchanged.
+
+### Scatter LOD representation audit: section 5 evidence
+
+The batch 69 cross-package audit checked ordered ring compaction, inclusive far rejection, page/ring capacity and
+CPU versus GPU float arithmetic. Existing tile-distance bounds already cover uploaded origins, sides, camera and
+rounding/flush allowances. Another cause remained in Scatter's input validator: distinct positive float64 LOD
+boundaries could upload as zero or equal f32 values. The constructor now validates the uploaded representation,
+including sparse lists, before any GPU setup. packages/scatter/test/tiles-budget.test.js regresses zero/subnormal
+and collapsed near/middle/far boundaries and accepts the smallest normal f32 boundary. Existing exact-endpoint,
+conservative-distance and explicit-cap tests remain in verify/check:merge and grass-tiles.browser.mjs.

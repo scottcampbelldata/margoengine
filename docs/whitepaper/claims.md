@@ -1349,3 +1349,11 @@ covers weight division underflow and accepted subnormal boundaries. loading.test
 and instantiation failures, exact abort reasons and unsupported SIMD; worker.test.js uses the actual shipped worker
 for missing-asset error forwarding. These strengthen LIM-613/614/616/623/624 input/error evidence with generated
 hostile inputs. They make no new speed, authored-asset or GPU output claim.
+
+### Scatter uploaded LOD validation
+
+packages/scatter/test/tiles-budget.test.js rejects positive float64 distances that become zero/subnormal in f32,
+strictly increasing float64 pairs that upload equal, and sparse triples. It accepts the smallest normal f32 triple.
+The parent accepts the rejected fixtures; all use the owning Scatter constructor, also inherited by ScatterTiles.
+This is input-contract evidence; the existing inclusive endpoint, conservative capacity and explicit drawn-cap
+regressions and real-GPU fixtures remain unchanged. No performance claim.

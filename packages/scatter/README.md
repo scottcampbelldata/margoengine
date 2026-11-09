@@ -39,7 +39,9 @@ const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry],
 
 A single Geometry can be supplied for all rings; the package does not auto-decimate meshes. heightmap returns a sampleable red-channel height texture covering area around center, one height per texel centre (as `TerrainHeightmap` writes it). Each instance takes the bilinear interpolation of the four texel centres around it, and the ground normal (for `maxSlope`) is that patch's gradient, so roots follow slopes between texels. Heights are world units plus center Y; absent heightmap is flat. Rules are fixed at construction and distribution is evaluated on GPU each frame. Output uses random Y rotation and scale with a simple diffuse material. Three storage buffers reserve count instances each, so account for GPU memory; device limits are checked. No core geometry/material feature additions are needed.
 
-The default LOD distances are `[25,60,120]` world units. `lodFade` defaults to a
+The default LOD distances are `[25,60,120]` world units. All three distances must fit positive normal f32 values
+(at least 2^-126 after conversion) and remain strictly increasing after GPU upload; values that collapse to zero
+or equal boundaries are rejected with RangeError, including in ScatterTiles. `lodFade` defaults to a
 2-unit overlap centered on each of the first two distances. Compute emits both
 adjacent meshes inside that band; complementary 4x4 Bayer masks cross-fade them
 in both diffuse and PBR rendering, without alpha blending or per-frame history.

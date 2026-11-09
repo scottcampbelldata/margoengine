@@ -2,8 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
 import { ScatterTiles } from '../dist/tiles.js';
+import { Scatter } from '../dist/index.js';
 import { outsideLod, tileDistance } from '../src/lod.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+test('LOD boundaries must stay positive and strictly increasing in uploaded f32 values', () => {
+  for (const lod of [
+    [Number.MIN_VALUE, 2, 4],
+    [2 ** -127, 2, 4],
+    [1, 1 + 2 ** -25, 4],
+    [1, 4 - 2 ** -25, 4],
+    [1, , 4],
+  ]) {
+    assert.throws(() => new Scatter(box(), { lod }), RangeError);
+    assert.throws(() => new ScatterTiles(box(), { bounds: [0, 0, 1, 1], lod }), RangeError);
+  }
+  const lod = [2 ** -126, 2 ** -125, 2 ** -124];
+  using valid = new Scatter(box(), { lod });
+  assert.deepEqual(Array.from(valid.values.slice(32, 35)), lod);
+});
 
 test('CPU and WGSL share an inclusive outer LOD rejection rule', () => {
   assert.equal(outsideLod(4, 4), false);

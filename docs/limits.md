@@ -1321,3 +1321,13 @@ also includes its help link. These are synthetic hostile-input regressions, not 
 Current bare-peer entry sizes: root 1,868 B, overlapping 2,457 B, constraints 2,484 B, sockets 776 B, chunks 3,647 B,
 worker 1,331 B min+gzip; bundled worker 3,399 B gzip. Earlier batch sizes above are historical.
 Core plus stage remains 23,797 B gzip against its unchanged strict 25,000-byte gate.
+
+## Scatter uploaded LOD boundaries (batch 69 cross-package audit)
+
+All three LOD distances must remain positive normal f32 values (at least 2^-126 after conversion), no greater
+than 100,000 in the authored input, and strictly increasing after upload. Sparse lists, underflow to zero,
+subnormal GPU values and distinct float64 boundaries that become equal in f32 throw RangeError before setup.
+This also applies to ScatterTiles, TrampledScatter and ImposterScatter through the shared Scatter constructor.
+The inclusive outer rejection and conservative f32 tile-distance budget remain unchanged; ordered compaction
+and indirect counts retain the explicit capacity cap. Scatter root currently measures 19,094 B min+gzip;
+other scatter entries are unchanged. No speed or new rendering-quality claim.

@@ -781,3 +781,11 @@ related input/error classes. All run in verify/check:merge. Run node scripts/gpu
 --max=8 --wait-max=8 -- npm run test:gpu --workspace @margoengine/wfc for both real browser backends, and the same
 lock wrapper around npm run check:readme-run -- --packages=wfc. No measured-speed rerun is needed: output algorithms,
 work counts, benchmark scenes and the Rust artifact are unchanged.
+
+### Scatter LOD representation cross-check
+
+Run npm test --workspace @margoengine/scatter; tiles-budget.test.js covers float64-to-f32 collapse and the existing
+inclusive capacity fixtures. After the package build, run the scatter browser scripts through
+node scripts/gpu-lock.mjs run --owner=codex-69fix --max=15 --wait-max=8 --
+node scripts/gpu-package-tests.mjs --no-build --only=scatter --serial.
+The ordered compaction, per-ring caps and conservative tile-distance arithmetic are unchanged.
