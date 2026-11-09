@@ -48,6 +48,10 @@
     "./gi": {
       "types": "./dist/gi.d.ts",
       "import": "./dist/gi.js"
+    },
+    "./height": {
+      "types": "./dist/height.d.ts",
+      "import": "./dist/height.js"
     }
   },
   "files": [

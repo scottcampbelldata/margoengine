@@ -1502,3 +1502,7 @@ The existing mixer finite-FIR meter supplies true peak and a documented float32 
 ## 2D global illumination (batch 55)
 
 `@margoengine/lighting2d/gi` is written from published descriptions of radiance cascades for 2D global illumination: Alexander Sannikov, "Radiance Cascades: A Novel Approach to Calculating Global Illumination", 2023. Ray interval partitioning across cascade levels, angular ray distribution, ray-segment and ray-circle intersections, and irradiance integration are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.
+
+## 2.5D height shadows and self-shadowing (batch 55)
+
+`@margoengine/lighting2d/height` is written from standard 3D perspective and directional shadow projection geometry (similar triangles and ray-slab / ray-cylinder intersections along height intervals) applied to 2D top-down and isometric game projections. Height-interval testing, ground shadow projection, and surface self-shadowing are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.

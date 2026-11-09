@@ -181,6 +181,37 @@ gi.emitters[0] = {x: 41, y: 30, radius: 12, color: '#ffd9a0', intensity: 2};
 
 `RadianceCascade2D` and `evaluate2DGI(point, normal, scene, options)` evaluate 2D global illumination on the CPU for tests.
 
+## 2.5D height and self-shadowing
+
+`@margoengine/lighting2d/height` casts perspective height shadows and self-shadows for top-down and isometric games.
+Sprites and structures have vertical height (z-axis extrusion) and elevation; light rays from point, spot and directional
+lights cast geometric shadows onto ground planes and lower receivers, and self-shadow vertical faces and lower structures.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {HeightLighting2D, createHeightOccluder} from 'margoengine/lighting2d/height';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const building = createHeightOccluder({shape: 'box', offset: [80, 45], width: 24, depth: 24, height: 16, selfShadow: true});
+const lighting = HeightLighting2D.attach(engine, {
+  target: shade.target,
+  camera: shade.camera,
+  occluders: [building],
+  elevation: 0,
+});
+const sun = lighting.addLight({kind: 'directional', angle: 0, elevation: Math.PI / 4, color: '#fff0d0'});
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+sun.angle += 0.01;
+```
+
+CPU helper functions `inHeightShadow(light, occluders, x, y, receiverElevation)`, `heightShadowFactor(light, occluders, x, y, receiverElevation)`
+and `heightLightAt(light, occluders, x, y, receiverElevation, normal)` evaluate height-based shading and self-shadowing in Node.
+
 ## CPU forms
 
 `lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and

@@ -7,6 +7,7 @@ import { inShadow, lightAt, Lighting2D, occluderEdges } from '/packages/lighting
 import { SoftLighting2D, softLightAt } from '/packages/lighting2d/dist/soft.js';
 import { CookieLighting2D, cookieLightAt, createSpotCookie } from '/packages/lighting2d/dist/cookie.js';
 import { GILighting2D, RadianceCascade2D } from '/packages/lighting2d/dist/gi.js';
+import { HeightLighting2D, createHeightOccluder, heightLightAt } from '/packages/lighting2d/dist/height.js';
 
 const WIDTH = 32,
   HEIGHT = 16,
@@ -488,6 +489,53 @@ window.check = {
       out.checks['2d global illumination radiance cascades'] = compare(bytes, wantGI);
       giPass.dispose();
       giTarget.destroy();
+    }
+
+    // 2.5D height lighting and top-down self-shadowing
+    {
+      const heightTarget = texture(),
+        camera = { x: 0, y: 0, zoom: 1 },
+        occluders = [
+          createHeightOccluder({
+            shape: 'box',
+            offset: [16, 8],
+            width: 8,
+            depth: 8,
+            height: 12,
+            elevation: 0,
+            selfShadow: true,
+          }),
+        ],
+        heightPass = HeightLighting2D.attach(instance, {
+          target: heightTarget,
+          camera,
+          occluders,
+          elevation: 0,
+        }),
+        light = heightPass.addLight({
+          kind: 'point',
+          x: 10,
+          y: 8,
+          radius: 30,
+          height: 20,
+          color: '#ffffff',
+          intensity: 1.0,
+        });
+
+      frame();
+      const bytes = await read(heightTarget);
+      const wantHeight = new Float64Array(WIDTH * HEIGHT * 3);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = camera.x + (x + 0.5) / camera.zoom;
+          const wy = camera.y + (y + 0.5) / camera.zoom;
+          const rgb = heightLightAt(light, occluders, wx, wy, 0);
+          for (let c = 0; c < 3; c++) wantHeight[(y * WIDTH + x) * 3 + c] = Math.min(1, rgb[c]) * 255;
+        }
+      }
+      out.checks['2.5d height and self shadowing'] = compare(bytes, wantHeight);
+      heightPass.dispose();
+      heightTarget.destroy();
     }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();

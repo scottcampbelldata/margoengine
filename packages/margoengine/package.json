@@ -1342,6 +1342,10 @@
       "types": "./dist/lighting2d/gi.d.ts",
       "import": "./dist/lighting2d/gi.js"
     },
+    "./lighting2d/height": {
+      "types": "./dist/lighting2d/height.d.ts",
+      "import": "./dist/lighting2d/height.js"
+    },
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"
