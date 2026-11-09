@@ -1145,3 +1145,11 @@ Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded c
 1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
 Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
 The full residual remains open; this does not prove physical equivalence.
+
+### Scatter tile input storage (batch 77 audit)
+
+Tile bounds, coordinates and spans must fit normal f32 (zero coordinates allowed), with ordered converted bounds.
+The side is positive, its product with 65,535 and its endpoint sums fit f32. Subarrays may have any byte offset;
+unaligned views are copied before packed-word reads. Invalid updates leave held records unchanged. The tiles entry
+measures 7,975 minified / 3,295 B gzip, within its existing 3,415 B budget. Existing slots, per-tile, GPU binding and
+drawn-ring limits still apply. No speed measurement or increase to supported world size is claimed.

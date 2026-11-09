@@ -555,3 +555,15 @@ engine.start();
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 
+
+### Tile input storage
+
+`setTile` accepts any byte-aligned Uint8Array view of complete 8-byte records, including subarrays at an unaligned
+word offset. Bounds and tile coordinates must remain finite as f32; nonzero coordinates and spans must be normal
+f32 values. Bounds must stay ordered after conversion. A tile side must be positive and normal, its product with
+65,535 must fit f32 (the packed-coordinate shader intermediate), and its endpoint sums must fit f32. Invalid input
+throws before replacing held records.
+
+Stream clumped grass with the same entry: use `generateGrassMesh(7)`, `(3)` and `(1)` from
+`@margoengine/procedural` as the three geometries, with `blades: {}` and the usual `lod` distances. Each record
+places a clump; adding and removing tiles manages the held area.

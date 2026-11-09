@@ -1502,3 +1502,21 @@ sheen roughness at .03. The ratified extension permits simplified visibility, wh
 its energy-conservation tradeoff. No ablation yet attributes the complete picture loss to these
 choices; base shading, silhouettes and texture filtering remain included. No shader was tuned
 to this reference or changed without a demonstrated small root cause.
+
+### Fixed 2026-11-09: scatter tile input conversion and byte offsets
+
+Repro: pass a Uint8Array.subarray(1, 9) to setTile, or replace a held tile with side Infinity, sparse origin or an
+unrepresentable f32 coordinate. Packed Uint32Array construction assumed word alignment; rectangle validation tested
+JS finiteness incompletely and never checked GPU conversion or intermediates. Validate before mutation and copy an
+unaligned view. Bounds also reject spans that collapse as f32. Both tests in scatter/test/tiles-inputs.test.js fail
+on the parent; its atomic-upload check compares retained record and page buffers. The grass-tiles browser test
+uses an unaligned view on real WebGPU, streams crossed-ribbon clumps through all three LODs, removes tiles and
+restores the device. Native WebGL2 receives the existing coded unsupported error and help link.
+
+### Fixed 2026-11-09: WFC browser harness cleanup and workspace root
+
+The batch 77 full gate found packages/wfc/test/browser-check.mjs bypassing the shared bounded teardown.
+tests/browser-teardown.test.js fails on the parent. Use closeAll for browser and server in one bounded cleanup.
+The harness also let Vite serve the workspace directory when npm test:gpu launched it, while its imports address
+the repository root. Set root from import.meta.url; wfc/test/browser-launch.test.js fails without that change.
+The package GPU script now runs as written from npm's workspace cwd. No WFC algorithm or public API changed.

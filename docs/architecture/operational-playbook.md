@@ -1990,3 +1990,13 @@ all-pixel budgets; native WebGL2 rejects PBR. The sheen BRDF is shared by materi
 gltf-pro, but this picture measures default glTF import only. The unresolved image loss,
 simplified visibility and albedo/roughness choices are recorded separately in known-bugs.
 No core or shader math was changed and batch 168 measurements were not repeated.
+
+### Scatter tile validation evidence (batch 77, section 5)
+
+Tile rectangles are preflighted before replacing held pages; byte views need no word alignment. Node regressions
+cover hostile conversion, collapsed bounds and atomic record/page storage. The generated grass clumps and records
+in scatter/test/grass-tiles.browser.mjs are stand-ins on real RTX A6000 WebGPU: exactly one clump in each selected
+near/middle/far ring, two after adding a tile, one after removal and restoration, zero after removing both. Ten
+distinct shader modules compile without errors. Native WebGL2 refusal is exercised with a help link. Existing LOD
+pixel/complementary fade tests remain the image proof; this new test asserts draw values, not artistic appearance.
+No new core/stage API, shader algorithm or speed claim. Node tests enter check:merge via the package test glob.

@@ -76,6 +76,7 @@ export function tilesCullShader(): string {
 /** Records per page, and the pages the pool starts with. */
 const PAGE = 64,
   FIRST_PAGES = 16;
+const normal = (n: number) => Number.isFinite(n) && Number.isFinite(Math.fround(n)) && (n === 0 || Math.abs(Math.fround(n)) >= 2 ** -126);
 /** Headroom when a buffer grows: half again the records or instances that need it, plus a little. */
 const grown = (n: number) => Math.ceil(n * 1.5) + 256;
 
@@ -134,9 +135,11 @@ export class ScatterTiles extends Scatter {
     if (
       !Array.isArray(bounds) ||
       bounds.length !== 4 ||
-      !bounds.every(Number.isFinite) ||
-      bounds[2] <= bounds[0] ||
-      bounds[3] <= bounds[1]
+      !Array.from(bounds).every(normal) ||
+      !normal(Math.fround(bounds[2]) - Math.fround(bounds[0])) ||
+      !normal(Math.fround(bounds[3]) - Math.fround(bounds[1])) ||
+      Math.fround(bounds[2]) <= Math.fround(bounds[0]) ||
+      Math.fround(bounds[3]) <= Math.fround(bounds[1])
     )
       throw new RangeError(
         'ScatterTiles needs bounds: the world rectangle [minX, minZ, maxX, maxZ] its heightmap covers',
@@ -223,11 +226,17 @@ export class ScatterTiles extends Scatter {
     if (this.#leader) return this.#leader.setTile(key, origin, side, records);
     if (!(records instanceof Uint8Array) || records.length % 8)
       throw new TypeError('ScatterTiles records must be a Uint8Array of 8-byte records');
-    if (!Array.isArray(origin) || origin.length !== 2 || !origin.every(Number.isFinite) || !(side > 0))
-      throw new RangeError('ScatterTiles tile needs an [x, z] origin and a side above 0');
+    if (
+      !Array.isArray(origin) || origin.length !== 2 || !Array.from(origin).every(normal) ||
+      !normal(side) || !(side > 0) || !Number.isFinite(Math.fround(Math.fround(side) * 65535)) ||
+      !normal(Math.fround(origin[0]) + Math.fround(side)) || !normal(Math.fround(origin[1]) + Math.fround(side))
+    )
+      throw new RangeError('ScatterTiles tile needs finite f32 [x, z] and a positive normal f32 side whose packed-coordinate products fit f32');
     if (!this.#held.has(key) && this.#held.size >= this.slots)
       throw new RangeError('ScatterTiles has no free slot; remove a tile or attach with more slots');
-    const words = new Uint32Array(records.buffer, records.byteOffset, records.length >> 2);
+    // A Uint8Array may start on any byte. Copy only an unaligned view before reading its packed words.
+    const aligned = records.byteOffset % 4 ? records.slice() : records;
+    const words = new Uint32Array(aligned.buffer, aligned.byteOffset, aligned.length >> 2);
     let n = 0;
     for (let k = 0; k < words.length; k += 2) if (this.#species < 0 || (words[k + 1] & 255) === this.#species) n++;
     if (n > this.slotSize)
