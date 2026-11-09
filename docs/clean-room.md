@@ -3329,3 +3329,20 @@ group, so simply deduplicating bindings inside a group is not a new repair.
 Cross-group packing or another storage representation needs a complete design
 and regressions, not smaller materials, missing effects or a raised hardware
 limit. No runtime/test change is claimed. Checkpoint and continue.
+
+### Batch 273 compatibility failure 4: LOD picking isolation
+
+Compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (mapAsync and queue completion), and Sven Woop,
+Carsten Benthin and Ingo Wald, Watertight Ray/Triangle Intersection (2013),
+https://jcgt.org/published/0002/01/05/ (abstract and method overview).
+Readback completion and CPU ray equivalence are different obligations. No
+companion source was read and no intersection or coverage tolerance changed.
+
+The owned imposter diagnostic preserves every grid point and assertion input,
+adds row markers, and removes the two optional wall-clock loops (no timing
+measurement was run). It reaches readiness and advances through successive
+rows, so this is not evidence of a permanently stuck first pick. Its bounded
+run and log are test-results/batch-273-lod-picking-probe*. The owner and cause
+of the accumulated grid cost remain unresolved; no repair is claimed. Move
+to the next failure rather than consuming this continuation on it.

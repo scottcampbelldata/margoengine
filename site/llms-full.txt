@@ -8875,6 +8875,14 @@ textures. No sampler-count reduction, effect omission or raised limit is a
 repair. Cross-group storage packing or another representation remains open.
 Receipt: test-results/batch-273-materials-sampler-repro.log (10.0 s).
 
+Batch 273 LOD imposter isolation: a diagnostic preserving the full picking grid
+advances through successive rows after readiness. The original report's timeout
+does not establish a permanently stuck initial await. The optional GPU/CPU
+wall-clock loops were removed from this diagnostic before running; all pixel
+positions and CPU/GPU comparison work remain. Per-pick render/readback and CPU
+cost are not yet isolated. Receipt: test-results/batch-273-lod-picking-probe.log;
+its run is bounded at 3.5 minutes under the shared GPU lock. No repair claimed.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
