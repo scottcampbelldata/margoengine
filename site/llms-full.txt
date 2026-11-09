@@ -5863,6 +5863,15 @@ previously registered as contact-shadows, so the second attachment threw Invalid
 now uses the plugin's name. CPU and real-GPU regressions attach both, render both and remove the
 accumulator while retaining the contact effect.
 
+### Corrected 2026-11-09: static USDZ subdivision documentation
+
+The USDZ README said the default static reader loads subdivision cages. The owning reader
+actually refuses subdivision and hole faces unless an optional entry handles them, as the
+existing unsupported-feature regression in packages/usdz/tests/usdz.test.js requires. The
+outside NormalsTextureBiasAndScale sample reproduced that documented-boundary mismatch.
+The README now requires subdivisionScheme none; no parser, test or tolerance changed.
+The introduction's missing compatible archive remains open in missing-test-items.md.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -6872,7 +6881,7 @@ Standard USDZ is an uncompressed, aligned archive. Deflate support accepts a bro
 
 Vertex colors read through a `UsdPrimvarReader` of `displayColor` or `displayOpacity` load as `mesh.colors` (four floats per vertex) and glTF COLOR_0, a constant `inputs:opacity` or the base colour map's alpha gives `BLEND`, or `MASK` with `inputs:opacityThreshold`; so a file from `exportUSDZ` keeps its paint and alpha. A separate opacity map and a reader of any other primvar are refused.
 
-Without the entries below this is a static mesh subset of one flattened layer: subdivided meshes load as cages. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), `!resetXformStack!` is honoured (see [Reset transform stacks](#reset-transform-stacks)), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
+Without the entries below this is a static mesh subset of one flattened layer: meshes need `subdivisionScheme = "none"`, and subdivision or hole faces are refused. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), `!resetXformStack!` is honoured (see [Reset transform stacks](#reset-transform-stacks)), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
 
 ## Composition
 

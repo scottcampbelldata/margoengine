@@ -470,3 +470,31 @@ Lane C claims P06 real-tool mip-chain upload/readback proof next; no material so
 Lane C also claims usdz/readme-margoengine-usdz-087124 missing /model.usdz input; the composition example is not claimed.
 
 S2/IES landing validation: full verify passes 13,318 tests with zero failures/skips (440.9 s), lint and hygiene pass. After rebasing lane Q and the unrelated media entry, 212 scoped tests and all 20 clustered/tiles README examples pass; the new media entry was built to supply its declaration before hygiene. The tiles GPU suite passes 16 checks, 11 shader modules and zero shader errors. The earlier IES alias regression fails without the repair. No API exports changed.
+
+## Further USDZ input investigations (2026-11-09)
+
+The claimed USDZ introduction remains open; no alias or known exception was removed.
+At usd-wg/assets 091bb5c6f8eb665ad4cf9d6c10025cecc07eda88, the existing CC-BY-4.0
+BoxAnimated sample correctly requires the animation entry, which the static introduction
+does not import. A fresh DamagedHelmet.usdz download is 4,993,564 bytes, SHA-256
+2ea8b6bd7c2fbadb1bf3ad300166c9b49a7939b78f6dd7b57fc835291d315924. Its own README
+states CC-BY-NC, so it was excluded from the free/open fixture selection. Its USDA also
+repeats inputs:sourceColorSpace in one normal_texture Shader (Raw then raw); the strict
+reader correctly refuses that duplicate. It is not a new parser bug or a successful rerun.
+
+Two further outside standard files were downloaded from the same pinned repository:
+NormalsTextureBiasAndScale.usdz (116,373 bytes) is refused for subdivision; RoughnessTest.usdz
+(61,906 bytes) is refused for a concave or non-planar polygon. Neither input was aliased,
+modified, committed or counted as a README pass. The static reader requires subdivisionScheme
+none and convex planar polygons. Its README incorrectly promised cages without optional
+entries; that sentence now matches the existing strict reader and the unmodified subdivision
+rejection regression in packages/usdz/tests/usdz.test.js. No reader behaviour changed.
+
+P06 remains open and claimed by this lane. The outside arraytex_7_mipmap_reference_u.ktx2
+has five tool-written levels and seven layers, but every image checked in layer zero is
+solid-colour. It is a valid outside-tool conformance candidate; GPU upload/readback remains to run. Existing local
+cube-native files were produced here by KTX-Software from real photographs and have independent
+ktx-extract hashes, but they are not newly downloaded outside-authored chains. No GPU upload
+proof or P06 closure is claimed. A future pass on the outside solid-colour chain must retain its conformance-pattern scope; it would not establish production-texture quality.
+
+USDZ investigation validation: lint and hygiene pass; full verify has 13,335 tests with zero failures/skips (297.9 s). All 242 USDZ package tests and the real browser checks pass (16 shader modules, zero errors). README execution is 6/8, retaining the original two known exceptions and zero fresh failures. The excluded NC archive and extracted layer were removed from this lane after inspection; only the source/hash record remains.

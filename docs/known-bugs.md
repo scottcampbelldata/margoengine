@@ -1827,3 +1827,12 @@ Coexistence repro: attach contact and accumulated shadows in the same scene. Bot
 previously registered as contact-shadows, so the second attachment threw Invalid pass. Registration
 now uses the plugin's name. CPU and real-GPU regressions attach both, render both and remove the
 accumulator while retaining the contact effect.
+
+### Corrected 2026-11-09: static USDZ subdivision documentation
+
+The USDZ README said the default static reader loads subdivision cages. The owning reader
+actually refuses subdivision and hole faces unless an optional entry handles them, as the
+existing unsupported-feature regression in packages/usdz/tests/usdz.test.js requires. The
+outside NormalsTextureBiasAndScale sample reproduced that documented-boundary mismatch.
+The README now requires subdivisionScheme none; no parser, test or tolerance changed.
+The introduction's missing compatible archive remains open in missing-test-items.md.

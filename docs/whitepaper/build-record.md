@@ -3965,3 +3965,15 @@ Job 8 checks passed: lint, hygiene after the fresh build, three Cornell contract
   fail before verify and in direct tiles tests. No asset bytes or engine code were copied.
 
 S2/IES validation: lint and hygiene pass; full verify 13,318 pass, zero failures/skips. Rebase: 212 scoped tests and 20/20 original clustered/tiles README examples pass. Tiles GPU: 16 checks, 11 shader modules, zero errors. No exports or package size budgets changed.
+
+## Missing-input continuation: USDZ source investigation (2026-11-09)
+
+The static introduction remains unproved: BoxAnimated needs the animation entry; the old
+DamagedHelmet USDZ has a duplicate sourceColorSpace declaration and an NC source grant;
+NormalsTextureBiasAndScale requires subdivision; RoughnessTest has non-planar polygons.
+No unsuitable alias or README exception was removed. The misleading default subdivision-cage
+sentence is corrected to the reader's existing strict boundary, covered by the existing
+usdz.test.js unsupported-feature regression. No parser or renderer source changed, and
+no new rendering or speed claim is made. P06 remains open; its outside-tool conformance
+chain still needs the upload/readback rerun. Its solid-colour scope does not establish
+production-texture quality.
