@@ -2297,3 +2297,8 @@ and atomic updates: results/review-99-compose-20261109.json. The unchanged
 12-minute compatibility limit passes. The earlier timeout has no phase record.
 No general rendering fidelity, compile-time guarantee or equal-cost convergence
 claim follows. Triangle sampling and mesh-deflector guiding remain open.
+
+ComputeFrame's existing ownership browser proof is now selected by its owning
+package GPU plan. The regression pins that command, and the actual native and
+compatibility run passes its original exact values and ownership assertions.
+This is test registration evidence only, with no new engine capability claim.

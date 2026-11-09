@@ -3454,3 +3454,10 @@ strings to satisfy its partial lexer. Embed canonical source verbatim instead
 and remove the compactor. Regression compares every embedded/delivered byte and
 manifest digest to its source; an isolated generator fixture preserves modern
 string syntax and comments. See [size restoration](size-restore.md).
+
+### Fixed: ComputeFrame browser regression missing from its package plan
+
+The tracked scene-owner-browser.mjs had no package script, so GPU plan validation
+threw before selecting any package. Compute now registers test:gpu:owners;
+packages/compute/tests/gpu-registration.test.js pins the real command. Native
+and WebGL2 compatibility run the original assertions successfully.

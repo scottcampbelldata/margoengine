@@ -670,3 +670,7 @@ build phase it executes value/error checks and exact candidate-output checks,
 while throughput and hardware winner measurements are explicitly deferred.
 All original measurement scenes remain in the named release speed suite;
 public `autotune` and `tuneCompute` behavior is unchanged.
+
+`npm run test:gpu:owners --workspace @margoengine/compute` runs the real
+ComputeFrame ownership regression on native WebGPU and the WebGL2 compatibility
+layer. It is registered in the package GPU plan, including affected merge checks.

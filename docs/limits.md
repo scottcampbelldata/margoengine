@@ -2747,3 +2747,7 @@ inside the unchanged 12-minute lease. The isolated resampled README diagnostic
 passes 20 seconds on Dawn, with trace compile 15.5 seconds and capture 0.13 seconds;
 the actual runner selection also passes 1/1 at its unchanged deadline. No deadline or numeric bound changed.
 This is startup attribution only; it does not measure release throughput.
+
+ComputeFrame registration repair: the existing native/compatibility ownership
+proof is now in compute's GPU plan. This changes no entry bytes, algorithm,
+workload, numeric bound or timeout; core plus stage stays 23924 B.

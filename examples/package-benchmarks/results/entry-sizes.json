@@ -1,5 +1,5 @@
 {
-  "commit": "8b5c04aab",
+  "commit": "0a70b4194",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -996,8 +996,8 @@
         "gzip": 1353
       },
       "./unity": {
-        "raw": 200209,
-        "gzip": 50038
+        "raw": 142105,
+        "gzip": 40965
       },
       "./hash": {
         "raw": 2830,
@@ -1130,8 +1130,8 @@
         "gzip": 3587
       },
       "dist/workers/fbx.js": {
-        "raw": 251536,
-        "gzip": 83173
+        "raw": 251439,
+        "gzip": 83143
       }
     },
     "@margoengine/fsm": {
@@ -2614,8 +2614,8 @@
         "gzip": 977
       },
       "./scenes": {
-        "raw": 64781,
-        "gzip": 19197
+        "raw": 64163,
+        "gzip": 18947
       },
       "./stars": {
         "raw": 10171,
@@ -3306,8 +3306,8 @@
         "gzip": 7649
       },
       "dist/workers/usdz.js": {
-        "raw": 338426,
-        "gzip": 113909
+        "raw": 338321,
+        "gzip": 113871
       }
     },
     "@margoengine/vfx": {
@@ -4044,14 +4044,14 @@
       "brotli": 14147
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 249379,
-      "gzip": 83018,
-      "brotli": 71307
+      "raw": 249282,
+      "gzip": 82988,
+      "brotli": 71299
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 334771,
-      "gzip": 113608,
-      "brotli": 97628
+      "raw": 334666,
+      "gzip": 113570,
+      "brotli": 97558
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21482,

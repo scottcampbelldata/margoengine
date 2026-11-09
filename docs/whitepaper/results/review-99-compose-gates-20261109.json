@@ -1,0 +1,54 @@
+{
+  "scope": "Review 99 composition and inherited ComputeFrame test-registration blocker",
+  "sourceMeasurements": {
+    "revision": "0a70b4194",
+    "packageDirty": false,
+    "coreStageGzip": 23924,
+    "networkRequests": 5,
+    "networkTransferredBytes": 36612
+  },
+  "lint": "pass",
+  "hygiene": "pass",
+  "quality": [
+    "sizes",
+    "duplicates",
+    "tests",
+    "api",
+    "clean-room"
+  ],
+  "metadata": {
+    "original": {
+      "passed": 28,
+      "failed": 2,
+      "cause": "Inherited ComputeFrame browser regression was absent from its package script map."
+    },
+    "failedFileRerun": {
+      "path": "tests/voxel-pathtracer-gpu-split.test.js",
+      "passed": 5,
+      "failed": 0
+    },
+    "newComputeRegistrationTest": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "computeRegistrationGpu": [
+    "native original exact values and ownership assertions passed",
+    "WebGL2 compatibility original exact values and ownership assertions passed"
+  ],
+  "readme": {
+    "composition": "retained prior 1/1 pass",
+    "resampled": "actual failed-only selection passes 1/1 at original 20 s deadline",
+    "compute": "21 unchanged examples retained from main batch-56 receipt; no example code changed"
+  },
+  "verify": {
+    "status": "inherited composed-step evidence, not a green original full verify",
+    "originalPassed": 13678,
+    "originalSchedulerFailures": 3,
+    "cause": "Removed helper-injected MARGO_GPU_SLOTS=1; CPU scheduler tests no longer receive GPU settings.",
+    "failedSchedulerFilesOnly": "7/7 and 20/20 pass",
+    "fullVerifyRepeated": false
+  },
+  "transport": "Retained native capture plus corrected AOV-only continuation and fresh full compatibility proof in review-99-compose-20261109.json. No passed transport case repeated.",
+  "limits": "No numeric bound or deadline changed. Startup attribution is diagnostic, not release throughput."
+}

@@ -4493,3 +4493,14 @@ its trace compile takes 15.5 seconds and its capture 0.13 seconds. The actual
 README runner selection also passes 1/1 at its unchanged deadline. These are startup diagnostics on a busy
 machine, not speed claims. Triangle emitter NEE and expanded mesh guide tables
 remain open. Evidence: whitepaper/results/review-99-compose-20261109.json.
+
+### ComputeFrame GPU registration repair (review 99 integration)
+
+The inherited scene-owner-browser.mjs was tracked but absent from the compute
+manifest, so the whole GPU planner rejected every package. Register test:gpu:owners
+in compute; its existing test passes native and compatibility exact four-step
+values and disposal/scene isolation. The new package regression pins the planned
+command. The original metadata run had 28/30 passes; its two planner failures are
+repaired by the failed-file-only 5/5 continuation. All five quality gates pass.
+No rendering source, limit or assertion changed. The earlier full verify and
+its repaired scheduler files are retained; no new full verify success is claimed.

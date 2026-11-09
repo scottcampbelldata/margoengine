@@ -3239,3 +3239,10 @@ uninstrumented older run spent its time. Log pipeline promises, tracer readiness
 capture and teardown separately; retain all transport checks and hard limits.
 The Vulkan continuation and native Dawn README diagnostic are distinct from
 lane-U's D3D11 compiler work. No foreign implementation was read.
+
+ComputeFrame registration follow-up reuses the ownership sources above and
+compares the Node.js contributors, Test runner (2026),
+https://nodejs.org/api/test.html , with npm contributors, Scripts (2026),
+https://docs.npmjs.com/cli/v11/using-npm/scripts/ . A tracked browser driver is
+not invoked by Node unit discovery; its owning manifest must register an explicit
+GPU command. No shader algorithm, external implementation or timing test changed.
