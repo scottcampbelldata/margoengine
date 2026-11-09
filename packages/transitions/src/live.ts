@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { fullscreen, render, group, draw } from '../../shared/gpu.js';
 import { fault } from '../../shared/errors.js';
+import { floatOutput } from './formats.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
@@ -122,10 +123,11 @@ export class LiveTransitions implements EnginePlugin {
         target.sampleCount !== 1 ||
         target.dimension !== '2d' ||
         target.depthOrArrayLayers !== 1 ||
+        !floatOutput(target.format, this.engine.renderTarget?.samples ?? 1) ||
         this.images.includes(target))
     )
       throw new TypeError(
-        'Live transition target must be a separate single-sample 2D render attachment; create an output texture',
+        'Live transition target must be a separate single-sample 2D float color render attachment with MSAA resolve support; choose rgba8unorm',
       );
     if (this.images[0]?.width !== width || this.images[0]?.height !== height) {
       this.releaseImages();

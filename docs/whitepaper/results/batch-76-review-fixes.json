@@ -1,0 +1,54 @@
+{
+  "pixels": 402,
+  "maskPixels": 1344,
+  "samples": [
+    1,
+    4
+  ],
+  "fallback": "unsupported",
+  "restoration": true,
+  "livePixels": 374,
+  "liveSamples": [
+    1,
+    4
+  ],
+  "liveFallback": "unsupported",
+  "liveRestoration": true,
+  "viewportPixels": 2304,
+  "viewportSamples": [
+    1,
+    4
+  ],
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "date": "2026-11-09",
+  "scope": "Batch 76 review corrections; generated stand-in correctness only",
+  "regressions": {
+    "viewport": "2304 exact patterned pixel comparisons at idle/0/0.5/1, built-in/custom/mask, offset viewport and stacked scissor, 1x/4x",
+    "format": "Reject integer/depth/non-resolvable 32-bit float MSAA before source updates or progress changes; accept baseline normalized/float outputs",
+    "trust": "Reject extra reachable resources; accept unused declarations and wrapper globals; costly loop compiled/disposed, never dispatched"
+  },
+  "entryGzipBytes": {
+    "root": 4478,
+    "custom": 5207,
+    "mask": 5429,
+    "live": 2638
+  },
+  "coreStageGzipBytes": 23797
+}

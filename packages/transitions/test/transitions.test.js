@@ -28,3 +28,24 @@ test('transition freezes previous scene once, advances progress, resizes and tea
   await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
+
+test('capture formats reject non-float color and unsupported resolves before allocation', () => {
+  for (const [format, samples] of [
+    ['rgba8uint', 1],
+    ['rgba8sint', 4],
+    ['depth32float', 1],
+    ['rgba32float', 4],
+  ]) {
+    const h = optionalGPU();
+    const effect = new Transitions();
+    h.engine.use(effect);
+    effect.start();
+    h.context.format = format;
+    h.context.descriptor.multisample = { count: samples };
+    const allocated = h.resources.length;
+    assert.throws(() => h.engine.frameGraph.execute(h.context), TypeError, `${format} ${samples}x`);
+    assert.equal(h.resources.length, allocated);
+    assert.equal(effect.progress, 0);
+    effect.dispose();
+  }
+});

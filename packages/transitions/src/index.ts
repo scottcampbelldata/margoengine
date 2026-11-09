@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '
 import { fullscreen, group, render, draw } from '../../shared/gpu.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { MargoError } from '@margoengine/math/errors';
+import { floatOutput } from './formats.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -29,12 +30,13 @@ fn sample(t:texture_2d<f32>,uv:vec2f)->vec4f {let size=vec2i(textureDimensions(t
 fn dissolvePcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
 fn dissolveThreshold(pixel:vec2u)->f32 {return f32(dissolvePcg(pixel.x+dissolvePcg(pixel.y))>>8u)*5.9604645e-8;}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
- let p=settings.x;if(p<=0.0){return sample(before,i.uv);}if(p>=1.0){return sample(after,i.uv);}
- var edge=i.uv.x;
- if(settings.y==1.0){edge=dissolveThreshold(vec2u(i.uv*vec2f(textureDimensions(after))));}
- if(settings.y==2.0){edge=fract(atan2(i.uv.x-0.5,0.5-i.uv.y)/6.2831853+1.0);}
- if(settings.y==3.0){let shift=vec2f(sin(p*3.14159265)*settings.z,0);let a=sample(after,i.uv+shift);let b=sample(after,i.uv-shift);return mix(sample(before,i.uv),vec4f(a.r,sample(after,i.uv).g,b.b,1),p);}
- return mix(sample(before,i.uv),sample(after,i.uv),1.0-smoothstep(p-0.01,p+0.01,edge));
+ let uv=i.position.xy/vec2f(textureDimensions(after));
+ let p=settings.x;if(p<=0.0){return sample(before,uv);}if(p>=1.0){return sample(after,uv);}
+ var edge=uv.x;
+ if(settings.y==1.0){edge=dissolveThreshold(vec2u(i.position.xy));}
+ if(settings.y==2.0){edge=fract(atan2(uv.x-0.5,0.5-uv.y)/6.2831853+1.0);}
+ if(settings.y==3.0){let shift=vec2f(sin(p*3.14159265)*settings.z,0);let a=sample(after,uv+shift);let b=sample(after,uv-shift);return mix(sample(before,uv),vec4f(a.r,sample(after,uv).g,b.b,1),p);}
+ return mix(sample(before,uv),sample(after,uv),1.0-smoothstep(p-0.01,p+0.01,edge));
 }`;
 /**
  * start() freezes the last rendered frame while the scene underneath changes. WebGPU only.
@@ -107,6 +109,10 @@ export class Transitions implements EnginePlugin {
       order: -80,
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
+        if (!floatOutput(c.format, c.descriptor.multisample?.count ?? 1))
+          throw new TypeError(
+            'Transitions need a float color render attachment with MSAA resolve support; choose rgba8unorm',
+          );
         if (
           this.scene?.width !== c.width ||
           this.scene?.height !== c.height ||

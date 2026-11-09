@@ -1437,3 +1437,9 @@ irradiance above 1.5 times fill. The new staging composition variant retains its
 occlusion and outside pixels after actual device replacement on WebGPU and WebGL2 compatibility.
 [Evidence](results/batch-56-rigs.json). Generated studio/box stand-ins only, distant image lighting,
 no local-light falloff, physical area-shadow, photographic-product or performance claim.
+
+### Batch 76 independent review corrections (LIM-625, LIM-627, LIM-629)
+
+The earlier solid-color records did not establish offset-view capture addressing. packages/transitions/test/viewport-browser.js now compares 2304 generated spatial-color pixels exactly against renders without transitions, at idle/0/0.5/1 for every built-in kind/custom/mask, 1x/4x, including a stacked scissor's untouched surrounding pixels. Root/custom sampling uses absolute fragment coordinates; mask already did. This package GPU suite is selected by check:merge. packages/transitions/test/live.test.js and live-browser.js prove integer/depth rejection before scene updates/progress changes and baseline normalized/float output acceptance; transitions.test.js covers the shared capture guard. Non-resolvable 32-bit float outputs are rejected in the 4x path.
+
+Custom source is trusted code. gpu-browser.js proves fixed reachable resource bindings by refusing extra texture/sampler/uniform/storage bindings, while accepting unused declarations and wrapper globals. A billions-of-iterations shader compiles and is disposed without dispatch. There is no execution-work bound or safe-hostile-shader claim; custom.test.js proves abort after attachment leaves frames running. [Review-fix device record](results/batch-76-review-fixes.json). Generated stand-ins, one RTX A6000, no performance or cross-device evidence. Root/custom/mask/live sizes 4478/5207/5429/2638 B min+gzip within unchanged budgets; core plus stage unchanged at 23797 B.

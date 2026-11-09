@@ -103,6 +103,53 @@ export async function liveChecks() {
     };
     try {
       assert(engine.renderTarget.samples === samples, 'requested sample mode');
+      for (const format of [
+        'rgba8uint',
+        'rgba8sint',
+        'r32uint',
+        'depth32float',
+        'depth24plus-stencil8',
+        ...(samples === 4 ? ['rgba32float', 'rg32float', 'r32float'] : []),
+      ]) {
+        const invalid = engine.gpu.createTexture({ size: [8, 4], format, usage: GPUTextureUsage.RENDER_ATTACHMENT });
+        const a = updatesA,
+          b = updatesB,
+          progress = effect.progress;
+        engine.gpu.pushErrorScope('validation');
+        let refused = false;
+        try {
+          effect.render({ delta: 0.25, target: invalid });
+        } catch (error) {
+          refused = error instanceof TypeError;
+        }
+        const error = await engine.gpu.popErrorScope();
+        invalid.destroy();
+        assert(refused && !error, `reject ${format} before GPU submission: ${error?.message}`);
+        assert(
+          updatesA === a && updatesB === b && effect.progress === progress,
+          `${format} leaves both sources and progress unchanged`,
+        );
+      }
+      // Already-valid float/normalized render attachments are accepted, including single-channel outputs.
+      for (const format of [
+        'r8unorm',
+        'rg8unorm',
+        'r16float',
+        'rg16float',
+        'rgba16float',
+        'rgb10a2unorm',
+        'rgba8unorm-srgb',
+        'bgra8unorm',
+        'bgra8unorm-srgb',
+        ...(samples === 1 ? ['r32float', 'rg32float', 'rgba32float'] : []),
+      ]) {
+        const output = engine.gpu.createTexture({ size: [8, 4], format, usage: GPUTextureUsage.RENDER_ATTACHMENT });
+        engine.gpu.pushErrorScope('validation');
+        effect.render({ target: output });
+        const error = await engine.gpu.popErrorScope();
+        output.destroy();
+        assert(!error, `${samples}x output ${format}: ${error?.message}`);
+      }
       allocate(8, 4);
       await frame(0, [1, 0, 0, 1]);
       await frame(0.25, [0.75, 0, 0.25, 1]);

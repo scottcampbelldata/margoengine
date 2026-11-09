@@ -98,3 +98,16 @@ test('restoration cancels built-in history and fallback errors include help', ()
     (e) => e.code === 'unsupported' && /https:/.test(e.message),
   );
 });
+
+test('abort after attachment does not cancel shader execution or detach the effect', async () => {
+  const h = harness();
+  const controller = new AbortController();
+  const effect = await createCustomTransition(h.engine, wgsl, { signal: controller.signal });
+  h.frame();
+  effect.start();
+  controller.abort();
+  h.frame();
+  assert.equal(effect.progress, 0.1);
+  assert.equal(h.engine.plugins.get(effect.name), effect);
+  effect.dispose();
+});

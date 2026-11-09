@@ -61,9 +61,10 @@ fn sample(t:texture_2d<f32>,uv:vec2f)->vec4f {
 }
 ${wgsl}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
- if(settings.x<=0.0){return sample(before,i.uv);}
- if(settings.x>=1.0){return sample(after,i.uv);}
- return transition(before,after,i.uv,settings.x);
+ let uv=i.position.xy/vec2f(textureDimensions(after));
+ if(settings.x<=0.0){return sample(before,uv);}
+ if(settings.x>=1.0){return sample(after,uv);}
+ return transition(before,after,uv,settings.x);
 }`;
   // Pop the scope immediately, before any await, so unrelated caller work cannot enter it.
   device.pushErrorScope('validation');

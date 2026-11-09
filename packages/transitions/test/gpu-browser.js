@@ -174,6 +174,10 @@ export async function transitionChecks() {
         'not wgsl',
         'fn transition()->vec4f{return vec4f(1);}',
         '@group(1) @binding(0) var t:texture_2d<f32>; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return textureLoad(t,vec2i(0),0);}',
+        '@group(0) @binding(3) var t:texture_2d<f32>; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return textureLoad(t,vec2i(0),0);}',
+        '@group(1) @binding(0) var<uniform> extra:vec4f; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return extra;}',
+        '@group(1) @binding(0) var<storage,read_write> extra:array<vec4f>; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{extra[0]=vec4f(p);return extra[0];}',
+        '@group(1) @binding(0) var s:sampler; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return textureSample(a,s,uv);}',
       ].entries()) {
         let refused = false;
         const create = device.createShaderModule.bind(device);
@@ -188,6 +192,18 @@ export async function transitionChecks() {
         }
         assert(refused && plugins.size === 0, 'invalid WGSL never attaches');
       }
+      // Validation is resource-interface validation, not an execution-work sandbox. Compile only, never dispatch.
+      effect = await createCustomTransition(
+        engine,
+        'fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f {var n=0u;var r=vec4f(0);loop{r=r+sample(a,uv);n++;if(n>=u32(p*4000000000.0)){break;}}return r;}',
+      );
+      effect.dispose();
+      // Unreachable declarations need no bound resource. Wrapper globals are visible to trusted user WGSL.
+      effect = await createCustomTransition(
+        engine,
+        '@group(1) @binding(0) var unused:texture_2d<f32>; fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return settings+sample(before,uv)*0.0+sample(after,uv)*0.0;}',
+      );
+      effect.dispose();
       effect = await createCustomTransition(
         engine,
         'fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return mix(sample(a,uv),sample(b,uv),p*p);}',

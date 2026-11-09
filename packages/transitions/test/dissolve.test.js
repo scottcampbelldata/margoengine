@@ -16,7 +16,7 @@ test('dissolve thresholds come from an integer hash of the pixel', () => {
     code,
     /fn dissolveThreshold\(pixel:vec2u\)->f32 \{return f32\(dissolvePcg\(pixel\.x\+dissolvePcg\(pixel\.y\)\)>>8u\)\*5\.9604645e-8;\}/,
   );
-  assert.match(code, /edge=dissolveThreshold\(vec2u\(i\.uv\*vec2f\(textureDimensions\(after\)\)\)\);/);
+  assert.match(code, /edge=dissolveThreshold\(vec2u\(i\.position\.xy\)\);/);
   assert.doesNotMatch(code, /43758|12\.9898/);
 });
 

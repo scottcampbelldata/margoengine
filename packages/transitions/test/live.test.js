@@ -150,6 +150,7 @@ test('output targets reject invalid shapes, missing usage and capture feedback w
     sampleCount: 1,
     dimension: '2d',
     depthOrArrayLayers: 1,
+    format: 'rgba8unorm',
   };
   for (const patch of [{ usage: 0 }, { sampleCount: 4 }, { dimension: '3d' }, { depthOrArrayLayers: 2 }])
     assert.throws(() => effect.render({ delta: 0.5, target: { ...valid, ...patch } }), TypeError);
@@ -163,4 +164,45 @@ test('output targets reject invalid shapes, missing usage and capture feedback w
     (e) => e.code === 'disposed',
   );
   assert.equal(h.engine.scenes.size, 2);
+});
+
+test('integer and depth outputs reject before either scene updates or images allocate', () => {
+  const h = harness();
+  let updates = 0;
+  h.before.plugins.set('animate', { onPreUpdate: () => updates++ });
+  h.after.plugins.set('animate', { onPreUpdate: () => updates++ });
+  const effect = LiveTransitions.attach(h.engine, h.before, h.after);
+  effect.start();
+  for (const format of ['rgba8uint', 'rgba8sint', 'r32uint', 'depth32float', 'depth24plus-stencil8', 'stencil8']) {
+    const target = {
+      width: 8,
+      height: 4,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      sampleCount: 1,
+      dimension: '2d',
+      depthOrArrayLayers: 1,
+      format,
+    };
+    assert.throws(() => effect.render({ delta: 0.25, target }), TypeError, format);
+    assert.equal(effect.progress, 0);
+    assert.equal(updates, 0);
+    assert.equal(effect.images.length, 0);
+  }
+  h.engine.renderTarget = { samples: 4 };
+  for (const format of ['r32float', 'rg32float', 'rgba32float']) {
+    const target = {
+      width: 8,
+      height: 4,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      sampleCount: 1,
+      dimension: '2d',
+      depthOrArrayLayers: 1,
+      format,
+    };
+    assert.throws(() => effect.render({ delta: 0.25, target }), TypeError, format);
+    assert.equal(effect.progress, 0);
+    assert.equal(updates, 0);
+    assert.equal(effect.images.length, 0);
+  }
+  effect.dispose();
 });

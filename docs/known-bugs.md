@@ -1,5 +1,9 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: batch 76 transition review
+
+Built-in/custom composites used viewport-local UVs to address full-target captures, reading uncaptured pixels in offset views. They now derive capture UVs from absolute fragment positions. viewport-browser.js compares spatial colors against baseline at idle/0/0.5/1 across all built-in kinds, custom and mask, at 1x/4x, including preservation outside a stacked scissor. Live target validation omitted the fragment output's format domain, so integer/depth targets could advance source scenes before invalid GPU work. A shared float-color/resolve check now rejects those formats before live allocation or updates and also guards frozen-frame capture. live.test.js, live-browser.js and transitions.test.js cover this class, including non-resolvable 32-bit float 4x outputs. README and limits document custom WGSL's trusted-author requirement and fixed resource interface; real-compiler regressions accept costly code without dispatch, reject reachable extra resources and distinguish unused declarations. No core/stage change.
+
 ### Fixed 2026-11-09: five executable README exceptions
 
 React's first scene reached raw CommonJS modules in the page runner; React dependencies are now prebundled.

@@ -948,3 +948,7 @@ a compute textureLoad/pack4x8unorm read using a linear view. Expected hashes com
 from independent `ktx extract --raw --all`, not Margo's decoded data. All 35 images
 (9,548 texel bytes) must match. Solid-colour conformance only; no quality or timing
 claim. Durable record: `results/mips-real-tool-20261109.json`.
+
+### Batch 76 independent review corrections
+
+Run npm test --workspace @margoengine/transitions, then node scripts/gpu-lock.mjs run --owner=codex-76fix --max=8 --wait-max=10 -- node packages/transitions/scripts/test-gpu.mjs. The runner includes viewport-browser.js: compare patterned 8x4 captures with a no-transition baseline inside the right-half viewport and throughout a stacked inset/scissor target, for four built-in kinds/custom/mask at idle/0/0.5/1, 1x/4x. Original code fails at wipe idle 1x pixel 4,0 red (0 versus 127). The live integer-format regression fails against the original code because rgba8uint does not throw. Live real-device tests check integer/depth/non-resolvable float refusal with unchanged source updates/progress and accept baseline float/normalized formats. Additional resource-interface probes compile only; the costly-loop shader is never dispatched. Run node --test --test-timeout=60000 packages/scatter/test/*.test.js for the ring/f32/capacity audit's existing regression suite. Evidence is correctness on generated inputs, not throughput or hostile-shader execution safety.

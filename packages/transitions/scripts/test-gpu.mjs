@@ -7,7 +7,8 @@ try {
   const result = await browser.page.evaluate(async () => {
     const { transitionChecks } = await import('/packages/transitions/test/gpu-browser.js');
     const { liveChecks } = await import('/packages/transitions/test/live-browser.js');
-    return { ...(await transitionChecks()), ...(await liveChecks()) };
+    const { viewportChecks } = await import('/packages/transitions/test/viewport-browser.js');
+    return { ...(await transitionChecks()), ...(await liveChecks()), ...(await viewportChecks()) };
   });
   assert.ok(result.pixels > 0);
   console.log(JSON.stringify({ ...result, hardware: browser.hardware }));
