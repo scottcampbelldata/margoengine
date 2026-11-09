@@ -1506,6 +1506,125 @@
       },
       "qualityEntries": 977,
       "note": "Main advanced during the fast-forward push; no force or overwrite. Rebased again. Repair source and GPU lock unchanged; rebuilt all packages after upstream named TRS/caller migration, reran real-model pathtrace on both backends, HDR-shadow rotation on each backend and all 27 environment/staging/umbrella README examples. All pass. Red capture regression remains excluded."
+    },
+    "tierIntegration": {
+      "base": "b30aaa010",
+      "tip": "1a3e03597",
+      "cpu": {
+        "landing-tiers-build": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 40.489,
+          "log": "test-results/56fix/landing-tiers-build.log"
+        },
+        "landing-tiers-api": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 64.4,
+          "log": "test-results/56fix/landing-tiers-api.log"
+        },
+        "landing-tiers-quality": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 91.895,
+          "log": "test-results/56fix/landing-tiers-quality.log"
+        },
+        "landing-tiers-lint": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 3.908,
+          "log": "test-results/56fix/landing-tiers-lint.log"
+        },
+        "landing-tiers-hygiene": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 17.641,
+          "log": "test-results/56fix/landing-tiers-hygiene.log"
+        },
+        "landing-tiers-units": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 7.081,
+          "log": "test-results/56fix/landing-tiers-units.log"
+        },
+        "landing-tiers-readme-types": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 7.08,
+          "log": "test-results/56fix/landing-tiers-readme-types.log"
+        }
+      },
+      "gpu": [
+        {
+          "id": "post-native",
+          "words": [
+            "node",
+            "packages/post/test/image-browser.mjs"
+          ],
+          "max": 0.75,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 3.744,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-post-native.log"
+        },
+        {
+          "id": "post-compat",
+          "words": [
+            "node",
+            "test-results/56fix/post-compat-gpu.mjs"
+          ],
+          "max": 3,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 124.444,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-post-compat.log"
+        },
+        {
+          "id": "view-compat",
+          "words": [
+            "node",
+            "packages/environment/tests/review56-browser.mjs",
+            "--compat"
+          ],
+          "max": 0.75,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 20.186,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-view-compat.log"
+        },
+        {
+          "id": "compute-owner",
+          "words": [
+            "node",
+            "packages/compute/tests/scene-owner-browser.mjs"
+          ],
+          "max": 1.5,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 7.585,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-compute-owner.log"
+        },
+        {
+          "id": "readmes-post",
+          "words": [
+            "node",
+            "scripts/run-readme-examples.mjs",
+            "--packages=post"
+          ],
+          "max": 2,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 46.682,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-readmes-post.log"
+        }
+      ],
+      "api": {
+        "entries": 895,
+        "exports": 8683
+      },
+      "qualityEntries": 978,
+      "units": 340,
+      "note": "The next current-main rebase adds the scoped compatibility tiers and post precision requirements. Kept upstream tier guards and owner identity repairs together. Default full-tier rendering retains its path; native post smoke, all eleven compatibility post GPU commands, compatibility view/owner/studio pixels, both compute owner backends, and complete post README execution pass. Original five/model proofs and unaffected owner package gates are reused. The deliberately red capture regression and its package wiring are absent; hunter branch untouched. Full verify remains the historical once-run receipt, not a fresh full-green claim."
     }
   }
 }
