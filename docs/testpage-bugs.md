@@ -298,3 +298,21 @@ attributes an ANGLE/Direct3D11 loseContext hang to float targets/compute state.
 That cause is not yet independently confirmed. Preserve this new entry for
 reproduction and owning-package triage after the coordinator's required local
 landing; do not count it as fixed or silently omit it.
+
+## Completed local follow-up landing gates
+
+All remaining labels/netcode/tiles browser suites pass (17.9 s supervisor;
+5.1/6.1/6.3 s suites), including 16 tile spatial/budget checks and 11 shader
+modules with zero compilation errors. All 56 environment/transitions/netcode/
+inspector/labels/tiles README programs execute: 22 Node and 34 browser, zero
+failures or exceptions, 46.7 s. testpage-followup-browser.json and the browser/
+readmes logs retain the results. The requeue supervisor also passes and releases
+its GPU lock. Full lint/hygiene/verify and the retained earlier package/GPU gates
+are complete; no test, tolerance, size budget or workload was loosened.
+
+The branch rebases onto current main before its fast-forward push. Conflicts
+were appended evidence/known-bug documentation and generated indexes; both sides
+are retained and LLM indexes regenerated. The rebased focused documentation,
+error-page and export-target suite passes 16 tests with zero failures/skips.
+Core and stage remain unchanged in this landing. Approved entries 32/36 and
+untriaged entries 42-45 remain next, after this required first follow-up push.

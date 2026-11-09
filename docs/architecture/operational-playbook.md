@@ -3027,3 +3027,19 @@ land these validated repairs before diagnosing the separate 7.4 ms slow-send
 outlier. That frame remains open, above twice the 3.5 ms gate, without a busy
 exemption or speed claim. The remaining 42 README exceptions and P01-P29 proof
 boundaries remain unchanged.
+
+### Test-page local follow-ups: section 5 landing evidence (2026-11-09)
+
+The built-export target gate, environment disposal, nested transition captures,
+burst-join capacity, inspector initial ranges and duplicate-label diagnostics
+pass full verify: 13,517 unit tests, zero failures/skips, all 20 proof scenarios,
+887 API entries and 970 quality size entries. Core plus stage remains 23,837 B
+gzip. A diagnostic size failure was repaired within the existing labels budget
+(5,546 B); no ratchet or test threshold changed. Lint and hygiene pass.
+
+Retained package evidence is 470 unit tests and all 13 environment/transition
+browser scripts. The remaining labels/netcode/tiles browser scripts now pass,
+including the tiles spatial and lifecycle oracles, with zero shader errors.
+All 56 six-package README programs execute without failures/exceptions. These
+are current-host correctness results, with no new timing claim. The approved
+core reference guard for 32/36 and new reports 42-45 remain outside this landing.
