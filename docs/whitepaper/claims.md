@@ -1511,3 +1511,16 @@ turns the camera around the product target. The staging README now gives that co
 compatibility coverage, shadow pixels, orbit invariants, rollback, disposal and actual device
 replacement restoring every pixel. CPU tests cover hostile bounds and turn periods, reduced motion
 and input pauses. The orbit remains Y-up and the fit one-time. No speed or photographic quality claim.
+
+### Complete Potree README folder evidence (2026-11-09)
+
+Both original Potree examples execute on the entire published BSD-2-Clause
+lion_takanawa_normals dataset, not the committed excerpt. The required manifest
+pins all 80 files and the full package proof compares all 341,989 coordinates and
+RGB values exactly across all 77 binary nodes using an independent raw-record and
+file-space-octant oracle. All 18 points README snippets and the 1x/4x GPU package
+suites pass. This proves complete-folder reading and example execution; surveyed
+accuracy, normal decoding, production rendering quality and speed remain separate.
+Evidence: results/readme-potree-complete-20261109.json. Reproduce with the shared
+fetch command, `node --test packages/points/tests/potree-complete.test.js` and
+`npm run check:readme-run -- --packages=points`.

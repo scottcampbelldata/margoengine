@@ -15,10 +15,15 @@ test('all worktrees and direct tests resolve the same external assets without an
   );
   assert.equal(externalAssetRoot({ MARGO_SPLAT_SAMPLES: 'test-results/override' }), resolve('test-results/override'));
   assert.ok(SERIAL.includes('node scripts/support/external-test-assets.mjs'));
-  assert.equal(externalAssets.length, 377);
+  assert.equal(externalAssets.length, 457);
   for (const file of [
     'video/flower.mp4',
     'usdz-static/BoxTextured.blender.usdz',
+    'potree-lion/cloud.js',
+    'potree-lion/data/r/r.hrc',
+    'potree-lion/data/r/r.bin',
+    'potree-lion/data/r/r606.bin',
+    'potree-lion/sources.json',
     'tower.glb',
     'racoonfamily.spz',
     'hornedlizard.spz',

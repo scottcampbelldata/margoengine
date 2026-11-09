@@ -7,6 +7,10 @@ import { externalAssets, externalAssetRoot } from './support/external-test-asset
 
 // Shared required assets keep one cache and one source/hash record for verify and README execution.
 export const readmeExternalFiles = { '/model.usdz': 'usdz-static/BoxTextured.blender.usdz' };
+// Preserve the complete folder and all its relative links, including the JSON named cloud.js.
+for (const { file } of externalAssets.filter(({ file }) => file.startsWith('potree-lion/'))) {
+  readmeExternalFiles[`/scans/site/${file.slice('potree-lion/'.length)}`] = file;
+}
 
 export const readmeCache = () =>
   resolve(process.env.MARGO_README_SAMPLES ?? resolve(import.meta.dirname, '../../engine-bench/readme-samples'));

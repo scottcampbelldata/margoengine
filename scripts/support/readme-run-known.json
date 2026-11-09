@@ -28,8 +28,6 @@
   "loaders/readme-textured-obj-meshes-b6f1ea": "sample: LoaderError: OBJ: the OBJ has no faces to draw as a mesh; draw its points with pointsToGeometry instead",
   "loaders/readme-textured-obj-meshes-c37231": "sample: LoaderError: load: request for https://example.com/models/chair.obj failed (Failed to fetch)",
   "mesh-edit/readme-import-to-editable-meshes-and-fl-03d481": "sample: TypeError: glTF accessor undefined does not exist; pass an index into accessors",
-  "points/readme-potree-folders-margoengine-point-41f702": "sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it",
-  "points/readme-potree-folders-margoengine-point-5be661": "sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it",
   "post/readme-smaa-10a00a": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
   "quality/readme-tier-presets-0abcba": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
   "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips",

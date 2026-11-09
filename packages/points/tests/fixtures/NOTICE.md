@@ -1,5 +1,28 @@
 # Test fixtures
 
+## Complete external Potree README folder
+
+The two Potree README examples additionally require the complete unmodified
+`pointclouds/lion_takanawa_normals` standard dataset at Potree revision
+`5636cd471d9eb464969e758be45c44d7613d3859`, not just the excerpt below.
+Source: https://github.com/potree/potree/tree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals
+Licence: BSD-2-Clause, Copyright (c) 2011-2020 Markus Schütz; repository LICENSE
+at that exact revision. All 80 files (6,157,310 bytes) stay in the shared external
+cache, including source metadata, cloud.js JSON, hierarchy and all 77 binary nodes.
+`scripts/support/external-test-assets.json` pins every URL, size and SHA-256.
+Acquire with `node scripts/fetch-readme-assets.mjs` or
+`node scripts/reference-rendering/fetch-skip-assets.mjs`. Missing, changed or
+LFS-only bytes fail in verify and the direct package proof.
+
+`potree-complete.test.js` compares every coordinate and RGB value of all 341,989
+points with the raw 18-byte records and independently reconstructed file-space
+octants. Every published binary node is visited exactly once; zero-count leaf
+records are retained. This is complete-data reading and example execution, not
+surveyed ground truth, normal decoding, production render quality or speed evidence.
+Only standard data was downloaded; no Potree implementation was read or copied.
+
+## Committed excerpts and other fixtures
+
 Fixtures are used only by the tests and are not part of the published package (`files` is `dist`).
 
 - `bunny.pcd` is `test/bunny.pcd` from the Point Cloud Library, https://github.com/PointCloudLibrary/pcl

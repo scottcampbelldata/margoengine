@@ -4017,3 +4017,24 @@ independent 288-byte SHA-256 oracle. Real Draco Wasm verifies all output channel
 lengths, 406 vertices and 2,046 indices. No codec or runtime source changes.
 This is runnable-example evidence, not a new decoder accuracy or speed claim.
 Record: results/readme-decoder-streams-20261109.json.
+
+## Complete Potree README folder (2026-11-09)
+
+Both original Potree snippets now run on the complete outside lion_takanawa_normals
+folder at potree/potree 5636cd471d9eb464969e758be45c44d7613d3859, under the existing
+BSD-2-Clause standard-data grant. All 80 unmodified files / 6,157,310 bytes stay
+outside the repository. Every URL, size and SHA-256 is pinned in the shared required
+manifest, now 457 files. Both acquisition commands obtain the same full family;
+verify and the direct package proof fail on absent, changed or LFS-only bytes.
+
+The alias regression fails before mapping and checks every file, including missing
+r606.bin refusal. The complete-data regression visits all 77 published nodes exactly
+once and compares all 1,025,967 position components and all 1,025,967 RGB components
+with raw records and independently reconstructed file-space octants, exactly. Total
+points are 341,989, matching cloud.js and the source record sizes. No normal-decoding,
+surveyed accuracy, production-world visual quality or speed proof is claimed.
+
+All 18 original points examples pass; only these two exceptions are removed, leaving
+49 overall. Package GPU checks pass at 1x and 4x (21 and 22 checks). The combined
+package/root run passes 192 tests, zero failures/skips. No reader, renderer, core,
+stage or held physics source changed. Record: results/readme-potree-complete-20261109.json.

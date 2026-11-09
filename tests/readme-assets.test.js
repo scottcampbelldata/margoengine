@@ -17,6 +17,32 @@ import { parseUSDZ } from '../packages/usdz/dist/index.js';
 import { createHash } from 'node:crypto';
 import { parsePly, parseSplat, parseSpz, parseSog, validateSplats } from '../packages/splats/dist/data.js';
 import { MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD } from '../packages/decoders/dist/meshopt-simd.js';
+import { externalAssets } from '../scripts/support/external-test-assets.mjs';
+
+test('Potree README aliases preserve the complete outside folder and refuse a missing node', () => {
+  const family = externalAssets.filter(({ file }) => file.startsWith('potree-lion/'));
+  assert.equal(family.length, 80);
+  assert.equal(
+    family.reduce((sum, item) => sum + item.size, 0),
+    6157310,
+  );
+  for (const item of family) {
+    const pathname = '/scans/site/' + item.file.slice('potree-lion/'.length);
+    const fixture = readmeFixture(pathname);
+    assert.ok(fixture, pathname + ' needs an explicit, format-correct required input');
+    assert.equal(createHash('sha256').update(readFileSync(fixture.path)).digest('hex'), item.sha256, pathname);
+  }
+  assert.equal(readmeFixture('/scans/site/metadata.json'), undefined, 'a 1.7 folder has no 2.0 metadata');
+  const empty = mkdtempSync(join(tmpdir(), 'readme-potree-'));
+  try {
+    assert.throws(
+      () => readmeFixture('/scans/site/data/r/r606.bin', undefined, undefined, empty),
+      /r606\.bin[\s\S]*fetch-skip-assets/,
+    );
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
 
 test('the Draco README serves the exact published Avocado compressed view with matching attribute IDs', () => {
   const fixture = readmeFixture('/mesh.drc');

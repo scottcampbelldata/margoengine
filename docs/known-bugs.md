@@ -1936,3 +1936,28 @@ An ordinary projected-edge multiply/subtract could give inconsistent signs on ad
 The optional mesh design limits are documented in its README and limits.md. They do not close batch 99's separate exact-parity or moving-camera denoising defects.
 
 Mixed-tracer creation also redundantly rebuilt the already-copied voxel snapshot to check added storage. This misreported the first packing as reuse. The constructor now keeps its first snapshot; the existing pre-allocation device check validates the combined binding reserve. mesh.test.js requires one packed model and zero reused models on creation, and still rejects an oversized combined binding before GPU allocation.
+
+### Resolved: decoder stream and Potree README input failures (2026-11-09)
+
+The Draco introduction now serves Avocado's exact 8,722-byte compressed view with
+its file-specific IDs 3/1/0. The SIMD snippet serves MeshoptCubeTest view 25 and uses
+its real count 24, stride 12, ATTRIBUTES/NONE. Required aliases, exact source-byte
+comparisons, independent SIMD output hash and a real Draco Wasm regression cover
+the causes. Both browser snippets pass. No codec behavior changed.
+
+Both original Potree snippets now run on the entire licensed 80-file external
+lion_takanawa_normals folder, preserving all relative links. The alias regression
+fails before mapping and refuses an absent node; the package test independently
+compares all 341,989 coordinates and RGB values exactly across all 77 nodes.
+All 18 points examples pass. Missing, changed or LFS-only files fail, never skip.
+
+### Open: decoder Node glTF README example context and source
+
+Reproduce with `npm run check:readme-run -- --packages=decoders`. The Node glTF
+example under Any image to pixels constructs Engine with document.querySelector,
+so the runner executes it in a page, then the example.com/helmet.gltf request fails.
+The advertised nodeKTX2 also dynamically imports Node's module/fs/url APIs, so a
+valid Basis texture would require the promised Node runtime instead. Correct repair
+needs a complete openly licensed Basis glTF input and a Node GPU/headless setup,
+retaining the loadGLTF integration. This is still a runtime known-list exception;
+no texture-only substitute, browser fallback or passing claim has been added.

@@ -2291,5 +2291,645 @@
     "sha256": "e3ecec5022ab19cdeedcc9a5708baacf31ea2edc8e37690adfb07ff44fd6f6a8",
     "size": 1991579,
     "licence": "CC0-1.0 (Vladimir Petkovic and Adobe Inc.)"
+  },
+  {
+    "file": "potree-lion/cloud.js",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/cloud.js",
+    "size": 751,
+    "sha256": "d9fecdacac434ddded840e468bb37b71c0b0a0b3396513edbff1bc536609e026",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r.bin",
+    "size": 189864,
+    "sha256": "e865a0fe842a25e005cbbd8f0bdfc0396929f0cee706fe241fd1b9dd897ab7c6",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r.hrc",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r.hrc",
+    "size": 385,
+    "sha256": "b2a294f53e04f601bd5665ef3af61c6a6d8bb15f24d3399b126cf54d4df27bed",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r0.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r0.bin",
+    "size": 173952,
+    "sha256": "873409e80ae881fb35cc3bf643fcb1cdae95bef97c0fe19b79a6d98a2c39d7ab",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r00.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r00.bin",
+    "size": 33534,
+    "sha256": "a89a58daa0ecb3616362bf8139a7c56674b58e48d669a033b0607790dc34ebbd",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r01.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r01.bin",
+    "size": 44550,
+    "sha256": "44549fe1c1121aa527df4b11596859620f411365da253d49c5e920eefedb0d32",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r02.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r02.bin",
+    "size": 113922,
+    "sha256": "5616ece096a8ed541c84c1d3907da39945c8857945ea1770bb8f664071f12ba4",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r03.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r03.bin",
+    "size": 168750,
+    "sha256": "f5e7b9772e6884ec0faa4ec9651b5f64e277723d54c84e605e301598ec92ffbb",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r04.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r04.bin",
+    "size": 101736,
+    "sha256": "11afd1e4355ec87397a1043f0b6a6489f89591c5e49c889fcb38b0153b1f2f66",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r06.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r06.bin",
+    "size": 264600,
+    "sha256": "e60948c6a479f92838fd75e2b28d71d62ed9886c4a082f4c879ca3cff702f75c",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r07.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r07.bin",
+    "size": 237312,
+    "sha256": "a5c86bbf5b7e41ad52d14de50f7be6b88adfbc86735b911372ded33da0f824f2",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r070.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r070.bin",
+    "size": 36594,
+    "sha256": "12d216add4960c6be7d423bc1c6633d63bd4d573fa2b75a8809260e91fa51008",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r071.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r071.bin",
+    "size": 14130,
+    "sha256": "4645b278bebcceae61fb1b45243f9804b625958b2c819784feca08ebdfe9f656",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r072.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r072.bin",
+    "size": 82476,
+    "sha256": "91485be57d52382ca8aebea0da8ab911ff81e37cfb19ef1403616a2c84c82634",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r073.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r073.bin",
+    "size": 39978,
+    "sha256": "346b636e2eb620b68399a4086511a253408dfb4ce964c52e86dc7bfb24e32c51",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r074.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r074.bin",
+    "size": 76554,
+    "sha256": "df7118355dde70e27a321451bc0fe0ebbff0d76615922459fc2b813606701f97",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r075.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r075.bin",
+    "size": 17118,
+    "sha256": "bda850e71d9168db9d63ef0517b6b9c9a78b972becc04280361a770d0e20d347",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r076.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r076.bin",
+    "size": 79092,
+    "sha256": "40039341bf948f3c646bb15de27639a1f3d9fc16761a76ed87c3a8113a37bd00",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r077.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r077.bin",
+    "size": 53496,
+    "sha256": "fba1c1d2653538aec6908cb0e47932e05e6b3a3c68bb3639f9db0d9021292f3d",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r1.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r1.bin",
+    "size": 98784,
+    "sha256": "9990ca32e1e167ea951880d224bfbd302e416e5b8170d993603b7de6e9b0799f",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r10.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r10.bin",
+    "size": 342,
+    "sha256": "d0994756f71d0e3b1cf6ce077407c9d7aa578e0e83fa79541cdda65ccbdadd49",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r11.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r11.bin",
+    "size": 36,
+    "sha256": "0341e583b066959f0ecd4e505727e31daf0a3680d5037443d5856ca3b1aa5409",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r12.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r12.bin",
+    "size": 40662,
+    "sha256": "86ff20883b8beb85b47df41e19c5e5c23866f677f7b981b65ce4255829f5780d",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r14.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r14.bin",
+    "size": 1440,
+    "sha256": "abdf3f1b68efee99a97d27fd5d57212fc13b9084b8beb1ad3c8bd189b86ff191",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r16.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r16.bin",
+    "size": 244998,
+    "sha256": "c0749f215054ae038af0b83ace4b840451204b176f722f3e8aeb2addf57b6dd4",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r160.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r160.bin",
+    "size": 47574,
+    "sha256": "e4f2335de34a39b041bc2cd5ced17c51b9c354d3a7de976a3313da37f56c2fb9",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r161.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r161.bin",
+    "size": 76248,
+    "sha256": "47c9e5a379942c9d1743e3b44147e34eeb6378f732c1f2941b477b97bba29f9a",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r162.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r162.bin",
+    "size": 39744,
+    "sha256": "fc98999baefb1c5061921cebdeb2228e43670c430a42745bfe79266e5168c39e",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r163.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r163.bin",
+    "size": 30366,
+    "sha256": "5cbd1da83d80699ddd4c3204c9cbe543b97fb5140b450ce37213d5baf7af77c3",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r164.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r164.bin",
+    "size": 46080,
+    "sha256": "6728ec2a1d28a16763612198c4109a483c6986fdce77f23e2fc70b50cd667e7f",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r165.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r165.bin",
+    "size": 71676,
+    "sha256": "2511c80be40972a37ffc2dcee13135960be192fffff8d97dbd193f5252e8c670",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r166.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r166.bin",
+    "size": 55386,
+    "sha256": "3b37b50d68619f2080da546ae956608d0e76a5f38743b7c891fe045a68312917",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r167.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r167.bin",
+    "size": 60480,
+    "sha256": "c777fd4bc4e6b394c0c4c20f8b0d4104f7502a3fc7c41d5ff576a0ee7bc38080",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r17.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r17.bin",
+    "size": 108162,
+    "sha256": "dbb4c73d9c639c7b6cf8ede703d105517398b1bade161026ae6b534a5d5782af",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r2.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r2.bin",
+    "size": 140814,
+    "sha256": "7e6f7a30bca2295e593a24e50da274c6f394aae1b07b7604803bef8b3fed9cf0",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r20.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r20.bin",
+    "size": 19476,
+    "sha256": "5c19bd7f1fafdba30a1668b68d4e056ab21c27523a93391c66187f4b9cb2c2b2",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r21.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r21.bin",
+    "size": 57510,
+    "sha256": "92e6714f8330cb788dbfea28105f43c238212c2cd45987785929e22860ad979b",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r22.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r22.bin",
+    "size": 38340,
+    "sha256": "a03a44d05d01bbefcdab2ff185d17856b7e294296663ffa5f4ed129b976e3243",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r23.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r23.bin",
+    "size": 67068,
+    "sha256": "bd78a5d7420ca5af38e7ae63fc0272f28fdbe092332e4e62f3ad6582539ce937",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r25.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r25.bin",
+    "size": 189756,
+    "sha256": "d0075e0fe022836147dee68d469b539e51f0067a10793c7e3368b7ce7af87c34",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r250.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r250.bin",
+    "size": 57960,
+    "sha256": "32ce6868b9b194f04670e30c846e3d9352f32fdefe86c9cfb71019d50e2797e4",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r252.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r252.bin",
+    "size": 40086,
+    "sha256": "fb7796ab94af6a291da46bbe4a8ae37b0f6d09b8d35a3f0bd3a05ae03769b088",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r253.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r253.bin",
+    "size": 2376,
+    "sha256": "54c38d56ff04e4eea137894309f9325e56413c49f538100b9c9c4e09f933545e",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r254.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r254.bin",
+    "size": 68058,
+    "sha256": "ea1259555b496ba3494474ffcc2a006bb0b7e6d6fd06ddc7a5eb035e54e40fcc",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r255.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r255.bin",
+    "size": 56214,
+    "sha256": "563ea06edc1f7d90fa3b8630b4f00a0433395cd917f8f96f06dc304bca180ff5",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r256.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r256.bin",
+    "size": 44478,
+    "sha256": "f24758b36b2f3cf810bb82fa54f11a65b4339010eebe67e3baa2476b710a843c",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r257.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r257.bin",
+    "size": 43884,
+    "sha256": "b20ab52b1c13e1a08479b6cc6d15eb3ef5b7af0388c8892120d846d36ced902e",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r26.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r26.bin",
+    "size": 89352,
+    "sha256": "490560a8de55852def7547a2e08bf4276101bc0670fbaac9c075d6878a6d4ae2",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r27.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r27.bin",
+    "size": 236970,
+    "sha256": "47e98725d0b55fee7b5c8b3472aab3cbe6870b418ba370131d65461711a6cb64",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r3.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r3.bin",
+    "size": 46440,
+    "sha256": "5c068843acacc285bf12da7b72e8702cecf8561a5ae57cfd6d6bc5348f2180dc",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r30.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r30.bin",
+    "size": 594,
+    "sha256": "e9ed984b3761654cdfc57b7c40560d6cb62923b74e453fdfbabafdcd0a4be129",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r32.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r32.bin",
+    "size": 30798,
+    "sha256": "631495bea32fda9a180aa61ce254ca1adcb051581486a0a3a39f6fb9fd51a271",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r34.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r34.bin",
+    "size": 300528,
+    "sha256": "43af597b9667d35274879ab28d1987adb9cddbcd2328a98c4de4390e7efadd86",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r35.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r35.bin",
+    "size": 20754,
+    "sha256": "0b8a2300554ed2071ce7c28f60c15b15bce3482cbc482359d58d9630bcff2c34",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r36.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r36.bin",
+    "size": 3600,
+    "sha256": "48ea7e3c1c92955cc02fe85af0966439887cebe6be2817c55646c21edec57774",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r37.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r37.bin",
+    "size": 36,
+    "sha256": "ef535db973c09145e9742ba9d998a2cf225face6ac0227ce9466527bef859d4f",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r4.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r4.bin",
+    "size": 75096,
+    "sha256": "f6782597fb6dc58e233080465f7b92d0f410fe31fcbd093325c3bf204b347240",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r40.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r40.bin",
+    "size": 34362,
+    "sha256": "ff50bd7cbad84fb55824106637498bad284bd2c29f552aeb84788dd93da5de97",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r42.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r42.bin",
+    "size": 138186,
+    "sha256": "56760225b67d0e18d79504e89b6fb3913fdd76da99a18b31870fdea6d8b99e37",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r420.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r420.bin",
+    "size": 62046,
+    "sha256": "f20a44332ea14ee92d841cf99544feff816a75c5573abda16a427a2ca50ed311",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r421.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r421.bin",
+    "size": 44442,
+    "sha256": "d756f6da97a39b69bbcb65dfcb417a9b9d8dbbcb938aa6fb5e784e6235f876f2",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r422.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r422.bin",
+    "size": 56106,
+    "sha256": "1dbe76db2617568aee4b279d7ef8848c9f73ad68e1d8d0a5333b7ac0ccc3fa67",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r423.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r423.bin",
+    "size": 51390,
+    "sha256": "a0a43d2aa955680f538d2a0d7e91434514431b5f3b70c5f2cc7aebfdd7b1f339",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r424.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r424.bin",
+    "size": 6624,
+    "sha256": "4f2ec4b40f1e1ad5b0dfcaa90571abf8564e1e17f3eabde6a233b4dff2a40fe8",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r426.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r426.bin",
+    "size": 20610,
+    "sha256": "d4555dcb4631436ace7bfbd60cf28dc3cfdca3f3f3146263f30c2433042e4b07",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r43.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r43.bin",
+    "size": 230454,
+    "sha256": "a9722e21b41a574ebbeec9826466145078bc163b6d18b84695fb380fc20053b8",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r5.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r5.bin",
+    "size": 39942,
+    "sha256": "3273cd0f7ff5fa0368d06a906b6b3bc3973a384386fa8a4bb031cf0cb9a86583",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r6.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r6.bin",
+    "size": 128736,
+    "sha256": "8ac5375a7b9817522e8f7d043b4a331602db5304ef5bad66b9e8f6df1c560961",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r60.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r60.bin",
+    "size": 162270,
+    "sha256": "77522110583f8bd3d5759675f74577433f18419d6e70ae4415caa4ed21d32068",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r600.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r600.bin",
+    "size": 58554,
+    "sha256": "9b861d882cdc2b2f6da9875eb015170a0607982f995fc626efba8ecb6b1475ad",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r601.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r601.bin",
+    "size": 56502,
+    "sha256": "69038761b968a767844c46b2ad2d91e7786d1a573db9c623c9416cf7250a0ce2",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r602.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r602.bin",
+    "size": 30060,
+    "sha256": "4519d69e9bbc844ab1b29946c72424a3f3afd79c3f64fed3e9f3aa111edb7fbe",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r603.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r603.bin",
+    "size": 82926,
+    "sha256": "342dcdac0117aec25cba33696632d2c5f37f23603c1b0ef736563d355fccc594",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r604.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r604.bin",
+    "size": 21816,
+    "sha256": "20fafa057a47228d27c823a8c3ce4587d9e29ebd23db1952a4a868a954d24c5b",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r606.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r606.bin",
+    "size": 37098,
+    "sha256": "9f5877fe02c8b17659c17e04d408c9cbd0821310a723ad59698c023054d4af69",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r61.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r61.bin",
+    "size": 188442,
+    "sha256": "12f37ec73aa41b6b2a32a6f05591349e52266124f9ee880ef3176ad33241999d",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r62.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r62.bin",
+    "size": 281106,
+    "sha256": "b7e620e57c1d0e7583fa79d28dccc17f8bf8533f7d3d3eed4856c87a77fdc428",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r63.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r63.bin",
+    "size": 134316,
+    "sha256": "3f62558baf0e563195fed523aaf326c270a51b6a0108e6c72004644a1dd74def",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/data/r/r7.bin",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/data/r/r7.bin",
+    "size": 9990,
+    "sha256": "2d01477d16ba8f91a495cee6d11a8a5915b0c58b8cb426bd71b63069ead03283",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "potree-lion/sources.json",
+    "url": "https://raw.githubusercontent.com/potree/potree/5636cd471d9eb464969e758be45c44d7613d3859/pointclouds/lion_takanawa_normals/sources.json",
+    "size": 372,
+    "sha256": "ca42bd174ba55d73db594fb879a067d7b90985affa0b25a4ee171b5ef22fc227",
+    "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
+    "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
   }
 ]

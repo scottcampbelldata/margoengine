@@ -195,8 +195,8 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | points/readme-las-and-laz-scans-margoengine-po-2d683c | /scans/site.las | sample: MargoError: GET /scans/site.las answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
 | points/readme-las-and-laz-scans-margoengine-po-6ccdb7 | /scans/fullwave.laz, /scans/fullwave.wdp | sample: MargoError: GET /scans/fullwave.laz answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
 | points/readme-laz-decoder-margoengine-points-l-7c341a | /scans/site.laz | sample: MargoError: GET /scans/site.laz answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
-| points/readme-potree-folders-margoengine-point-41f702 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Pending file selection, provenance and rerun |
-| points/readme-potree-folders-margoengine-point-5be661 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Pending file selection, provenance and rerun |
+| points/readme-potree-folders-margoengine-point-41f702 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Passed: complete licensed 80-file Potree folder, all 77 nodes / 341989 points exact; original snippet passes and exception removed |
+| points/readme-potree-folders-margoengine-point-5be661 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Passed: complete licensed 80-file Potree folder, all 77 nodes / 341989 points exact; original snippet passes and exception removed |
 | splats/readme-margoengine-splats-f08e38 | /capture.splat | sample: Error: Failed to load splats: 404 | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
 | splats/readme-ply-captures-editing-and-level-o-0d1416 | /capture.ply | sample: Error: Failed to load splats: 404 | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
 | text/readme-prebuilt-atlases-bitmapfont-5ec840 | /fonts/inter.json | sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL | FIXED by lane Q: supplied Margo-generated Source Sans 3 ASCII SDF JSON/PNG, SIL OFL 1.1; README uses source-sans.json; exception removed, scoped run 40/40 |
@@ -577,3 +577,23 @@ core, stage or held physics source changed. Execution records are in
 `docs/whitepaper/results/readme-decoder-streams-20261109.json`.
 Decoder scoped validation: 291 tests pass with zero failures/skips; all 14 decoder GPU checks and both repaired browser snippets pass. README execution is 16/17, retaining only the unrelated Node/example.com sample. Known list now has 51 entries.
 Decoder landing validation: full verify passes 13,378 tests with zero failures/skips (329.1 s); lint and standalone hygiene pass. The 291 scoped tests, 14 GPU checks and 16/17 README execution result pass. No exports changed.
+
+## Complete Potree README inputs (2026-11-09)
+
+Both original examples now pass on the entire outside lion_takanawa_normals folder,
+not the committed excerpt. Its 80 unmodified files / 6,157,310 bytes use Potree's
+BSD-2-Clause grant at 5636cd471d9eb464969e758be45c44d7613d3859. Every file is pinned,
+required and acquired by both existing downloaders in the shared external cache.
+The manifest now has 457 files. The alias regression fails before the mapping and
+refuses a missing node; the full package proof independently compares all 1,025,967
+position and 1,025,967 RGB components exactly across all 77 nodes / 341,989 points.
+All 18 points examples, 192 scoped tests and 1x/4x GPU suites pass. Two exceptions
+are removed, leaving 49. No production-render, surveyed-accuracy, normal-decoding
+or performance claim. Record: docs/whitepaper/results/readme-potree-complete-20261109.json.
+
+P20 source search also checked ten nontrivial trimesh model PLY files at
+6c158cce226500fc64b12acd265af0cf01d1c212: every one was ASCII or little-endian.
+The ply-rs example list and python-plyfile tetrahedron supplied no big-endian model.
+No implementation was read or copied; no P20 closure, parser change or tolerance change.
+Potree pre-rebase landing validation: full verify passes 13,383 tests with zero failures/skips (398.6 s); lint and standalone hygiene pass. Both download contracts, all 192 scoped tests, 18 original README snippets and 1x/4x GPU suites pass. No exports changed. Current main adds 24 other required inputs; the final combined manifest will retain them.
+Potree post-rebase validation: the combined 457-file required manifest validates; rebuilt packages, lint and hygiene pass. All 201 focused tests (including generated documentation) and all 18 original points README examples pass with zero failures/skips. The original 1x/4x GPU suites remain passing. Both main and lane documentation additions are retained.

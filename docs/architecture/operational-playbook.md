@@ -2531,3 +2531,14 @@ Section 5 evidence: mesh.test.js covers hostile data, atomic failed/cancelled up
 mesh-build-ab.mjs compares every output word with an independent scalar median builder, in alternating paired rounds. SIMD validation groups four coordinate predicates per instruction group. Loaded-machine timings are diagnostic and carry no release or rival speed claim.
 
 Mixed-tracer creation builds the voxel snapshot once. Device setup checks the geometry reserve against the actual binding limit before allocating. The packing-stat regression prevents an internal second setScene from hiding initial work as reuse.
+
+### Complete Potree README folder: section 5 evidence (2026-11-09)
+
+The required outside manifest grows to 457 files, adding all 80 files of the
+BSD-2-Clause lion_takanawa_normals dataset. Both downloaders share one cache and
+source/hash record. Direct points tests validate the entire family before traversal;
+verify preflights it too. Root regressions require every alias and fail on a missing
+node. The full package proof visits all 77 nodes and independently compares all
+341,989 coordinates and RGB values exactly. Both original examples and the whole
+18-example points README pass; 1x/4x GPU package suites remain required. No runtime,
+core, stage or held physics source changed. No surveyed/normal-decoding/quality/speed claim.

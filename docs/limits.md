@@ -1574,3 +1574,14 @@ Flat surfaces are double-sided. Glass requires closed outward-wound uniform-mate
 Uncertain ray-space edge determinants use exact integer product subtraction, with no geometric edge dilation. Transformed coordinates and transport remain Float32; no universal watertightness, ill-conditioned triangle, production-asset or outside-renderer equality claim. Builds copy caller arrays and check cancellation around synchronous Rust work; a worker is needed to interrupt that work in flight. setScene rebuilds all triangle geometry.
 
 Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method measures 22,864 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,716 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 80,918 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,797 B gzip, below the strict 25,000 B cap.
+
+### Complete Potree README folder evidence (2026-11-09)
+
+The README's /scans/site/ alias preserves the complete BSD-2-Clause published
+Potree 1.7 lion_takanawa_normals folder: 80 files / 6,157,310 bytes, including all
+77 binary nodes / 341,989 points, hierarchy, cloud.js JSON and source metadata.
+All coordinates and RGB values match independent raw-record reconstruction exactly.
+The 18 original examples execute. This closes two missing-file examples and is not
+surveyed accuracy, NORMAL_OCT16 decoding, production-render quality or speed proof.
+No parser/render behavior, entry sizes, exports or budgets changed. The required
+shared outside manifest now has 457 files and fails if any is missing or changed.

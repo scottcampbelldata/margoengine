@@ -495,6 +495,14 @@ console.log(positions.length / 3, attributes?.classification, attributes?.gps_ti
 
 A 1.7 hierarchy file lists leaves with 0 points in real folders, so a leaf's `count` comes from its file once `load` has read it. Other encodings and versions before 1.4 throw a `MargoError` with code `unsupported`. The reader is checked on real PotreeConverter output: see `tests/potree-check.mjs`.
 
+The runnable README uses the complete published `lion_takanawa_normals` Potree 1.7
+folder (BSD-2-Clause; provenance in `tests/fixtures/NOTICE.md`), served as `/scans/site/`.
+From a clone, run `node scripts/fetch-readme-assets.mjs` to acquire its 80 pinned files
+in the shared external cache. Serve that folder intact, including `cloud.js` and all
+relative `data/` files. The package test requires it and checks every coordinate and
+RGB value of all 341,989 points across 77 nodes against their raw records. This
+establishes complete-file reading, not surveyed accuracy or production rendering quality.
+
 ## Surfels (`margoengine/points/surfels`)
 
 `SurfelPlugin` draws clouds as small blended discs, so a scan reads as one continuous surface instead of overlapping dots. It runs three passes: every disc writes depth pushed back a little, discs within that push of the front add colour and weight into a float target, and a full-screen pass divides one by the other and draws it over the scene. The weight is Gaussian across the disc and falls with depth behind the front surface, so a wall does not bleed through the floor in front of it. Discs share the scene's depth, so meshes and surfels hide each other.

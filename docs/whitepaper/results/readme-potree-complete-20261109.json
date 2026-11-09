@@ -1,0 +1,134 @@
+{
+  "date": "2026-11-09",
+  "scope": "Complete outside folder reading and original README execution; no surveyed, normal-decoding, production-render or speed claim",
+  "source": {
+    "repository": "potree/potree",
+    "revision": "5636cd471d9eb464969e758be45c44d7613d3859",
+    "folder": "pointclouds/lion_takanawa_normals",
+    "licence": "BSD-2-Clause",
+    "author": "Markus Schütz",
+    "manifest": "scripts/support/external-test-assets.json",
+    "files": 80,
+    "bytes": 6157310,
+    "allFilesDownloadedAndSHA256Checked": true
+  },
+  "proof": {
+    "test": "packages/points/tests/potree-complete.test.js",
+    "nodes": 77,
+    "points": 341989,
+    "coordinateComponents": 1025967,
+    "rgbComponents": 1025967,
+    "allExact": true,
+    "independentOracle": "Raw uint32 XYZ / RGBA8 records; independently split file-space octants; all published .bin names visited exactly once"
+  },
+  "regression": "README alias test fails before folder mapping; each alias digest is pinned, and missing r606.bin refuses with fetch command",
+  "readmeResults": [
+    {
+      "id": "points/readme-margoengine-points-068641",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-hdr-colors-b5756b",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-mipmaps-f949ef",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-fog-357fa4",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-with-glass-e0a52b",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-clipping-planes-5520d2",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-las-and-laz-scans-margoengine-po-2d683c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-las-and-laz-scans-margoengine-po-6ccdb7",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-laz-decoder-margoengine-points-l-7c341a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-e57-scans-margoengine-points-e57-27ad6c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-large-clouds-octree-level-of-det-37fb37",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-placing-an-octree-in-a-scene-a6e28c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-adaptive-point-size-ce4855",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-copc-files-margoengine-points-co-e8bfa1",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-gpu-picking-margoengine-points-p-3acccd",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-potree-folders-margoengine-point-5be661",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-potree-folders-margoengine-point-41f702",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "points/readme-surfels-margoengine-points-surfe-b32053",
+      "result": "pass",
+      "place": "page"
+    }
+  ],
+  "gpuChecks": [
+    {
+      "samples": 4,
+      "checks": 22,
+      "browser": "157.0.4341.42"
+    },
+    {
+      "samples": 1,
+      "checks": 21,
+      "browser": "157.0.4341.42"
+    }
+  ],
+  "removedKnownExceptions": [
+    "points/readme-potree-folders-margoengine-point-41f702",
+    "points/readme-potree-folders-margoengine-point-5be661"
+  ],
+  "combinedRequiredAssets": 457
+}
