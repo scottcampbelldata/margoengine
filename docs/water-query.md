@@ -129,3 +129,9 @@ backends after removing the unnecessary usage flag. All nine water/umbrella
 README examples execute with zero known failures. Lint, hygiene, API, docs links
 and the size gate pass; research, evidence, API report and generated docs are
 in the same landing. No GPU job remains held or queued by this lane.
+
+Later landing rebases incorporated unrelated materials fixtures, sciviz LIC
+and save ownership changes. Their affected outputs and combined API/docs
+were rebuilt and checked; Water source and its retained GPU proof did not
+change. These were targeted rebase checks, never another full verify run.
+
