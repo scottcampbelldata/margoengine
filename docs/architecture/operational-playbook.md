@@ -2327,3 +2327,5 @@ one coordinate step, repeatedly switching media at zero distance. Forward half-o
 uses ceil minus one for negative directions in the existing two-level walk. No retry or epsilon
 attenuation correction is used. The grazing test failed at radiance about 0.997 before this repair,
 against a physical path value about 3.5.
+
+Batch 160 section 5 job 7 adds external constant-furnace IBL evidence for the full 123-primitive glTF scene, with Mitsuba direct/full transport references, unchanged display mapping and exact independent backend budgets. Raw/display hashes protect reference recapture; unit contracts cover ordering, finite radiance, source preservation and frozen counts/budgets. Native WebGL2 refuses the path; real compatibility renders it. Geometric IBL visibility/reflections and principled/glTF differences remain open. Constant radiance does not establish directional prefilter or nonuniform-sky accuracy; batch 168 evidence remains in force. No production renderer code changed.

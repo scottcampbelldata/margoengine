@@ -1399,3 +1399,10 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 | Measurement | Proof | Scope |
 | --- | --- | --- |
 | RGB-byte MAE 0.5777244567871094 / 0.5777206420898438 | [Frozen result](results/batch-160-iridescence.json), tests/reference-rendering.test.js | Complete 346-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
+
+### Batch 160 constant-environment IBL, job 7
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| Direct-only RGB-byte MAE 2.9175326029459634 / 2.9175211588541665 | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
+| Full-transport MAE 1.8851051330566406 / 1.8851038614908855 | Same result and contracts; GPU-locked environment.mjs | Mitsuba max depth 8, constant radiance, no sun, shared display transform. Geometric IBL occlusion/reflections and BSDF mismatch remain open; no path-tracing equivalence or nonuniform-sky claim. |

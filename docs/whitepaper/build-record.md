@@ -3937,3 +3937,9 @@ IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/w
 The manager-authorized shared determinism investigation ended within its 45-minute cap without a proven root cause. Job 4 stays local at 97c74a713; job 5, including an exact failing repeat-capture reproducer and detailed notes, is local at bfd887103. Their original budgets remain frozen. Job 6 is independent and closes neither failure; the batch list row remains open while parked work remains unresolved.
 
 Job 6 checks passed: lint, hygiene, the 11 reference/packing contracts, full verify (13,320 tests, zero failures or skips), and both material cases' unchanged GPU-locked budgets on native WebGPU and WebGL2 compatibility. Root harness/docs only; package README execution and API regeneration are not applicable. No speed result was measured.
+
+### Job 7: constant-environment IBL
+
+The complete job 1 source scene (123 primitives, 528,291 vertices, 1,040,409 triangles) is lit with constant linear [0.3,0.5,0.7] radiance and no sun. Margo EnvironmentLighting defaults are compared with Mitsuba 3.9.1 scalar_rgb public-API output, 128 spp, seed 160, direct max depth 2 and full max depth 8. Full-transport all-pixel RGB-byte MAE is 1.8851051330566406 / 1.8851038614908855 (native/compatibility); direct-only is 2.9175326029459634 / 2.9175211588541665. Exact first budgets, raw and display hashes are frozen in batch-160-environment.json. Native WebGL2 is explicitly refused. Geometry visibility/reflections, split-sum/SH and principled/glTF differences remain open; this constant furnace does not establish nonuniform-sky or directional prefilter accuracy. No renderer/package code or speed claim changed. Batch 168 sky evidence is reused.
+
+Job 7 checks passed: lint, hygiene, all four new reference contracts, full verify and the frozen GPU-locked direct/full budgets on both backends. Root harness/docs only; package README execution and API regeneration are not applicable.

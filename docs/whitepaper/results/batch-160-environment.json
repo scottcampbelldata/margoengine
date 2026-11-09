@@ -1,0 +1,253 @@
+{
+  "family": "environment",
+  "domain": "All RGB pixels, PBR Neutral/sRGB, constant radiance [0.3,0.5,0.7], black background, no direct sun; principled direct/full transport separately",
+  "sourceSha256": "5e677f260ec0f366967a6e9545de2f3dab2a160e307b9bcb9d050cd2028f63f8",
+  "sceneSha256": "b719b166070cd6463fe57449cc7df19b8637cb72f6cb4ba16e677463835c75a2",
+  "settings": {
+    "width": 512,
+    "height": 512,
+    "camera": {
+      "position": [
+        12,
+        9,
+        18
+      ],
+      "target": [
+        3,
+        3,
+        -1.5
+      ],
+      "fov": 35,
+      "near": 0.1,
+      "far": 100
+    },
+    "light": {
+      "direction": [
+        0.4,
+        0.7,
+        0.6
+      ],
+      "intensity": 0
+    },
+    "environment": [
+      0.3,
+      0.5,
+      0.7
+    ]
+  },
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "margo": {
+    "backend": "webgpu",
+    "draws": 123,
+    "primitives": 123,
+    "errors": []
+  },
+  "nativeWebGL2": {
+    "code": "unsupported",
+    "message": "PBRModel requires WebGPU; use a browser that supports it"
+  },
+  "rows": {
+    "direct": {
+      "linearSha256": "1a773cb31e03cfd14deb93d35710af9e1677b4085d02eab3c73be56ab99bb14a",
+      "referenceSha256": "c34e85486acc2aef5a46e16b0d8ba25db2c54a0ecb5e92d790e697dcbacfc9d5",
+      "meta": {
+        "version": "3.9.1",
+        "variant": "scalar_rgb",
+        "primitives": 123,
+        "vertices": 528291,
+        "triangles": 1040409,
+        "samples": 128,
+        "seed": 160,
+        "maxDepth": 2,
+        "mode": "direct",
+        "threadCount": 4,
+        "model": "glTF metal/rough parameters mapped to Mitsuba principled; not a bit-exact glTF BSDF"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 2294441,
+        "square": 76817341,
+        "max": 170,
+        "mae": 2.9175326029459634,
+        "rmse": 9.883233287834557,
+        "foreground": 47481,
+        "foregroundAbsolute": 2294441,
+        "foregroundMae": 16.107783464262898,
+        "changed": 46724
+      }
+    },
+    "full": {
+      "linearSha256": "70eb74b432b9268d2f31be27fb41c8898fadab395da72c500043fd7e0aa98240",
+      "referenceSha256": "192545ff4773f00f619fcd9f1402be0245036e1ca0e73406ae8cea33f4f3e215",
+      "meta": {
+        "version": "3.9.1",
+        "variant": "scalar_rgb",
+        "primitives": 123,
+        "vertices": 528291,
+        "triangles": 1040409,
+        "samples": 128,
+        "seed": 160,
+        "maxDepth": 8,
+        "mode": "full",
+        "threadCount": 4,
+        "model": "glTF metal/rough parameters mapped to Mitsuba principled; not a bit-exact glTF BSDF"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 1482507,
+        "square": 31967589,
+        "max": 118,
+        "mae": 1.8851051330566406,
+        "rmse": 6.375648315973413,
+        "foreground": 47500,
+        "foregroundAbsolute": 1482507,
+        "foregroundMae": 10.403557894736842,
+        "changed": 46660
+      }
+    }
+  },
+  "compat": {
+    "family": "environment",
+    "domain": "All RGB pixels, PBR Neutral/sRGB, constant radiance [0.3,0.5,0.7], black background, no direct sun; principled direct/full transport separately",
+    "sourceSha256": "5e677f260ec0f366967a6e9545de2f3dab2a160e307b9bcb9d050cd2028f63f8",
+    "sceneSha256": "b719b166070cd6463fe57449cc7df19b8637cb72f6cb4ba16e677463835c75a2",
+    "settings": {
+      "width": 512,
+      "height": 512,
+      "camera": {
+        "position": [
+          12,
+          9,
+          18
+        ],
+        "target": [
+          3,
+          3,
+          -1.5
+        ],
+        "fov": 35,
+        "near": 0.1,
+        "far": 100
+      },
+      "light": {
+        "direction": [
+          0.4,
+          0.7,
+          0.6
+        ],
+        "intensity": 0
+      },
+      "environment": [
+        0.3,
+        0.5,
+        0.7
+      ]
+    },
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "margo": {
+      "backend": "webgpu",
+      "draws": 123,
+      "primitives": 123,
+      "errors": []
+    },
+    "nativeWebGL2": {
+      "code": "unsupported",
+      "message": "PBRModel requires WebGPU; use a browser that supports it"
+    },
+    "rows": {
+      "direct": {
+        "linearSha256": "1a773cb31e03cfd14deb93d35710af9e1677b4085d02eab3c73be56ab99bb14a",
+        "referenceSha256": "c34e85486acc2aef5a46e16b0d8ba25db2c54a0ecb5e92d790e697dcbacfc9d5",
+        "meta": {
+          "version": "3.9.1",
+          "variant": "scalar_rgb",
+          "primitives": 123,
+          "vertices": 528291,
+          "triangles": 1040409,
+          "samples": 128,
+          "seed": 160,
+          "maxDepth": 2,
+          "mode": "direct",
+          "threadCount": 4,
+          "model": "glTF metal/rough parameters mapped to Mitsuba principled; not a bit-exact glTF BSDF"
+        },
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 2294432,
+          "square": 76816910,
+          "max": 170,
+          "mae": 2.9175211588541665,
+          "rmse": 9.883205561806381,
+          "foreground": 47481,
+          "foregroundAbsolute": 2294432,
+          "foregroundMae": 16.107720281094895,
+          "changed": 46725
+        }
+      },
+      "full": {
+        "linearSha256": "70eb74b432b9268d2f31be27fb41c8898fadab395da72c500043fd7e0aa98240",
+        "referenceSha256": "192545ff4773f00f619fcd9f1402be0245036e1ca0e73406ae8cea33f4f3e215",
+        "meta": {
+          "version": "3.9.1",
+          "variant": "scalar_rgb",
+          "primitives": 123,
+          "vertices": 528291,
+          "triangles": 1040409,
+          "samples": 128,
+          "seed": 160,
+          "maxDepth": 8,
+          "mode": "full",
+          "threadCount": 4,
+          "model": "glTF metal/rough parameters mapped to Mitsuba principled; not a bit-exact glTF BSDF"
+        },
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 1482506,
+          "square": 31967280,
+          "max": 118,
+          "mae": 1.8851038614908855,
+          "rmse": 6.375617502262526,
+          "foreground": 47500,
+          "foregroundAbsolute": 1482506,
+          "foregroundMae": 10.403550877192982,
+          "changed": 46660
+        }
+      }
+    }
+  }
+}

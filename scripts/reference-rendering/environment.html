@@ -1,0 +1,21 @@
+<!doctype html><style>body{margin:0;background:black}canvas{width:512px;height:512px}</style><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+window.renderEnvironment=async(bytes,settings,backend='webgpu')=>{
+ const canvas=document.body.appendChild(document.createElement('canvas'));
+ const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera});
+ try{
+ const errors=[];engine.gpu?.addEventListener('uncapturederror',event=>errors.push(event.error.message));
+ engine.scene.background='#000000';engine.lighting.direction.set([0,1,0,0]);engine.lighting.radiance.set([1,1,1,0]);
+ const model=await parseGLTFAsync(engine,new Uint8Array(bytes));
+ const data=new Float32Array(64*32*4);for(let p=0;p<64*32;p++)data.set([...settings.environment,1],p*4);
+ const environment=await Environment.attach(engine,{width:64,height:32,data});
+ EnvironmentLighting.attach(engine,environment).add(model);
+ await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+ if(errors.length)throw Error(errors.join('\n'));
+ return{backend:engine.backend,draws:engine.stats.drawCalls,primitives:model.primitives.length,errors,png:canvas.toDataURL('image/png')};
+ }finally{engine.dispose();canvas.remove();}
+};</script>

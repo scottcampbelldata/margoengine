@@ -1782,3 +1782,9 @@ The same regression covers a second cause exposed by the physical-origin repair:
 selection at a negative grazing boundary can repeatedly select the previous medium when the query
 advance rounds away. The walk now selects the forward half-open interval for each direction. A
 one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
+
+### Batch 160 job 7: environment furnace picture loss (open)
+
+Repro: GPU-locked node scripts/reference-rendering/environment.mjs, then --compat, after fetching the pinned job 1 model and generating the Mitsuba references with --capture-reference. All 123 primitives, 528,291 vertices and 1,040,409 triangles are retained. Direct-only MAE is 2.9175326029459634 / 2.9175211588541665; full-transport MAE is 1.8851051330566406 / 1.8851038614908855 (WebGPU / compatibility). Every RGB pixel and silhouette counts.
+
+Known structural causes: Margo's split-sum/SH IBL samples only the environment, so other scene geometry neither occludes it nor appears in reflections. Mitsuba traces geometric visibility in both references and up to eight vertices in the full reference. The direct-only image truncates continued surface paths at two vertices. Mitsuba principled maps the authored base/metal/rough parameters, but its BSDF is not a bit-exact glTF implementation. Margo's shared IBL approximations, finite 128-spp reference noise, different antialiasing and all-pixel silhouettes also remain in the metric. The constant-radiance case does not isolate their individual contributions or prove directional prefilter quality. No small package defect has been isolated, and this loss is not closed by recording a budget.

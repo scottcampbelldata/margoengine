@@ -871,3 +871,7 @@ checks root physical path length, then RGB absorption/emission/shadows, clear an
 conservative scattering on native WebGPU and compatibility. It finally destroys and restores a real
 native device and checks the converged frame and disabled/disposed raster exactly. Generated fixtures
 are stand-ins for analytic optical media, not outside production assets or rival renders.
+
+### Batch 160 environment IBL, job 7
+
+Fetch the pinned job 1 asset with node scripts/reference-rendering/fetch-assets.mjs. References and binaries stay under engine-bench. In an outside Python venv install mitsuba==3.9.1 and numpy==2.5.4; set MARGO_MITSUBA_PYTHON to its python executable (default is engine-bench/batch-168/mitsuba-venv/Scripts/python.exe). Run node scripts/gpu-lock.mjs run --owner=codex-160 --max=25 -- node scripts/reference-rendering/environment.mjs --capture-reference, then the same harness without --capture-reference and with --compat. The public Python adapter renders fixed-seed scalar_rgb direct/full images into a candidate directory; both raw and display hashes must match before any frozen artifact changes. Unchanged copies are retained outside, never committed. --measure refuses any existing budget. Root tests: node --test --test-timeout=120000 tests/reference-environment.test.js. All pixels, no crop, denoise, fitted exposure or new tone curve. Constant furnace only; use the existing batch 168 harness for sky/OIT/staging/lightmap evidence.
