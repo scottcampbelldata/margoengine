@@ -1360,8 +1360,9 @@ families and the independent path-traced IBL/Cornell controls are still unmeasur
 
 ### Lighting2d batch 55 repair evidence (2026-11-08)
 
-`packages/lighting2d/tests/frame-regressions.js`, `emission-regressions.js` and `frame-lifecycle.test.js` extend the existing
-`test:gpu` suite, already discovered by `check:gpu-packages` in `check:merge`. Every direct-light entry now runs the same
+`packages/lighting2d/tests/frame-regressions.js` and `emission-regressions.js` extend the existing `test:gpu` suite,
+already discovered by `check:gpu-packages` in `check:merge`; `frame-lifecycle.test.js` adds Node lifecycle coverage.
+Every direct-light entry now runs the same
 mask/layer, repeated-frame, format, name-reuse and device-loss scenarios. Independent arithmetic checks cover separate
 height uniforms and isolated HDR threshold images; actual `Bloom.encodeImage` output is checked against a separately
 encoded dispatch and must spread outside a zero-glow sprite. All six entries reject a native WebGL2 engine with a coded
@@ -1369,7 +1370,7 @@ error and help link. Direct-light storage ceilings are device limits rather than
 
 Current evidence is one RTX A6000/Edge device. Cross-vendor rounding and adapter behaviour remain unproved. The spatial
 GI replacement now has the independent energy, visibility and analytic-circle evidence described below. No speed claim
-or benchmark is added. All six optional byte budgets remain unchanged; the candidate cannot land until their gate passes.
+or benchmark is added. Scott approved the six exact measured optional ceilings on 2026-11-09; all gates remain mandatory.
 
 
 The following remain technical gaps, not permission to weaken a check:
@@ -1931,7 +1932,7 @@ The shared loader translates policy-blocked compilation through the shared error
 
 The approved core correction changes only `packages/core/src/kernel.ts`: core owns the transform-kernel compilation and instantiation, so an optional package cannot report its startup failure. Approval: Scott, "Yes approved", 2026-11-10. Core plus stage measures 23,797 B gzip with `npm run measure:size`, below 25,000 B.
 
-Lighting2d height precision repair (2026-11-08): owned rgba16float accumulation precedes one target presentation. `frame-regressions.js` proves 100 individually sub-byte directional lights, in addition to format, resize, frame order and restoration checks. RTX A6000: 148 pixel checks, no errors. Half-float blending retains its finite rounding precision; this is not a float32 accumulation claim.
+Lighting2d height precision repair (2026-11-08): owned rgba16float accumulation precedes one target presentation. `frame-regressions.js` proves 100 individually sub-byte directional lights, in addition to format, resize, frame order and restoration checks. The historical height-repair checkpoint passed 148 pixel checks on RTX A6000 with no errors; the final suite evidence is below. Half-float blending retains its finite rounding precision; this is not a float32 accumulation claim.
 
 Lighting2d spatial GI repair (2026-11-08): GPU compute builds each upper spatial/angular grid, retaining radiance and
 transmittance. Per-child connectors implement Osborne/Sannikov appendix A before interpolation. Separate two-sided
@@ -1941,11 +1942,27 @@ all eight levels, distinct bounce orders, analytic circle angular measure (11 di
 and format/resize/removal/restore/dispose/reattach lifecycle. These suites extend lighting2d test:gpu, already a
 check:merge GPU gate; there is no new bypass. Original GI fails 21 Node assertions and the GPU value checks.
 Missing evidence: other GPUs, general scene convergence and performance. Surface patches/32-direction quadrature
-are finite approximations, detailed in limits.md. Byte-budget approval is still needed before landing.
+are finite approximations, detailed in limits.md. The exact measured byte ceilings were approved by Scott on 2026-11-09 ("Approve new size"), with no headroom.
 
 The GI angular merge additionally uses integer multiplication for direction counts, bilinear difference interpolation
 and incremental angular means. This preserves a uniform unit field exactly for branching 2/3/5/7/8. Browser regressions
 read every intermediate float32 cascade sample and assert the configured allocation sizes, not just the final pixels.
 The first weighted-sum formulation failed these assertions (and the Node unit-field test at branching 7); no tolerance
 was changed. The exported CPU class documentation omission caught by verify was corrected in source and its API quality
-gate was checked again. Full verify was run once; its six byte ceilings remain unchanged and failing.
+gate was checked again. Initial verification found the prior size ceilings and missing GI TSDoc; both were resolved,
+with Scott approving the six exact measured ceilings on 2026-11-09. The first landing verify then found only the stale
+generated `site/llms-full.txt` through the existing `tests/llms.test.js`. Canonical guide regeneration fixed the cause,
+and the unchanged LLM, claims and umbrella regressions passed.
+
+Full verification evidence (2026-11-09, main base `7bc32a1cb`): lint, hygiene and full verify passed. Full verify completed in 915.019 s under
+its 2,400 s hard limit, including a 324.1 s global Node test chain. On that base the lighting2d package passed 99 Node tests,
+236 RTX A6000/Edge GPU checks with zero wrong values or validation errors across 11 WGSL modules, and all 8 runnable
+README examples. API reports were regenerated and checked. Cross-vendor rounding, general-scene convergence and speed
+remain outside this evidence.
+
+The subsequent rebase onto `571fb8d30` kept lighting2d source and tests identical; core/shared gained the CSP diagnostic
+correction described above. Fresh integration checks passed the build, lint, hygiene, 165 Node tests with no skips
+(including all 99 lighting2d tests, CSP and incoming regressions), and all 236 lighting2d GPU checks with zero wrong values
+or validation errors across 11 WGSL modules. Full API update/check reports 99 packages, 856 entries and 8,525 exports;
+all five quality gates pass, including 938 size items. All 8 README examples and generated LLM/claims/umbrella regressions pass;
+the link check reports 208 documents with zero broken links. The full verify measurement above applies to the earlier `7bc32a1cb` base.

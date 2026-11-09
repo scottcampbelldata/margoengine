@@ -65,19 +65,12 @@ README still expected a phone DPR cap of 2. The demo now uses the returned tier 
 documents DPR 1. `scripts/modern-grass-tests.js` asserts the exact phone label and exact DPR 1 on an actual
 mobile browser context; the existing pixel, interaction, device restoration and teardown checks remain.
 
-### Lighting2d repair candidate byte budgets
+### Fixed 2026-11-09: lighting2d repair byte ceilings
 
-The unlanded repaired root/soft/cookie/GI/height/emissive entries measure
-5,394/5,901/7,350/8,589/6,832/4,087 B min+gzip against unchanged
-5,152/5,605/7,079/6,941/6,323/3,780 B budgets. No budget was raised and nothing is pushed.
-Compacting contiguous typed-array stores, eliminating redundant bind-group caches, sharing numeric validation and
-removing redundant public-field initializations saves 293 B against the fully repaired candidate, with identical work/results.
-An identifier-renaming experiment and broader store compaction were discarded when their savings/readability did not help.
-Remaining required increments: root +242, soft +296, cookie +271, GI +1,648, height +509, emissive +307 B.
-They buy polygon masks/validation, soft visibility correctness, cookie restoration/scalar gain, spatial interval grids and
-finite bounce orders, complete height-span shadows/HDR accumulation, and isolated HDR extraction/real Bloom respectively.
-The reviewable request is to use the measured sizes as ceilings (no added headroom); it requires Scott's decision.
-These bytes are a release gate blocker, not permission to remove work or bypass verify. Correctness regressions remain enabled.
+Scott approved the six measured ceilings exactly: "Approve new size" (2026-11-09).
+Root/soft/cookie/GI/height/emissive are 5,394/5,901/7,350/8,589/6,832/4,087 B min+gzip, with no headroom.
+The repair removed 293 B without dropping work. The 3,273 B increase and the work it buys are recorded beside the
+lighting2d rows in [limits.md](limits.md). All correctness regressions and normal quality gates remain enabled.
 
 ### Fixed in lane C: lighting2d GI review findings 3..7, 12 and 24
 
@@ -89,7 +82,7 @@ point, spot and directional semantics, masks, layers and shadows match the CPU. 
 opaque emitter at all eight cascade counts, far sources beyond level three, distinct bounce orders, nearest-source
 occlusion, analytic circular-source angular measure, light kinds/masks/layers and resource lifecycle.
 Original d97d79d67 GI fails 21 of the first 37 new Node assertions and the new GPU value assertions.
-The byte-budget release blocker above remains; this local candidate is not pushed.
+The byte ceilings above are approved; all normal checks are required before pushing.
 
 ### Two identical runs of GlassVaseFlowers can differ on a few pixels
 

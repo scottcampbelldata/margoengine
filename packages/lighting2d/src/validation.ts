@@ -41,4 +41,3 @@ export function checkLight(l: Light2D): void {
     !!hexColor(l.color);
   if (!good) throw invalid();
 }
-

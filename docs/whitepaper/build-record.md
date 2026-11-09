@@ -3507,6 +3507,7 @@ Six optional 2D lighting entries, built in order on the dev PC, with no core or 
 The initial all-package search and per-job README/export checks found none already implemented.
 Hard shadows, point/spot/directional lights, normal maps and occluder edge chains existed and
 are extended or built over. No job was skipped.
+The job table and source/slip notes below record the initial implementation; the review repairs and final evidence follow.
 
 | # | Job | Status | Commit | Entry | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -3518,37 +3519,60 @@ are extended or built over. No job was skipped.
 | 6 | Emissive sprites and bloom hookup | DONE | 664b7531d | lighting2d/emissive | emissive.test.js, browser-check.js (LIM-601) |
 
 - **Built from:** Published specs and papers: Fernando 2005 (PCSS 2D area light penumbra estimation) and Akenine-Moller & Assarsson 2002 (penumbra wedges) for soft shadows; Segal et al. 1992 (projective texture masks) for cookies; Franklin 1970 (PNPOLY Jordan curve theorem point-in-polygon) for light masks; Alexander Sannikov 2023 ("Radiance Cascades: A Novel Approach to Calculating Global Illumination") for 2D radiance cascade GI; standard 3D perspective/directional ray-slab and ray-cylinder projection geometry along height intervals for 2.5D height and self-shadowing; and standard polynomial distance attenuation with luminance thresholding for emissive sprites and bloom hookup.
-- **Slips and bugs:** In radiance cascade testing, segment endpoints exactly on the 45-degree ray diagonal passing through pixel centers caused float32 boundary rounding differences against double float64, resolved by extending wall segments past grid diagonals. In direct pass with blending, alpha was initially cleared to 0, resolved by writing alpha 1.0 (255). Concurrent pushes from other lanes required ordinary rebases; no force-push, skipped checks or loosened bars.
+- **Initial implementation slips and bugs:** In radiance cascade testing, segment endpoints exactly on the 45-degree ray diagonal passing through pixel centers caused float32 boundary rounding differences against double float64, resolved by extending wall segments past grid diagonals. In direct pass with blending, alpha was initially cleared to 0, resolved by writing alpha 1.0 (255). Concurrent pushes from other lanes required ordinary rebases; no force-push, skipped checks or loosened bars.
 - **Docs per job:** 1, 2, 3, 4, 5 and 6 each update packages/lighting2d/README.md, docs/limits.md, docs/whitepaper/claims.md, docs/clean-room.md, plus generated API surface and LLM records. Job 6 adds this record and marks list-2 row 55 done.
-- **Reviewed batch-55 entry sizes (gzip B):** root 4,896; soft 5,349; cookie 6,823; gi 6,685; height 6,067; emissive 3,524.
-  These replace the stale completion figures. Core plus stage was 23,626 B, below 25,000.
+- **Historical pre-repair reviewed entry sizes (gzip B):** root 4,896; soft 5,349; cookie 6,823; gi 6,685; height 6,067; emissive 3,524.
+  The repaired sizes below supersede these figures. Core plus stage was 23,626 B, below 25,000.
 
-### Batch 55 repair in lane C (2026-11-08, not yet landed)
+### Batch 55 repair in lane C (2026-11-08; exact ceilings approved 2026-11-09)
 
-Direct-light repair candidates cover F1/F2/F8/F9/F11/F13-F23/F25: independent per-light height uniforms, frame-encoder
+All 26 review findings are repaired. Direct-light F1/F2/F8/F9/F11/F13-F23/F25 have independent per-light height uniforms, frame-encoder
 ordering, device/format keyed resource lifetimes, owned cookie texture destruction, masks/layers on all direct entries,
 scalar cookie colour gain, exact soft-shadow limits, floating height spans and receiver-facing shading, growing scene
 storage, unregistering disposal, and hostile numeric validation. F10 now owns separate HDR emission and local extraction
 images and dispatches the actual unattached Bloom image API through an owned per-device factory. Public API reports and
-README examples describe the changed adapter contract.
+README examples describe the changed adapter contract. Native WebGL2 refusals use coded unsupported errors with help links.
+F26 corrects the claims, limits, clean-room references and operational-playbook section 5 evidence, including the sizes here.
 
-The Node regression file was run against original source (fails) and restored repaired source (passes unchanged).
-`frame-regressions.js` and `emission-regressions.js` extend the check:merge-discovered GPU suite with 147 checks and
-native WebGL2 coded refusals on RTX A6000/Edge. These are correctness measurements, not timing claims or a multi-GPU claim.
-GI F3/F4/F5/F6/F7/F12/F24 remains open: LIM-599 is withdrawn and every repro/cause is recorded in known-bugs.md.
+GI F3-F7/F12/F24 now uses GPU compute spatial probe grids with doubling spacing, an angular direction hierarchy,
+radiance/transmittance intervals and a separately visible connector to each interpolated child interval, following
+Sannikov and Osborne/Sannikov appendix A. All 1..8 requested cascade levels execute. Finite diffuse bounce orders 0..4
+use separate preceding-order fields, two-sided midpoint surface patches and normalized cosine quadrature, without temporal
+history. Opaque nearest emitters terminate transmission. Aligned light storage and top-left camera coordinates preserve
+direct-light semantics. Integer direction counts, difference-form interpolation and incremental means preserve constant
+fields exactly, including non-power-of-two branching. Small sources may be undersampled by the documented finite quadrature;
+there is no arbitrary-scene accuracy or performance claim.
 
-Candidate min+gzip entry bytes, other packages external, measured with `bundleBytes` from `scripts/measure-size.js`:
-root 5,421; soft 5,926; cookie 7,374; gi 6,687; height 6,698; emissive 4,198. The optional-entry ratchet budgets remain
-unchanged (5,152/5,605/7,079/6,941/6,323/3,780 respectively in root/soft/cookie/gi/height/emissive order). Several candidates
-exceed those budgets; reducing bytes without removing work remains a landing requirement. Full gate results are recorded
-by the lane's handoff, not inferred from the passing pixel suite.
+The additional height defect found during repair is fixed with owned rgba16float accumulation and a single presentation
+conversion: 100 lights contributing .001 now sum to .1 instead of disappearing through repeated unorm rounding.
+Compacting packing/validation and removing redundant stores and bind-group caches saved 293 B without removing work or tests.
 
-Repair checkpoint gates: 54 lighting2d Node tests pass; GPU suite 147 checks, zero wrong values and zero validation errors;
-8/8 README examples run; API reports regenerated and api:check passes; lint has warnings only and hygiene passes. The one
-full verify run finished in 375.9 s with quality sizes failing for the five optional entries above (emissive was 4,154 B
-at that run, before the additional RGB-threshold regression raised its candidate to 4,198 B). Other completed quality
-subgates passed; no retry, budget increase, force-push or push was performed. An additional 100-dim-height-light probe found
-unorm accumulation loss, now recorded with its root cause in known-bugs.md. Work is not ready to land.
+Measured min+gzip entry bytes, other packages external, using `bundleBytes` from `scripts/measure-size.js`:
+root 5,394; soft 5,901; cookie 7,350; gi 8,589; height 6,832; emissive 4,087. Scott approved these exact ceilings,
+with no headroom, on 2026-11-09: "Approve new size". Relative to the previous budgets, the extra
+242/296/271/1,648/509/307 B retain masks/validation, correct soft visibility, cookie restoration/scalar gain,
+spatial intervals/finite bounces, complete height intersections/HDR accumulation, and HDR extraction/actual Bloom hookup,
+respectively. The total increase is 3,273 B. Core and stage are unchanged.
+
+Full verification evidence (2026-11-09, main base `7bc32a1cb`): lint, hygiene and full verify passed. Full verify completed in 915.019 s under
+its 2,400 s hard limit; its global Node test chain took 324.1 s. On that base the lighting2d Node suite passed 99 tests; the RTX A6000/Edge GPU suite passed 236 checks
+with zero wrong values or validation errors across 11 WGSL modules; all 8 README examples ran. Device restoration,
+format/resize/removal/disposal/reattachment and native WebGL2 coded refusals are covered. Independent GI oracles include
+opaque walls and sealed sources, unit energy inside an enclosing source at all eight levels, far sources, separate bounce
+orders, nearest-source occlusion and 11 analytic circular-source distances within 5% of asin(r/d)/pi. Original-source
+regressions fail for GI, constant-field merges and sub-byte height accumulation, then pass unchanged on the repaired source.
+API reports were regenerated and checked. Initial verification found the then-unchanged size ceilings and missing GI
+TSDoc; the TSDoc was repaired and Scott approved the exact measured ceilings. The first landing verify then found only
+a stale generated `site/llms-full.txt`, caught by the existing `tests/llms.test.js`. Canonical guide regeneration fixed
+the cause; the unchanged LLM, claims and umbrella regressions passed, followed by the full green verify above.
+
+The later rebase onto `571fb8d30` kept lighting2d source and tests identical and incorporated core/shared CSP diagnostics.
+Fresh integration checks after that rebase passed the build, lint, hygiene, 165 Node tests with no skips (including all
+99 lighting2d tests, CSP and incoming regressions), and all 236 lighting2d GPU checks with zero wrong values or validation
+errors across 11 WGSL modules. Full API update/check reports 99 packages, 856 entries and 8,525 exports; all five quality
+gates pass, including 938 size items. All 8 README examples and generated LLM/claims/umbrella regressions pass; the link check reports
+208 documents with zero broken links.
+These are post-rebase integration results; the full verify above ran on the earlier `7bc32a1cb` base.
 
 ## Batch 168: rival measurements
 
