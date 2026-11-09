@@ -2,6 +2,9 @@
 export interface ZstdOptions {
   /** Aborts decoding between blocks; the promise rejects with the signal's reason. */
   signal?: AbortSignal;
+  /** Optional exclusive output storage. Its capacity is an additional limit. Do not resize, detach, transfer or
+   * grow its Wasm memory until the promise settles. Returns a prefix view; on failure contents are unspecified. */
+  destination?: Uint8Array<ArrayBuffer>;
   /** Largest total output in bytes; more throws a RangeError. Default 268,435,456 (256 MiB). */
   maxOutputSize?: number;
   /** Largest frame window in bytes a frame may declare; more throws a RangeError. Default 134,217,728 (128 MiB). */

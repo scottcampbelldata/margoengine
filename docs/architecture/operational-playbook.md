@@ -10,6 +10,31 @@ metadata failures corrected and all seven affected checks passing; it was not re
 +13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
 retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
 
+## Report24 verification and residual evidence
+
+The full verify ran once:14,081/14,084 unit tests passed, with only3 failures
+from viewcube's stale engine fixture missing sceneOf. Its fixture now follows
+plugin identity, retaining all assertions and adding a disposal regression;
+all19 affected tests, viewcube GPU and README examples pass. Other verify
+steps passed and were retained. The full verify was not duplicated.
+The173-pair memory campaign preserves64 pairs before a build/dist race, then
+resumes only missing pairs after the build dependency. All scalar hashes and
+Wasm bars pass;2 RSS losses remain. This is not final replacement acceptance.
+
+
+## Owned decompression storage evidence (section 5 continuation)
+
+The shared Zstd decoder supports bounded caller-owned output. The destination
+identity, allocation-size and canary regression plus malformed/abort/detached
+cases run in the ordinary decoders test glob, hence in verify and check:merge.
+Existing allocating Zstd tests remain unchanged. A private Basis range ABI
+checks offsets against its owned input Vec; no unchecked caller pointer is
+accepted. It retains the allocation through yielded inflation and disposal.
+These private changes are not public loader/worker or all-format acceptance.
+The original173 retained-output memory pairs have been remeasured;2 RSS
+losses remain. Further storage changes need the same proof before closing
+those losses. GPU ETC2/EAC proof remains absent on RTX A6000.
+
 
 ### Section 5 evidence: batch 134 current-Wasm bounded campaigns
 

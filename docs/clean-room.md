@@ -10,6 +10,52 @@ metadata failures corrected and all seven affected checks passing; it was not re
 +13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
 retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
 
+## Batch 134 BC1/BC3 draft research, report24
+
+Andrew Garrard/Khronos, *Data Format Specification1.4* (2025),18.1/18.2/18.4
+and Tables118-120 were reread fully from retained text/current HTML:
+https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html.
+Ignacio Castano, *High Quality DXT Compression using CUDA* (2007), selected
+cluster/covariance/normal-system/discrete-error sections and the equation on
+printed page5, visually checked; no CUDA code adopted:
+https://developer.download.nvidia.cn/compute/cuda/1.1-Beta/x86_website/projects/dxtc/doc/cuda_dxtc.pdf.
+Pavel Krajcevski, Adam Lake and Dinesh Manocha, *FasTC: Accelerated Fixed-Rate
+Texture Encoding* (I3D2013), selected3.1-3.3/3.5, printed139 visually checked:
+https://gamma-web.iacs.umd.edu/FasTC/extra/paper.pdf. Neither paper was read
+fully this turn. The draft combines ordered cluster proposals with actual
+rounded discrete-palette SSE; constant blocks have an independent discrete
+search, padding contributes no fit weight, BC3 alpha reuses the accepted byte
+fitter. No source-side prior, old endpoint strategy or companion code used.
+Search results exposed implementation references; none opened or used.
+Original-source11/98 losses remain failures; a7/98 ideal-fidelity diagnostic
+is evidence for review, not authorization to change the color bar.
+
+
+## Batch 134 owned supercompression storage, report24
+
+Before implementation, compared Yann Collet and Mark Kucherawy, *RFC8878:
+Zstandard Compression and the application/zstd Media Type* (2021), selected
+frame/window/content/checksum rules, https://www.rfc-editor.org/rfc/rfc8878.html;
+Zoe Paraskevopoulou, Michael Fitzgibbons, Michelle Thalakottur, Noble Mushtak,
+Jose Sulaiman Mazur and Amal Ahmed, *RichWasm: Bringing Safe, Fine-Grained,
+Shared-Memory Interoperability Down to WebAssembly* (2024), abstract only,
+https://arxiv.org/abs/2401.08287; and Xinyu Zeng, Ruijun Meng, Martin Prammer,
+Wes McKinney, Jignesh M. Patel, Andrew Pavlo and Huanchen Zhang, *F3: The
+Open-Source Data File Format for the Future* (SIGMOD2025), selected section6.3
+output/lifetime prose and Figure8, https://db.cs.cmu.edu/papers/2025/zeng-sigmod2025.pdf.
+The W3C WebAssembly WG's *JavaScript Interface*, 4 November2026 editor draft,
+https://webassembly.github.io/spec/js-api/, memory-buffer/grow algorithms,
+requires handling fixed-buffer detachment. These are scoped reviews, not full
+paper reads. No companion code, other repository source or decoder internals read.
+
+The shared Zstd reader can now borrow bounded destination storage. Normal
+allocating decode stays unchanged. A private Basis experiment reserves owned
+Wasm input, inflates directly there and transcodes checked offsets without a
+full decoded JS level or a second input copy. Disposal retains the allocation
+until asynchronous borrowing ends. Fixed-destination regressions fail on the
+prior reader and pass the new reader. The private replacement, 25 RSS losses
+and remaining formats are still subject to their separate acceptance gates.
+
 
 ## Batch 134 corpus, uploads and memory continuation
 

@@ -30,3 +30,30 @@ JSON/BIN ordering that failed and ask for a complete glTF 2.0 GLB file. This is 
 container check; consumers still validate JSON and asset versions.
 
 Specifications and regression evidence: [size restoration](../../docs/size-restore.md).
+
+## Owned Zstandard output
+
+Run this example from the repository root. `destination` is optional: omitting
+it preserves allocating decode. When supplied, its capacity is an additional
+output limit and the result shares its storage. The decoder writes each output
+byte directly there, verifies checksums and retains its normal cancellation,
+frame, window and dictionary behavior. Defaults remain 256 MiB of output and a
+128 MiB frame window.
+
+```js
+import { decompressZstd } from './packages/shared/zstd.js';
+const frame = Uint8Array.of(0x28, 0xb5, 0x2f, 0xfd, 0x20, 5, 0x29, 0, 0, 77, 97, 114, 103, 111);
+const destination = new Uint8Array(5);
+const result = await decompressZstd(frame, { destination });
+console.log(new TextDecoder().decode(result)); // Margo
+```
+
+The caller owns the destination exclusively until the promise settles. Do not
+resize, transfer, detach or grow its Wasm memory during that borrow. Input and
+output ranges may not overlap. A rejection leaves destination contents
+unspecified; do not publish them as decoded data. A caller providing Wasm storage
+must retain its allocation until completion and use checked ranges afterwards.
+
+The regression in `packages/decoders/tests/zstd-destination.test.js` checks output
+storage identity, allocation sizes, canaries, truncation, checksums, dictionaries,
+limits, cancellation and detachment. It runs in verify and check:merge.

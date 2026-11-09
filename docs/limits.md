@@ -10,6 +10,30 @@ metadata failures corrected and all seven affected checks passing; it was not re
 +13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
 retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
 
+## Batch 134 report24 private draft limits
+
+Current draft Wasm is203,110 raw/73,104 gzip9 bytes; no public entry or ceiling
+has been finalized. Original173 scalar memory pairs pass Wasm high water but
+have2 RSS losses (down from25), and the contiguous raw-level reserve still
+inherits an inappropriate128MiB compressed-input cap for narrow arrays.
+BC1/BC3 has11/98 original-source quality losses; the color bar is unchanged.
+Current51-seed/historical-target fuzz and new BC/scalar/range hostile probes
+remain bounded scope. ETC2/EAC hardware uploads, remaining target formats,
+worker/API integration and final memory/entry acceptance remain open.
+[Full report24 evidence](whitepaper/results/batch-134-owned-zstd-checkpoint.json).
+
+
+## Owned Zstd destination limits
+
+The internal shared reader's optional destination is exclusive caller storage
+until the promise settles. Its capacity adds a limit to `maxOutputSize`; it
+never grows or substitutes the buffer. Returned bytes are a prefix view.
+Input/output ranges must not overlap. Do not resize, detach, transfer or grow
+its Wasm memory while borrowed. On rejection its contents are unspecified.
+The existing 256MiB output and128MiB window defaults, dictionary refusal,
+checksum verification, concatenated/skippable frames and cancellation remain.
+This does not replace the shipped Basis transcoder or close its RSS losses.
+
 
 ## Batch 134 corpus, upload and memory limits
 

@@ -1,5 +1,20 @@
 # Performance history: losses, causes and fixes
 
+## Batch 134 owned-storage checkpoint, timing deferred
+
+The [current scoped evidence](results/batch-134-owned-zstd-checkpoint.json)
+compares all173 original scalar memory pairs, fresh old/new processes retaining
+full outputs. Wasm high water passes173/173; strict RSS passes171/173, against
+148/173 previously. One original loss and one new small loss remain. Maximum
+Wasm:17,170,432 old/10,747,904 new bytes; maximum process RSS:111,084 old/108,424
+new KiB. Lower global maxima never waive either per-pair loss.
+
+Private combined Wasm:203,110 raw/73,104 gzip9 bytes, up from187,031/68,167
+in the prior scalar checkpoint, including the unaccepted BC1/BC3 draft and
+checked range ABI. This is not final public-entry size. No optional ceiling
+changed. No timing A/B, startup, cold/warm or speed claim; speed-phase debt stays.
+
+
 ### Batch 134 scoped memory, with RSS losses retained
 
 The [173-pair measurement](results/batch-134-corpus-uploads-memory.json) runs

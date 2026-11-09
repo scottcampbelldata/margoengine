@@ -21,24 +21,44 @@ paths now release every acquired buffer/texture and renderer registration, prese
 Native fallback refuses with linked unsupported before allocation. mesh-ownership.test.js fails on all four
 old paths and passes the corrected build. This CPU checkpoint does not claim full job 3 GPU acceptance.
 
-### Open: batch 134 private adapter duplicates decoded Zstd levels
+### Open: batch 134 private replacement RSS and raw-level capacity
 
-All 173 scalar memory pairs pass Wasm high water, but 25 fail fresh-process
-RSS against the prebuilt. The private TS adapter's levelData produces a full
-JS decoded level; input() then copies it into owned Wasm input. The largest
-loss controls keep 4,194,304 duplicate raw bytes alongside retained outputs.
-Repro: retained `report23-memory.mjs`, especially GlassPlastic normal target5
-(107,436 old / 111,748 new KiB). All 12 output hashes stay exact. Repacking
-only that container's storage to uncompressed, same UASTC payload, gives
-107,308 old / 104,284 new KiB and 12 exact old/12 exact new hashes. This
-supports the supercompression-storage diagnosis; precise RSS includes host
-allocator/JIT behavior and every loss still needs proof after the root fix.
-Implement generic owned-buffer decompression or a clean-room same-feature
-Rust path with full layer/face handling, preserving all output/API/fuzz work;
-then repeat the original corpus memory bar. Do not force GC, discard outputs,
-change runtime source metadata or excuse a memory miss as busy timing.
-[Every pair and diagnosis](whitepaper/results/batch-134-corpus-uploads-memory.json).
-Public replacement, other targets and ETC2/EAC hardware uploads remain open.
+Report24 removes the full decoded JS Zstd level and per-image input copies:
+inflation writes directly into borrowed owned Wasm input and checked ranges
+handle layers/faces/mips. All173 fresh-process scalar pairs retain exact
+outputs and pass Wasm high water. Strict RSS losses fall from25 to2; one of
+the original25 remains. Current losses: array UASTC BC4,88,788 old/89,104 new
+KiB; LensesMat normal R11,94,416 old/95,248 new KiB. These are failures, not
+busy-machine timing waivers. Exact RSS includes host allocator/JIT and
+committed Wasm pages; the residual cause is not yet isolated. Never force GC,
+discard outputs, relax a bar or repeat measurements to get a better number.
+
+The new contiguous owned raw-level reserve also inherits basis_input's128MiB
+compressed-input cap. A1x16384 UASTC array with2049 layers has134,283,264 raw
+bytes, while each image needs65,536. Its dimensions/image/pixel limits fit,
+but the new full-level reservation refuses. Add a separately checked decoded
+level reservation with a layout/boundary regression; preserve the compressed
+input limit rather than raising it. The private replacement remains unaccepted.
+[Current evidence](whitepaper/results/batch-134-owned-zstd-checkpoint.json)
+retains every pair; [original diagnosis](whitepaper/results/batch-134-corpus-uploads-memory.json)
+retains the25 initial losses and storage-normalized control.
+
+### Open: batch 134 BC1/BC3 source quality and remaining targets
+
+The private discrete cluster-fit draft passes71 native tests before owned-range
+addition (72 afterward), and87/98 original-source BC1/BC3 pairs (1296 images,
+1296 old controls exact). The11 losses are published, not accepted. All11
+improve error against the actual decoded payload, but that diagnostic changes
+no color bar. Even zero added payload error loses7/98 original-source pairs;
+it is not a lower bound on source error for arbitrary encoders. Root work must
+stay generic and specification-derived, without hidden originals or file tuning.
+The full quality report and diagnostic are in the current evidence above.
+
+ETC1S BC7/ASTC/PVRTC, UASTC PVRTC and BC6H remain missing. ETC2/EAC GPU proof
+remains absent on RTX A6000 WebGPU; the AMD Vulkan upload attempt could not
+create an adapter because the native binding could not load vulkan-1.dll
+(Windows Error87). No ETC upload occurred. Public API/worker/final all-target
+corpus, fuzz, memory, upload and entry acceptance remain open; prebuilt retained.
 
 ### Resolved scalar bar: batch 134 source-reference mismatch (2026-11-09)
 

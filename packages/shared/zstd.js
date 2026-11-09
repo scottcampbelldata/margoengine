@@ -3,8 +3,7 @@
 // description; no other implementation was read. Dictionaries are refused with a coded error.
 import { margoError } from './errors.js';
 
-const damaged = (what) =>
-  new RangeError(`The Zstandard data is damaged (${what}); check that the file is complete.`);
+const damaged = (what) => new RangeError(`The Zstandard data is damaged (${what}); check that the file is complete.`);
 
 const MAX_BLOCK = 1 << 17;
 /** Output bytes between yields to the event loop, so an abort can land during a long decode. */
@@ -226,15 +225,7 @@ function readHuffman(data, at, end) {
 }
 
 /** Decodes one Huffman-coded stream of `size` literals into `out` at `to`. */
-function huffmanStream(
-  table,
-  data,
-  at,
-  length,
-  out,
-  to,
-  size,
-) {
+function huffmanStream(table, data, at, length, out, to, size) {
   const stream = new BackwardBits(data, at, length),
     { bits, symbol, length: lengths } = table;
   for (let i = 0; i < size; i++) {
@@ -252,11 +243,14 @@ let LL_PREDEFINED, ML_PREDEFINED, OF_PREDEFINED;
 /** Growable output with a hard limit. */
 class Output {
   length = 0;
-  constructor(limit) {
-    this.limit = limit;
-    this.bytes = new Uint8Array(Math.min(limit, 1 << 16));
+  constructor(limit, destination) {
+    this.limit = Math.min(limit, destination?.length ?? limit);
+    this.fixed = destination !== undefined;
+    this.capacity = destination?.length;
+    this.bytes = destination ?? new Uint8Array(Math.min(limit, 1 << 16));
   }
   reserve(extra) {
+    if (this.fixed && this.bytes.length !== this.capacity) throw damaged('a detached output destination');
     const need = this.length + extra;
     if (need > this.limit)
       throw new RangeError(
@@ -270,13 +264,7 @@ class Output {
 }
 
 /** Decodes the literals section of a compressed block; returns the literals and where the sequences start. */
-function readLiterals(
-  data,
-  at,
-  end,
-  state,
-  scratch,
-) {
+function readLiterals(data, at, end, state, scratch) {
   const b0 = data[at],
     type = b0 & 3,
     format = (b0 >> 2) & 3;
@@ -351,16 +339,7 @@ function readLiterals(
 }
 
 /** Picks the FSE table for one symbol type from its compression mode (RFC 8878 3.1.1.3.2.1). */
-function sequenceTable(
-  mode,
-  data,
-  at,
-  end,
-  previous,
-  predefined,
-  maxLog,
-  maxSymbol,
-) {
+function sequenceTable(mode, data, at, end, previous, predefined, maxLog, maxSymbol) {
   if (mode === 0) return [predefined(), 0];
   if (mode === 1) {
     if (at >= end) throw damaged('a missing RLE sequence symbol');
@@ -373,16 +352,7 @@ function sequenceTable(
 }
 
 /** Decodes one compressed block (RFC 8878 3.1.1.3) and appends it to `out`. */
-function compressedBlock(
-  data,
-  at,
-  end,
-  out,
-  frameStart,
-  window,
-  state,
-  scratch,
-) {
+function compressedBlock(data, at, end, out, frameStart, window, state, scratch) {
   const [literals, seqAt] = readLiterals(data, at, end, state, scratch);
   let p = seqAt;
   if (p >= end) throw damaged('a block without its sequences section');
@@ -498,7 +468,9 @@ function compressedBlock(
 
 /**
  * Decompresses Zstandard data (RFC 8878): one or more frames, skippable frames skipped, content checksums verified.
- * Dictionaries are not supported.
+ * Dictionaries are not supported. An optional destination is borrowed exclusively until the promise settles;
+ * do not resize, transfer, detach or grow its Wasm memory meanwhile. Its capacity is an additional output limit.
+ * Returns a view of the written prefix with no output allocation/copy. On rejection its contents are unspecified.
  * @throws TypeError when `input` is not bytes; RangeError for damaged or truncated data, a failed checksum, a frame
  * window above `maxWindowSize` or output above `maxOutputSize`; MargoError `unsupported` for a frame that needs a
  * dictionary.
@@ -507,12 +479,21 @@ function compressedBlock(
  */
 export async function decompressZstd(input, options = {}) {
   if (!(input instanceof Uint8Array)) throw new TypeError('Expected Zstandard bytes as a Uint8Array');
-  const { signal, maxOutputSize = 1 << 28, maxWindowSize = 1 << 27 } = options;
+  const { signal, maxOutputSize = 1 << 28, maxWindowSize = 1 << 27, destination } = options;
+  if (destination !== undefined && !(destination instanceof Uint8Array))
+    throw new TypeError('Expected a Zstandard destination as a Uint8Array');
+  if (
+    destination &&
+    input.buffer === destination.buffer &&
+    input.byteOffset < destination.byteOffset + destination.length &&
+    destination.byteOffset < input.byteOffset + input.length
+  )
+    throw new RangeError('Zstandard input and destination overlap; use separate byte ranges.');
   if (!(maxOutputSize >= 0) || !(maxWindowSize >= 0))
     throw new RangeError('maxOutputSize and maxWindowSize must be 0 or more bytes; pass byte counts.');
   signal?.throwIfAborted();
   const data = input,
-    out = new Output(maxOutputSize),
+    out = new Output(maxOutputSize, destination),
     scratch = new Uint8Array(MAX_BLOCK);
   let at = 0,
     nextYield = YIELD_EVERY;
@@ -614,7 +595,11 @@ export async function decompressZstd(input, options = {}) {
       if (xxh64Low(out.bytes, frameStart, out.length) !== expected) throw damaged('a content checksum mismatch');
     }
   }
-  return out.bytes.length === out.length ? out.bytes : out.bytes.slice(0, out.length);
+  return out.fixed
+    ? out.bytes.subarray(0, out.length)
+    : out.bytes.length === out.length
+      ? out.bytes
+      : out.bytes.slice(0, out.length);
 }
 
 // xxHash64 (seed 0) on 32-bit halves; each 64-bit operation leaves its result in rh:rl.

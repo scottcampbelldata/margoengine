@@ -10,6 +10,20 @@ metadata failures corrected and all seven affected checks passing; it was not re
 +13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
 retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
 
+## Owned Zstd storage regression
+
+From the repository root, run the example in
+[the shared helper README](../../packages/shared/README.md), then:
+
+```sh
+node --test --test-timeout=120000 packages/decoders/tests/zstd-destination.test.js
+```
+
+The ordinary splats Zstd corpus tests additionally exercise existing allocating
+behavior after a package build. The destination regression records allocation
+sizes, not wall-clock speed. Keep the private Basis173-pair RSS campaign and
+remaining-format source-quality losses separate from this helper's proof.
+
 
 ## Batch 134 corpus, upload and memory continuation
 

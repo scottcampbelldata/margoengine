@@ -10,6 +10,30 @@ metadata failures corrected and all seven affected checks passing; it was not re
 +13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
 retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
 
+## Batch 134 current private evidence limits
+
+The [owned-storage checkpoint](results/batch-134-owned-zstd-checkpoint.json)
+retains51 primary fuzz seeds and17,908 historical-target calls on the current
+Wasm. Separate new BC/scalar/range probes make172,056 ABI calls and756
+container calls, with coded refusals and six post-failure controls. All173
+accepted scalar memory outputs remain exact; two strict RSS losses stay open.
+BC1/BC3 source-quality87/98 is incomplete, not a replacement acceptance claim.
+No ETC2/EAC hardware upload, final all-target or timing claim follows.
+
+
+## Bounded caller-owned Zstd output
+
+The internal shared Zstd reader accepts an optional exclusive destination.
+Its returned prefix shares the supplied buffer. A four-MiB regression records
+no output-sized allocation, preserves canaries and verifies exact output;
+additional cases cover concatenated and unknown-size frames, checksums,
+truncation, limits, dictionaries, cancellation and Wasm view detachment.
+The previous implementation fails these destination regressions. Existing
+allocating callers retain their behavior. This proves storage ownership and
+copy removal, not a timing result or final Basis RSS acceptance.
+See [the helper contract and runnable example](../../packages/shared/README.md)
+and `packages/decoders/tests/zstd-destination.test.js`.
+
 
 ## Batch 134 current-Wasm corpus, hostile input and uploads
 
