@@ -193,6 +193,22 @@ try {
     console.log(`ok ${name}: lights ${r.header.join(',')} depth ${r.depthGot.map((v) => v.toFixed(5)).join(' ')}`);
   }
   {
+    const name = 'shadow far',
+      r = await page.evaluate(() => window.checkShadowFar());
+    report.results[name] = r;
+    clean(r, name);
+    for (const sample of r.samples) {
+      assert.equal(sample.error, null, name);
+      assert.ok(
+        Math.abs(sample.got - sample.want) < 1e-4,
+        `${name} centre ${sample.center}: got ${sample.got} want ${sample.want}`,
+      );
+    }
+    console.log(
+      `ok ${name}: ${r.samples.map((sample) => `${sample.center} ${sample.got.toFixed(5)}`).join(' ')}`,
+    );
+  }
+  {
     const name = 'nodes',
       r = await page.evaluate(() => window.checkNodes());
     report.results[name] = r;

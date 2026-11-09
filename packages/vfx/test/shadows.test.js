@@ -53,7 +53,10 @@ test('shadows packs lights in slot order and draws sphere impostors, without pat
   const simulation = codes.find((code) => code.includes('fn update('));
   assert.equal(simulation.includes('particleShadows'), false);
   assert.ok(codes.some((code) => code.includes('fn pack(') && code.includes('fn prefix(')));
-  assert.ok(codes.some((code) => code.includes('@builtin(frag_depth)') && code.includes('sqrt(max(0.0,1.0-d))')));
+  const depth = codes.find((code) => code.includes('@builtin(frag_depth)'));
+  assert.ok(depth.includes('sqrt(max(0.0,1.0-d))'));
+  assert.match(depth, /back>=0\.0&&front<=1\.0/);
+  assert.match(depth, /select\(clip\.z,kept\*clip\.w,overlaps&&outside\)/);
   let drawn = 0;
   source.drawShadow({
     cascade: 0,

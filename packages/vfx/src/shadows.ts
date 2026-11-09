@@ -16,7 +16,9 @@ declare const GPUMapMode: { READ: number };
  * Hoffman, Real-Time Rendering, 4th ed., 2018, billboard impostors). Under the cascade's orthographic matrix the
  * front of a sphere is centerZ - sqrt(r^2 - x^2 - y^2) (elementary geometry). Reeves, "Particle Systems", SIGGRAPH
  * 1983, draws particles as their own primitives. The map's receiver bias stays in the shadow pass; this writes
- * geometric depth.
+ * geometric depth. WebGPU clips a primitive whose clip z is outside [0, w] (WebGPU spec, primitive clipping). The
+ * quad therefore sits inside that interval whenever the sphere's depth interval meets [0, 1], so a centre past the
+ * far plane does not drop a front that is still in range. The fragment still writes the geometric depth.
  *
  * Lights: the first `count` live slots, in slot order, become point lights. The order is an inclusive workgroup
  * scan (Blelloch, "Prefix Sums and Their Applications", CMU-CS-90-190, 1990; Harris, Sengupta and Owens, "Parallel
@@ -85,11 +87,19 @@ struct ShadowVary {@builtin(position) clip:vec4f,@location(0) local:vec2f,@locat
   let sx=length(vec3f(shadowMatrix[0].x,shadowMatrix[1].x,shadowMatrix[2].x));
   let sy=length(vec3f(shadowMatrix[0].y,shadowMatrix[1].y,shadowMatrix[2].y));
   let sz=length(vec3f(shadowMatrix[0].z,shadowMatrix[1].z,shadowMatrix[2].z));
+  let depthRadius=radius*sz;
+  let centerZ=clip.z/max(abs(clip.w),1e-20);
+  let front=centerZ-depthRadius;
+  let back=centerZ+depthRadius;
+  let overlaps=clip.w>0.0&&back>=0.0&&front<=1.0;
+  let outside=centerZ<0.0||centerZ>1.0;
+  let kept=clamp(centerZ,1e-4,1.0-1e-4);
+  let z=select(clip.z,kept*clip.w,overlaps&&outside);
   let local=corners[v];
-  o.clip=select(vec4f(clip.xy+local*vec2f(radius*sx,radius*sy)*clip.w,clip.z,clip.w),vec4f(0.0,0.0,0.0,1.0),dead);
+  o.clip=select(vec4f(clip.xy+local*vec2f(radius*sx,radius*sy)*clip.w,z,clip.w),vec4f(0.0,0.0,0.0,1.0),dead);
   o.local=local;
-  o.centerZ=select(clip.z/max(abs(clip.w),1e-20),0.0,dead);
-  o.depthRadius=radius*sz;
+  o.centerZ=select(centerZ,0.0,dead);
+  o.depthRadius=depthRadius;
   return o;
 }
 @fragment fn fragment(i:ShadowVary)->@builtin(frag_depth) f32 {

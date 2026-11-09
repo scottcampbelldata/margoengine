@@ -68,6 +68,19 @@ try {
     `ok shadows webgl2: lights ${shadows.header.join(',')} depth ${shadows.depthGot.map((v) => v.toFixed(5)).join(' ')}`,
   );
 
+  const far = await page.evaluate(() => window.checkShadowFar());
+  clean(far, 'shadow far');
+  for (const sample of far.samples) {
+    assert.equal(sample.error, null, 'shadow far');
+    assert.ok(
+      Math.abs(sample.got - sample.want) < 1e-4,
+      `shadow far centre ${sample.center}: got ${sample.got} want ${sample.want}`,
+    );
+  }
+  console.log(
+    `ok shadow far webgl2: ${far.samples.map((sample) => `${sample.center} ${sample.got.toFixed(5)}`).join(' ')}`,
+  );
+
   const nodes = await page.evaluate(() => window.checkNodes());
   clean(nodes, 'nodes');
   assert.deepEqual(nodes.mismatches, [], JSON.stringify(nodes));
