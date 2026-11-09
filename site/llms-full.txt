@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-612). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-613). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3630,6 +3630,10 @@ Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 
 Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Directions must be independent. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
 
 LIM-610: Node full yaw/elevation/roll basis and lifecycle checks, and real browser PCM on all three routes for generated independent-channel tones/loops and a licensed external rain-stimulus excerpt, each within 1e-6 of float64 channel matrices with zero GPU errors. First four channels of the CC BY 4.0 external 64-channel file are interpreted as ACN/SN3D; this proves file decoding and matrix routing, not a microphone chain or verified acoustic capture. XR apps feed headset world forward/up through existing listener.setPose; physical headset tracking, subjective localization, other browsers/devices and performance unmeasured.
+
+## WFC overlapping pins and ground (batch 69)
+
+Optional wfc/overlapping: 2,451 B min+gzip, peers external. Existing N 2..5, 4096-pattern and cells times patterns <= 4,194,304 limits remain. Pins are exact finite sample values at output pixels; ground fixes 1..height bottom rows (default 1), and may appear elsewhere. Periodic wrapping includes all covering pattern offsets even when output dimensions are smaller than N. Conflicts are unsatisfiable, with bounded failure rather than altered pixels. No connected-layout guarantee. CPU only on both WebGPU and WebGL2; browser checks create real contexts, solve and test coded contradictions. LIM-613: synthetic binary/maze samples, no authored level or hardware performance claim. Abort checkpoints are synchronous; use a worker for in-flight event cancellation.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -9109,7 +9113,7 @@ const cells = generator.solve(123);
 
 Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; connectivity belongs in the tile rules and caller validation.
 
-## Overlapping model (`@margoengine/wfc/overlapping`, 1.9 kB min+gzip)
+## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
 
 Learns N x N patterns from a sample image and generates outputs in which every N x N window appears in the sample.
 
@@ -9130,12 +9134,36 @@ attempt restarts from scratch with the seed stream continuing; when the attempts
 bounded by the budgets, so an unsatisfiable sample fails instead of hanging (the tests run one in a child process with a
 timeout). A 7 x 7 maze sample with `symmetry: 1` fails every seed without backtracking and solves them all with it.
 Limits: at most 4096 patterns and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
-min-entropy scan is O(cells) per choice, fine to about 128 x 128; no ground/pinning constraints yet; CPU only.
+min-entropy scan is O(cells) per choice, fine to about 128 x 128; CPU only; works identically beside WebGPU and WebGL2 (tested in a real browser).
 Example: `examples/overlapping.html`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/wfc
+
+
+## Fixed entrances and floors
+
+Overlapping pins use output pixel coordinates and original sample values. Every covering pattern is restricted before
+search, including the final N-1 pixels and periodic seams; backtracking cannot undo those restrictions.
+
+```ts
+import {OverlappingModel} from '@margoengine/wfc/overlapping';
+const model = new OverlappingModel({data: [0,0,0,0], width: 2, height: 2}, {N: 2});
+const image = model.solve(16, 12, {
+  seed: 7,
+  pins: [{position: [15, 0], value: 0}],
+  ground: {value: 0, rows: 2},
+});
+console.log(image[15], image.at(-1));
+```
+
+Defaults: pins empty, ground absent, ground.rows 1, signal absent. Ground fixes the bottom image rows, and does not
+forbid the value elsewhere. Pins and ground may coexist; conflicts or values absent from the sample exhaust the bounded
+search and throw coded failed with a help link. Invalid coordinates/rows throw RangeError. A pre-aborted AbortSignal
+throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
+or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
+Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.
 
 === @margoengine/splines (packages/splines/README.md) ===
 

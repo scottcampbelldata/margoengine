@@ -1886,3 +1886,7 @@ Audio/zones routes additional wet sends to existing mixer/reflections effects an
 ### Ambisonic-bed evidence (batch 110, section 5)
 
 Audio/ambisonics keeps four components discrete through a splitter and eight gain paths into two virtual cardioids, rotating decoder directions by listener pose and inverse field quaternion. No renderer/core/stage changes, worklet or convolution. LIM-610 and whitepaper/results/audio-ambisonics-20261108.json record real browser sample-reference PCM beside WebGPU, native WebGL2 and compatibility WebGL2, including generated looping components plus decoding/resampling of a licensed external rain stimulus. CPU tests additionally cover full orientation bases and lifecycle. Real headset tracking, HRTF localization, subjective quality and speed remain unmeasured.
+
+### WFC unary output constraints (batch 69)
+
+Overlapping pins/ground remove incompatible pattern domains at every covering origin before search. Initial bans are below all decision trail marks; retries rebuild them. Section 5 evidence: generated binary/maze Node tests and the wfc browser check on real WebGPU and WebGL2 contexts. No GPU maths, shaders or device capability requirement; no authored-level, cross-vendor or timing evidence yet.

@@ -20,6 +20,15 @@ export interface OverlappingSolveOptions {
   /** The output wraps around its edges (default false). */ periodic?: boolean;
   /** Backtracks allowed per attempt before restarting, 0..100,000 (default 1000). */ backtracks?: number;
   /** Fresh starts after a failed attempt, 1..64 (default 4). */ attempts?: number;
+  /** Fixed output pixels, including pixels on the final N-1 rows/columns (default none). */ pins?: readonly PixelPin[];
+  /** Fix the bottom `rows` image rows to one sample value (default absent; rows defaults to 1). */
+  ground?: { readonly value: number; readonly rows?: number };
+  /** Abort before solving or at a propagation/observation checkpoint (default absent). */ signal?: AbortSignal;
+}
+/** One fixed pixel in output coordinates, not pattern-origin coordinates. */
+export interface PixelPin {
+  /** Integer [x, y] inside the output image. */ readonly position: readonly [number, number];
+  /** Original sample value, not an internal palette or pattern index. */ readonly value: number;
 }
 /** What the last `solve` did. */
 export interface OverlappingStats {
@@ -124,7 +133,15 @@ export class OverlappingModel {
   solve(
     width: number,
     height: number,
-    { seed = 1, periodic = false, backtracks = 1000, attempts = 4 }: OverlappingSolveOptions = {},
+    {
+      seed = 1,
+      periodic = false,
+      backtracks = 1000,
+      attempts = 4,
+      pins = [],
+      ground,
+      signal,
+    }: OverlappingSolveOptions = {},
   ): Float64Array {
     const N = this.N,
       T = this.patterns,
@@ -148,6 +165,24 @@ export class OverlappingModel {
       throw new RangeError(
         'Invalid WFC output size or solve options; use an integer output size and attempts from 1 to 64',
       );
+    for (const pin of pins)
+      if (
+        pin.position.length !== 2 ||
+        pin.position.some((v, axis) => !Number.isInteger(v) || v < 0 || v >= [width, height][axis]) ||
+        !Number.isFinite(pin.value)
+      )
+        throw new RangeError('Invalid overlapping pin; use an output pixel inside the image and a finite sample value');
+    if (
+      ground &&
+      (!Number.isFinite(ground.value) ||
+        !Number.isInteger(ground.rows ?? 1) ||
+        (ground.rows ?? 1) < 1 ||
+        (ground.rows ?? 1) > height)
+    )
+      throw new RangeError(
+        'Invalid ground rows; use a finite sample value and an integer row count from 1 to output height',
+      );
+    signal?.throwIfAborted();
     const { weights, weightLogs, propagator } = this,
       wave = new Uint8Array(cells * T),
       compatible = new Int32Array(cells * T * 4),
@@ -185,6 +220,7 @@ export class OverlappingModel {
       if (--counts[i] === 0) contradiction = true;
     };
     const propagate = (): boolean => {
+      signal?.throwIfAborted();
       while (stack.length && !contradiction) {
         const e = stack.pop()!,
           i = Math.floor(e / T),
@@ -233,6 +269,23 @@ export class OverlappingModel {
       for (let i = 0; i < cells; i++)
         for (let t = 0; t < T; t++)
           for (let d = 0; d < 4; d++) compatible[(i * T + t) * 4 + d] = propagator[(d + 2) % 4][t].length;
+      // Restrict every pattern covering a fixed pixel. Restricting only its origin loses far-edge pixels and can
+      // allow an overlapping neighbour to contradict a pin. These bans precede every decision and survive undo.
+      const fix = (x: number, y: number, value: number) => {
+        const color = this.colors.indexOf(value);
+        for (let dy = 0; dy < N; dy++)
+          for (let dx = 0; dx < N; dx++) {
+            const cx = periodic ? (((x - dx) % FW) + FW) % FW : x - dx,
+              cy = periodic ? (((y - dy) % FH) + FH) % FH : y - dy;
+            if (cx < 0 || cx >= FW || cy < 0 || cy >= FH) continue;
+            const i = cx + cy * FW;
+            for (let t = 0; t < T; t++) if (wave[i * T + t] && this.pixels[t][dx + dy * N] !== color) ban(i, t);
+          }
+      };
+      for (const pin of pins) fix(pin.position[0], pin.position[1], pin.value);
+      if (ground)
+        for (let y = height - (ground.rows ?? 1); y < height; y++)
+          for (let x = 0; x < width; x++) fix(x, y, ground.value);
       // Patterns with no partner in some direction can never sit next to a neighbour there.
       for (let i = 0; i < cells; i++)
         for (let t = 0; t < T; t++)
@@ -278,7 +331,7 @@ export class OverlappingModel {
     }
     throw new MargoError(
       'failed',
-      'WFC contradicted within the backtrack and attempt budget; raise backtracks or attempts, or try another seed',
+      'WFC contradicted within the backtrack and attempt budget; check pins/ground, raise backtracks or attempts, or try another seed. Help: https://margoengine.com/docs/wfc',
     );
   }
 

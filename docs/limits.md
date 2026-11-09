@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-612). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-613). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1043,3 +1043,7 @@ Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 
 Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Directions must be independent. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
 
 LIM-610: Node full yaw/elevation/roll basis and lifecycle checks, and real browser PCM on all three routes for generated independent-channel tones/loops and a licensed external rain-stimulus excerpt, each within 1e-6 of float64 channel matrices with zero GPU errors. First four channels of the CC BY 4.0 external 64-channel file are interpreted as ACN/SN3D; this proves file decoding and matrix routing, not a microphone chain or verified acoustic capture. XR apps feed headset world forward/up through existing listener.setPose; physical headset tracking, subjective localization, other browsers/devices and performance unmeasured.
+
+## WFC overlapping pins and ground (batch 69)
+
+Optional wfc/overlapping: 2,451 B min+gzip, peers external. Existing N 2..5, 4096-pattern and cells times patterns <= 4,194,304 limits remain. Pins are exact finite sample values at output pixels; ground fixes 1..height bottom rows (default 1), and may appear elsewhere. Periodic wrapping includes all covering pattern offsets even when output dimensions are smaller than N. Conflicts are unsatisfiable, with bounded failure rather than altered pixels. No connected-layout guarantee. CPU only on both WebGPU and WebGL2; browser checks create real contexts, solve and test coded contradictions. LIM-613: synthetic binary/maze samples, no authored level or hardware performance claim. Abort checkpoints are synchronous; use a worker for in-flight event cancellation.

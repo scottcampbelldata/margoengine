@@ -7,7 +7,7 @@ export class OverlappingModel {
     readonly patterns: number;
     readonly stats: OverlappingStats;
     constructor(sample: Sample, { N, periodicInput, symmetry }?: OverlappingOptions);
-    solve(width: number, height: number, { seed, periodic, backtracks, attempts }?: OverlappingSolveOptions): Float64Array;
+    solve(width: number, height: number, { seed, periodic, backtracks, attempts, pins, ground, signal }?: OverlappingSolveOptions): Float64Array;
 }
 
 export interface OverlappingOptions {
@@ -21,11 +21,22 @@ export interface OverlappingSolveOptions {
     periodic?: boolean;
     backtracks?: number;
     attempts?: number;
+    pins?: readonly PixelPin[];
+    ground?: {
+        readonly value: number;
+        readonly rows?: number;
+    };
+    signal?: AbortSignal;
 }
 
 export interface OverlappingStats {
     backtracks: number;
     attempts: number;
+}
+
+export interface PixelPin {
+    readonly position: readonly [number, number];
+    readonly value: number;
 }
 
 export interface Sample {

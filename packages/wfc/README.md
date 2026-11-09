@@ -12,7 +12,7 @@ const cells = generator.solve(123);
 
 Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; connectivity belongs in the tile rules and caller validation.
 
-## Overlapping model (`@margoengine/wfc/overlapping`, 1.9 kB min+gzip)
+## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
 
 Learns N x N patterns from a sample image and generates outputs in which every N x N window appears in the sample.
 
@@ -33,10 +33,33 @@ attempt restarts from scratch with the seed stream continuing; when the attempts
 bounded by the budgets, so an unsatisfiable sample fails instead of hanging (the tests run one in a child process with a
 timeout). A 7 x 7 maze sample with `symmetry: 1` fails every seed without backtracking and solves them all with it.
 Limits: at most 4096 patterns and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
-min-entropy scan is O(cells) per choice, fine to about 128 x 128; no ground/pinning constraints yet; CPU only.
+min-entropy scan is O(cells) per choice, fine to about 128 x 128; CPU only; works identically beside WebGPU and WebGL2 (tested in a real browser).
 Example: `examples/overlapping.html`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/wfc
 
+
+## Fixed entrances and floors
+
+Overlapping pins use output pixel coordinates and original sample values. Every covering pattern is restricted before
+search, including the final N-1 pixels and periodic seams; backtracking cannot undo those restrictions.
+
+```ts
+import {OverlappingModel} from '@margoengine/wfc/overlapping';
+const model = new OverlappingModel({data: [0,0,0,0], width: 2, height: 2}, {N: 2});
+const image = model.solve(16, 12, {
+  seed: 7,
+  pins: [{position: [15, 0], value: 0}],
+  ground: {value: 0, rows: 2},
+});
+console.log(image[15], image.at(-1));
+```
+
+Defaults: pins empty, ground absent, ground.rows 1, signal absent. Ground fixes the bottom image rows, and does not
+forbid the value elsewhere. Pins and ground may coexist; conflicts or values absent from the sample exhaust the bounded
+search and throw coded failed with a help link. Invalid coordinates/rows throw RangeError. A pre-aborted AbortSignal
+throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
+or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
+Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.

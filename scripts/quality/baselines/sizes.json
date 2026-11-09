@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11494416,
+  "total": 11494864,
   "history": [
     {
       "date": "2026-10-24",
@@ -4856,6 +4856,12 @@
       "commit": "0a699ad2c",
       "reason": "scatter imposter entry, lod imposterShader export",
       "grew": 3
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "7bc32a1cb",
+      "reason": "WFC-pixel-pins-and-ground-restrict-all-covering-patterns",
+      "grew": 1
     }
   ],
   "items": {
@@ -5720,7 +5726,7 @@
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/webgl2-compat/xr": 103981,
     "@margoengine/wfc": 1878,
-    "@margoengine/wfc/overlapping": 2259,
+    "@margoengine/wfc/overlapping": 2707,
     "@margoengine/worker": 2128,
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 8967,
