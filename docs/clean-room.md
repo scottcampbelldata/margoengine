@@ -3536,3 +3536,19 @@ published decimal rows without 8-bit quantization or custom delta coding.
 The BIDS container is parsed only for the four data arrays; PLOS S2 is numeric
 data. No companion implementation is used. Comparison research, source
 hashes, precision boundaries and regression proofs: [size restoration](size-restore.md).
+### Batch 273 compatibility failure 6: optional clip-distance coverage
+
+Before editing, compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/#clip-distances (optional feature and primitive
+clipping); Alan Baker, Mehmet Oguz Derin and David Neto, WebGPU Shading Language
+(2026), https://www.w3.org/TR/WGSL/#clip-distances (signed half-spaces);
+Robert J. Simpson (editor), The OpenGL ES Shading Language 3.00, revision 6
+(2016), https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf
+(section 6.4: discard writes no buffers); and Alexander V. Popov, An Efficient
+Depth Linearization Method for Oblique View Frustums (2016),
+https://jcgt.org/published/0005/04/03/paper.pdf (sections 1 and 4).
+Optional rasterizer clipping and fragment discard have different edge coverage;
+an oblique projection would change the depth contract rather than test the
+existing fallback. Keep the native rasterizer checks and independently require
+the compatibility device to use discard, with the same plane, depth, shadow,
+instancing and live-switch pixel bars. No companion or rival source was read.
