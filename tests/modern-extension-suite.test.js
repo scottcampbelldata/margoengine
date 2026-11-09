@@ -123,3 +123,10 @@ test('every browser suite of this repo is in a check or in NOT_IN_CHECKS with a 
   }
   for (const name of ['modern:test:sky', 'modern:test:finalization', 'test:tokyo']) assert.ok(name in ROOT, name);
 });
+
+test('the compute scene-owner regression is a scheduled standalone real-GPU leaf', () => {
+  const owner = plan().find((item) => item.label === 'compute test:gpu:owners');
+  assert.ok(owner);
+  assert.equal(owner.cwd, 'packages/compute');
+  assert.equal(owner.command, 'cd ../.. && node packages/compute/tests/scene-owner-browser.mjs');
+});

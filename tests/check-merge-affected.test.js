@@ -32,6 +32,8 @@ import { umbrellaChangeIsReexportOnly } from '../scripts/support/umbrella-change
 import { demos } from '../scripts/support/visual-demos.js';
 
 const root = resolve(import.meta.dirname, '..');
+// Complete asynchronous setup before registering any test that can read this binding.
+const ctx = await planContext(root);
 const ws = (name, deps = []) => ({ name, dir: `packages/${name}`, deps });
 // a <- b <- c, d alone; x depends on a too.
 const graph = [ws('a'), ws('b', ['a']), ws('c', ['b']), ws('d'), ws('x', ['a'])];
@@ -354,7 +356,7 @@ test('documents, site pages and licences change nothing on the GPU; a catalog as
 
 // ---- The real repository. ----
 const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-const ctx = await planContext(root);
+
 const { workspaces, tests, steps, browserFiles } = ctx;
 const real = ctx.footprints;
 const closure = ctx.matrix;
