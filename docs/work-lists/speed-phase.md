@@ -276,3 +276,16 @@ once rather than 100 times. Horizontal micro misses read 3,200 rather than
 and all correctness cases run by default. The optional model latency loop needs
 --time and belongs to the quiet speed phase after Scott ends the build phase.
 No elapsed speed win or accepted slowdown is claimed from these work counts.
+
+## Batch 134 retained timing proof
+
+Scott's 2026-11-10 build-phase ruling defers benchmarks, paired wall-clock A/Bs and timing-only assertions until
+he starts the speed phase. Correctness evidence and deterministic work counts continue; correctness GPU gates use
+shared locks. Retain historical timing records, without treating them as fresh acceptance evidence.
+
+| Work | Evidence retained | Timing proof still owed before release |
+|---|---|---|
+| Batch 134 clean-room Basis replacement | Existing prebuilt baseline, active 51-file corpus, 699 served file/target pairs and 9,491 image hashes; private replacement remains incomplete. No new wall-clock A/B was run in this continuation. | Interleaved old/new cold and warm per-file/per-target rounds with per-round minima and spread; isolated compile, instantiate, startup and first-call timings; match or beat each required old target. Run only when Scott ends the build phase. |
+
+Raw/gzip entry and Wasm size, peak memory, exact output, source-quality, hostile-input and GPU correctness bars
+remain required. The deferred timing work does not mark Batch 134 jobs 2-5 complete or authorize prebuilt removal.

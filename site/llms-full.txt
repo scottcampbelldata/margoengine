@@ -4931,6 +4931,16 @@ fragment-stage storage buffers and recommends weighted OIT. The base OIT check
 passes first. Review the advertised storage capabilities, the existing documented
 ExactOIT limit, and its refusal/help contract before changing either test or route.
 
+### Voxel browser gate revalidation pending after the Chromium repair (2026-11-09)
+
+The earlier voxel GPU run passed render, bevel, lighting, LOD and coloured-light
+assertions, then failed closing `light-rgb-browser-check.mjs` with
+`SHUTDOWN_TIMEOUT`, still open: browser, at the unchanged30,000ms budget.
+The owning helper-program cause is fixed by cf699846f (above), now fetched on
+origin/main. The full voxel GPU and README gates must pass after rebase before
+the separately tested memory-admission fix lands. The historical13,548-test
+verify and250 voxel CPU passes do not establish repaired browser acceptance.
+
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
 ChildProcess `exit` does not establish that its stdio has closed. The shared
