@@ -1850,3 +1850,7 @@ The existing studio CPU/value GPU tests and new staging composition variant pass
 WebGL2 compatibility, including contact removal and actual replacement-device recovery. No new
 defect was exposed by this scoped audit. Distant image lighting and native WebGL2 exclusion remain
 documented limits; the independent batch 168 physical contact-shadow picture loss remains open.
+
+### Batch 65 job 1 audit
+
+Fixed during feature validation: extreme UV scales could return Infinity and narrow distant roads could return collapsed float32 faces. The entry now rejects both at the storage boundary. packages/road/test/junction-precision.test.js fails without these checks and passes with them. No open road-junction defect remains in the bounded planar contract. Graded junctions, curbs and overpasses are explicit design limits in limits.md, not implemented capabilities. Unit and GPU tests cover crossings, T junctions, a courtyard, hostile inputs, aborts, ownership, device reboot and disposal.

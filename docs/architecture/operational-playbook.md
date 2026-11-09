@@ -2426,3 +2426,7 @@ and pack4x8unorm into storage, since supplied textures promise sampling rather t
 COPY_SRC. No rendering or core/stage code changes. The solid-colour density controls
 remain; these outside solid-colour patterns add upload conformance, not production
 texture quality, nonuniform authored-image evidence or speed measurements.
+
+### Batch 65 job 1: at-grade road junctions
+
+The optional road/junctions entry lazily loads existing polygon strokes, polygon union, shape triangulation and geometry transforms. Union precedes triangulation, so crossings and T junctions have one surface, including holes. Core and stage are unchanged. Section 5 evidence: road/test/junction-precision.test.js rejects float32 face collapse and UV overflow; road/test/junctions.test.js checks analytic area, half-open triangle coverage, winding, normals, UVs, ownership, extremes and abort boundaries. road/test/browser-check.mjs draws the result on native WebGPU and real WebGL2 compatibility, checks five interior pixels and a clear exterior, then exact reboot pixels and double disposal. Generated roads are stand-ins; no surveyed-road, graded-junction, curb, performance or other-hardware claim is made.

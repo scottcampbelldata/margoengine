@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-632). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-633). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1477,3 +1477,7 @@ production-scene, elapsed-time or SIMD claim. Cached edge roots have four cell u
 per solve, a deterministic reduction in root work with identical Hermite data.
 Entry JS is 1,559 B gzip (new ceiling 1,815 B); sdf.wasm is 40,594 B raw /
 17,183 B gzip. Core plus stage is unchanged at 23,797 B gzip, strictly below 25,000 B.
+
+### Batch 65 job 1: road junction surface (LIM-633)
+
+The optional road/junctions entry is 1021 B min+gzip with bare package imports external. Polygon, triangulation and geometry utility dependencies load only on invocation and are additional downloads. Core plus stage remains below 25,000 B. Supports 1..64 constant-elevation roads and at most 4096 total points, width above 0 through 1000 m, coordinates/elevation within +/-1,000,000 m, bevel joins and butt caps. Geometry's shared snap grid is about 2^26 steps across the footprint; sub-two-step features may vanish. Output positions are float32; triangles that collapse or reverse at that precision reject with a coded help-linked error, as do UV scales that overflow float32. No grades, curb stitching, civil turn radii or overpass classification. Aborts are checked around lazy imports, not during synchronous polygon work. Native WebGPU and WebGL2 compatibility pixel/lifecycle checks use generated roads only; no speed or surveyed-geometry claim.

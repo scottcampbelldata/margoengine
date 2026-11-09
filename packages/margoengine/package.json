@@ -2354,6 +2354,10 @@
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"
     },
+    "./road/junctions": {
+      "types": "./dist/road/junctions.d.ts",
+      "import": "./dist/road/junctions.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

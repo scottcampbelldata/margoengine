@@ -1873,3 +1873,7 @@ standard test asset, with Cesium CC-BY-4.0 attribution through supply-chain.mjs.
 The private CAD API checkout was absent and the supplied private repository URL
 returned HTTP 404; no supported API could be inspected or reused. This isolated
 implicit polygon mesher adds no boundary-representation tooling or paid package.
+
+## Batch 65 job 1: road junction surfaces
+
+A wide paper search preceded implementation. Wang et al., [Automatic Generation of Large-scale 3D Road Networks based on GIS Data (2021), section 3.2](https://arxiv.org/html/2103.08275), separates reference axes, intersection boundaries and links. Cura, Perret and Paparoditis, [StreetGen (2018), sections 2.3 and 2.5](https://arxiv.org/html/1801.05741), separates road sections, intersections and their surface union. Margo combines these descriptions as constant-elevation stroked polylines united before triangulation, reusing its own geometry/polygon, extrude and utils APIs. This does not implement either paper's full civil-engineering model. Only papers and existing Margo code were read; no foreign source was opened or adapted. New work orchestrates existing polygon/triangulation kernels, rather than introducing a CPU-heavy geometry solver. The private CAD API was inspected; boundary-representation tooling is unnecessary for planar surface union and is not a dependency.

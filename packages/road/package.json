@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./junctions": {
+      "types": "./dist/junctions.d.ts",
+      "import": "./dist/junctions.js"
     }
   },
   "files": [
@@ -36,7 +40,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/splines": "^1.0.0"
+    "@margoengine/splines": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
@@ -44,6 +49,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js road",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "node test/browser-check.mjs"
   }
 }
