@@ -37,3 +37,13 @@ gate itself. These papers motivate the design; repository tests supply its proof
 The restart forbids speed and timing tests and assigns teardown to lane-T.
 No new timing result is claimed. Historical native evidence is retained; current
 correctness gates and their outstanding results are recorded separately.
+
+
+Integration review: mainline added SciRenderer's explicit native WebGL2 route.
+Following the WebGL specification and conservative review method above, the
+source gate records its one backend branch with webgl2.test.js as the unit
+witness, plus webgl2-browser.mjs for actual native/preview pixel and recovery
+proof. The default Figure still refuses without a supplied native driver.
+preview-contract.test.js proves that an unreviewed SciRenderer fails the gate,
+its reviewed branch passes, and an added backend guard requires review again.
+No renderer or refusal is removed and no arbitrary GPU-only route is allowed.

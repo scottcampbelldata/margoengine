@@ -3745,3 +3745,23 @@ coordination-path pointer. The pointer is reworded in its owning report, retaini
 the existing no-private-paths regression unchanged. The final focused regression
 and metadata run validates that repair; no full-verify pass is substituted for
 this recorded result. Package/browser/README proofs above remain unchanged.
+
+
+The final mainline rebase adds a real native sciviz backend. The preview contract
+gate now records SciRenderer's existing single backend branch and its native
+rendering regressions. Without that review the conservative source gate rejects
+it; an additional backend guard invalidates the review count. Default GPU-only
+attachment still refuses without the explicit fallback. This is source-gate
+integration for the existing route, not a new renderer feature or relaxed test.
+
+
+The final source-gate integration passes 326 focused tests with zero failures or
+skips, including all compatibility, DOF and LOD unit tests, native sciviz route
+checks, paired size/network records and the unchanged clone-path regression.
+The actual sciviz native-WebGPU/native-WebGL2 pixel and recovery command passes
+with its original all-pixel bounds. Fresh preview-contract runs pass in both
+outer modes, and the additional compatibility README gate passes all 12 examples.
+Lint, hygiene, quality, API (889 entries/8,643 exports), documentation, README types,
+preview source contract and size gates pass. The full verify's earlier one-doc
+failure and its precise repair remain recorded above. Durable summary:
+whitepaper/results/preview-contract-landing-20261109.json (relative to docs).

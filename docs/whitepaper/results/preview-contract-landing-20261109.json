@@ -1,0 +1,58 @@
+{
+  "scope": "Preview attachment contract and compatibility continuation",
+  "coreStageSourceChanged": false,
+  "coreStageGzip": 23924,
+  "api": {
+    "entries": 889,
+    "exports": 8643
+  },
+  "verify": {
+    "passed": 13632,
+    "total": 13633,
+    "skipped": 0,
+    "failure": "Upstream GPU report named an untracked coordination path",
+    "repair": "docs/work-lists/gpu-lock-report.md reworded; tests/no-private-paths.test.js unchanged"
+  },
+  "finalFocused": {
+    "passed": 326,
+    "failed": 0,
+    "skipped": 0
+  },
+  "gates": {
+    "lint": "pass",
+    "hygiene": "pass",
+    "quality": "pass",
+    "api": "pass",
+    "readmeTypes": "pass",
+    "docLinks": "pass",
+    "previewSourceContract": "pass"
+  },
+  "gpu": {
+    "canonicalCompatibilitySuite": "pass: native oracles and real compatibility draws",
+    "lodCorrectness": "pass",
+    "previewContractAfterRebase": [
+      "native pass",
+      "compatibility pass"
+    ],
+    "scivizReviewedRoute": "native WebGPU and native WebGL2 pixel/recovery pass",
+    "cutoutDefaults": "pass once per backend for three identical aliases; no --cost"
+  },
+  "readmes": {
+    "expected": 545,
+    "covered": 545,
+    "pass": 533,
+    "knownFailures": 12,
+    "newFailures": 0,
+    "freshDofLodCompatibility": "30/30 pass",
+    "freshCompatibilityAfterRebase": "12/12 pass"
+  },
+  "compatibilityContinuation": {
+    "selected": 115,
+    "passed": 89,
+    "failed": 26,
+    "originalSaved": 37,
+    "resumedMissing": 54,
+    "ownership": "Parity batch 273; retained in docs/known-bugs.md"
+  },
+  "timingMeasurementsAccepted": false
+}

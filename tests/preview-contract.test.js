@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inspectPreviewContract, checkPreviewContract } from '../scripts/check-preview-contract.mjs';
+import { inspectPreviewContract, checkPreviewContract, previewRoutes } from '../scripts/check-preview-contract.mjs';
 import { PARALLEL } from '../scripts/verify.mjs';
 
 const owner = (setup, pass = "if (c.backend === 'webgpu') this.draw(c)") => `
@@ -88,6 +88,18 @@ test('an object plugin has the same contract as a class', () => {
     .replace('class Example {', 'const plugin = {')
     .replace('setup(engine) {  }', 'setup(engine) {  },');
   assert.equal(fails(object), 1);
+});
+
+test('the native sciviz route is reviewed against its backend count and real rendering regressions', () => {
+  const file = 'packages/sciviz/src/render.ts';
+  const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+  assert.deepEqual(previewRoutes[file + ':SciRenderer'], [1, 'packages/sciviz/tests/webgl2.test.js']);
+  assert.equal(inspectPreviewContract(source, file, {}).failures.length, 1);
+  assert.deepEqual(inspectPreviewContract(source, file).failures, []);
+  const extraGuard = source.replace('this.fallback!.render(context, visible);',
+    "if (context.backend === 'webgl2') this.fallback!.render(context, visible);");
+  assert.notEqual(extraGuard, source);
+  assert.equal(inspectPreviewContract(extraGuard, file).failures.length, 1, 'new guarded work needs another review');
 });
 
 test('all package pass owners meet the preview contract, enforced by verify and therefore check:merge', {
