@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL_CPU_ACCEPTED_GPU_PENDING",
+  "status": "ACCEPTED_AFFECTED_CHECKS",
   "parent": "0ea6ec075",
   "package": "animator",
   "regression": "packages/animator/test/scene-owner.test.js",
@@ -8,7 +8,7 @@
     "fail": 5
   },
   "units": {
-    "pass": 198,
+    "pass": 213,
     "fail": 0,
     "skip": 0
   },
@@ -20,10 +20,224 @@
     "fullRunRepeated": false,
     "reason": "Scott requested affected checks only"
   },
-  "pending": [
-    "GPU owner rendering",
-    "runtime README",
-    "affected CPU gates",
-    "entry sizes and API"
-  ]
+  "pending": [],
+  "fix": "4b40d6871",
+  "ownerGpu": {
+    "cases": [
+      {
+        "target": "default",
+        "factory": "Animator",
+        "mode": "direct",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "default",
+        "factory": "Animator",
+        "mode": "owner",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "default",
+        "factory": "AnimatorGraph",
+        "mode": "direct",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "default",
+        "factory": "AnimatorGraph",
+        "mode": "owner",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "secondary",
+        "factory": "Animator",
+        "mode": "direct",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "secondary",
+        "factory": "Animator",
+        "mode": "owner",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "secondary",
+        "factory": "AnimatorGraph",
+        "mode": "direct",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      },
+      {
+        "target": "secondary",
+        "factory": "AnimatorGraph",
+        "mode": "owner",
+        "time": 0.25,
+        "x": 0.10000000149011612,
+        "lit": 242
+      }
+    ],
+    "errors": []
+  },
+  "gpu": {
+    "code": 0,
+    "timedOut": false,
+    "seconds": 29.453
+  },
+  "gameAndReadme": [
+    {
+      "id": "game",
+      "max": 2,
+      "words": [
+        "node",
+        "scripts/modern-game-tests.js"
+      ],
+      "code": 0,
+      "timedOut": false,
+      "seconds": 20.682,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-animator-gpu-game.log"
+    },
+    {
+      "command": "node scripts/run-readme-examples.mjs --packages=animator",
+      "code": 0,
+      "timedOut": false,
+      "seconds": 21.118,
+      "examples": {
+        "pass": 15,
+        "failed": 0
+      }
+    }
+  ],
+  "readmeAssetRegression": {
+    "file": "packages/animator/test/readme-assets.test.js",
+    "parent": {
+      "pass": 2,
+      "fail": 12
+    },
+    "fixed": {
+      "pass": 15,
+      "fail": 0
+    },
+    "knownFailuresRemoved": 10
+  },
+  "sizes": [
+    {
+      "name": "@margoengine/animator",
+      "gzip": 19150,
+      "ceiling": 19297
+    },
+    {
+      "name": "@margoengine/animator/graph",
+      "gzip": 8527,
+      "ceiling": 8542
+    },
+    {
+      "name": "@margoengine/animator/inertialize",
+      "gzip": 1894,
+      "ceiling": 2150
+    },
+    {
+      "name": "@margoengine/animator/sync",
+      "gzip": 1859,
+      "ceiling": 2070
+    },
+    {
+      "name": "@margoengine/animator/warping",
+      "gzip": 4650,
+      "ceiling": 4883
+    },
+    {
+      "name": "@margoengine/animator/fbik",
+      "gzip": 5434,
+      "ceiling": 5618
+    },
+    {
+      "name": "@margoengine/animator/motion-matching",
+      "gzip": 6994,
+      "ceiling": 7250
+    },
+    {
+      "name": "@margoengine/animator/mirror",
+      "gzip": 1774,
+      "ceiling": 2030
+    },
+    {
+      "name": "@margoengine/animator/spline-ik",
+      "gzip": 3862,
+      "ceiling": 4094
+    }
+  ],
+  "api": "9 selected entries unchanged",
+  "checks": {
+    "lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 11.496
+    },
+    "hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 47.713
+    },
+    "quality": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 73.657
+    },
+    "api": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 17.898
+    },
+    "readmetypes": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 8.711
+    },
+    "links": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 3.216
+    }
+  },
+  "acceptanceChecks": {
+    "lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 3.296
+    },
+    "hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 14.364
+    },
+    "links": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 1.595
+    },
+    "readmetypes": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 4.574
+    },
+    "guards": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 6.839
+    }
+  },
+  "auditLedger": "docs/work-lists/batch-56-scene-owner-packages.json"
 }

@@ -4015,4 +4015,23 @@ now resolves sceneOf(this), attaches factories to the registered Animation's
 scene (model root scene when Animation has no registration), and checks playback
 dependencies in its own scene. Five of fourteen real-engine cases fail on the
 parent. Repaired package and class-wide guard pass 198 checks, zero skips.
-GPU and runtime README acceptance are pending. Core and stage are untouched.
+All eight real-GPU owner cases pass (242 model pixels each), the complete game
+browser passes, and all fifteen runtime README examples pass. The final package
+and guard run passes 213 checks. Core and stage are untouched.
+
+### Animator README asset contracts
+
+Compared Khronos Group, *glTF 2.0 Specification* (2017, maintained 2026),
+https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; the ownership and explicit
+resource-management sources above; and the repository's already-noticed Quaternius
+Universal Animation Library and KayKit Adventurers standard assets. The standard
+binds channels to node indices in their actual hierarchy and gives application
+clip/bone names no universal meaning. Our inference is to use the existing
+authored clips, marker keys and bones in examples, rather than fictional names
+or aliases on a different skeleton. No source implementation was read or copied.
+
+Twelve old asset-contract cases failed; all fifteen revised standalone examples
+name and load the real bundled models. The regression parses each example and
+compares its clip, marker-table and literal bone references with the GLB JSON.
+Runtime execution proves dynamic full-body chains and the solver setup too.
+All fifteen pass, without adding a skip, fallback or synthetic replacement.

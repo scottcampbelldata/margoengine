@@ -2110,3 +2110,13 @@ fails five owner cases. Run packages/animator/test/scene-owner-browser.mjs and
 scripts/run-readme-examples.mjs --packages=animator in separate shared GPU lock
 commands with --wait-max=60, one lane slot, and a measured hold plus margin.
 Builds, units and other CPU checks stay outside the lock.
+
+Animator final acceptance: the same unit command now includes the fifteen
+readme-assets.test.js contracts and passes 213 checks. The owner browser passes
+eight cases, each with 242 model pixels and zero GPU errors. The complete
+scripts/modern-game-tests.js browser passes; all fifteen README examples execute
+in a page. The nine entry APIs and unchanged size ceilings pass. See the
+[receipt](results/batch-56-animator-owner-20261109.json). The first custom GPU
+fixture missed its required viewport and was corrected; no product assertion
+was weakened. Retained diagnostics include the large failed-assertion formatting
+stall, old README failures and the subsequently corrected sync-marker table.

@@ -4820,10 +4820,13 @@ owner cases with at least 476 red pixels, exact detachment and listener cleanup.
 Three walk checks and fourteen runtime README examples pass. Only affected
 gates were rerun; the inherited single full verify is retained without repetition.
 
-### Section 5 pending evidence: Animator registration ownership
+### Section 5 evidence: Animator registration ownership
 
 Five parent failures in fourteen real-engine cases cover secondary direct/model
 disposal, both factories and direct dependency lookup. The optional repair passes
 198 package/guard checks. A source-wide EnginePlugin disposal and factory guard
-runs in the check:merge unit inventory. GPU and runtime README acceptance remain
-pending. The inherited full verify is retained; only affected gates are rerun.
+runs in the check:merge unit inventory. Final units plus asset-contract checks
+pass 213 cases; all eight real-GPU owner cases pass (242 model pixels each),
+the complete game browser passes and all fifteen runtime README examples pass.
+The asset-contract regression checks real authored clip, marker and bone names.
+The inherited full verify is retained; only affected gates are rerun.

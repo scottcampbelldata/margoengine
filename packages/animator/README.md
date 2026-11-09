@@ -10,13 +10,13 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial:'locomotion', parameters:{speed:0},
   states:{
-    locomotion:{parameter:'speed', samples:[{value:0,clip:'Idle'},{value:1,clip:'Walk'},{value:3,clip:'Run'}]},
-    idle:'Idle'
+    locomotion:{parameter:'speed', samples:[{value:0,clip:'Idle_Loop'},{value:1,clip:'Walk_Loop'},{value:3,clip:'Jog_Fwd_Loop'}]},
+    idle:'Idle_Loop'
   },
   transitions:[{from:'locomotion',to:'idle',when:p=>p.speed<0,duration:0.15}]
 });
@@ -32,6 +32,8 @@ the solved endpoints; only the hip, knee and optional ankle orientation are
 written. Disconnected, duplicated or reversed endpoints reject before installation
 with code `unsupported` and a help link. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
 
+The examples use [Quaternius' bundled CC0 mannequin](../../examples/assets/quaternius/UAL1_Standard_RM.glb). Serve that file at `/UAL1_Standard_RM.glb`; its authored clip and bone names are used below. The root-motion example instead serves [KayKit's CC0 mannequin](../../examples/assets/kaykit/adventurers/animations/Rig_Medium/Rig_Medium_MovementBasic.glb) at `/Rig_Medium_MovementBasic.glb`.
+
 ## CCD chains (any length)
 
 `addCCDChain(animator, chain)` adds a Cyclic Coordinate Descent IK chain (Wang and Chen 1991) for arms, spines, tails, tentacles or fingers, solved every frame after the pose, additive layers and foot IK. Each sweep goes from the last joint to the first; every joint turns, on its own, so the end effector moves toward the target, then its limit is applied. `joints` lists glTF node indices from the first joint to the last, each the child of the one before. The Animator keeps the chain object and reads `target`, `rotation`, `pole`, `weight` and the solve settings every frame, so move the target by writing into it:
@@ -40,7 +42,7 @@ with code `unsupported` and a help link. The callback receives a world-space ori
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
 const grab = () => console.log('reached');
 const reach: CCDChain = {
-  joints: [joint('Shoulder'), joint('Elbow'), joint('Wrist')], // glTF node indices
+  joints: [joint('upperarm_l'), joint('lowerarm_l'), joint('hand_l')], // glTF node indices
   target: [0.4, 1.3, 0.5],                   // world space; mutate it per frame
   rotation: null,                            // optional world rotation (x, y, z, w) for the last joint
   pole: [0.3, 1.0, -0.5],                    // optional: the elbow bends toward this point
@@ -127,11 +129,11 @@ import { Animation } from 'margoengine/animation';
 import { Animator, addAimConstraint, addLookAt, type LookAt } from 'margoengine/animator';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
-const model = await loadGLTF(engine, '/hero.glb');
-const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle' } });
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle_Loop' } });
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
 const look: LookAt = {
-  joints: [node('Spine2'), node('Neck'), node('Head')], // first to last, each below the one before
+  joints: [node('spine_03'), node('neck_01'), node('Head')], // first to last, each below the one before
   target: [0, 1.6, 2], // world point; write into it every frame
   shares: [1, 2, 4], // default equal: how much of the turn each bone takes
   axis: [0, 0, 1], // default: the last bone's local look direction (glTF forward)
@@ -142,7 +144,7 @@ const look: LookAt = {
   weight: 1, // default 1: blend from the animated pose
 };
 const removeLook = addLookAt(animator, look);
-const removeAim = addAimConstraint(animator, { joint: node('RightHand'), target: [1, 1, 1], axis: [0, 1, 0], up: null });
+const removeAim = addAimConstraint(animator, { joint: node('hand_r'), target: [1, 1, 1], axis: [0, 1, 0], up: null });
 engine.start();
 removeLook();
 removeAim();
@@ -159,11 +161,11 @@ import { Animation } from 'margoengine/animation';
 import { Animator } from 'margoengine/animator';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
-const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Jump, Land
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animator = Animator.attach(Animation.attach(model), {
   initial: 'idle',
   parameters: { speed: 0 },
-  states: { idle: 'Idle', walk: 'Walk', jump: 'Jump', land: 'Land' },
+  states: { idle: 'Idle_Loop', walk: 'Walk_Loop', jump: 'Jump_Start', land: 'Jump_Land' },
   transitions: [
     { from: 'idle', to: 'walk', when: (p) => p.speed > 0.1 },
     { from: 'walk', to: 'idle', when: (p) => p.speed <= 0.1 },
@@ -204,14 +206,14 @@ import { Animation } from 'margoengine/animation';
 import { AnimatorGraph, type AnimatorGraphDocument } from 'margoengine/animator/graph';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run, Jump, Land
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const locomotion: AnimatorGraphDocument = {
   parameters: { speed: 'float', grounded: { type: 'bool', default: true }, weapon: 'int', jump: 'trigger' },
   initial: 'move',
   states: {
-    move: { parameter: 'speed', samples: [{ value: 0, clip: 'Idle' }, { value: 1, clip: 'Walk' }, { value: 3, clip: 'Run' }] },
-    jump: 'Jump',
-    land: 'Land',
+    move: { parameter: 'speed', samples: [{ value: 0, clip: 'Idle_Loop' }, { value: 1, clip: 'Walk_Loop' }, { value: 3, clip: 'Jog_Fwd_Loop' }] },
+    jump: 'Jump_Start',
+    land: 'Jump_Land',
   },
   transitions: [
     { from: 'move', to: 'jump', conditions: [['jump'], ['grounded']], duration: 0.05 },
@@ -254,10 +256,11 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const model = await loadGLTF(engine, '/hero.glb');
-const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
-const upperBody = [3, 4, 5, 6, 7]; // glTF node indices of the spine, arms and head
-const wave = { clip: 'Wave', weight: 0, mask: upperBody, blend: 'override' as const, time: 0 };
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
+const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk_Loop'}});
+const upperBody = ['spine_01', 'spine_02', 'spine_03', 'upperarm_l', 'upperarm_r', 'Head']
+  .map(name => model.asset.doc.nodes!.findIndex(node => node.name === name));
+const wave = { clip: 'Interact', weight: 0, mask: upperBody, blend: 'override' as const, time: 0 };
 const removeWave = animator.addLayer(wave);
 wave.weight = 1; // then advance wave.time from your frame loop; removeWave() when done
 removeWave();
@@ -274,15 +277,15 @@ import { Animation } from 'margoengine/animation';
 import { Animator, addFootPlacement } from 'margoengine/animator';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
-const model = await loadGLTF(engine, '/hero.glb');
-const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk_Loop' } });
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
 const stepHeight = (x: number) => (x > 2 ? 0.2 : 0); // your terrain or physics raycast
 const feet = addFootPlacement(animator, {
-  pelvis: node('Hips'),
+  pelvis: node('pelvis'),
   legs: [
-    { hip: node('LeftUpLeg'), knee: node('LeftLeg'), ankle: node('LeftFoot'), pole: [0, 0.5, 2] },
-    { hip: node('RightUpLeg'), knee: node('RightLeg'), ankle: node('RightFoot'), pole: [0, 0.5, 2] },
+    { hip: node('thigh_l'), knee: node('calf_l'), ankle: node('foot_l'), pole: [0, 0.5, 2] },
+    { hip: node('thigh_r'), knee: node('calf_r'), ankle: node('foot_r'), pole: [0, 0.5, 2] },
   ],
   raycast: (origin) => ({ position: [origin[0], stepHeight(origin[0]), origin[2]], normal: [0, 1, 0] }),
   probeHeight: 0.5, // default: highest step found above the ankle
@@ -310,11 +313,11 @@ import {Animation} from 'margoengine/animation';
 import {addInertialization} from 'margoengine/animator/inertialize';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
 const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial: 'run',
-  states: {run: 'Run', stop: 'Stop'},
+  states: {run: 'Jog_Fwd_Loop', stop: 'Idle_Loop'},
   transitions: [{from: 'run', to: 'stop', when: (p) => p.speed < 0.1, duration: 0.25}],
 });
 const inertia = addInertialization(animator); // each transition's duration is how long its offset fades
@@ -341,13 +344,13 @@ import {Animation} from 'margoengine/animation';
 import {addSyncGroup} from 'margoengine/animator/sync';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
 const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial: 'move', parameters: {speed: 0},
   states: {
-    move: {parameter: 'speed', samples: [{value: 0, clip: 'Walk'}, {value: 1, clip: 'Run'}]},
-    sprint: 'Sprint',
+    move: {parameter: 'speed', samples: [{value: 0, clip: 'Walk_Loop'}, {value: 1, clip: 'Jog_Fwd_Loop'}]},
+    sprint: 'Sprint_Loop',
   },
   transitions: [{from: 'move', to: 'sprint', when: (p) => p.speed > 1, duration: 0.2}],
 });
@@ -355,9 +358,9 @@ const sync = addSyncGroup(animator, {
   states: ['move', 'sprint'],
   markers: ['LeftFootDown', 'RightFootDown'],   // optional: line up steps, not just clip fractions
   clipMarkers: {                                // for clips with no markers of their own, as glTF clips are
-    Walk: [{time: 0.1, name: 'LeftFootDown'}, {time: 0.6, name: 'RightFootDown'}],
-    Run: [{time: 0.05, name: 'LeftFootDown'}, {time: 0.3, name: 'RightFootDown'}],
-    Sprint: [{time: 0.02, name: 'LeftFootDown'}, {time: 0.25, name: 'RightFootDown'}],
+    Walk_Loop: [{time: 0.1, name: 'LeftFootDown'}, {time: 0.6, name: 'RightFootDown'}],
+    Jog_Fwd_Loop: [{time: 0.05, name: 'LeftFootDown'}, {time: 0.3, name: 'RightFootDown'}],
+    Sprint_Loop: [{time: 0.02, name: 'LeftFootDown'}, {time: 0.25, name: 'RightFootDown'}],
   },
 });
 console.log(sync.phase); // 0 up to 1, the group's place in its cycle
@@ -426,18 +429,18 @@ import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import {addFullBodyIK, type FullBodyLimb} from 'margoengine/animator/fbik';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb'); // a clip named Idle
-const animator = Animator.attach(Animation.attach(model), {initial:'idle', states:{idle:'Idle'}});
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
+const animator = Animator.attach(Animation.attach(model), {initial:'idle', states:{idle:'Idle_Loop'}});
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
 const limb = (side: string, a: string, b: string, c: string): FullBodyLimb => ({
-  upper: joint(side + a), lower: joint(side + b), end: joint(side + c)
+  upper: joint(a + '_' + side), lower: joint(b + '_' + side), end: joint(c + '_' + side)
 });
-const leftHand = limb('Left', 'Arm', 'ForeArm', 'Hand');
+const leftHand = limb('l', 'upperarm', 'lowerarm', 'hand');
 const ik = addFullBodyIK(animator, {
-  pelvis: joint('Hips'),
-  spine: [joint('Spine'), joint('Chest')],
-  legs: [limb('Left', 'UpLeg', 'Leg', 'Foot'), limb('Right', 'UpLeg', 'Leg', 'Foot')],
-  arms: [leftHand, limb('Right', 'Arm', 'ForeArm', 'Hand')],
+  pelvis: joint('pelvis'),
+  spine: [joint('spine_01'), joint('spine_03')],
+  legs: [limb('l', 'thigh', 'calf', 'foot'), limb('r', 'thigh', 'calf', 'foot')],
+  arms: [leftHand, limb('r', 'upperarm', 'lowerarm', 'hand')],
   head: {joint: joint('Head')}
 });
 leftHand.target = [0.3, 1.15, 0.85]; // world space; write into it every frame
@@ -460,13 +463,13 @@ import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import {addMotionMatching, MotionDatabase, motionStates} from 'margoengine/animator/motion-matching';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animation = Animation.attach(model);
-const animator = Animator.attach(animation, {initial: 'Idle', states: motionStates(animation)}); // one state per clip
+const animator = Animator.attach(animation, {initial: 'Idle_Loop', states: motionStates(animation)}); // one state per clip
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
 const database = MotionDatabase.build(animator, {
-  root: joint('Hips'),
-  bones: [joint('LeftFoot'), joint('RightFoot')],
+  root: joint('pelvis'),
+  bones: [joint('foot_l'), joint('foot_r')],
 });
 const velocity: [number, number, number] = [0, 0, 0];
 const matcher = addMotionMatching(animator, {database, velocity});
@@ -499,9 +502,9 @@ import {Animation} from 'margoengine/animation';
 import {addMirror, mirrorPairs} from 'margoengine/animator/mirror';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
 const animation = Animation.attach(model);
-const animator = Animator.attach(animation, {initial: 'swing', states: {swing: 'SwingLeft', idle: 'Idle'}});
+const animator = Animator.attach(animation, {initial: 'swing', states: {swing: 'Sword_Attack', idle: 'Idle_Loop'}});
 const mirror = {enabled: true, states: ['swing']}; // read every frame
 const handle = addMirror(animator, mirror);
 console.log(handle.pairs);                    // each node's partner, by glTF node index
@@ -525,18 +528,18 @@ import {Animation} from 'margoengine/animation';
 import {addSplineIK, type SplineIKChain} from 'margoengine/animator/spline-ik';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
 const animation = Animation.attach(model);
-const animator = Animator.attach(animation, {initial: 'idle', states: {idle: 'Idle'}});
+const animator = Animator.attach(animation, {initial: 'idle', states: {idle: 'Idle_Loop'}});
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
 const points: [number, number, number][] = [[0, 1, 0], [0.4, 1.3, 0], [0.4, 1.8, 0.3], [0, 2.1, 0.5]];
-const tail: SplineIKChain = {
-  joints: [joint('Tail1'), joint('Tail2'), joint('Tail3'), joint('Tail4')], // from first to last
+const spine: SplineIKChain = {
+  joints: [joint('spine_01'), joint('spine_02'), joint('spine_03'), joint('neck_01')], // from first to last
   curve: points,            // or a Spline of any kind; rewrite the points every frame to animate it
   anchor: 'root',           // keep the first joint on the body and bring the curve to it
   twist: [0, Math.PI / 2],  // radians about the chain, at its first and last bone
 };
-const handle = addSplineIK(animator, tail);
+const handle = addSplineIK(animator, spine);
 points[3][0] = 0.3;         // read every frame
 console.log(handle.overrun); // how far the chain ran past the curve's end
 ```
@@ -563,11 +566,17 @@ for another attachment. Owner removal, model unloading and engine disposal also
 clean up the Animator.
 
 ```ts
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb');
 const productScene = engine.createScene('product-animation');
 const productAnimation = new Animation(model);
 productScene.use(productAnimation);
 const productAnimator = Animator.attach(productAnimation, {
-  initial: 'idle', states: { idle: 'Idle' }
+  initial: 'idle', states: { idle: 'Idle_Loop' }
 });
 productAnimator.dispose(); // removes only this scene's Animator
 productScene.removePlugin(productAnimation.name);

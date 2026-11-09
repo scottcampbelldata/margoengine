@@ -2550,10 +2550,12 @@ passes 17 checks, including twelve owner pixel cases; three walk checks and
 fourteen runtime README examples pass. No speed claim. Research:
 [clean-room record](../clean-room.md).
 
-### Animator owner CPU proof
+### Animator owner CPU and GPU proof
 
 The optional Animator package follows the registered dependency's scene for
 factory attachment and its own registration for direct updates and disposal.
 Fourteen real-engine cases pass after five failures on the parent; the complete
-package/guard run passes 198 checks. GPU and runtime README proof remain pending.
+package/guard/asset-contract run passes 213 checks. Eight real-GPU owner cases
+render 242 model pixels each without validation errors; the complete game browser
+and all fifteen runtime README examples pass.
 No speed or whole-audit completion claim is added.

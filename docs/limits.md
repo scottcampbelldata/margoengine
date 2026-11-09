@@ -3027,5 +3027,20 @@ claim; no core/stage or export change and no size ceiling raised.
 Animator and AnimatorGraph factories follow the registered Animation's scene.
 Direct updates and disposal query the owning scene. Disposal is terminal and
 idempotent; reattachment rejects without retaining a registration. Fourteen owner
-cases and 198 package/guard checks pass; GPU and README acceptance are pending.
+cases and 213 package/guard checks pass. All eight GPU owner cases (242 model
+pixels each), the complete game browser and fifteen runtime README examples pass.
 No core/stage source, public exports, timing budgets or size ceilings changed.
+
+Animator entry sizes after the owner repair (min+gzip, package dependencies external):
+
+| Entry | Bytes | Unchanged ceiling |
+| --- | ---: | ---: |
+| @margoengine/animator | 19150 | 19297 |
+| @margoengine/animator/graph | 8527 | 8542 |
+| @margoengine/animator/inertialize | 1894 | 2150 |
+| @margoengine/animator/sync | 1859 | 2070 |
+| @margoengine/animator/warping | 4650 | 4883 |
+| @margoengine/animator/fbik | 5434 | 5618 |
+| @margoengine/animator/motion-matching | 6994 | 7250 |
+| @margoengine/animator/mirror | 1774 | 2030 |
+| @margoengine/animator/spline-ik | 3862 | 4094 |

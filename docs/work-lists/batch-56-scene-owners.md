@@ -156,3 +156,18 @@ adapters onto this Animator, with cleanup delegated to its callback registries;
 none installs another EnginePlugin or wrapper. Disposed Animator reattachment is
 intentionally rejected and proved without a retained registration. Animation is
 next; its own direct removal is a separate candidate, not accepted by this proof.
+
+Animator acceptance is complete: 213 package/guard/asset-contract checks, eight
+real-GPU owner cases (242 model pixels each, zero errors), the complete game
+browser and all fifteen runtime README examples pass. All nine entry APIs and
+ceilings are unchanged. Ten old runtime known-list failures are removed after
+replacing fictional hero clip/bone names with actual bundled model names.
+
+## Finite package completion ledger
+
+[Every workspace package](batch-56-scene-owner-packages.json) now has an explicit
+audited, pending, held-physics or outside-edit-scope status. This list defines the
+end of the wider audit and includes packages with no syntactic owner matches;
+their lack of a match is not a waiver. Prior environment/staging/TAA/post proofs
+cover the listed fixes, not a completed audit of every package entry. Core/stage
+source and the hunter's capture repair remain outside this lane's edit scope.

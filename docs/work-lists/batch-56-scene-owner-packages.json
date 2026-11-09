@@ -1,0 +1,498 @@
+{
+  "scope": "Every workspace package. Pending includes packages without explicit EnginePlugin or removePlugin matches; syntax is not a lifetime proof. The existing capture repair remains exclusively hunter-owned.",
+  "status": "OPEN",
+  "baseline": "4b40d6871ec0515374fb507ebd36fc14b2454093",
+  "completion": "Every pending package needs source/dataflow inspection of registration, ownership, captures, disposal, factories and inheritance; runtime regressions for each defect and applicable package gates. Held physics is not silently waived. Core/stage are outside this lane edit scope.",
+  "packages": [
+    {
+      "package": "animation",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "animator",
+      "status": "audited",
+      "evidence": "docs/whitepaper/results/batch-56-animator-owner-20261109.json"
+    },
+    {
+      "package": "audio",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "behavior",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "biomes",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "blender",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "bvh",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "cache",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "cameras",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "cinematic",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "clustered",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "compute",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "controls",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "core",
+      "status": "outside-edit-scope",
+      "evidence": null
+    },
+    {
+      "package": "creative",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "culling",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "cutscene",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "decoders",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "dof",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "ecs",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "environment",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "exporters",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "fbx",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "fsm",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "geometry",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "gltf",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "gltf-pro",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "headless",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "html",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "input",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "inspector",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "kinematics-constraints",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "labels",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "lighting2d",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "lightmap",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "lines",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "loaders",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "lod",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "margoengine",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "materials",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "math",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "mcp",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "mesh-edit",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "mixer",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "navmesh",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "net",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "netcode",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "oit",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "physics",
+      "status": "held-physics",
+      "evidence": null
+    },
+    {
+      "package": "physics2d",
+      "status": "held-physics",
+      "evidence": null
+    },
+    {
+      "package": "pixel",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "points",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "post",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "procedural",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "quality",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "ragdoll",
+      "status": "held-physics",
+      "evidence": null
+    },
+    {
+      "package": "react",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "rigging",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "road",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "save",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "scatter",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "scene",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "scenery",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "sciviz",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "selection",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "shader",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "shadows",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "sky",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "splats",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "splines",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "sprites",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "stage",
+      "status": "outside-edit-scope",
+      "evidence": null
+    },
+    {
+      "package": "staging",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "stats",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "taa",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "terrain",
+      "status": "audited",
+      "evidence": "docs/work-lists/batch-56-scene-owners.md"
+    },
+    {
+      "package": "text",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "tilemap",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "tiles",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "tonemap",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "toon",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "transitions",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "tween",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "ui",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "usdz",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "vfx",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "video",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "viewcube",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "voxel",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "voxel-edit",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "voxel-net",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "voxel-pathtracer",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "water",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "weather",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "webgl2-compat",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "wfc",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "worker",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "package": "xr",
+      "status": "pending",
+      "evidence": null
+    }
+  ]
+}
