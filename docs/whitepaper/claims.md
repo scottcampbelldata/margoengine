@@ -2417,3 +2417,9 @@ restored real-model frames, and the added owner case draws 484 red pixels. Its
 failed state leaves zero secondary plugins/meshes and preserves the default
 sentinel. All 12 runtime README examples pass. Core plus stage remains 23924 B;
 optional engine entry grows 8182 to 8285 B within its unchanged ceiling.
+
+The required single full verify passes in 443.5 s: 13967/13967 units, zero failures
+and skips; API, quality, sizes, parity, XR records, preview contracts, both
+sandboxes, README type checks, documentation links and all historical proofs pass.
+Lint passes with 120 existing warnings; hygiene passes. The [Save receipt](results/batch-56-save-owner-20261109.json)
+retains the full acceptance scope.

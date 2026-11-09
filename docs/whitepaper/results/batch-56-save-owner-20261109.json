@@ -58,7 +58,15 @@
   "hygiene": {
     "pass": true
   },
-  "verify": "pending once-run bounded full verify",
+  "verify": {
+    "passed": true,
+    "seconds": 443.5,
+    "unitTests": 13967,
+    "fail": 0,
+    "skip": 0,
+    "runCount": 1,
+    "hardLimitMinutes": 40
+  },
   "scope": "Save registration ownership; wider audit remains open; core light capture repair owned by separate hunter",
   "retainedFailures": [
     "initial GPU fixture lacked required viewport; original assertions passed; corrected fixture passed",

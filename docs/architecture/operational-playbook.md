@@ -4681,3 +4681,9 @@ Knight/shoe/clone comparison remains exact (zero differing components); the adde
 secondary factory proof yields 484 red pixels, one pass and zero leaked meshes
 or registrations after failure. Twelve runtime README examples pass; no GPU
 validation errors. Engine entry 8182 to 8285 B; core plus stage remains 23924 B.
+
+The required single full verify passes in 443.5 s: 13967/13967 units, zero failures
+and skips; API, quality, sizes, parity, XR records, preview contracts, both
+sandboxes, README type checks, documentation links and all historical proofs pass.
+Lint passes with 120 existing warnings; hygiene passes. The [Save receipt](../whitepaper/results/batch-56-save-owner-20261109.json)
+retains the full acceptance scope.

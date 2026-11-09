@@ -99,7 +99,7 @@ Stats continuation: all four classes are reproduced and repaired with eight real
 
 The expanded inheritance inventory identifies 23 locally resolved subclasses, 24 other setup-bearing classes, 35 unresolved bases (including unrelated non-plugins) and 18 named setup object expressions. These are additional syntactic candidates, not lifetime proof or a count of defects. Imported package bases, aliases, mixins and factory dataflow still require inspection. Lane-local owner-inheritance-inventory.json retains every candidate.
 
-Save's factory bug is repaired in the optional engine entry. The original three default controls and six secondary success/rollback cases now pass. Expanded coverage has 16 cases (parent 3 pass/13 fail), including partial attachments, helpers, scope name collisions and replacement identity. Full package units pass 112 checks, all four Save GPU commands and all 12 runtime README examples pass; final verify receipt follows. Other owner groups remain unproved.
+Save's factory bug is repaired in the optional engine entry. The original three default controls and six secondary success/rollback cases now pass. Expanded coverage has 16 cases (parent 3 pass/13 fail), including partial attachments, helpers, scope name collisions and replacement identity. Full package units pass 112 checks, all four Save GPU commands and all 12 runtime README examples pass; the single full verify passes all 13967 units and every other chain. [Save receipt](../whitepaper/results/batch-56-save-owner-20261109.json). Other owner groups remain unproved.
 
 The fresh rebase inventory adds the upstream FFTOcean active-shaped removal to
 the candidate list. Its registration/runtime ownership has not been accepted by
