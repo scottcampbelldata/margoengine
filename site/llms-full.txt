@@ -3225,7 +3225,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Rhino 3DM (`@margoengine/loaders/3dm`, 2026-11-06) | By method: reads meshes, saved render meshes, NURBS surface objects and solids that are one plain surface. Other solids saved without a render mesh are counted in `skipped`, as are curves and text, and materials are indices, not read. Needs a rhino3dm runtime from the caller. Read through rhino3dm 8.35 on seven McNeel sample files; no file from a user's own Rhino session. | Trims need a solid modelling kernel, which this repository does not hold, and the runtime gives no trim curves, so a face that may be trimmed is left out rather than drawn past its trim. | A file saved with small-file options loads with its solids skipped. | Save with render meshes kept, or export a mesh format. |
 | Long-tail formats (`/3ds`, `/tds`, `/lwo`, `/amf`, `/md2`, `/pdb`, `/kmz`, 2026-11-06) | By method: 3DS returns cameras, lights and keyframes as data and plays nothing; LWO skips curves and clips that are not still images, reads patch and subdivision polygons as their control cage, and returns bones and weight maps as data, with no real rigged file behind them (a built file is the stand-in); AMF skips curved edges and colour formulas; MD2 computes its normals; PDB loads the first MODEL; KMZ places models only with `origin`, takes altitudes as height above the WGS84 ellipsoid, puts `clampToGround` at height 0 and reads models only. `.tds` is 3DS under a second extension, so this list is six formats. Read on real files for each format (`.tds` is the same reader on 3DS bytes, with no file of its own). | Each entry reads what a mesh needs and hands the rest over as data; no scene graph, terrain or skinning lives in a loader. | A 3DS or LWO animation, light or rig needs code of yours to play it. | glTF carries them ready to play where a file can be converted. |
 | PCX (`@margoengine/decoders/pcx`, 2026-11-06) | Enforced: 8 bits in 1, 3 or 4 planes, 4 bits in 1 plane, 1 bit in 1 or 4 planes; every other layout, and a header whose line size is too short for its width, is refused. `maxPixels` defaults to 2^26. Three real files equal Pillow 13.0.0 pixel for pixel. Pillow's `01r_00.pcx` is refused: it declares 8 bits and 88 pixels on 12-byte lines. | The layouts real files use, Quake II skins among them. | An unusual PCX throws a coded error. | Convert the file to PNG. |
-| Real files (`npm run test:real-files -w @margoengine/loaders`, 2026-11-06) | By method: 123 public files from real tools, one or two per format, are listed by URL and hash in `packages/loaders/tests/real-files/manifest.json` and are not in the repository. The run is opt-in, not part of `npm test`. Only one file per variant was read, so a tool's other output is unproven. Big-endian PLY still has no valid real-file proof (the LGPL MATLAB cow probe is internally inconsistent and correctly refused). MPD, zipped AMF, PTS intensity/RGB and chemistry XYZ now have pinned real-file passes, including complete MPD dependencies and every XYZ attribute. `/nurbs` has no file format of its own, so it is compared with rhino3dm on the curves of a real `.3dm`. Point formats read: LAS 0, 1, 2 (one point), 3, 4, 6, 7; LAZ 0, 1, 2, 3, 6, 7, 8, 10. | A public test of every tool's every version does not exist, and the files' licences allow linking, not always copying. | A file from a tool not in the list may still fail. | Report the file; every failure found so far got a fix and a regression test. |
+| Real files (`npm run test:real-files -w @margoengine/loaders`, 2026-11-06) | By method: 124 public files from real tools, one or two per format, are listed by URL and hash in `packages/loaders/tests/real-files/manifest.json` and are not in the repository. The run is opt-in, not part of `npm test`. Only one file per variant was read, so a tool's other output is unproven. Big-endian PLY now has a complete VTK horse proof: all 48,485 vertices and 96,966 triangle faces match independent python-plyfile output exactly, including every position, white RGB component and index. The earlier LGPL MATLAB cow probe remains internally inconsistent and correctly refused. MPD, zipped AMF, PTS intensity/RGB and chemistry XYZ now have pinned real-file passes, including complete MPD dependencies and every XYZ attribute. `/nurbs` has no file format of its own, so it is compared with rhino3dm on the curves of a real `.3dm`. Point formats read: LAS 0, 1, 2 (one point), 3, 4, 6, 7; LAZ 0, 1, 2, 3, 6, 7, 8, 10. | A public test of every tool's every version does not exist, and the files' licences allow linking, not always copying. | A file from a tool not in the list may still fail. | Report the file; every failure found so far got a fix and a regression test. |
 | Refused by design on real files (2026-11-06) | By method: `parseUSDA` and `parseUSDZ`, without the `composition()` extension, refuse USDC, subdivision surfaces and arcs to other layers with code `unsupported`. `parseTTF` refuses CFF outlines in `.otf` fonts. `parseDXF` skips `3DSOLID` (binary ACIS) and `HATCH`, and names them in `skipped`. `parseVTK` does not read `LINES`. `parseXYZ` keeps 32-bit floats with no origin, so survey coordinates lose precision: the swisstopo file's metres near 2,600,000 round to steps of 0.25 m. `parseSTL` keeps a file's stored normals, even where they oppose its winding, as `Spider_ascii.stl`'s do, so such a file draws dark. | `@margoengine/usdz` is the full USD reader, and the rest need a solid modelling kernel or a change to the shared result. | Those files load as named errors, or with parts counted as skipped. | `@margoengine/usdz` for USD; `parseLAS` keeps an origin for survey data. |
 | USD composition (`@margoengine/usdz/compose`, 2026-11-06) | By method: sublayers, references, payloads, inherits, specializes and variant sets, across text and binary layers and `.usdz` packages, with layer offsets, list edits and `timeCodesPerSecond` scaling. Measured on 546 local real files against OpenUSD 26.08: 424 of 443 files with meshes give the same mesh set, world bounds, triangle counts and bound material (9 of 443 before). With `/materialx` and the other entries on, 441 of 443: the other two are `timeCodesPerSecond_-1.usda`, an accepted difference below, and a projective transform. Generated stress stages, nested far past real files: 104 of 150 give the same prims and properties as OpenUSD. Built from the AOUSD USD Core Specification v1.1.0. Accepted difference: a time scale at or below 0, a `timeCodesPerSecond` of 0 or below among them, is a composition error by the specification, so the offset counts as the default and `invalid-offset` is listed, where OpenUSD 26.08 applies a negative scale (`timeCodesPerSecond_-1.usda`) and did not finish on `timeCodesPerSecond_0.usda` in our truth script. Margo opens that file in 5 ms. | The 46 that differ nest classes and variants and reach one site twice, which the specification does not settle (`docs/known-bugs.md`). Value clips, relocates, splines, `.abc` layers, implicit shapes, `PointInstancer`, curves and points are not read. A projective `xformOp:transform` is refused. | Those prims are left out or listed in `asset.issues`. | Bake value clips and implicit shapes with `usdcat --flatten` or Blender before loading. |
 | UsdSkel (`@margoengine/usdz/skel`, 2026-11-07) | By method: skeletons under a SkelRoot, skin weights, `skel:joints`, `geomBindTransform`, constant and vertex influences, blend shapes with sparse offsets, normal offsets and in-betweens, and their animation as one clip named after the default prim. Measured against OpenUSD 26.08 on 12 real stages: 2.7e-4 of the figure's size at worst, 1.3e-3 on HumanFemale. | The engine takes eight influences on a point. Past that the strongest eight stay and are scaled to the same total, and `asset.issues` says so: that alone is the HumanFemale gap, 0.17 units on a figure 133 units tall (1.5e-5 of its size with the cap lifted). A joint with shear has no node form and is listed. One clip per stage. | Listed in `asset.issues`; the mesh still draws. | Bake to eight influences in the DCC tool. |
@@ -4282,6 +4282,9 @@ asset's integration evidence, without independent Basis pixel accuracy, producti
 quality, cross-device image equality or performance claims. Required input hashes
 and missing-file failures apply in Node too. Record: whitepaper/results/readme-node-basis-20261109.json.
 
+
+P20 scope (2026-11-09): the complete VTK horse is independently checked as big-endian PLY, with white RGB and an ignored confidence field. It has no authored normals or UVs, and it proves no varying-color, surveyed-accuracy, visual-quality or speed claim. The original input and both licence texts stay outside Margo with pinned digests. Record: whitepaper/results/ply-big-endian-horse-20261109.json.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -4290,12 +4293,19 @@ and missing-file failures apply in Node too. Record: whitepaper/results/readme-n
 
 The Node `nodeKTX2` example used a page's `document` and fetched the placeholder
 `example.com/helmet.gltf`. Its grandfathered fetch failure let the README runner
-exit successfully without executing that example. It now creates a real Node GPU
-binding and headless canvas, disposes both scopes, and loads the pinned published
-StainedGlassLamp Basis sample. The exception is removed. The scoped decoder/glTF
-README run executes all 43 examples with zero failures; the runner regression test
+exit successfully without executing that example. The initial repair created a real Node GPU
+binding and headless canvas, disposed both scopes, and loaded the pinned published
+StainedGlassLamp Basis sample. Its scoped decoder/glTF
+README run executed all 43 examples with zero failures; the runner regression test
 requires this example to select Node and treats any execution failure as a gate
 failure. No decoder algorithm changed in this documentation repair.
+
+The missing-input audit independently reached the same repair before that branch
+landed. The merged example uses the already required complete FlightHelmet Basis
+family for exact cache/hash failure checks and a full Node GPU integration proof
+(15 textures and 177 mips). Both lanes' host and failure-gate regressions remain;
+this is one exception closure, leaving 48 overall. See
+whitepaper/results/readme-node-basis-20261109.json.
 
 ### Open: batch 133 clean-room Draco replacement is not implemented
 
@@ -6347,6 +6357,16 @@ CityJSON bytes. The fixture now opts out of text conversion and its original byt
 are restored. Root procedural-standard-assets.test.js checks the attribute and
 length/hash; the existing package test independently parses the actual asset.
 
+
+### Closed: real-file PLY count oracle assumed float-only rows (2026-11-09)
+
+The count oracle advanced four bytes per float vertex property and ignored color bytes; it also assumed one-byte face counts and 32-bit indices. The valid outside VTK horse reproduced a false face-data failure. The reference count walk now consumes every declared scalar/list width and element, with both-endian and malformed-body regressions in packages/loaders/tests/ply-outside.test.js. Every position, white color and index of the complete horse matches independent python-plyfile output. The production PLY reader needed no change.
+
+
+### Open: biome whole-world I/O README does not finish within the page budget (2026-11-09)
+
+Repro: npm run check:readme-run -- --packages=biomes. The docs-files-files-in-and-out-7b879b example creates the default 4 km world, exports complete height/weights/masks/temperature data, then saves/loads and compares digests. The corrected runner reports failure after 20 s while waiting for module completion and closes the owning browser. No missing file or network fixture is involved in those exports. The repeated whole-world generation/serialization workload is the path to profile; the individual expensive or stalled operation has not yet been isolated. This is still open, without a claimed root-cause repair, accepted slowdown, shrunk example or raised deadline. The aborted wider audit supplies no result for later examples.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -7153,6 +7173,8 @@ the shared types) and `@margoengine/loaders/usd` (`parseUSDA`, `parseUSDZ`, `rea
 
 Build from source with `npm run build` in `packages/loaders`.
 
+Real big-endian PLY evidence includes the complete VTK horse: 48,485 vertices and 96,966 triangles. Every position, RGB component and index matches independently recorded python-plyfile 1.1.3 output exactly. The file has white vertex colors and a skipped confidence property; this does not prove varying-color, normal or UV accuracy. From a built clone, fetch the required original file and its licences with `node scripts/reference-rendering/fetch-skip-assets.mjs`, then run `node --test packages/loaders/tests/ply-outside.test.js`. Missing, changed and LFS-only inputs fail. The source, licences and oracle hashes are recorded in `tests/fixtures/horse-oracle.json`, the required external manifest and `THIRD-PARTY-NOTICES.md`.
+
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
@@ -7180,28 +7202,6 @@ Every parser returns the same `LoadedGeometry`:
 {kind: 'mesh' | 'points', positions: Float32Array, normals?, colors? /* sRGB 0..1 */, uvs?, indices?: Uint32Array,
  groups?: {start, count, name?, objectId?, color?: [r, g, b, a]}[], attributes?: Record<string, Float32Array>}
 ```
-
-| Function | Reads |
-| --- | --- |
-| `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; files without faces become point clouds; unknown elements and properties skipped |
-| `parseSTL` | See [STL](#stl) |
-| `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
-| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
-| `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
-| `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
-| `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
-| `parseVTK` | `# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY `DATASET POLYDATA`: POINTS, POLYGONS, TRIANGLE_STRIPS, 5.x OFFSETS/CONNECTIVITY, point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES, SCALARS |
-| `parseOBJ` (async), `parseMTL` | See [OBJ and MTL](#obj-and-mtl) |
-| `parseDAE`, `flattenDAE` | See [COLLADA](#collada) |
-| `parseTMX` (async), `tmxLayerQuads` | See [Tiled TMX](#tiled-tmx) |
-| `parseTTF`, `textGeometry` (`/font`) | See [Fonts and 3D text](#fonts-and-3d-text) |
-| `parseSVG` (`/svg`) | See [SVG](#svg) |
-| `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
-| `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
-| `parseGCode` (`/gcode`) | See [G-code](#g-code) |
-| `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
-| `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
-| `parseLottie` (`/lottie`) | See [
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 

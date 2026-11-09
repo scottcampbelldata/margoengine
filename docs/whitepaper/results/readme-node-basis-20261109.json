@@ -138,5 +138,8 @@
     "browserGPUChecks": 14,
     "readmePassed": 17,
     "readmeTotal": 17
-  }
+  },
+  "concurrentUpstreamRepair": "da393371370fa6e0b25932e7649fca5d5475c209",
+  "closureCountedOnce": true,
+  "mergedExample": "FlightHelmet, reusing the complete required hash-checked family; both host/failure regressions retained"
 }

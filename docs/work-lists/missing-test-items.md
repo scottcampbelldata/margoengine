@@ -108,7 +108,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P17 | limits images, LIM-285 | public glTF with MSFT_texture_dds | Microsoft glTF sample assets, per-model licence | Pending |
 | P18 | limits Draco points | public point cloud with generic attributes | Google Draco standard test data, Apache-2.0 to verify | Pending; encoder-created proof remains labelled |
 | P19 | limits long-tail loaders, LIM-195 | rigged LWO with bones and weight maps | Freely licensed LightWave model corpus | Pending source/licence |
-| P20 | limits real files | valid real big-endian PLY | John Burkardt cow.binary.ply has an LGPL grant, but is malformed: 75,670 bytes instead of its declared 75,673; face 5,008 contains out-of-range index 3,587 | Downloaded and correctly refused. Valid-file proof remains pending; no parser tolerance or refusal changed |
+| P20 | limits real files | complete VTK horse.ply, 48,485 vertices / 96,966 triangles | PyVista vtk-data 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3, VTKData BSD-3-Clause and collection Apache-2.0 | Closed: every position, white RGB component and index matches independent python-plyfile 1.1.3 output. Earlier malformed LGPL cow remains correctly refused |
 | P21 | same | LDraw MPD | LDraw models; verify model-specific CC licence | Passed: 13 embedded submodels, 526,895 triangles, zero missing parts/warnings with the pinned library and four licensed sticker dependencies |
 | P22 | same | zipped AMF | Public 3MF/AMF consortium or slicer sample data; per-file licence | Passed: real Slic3r ZIP, 8 vertices/12 triangles; every placed coordinate/triangle matches the independent XML oracle. Fixed the proof harness to include constellation placement, with a regression |
 | P23 | same | PTS with intensity and colour | Public survey dataset, CC0/CC-BY/public domain | Passed: PDAL autzen.pts, all 10 coordinates, signed intensities and RGB values compared with source text |
@@ -628,3 +628,62 @@ budget was increased. No core, stage or held physics source changes.
 Record: docs/whitepaper/results/readme-node-basis-20261109.json.
 
 Node Basis group validation: lint/hygiene pass; verify passes 13,400 tests with zero failures/skips (368.7 s). All 258 decoder package tests, 46 focused root tests, 14 browser GPU checks, the full Node GPU integration and all 17 decoder snippets pass. No exports changed.
+
+
+### P20: complete outside big-endian PLY proof (2026-11-09)
+
+The unmodified 2,182,101-byte VTK horse.ply at PyVista vtk-data revision
+5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3 declares binary_big_endian. The VTKData
+Copyright.txt grants BSD-3-Clause (Ken Martin, Will Schroeder, Bill Lorensen), and
+the collection supplies Apache-2.0 in LICENSE. The model and both licence texts
+are required outside inputs with pinned URLs, sizes and digests. The shared required
+manifest now has 460 records; the optional real-file manifest has 124 rows.
+
+An outside python-plyfile 1.1.3 / NumPy 2.3.4 reader independently records all
+48,485 vertices, 96,966 triangle faces, bounds and canonical array hashes. Margo
+matches all 145,455 position components, 145,455 white RGB components and 290,898
+indices exactly. Confidence is skipped as documented. No authored normals/UVs,
+varying-color accuracy, surveyed geometry, rendering quality or speed is proved.
+The previous malformed Burkardt cow is still invalid; no refusal or tolerance changes.
+
+The real-file count checker assumed float-only vertex rows and one-byte counts
+with 32-bit indices. That misread this valid file's three color bytes as face data.
+Its separate reference walk now advances by every declared scalar/list width and
+element. Regression vectors exercise both byte orders, extra elements, mixed scalar
+widths, 16-bit list counts/indices, ASCII polygons, truncation and trailing bytes.
+The complete outside-file test additionally matches the independent Python hashes.
+No production loader, core, stage or held physics source changed.
+Record: docs/whitepaper/results/ply-big-endian-horse-20261109.json.
+
+
+### README page lifecycle deadline follow-up (2026-11-09)
+
+An additional full 1,096-example audit stopped progressing during the biome guide
+examples. Its last new page was biomes/docs-workers-workers-f8307d at 07:16:25;
+the page lifecycle stayed open for over six minutes, past the 20-second page budget.
+The owned process tree was explicitly ended with no survivors. This is a failed
+audit, never a completed or passing full-README run. Its supervisor record is
+test-results/missing-items/node-basis-all-readmes.json (1,039.5 s).
+
+The harness bounded navigation/module waits but left page creation, error queries
+and page.close unbounded. The existing page deadline now covers the whole lifecycle
+and closes the owned browser tree when it expires. It names the active phase,
+stops scheduling later examples after browser termination, and keeps completed
+results in its run-local partial-report.json. Three regressions use non-answering
+creation, query and close calls; the existing module-wait regression remains.
+No timeout was raised, no incomplete example is accepted and no later example is
+claimed to have run.
+
+A focused biome run now ends with a failure instead of hanging: its files-in/out
+example times out while waiting for module completion. That example creates the
+default 4 km world and runs multiple whole-world exports before its save/load
+comparison. No fixture request is needed for that work. The owning biomes workload
+still needs diagnosis and a proper fix; it is not an accepted slowdown and no
+world, output or deadline was reduced. It remains open, outside this PLY proof.
+The runtime known list stays at 48; no exception is added for it.
+
+P20 final validation before the last main rebase: lint/hygiene pass; full verify passes 13,421 tests, zero failures/skips (281.3 s). The initial inventory-only assertion failure (460 versus 457) was corrected by requiring exactly 460 plus the three new names; the direct PLY test validates the whole source/licence family. All 520 loader tests, both package GPU suites, the full real horse render, independent oracle regeneration and 41/44 scoped loader/decoder snippets pass; three existing exceptions remain and no fresh failure is allowed. The wider biome audit remains open as recorded above.
+
+Final main reconciliation: da3933713 independently repaired the same Node host/example while this lane verified. Its Draco plan/source review and failure-gate regression are preserved. The merged example uses the existing complete FlightHelmet required family and this lane adds full-data Node GPU evidence and strict completion handling. This is one shared closure, not two; 48 runtime exceptions remain.
+
+Final rebase validation at main 252df10cc: fresh package build, lint, hygiene, 59 focused tests and API reports pass. All 41/44 scoped loader/decoder examples and the complete Node Basis GPU integration pass with the same retained three exceptions and zero fresh failures. The 13,421-test full verification above preceded this last main rebase; both concurrent Node host regressions and upstream Draco/spectral documentation remain preserved.

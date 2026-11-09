@@ -301,6 +301,10 @@ const ASSETS = [
     'test fixture: the FlightHelmet glTF-KTX-BasisU texture and all 17 external model inputs, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Gary Hsu and Microsoft); required hashes in scripts/support/external-test-assets.json',
   ],
   [
+    'packages/loaders/tests/fixtures/horse-oracle.json',
+    'outside test input: complete unmodified binary-big-endian horse.ply, 2182101 bytes, SHA-256 dfadaea01775943a75f9bf0560e6ad55aab39694af3003d9976a46e58226c4d7, from PyVista vtk-data at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/horse.ply. VTKData Copyright.txt grants BSD-3-Clause, copyright 1993-2008 Ken Martin, Will Schroeder, Bill Lorensen; the collection also supplies Apache-2.0 in LICENSE. Both original licence files are pinned and downloaded with the model through scripts/support/external-test-assets.json, outside Margo. The fixture here contains only independent python-plyfile 1.1.3/NumPy 2.3.4 output hashes and facts; no parser code or model bytes ship',
+  ],
+  [
     'packages/clustered/test/fixtures/NOTICE.md',
     'test fixture: TypeB-AsymmetricNarrow.ies, a GE Lighting Solutions Evolve LED Flood report, as Type B - 03.ies of https://github.com/lfaynshteyn/ies_rescale, commit bf2e6a6a (MIT, Lev Faynshteyn)',
   ],

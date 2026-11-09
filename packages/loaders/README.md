@@ -10,6 +10,8 @@ the shared types) and `@margoengine/loaders/usd` (`parseUSDA`, `parseUSDZ`, `rea
 
 Build from source with `npm run build` in `packages/loaders`.
 
+Real big-endian PLY evidence includes the complete VTK horse: 48,485 vertices and 96,966 triangles. Every position, RGB component and index matches independently recorded python-plyfile 1.1.3 output exactly. The file has white vertex colors and a skipped confidence property; this does not prove varying-color, normal or UV accuracy. From a built clone, fetch the required original file and its licences with `node scripts/reference-rendering/fetch-skip-assets.mjs`, then run `node --test packages/loaders/tests/ply-outside.test.js`. Missing, changed and LFS-only inputs fail. The source, licences and oracle hashes are recorded in `tests/fixtures/horse-oracle.json`, the required external manifest and `THIRD-PARTY-NOTICES.md`.
+
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';

@@ -4,12 +4,19 @@
 
 The Node `nodeKTX2` example used a page's `document` and fetched the placeholder
 `example.com/helmet.gltf`. Its grandfathered fetch failure let the README runner
-exit successfully without executing that example. It now creates a real Node GPU
-binding and headless canvas, disposes both scopes, and loads the pinned published
-StainedGlassLamp Basis sample. The exception is removed. The scoped decoder/glTF
-README run executes all 43 examples with zero failures; the runner regression test
+exit successfully without executing that example. The initial repair created a real Node GPU
+binding and headless canvas, disposed both scopes, and loaded the pinned published
+StainedGlassLamp Basis sample. Its scoped decoder/glTF
+README run executed all 43 examples with zero failures; the runner regression test
 requires this example to select Node and treats any execution failure as a gate
 failure. No decoder algorithm changed in this documentation repair.
+
+The missing-input audit independently reached the same repair before that branch
+landed. The merged example uses the already required complete FlightHelmet Basis
+family for exact cache/hash failure checks and a full Node GPU integration proof
+(15 textures and 177 mips). Both lanes' host and failure-gate regressions remain;
+this is one exception closure, leaving 48 overall. See
+whitepaper/results/readme-node-basis-20261109.json.
 
 ### Open: batch 133 clean-room Draco replacement is not implemented
 
@@ -2060,3 +2067,13 @@ Building reference checkout correction: Git text conversion changed the pinned
 CityJSON bytes. The fixture now opts out of text conversion and its original bytes
 are restored. Root procedural-standard-assets.test.js checks the attribute and
 length/hash; the existing package test independently parses the actual asset.
+
+
+### Closed: real-file PLY count oracle assumed float-only rows (2026-11-09)
+
+The count oracle advanced four bytes per float vertex property and ignored color bytes; it also assumed one-byte face counts and 32-bit indices. The valid outside VTK horse reproduced a false face-data failure. The reference count walk now consumes every declared scalar/list width and element, with both-endian and malformed-body regressions in packages/loaders/tests/ply-outside.test.js. Every position, white color and index of the complete horse matches independent python-plyfile output. The production PLY reader needed no change.
+
+
+### Open: biome whole-world I/O README does not finish within the page budget (2026-11-09)
+
+Repro: npm run check:readme-run -- --packages=biomes. The docs-files-files-in-and-out-7b879b example creates the default 4 km world, exports complete height/weights/masks/temperature data, then saves/loads and compares digests. The corrected runner reports failure after 20 s while waiting for module completion and closes the owning browser. No missing file or network fixture is involved in those exports. The repeated whole-world generation/serialization workload is the path to profile; the individual expensive or stalled operation has not yet been isolated. This is still open, without a claimed root-cause repair, accepted slowdown, shrunk example or raised deadline. The aborted wider audit supplies no result for later examples.

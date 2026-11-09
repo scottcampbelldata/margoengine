@@ -1,0 +1,102 @@
+{
+  "date": "2026-11-09",
+  "scope": "Complete valid outside big-endian PLY input, independent positions/white colors/topology, not surveyed/visual quality or speed",
+  "source": {
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/horse.ply",
+    "revision": "5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3",
+    "bytes": 2182101,
+    "licences": [
+      "BSD-3-Clause (VTKData Copyright.txt)",
+      "Apache-2.0 (PyVista collection LICENSE)"
+    ],
+    "unmodified": true
+  },
+  "oracle": {
+    "sourceSha256": "dfadaea01775943a75f9bf0560e6ad55aab39694af3003d9976a46e58226c4d7",
+    "oracle": {
+      "tool": "python-plyfile",
+      "version": "1.1.3",
+      "numpy": "2.3.4",
+      "python": "3.13.16"
+    },
+    "format": "binary_big_endian",
+    "vertices": 48485,
+    "faces": 96966,
+    "triangles": 96966,
+    "positionComponents": 145455,
+    "colorComponents": 145455,
+    "indexComponents": 290898,
+    "positionsFloat32LESha256": "7c56d4622758b84beea942dd126994ddb2e2b099a6d31f8da3f38588163ea227",
+    "colorsFloat32LESha256": "714eb226640ca4b9276153142d28af923f92875ffccc52615bde74966629008c",
+    "indicesUint32LESha256": "11892da14060e89357382be842c395725e5178f6a939481d1b52fa00ea24ef0e",
+    "bounds": [
+      -0.042003002017736435,
+      -0.09167049825191498,
+      -0.07641799747943878,
+      0.042003002017736435,
+      0.09167050570249557,
+      0.07641800493001938
+    ],
+    "vertexProperties": [
+      "x",
+      "y",
+      "z",
+      "confidence",
+      "red",
+      "green",
+      "blue"
+    ],
+    "ignoredProperty": "confidence",
+    "minimumIndex": 0,
+    "maximumIndex": 48484,
+    "uniqueColors": 1
+  },
+  "comparison": {
+    "allPositionComponentsExact": true,
+    "allColorComponentsExact": true,
+    "allIndicesExact": true,
+    "boundsExact": true,
+    "noNormalsOrUVs": true,
+    "colorsAreWhite": true
+  },
+  "rootFix": "outside-file count oracle now respects every declared scalar/list width and element",
+  "requiredAssets": 460,
+  "realFileManifestRows": 124,
+  "physicsHeld": true,
+  "validation": {
+    "lint": true,
+    "hygiene": true,
+    "verifyTests": 13421,
+    "verifyFailures": 0,
+    "verifySkips": 0,
+    "verifySeconds": 281.3,
+    "packageTests": 520,
+    "scopedRootTests": 49,
+    "finalFocusedTests": 31,
+    "realFileCPU": true,
+    "coreDrawnPixels": 20189,
+    "pbrDrawnPixels": 20133,
+    "bothPackageGPUSuites": true,
+    "independentOracleRegeneratedExactly": true,
+    "originalCounterFailsOnUnmodifiedFile": true,
+    "requiredReadmePassed": 41,
+    "requiredReadmeTotal": 44,
+    "retainedReadmeExceptions": 3,
+    "freshReadmeFailures": 0,
+    "afterFinalMainRebase": {
+      "base": "252df10cc",
+      "freshBuild": true,
+      "lint": true,
+      "hygiene": true,
+      "focusedTests": 59,
+      "failures": 0,
+      "skips": 0,
+      "apiReportsMatch": true,
+      "readmePassed": 41,
+      "readmeTotal": 44,
+      "retainedExceptions": 3,
+      "freshReadmeFailures": 0,
+      "nodeBasisGPU": true
+    }
+  }
+}

@@ -451,19 +451,50 @@ async function startPages(samples, examples) {
 
 export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
   const file = await writePageExample(example);
-  const page = await pages.browser.newPage(),
-    url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
+  const url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
+  let phase = 'creating page',
+    page,
+    result,
+    timer;
+  const fail = (reason) => ({ result: 'fail', place: 'page', reason });
+  const work = (async () => {
+    try {
+      page = await pages.browser.newPage();
+      phase = 'navigating';
+      await page.goto(url, { timeout });
+      phase = 'waiting for module completion';
+      await page.waitForFunction(() => window.__ran, undefined, { timeout });
+      phase = 'settling';
+      await page.waitForTimeout(SETTLE);
+      phase = 'reading errors';
+      const errors = await page.evaluate(() => window.__errors);
+      result = errors.length ? fail(errors[0]) : { result: 'pass', place: 'page' };
+    } catch (error) {
+      result = fail(String(error.message).split('\n')[0].slice(0, 300));
+    } finally {
+      phase = 'closing page';
+      await page?.close();
+    }
+    return result;
+  })();
+  const expired = Symbol('deadline');
   try {
-    await page.goto(url, { timeout: PAGE_LIMIT });
-    await page.waitForFunction(() => window.__ran, undefined, { timeout });
-    await page.waitForTimeout(SETTLE);
-    const errors = await page.evaluate(() => window.__errors);
-    if (errors.length) return { result: 'fail', place: 'page', reason: errors[0] };
-    return { result: 'pass', place: 'page' };
+    const outcome = await Promise.race([
+      work,
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(expired), timeout);
+      }),
+    ]);
+    if (outcome !== expired) return outcome;
+    const reason = `Example did not finish within ${timeout / 1000} s while ${phase}${result?.reason ? '; ' + result.reason : ''}`;
+    pages.failed = `${example.id}: ${reason}`;
+    // The owned browser's bounded close kills its whole process tree, including unresponsive renderers/workers.
+    await closeAll({ browser: pages.browser });
+    return fail(reason);
   } catch (error) {
-    return { result: 'fail', place: 'page', reason: String(error.message).split('\n')[0].slice(0, 300) };
+    return fail(String(error.message).split('\n')[0].slice(0, 300));
   } finally {
-    await page.close();
+    clearTimeout(timer);
   }
 }
 
@@ -537,9 +568,19 @@ async function run() {
   if (forPage.length) {
     const pages = await startPages(samples, examples);
     try {
-      await eachLimited(forPage, PAGE_JOBS, async (example) =>
-        results.set(example.id, await runInPage(example, pages)),
-      );
+      await eachLimited(forPage, PAGE_JOBS, async (example) => {
+        if (pages.failed) throw new Error(pages.failed);
+        results.set(example.id, await runInPage(example, pages));
+        writeFileSync(
+          join(scratch, 'partial-report.json'),
+          `${JSON.stringify(
+            [...results].map(([id, result]) => ({ id, ...result })),
+            null,
+            1,
+          )}\n`,
+        );
+        if (pages.failed) throw new Error(pages.failed);
+      });
     } finally {
       await closeAll({ browser: pages.browser, servers: [pages.server] });
     }

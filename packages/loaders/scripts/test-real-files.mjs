@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import { referenceAMF } from './amf-reference.mjs';
+import { referencePLYFacts } from './ply-reference.mjs';
 import {
   LoaderError,
   flattenDAE,
@@ -207,26 +208,7 @@ function dxfEntities(string) {
 const fanned = (lines) => lines.reduce((sum, line) => sum + Number(line.trim().split(/\s+/)[0]) - 2, 0);
 
 function plyFacts(bytes) {
-  const head = text(bytes.subarray(0, 4096)),
-    end = head.indexOf('end_header'),
-    header = head.slice(0, end),
-    vertices = Number(header.match(/element vertex (\d+)/)[1]),
-    faces = Number(header.match(/element face (\d+)/)?.[1] ?? 0),
-    start = head.indexOf('\n', end) + 1;
-  let triangles = 0;
-  if (header.includes('format ascii')) {
-    const lines = text(bytes.subarray(start)).split(/\r?\n/);
-    triangles = fanned(lines.slice(vertices, vertices + faces));
-  } else {
-    const properties = header.slice(header.indexOf('element vertex'), header.indexOf('element face'));
-    let p = start + vertices * 4 * count(properties, /property float/g);
-    for (let i = 0; i < faces; i++) {
-      triangles += bytes[p] - 2;
-      p += 1 + 4 * bytes[p];
-    }
-    assert.equal(p, bytes.length, 'PLY walk ended at the end of the file');
-  }
-  return { vertices, triangles };
+  return referencePLYFacts(bytes);
 }
 
 /** Triangles of every `coordIndex` list in a VRML or X3D file, polygons ending at -1 and fanned. */

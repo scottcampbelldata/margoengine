@@ -1141,3 +1141,12 @@ the rendered model. Raw result: packages/decoders/test-results/node-gltf/result.
 Run npm run check:readme-run -- --packages=decoders to execute all 17 examples.
 Use MARGO_RESULT_CACHE=off for the verification run. No browser substitute or
 independent Basis decoder is involved; the proof is complete-asset integration.
+
+
+### P20 complete VTK big-endian horse (2026-11-09)
+
+Build packages; fetch with node scripts/reference-rendering/fetch-skip-assets.mjs, then run node --test packages/loaders/tests/ply-outside.test.js. The complete unmodified horse and both licence files are under ply-horse/ in the shared external cache. Source URLs, sizes and SHA-256 values are in scripts/support/external-test-assets.json.
+
+The independent oracle uses Python 3.13, python-plyfile 1.1.3 and NumPy 2.3.4 installed in an outside environment. Run python packages/loaders/scripts/ply-reference.py <external-cache>/ply-horse/horse.ply <output.json>, then compare it with packages/loaders/tests/fixtures/horse-oracle.json. It reads the original file without re-encoding it and records every position/color/index hash. Python is needed to regenerate that oracle, not to run the required Node regression.
+
+For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it through the shared GPU lock. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.

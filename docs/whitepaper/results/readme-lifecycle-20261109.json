@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-09",
+  "fullAudit": {
+    "status": "failed-hung",
+    "selected": 1096,
+    "seconds": 1039.5,
+    "processTreeManuallyEnded": true,
+    "survivors": [],
+    "lastCreatedPage": "biomes/docs-workers-workers-f8307d",
+    "completedResultsNotRecoverable": true
+  },
+  "rootCause": "navigation/module waits had deadlines, but page creation/error queries/closure did not",
+  "fix": "the existing page deadline covers the entire lifecycle and terminates the owned browser; stop scheduling and preserve completed partial results",
+  "regressions": [
+    "non-answering browser.newPage",
+    "non-answering page.evaluate",
+    "non-answering page.close",
+    "unfinished module with no error"
+  ],
+  "focusedBiomes": {
+    "status": "failed",
+    "example": "biomes/docs-files-files-in-and-out-7b879b",
+    "phase": "waiting for module completion",
+    "deadlineSeconds": 20,
+    "missingFixture": false,
+    "owningWorkloadUnresolved": true
+  },
+  "knownRemaining": 48,
+  "physicsHeld": true
+}

@@ -100,6 +100,36 @@ test('a page whose module never completes fails even with no page error', async 
   assert.equal(closed, true);
 });
 
+for (const phase of ['creating page', 'reading errors', 'closing page']) {
+  test(`the whole page deadline bounds ${phase} and closes the owning browser`, async () => {
+    let browserClosed = false;
+    const never = () => new Promise(() => {});
+    const page = {
+      goto: async () => {},
+      waitForFunction: async () => {},
+      waitForTimeout: async () => {},
+      evaluate: phase === 'reading errors' ? never : async () => [],
+      close: phase === 'closing page' ? never : async () => {},
+    };
+    const pages = {
+      origin: 'http://example.test',
+      browser: {
+        newPage: phase === 'creating page' ? never : async () => page,
+        close: async () => {
+          browserClosed = true;
+        },
+      },
+    };
+    const result = await runInPage({ id: `runner-test/${phase.replaceAll(' ', '-')}`, code: 'export {}' }, pages, {
+      timeout: 50,
+    });
+    assert.equal(result.result, 'fail');
+    assert.match(result.reason, new RegExp('while ' + phase));
+    assert.equal(browserClosed, true);
+    assert.match(pages.failed, /did not finish/);
+  });
+}
+
 test('TypeScript runs as a reader would paste it', async () => {
   const result = await runInNode(
     { id: 'runner-test/passes', code: 'const size: number = 2;\nconsole.log(size);' },

@@ -2676,3 +2676,11 @@ no independent Basis pixel-accuracy, quality or speed claim. Both Node and brows
 README deadlines now fail unfinished examples; verify regressions cover each.
 No deadlines were raised; no core, stage or held physics source changed.
 Record: whitepaper/results/readme-node-basis-20261109.json.
+
+
+### P20 required input and independent oracle: section 5 evidence (2026-11-09)
+
+The required external manifest adds the complete VTK big-endian horse and both original licence texts (460 inputs total). Missing, changed or LFS-only bytes fail verify/direct tests. A checked-in python-plyfile output record proves every position, white color and index; the optional real-file count oracle now walks every declared scalar/list width, with regressions for the previous float-only assumption. No production parser, rendering backend, core, stage or held physics source changes. Surveyed/visual/speed and authored normal/UV accuracy remain unproved. Record: whitepaper/results/ply-big-endian-horse-20261109.json.
+
+
+README lifecycle gate (2026-11-09): the same 20-second page deadline now covers creation, navigation, module completion, settling, error queries and page closure. A hung lifecycle fails, closes the owned browser tree, stops later scheduling and preserves completed partial results. Three deterministic non-answering-call regressions run in verify. An extra full audit was killed after a genuine lifecycle hang; its focused biome files-in/out example now reports an unfinished module. No full-audit pass or accepted slowdown is claimed.

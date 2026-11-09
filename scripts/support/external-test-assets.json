@@ -2931,5 +2931,29 @@
     "sha256": "ca42bd174ba55d73db594fb879a067d7b90985affa0b25a4ee171b5ef22fc227",
     "licence": "BSD-2-Clause (PotreeConverter standard sample data, Potree repository LICENSE)",
     "licenceUrl": "https://github.com/potree/potree/blob/5636cd471d9eb464969e758be45c44d7613d3859/LICENSE"
+  },
+  {
+    "file": "ply-horse/horse.ply",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/horse.ply",
+    "size": 2182101,
+    "sha256": "dfadaea01775943a75f9bf0560e6ad55aab39694af3003d9976a46e58226c4d7",
+    "licence": "BSD-3-Clause (VTKData Copyright.txt); Apache-2.0 (PyVista collection LICENSE)",
+    "licenceUrl": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Copyright.txt"
+  },
+  {
+    "file": "ply-horse/LICENSE-Apache-2.0",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/LICENSE",
+    "size": 11357,
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "licence": "BSD-3-Clause (VTKData Copyright.txt); Apache-2.0 (PyVista collection LICENSE)",
+    "licenceUrl": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Copyright.txt"
+  },
+  {
+    "file": "ply-horse/Copyright-BSD-3-Clause.txt",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Copyright.txt",
+    "size": 1768,
+    "sha256": "7876dec881e6909f76c47d631cfd0b9daed66e520a77d3ad016a6b9a490b9420",
+    "licence": "BSD-3-Clause (VTKData Copyright.txt); Apache-2.0 (PyVista collection LICENSE)",
+    "licenceUrl": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Copyright.txt"
   }
 ]
