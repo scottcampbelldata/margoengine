@@ -76,3 +76,17 @@ after rebuilding procedural, sciviz and staging reports 886 entries/8,634 export
 with no unrelated snapshot changes. The final procedural suite passes 101 tests.
 The latest Added section assigns 20, 23, 24 and 25 after this batch lands;
 21, 22 and 26-31 belong to lane S. Physics remains on hold.
+
+## Gate-discovered shader-brush example defect
+
+The required README runner exposed a pre-existing whole-grid dilation inside
+`grid.voxels.every(...)` in voxel-edit's shader-brush example. An equal 64^3-cell
+result would recompute the same reference 262,144 times. The reference is now
+computed once; the grid and equality comparison are identical.
+`packages/voxel-edit/tests/readme-brush-work.test.js` executes the actual README
+block with the real CPU dilation and a GPU stand-in, checks equality, resource
+disposal and exactly one reference call. The same test on origin/main's README
+fails on the second call. This is a deterministic work-count fix, with no timing
+claim or raised deadline. The browser runner's original 20 s timeout stays intact.
+Verify also caught missing TSDoc on the new BakedTexture union; its documentation
+is now present. The failed gate is retained in testpage-resume-verify.log.

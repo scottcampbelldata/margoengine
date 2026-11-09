@@ -262,7 +262,8 @@ model.voxels[32 + 64 * (32 + 64 * 32)] = 5; // one cell in the middle
 
 const grow = await ShaderBrush.create(device, brushes.grow);
 const { grid, changed } = await grow.run(model, { passes: 3 }); // the same cells as dilateGrid(model, {iterations: 3})
-console.log(changed, grid.voxels.every((v, i) => v === dilateGrid(model, { iterations: 3 }).grid.voxels[i]));
+const reference = dilateGrid(model, { iterations: 3 }).grid;
+console.log(changed, grid.voxels.every((v, i) => v === reference.voxels[i]));
 
 // Your own brush: rings of colour by height inside the selection, rough edges from noise.
 const rings = await ShaderBrush.create(
