@@ -1,5 +1,5 @@
 {
-  "commit": "da96932cb",
+  "commit": "4977f76ed",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -64,12 +64,12 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 54079,
-        "gzip": 19123
+        "raw": 54148,
+        "gzip": 19150
       },
       "./graph": {
-        "raw": 26087,
-        "gzip": 8488
+        "raw": 26193,
+        "gzip": 8527
       },
       "./inertialize": {
         "raw": 4187,
@@ -1332,8 +1332,8 @@
         "gzip": 1178
       },
       "./stage": {
-        "raw": 6633,
-        "gzip": 3106
+        "raw": 6707,
+        "gzip": 3140
       },
       "./compare": {
         "raw": 5633,

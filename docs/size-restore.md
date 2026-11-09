@@ -711,3 +711,8 @@ Seventeen record cases, API currentness, documentation links and the size gate
 pass. Headless/stage stays 3140 B; core/stage stays 23924 B. Keep the original
 13997/13998 full verify and the repaired failed-file continuation as separate
 evidence; no second full verify or new GPU/README replay is claimed.
+
+Sciviz integration at 4977f76ed rebuilds sciviz and the umbrella after the
+concurrent tubes adapter/streamline repair; both genuine records report this
+commit with dirty=false. All 17 record checks, API, links and size gate pass.
+Headless/stage remains 3140 B, core/stage 23924 B.
