@@ -1086,7 +1086,7 @@
    "Source-quality coverage is incomplete; no replacement code, replacement comparison, hostile-input fuzz or GPU proof exists."
   ],
   "load": "Loaded-machine diagnostic; cold paired controls overlapped part of isolated-memory controls and repository verification. No release speed or new/old ratio is claimed.",
-  "rawEvidence": "private/batch-134/measure/built; original vendor results, startup, memory, all image hashes, trial arrays and versioned record retained under private/batch-134/measure."
+  "rawEvidence": "Maintainer-only batch-134 measure archive (not shipped in a clone): original vendor results, startup, memory, all image hashes, trial arrays and versioned record. Public reproduction: docs/whitepaper/reproduce.md."
  },
  "sourceProvenanceEvidence": [
   {

@@ -117,11 +117,12 @@
       ]
     },
     "consolidate-built-final": {
+      "scope": "Archived maintainer command, not shipped in a clone; public reproduction is documented in docs/whitepaper/reproduce.md",
       "exit": 0,
       "elapsedSeconds": 0.23764705657958984,
       "command": [
         "node",
-        "private/batch-134/measure/consolidate-built.mjs"
+        "<maintainer-evidence>/batch-134/measure/consolidate-built.mjs"
       ]
     }
   },
