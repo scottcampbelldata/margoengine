@@ -2,6 +2,8 @@
 
 Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
+For minimum-spaced placement, import the optional [`/poisson` entry](#poisson-disk-placement).
+
 `generateCabinMesh(height, position = [0,0])` builds a 6 × 8 m timber cabin,
 35° roof, recessed windows/door and terrain-sunk stone/porch supports. `position`
 is the world XZ origin used for terrain sampling. It returns `floor`, `siding`,
@@ -248,4 +250,44 @@ Studio's tree walker (96 x 96 x 96 cells: sphere 162 ms, noise 177 ms, recolor 2
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/procedural
+
+## Poisson disk placement
+
+Optional `@margoengine/procedural/poisson`: 1,269 B min+gzip JavaScript and one lazy Rust/Wasm file,
+29,914 B raw / 13,192 B gzip. Importing the entry fetches nothing. The factory loads the shipped artifact;
+applications need no Rust toolchain. WebGPU and WebGL2 use the same CPU sampler.
+
+```ts
+import {createPoissonSampler} from 'margoengine/procedural/poisson';
+using sampler = await createPoissonSampler();
+const trees = sampler.rectangle([0, 0, 40, 30], {radius: 2, seed: 7}); // packed XY
+const onSlope = sampler.surface(new Float32Array([
+  0, 0, 0,  10, 0, 0,  0, 10, 10,
+]), {radius: 0.8, seed: 11}); // packed XYZ, on this triangle
+console.log(trees.positions.length / 2, onSlope.positions.length / 3);
+```
+
+`rectangle` takes `[minX,minY,maxX,maxY]`, with positive extents. `surface` takes `Float32Array` or
+`Float64Array` triangle soup, nine numbers per triangle, at most 65,536 triangles. Triangle choices are weighted
+by area. Empty or zero-area surfaces return no points. Separation is ambient Euclidean distance, including
+across nearby disconnected faces, rather than distance along a surface. Coordinates must be finite and within
++/-1,000,000. Output arrays are fresh float64 coordinates; converting them to float32 can reduce spacing.
+
+`radius` is required, 0.000001..1,000,000. Other defaults: `seed: 1` (uint32, zero shares one's stream),
+`maxPoints: 4096` (0..65,536), `attempts: 100000` (0..2,000,000). Zero points or attempts returns empty output.
+Bounded dart throwing guarantees separation, not a maximal covering or the point limit. Inspect result
+`attempts` (candidates actually considered), `comparisons` (neighbour distance tests) and `dimensions` (2 or 3).
+Triangles whose cross products round to zero carry no probability. No spectral or frame-time guarantee is made.
+
+The factory accepts `{signal}` for loading; sampling options accept `signal`, checked before synchronous work.
+Use a worker for cancellation in flight. `dispose()` and `Symbol.dispose` are idempotent, preserve returned arrays
+and release the instance. Later work throws code `disposed`; invalid input throws code `failed`, with a help link.
+No rendering resources are owned; device/context loss leaves sampling usable.
+
+The Rust hash and a float64 all-pairs oracle accept identical output for 3,000 fixed candidate points, using 3,329
+versus 3,445,553 distance tests. This proves less rejection work, not a language or wall-clock speedup. Native tests:
+`npm run test:poisson-kernel --workspace @margoengine/procedural`. Rebuild the committed artifact with
+`npm run build:poisson --workspace @margoengine/procedural` (Rust target `wasm32-unknown-unknown`, simd128 enabled;
+no SIMD speed claim). Browser proof: `npm run test:gpu --workspace @margoengine/procedural`, including a production
+consumer below a non-root base, lazy Wasm requests and values on WebGPU/WebGL2 after device/context loss.
 

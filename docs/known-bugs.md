@@ -1,5 +1,12 @@
 # Known bugs and unverified features
 
+### Fixed in batch 68 draft: tiny triangle area underflow
+
+Squaring cross-product components before their norm rounded representable tiny triangle areas to zero.
+The Poisson sampler uses scaled `hypot` norms. `packages/procedural/test/poisson.test.js` checks that a triangle
+with 1e-150 edge lengths yields one point. Cross products that themselves round to zero remain a documented
+float64 geometry limit (LIM-621).
+
 What is known to be wrong or not yet proven, and what it would take to close each item. Design limits (where a
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.

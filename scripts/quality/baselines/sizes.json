@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11513583,
+  "total": 11515108,
   "history": [
     {
       "date": "2026-10-24",
@@ -4916,6 +4916,12 @@
       "commit": "900a3e833",
       "reason": "voxel-net/server: tls option (98.7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "ad59b13cb",
+      "reason": "procedural/poisson: new optional sampling entry; separate lazy Rust/Wasm asset, unchanged root",
+      "grew": 1
     }
   ],
   "items": {
@@ -5865,6 +5871,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/procedural/poisson": 1525
   }
 }

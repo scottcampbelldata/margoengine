@@ -1654,6 +1654,19 @@ Only the specification prose/equations and standard sample assets were read, nev
 The VdotH versus NdotV formulation difference is recorded for investigation; the nonnormative
 example alone is not evidence attributing the complete measured image loss.
 
+## Poisson disk placement (batch 68, job 1)
+
+The broad initial literature search covered Bridson,
+[Fast Poisson Disk Sampling in Arbitrary Dimensions (2007)](https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf),
+Bowers et al., [Parallel Poisson Disk Sampling with Spectrum Analysis on Surfaces (2010)](https://hub.hku.hk/handle/10722/141786),
+and Yuksel, [Sample Elimination for Generating Poisson Disk Sample Sets (2015)](https://doi.org/10.1111/cgf.12538).
+The implementation combines spatial-neighbour rejection motivated by Bridson's grid with area-weighted polygon
+choice and reflected triangle barycentric samples in Greg Turk's
+[1992 thesis, surface point distribution](https://faculty.cc.gatech.edu/~turk/my_papers/turk_thesis_2.pdf).
+It uses bounded global darts, not Bridson's active annulus, Bowers's parallel schedule or Yuksel's elimination.
+No intrinsic-distance, maximal-covering or spectral claim follows. Rust, TypeScript, synthetic fixtures and the
+all-pairs oracle are original; no external engine or library implementation was read or copied.
+
 ## WFC global constraints (batch 69, job 2)
 
 Written from the constraint-satisfaction and global reachability discussion in Karth and Smith, [WaveFunctionCollapse is Constraint Solving in the Wild (2017)](https://adamsmith.as/papers/wfc_is_constraint_solving_in_the_wild.pdf), sections 4-5. Count lower/upper bounds come from certain/possible group membership. Breadth-first search over possible walkable cells rules out impossible paths; unreachable optional cells are removed when a connected group already has a required cell. Chronological undo restores all local and global domain removals. No external implementation/code was read or copied. Generated binary and three-tile grids are stand-ins.

@@ -1351,6 +1351,17 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Procedural Poisson placement (batch 68, job 1)
+
+`procedural/poisson` keeps rejection and area loops in one lazy feature-local Rust/Wasm module; core and stage
+stay unchanged. Its hash matches a float64 all-pairs oracle on identical candidates: 3,329 versus 3,445,553
+distance tests. This is deterministic work evidence, not language speed evidence. Synthetic rectangles and
+sloped/disconnected triangles establish spacing, bounds, area weighting, hostile inputs and lifecycle behavior.
+The browser test builds a production consumer under `/sampling/`, verifies no Wasm request on import, then
+compares WebGPU/WebGL2 values after device/context loss. No renderer resources are owned. Rebuild with
+`build:poisson`; native tests use `test:poisson-kernel`. SIMD is enabled without an acceleration claim.
+Authored meshes, spectral quality, maximal covering and cross-platform bit identity remain unmeasured (LIM-621).
+
 The required-input audit also exercised the newly landed SQL-store restart test. The unit watchdog caught a
 Windows `EBUSY` folder hook before database closure, followed by a leaked server and generator workers. Its
 test-body `AsyncDisposableStack` now closes resources before directory removal, including failed setup; the

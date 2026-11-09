@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-620). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-621). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1213,3 +1213,16 @@ Current audio root 7,687 B gzip; Doppler entry 1,323 B (unchanged ceiling 1,346 
 LIM-603/605/607/608/610 PCM proofs are real browser Web Audio offline rendering; output-device PCM and subjective quality are unmeasured. Live AudioContext regressions cover state changes and controlled quantized clocks, not audible device output. Web Audio specifies subsample loop endpoints. At 130 bpm, marker checks cover one virtual hour at 8 kHz and five minutes each at 44.1/48 kHz, maximum phase error below 0.424 sample frames without cumulative rounding drift in Edge 157. Other browsers and hour-long 44.1/48 kHz sessions remain unmeasured. Evidence: docs/whitepaper/results/audio-review-20261109.json.
 
 Quiet-world zero-resend resume evidence assumes stationary clients with a fully received view. The initial loaded flag does not freeze future view changes. Moving clients may legitimately need in-flight chunk messages resent after a cut; the server ring recovers those messages, as the existing resume tests require.
+
+## Poisson disk placement (LIM-621)
+
+Optional procedural/poisson: 1,269 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
+CPU-only on WebGPU and WebGL2. Rectangle or area-weighted triangle-soup darts, ambient Euclidean separation,
+not geodesic spacing. Finite coordinates within +/-1,000,000; radius 0.000001..1,000,000; maximum 65,536 triangles,
+65,536 returned points and 2,000,000 candidates. Defaults: seed 1, 4,096 points, 100,000 candidates.
+Zero numerical area carries no probability, including cross products rounded to zero. Finite dart budgets need not
+cover a domain or return the point limit. No spectral, maximal-covering or frame-time promise. Output is float64;
+conversion to float32 can reduce separation. Signals precede synchronous sampling; workers enable in-flight aborts.
+Synthetic fixtures and a float64 oracle prove spacing, bounds, area weighting and exact rejection output.
+Real production-browser WebGPU/WebGL2 contexts prove lazy assets below a non-root base and independence from
+device/context loss. Authored meshes, hardware speed and cross-platform bit identity are unmeasured.

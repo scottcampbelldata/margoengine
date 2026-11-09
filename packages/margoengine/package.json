@@ -2126,6 +2126,10 @@
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
     },
+    "./procedural/poisson": {
+      "types": "./dist/procedural/poisson.d.ts",
+      "import": "./dist/procedural/poisson.js"
+    },
     "./procedural/standin": {
       "types": "./dist/procedural/standin.d.ts",
       "import": "./dist/procedural/standin.js"

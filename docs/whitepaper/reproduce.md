@@ -1,5 +1,15 @@
 # Reproducing Margo's numbers
 
+## Poisson placement work count (batch 68, job 1)
+
+Run `npm test --workspace @margoengine/procedural` for the seeded 3,000-candidate float64 all-pairs comparison:
+3,329 hash distance tests versus 3,445,553 all-pairs tests, exactly the same accepted coordinates. This is a work
+count, not a wall-clock speed claim. `npm run test:poisson-kernel --workspace @margoengine/procedural` runs the
+native Rust tests; `npm run build:poisson --workspace @margoengine/procedural` rebuilds the committed Wasm.
+Run `node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+for real production-browser WebGPU/WebGL2 value, lazy-asset, non-root-base and device/context-loss checks.
+Only synthetic geometric inputs are proven; authored mesh placement and spectral/speed quality are unmeasured.
+
 Every public number should come from one of the commands below. Run them from the repository root on the commit you
 want to check. Status of each claim and which command backs it: [claims.md](claims.md).
 

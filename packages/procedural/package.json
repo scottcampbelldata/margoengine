@@ -26,6 +26,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./poisson": {
+      "types": "./dist/poisson.d.ts",
+      "import": "./dist/poisson.js"
+    },
     "./standin": {
       "types": "./dist/standin.d.ts",
       "import": "./dist/standin.js"
@@ -63,8 +67,11 @@
     "@margoengine/core": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js procedural",
+    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs",
     "test": "npm run build && node --test test/*.test.js",
+    "build:poisson": "node scripts/build-poisson.mjs",
+    "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
+    "test:gpu": "node test/poisson-browser.mjs",
     "prepack": "npm run build"
   }
 }

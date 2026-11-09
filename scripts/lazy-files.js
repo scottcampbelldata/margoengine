@@ -10,6 +10,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
+  {
+    package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/poisson.wasm',
+    label: 'poisson.wasm',
+    kind: 'Rust Wasm sampler',
+    measure: 'file',
+    when: '`createPoissonSampler()`, only from the optional /poisson entry',
+  },
   // The stage (`margoengine`): each method imports its pack on first call; core is already loaded with the stage.
   {
     package: 'margoengine',

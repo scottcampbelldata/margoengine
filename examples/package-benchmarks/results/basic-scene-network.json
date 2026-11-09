@@ -1,39 +1,39 @@
 {
-  "commit": "f95793d08",
-  "dirty": false,
-  "browser": "chromium 156.0.8078.4 headless",
-  "adapter": "apple metal-3",
+  "commit": "52ccbbb00",
+  "dirty": true,
+  "browser": "msedge 157.0.4341.42 headless",
+  "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 794,
-      "raw": 544,
-      "gzip": 365,
-      "brotli": 219
+      "transferred": 808,
+      "raw": 558,
+      "gzip": 370,
+      "brotli": 228
     },
     {
-      "path": "assets/geometry-BZCQA1NR.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2563,
-      "raw": 4277,
-      "gzip": 2193,
-      "brotli": 1969
-    },
-    {
-      "path": "assets/index-BvYS-_5c.js",
+      "path": "assets/index-Rr5BRfTE.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24201,
+      "transferred": 24228,
       "raw": 58035,
-      "gzip": 23819,
-      "brotli": 21000
+      "gzip": 23846,
+      "brotli": 21055
     },
     {
-      "path": "assets/dist-ZLDmp4-C.js",
+      "path": "assets/geometry-DbR6RWSs.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2572,
+      "raw": 4311,
+      "gzip": 2202,
+      "brotli": 1977
+    },
+    {
+      "path": "assets/dist-B1YrEvPA.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
       "transferred": 7034,
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 36197,
-    "raw": 81529,
-    "gzip": 33493,
-    "brotli": 29526
+    "transferred": 36247,
+    "raw": 81577,
+    "gzip": 33534,
+    "brotli": 29598
   },
   "notFetched": []
 }

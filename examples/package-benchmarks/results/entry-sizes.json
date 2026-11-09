@@ -1,10 +1,10 @@
 {
-  "commit": "f95793d08",
-  "dirty": false,
+  "commit": "52ccbbb00",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
-    "gzip": 23782,
+    "gzip": 23797,
     "limit": 25000
   },
   "packages": {
@@ -102,20 +102,20 @@
     },
     "@margoengine/audio": {
       ".": {
-        "raw": 25169,
-        "gzip": 7642
+        "raw": 25290,
+        "gzip": 7687
       },
       "./occlusion": {
-        "raw": 3315,
-        "gzip": 1516
+        "raw": 3468,
+        "gzip": 1517
       },
       "./doppler": {
-        "raw": 2515,
-        "gzip": 1090
+        "raw": 3270,
+        "gzip": 1323
       },
       "./events": {
-        "raw": 18422,
-        "gzip": 5491
+        "raw": 18543,
+        "gzip": 5534
       },
       "./music": {
         "raw": 3742,
@@ -621,11 +621,11 @@
     "@margoengine/core": {
       ".": {
         "raw": 51562,
-        "gzip": 21438
+        "gzip": 21449
       },
       "./extension": {
-        "raw": 51660,
-        "gzip": 21501
+        "raw": 51659,
+        "gzip": 21475
       }
     },
     "@margoengine/creative": {
@@ -634,8 +634,8 @@
         "gzip": 3073
       },
       ".": {
-        "raw": 61586,
-        "gzip": 18995
+        "raw": 62200,
+        "gzip": 19043
       },
       "./particles": {
         "raw": 1028,
@@ -654,16 +654,16 @@
         "gzip": 7023
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 6996
+        "raw": 20958,
+        "gzip": 7013
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -2247,6 +2247,10 @@
         "raw": 30398,
         "gzip": 12594
       },
+      "./poisson": {
+        "raw": 2382,
+        "gzip": 1269
+      },
       "./standin": {
         "raw": 711,
         "gzip": 417
@@ -2868,8 +2872,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3712,6 +3716,11 @@
     }
   },
   "lazyFiles": {
+    "packages/procedural/dist/poisson.wasm": {
+      "raw": 29914,
+      "gzip": 13192,
+      "brotli": 11601
+    },
     "packages/gltf/dist/index.js": {
       "raw": 17475,
       "gzip": 6698,
