@@ -1643,3 +1643,14 @@ Environment owns the fixes for explicit background views leaking into differentl
 ## Batch 56 job 7: existing blurred glossy floor
 
 SKIPPED as a new entry because environment/reflector already provides a transformed planar reflection with roughness blur. The new staging composition uses it without duplicate runtime code. [Native evidence](../../examples/package-benchmarks/results/batch-56-floor.json) and [compatibility evidence](../../examples/package-benchmarks/results/batch-56-floor-compat.json) use the real licensed 20,734-triangle FlightHelmet: 4,078 reflected pixels below its complete main-view silhouette, 4,077 changed by blur, all eight mip levels within the unchanged independent bound, exact rounding probes, device replacement, resize, empty capture and disposal. Scope is a tinted planar image reflection, not a physically integrated rough floor. No speed claim.
+
+### Batch 99 parity continuation: gamma value regression (2026-11-09, PARTIAL)
+
+`docs/whitepaper/results/batch-99-parity-gamma-20261109.json` records observed raw output
+from the official external 0.99.7.2 binary, with archive/executable and fixture/image digests.
+The fixed-exponent mapping failed the new unit regressions. The corrected mapping gives
+exact native/compatibility display bytes 20/46/89 at film gamma 1/1.8/5 and the gamma-1
+coloured sky value 64. The authored calibration scenes are stand-ins executed on the real
+outside tool. The source, binary and PNGs are not redistributed. This proves those value
+regressions only. Subsurface, glass and atmosphere exact-pixel parity, independent whole-image
+repeatability and noise-free camera-move denoising remain unproven. Batch 99 remains incomplete.

@@ -104,7 +104,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 15, `./bot` 4, `./file-store` 1, `./entities` 14, `./shards` 12, `./webtransport` 6, `./chat` 16, `./rewind` 8, `./sql-store` 4 | 92 |  | 8,446 |
-| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 80,918 |
+| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 80,997 |
 | @margoengine/water | `.` 8 |  |  | 19,784 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
 | @margoengine/webgl2-compat | `.` 15, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2 | 145 |  | 102,200 |

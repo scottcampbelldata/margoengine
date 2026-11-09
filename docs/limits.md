@@ -1785,3 +1785,18 @@ Environment scene captures own their target viewport, including MSAA depth copie
 ### Reflective-floor reuse (batch 56, job 7)
 
 No staging/floor alias or duplicate renderer is added. Environment/reflector gives a finite tinted opaque mirror, transformed from local XY, with roughness 0..1 selecting a box-filtered mip among at most eight levels. Defaults: sharp roughness 0, width/height 1, resolution 1, autoUpdate true. It costs another scene capture, uses one bounce per frame for other mirrors and has no Fresnel, GGX or distance-dependent cone. Real FlightHelmet reflected pixels, all mip values, numeric boundaries and restored-frame equality are proved on WebGPU and WebGL2 compatibility; native preview returns linked unsupported. No speed claim. Gzip sizes: staging 8,520 B, accumulate 9,655 B, pathtrace 1,213 B, reused reflector 11,104 B; core plus stage 23,797 B remains below 25,000.
+
+### Batch 99 parity continuation: colour decoding evidence (2026-11-09)
+
+`magicaVoxelLinear(value, gamma?)` and `magicaVoxelMaterial(id, rgb, attributes?, gamma?)`
+accept finite film gamma 1..5, default 2.2. Pass the lighting result's `options.gamma`
+to material conversion. Light, ground, edge and grid colours use that film gamma automatically;
+raw fog and atmosphere coefficient colours keep their existing convention. Outside-tool values
+at gamma 1/1.8/5 and a coloured gamma-1 sky pass the native/compatibility GPU regression.
+The calibration fixtures are authored stand-ins run on a real external binary. They do not
+establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
+or a noise-free moving-camera denoiser. No speed claim is made.
+
+The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
+entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
+strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.

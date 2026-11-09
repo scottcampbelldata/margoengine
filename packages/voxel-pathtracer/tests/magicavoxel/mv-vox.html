@@ -26,8 +26,8 @@ window.render=async(b64,opt)=>{
  const used=new Set();for(const mv of vox.models)for(let i=3;i<mv.voxels.length;i+=4)used.add(mv.voxels[i]);
  const attrs=new Map(vox.materials.map((m)=>[m.id,m.attributes]));
  const tweak=opt.tweak?new Function('m',opt.tweak):(m)=>m;
- const materials=[...used].map((id)=>tweak(PT.magicaVoxelMaterial(id,vox.palette.subarray(4*id,4*id+3),attrs.get(id))));
  const light=PT.magicaVoxelLighting(robj,opt.hdr?{imageSky:{width:opt.hdr.width,height:opt.hdr.height,data:new Float32Array(opt.hdr.data)}}:{}),cam=PT.magicaVoxelCamera(cams.get(opt.camera??1),robj);
+ const materials=[...used].map((id)=>tweak(PT.magicaVoxelMaterial(id,vox.palette.subarray(4*id,4*id+3),attrs.get(id),light.options.gamma)));
  const canvas=document.querySelector('canvas');canvas.width=opt.width;canvas.height=opt.height;
  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:cam.position,target:cam.target,fov:cam.fov,near:0.5,far:4000}});
  engine.camera.up=cam.up;

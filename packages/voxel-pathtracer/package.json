@@ -90,7 +90,8 @@
     "build:mesh": "node scripts/build-mesh.mjs",
     "test:mesh-kernel": "node scripts/build-mesh.mjs --test",
     "test:gpu:mesh": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-browser.mjs",
-    "test:gpu:spectral": "cd ../.. && node packages/voxel-pathtracer/tests/spectral-browser.mjs"
+    "test:gpu:spectral": "cd ../.. && node packages/voxel-pathtracer/tests/spectral-browser.mjs",
+    "test:gpu:parity-gamma": "cd ../.. && node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -104,7 +105,8 @@
       "test:gpu:sky": 10,
       "test:gpu:media": 10,
       "test:gpu:mesh": 10,
-      "test:gpu:spectral": 10
+      "test:gpu:spectral": 10,
+      "test:gpu:parity-gamma": 6
     }
   },
   "peerDependenciesMeta": {

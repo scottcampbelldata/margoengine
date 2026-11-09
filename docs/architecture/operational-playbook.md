@@ -2823,3 +2823,17 @@ The floor's independent mip oracle caught hardware filter/storage rounding beyon
 Job 7 is SKIPPED as a new implementation: environment/reflector already captures and blurs a transformed planar surface. The staging README composes it as a product floor. Real FlightHelmet evidence shows 4,078 reflected pixels below the entire product silhouette and 4,077 pixels changed by roughness on each tested backend. Its existing image blur is not a physical GGX floor BRDF. The owning capture and precision defects were repaired in the separate preceding environment fix with failing regressions; no core/stage or held physics edits.
 
 The environment mirror GPU gate now runs its unchanged 65 assertions on both WebGPU and WebGL2 compatibility, at 1x and 4x MSAA. Its fixture queues a canvas-texture copy before expiration and maps after GPU completion. This repairs a premature first-compute read without reading an expired native canvas. The earlier compatibility TAA mismatch and the intermediate native blank-frame failure are retained in the canvas-readiness evidence; neither is excused by changing pixels, thresholds or frame counts.
+
+### Batch 99 parity colour decoding: section 5 evidence (2026-11-09)
+
+Palette and light/surface colour conversion now uses the file's film gamma, default 2.2.
+The former fixed exponent produced a 9-level sunlight value where the external black-box
+reference measures 20 at gamma 1. Unit regressions fail on the old build. The dedicated
+`voxel-pathtracer test:gpu:parity-gamma` requires exact bytes 20/46/89 at gamma 1/1.8/5
+on native WebGPU and WebGL2 compatibility, plus the gamma-1 coloured sky value. Both
+backends compile without shader diagnostics or GPU errors. The outside binary, its licence,
+input/output digests and numeric results are recorded in
+`whitepaper/results/batch-99-parity-gamma-20261109.json`; no outside implementation or PNG ships.
+This evidence covers colour decoding. Exact subsurface, glass and atmosphere pixel parity
+and camera-move disocclusion denoising remain open. An independently restarted complete
+zero-error image corpus remains missing. No core/stage source or physics source changed.

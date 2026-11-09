@@ -4373,6 +4373,21 @@ Environment scene captures own their target viewport, including MSAA depth copie
 
 No staging/floor alias or duplicate renderer is added. Environment/reflector gives a finite tinted opaque mirror, transformed from local XY, with roughness 0..1 selecting a box-filtered mip among at most eight levels. Defaults: sharp roughness 0, width/height 1, resolution 1, autoUpdate true. It costs another scene capture, uses one bounce per frame for other mirrors and has no Fresnel, GGX or distance-dependent cone. Real FlightHelmet reflected pixels, all mip values, numeric boundaries and restored-frame equality are proved on WebGPU and WebGL2 compatibility; native preview returns linked unsupported. No speed claim. Gzip sizes: staging 8,520 B, accumulate 9,655 B, pathtrace 1,213 B, reused reflector 11,104 B; core plus stage 23,797 B remains below 25,000.
 
+### Batch 99 parity continuation: colour decoding evidence (2026-11-09)
+
+`magicaVoxelLinear(value, gamma?)` and `magicaVoxelMaterial(id, rgb, attributes?, gamma?)`
+accept finite film gamma 1..5, default 2.2. Pass the lighting result's `options.gamma`
+to material conversion. Light, ground, edge and grid colours use that film gamma automatically;
+raw fog and atmosphere coefficient colours keep their existing convention. Outside-tool values
+at gamma 1/1.8/5 and a coloured gamma-1 sky pass the native/compatibility GPU regression.
+The calibration fixtures are authored stand-ins run on a real external binary. They do not
+establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
+or a noise-free moving-camera denoiser. No speed claim is made.
+
+The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
+entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
+strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -4512,6 +4527,20 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
 ### Batch 99 caustic guide scope
 
 Job 4's optional caustic guide is independently covered by `packages/voxel-pathtracer/tests/guiding-browser.mjs`. Its finite deflector table and geometry-prior variance trade-off are design limits in the README and `docs/limits.md`; they do not close the separate job 1 parity or job 2 disocclusion defects above.
+
+### Batch 99 parity continuation: gamma correction and unresolved subsurface transport
+
+The mapping's fixed exponent 2.2 decoded palette and light colours incorrectly when `_film _gam` changed.
+The corrected decoder accepts the file gamma; `magicaVoxelLighting` applies it to light and display surface
+colours. `magicavoxel.test.js` has regressions that fail on the former build, and
+`tests/magicavoxel-gamma-browser.mjs` requires exact measured output bytes on native and compatibility backends.
+Record: `docs/whitepaper/results/batch-99-parity-gamma-20261109.json`.
+This fixes that colour conversion only. In the recorded 16 x 16 base / 8 x 8 x 6 subsurface block, the corrected
+4,096-sample render still differs on 180,988 pixels from the external 1,024-sample reference, with RGB absolute
+error 7,398,780. The existing cloud model has no diffuse surface interface and still shows broad soft edges.
+Chiang, Kutz and Burley 2016 describe the distinction between apparent surface albedo and single-scattering
+albedo with a diffuse interface. That is a candidate transport cause to investigate, not an established match.
+Neither this record nor the gamma fix closes exact parity. The full zero-error oracle remains required.
 
 ### Fixed in batch 99: media-boundary emitter MIS distance
 

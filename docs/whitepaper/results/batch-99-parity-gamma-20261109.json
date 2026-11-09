@@ -1,0 +1,371 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "status": "PARTIAL: gamma bug regression only; exact subsurface/glass/atmosphere parity remains open",
+  "provenance": {
+    "tool": "MagicaVoxel 0.99.7.2 win64, external black box",
+    "url": "https://github.com/ephtracy/ephtracy.github.io/releases/download/0.99.7/MagicaVoxel-0.99.7.2-win64.zip",
+    "archiveBytes": 3794277,
+    "archiveSha256": "58320b90be00742cac2984ac6ddcc2cdd773d0b18a4212a1560b52b082e4d873",
+    "executableSha256": "7657e4c00de35f5272eec5b8d513b36b4e0767bb941668aa37677f3f9a3d4162",
+    "licence": "Free use; no distribution of the software in other packages",
+    "licenceUrl": "https://ephtracy.github.io/mv_main.html",
+    "noImplementationRead": true,
+    "fixtures": "Margo-authored stand-in calibration scenes, not outside assets; real outside tool output values"
+  },
+  "references": [
+    {
+      "name": "d.vox",
+      "gamma": 1,
+      "fixtureSha256": "9c963886fac0c4da9219b8f4df8759b5e465ffebb5a5ee0022264344f9c395a7",
+      "pngSha256": "ea7c9671a42364c33e211b7dceb20a0907a9fbe31f25351adcc5fc34b66fff83",
+      "width": 960,
+      "height": 800,
+      "pixel": [
+        480,
+        400
+      ],
+      "rgba": [
+        20,
+        20,
+        20,
+        255
+      ],
+      "samples": 1024
+    },
+    {
+      "name": "d18.vox",
+      "gamma": 1.8,
+      "fixtureSha256": "0e3527a124a26d188f08ca828547465cb12f0ad2345b4ffda4eb53d5a4378b31",
+      "pngSha256": "369fd45b983bfd3b1c76d17f74932926bf79d4ab8a59b2d4c2f119a9e56e12cd",
+      "width": 960,
+      "height": 800,
+      "pixel": [
+        480,
+        400
+      ],
+      "rgba": [
+        46,
+        46,
+        46,
+        255
+      ],
+      "samples": 1024
+    },
+    {
+      "name": "d5.vox",
+      "gamma": 5,
+      "fixtureSha256": "f18b28182864265f93fadb8fbbafaf12196572688457f71c88cdba7650e1d03b",
+      "pngSha256": "8f40b7f0a69461f3336ac70d929b88b7faba1ac88ff755f3141ad62d8beaabb3",
+      "width": 960,
+      "height": 800,
+      "pixel": [
+        480,
+        400
+      ],
+      "rgba": [
+        89,
+        89,
+        89,
+        255
+      ],
+      "samples": 1024
+    },
+    {
+      "name": "sky.vox",
+      "gamma": 1,
+      "fixtureSha256": "3eca7a49b1644235039d99cc0b921ac6e35791e1b9036ebba342d2fadb83654c",
+      "pngSha256": "100cb37d662df3e8ceb55f5f00fb1a5dd287a31987039497661b1f6e8376bd0d",
+      "width": 960,
+      "height": 800,
+      "pixel": [
+        480,
+        400
+      ],
+      "rgba": [
+        64,
+        64,
+        64,
+        255
+      ],
+      "samples": 1024
+    }
+  ],
+  "gpu": [
+    {
+      "compat": false,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "result": {
+        "coverage": [
+          {
+            "gamma": 1,
+            "reference": 20,
+            "actual": [
+              20
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "lifecycle": true,
+            "replaced": true,
+            "different": 0
+          },
+          {
+            "gamma": 1.8,
+            "reference": 46,
+            "actual": [
+              46
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "gamma": 5,
+            "reference": 89,
+            "actual": [
+              89
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "name": "colored sky",
+            "actual": [
+              0.250980406999588,
+              0.250980406999588,
+              0.250980406999588
+            ],
+            "expected": 0.25098039215686274
+          }
+        ],
+        "errors": [],
+        "messages": []
+      }
+    },
+    {
+      "compat": true,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "webgpu": null,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [
+          "--use-angle=vulkan"
+        ],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "result": {
+        "coverage": [
+          {
+            "gamma": 1,
+            "reference": 20,
+            "actual": [
+              20
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "lifecycle": true,
+            "replaced": true,
+            "different": 0
+          },
+          {
+            "gamma": 1.8,
+            "reference": 46,
+            "actual": [
+              46
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "gamma": 5,
+            "reference": 89,
+            "actual": [
+              89
+            ],
+            "alpha": [
+              255
+            ]
+          },
+          {
+            "name": "colored sky",
+            "actual": [
+              0.250980406999588,
+              0.250980406999588,
+              0.250980406999588
+            ],
+            "expected": 0.25098039215686274
+          }
+        ],
+        "errors": [],
+        "messages": []
+      }
+    }
+  ],
+  "subsurface": {
+    "fixtureSha256": "53bf5cf3e36422f1779a595dfb3fed23f6505730c29a63cd3dcdf4c147fc464d",
+    "referencePngSha256": "040a7197746453e773b7e55cd12bc942e9470c92519f6a551d455bbc899134e8",
+    "beforePngSha256": "bc7366ebe37230bf52210e615449b978454549f85966bee14e421d78107ecddf",
+    "afterPngSha256": "1175145431ad2c9e2ecef3eb026cce36355f2326514c054f03be772ec7189baf",
+    "referenceSamples": 1024,
+    "margoSamples": 4096,
+    "before": {
+      "changedPixels": 188444,
+      "absoluteRgbError": 46287894,
+      "maximumLevelError": 203,
+      "mae": 20.090231770833334
+    },
+    "after": {
+      "changedPixels": 180988,
+      "absoluteRgbError": 7398780,
+      "maximumLevelError": 200,
+      "mae": 3.211276041666667
+    },
+    "points": [
+      {
+        "pixel": [
+          480,
+          650
+        ],
+        "reference": [
+          212,
+          207,
+          205,
+          255
+        ],
+        "before": [
+          92,
+          90,
+          90,
+          255
+        ],
+        "after": [
+          212,
+          209,
+          207,
+          255
+        ]
+      },
+      {
+        "pixel": [
+          200,
+          500
+        ],
+        "reference": [
+          211,
+          207,
+          205,
+          255
+        ],
+        "before": [
+          91,
+          90,
+          90,
+          255
+        ],
+        "after": [
+          210,
+          208,
+          206,
+          255
+        ]
+      },
+      {
+        "pixel": [
+          450,
+          300
+        ],
+        "reference": [
+          195,
+          109,
+          58,
+          255
+        ],
+        "before": [
+          141,
+          42,
+          13,
+          255
+        ],
+        "after": [
+          188,
+          93,
+          47,
+          255
+        ]
+      },
+      {
+        "pixel": [
+          500,
+          500
+        ],
+        "reference": [
+          177,
+          93,
+          46,
+          255
+        ],
+        "before": [
+          94,
+          28,
+          9,
+          255
+        ],
+        "after": [
+          144,
+          71,
+          36,
+          255
+        ]
+      }
+    ],
+    "exactPixelParity": false
+  },
+  "repeatability": {
+    "cameraReloadChangedPixels": 4020,
+    "cameraReloadMaximumError": 3,
+    "modeToggleChangedPixels": 0,
+    "caveat": "Repeated camera loading glides; mode toggle can retain the accumulated image. Neither proves independent restart repeatability. The gamma value cases are zero-variance interior measurements, not a complete image oracle."
+  },
+  "limitations": [
+    "No passing complete exact-pixel corpus yet",
+    "Only gamma 1, 1.8 and 5 material and gamma-1 sky values independently measured here",
+    "No glass or atmosphere remeasurement in this continuation",
+    "No speed claim"
+  ],
+  "research": [
+    "https://cgg.mff.cuni.cz/~jaroslav/papers/2014-zerovar/2014-zerovar-abstract.pdf",
+    "https://media.disneyanimation.com/uploads/production/publication_asset/153/asset/siggraph2016SSS.pdf",
+    "https://sebh.github.io/publications/egsr2020.pdf"
+  ],
+  "lifecycle": "Native and compatibility: real replacement device, exact gamma-1 capture bytes before/after, repeated disposal and rendering after disposal without validation errors."
+}

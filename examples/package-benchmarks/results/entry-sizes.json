@@ -1,6 +1,6 @@
 {
-  "commit": "086b4bcb8",
-  "dirty": false,
+  "commit": "4238614df",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -882,16 +882,16 @@
         "gzip": 9457
       },
       "./reflector": {
-        "raw": 29646,
-        "gzip": 10726
+        "raw": 30478,
+        "gzip": 11104
       },
       "./refractor": {
-        "raw": 29511,
-        "gzip": 10685
+        "raw": 30343,
+        "gzip": 11065
       },
       "./cube-camera": {
-        "raw": 16773,
-        "gzip": 5611
+        "raw": 16958,
+        "gzip": 5680
       },
       "./exr-write": {
         "raw": 3595,
@@ -3612,8 +3612,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 230650,
-        "gzip": 80918
+        "raw": 230877,
+        "gzip": 80997
       },
       "./restir": {
         "raw": 4182,

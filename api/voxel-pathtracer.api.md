@@ -384,9 +384,9 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>, { look, 
     imageSky?: Pick<TraceEnvironmentMap, 'width' | 'height' | 'data'>;
 }): MagicaVoxelLighting;
 
-export const magicaVoxelLinear: (value: number) => number;
+export const magicaVoxelLinear: (value: number, gamma?: number) => number;
 
-export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attributes?: MagicaVoxelDict): TraceMaterial;
+export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attributes?: MagicaVoxelDict, gamma?: number): TraceMaterial;
 
 export function magicaVoxelMatrix(size: ArrayLike<number>, translation?: ArrayLike<number>, rotation?: ArrayLike<number>, scale?: ArrayLike<number>): number[];
 

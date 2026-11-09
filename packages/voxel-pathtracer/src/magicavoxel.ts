@@ -1,7 +1,7 @@
 // MagicaVoxel compatibility: turns a .vox file's palette colours, MATL materials, rOBJ render settings and rCAM
 // cameras into this tracer's scene, environment, options and camera, so a file renders as MagicaVoxel 0.99.7 renders
 // it. The mapping was measured from MagicaVoxel's own renders of calibration scenes (black-box; its code was not
-// read): palette colours are linear by a pure 2.2 power, uniform sky radiance is its intensity, sun irradiance five
+// read): palette colours are linear by the film's gamma power (default 2.2), uniform sky radiance is its intensity, sun irradiance five
 // times its intensity, emitted radiance colour x (1 + 3 x emission x 10^power), metal reflects
 // min(1, specular x colour), the coat adds to the diffuse base, glass colour acts through `_d` absorption only, media
 // extinction is `_d` per voxel, and the film is Narkowicz's ACES fit with a 2.2 power.
@@ -99,16 +99,22 @@ const nums = (d: MagicaVoxelDict | undefined, key: string): number[] | undefined
   return parts.every(Number.isFinite) ? parts : undefined;
 };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-/** MagicaVoxel's 8-bit colour to linear: a pure 2.2 power (not the sRGB curve). */
-export const magicaVoxelLinear = (value: number): number => clamp01(value / 255) ** 2.2;
-const linear3 = (c: ArrayLike<number>): TraceVec3 => [
-  magicaVoxelLinear(c[0]),
-  magicaVoxelLinear(c[1]),
-  magicaVoxelLinear(c[2]),
+/** MagicaVoxel's 8-bit colour to linear with the film gamma (1..5, default 2.2), rather than the sRGB curve. */
+export const magicaVoxelLinear = (value: number, gamma = 2.2): number => {
+  if (typeof gamma !== 'number' || !Number.isFinite(gamma) || gamma < 1 || gamma > 5)
+    throw new RangeError(
+      'magicaVoxelLinear gamma must be finite and between 1 and 5; pass the file lighting.options.gamma',
+    );
+  return clamp01(value / 255) ** gamma;
+};
+const linear3 = (c: ArrayLike<number>, gamma = 2.2): TraceVec3 => [
+  magicaVoxelLinear(c[0], gamma),
+  magicaVoxelLinear(c[1], gamma),
+  magicaVoxelLinear(c[2], gamma),
 ];
-const colorOf = (d: MagicaVoxelDict | undefined, key: string, fallback: TraceVec3): TraceVec3 => {
+const colorOf = (d: MagicaVoxelDict | undefined, key: string, fallback: TraceVec3, gamma: number): TraceVec3 => {
   const c = nums(d, key);
-  return c && c.length >= 3 ? linear3(c) : fallback;
+  return c && c.length >= 3 ? linear3(c, gamma) : fallback;
 };
 /** An 8-bit colour as value / 255 (no 2.2 power), white when absent. */
 const rawColor = (c: number[] | undefined): TraceVec3 =>
@@ -153,14 +159,20 @@ export const fromMagicaVoxel = (p: ArrayLike<number>): TraceVec3 => [p[0], p[2],
  * The tracer material of palette index `id` with 8-bit colour `rgb` and MATL `attributes` (MagicaVoxel 0.99.7 keys,
  * and the older `_weight` / `_spec` / `_alpha` it still reads, which win when both are present). A missing key reads
  * as MagicaVoxel reads it: 0, except specular 1 (so `_type` alone is plain diffuse, opaque glass, a dark emitter).
+ * Pass the file lighting's `options.gamma` as `gamma` (1..5, default 2.2) to decode its palette consistently.
  * @throws RangeError when `id` is not 1 to 255.
  */
-export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attributes?: MagicaVoxelDict): TraceMaterial {
+export function magicaVoxelMaterial(
+  id: number,
+  rgb: ArrayLike<number>,
+  attributes?: MagicaVoxelDict,
+  gamma = 2.2,
+): TraceMaterial {
   if (!Number.isInteger(id) || id < 1 || id > 255)
     throw new RangeError(`magicaVoxelMaterial id ${id} is out of range; pass a palette index 1 to 255`);
   const a = attributes,
     type = get(a, '_type') ?? '_diffuse',
-    color = linear3(rgb),
+    color = linear3(rgb, gamma),
     weight = num(a, '_weight'),
     // MagicaVoxel's roughness r matches a GGX width of about 0.13 r (fitted to its reflections, r 0.05 to 1).
     rough = Math.sqrt(0.13 * clamp01(num(a, '_rough') ?? 0)),
@@ -302,6 +314,7 @@ export function magicaVoxelLighting(
     groundOn = (num(setting, '_ground') ?? 1) !== 0,
     bgOn = (num(setting, '_bg_c') ?? 0) !== 0,
     film = o('_film'),
+    gamma = Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
     bounce = o('_bounce'),
     lens = o('_lens'),
     diffuseCap = Math.min(64, Math.max(1, Math.round(num(bounce, '_diffuse') ?? 2))),
@@ -316,7 +329,7 @@ export function magicaVoxelLighting(
       internalReflections: 2,
     };
   const sunMV = [Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)],
-    sunColor = colorOf(o('_inf'), '_k', [1, 1, 1]),
+    sunColor = colorOf(o('_inf'), '_k', [1, 1, 1], gamma),
     atm = o('_atm'),
     atmosphere =
       mode === 1
@@ -331,7 +344,7 @@ export function magicaVoxelLighting(
           }
         : undefined;
   const environment: TraceEnvironment = {
-    skyColor: colorOf(o('_uni'), '_k', [1, 1, 1]),
+    skyColor: colorOf(o('_uni'), '_k', [1, 1, 1], gamma),
     skyIntensity: Math.max(0, num(o('_uni'), '_i') ?? 0.7),
     sunDirection: fromMagicaVoxel(sunMV),
     // In atmosphere mode the sun reaches the ground through the air (dimmed and reddened toward the horizon).
@@ -377,7 +390,7 @@ export function magicaVoxelLighting(
     ...(bgOn ? { background: displayed(rawColor(nums(o('_bg'), '_color') ?? [0, 0, 0]), film) } : {}),
     ...(groundOn
       ? {
-          groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
+          groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80], gamma), gamma),
           groundHeight: 0,
           // `_hor` h: the ground the camera sees at distance D fades into the sky behind it by 1 - e^(-D h / c),
           // c 2030 under the uniform sky (measured per pixel against the unfaded ground: h 0.1 and 0.5, cameras 60-180
@@ -419,14 +432,17 @@ export function magicaVoxelLighting(
       // corners at widths 0.2 and 0.5).
       edges:
         (num(setting, '_edge') ?? 0) !== 0
-          ? { color: colorOf(edge, '_color', [0, 0, 0]), width: Math.min(0.5, Math.max(0, num(edge, '_width') ?? 0.2)) }
+          ? {
+              color: colorOf(edge, '_color', [0, 0, 0], gamma),
+              width: Math.min(0.5, Math.max(0, num(edge, '_width') ?? 0.2)),
+            }
           : null,
       // Grid: lines every `_spacing` with half width `_width` on the ground, and on voxels with `_display` 0
       // (measured: spacing 1 and 4, widths 0.02 and 0.1, both display modes).
       grid:
         (num(setting, '_grid') ?? 0) !== 0
           ? {
-              color: colorOf(grid, '_color', [0, 0, 0]),
+              color: colorOf(grid, '_color', [0, 0, 0], gamma),
               spacing: Math.max(1e-3, num(grid, '_spacing') ?? 1),
               width: Math.max(0, num(grid, '_width') ?? 0.02),
               onVoxels: (num(grid, '_display') ?? 0) === 0,
@@ -447,7 +463,7 @@ export function magicaVoxelLighting(
       // As many samples per frame as keep the display's pace (the same image, sooner).
       samplesPerFrame: 'auto',
       toneMapping: (num(film, '_aces') ?? 1) !== 0 ? 'aces-narkowicz' : 'linear',
-      gamma: Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
+      gamma,
       exposure: Math.min(20, Math.max(-20, Math.log2(Math.max(expo, 2 ** -20)))),
       ...(look === 'magicavoxel'
         ? {

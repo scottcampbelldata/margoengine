@@ -26,6 +26,52 @@ test('palette colours are linear by a pure 2.2 power', () => {
   near3(magicaVoxelMaterial(3, [255, 128, 0]).color, [1, lin(128), 0]);
 });
 
+test('palette decoding follows film gamma across the black-box sunlight sweep', () => {
+  // Raw 0.99.7.2 reference values: a 128 grey Lambertian plane under _inf _i=0.1,
+  // normal incidence, no sky or ground, linear film, 1,024 samples. No transport fit.
+  for (const [gamma, expectedByte] of [
+    [1, 20],
+    [1.8, 46],
+    [5, 89],
+  ]) {
+    const color = magicaVoxelMaterial(1, [128, 128, 128], undefined, gamma).color;
+    near3(color, Array(3).fill((128 / 255) ** gamma));
+    const displayed = Math.round(255 * ((color[0] * 0.5) / Math.PI) ** (1 / gamma));
+    assert.equal(displayed, expectedByte, `reference gamma ${gamma}`);
+    near(magicaVoxelLinear(128, gamma), color[0]);
+  }
+  for (const gamma of [0, 0.999, 5.001, 1e30, NaN, Infinity, -Infinity, null, '2.2']) {
+    assert.throws(() => magicaVoxelLinear(128, gamma), /gamma.*between 1 and 5/);
+    assert.throws(() => magicaVoxelMaterial(1, [128, 128, 128], undefined, gamma), /gamma.*between 1 and 5/);
+  }
+});
+
+test('file gamma decodes light and display surface colours together, leaving raw fog coefficients raw', () => {
+  for (const gamma of [1, 1.8, 5]) {
+    const color = [128, 64, 200],
+      expected = color.map((x) => (x / 255) ** gamma);
+    const { environment: e, options: o } = magicaVoxelLighting([
+      { _type: '_film', _gam: String(gamma) },
+      { _type: '_uni', _k: color.join(' '), _i: '0.5' },
+      { _type: '_inf', _k: color.join(' ') },
+      { _type: '_ground', _color: color.join(' ') },
+      { _type: '_edge', _color: color.join(' ') },
+      { _type: '_grid', _color: color.join(' ') },
+      { _type: '_setting', _edge: '1', _grid: '1' },
+      { _type: '_fog_uni', _d: '1', _k: color.join(' ') },
+    ]);
+    for (const decoded of [e.skyColor, e.sunColor, e.groundColor, o.edges.color, o.grid.color])
+      near3(decoded, expected);
+    near3(
+      e.fog.color,
+      color.map((x) => x / 255),
+    );
+    assert.equal(o.gamma, gamma);
+    const defaults = magicaVoxelLighting([{ _type: '_film', _gam: String(gamma) }]);
+    near3(defaults.environment.groundColor, Array(3).fill((80 / 255) ** gamma));
+  }
+});
+
 test('metal: reflectance min(1, specular x colour), GGX width 0.13 x roughness, additive coat', () => {
   const m = magicaVoxelMaterial(5, [255, 191, 77], { _type: '_metal', _metal: '1', _rough: '0.2', _sp: '1.5' });
   assert.equal(m.type, 'metal');

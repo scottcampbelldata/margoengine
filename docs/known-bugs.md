@@ -136,6 +136,20 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
 
 Job 4's optional caustic guide is independently covered by `packages/voxel-pathtracer/tests/guiding-browser.mjs`. Its finite deflector table and geometry-prior variance trade-off are design limits in the README and `docs/limits.md`; they do not close the separate job 1 parity or job 2 disocclusion defects above.
 
+### Batch 99 parity continuation: gamma correction and unresolved subsurface transport
+
+The mapping's fixed exponent 2.2 decoded palette and light colours incorrectly when `_film _gam` changed.
+The corrected decoder accepts the file gamma; `magicaVoxelLighting` applies it to light and display surface
+colours. `magicavoxel.test.js` has regressions that fail on the former build, and
+`tests/magicavoxel-gamma-browser.mjs` requires exact measured output bytes on native and compatibility backends.
+Record: `docs/whitepaper/results/batch-99-parity-gamma-20261109.json`.
+This fixes that colour conversion only. In the recorded 16 x 16 base / 8 x 8 x 6 subsurface block, the corrected
+4,096-sample render still differs on 180,988 pixels from the external 1,024-sample reference, with RGB absolute
+error 7,398,780. The existing cloud model has no diffuse surface interface and still shows broad soft edges.
+Chiang, Kutz and Burley 2016 describe the distinction between apparent surface albedo and single-scattering
+albedo with a diffuse interface. That is a candidate transport cause to investigate, not an established match.
+Neither this record nor the gamma fix closes exact parity. The full zero-error oracle remains required.
+
 ### Fixed in batch 99: media-boundary emitter MIS distance
 
 The root voxel tracer used the final ray segment's `h.t` to convert the emitter PDF to solid angle after crossing a medium without scattering. NEE used the whole vertex-to-light distance, so the two MIS shares did not sum to one and over-counted energy. The tracer retains the last scattering position and uses its full distance for both voxel emission and area hits. `packages/voxel-pathtracer/tests/restir-browser.mjs` compares an absorbing half-block slab under a square light against independent quadrature, for both light types and both native WebGPU and compatibility. Before the correction, voxel emission averaged 0.756703 against about 0.69 physically expected, failing the unchanged 0.02 bound. The many-light 2x requirement is unchanged.

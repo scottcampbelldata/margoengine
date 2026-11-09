@@ -1273,3 +1273,21 @@ runtime/speed threshold, connectivity or real 3D geology is claimed.
 ## Batch 56 reflective-floor audit regressions
 
 Run npm test --workspace @margoengine/environment, then under the GPU lock run node packages/staging/test/floor-browser.mjs and the same command with --compat. --record writes batch-56-floor.json and batch-56-floor-compat.json in examples/package-benchmarks/results. The licensed FlightHelmet mobile GLB is an existing required fixture. The test verifies every component of all eight power-of-two mips against independent 2x2 means, exact half-rounding probes, displayed reflected pixels, actual replacement-device frame equality, resize and a uniform cleared product capture. Existing scripts/env-mirror-gpu-check.js exercises independent mirror, glass and cube-camera references.
+
+## Batch 99 parity gamma regression (2026-11-09)
+
+Run `npm run build:packages`, then
+`node scripts/gpu-lock.mjs run --owner=parity-gamma --max=6 -- node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs`.
+The test requires exact reference bytes on native WebGPU and WebGL2 compatibility and writes
+`test-results/voxel-pathtracer-magicavoxel-gamma.json`.
+
+For the external black-box value measurements, generate standard own fixtures with
+`node packages/voxel-pathtracer/tests/magicavoxel/parity-fixtures.cjs <temporary-directory>`.
+Use the official 0.99.7.2 win64 archive and executable with the digests in
+`results/batch-99-parity-gamma-20261109.json`; keep the tool and PNGs outside Margo.
+Open each `gamma-*.vox`, enter Render, load camera slot 1, wait for all 1,024 samples,
+and save the raw 960 x 800 snapshot without denoising. Read RGB at (480,400): gamma
+1/1.8/5 gives 20/46/89. For `colored-sky.vox` the gamma-1 value is 64. These interior
+zero-variance measurements do not establish whole-image repeatability. A camera-slot
+reload glides to its target, and model/render mode toggling can retain accumulation.
+The independent full zero-error parity corpus remains unfinished.

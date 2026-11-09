@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'docs/whitepaper/results/batch-99-parity-gamma-20261109.json',
+    'Own numerical observations of external MagicaVoxel 0.99.7.2 win64, by ephtracy, https://ephtracy.github.io/mv_main.html. Free use; distribution in other packages prohibited. Official release archive SHA-256 58320b90be00742cac2984ac6ddcc2cdd773d0b18a4212a1560b52b082e4d873, executable 7657e4c00de35f5272eec5b8d513b36b4e0767bb941668aa37677f3f9a3d4162. Only a black-box tool; executable, shaders and rendered PNGs stay outside Margo. No implementation read or copied. Calibration .vox files are Margo-authored stand-ins.',
+  ],
+  [
     'packages/procedural/test/fixtures/caves/reference.json',
     'Natural Earth v5.1.2 1:110m land GeoJSON, public domain, Nathaniel Vaughn Kelso and Tom Patterson; https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_110m_land.geojson; SHA-256 9e0729ee253ca7d7a5c4ae9395fb1902264c5377c52e224d13dd85010e2835d9. Original 138160-byte standard geographic test fixture, never shipped in npm. Terms: https://www.naturalearthdata.com/about/terms-of-use/. Own Madagascar rasterization and scalar automaton; no implementation copied.',
   ],

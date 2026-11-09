@@ -672,7 +672,7 @@ Numbers on other GPUs are not measured.
 
 ## MagicaVoxel files
 
-`magicaVoxelMaterial(id, rgb, attributes)`, `magicaVoxelLighting(renderObjects)`, `magicaVoxelCamera(camera,
+`magicaVoxelMaterial(id, rgb, attributes, gamma?)`, `magicaVoxelLighting(renderObjects)`, `magicaVoxelCamera(camera,
 renderObjects)`, `magicaVoxelModel(id, revision, size, xyzi)` and `magicaVoxelMatrix(size, translation, rotation)`
 turn a `.vox` file's palette, MATL materials, rOBJ render settings, rCAM camera and models into this tracer's inputs
 (MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelCamera` reports the projection: orthographic for
@@ -687,7 +687,7 @@ metal and glass, light through glass, sun-lit clouds, rough metal keeping its en
 look, lit correctly.
 
 The mapping was measured from MagicaVoxel 0.99.7's own renders of calibration scenes (a black box: its code was not
-read): palette colours are linear by a pure 2.2 power, sky radiance is its intensity, sun irradiance 5 x intensity,
+read): palette and light colours are linear by the film gamma's power (default 2.2), sky radiance is its intensity, sun irradiance 5 x intensity,
 emitters `colour x (1 + 3 x emission x 10^power)`, metal reflectance `min(1, specular x colour)` with GGX width
 0.13 x roughness, glass colour through `_d` absorption only, media extinction `_d` per voxel, fog extinction
 0.001 x `_d`. Its atmosphere sky (`_env _mode 1`) is reproduced by `bakeAtmosphere` (exported with
@@ -702,6 +702,19 @@ as `voxelScale`, which `magicaVoxelMatrix` takes as its fourth argument (the sce
 file passed as `magicaVoxelLighting(objects, { imageSky })` (the result's `imageSky.path` names it). Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
 MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the calibration scripts are in `tests/magicavoxel/`. On the same scenes at 960 x 800 and 1024 samples this tracer takes
 1.7-1.85 s on an RTX A6000.
+
+Pass `magicaVoxelLighting(...).options.gamma` to material conversion when the file changes `_film _gam`.
+The omitted argument keeps the default 2.2; explicit gamma must be finite and within 1..5.
+`magicaVoxelLinear(value, gamma?)` uses the same conversion. Light, ground, edge and grid colours use the
+file gamma automatically. Fog and atmosphere density colours retain their raw coefficient convention.
+
+```ts
+import { magicaVoxelLighting, magicaVoxelMaterial } from '@margoengine/voxel-pathtracer';
+
+const lighting = magicaVoxelLighting([{ _type: '_film', _gam: '1', _aces: '0' }]);
+const material = magicaVoxelMaterial(1, [128, 128, 128], { _type: '_diffuse' }, lighting.options.gamma);
+console.log(material.color); // [128 / 255, 128 / 255, 128 / 255]
+```
 
 ## Parity status and known gaps
 

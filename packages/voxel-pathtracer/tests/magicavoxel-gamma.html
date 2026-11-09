@@ -1,0 +1,47 @@
+<!doctype html><html><meta charset="utf-8"><title>File gamma color regression</title><canvas width="8" height="8"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer,magicaVoxelLighting,magicaVoxelMaterial} from '/packages/voxel-pathtracer/dist/index.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,3],target:[0,0,0]}});
+ const errors=[],messages=[],reports=[],coverage=[];
+ const watch=()=>{const device=engineRuntime(engine).gpu;
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);
+ device.createShaderModule=d=>{const module=create(d);reports.push(module.getCompilationInfo().then(i=>messages.push(...i.messages.filter(m=>m.type==='error').map(m=>m.message))));return module;};};watch();
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=10/aspect;out[5]=10;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
+ const scene={revision:1,models:[{id:'plane',revision:1,size:[1,1,1],voxels:new Uint8Array([1])}],
+ instances:[{id:'plane',modelId:'plane',matrix:[1,0,0,0,0,1,0,0,0,0,1,0,-0.5,-0.5,-0.5,1]}],materials:[],environment:{}};
+ try{
+  for(const [gamma,reference]of [[1,20],[1.8,46],[5,89]]){
+   const light=magicaVoxelLighting([{_type:'_film',_gam:String(gamma),_aces:'0'},
+    {_type:'_uni',_i:'0'},{_type:'_inf',_i:'0.1',_angle:'90 0',_area:'0'},{_type:'_setting',_ground:'0'}]);
+   // Rotate the reference's normal-incidence setup from +y to +z.
+   scene.environment={...light.environment,sunDirection:[0,0,1]};
+   scene.materials=[magicaVoxelMaterial(1,[128,128,128],undefined,light.options.gamma)];scene.revision++;
+   const t=VoxelPathTracer.attach(engine,{scene,...light.options,denoise:false});
+   try{await t.ready;const blob=await t.capture({width:8,height:8,samples:1,signal:AbortSignal.timeout(120000)});
+    const bitmap=await createImageBitmap(blob),canvas=new OffscreenCanvas(8,8),ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
+    const bytes=ctx.getImageData(0,0,8,8).data;
+    coverage.push({gamma,reference,actual:[...new Set(bytes.filter((_,i)=>i%4!==3))],alpha:[...new Set(bytes.filter((_,i)=>i%4===3))]});
+    if(gamma===1){
+     const old=engineRuntime(engine).gpu;await engine.rebootDevice();watch();await t.ready;engine.render();
+     const restored=await t.capture({width:8,height:8,samples:1,signal:AbortSignal.timeout(120000)});
+     const bitmap=await createImageBitmap(restored);ctx.clearRect(0,0,8,8);ctx.drawImage(bitmap,0,0);bitmap.close();
+     const again=ctx.getImageData(0,0,8,8).data;
+     coverage.push({lifecycle:true,replaced:old!==engineRuntime(engine).gpu,different:again.reduce((sum,v,i)=>sum+(v!==bytes[i]),0)});
+    }
+   }finally{t.dispose();t.dispose();engine.render();}
+  }
+  const light=magicaVoxelLighting([{_type:'_film',_gam:'1',_aces:'0'},
+   {_type:'_uni',_i:'0.5',_k:'128 128 128'},{_type:'_inf',_i:'0'},{_type:'_setting',_ground:'0'}]);
+  scene.environment=light.environment;scene.instances=[];scene.revision++;
+  const t=VoxelPathTracer.attach(engine,{scene,...light.options});
+  try{await t.ready;const im=await t.renderImage({width:1,height:1,samples:1,signal:AbortSignal.timeout(120000)});
+   coverage.push({name:'colored sky',actual:[...im.color],expected:64/255});
+  }finally{t.dispose();}
+  await Promise.all(reports);return {coverage,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>
