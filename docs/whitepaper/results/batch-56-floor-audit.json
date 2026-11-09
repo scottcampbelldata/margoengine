@@ -1,0 +1,31 @@
+{
+  "batch": 56,
+  "owner": "environment",
+  "sizes": {
+    "reflector": {
+      "raw": 30478,
+      "gzip": 11104
+    },
+    "refractor": {
+      "raw": 30343,
+      "gzip": 11065
+    },
+    "cube-camera": {
+      "raw": 16958,
+      "gzip": 5680
+    }
+  },
+  "regressions": [
+    "packages/environment/tests/planar-errors.test.js",
+    "packages/environment/tests/mirror.test.js",
+    "packages/staging/test/floor-browser.mjs"
+  ],
+  "before": [
+    "floor-links-before",
+    "floor-viewport-before",
+    "floor-msaa-before",
+    "floor-mip-diagnose",
+    "floor-explicit-gpu"
+  ],
+  "after": "floor-boundary-gpu and floor-boundary-compat; strict mip bound unchanged"
+}

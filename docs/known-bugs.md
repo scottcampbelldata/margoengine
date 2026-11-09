@@ -2144,3 +2144,7 @@ open. Its owned process tree was ended. caves-browser.mjs now calls bounded
 closeAll with browser and servers, then removes its temporary fixture directory.
 The GPU gate must finish with exit zero, not merely print passing assertions.
 No test, tolerance, size bar or time budget was loosened.
+
+### Batch 56 reflective-floor audit repairs
+
+The new real-product test exposed outer-view viewport leakage into reduced or first-frame resized captures. The fix saves/restores the view and sets the capture view before the MSAA target caches it; both failing regressions now pass. The unchanged independent mip bound exposed directional half-float blur bias; explicit loads plus nearest-half output rounding repair it, with exact boundary probes. The native planar-preview refusal now links its unsupported error. No open defect remains from this review and no tolerance was raised.

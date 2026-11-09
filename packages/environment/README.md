@@ -469,7 +469,7 @@ await environment.refresh();                      // later: capture again and re
 - **Layers**: `layers` is a 32-bit mask read from `@margoengine/cameras/layers` (`setRenderLayers`); meshes outside it,
   and `exclude`d meshes, are hidden (`mesh.visible`) for the capture only. Without that module every mesh is on layer 0.
 - **Cost**: each capture is a full scene render (shadow maps included) at the capture size; a cube camera is six.
-- **Limits**: WebGPU only. Captures are sequential renders before the frame, not nested passes: `update()` from inside a
+- **Limits**: WebGPU and the installed WebGL2 compatibility layer; the native preview throws linked `unsupported`. Captures are sequential renders before the frame, not nested passes: `update()` from inside a
   frame pass throws (core rejects nested renders). Scene passes that keep canvas-sized targets (transmission's opaque
   copy, selection's 1x ID buffer) are re-sized by captures of another size; keep `resolution: 1` with them. Another
   mirror seen in a capture shows its previous frame's image (one bounce per frame). A cube capture of a mirror shows the
@@ -477,6 +477,14 @@ await environment.refresh();                      // later: capture again and re
   `onFrame` callback registered after the surface that moves the camera shows one frame late (register it first, or
   call `update()` yourself). `Environment.refresh()` needs the environment created from the GPU cube with `keepSource`
   (default) and the same size; after a device loss, update the cube camera and refresh again.
+
+Captures use their own viewport and restore the outer view, including when a scene background creates
+an explicit canvas view or the canvas resizes. Roughness mip reductions use four explicit texel reads,
+with nearest binary16 rounding before storage so attachment rounding does not introduce a dark bias.
+The real-product floor check in `packages/staging/test/floor-browser.mjs` proves every mip component
+against independent 2x2 means within half-float rounding, exact tie/subnormal/maximum probes, resize,
+empty captures and every restored display pixel on WebGPU and WebGL2 compatibility. This is image blur,
+not a GGX rough-surface transport model. The reflection and clipping API examples above are unchanged.
 - **Checked on a real GPU** (`scripts/env-mirror-gpu-check.js`, NVIDIA Ampere, Edge/Chromium 155, 1x and 4x MSAA): mirror
   pixels against core drawing the scene reflected in the mirror plane (light reflected too, no mirror): mean 0.15 and
   99th percentile 4 of 255 at 4x (edges inside the reflection resolve MSAA before tone mapping), max 1 at 1x; same for an

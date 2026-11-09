@@ -1259,3 +1259,7 @@ cell must match, including before/after loss and fresh instances on both APIs.
 Native tests compare every threshold on asymmetric grids and prove the exact
 read-count formulas in perf-history.md; tiny grids choose direct reads. No fixed
 runtime/speed threshold, connectivity or real 3D geology is claimed.
+
+## Batch 56 reflective-floor audit regressions
+
+Run npm test --workspace @margoengine/environment, then under the GPU lock run node packages/staging/test/floor-browser.mjs and the same command with --compat. --record writes batch-56-floor.json and batch-56-floor-compat.json in examples/package-benchmarks/results. The licensed FlightHelmet mobile GLB is an existing required fixture. The test verifies every component of all eight power-of-two mips against independent 2x2 means, exact half-rounding probes, displayed reflected pixels, actual replacement-device frame equality, resize and a uniform cleared product capture. Existing scripts/env-mirror-gpu-check.js exercises independent mirror, glass and cube-camera references.

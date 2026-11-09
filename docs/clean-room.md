@@ -2171,3 +2171,7 @@ land GeoJSON is public-domain standard geographic data, downloaded unmodified,
 hash-pinned and credited in test/fixtures/caves/reference.json and notices.
 Our test-only ray crossing rasterizer samples the Madagascar region at cell
 centres. Scalar CA parity on that real mask proves rules, not coastal realism.
+
+### Batch 56 floor audit: capture and binary16 precision
+
+Existing Margo Reflector supplies the feature; no outside renderer implementation was read. The W3C [WebGPU coordinate and attachment rules](https://www.w3.org/TR/webgpu/) and [WGSL floating-point rounding rules](https://www.w3.org/TR/WGSL/#floating-point-rounding-and-overflow) inform the repair. The shader derives a 2x2 arithmetic mean with explicit loads, then rounds the binary32 mantissa to the binary16 grid using discarded-bit arithmetic; subnormals round on the 2^-24 grid. No listing was copied. The independent CPU oracle reads every stored mip and also uses Margo's separately tested CPU binary16 conversion for boundary expectations. No new geometry processing, CPU-heavy production loop or Wasm is introduced.

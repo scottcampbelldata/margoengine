@@ -1,0 +1,54 @@
+{
+  "backend": "WebGPU",
+  "status": "SKIPPED",
+  "reuse": "@margoengine/environment/reflector",
+  "fixture": "FlightHelmet mobile glb",
+  "triangles": 20734,
+  "bounds": [
+    -0.20360524952411652,
+    0.000011730194273695815,
+    -0.17154578864574432,
+    0.1629406362771988,
+    0.7160004377365112,
+    0.2000291645526886
+  ],
+  "reflectionPixels": 4078,
+  "blurPixels": 4077,
+  "mipLevels": 8,
+  "maximumFractionOfHalfUlp": 1,
+  "variance": [
+    0.04854861147885414,
+    0.04431837115587689
+  ],
+  "deviceReplacement": true,
+  "resize": true,
+  "empty": {
+    "uniform": true,
+    "pixel": [
+      0.7998046875,
+      0.7998046875,
+      0.7998046875,
+      1
+    ],
+    "errors": []
+  },
+  "quantization": {
+    "actual": [
+      1,
+      0,
+      65504,
+      1.001953125
+    ],
+    "expected": [
+      1,
+      0,
+      65504,
+      1.001953125
+    ]
+  },
+  "disposal": true,
+  "native": {
+    "code": "unsupported",
+    "message": "reflector-2 requires WebGPU or the WebGL2 compatibility layer; select one of those backends; see https://margoengine.com/errors#unsupported"
+  }
+}

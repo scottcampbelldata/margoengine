@@ -2801,3 +2801,9 @@ every output cell on actual WebGPU and native WebGL2, before and after genuine
 loss and with a replacement generator. No shader is introduced. Seeded/3D
 controls are stand-ins, and geological realism, connectivity, renderer pixels,
 wall-clock/SIMD gains and other hardware remain unmeasured. Bounds: LIM-643.
+
+### Product-floor capture repairs: section 5 evidence (batch 56 audit)
+
+The owning environment capture now saves the outer view, sets its own viewport before SceneTarget.begin caches the MSAA depth-copy view, then restores the outer view after resolving. A scene background and a quarter-size capture previously threw Draw rectangle exceeds target; the unit regression failed before repair. The real first-frame resized product capture additionally caught the cached MSAA scissor and passes after the ordering repair. Core is unchanged.
+
+The floor's independent mip oracle caught hardware filter/storage rounding beyond half a binary16 ULP. Explicit clamped 2x2 loads and nearest-half quantization before attachment storage meet the unchanged bound at every real-product mip texel. Boundary probes independently expect ties to even, a subnormal tie, 65504 and an odd tie; all match exactly. WebGPU and WebGL2 compatibility pass actual replacement-device frame equality, resize, a uniform empty capture and disposal. Native preview refusal now includes its unsupported help link. No speed claim or full physical roughness claim. Gzip reflector11104, refractor11065, cube-camera5680 B; only planar ceilings rise for these repairs.

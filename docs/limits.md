@@ -1767,3 +1767,7 @@ cheaper direct rule. Counts exclude initialization, copies and allocation. No
 elapsed-time, SIMD, geological realism, rival-speed or cross-device rendering claim.
 
 Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23797 B gzip, strictly below 25000 B.
+
+### Product-floor capture audit (batch 56)
+
+Environment scene captures own their target viewport, including MSAA depth copies, and restore the outer background view. Planar blur uses explicit clamped 2x2 texels and nearest-half storage rounding. The unchanged mip test bound is half a binary16 ULP plus 5e-7 for arithmetic; exact boundary probes cover even/odd ties, subnormals and maximum finite half radiance. These prove the tested real FlightHelmet and numeric cases, not arbitrary HDR cancellation accuracy or photographic material transport. Native preview refusal is linked; WebGL2 compatibility runs the same capture/blur path. Reflector11104 B gzip (ceiling11438), refractor11065 (ceiling11397), cube-camera5680 (unchanged ceiling5691); core plus stage23797 B <25000.

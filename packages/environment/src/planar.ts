@@ -106,10 +106,19 @@ struct Out { @builtin(position) position:vec4f, @location(0) world:vec3f, @locat
 // 2x2 box reduction of the previous mip, for the roughness blur.
 const REDUCE = /* wgsl */ `
 @group(0) @binding(0) var source:texture_2d<f32>;
-@group(0) @binding(1) var linearSampler:sampler;
+// Return an exactly representable binary16 value before the render-target conversion. Its allowed
+// rounding direction must not accumulate a dark bias through successive mip reductions.
+fn nearestHalf(c:vec4f)->vec4f {
+  let a=abs(c);let bits=bitcast<vec4u>(a);
+  let normal=bitcast<vec4f>((bits+vec4u(4095)+((bits>>vec4u(13))&vec4u(1)))&vec4u(0xffffe000));
+  let subnormal=round(a*16777216.0)/16777216.0;
+  return sign(c)*select(subnormal,normal,a>=vec4f(0.00006103515625));
+}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
-  return textureSampleLevel(source,linearSampler,p.xy*2.0/vec2f(textureDimensions(source,0)),0.0);
+  let base=vec2i(p.xy)*2;let last=vec2i(textureDimensions(source,0))-1;
+  return nearestHalf((textureLoad(source,min(base,last),0)+textureLoad(source,min(base+vec2i(1,0),last),0)
+    +textureLoad(source,min(base+vec2i(0,1),last),0)+textureLoad(source,min(base+vec2i(1,1),last),0))*0.25);
 }`;
 
 const finite = (value: unknown, label: string, min = -Infinity, max = Infinity, open = false): number => {
@@ -301,7 +310,7 @@ export abstract class PlanarSurface {
     if (engine.backend !== 'webgpu')
       throw new MargoError(
         'unsupported',
-        `${this.name} requires the WebGPU backend; use an engine on the WebGPU backend`,
+        `${this.name} requires WebGPU or the WebGL2 compatibility layer; select one of those backends; see https://margoengine.com/errors#unsupported`,
       );
     if (this.engine) throw new MargoError('attached', `${this.name} is attached to an engine; create another surface`);
     this.engine = engine;
@@ -653,7 +662,6 @@ export abstract class PlanarSurface {
             layout: state.reduce!.getBindGroupLayout(0),
             entries: [
               { binding: 0, resource: view },
-              { binding: 1, resource: state.clampSampler },
             ],
           }),
         ),

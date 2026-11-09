@@ -107,7 +107,7 @@ let active: CaptureJob | null = null;
 export const activeCapture = (): object | null => active?.owner ?? null;
 
 // The capture's first and last passes: redirect into the job's target with linear output, then resolve and restore.
-let saved: Pick<CapturePassContext, 'color' | 'depth' | 'format' | 'descriptor' | 'width' | 'height'> & {
+let saved: Pick<CapturePassContext, 'color' | 'depth' | 'format' | 'descriptor' | 'width' | 'height' | 'view'> & {
     owner: unknown;
   },
   drawn = false;
@@ -132,11 +132,18 @@ const BEGIN: FramePass = {
       descriptor: c.descriptor,
       width: c.width,
       height: c.height,
+      view: c.view,
       owner: (c as unknown as Record<symbol, unknown>)[OWNER],
     };
-    target.scene!.begin(c);
     c.width = job.width;
     c.height = job.height;
+    // A scene background or layer mask gives even a full-canvas render an explicit view. That outer
+    // rectangle must not leak into this differently sized target (including captures before a resize).
+    c.view = {
+      id: 'capture', camera: c.camera, viewport: [0, 0, job.width, job.height], index: 0, count: 1,
+      clear: saved.view?.clear, layers: job.layers, target: {color: target.color!, depth: target.depth!},
+    };
+    target.scene!.begin(c);
     c.shader = linearShader(c.shader);
     drawn = true;
   },
@@ -154,6 +161,7 @@ const END: FramePass = {
     c.descriptor = saved.descriptor;
     c.width = saved.width;
     c.height = saved.height;
+    c.view = saved.view;
     (c as unknown as Record<symbol, unknown>)[OWNER] = saved.owner;
     job.finish?.(c);
   },
