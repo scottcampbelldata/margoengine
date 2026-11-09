@@ -18,6 +18,7 @@ export {
   frameBasis,
   frameMatrix,
   bakeShader,
+  imposterShader,
   type ImposterData,
   type ImposterFramesOptions,
   type ImposterOptions,

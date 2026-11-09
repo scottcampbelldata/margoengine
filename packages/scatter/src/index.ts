@@ -16,7 +16,7 @@ export {
   type Placement,
 } from './placement.js';
 import { windShader, validateWind, type ScatterWind } from './wind.js';
-import { poseShader } from './pose.js';
+import { fadeCode, poseShader } from './pose.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterWind } from './wind.js';
 import { validateExclusions, type GroundBounds } from './placement.js';
@@ -225,14 +225,6 @@ fn emit(ring:u32,instance:Instance){
  }
  emit(select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x),instance);
 }`;
-const fadeCode = `
-fn lodVisible(pixel:vec2f,fade:vec2f)->bool {
- if(fade.y==0.0){return true;}
- let bayer=array<u32,16>(0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);let p=vec2u(pixel)%4u;
- let threshold=(f32(bayer[p.y*4u+p.x])+0.5)/16.0;
- return select(fade.x>=threshold,fade.x<threshold,fade.y==1.0);
-}
-`;
 const renderCode =
   frame +
   fadeCode +
@@ -1021,6 +1013,7 @@ export class Scatter implements EnginePlugin {
     pass.setPipeline(pipeline);
     if (lit) pass.setBindGroup(0, lighting!);
     for (let i = 0; i < 3; i++) {
+      if (!this.drawsRing(i)) continue;
       pass.setBindGroup(lit ? 1 : 0, groups[i]);
       pass.setVertexBuffer(0, this.vertices[i]);
       pass.setIndexBuffer(this.indices[i], 'uint32');
@@ -1028,7 +1021,14 @@ export class Scatter implements EnginePlugin {
       else pass.drawIndexedIndirect(this.commands!, i * 20);
     }
     pass.end();
+    this.drawn(c);
   }
+  /** Whether the colour pass draws LOD ring `ring` (0 near, 1 middle, 2 far) with its mesh; a subclass that draws a ring its own way returns false (the shadow passes still draw it). */
+  protected drawsRing(_ring: number): boolean {
+    return true;
+  }
+  /** Runs after the colour pass each frame, to record a ring a subclass draws its own way (see `drawsRing`). */
+  protected drawn(_c: ScatterPassContext): void {}
   /**
    * Culls this frame's instances per shadow cascade on the GPU, before the cascades draw: `Shadows` calls it once per
    * frame with every cascade's matrix. Each cascade then draws, per LOD ring, only the instances whose posed bounds reach

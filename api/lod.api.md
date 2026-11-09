@@ -177,6 +177,8 @@ export const frameDirection: (i: number, j: number, n: number) => MutableVec3;
 
 export function frameMatrix(d: Vec3, c: Vec3, r: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
+export const imposterShader: string;
+
 export function normalMatrix(m: ArrayLike<number>): {
     c: number[];
     mirrored: boolean;

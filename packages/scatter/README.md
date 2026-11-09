@@ -517,6 +517,37 @@ engine.start();
   push field is not shared between scatters: give each its own interactors.
 - Real-GPU proof: `npm run test:browser:interact --workspace @margoengine/scatter` (build the packages first).
 
+## Imposter ring: `@margoengine/scatter/imposter`
+
+`ImposterScatter` is a `Scatter` whose far LOD ring draws as octahedral imposters instead of its mesh. Bake the far
+mesh once with `Imposter.bake` from `@margoengine/lod` (an optional peer: install it with this entry) and pass it as
+`imposter`; the near and middle rings, the distribute pass and the shadow passes are the plain `Scatter`'s.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Imposter } from '@margoengine/lod';
+import { ImposterScatter } from '@margoengine/scatter/imposter';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const material = new PbrMaterial({ color: [0.35, 0.6, 0.25], roughness: 0.8 });
+const tree = box(0.8, 1.6, 0.8), far = box(0.8, 1.6, 0.8);
+const imposter = Imposter.bake(engine, far, { material, frames: 12, frameSize: 64 }); // once, at load
+const forest = ImposterScatter.attach(engine, [tree, tree, far], {
+  count: 20000, area: [400, 400], lod: [40, 120, 600], material, imposter,
+});
+engine.start();
+```
+
+- How it works: after the colour pass, one indirect draw puts a camera-facing quad on every far-ring instance, shaded
+  by lod's own imposter shader (the three nearest baked views reprojected and blended, relit, with per-pixel depth),
+  reading the scatter instance (root, scale, yaw and ground tilt) in place of a matrix. The instance count is the far
+  ring's draw count, copied on the GPU, so nothing is read back. The middle-to-far fade band keeps its complementary
+  Bayer masks.
+- Bake the same mesh the far ring uses, in its own local space, so the imposter has the same bounds: the cull radius
+  comes from the ring meshes.
+- Limits: imposters ignore `wind`, `blades`, `variation` and `clusters` (they are baked still and untinted), and the
+  far ring still casts shadows with its mesh. A disposed imposter, or one with no device yet, draws the far mesh again.
+- Real-GPU proof: `npm run test:browser:imposter --workspace @margoengine/scatter` (build the packages first).
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 

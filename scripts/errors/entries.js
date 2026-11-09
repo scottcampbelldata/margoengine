@@ -1276,10 +1276,12 @@ export const entries = [
       'An interactor position is three finite numbers',
       'An interactor radius is world units above 0',
       'An interactor strength is from 0 to 1',
+      "imposterRingCode takes @margoengine/lod's imposterShader",
+      'ImposterScatter takes an Imposter',
     ],
     cause:
-      'An option or argument of a scatter entry is out of its range or of the wrong type: for `InstancePicker`, transforms that are not 16 floats an instance, a box with its min above its max, a mesh index past its positions, a ray with no direction, or an instance number past `count`; for `TrampledScatter`, a trample option out of range or an interactor with no position or radius.',
-    fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. Give each interactor `{ position: [x, y, z], radius }` with a radius above 0 and a strength from 0 to 1. The package README lists every option with its range.',
+      'An option or argument of a scatter entry is out of its range or of the wrong type: for `InstancePicker`, transforms that are not 16 floats an instance, a box with its min above its max, a mesh index past its positions, a ray with no direction, or an instance number past `count`; for `TrampledScatter`, a trample option out of range or an interactor with no position or radius; for `ImposterScatter`, no lod `Imposter` in `imposter`.',
+    fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. Give each interactor `{ position: [x, y, z], radius }` with a radius above 0 and a strength from 0 to 1. Bake the far mesh with `Imposter.bake(engine, mesh)` from `@margoengine/lod` and pass it as `imposter`. The package README lists every option with its range.',
   },
   {
     id: 'vfx-float',

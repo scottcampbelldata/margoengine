@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter imposter ring check</title><style>body{margin:0}canvas{display:block;width:320px;height:320px}</style></head><body><canvas width="320" height="320"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/scatter/imposter (imposter.browser.mjs drives it): a far field of boxes drawn as a
+// plain Scatter, as an ImposterScatter (far ring as imposters baked from the same box) and with no scatter at all.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Imposter} from '/packages/lod/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ImposterScatter} from '/packages/scatter/dist/imposter.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,14,22],target:[0,0,0],near:0.1,far:300}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const material=new PbrMaterial({color:[0.35,0.6,0.25],roughness:0.8});
+const shape=box(0.8,1.6,0.8);
+// Every instance past 2 units sits in the far ring, which ends at 200.
+const options={count:2000,area:[40,40],lod:[1,2,200],lodFade:0,material};
+const imposter=Imposter.bake(engine,shape,{material,frames:12,frameSize:64});
+let current;
+const read=async(buffer)=>{
+ const out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+ const data=Array.from(new Uint32Array(out.getMappedRange().slice(0)));out.destroy();return data;
+};
+window.check={
+ // kind 'none', 'plain', 'imposter' or 'disposed' (the imposter scatter after its imposter is disposed): one frame.
+ async make(kind){
+  current?.dispose();current=undefined;
+  if(kind==='plain')current=Scatter.attach(engine,shape,options);
+  else if(kind==='imposter')current=ImposterScatter.attach(engine,shape,{...options,imposter});
+  else if(kind==='disposed'){current=ImposterScatter.attach(engine,shape,{...options,imposter});imposter.dispose();}
+  device.pushErrorScope('validation');
+  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  return {commands:current?await read(current.commands):null,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>

@@ -60,6 +60,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
   trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
   ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshes).
+- **Other instance sources**: `imposterShader` is the imposter WGSL (group 0: frame, instance matrices, atlas, sampler); `@margoengine/scatter/imposter` rewrites its instance read to draw a scatter far ring from the same atlas.
 - **Picking**: an imposter has no triangles, so `lods.pickProxies()` lists the objects showing an imposter level, each
   `LOD` with `sphere` (the imposter's local bounding sphere) and `model` (the first gltf-pro model among its levels).
   `@margoengine/bvh` (`Raycaster.intersectEngine`, `intersectObjects` with the anchor or that model) and

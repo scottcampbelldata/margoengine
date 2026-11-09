@@ -1,10 +1,10 @@
 {
-  "commit": "4d6e9dd4b",
+  "commit": "0a699ad2c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -621,17 +621,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 18991
+        "raw": 62200,
+        "gzip": 19040
       },
       "./particles": {
         "raw": 1028,
@@ -650,16 +650,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 6996
+        "raw": 20958,
+        "gzip": 7013
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -1616,8 +1616,8 @@
     },
     "@margoengine/lod": {
       ".": {
-        "raw": 40528,
-        "gzip": 13935
+        "raw": 40548,
+        "gzip": 13943
       },
       "./auto": {
         "raw": 24280,
@@ -2494,8 +2494,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 62849,
-        "gzip": 18879
+        "raw": 63198,
+        "gzip": 18979
       },
       "./tiles": {
         "raw": 7525,
@@ -2512,6 +2512,10 @@
       "./interact": {
         "raw": 6730,
         "gzip": 2950
+      },
+      "./imposter": {
+        "raw": 6031,
+        "gzip": 2712
       }
     },
     "@margoengine/scene": {
@@ -2860,8 +2864,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,

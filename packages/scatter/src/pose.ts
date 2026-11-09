@@ -27,3 +27,13 @@ fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:
  return ScatterPose(world,windNormal(scatterTurn(n,c,s,up),bend,wind),vec4f(g,weight),1.0-blade.x*(1.0-t));
 }
 `;
+
+/** WGSL `lodVisible`: the complementary 4x4 Bayer masks that cross-fade an instance between two adjacent LOD rings. */
+export const fadeCode = `
+fn lodVisible(pixel:vec2f,fade:vec2f)->bool {
+ if(fade.y==0.0){return true;}
+ let bayer=array<u32,16>(0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);let p=vec2u(pixel)%4u;
+ let threshold=(f32(bayer[p.y*4u+p.x])+0.5)/16.0;
+ return select(fade.x>=threshold,fade.x<threshold,fade.y==1.0);
+}
+`;

@@ -1040,6 +1040,7 @@
       "frameBasis",
       "frameDirection",
       "frameMatrix",
+      "imposterShader",
       "normalMatrix",
       "octDecode",
       "octEncode"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11491446,
+  "total": 11494416,
   "history": [
     {
       "date": "2026-10-24",
@@ -4850,6 +4850,12 @@
       "commit": "4d6e9dd4b",
       "reason": "voxel-net gains the ./rewind entry, client viewTick and server tickRate",
       "grew": 2
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "0a699ad2c",
+      "reason": "scatter imposter entry, lod imposterShader export",
+      "grew": 3
     }
   ],
   "items": {
@@ -5446,6 +5452,7 @@
     "@margoengine/save/safe": 2102,
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,
+    "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3206,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
@@ -5767,6 +5774,8 @@
     "leak @margoengine/navmesh/debug -> @margoengine/lines": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
+    "leak @margoengine/scatter/imposter -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/scatter/imposter -> @margoengine/lod": 1,
     "leak @margoengine/scenery/scenes -> @margoengine/sky": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/shader -> @margoengine/materials": 1,

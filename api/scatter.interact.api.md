@@ -90,6 +90,8 @@ class Scatter implements EnginePlugin {
         buffer: GPUBuffer;
     }[];
     protected beforeDistribute(_c: ScatterPassContext): void;
+    protected drawsRing(_ring: number): boolean;
+    protected drawn(_c: ScatterPassContext): void;
     prepareShadow({ context, matrices, cascades }: {
         context: ScatterPassContext;
         matrices: Float32Array;
