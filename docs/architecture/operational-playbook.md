@@ -2286,3 +2286,5 @@ byte for byte, with every edited timestamp exact. This shares the browser decode
 is not independent H.264 decoder accuracy or other-device proof. The new required clip
 uses the existing digest/fetch/preflight mechanism, now 349 outside inputs. The optional
 entry is 3,458 B gzip within its unchanged 3,593 B gate; core/stage are unchanged.
+
+Batch 160 section 5 job 6 extends external picture evidence to anisotropic GGX and thin film, on all 50/346 original primitives respectively. Exact separate WebGPU and WebGL2 compatibility budgets include silhouettes and all RGB channels. Native WebGL2 refuses PBR. GLB packing only relocates bytes, with hash-checked originals and invariant tests; this is not a geometry-build performance change. Full image residual causes stay open. No core/stage or shader code changed.

@@ -1379,3 +1379,15 @@ and WebGL2 through the compatibility layer. The image is the licensed OpenEXR Br
 the box is a generated stand-in. This establishes composition only, not HDR-derived physical shadows,
 photographed-product quality, any-up-axis support or measured performance. Existing LIM-498 projection
 evidence and the batch 168 physical contact-shadow loss remain unchanged.
+
+### Batch 160 anisotropy, job 6
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| RGB-byte MAE 1.0416755676269531 / 1.0416755676269531 | [Frozen result](results/batch-160-anisotropy.json), tests/reference-rendering.test.js | Complete 50-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
+
+### Batch 160 iridescence, job 6
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| RGB-byte MAE 0.5777244567871094 / 0.5777206420898438 | [Frozen result](results/batch-160-iridescence.json), tests/reference-rendering.test.js | Complete 346-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |

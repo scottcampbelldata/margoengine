@@ -1,0 +1,154 @@
+{
+  "family": "anisotropy",
+  "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+  "sourceSha256": "306321ff8214727b145188ceb56d96d2882b393d0b596fa089fd20b07e959834",
+  "sceneSha256": "c15f06906b438734ea371c47344629d44d0d1353587731b8a6549646755c2659",
+  "referenceSha256": "cdc5a58d6279e747b69529110427910222a4c39a60a4d011fb81f2c791e9bbc9",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "margo": {
+    "backend": "webgpu",
+    "draws": 50,
+    "primitives": 50,
+    "width": 512,
+    "height": 512
+  },
+  "nativeWebGL2": {
+    "code": "unsupported",
+    "message": "PBRModel requires WebGPU; use a browser that supports it"
+  },
+  "metrics": {
+    "pixels": 262144,
+    "absolute": 819207,
+    "square": 29848293,
+    "max": 254,
+    "mae": 1.0416755676269531,
+    "rmse": 6.160687236844978,
+    "foreground": 56351,
+    "foregroundAbsolute": 819207,
+    "foregroundMae": 4.84585899096733,
+    "changed": 48767
+  },
+  "compat": {
+    "family": "anisotropy",
+    "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+    "sourceSha256": "306321ff8214727b145188ceb56d96d2882b393d0b596fa089fd20b07e959834",
+    "sceneSha256": "c15f06906b438734ea371c47344629d44d0d1353587731b8a6549646755c2659",
+    "referenceSha256": "cdc5a58d6279e747b69529110427910222a4c39a60a4d011fb81f2c791e9bbc9",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "margo": {
+      "backend": "webgpu",
+      "draws": 50,
+      "primitives": 50,
+      "width": 512,
+      "height": 512
+    },
+    "nativeWebGL2": {
+      "code": "unsupported",
+      "message": "PBRModel requires WebGPU; use a browser that supports it"
+    },
+    "metrics": {
+      "pixels": 262144,
+      "absolute": 819207,
+      "square": 29848299,
+      "max": 254,
+      "mae": 1.0416755676269531,
+      "rmse": 6.160687856044903,
+      "foreground": 56351,
+      "foregroundAbsolute": 819207,
+      "foregroundMae": 4.84585899096733,
+      "changed": 48766
+    }
+  },
+  "viewer": {
+    "url": "https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://margo-reference.invalid/scene.glb",
+    "resources": [
+      "https://github.khronos.org/glTF-Sample-Viewer-Release/libs/libktx.js",
+      "https://github.khronos.org/glTF-Sample-Viewer-Release/assets/index-CYJ9ofKn.js",
+      "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/model-index.json"
+    ],
+    "gl": {
+      "attributes": {
+        "alpha": false,
+        "antialias": true,
+        "depth": true,
+        "desynchronized": false,
+        "failIfMajorPerformanceCaveat": false,
+        "powerPreference": "default",
+        "premultipliedAlpha": true,
+        "preserveDrawingBuffer": false,
+        "stencil": false,
+        "xrCompatible": false
+      },
+      "samples": 4
+    },
+    "settings": {
+      "width": 512,
+      "height": 512,
+      "camera": {
+        "position": [
+          0,
+          3,
+          15
+        ],
+        "target": [
+          0,
+          3,
+          0
+        ],
+        "fov": 35,
+        "near": 0.01,
+        "far": 100
+      },
+      "light": {
+        "direction": [
+          0.4,
+          0.7,
+          0.6
+        ],
+        "intensity": 3
+      }
+    },
+    "referenceSha256": "cdc5a58d6279e747b69529110427910222a4c39a60a4d011fb81f2c791e9bbc9"
+  },
+  "source": {
+    "repository": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+    "commit": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
+    "model": "AnisotropyStrengthTest",
+    "license": "CC0-1.0, Ed Mackey, 2023"
+  }
+}

@@ -119,3 +119,27 @@ test('sheen has measured budgets for its entire twenty-primitive scene on both b
   assert.equal(baseline.sceneSha256, baseline.compat.sceneSha256);
   assert.equal(baseline.compat.hardware.webgpu.vendor, 'margo-webgl2');
 });
+
+for (const [family, primitives, absolute, compatAbsolute, square, compatSquare, max] of [
+  ['anisotropy', 50, 819207, 819207, 29848293, 29848299, 254],
+  ['iridescence', 346, 454341, 454338, 4616933, 4616922, 127],
+])
+  test(`${family} retains every primitive and its own measured backend budgets`, () => {
+    const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
+    assert.deepEqual(
+      [b.metrics.absolute, b.compat.metrics.absolute, b.metrics.square, b.compat.metrics.square],
+      [absolute, compatAbsolute, square, compatSquare],
+    );
+    for (const row of [b, b.compat]) {
+      assert.equal(row.margo.primitives, primitives);
+      assert.equal(row.metrics.pixels, 512 * 512);
+      assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+      assert.equal(row.metrics.max, max);
+      assert.equal(row.sourceSha256, referenceCase(family).sourceSha256);
+      assert.equal(row.nativeWebGL2.code, 'unsupported');
+    }
+    assert.equal(b.referenceSha256, b.compat.referenceSha256);
+    assert.equal(b.sceneSha256, b.compat.sceneSha256);
+    assert.equal(b.viewer.referenceSha256, b.referenceSha256);
+    assert.equal(b.compat.hardware.webgpu.vendor, 'margo-webgl2');
+  });

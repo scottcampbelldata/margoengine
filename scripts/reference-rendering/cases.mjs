@@ -28,6 +28,25 @@ export const cases = {
       camera: { position: [-0.18, 0, 1.8], target: [-0.18, 0, 0], fov: 35, near: 0.01, far: 100 },
     },
   },
+  anisotropy: {
+    model: 'AnisotropyStrengthTest',
+    license: 'CC0-1.0, Ed Mackey, 2023',
+    sourceSha256: '306321ff8214727b145188ceb56d96d2882b393d0b596fa089fd20b07e959834',
+    scale: 1,
+    settings: { ...SETTINGS, camera: { position: [0, 3, 15], target: [0, 3, 0], fov: 35, near: 0.01, far: 100 } },
+  },
+  iridescence: {
+    model: 'IridescenceMetallicSpheres',
+    license: 'CC0-1.0, UX3D, 2022',
+    sourceSha256: '2a590ca0724fab992f1bdb189ea59098d6cc3e308aba5cab566c25a1ae5fd895',
+    sourceFiles: {
+      'glTF/IridescenceMetallicSpheres.gltf': '8b43928584db4a27806fb9b806ebd22d5cb106b2262fc4ce3f4421419c0e60fe',
+      'glTF/IridescenceMetallicSpheres.bin': 'eeacab254dfd44b8e026a8ad9e865aa1b63711eb86fa7c36180a437845e97253',
+      'glTF/textures/guides.png': '04be7e96eacef9981b3cdf67eeef390d080f601af86d86bef51993ee1bf738cc',
+    },
+    scale: 1,
+    settings: { ...SETTINGS, camera: { position: [42, 32, 53], target: [0, 0, 0], fov: 35, near: 0.01, far: 200 } },
+  },
 };
 
 export function referenceCase(name) {

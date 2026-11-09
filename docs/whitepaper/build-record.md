@@ -3923,3 +3923,17 @@ Docs per job: (1) README, playbook, clean-room, claims LIM-625, limits, known-bu
 Final min+gzip entries: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B; each optional umbrella re-export 65 B. Budgets: root 4563 B, custom 5275 B, mask 5522 B, live 2757 B. The owner repair adds 7 B to the root; its documented budget restores 256 B headroom. Core plus stage remains 23797 B, below 25000 B. RGBA8 live cross-fade, nearest full-frame sampling, independent depths and one-device generated stand-in correctness are explicit limits; no HDR, artistic-quality, speed or rival-parity claim.
 
 Required lint, hygiene, full verify, transitions unit/GPU tests and executable README checks pass before each job push. API outputs accompany the live export. Rebase checks preserve both documentation sides and regenerate reports. Initial size-gate failure from the owner repair and draft GPU constant declaration errors were resolved before landing. No check, pixel tolerance or test budget was skipped or loosened.
+
+## Batch 160: remaining material and lighting references
+
+### Job 6: anisotropy
+
+AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Hosted Khronos Sample Viewer output only. Original legal notices and reference pictures remain outside. No production renderer code changed.
+
+### Job 6: iridescence
+
+IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Hosted Khronos Sample Viewer output only. Original legal notices and reference pictures remain outside. No production renderer code changed.
+
+The manager-authorized shared determinism investigation ended within its 45-minute cap without a proven root cause. Job 4 stays local at 97c74a713; job 5, including an exact failing repeat-capture reproducer and detailed notes, is local at bfd887103. Their original budgets remain frozen. Job 6 is independent and closes neither failure; the batch list row remains open while parked work remains unresolved.
+
+Job 6 checks passed: lint, hygiene, the 11 reference/packing contracts, full verify (13,320 tests, zero failures or skips), and both material cases' unchanged GPU-locked budgets on native WebGPU and WebGL2 compatibility. Root harness/docs only; package README execution and API regeneration are not applicable. No speed result was measured.

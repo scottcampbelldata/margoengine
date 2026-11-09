@@ -42,3 +42,7 @@ Job 3: Khronos SheenTestGrid at 8f492390ddc7a2ae221a1369ef560589cf8c70fb, source
 SHA-256 b3d82dde0ae6b93bef1a8085ec05540b21139f9917bfe771135c5aed9ba1c101.
 CC0-1.0, Eric Chadwick, 2023. Original GLB/legal README, matched GLB and rendered reference
 remain outside under engine-bench/batch-160; the result records their hashes.
+
+Job 6: AnisotropyStrengthTest, CC0-1.0, Ed Mackey, 2023, pinned 8f492390ddc7a2ae221a1369ef560589cf8c70fb. GLB SHA-256 306321ff8214727b145188ceb56d96d2882b393d0b596fa089fd20b07e959834. Iridescence is packed clean room from its original glTF, binary and PNG without modifying geometry/materials/nodes; exact input hashes are in cases.mjs. Original assets/legal notices and pictures remain outside under engine-bench/batch-160.
+
+Job 6: IridescenceMetallicSpheres, CC0-1.0, UX3D, 2022, pinned 8f492390ddc7a2ae221a1369ef560589cf8c70fb. GLB SHA-256 2a590ca0724fab992f1bdb189ea59098d6cc3e308aba5cab566c25a1ae5fd895. Iridescence is packed clean room from its original glTF, binary and PNG without modifying geometry/materials/nodes; exact input hashes are in cases.mjs. Original assets/legal notices and pictures remain outside under engine-bench/batch-160.

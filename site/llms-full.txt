@@ -3962,6 +3962,10 @@ Optional transitions/live cross-fades two independently rendered current RGBA8 i
 
 Current transitions entry measurements after the owner-scene repair and live entry: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B min+gzip. Earlier batch-76 measurements above describe the corresponding earlier commits. Each umbrella feature re-export measures 65 B.
 
+Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
+
+Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5712,6 +5716,16 @@ scope remain explicit limits. The generated box is a stand-in.
 ### Batch 76 job 3: live scene lifecycle
 
 The previously open non-default-scene disposal defect was fixed separately in 1823a741e before this entry. Live transitions own a composite scene and remove it through the same identity-based owner lookup; borrowed scenes survive. Partial texture allocation failures release every created image and propagate the original error, with live.test.js regression coverage. New draft declarations initially omitted GPU constant types; the package build exposed them and the declarations were supplied before delivery. No open defect was found in the live GPU proof; its bounded RGBA8 behavior and resize sampling are limits rather than unproved HDR claims.
+
+### Batch 160 anisotropy and iridescence picture residuals (open)
+
+GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
+
+### Batch 160 jobs 4 and 5: parked static-render variation (open)
+
+Per Scott's manager ruling, job 4 is preserved locally as 97c74a713 on batch-160-job4-parked and job 5 as bfd887103 on batch-160-job5-parked. Neither is pushed as passing evidence. Original budgets remain unchanged: volume compatibility full-Cycles absolute error 13,792,003 exceeds 13,792,000; native IOR can measure 2,423,421 against its frozen 2,423,418. Volume varies at blue samples (213,199), (214,199), (219,199); IOR varies at RGB (403,299). The bounded shared investigation did not establish the root cause.
+
+Repro on the job 5 branch: GPU-locked node scripts/reference-rendering/repeat.mjs --case=ior and the same command with --case=volume --compat. Each captures 24 static frames, waits for GPU completion before each read and asserts identical decoded bytes. Both fail; all pictures and repeat.json are retained outside engine-bench/batch-160. Fixed GPU command replays also vary with unchanged uploads and draw order, without compute dispatches or float atomics. Native stored multisample values vary before final resolve. Splitting, merging or instrumenting passes changes the observed output, so these interventions do not establish a package-owned API defect or an inherent backend rule. No workaround, bias or tolerance is substituted. Jobs 6 to 8 are independent measurements and do not close this release-blocking defect.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -842,3 +842,7 @@ This FFprobe binary was extracted from the already publisher-hash-checked outsid
 FFmpeg 8.1.2 archive. Neither movie nor tools ship. The reference feeds independent
 packet offsets/config/PTS to the same browser WebCodecs decoder; hashes are exact,
 not a perceptual tolerance or an independent decoder comparison.
+
+### Batch 160 anisotropy and iridescence, job 6
+
+Run fetch-assets.mjs and the existing viewer capture/run commands with --case=anisotropy and --case=iridescence, including --compat. Pinned original sources are SHA-256 checked; iridescence has no source GLB, so pack.mjs embeds its original buffer and guides.png in an aligned GLB. It preserves all authored nodes, materials, accessors, indices and bytes; no remeshing or baked material changes. Tests exercise multiple buffers/images and nonmutation. cases.mjs documents cameras, source/packed hashes and CC0 authors. All pixels at 512 x 512, same white sun as job 1, no IBL/exposure fitting. Frozen references cannot be replaced with --measure. Batch 168 sky/OIT/staging/lightmap results are reused, not repeated.
