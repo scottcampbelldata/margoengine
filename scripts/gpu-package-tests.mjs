@@ -133,6 +133,8 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/text/scripts/make-readme-atlas.mjs':
+    'writes the documented OFL font atlas under the GPU lock; text test:browser fetches and renders the committed atlas, generation is not a test',
   'packages/staging/scripts/rival-bench.mjs':
     'contact-shadow ray reference comparison, run directly under the GPU lock',
   'packages/sky/scripts/rival-bench.mjs':

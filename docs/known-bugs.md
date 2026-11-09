@@ -1,5 +1,17 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: five executable README exceptions
+
+React's first scene reached raw CommonJS modules in the page runner; React dependencies are now prebundled.
+The picking test was tried in the browser after its Node run failed against a nonexistent server. It now hosts its
+own React scene and waits for GPU frames and the picked state in Node. Browser drivers that exceed their deadline
+fail instead of passing as an ongoing server. Stage's basic glTF example was given an animated fixture because
+the runner selected static files by package name; it now selects by imported loader. The worker page's named
+companion source was never written; isolated per-program folders now contain its compiled worker. The text atlas
+did not exist; a generated, licensed Source Sans 3 SDF atlas and its relative PNG page now accompany the README.
+All 40 scoped examples execute without exceptions. Regression coverage is in tests/run-readme-examples.test.js,
+tests/readme-assets.test.js and packages/text/tests/rich.test.js; the text GPU suite fetches and renders the atlas.
+
 ### Fixed in batch 76 continuation: transitions scene disposal
 
 Transitions.dispose removed the active scene's plugin by name instead of its own registration. It now resolves its owning scene through engine.sceneOf(this) and removes only that registration. Disposing an already removed or unattached instance leaves other scenes alone. packages/transitions/test/scene-disposal.test.js fails against the old implementation; test/gpu-browser.js checks two actual scenes, preserves the default effect and renders both after disposal. No core change was needed.

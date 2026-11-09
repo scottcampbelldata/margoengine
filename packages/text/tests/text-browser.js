@@ -325,6 +325,18 @@ window.runTextTests = async () => {
   report.colors.rich = { richRed, richGreen, fieldInk };
   report.checks.push('RichText draws coloured runs and inline images; BitmapFont draws a prebuilt field');
 
+  label.visible = false;
+  const readmeFont = await BitmapFont.load('/tests/fixtures/fonts/readme/source-sans.json');
+  const hello = new Text({ text: 'Hello', font: readmeFont, fontSize: 2, color: '#00ff00', position: [-2, 1, 0] });
+  renderer.add(hello);
+  image = await frame();
+  const readmeInk = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  assert(readmeInk > 500, `The README's fetched SDF atlas did not draw Hello: ${readmeInk}`);
+  renderer.remove(hello);
+  label.visible = true;
+  report.colors.readmeAtlas = { readmeInk };
+  report.checks.push('README BitmapFont loads JSON and its relative PNG page and draws Hello');
+
   // 2b. AnimatedText per-glyph typewriter reveal and wave motion on the GPU.
   label.visible = false;
   const animated = new AnimatedText({ text: 'ABC', font, fontSize: 3, color: '#00ff00', position: [0, 0, 0] });

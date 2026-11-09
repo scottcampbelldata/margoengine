@@ -26,9 +26,9 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { acquire } from './gpu-lock.mjs';
-import { launchBrowser } from './lib/browser.mjs';
+import { chromiumLaunchOptions, launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
-import { closeAll } from './support/shutdown.mjs';
+import { closeAll, endTree } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
 
@@ -80,17 +80,55 @@ export function collectExamples(packages) {
     packageMarkdown(folder).flatMap(({ document, markdown }) => {
       const entries = readmeEntries(markdown),
         ids = exampleIds(name, document, entries);
-      return entries.map(({ code }, index) => ({ id: ids[index], name, code }));
+      const files = companionFiles(entries);
+      return entries.map(({ code }, index) => ({ id: ids[index], name, code, files }));
     }),
   );
 }
 
 /** True for code that can run only in a page, and false for code that needs Node, undefined when either may do. */
 export function placeOf(code) {
-  if (/from\s+['"](?:node:|webgpu['"])/.test(code)) return 'node';
+  if (/from\s+['"](?:node:|webgpu['"])/.test(code) || browserAutomation(code)) return 'node';
   if (/\bdocument\.|\bwindow\.|\bnavigator\.|requestAnimationFrame|createStage\(|Engine\.create\(|<canvas/.test(code))
     return 'page';
   return undefined;
+}
+
+/** A browser driver belongs to Node and must finish its assertions, rather than pass as an ongoing server. */
+export const browserAutomation = (code) => /from\s+['"](?:playwright|@playwright\/test)['"]/.test(code);
+
+/** Named source blocks in a multi-file example, such as the page and its worker. Only local basenames are accepted. */
+export function companionFiles(entries) {
+  return Object.fromEntries(
+    entries.flatMap(({ code }) => {
+      const name = /^\s*\/\/\s*([\w-]+\.(?:tsx?|[cm]?js))\s*\r?\n/.exec(code)?.[1];
+      return name ? [[name, code]] : [];
+    }),
+  );
+}
+
+/** The basic loader, directly or through Stage, needs a static fixture; the pro loader retains its animated sample. */
+export const usesMinimalGLTF = (code) =>
+  /(?:from\s*|import\s*\(\s*)['"](?:@margoengine\/(?:gltf|stage\/gltf)|margoengine\/(?:gltf|stage\/gltf))['"]/.test(
+    code,
+  );
+
+/** Each program has its own directory, so relative worker imports cannot collide with another example's files. */
+export async function writePageExample(example, base = join(scratch, 'page')) {
+  const folder = join(base, example.id),
+    file = join(folder, 'example.tsx');
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(file, example.code);
+  for (const [name, code] of Object.entries(example.files ?? {})) {
+    writeFileSync(join(folder, name), code);
+    // TypeScript projects commonly refer to the emitted .js name from new URL(). Serve that file too.
+    if (/\.tsx?$/.test(name))
+      writeFileSync(
+        join(folder, name.replace(/\.tsx?$/, '.js')),
+        (await transformWithOxc(code, name, { jsx: { runtime: 'automatic' } })).code,
+      );
+  }
+  return `/${example.id}/example.tsx`;
 }
 
 const CODE = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.html', '.md', '.json', '.py', '.txt', '.css']);
@@ -259,24 +297,45 @@ async function writeNodeExample(example, samples) {
   return { file, folder };
 }
 
-export async function runInNode(example, samples) {
+export async function runInNode(example, samples, { timeout = NODE_LIMIT } = {}) {
   const { file, folder } = await writeNodeExample(example, samples);
+  const launch = browserAutomation(example.code) ? chromiumLaunchOptions() : undefined;
   return new Promise((done) => {
     const child = spawn(process.execPath, ['--unhandled-rejections=strict', file], {
       cwd: folder,
+      detached: process.platform !== 'win32',
       stdio: ['ignore', 'ignore', 'pipe'],
-      env: example.code.includes('headless/ffmpeg') ? readmeNodeEnv() : process.env,
+      env: launch
+        ? {
+            ...process.env,
+            BROWSER_ARGS: JSON.stringify(launch.args),
+            ...(launch.channel ? { BROWSER_CHANNEL: launch.channel } : {}),
+            ...(launch.executablePath ? { BROWSER_EXECUTABLE: launch.executablePath } : {}),
+          }
+        : example.code.includes('headless/ffmpeg')
+          ? readmeNodeEnv()
+          : process.env,
     });
     let errors = '',
-      limited = false;
+      limited = false,
+      ending;
     child.stderr.on('data', (chunk) => (errors += chunk));
     const limit = setTimeout(() => {
       limited = true;
-      child.kill('SIGKILL');
-    }, NODE_LIMIT);
-    child.on('close', (code) => {
+      ending = endTree(child.pid);
+    }, timeout);
+    child.on('close', async (code) => {
       clearTimeout(limit);
-      if (limited) done({ result: 'pass', place: 'node', note: `ran to the ${NODE_LIMIT / 1000} s limit` });
+      const remaining = ending ? await ending : [];
+      if (remaining.length)
+        return done({
+          result: 'fail',
+          place: 'node',
+          reason: `Timed-out example left processes running: ${remaining.join(', ')}`,
+        });
+      if (limited && browserAutomation(example.code))
+        done({ result: 'fail', place: 'node', reason: `Browser test did not finish within ${timeout / 1000} s` });
+      else if (limited) done({ result: 'pass', place: 'node', note: `ran to the ${timeout / 1000} s limit` });
       else if (code === 0) done({ result: 'pass', place: 'node' });
       else done({ result: 'fail', place: 'node', reason: firstError(errors) });
     });
@@ -327,14 +386,20 @@ try {
 }
 </script>`;
 
-async function startPages(samples) {
+async function startPages(samples, examples) {
+  const programs = new Map(examples.map((example) => [`/${example.id}/example.tsx`, example]));
   const server = await createServer({
     root: join(scratch, 'page'),
     configFile: false,
     appType: 'custom',
     logLevel: 'silent',
     server: { port: 0, host: '127.0.0.1', fs: { allow: [root] }, hmr: false, watch: null },
-    optimizeDeps: { noDiscovery: true, include: [] },
+    // React ships CommonJS. A raw /@fs import cannot provide its named exports to a browser.
+    optimizeDeps: {
+      noDiscovery: true,
+      include: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'],
+    },
+    oxc: { jsx: { runtime: 'automatic' } },
     plugins: [
       {
         name: 'readme-samples',
@@ -346,8 +411,10 @@ async function startPages(samples) {
               return response.end(PAGE);
             }
             // Minimal glTF takes static models only, so its examples get one.
-            const fixture = readmeFixture(pathname),
-              minimal = /\.gl(?:b|tf)$/.test(pathname) && request.headers.referer?.includes('example=%2Fgltf%2F'),
+            const source = new URL(request.headers.referer ?? '/', 'http://example.test').searchParams.get('example'),
+              program = programs.get(source),
+              fixture = readmeFixture(pathname),
+              minimal = /\.gl(?:b|tf)$/.test(pathname) && program && usesMinimalGLTF(program.code),
               sample = minimal
                 ? { path: samples.staticModel }
                 : (fixture ?? assetFile(pathname) ?? sampleFor(samples, pathname));
@@ -371,11 +438,9 @@ async function startPages(samples) {
 }
 
 async function runInPage(example, pages) {
-  const file = join(scratch, 'page', `${example.id}.tsx`);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, example.code);
+  const file = await writePageExample(example);
   const page = await pages.browser.newPage(),
-    url = `${pages.origin}/run.html?example=${encodeURIComponent(`/${example.id}.tsx`)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
+    url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}`;
   try {
     await page.goto(url, { timeout: PAGE_LIMIT });
     const ran = await page
@@ -463,7 +528,7 @@ async function run() {
   });
   const forPage = examples.filter(({ id, code }) => placeOf(code) !== 'node' && results.get(id)?.result !== 'pass');
   if (forPage.length) {
-    const pages = await startPages(samples);
+    const pages = await startPages(samples, examples);
     try {
       await eachLimited(forPage, PAGE_JOBS, async (example) =>
         results.set(example.id, await runInPage(example, pages)),

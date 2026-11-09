@@ -1,5 +1,12 @@
 # Claims and evidence
 
+The lane-Q README repair (2026-11-09) runs all 40 examples in React, Stage, text and worker with zero failures.
+This closes five runtime exceptions: React CommonJS conversion, a self-hosted asynchronous picking test, Stage's
+static glTF selection, a generated OFL ASCII atlas and the worker companion source. It proves these examples on
+Chromium on this machine, not every README or cross-browser rendering. Reproduce with the four-package README
+command in reproduce.md. Harness and atlas regressions run in verify; the text browser suite fetches the atlas and
+reads back rendered glyph pixels. The atlas source, generator and SIL OFL terms are recorded in THIRD-PARTY-NOTICES.md.
+
 This page lists the numbers and capability statements in the docs, the script or test that backs each one, and a
 status. If a number in the README, on margoengine.com or in `docs/` is not here or in a committed result file,
 treat it as unverified and open an issue.

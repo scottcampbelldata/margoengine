@@ -299,17 +299,74 @@ export function Bubbling() {
 }
 ```
 
-In a Playwright test, click and then wait for the state:
+In a Playwright test, click and then wait for the state. This standalone Node test writes a small React app,
+serves it on a free port and removes it afterwards. Install `vite` and `@playwright/test` as development dependencies
+and install Playwright's Chromium browser first (`node node_modules/playwright/cli.js install chromium`).
+Run it from your project folder, where `react`, `react-dom` and `@margoengine/react` are installed:
+`BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and a JSON `BROWSER_ARGS` array can select your installed browser and GPU.
 
 ```ts
-import { chromium } from 'playwright';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { createServer } from 'vite';
+import { chromium } from '@playwright/test';
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
-await page.goto('http://localhost:5173/');
-await page.mouse.click(320, 240);
-await page.waitForFunction(() => document.querySelector('#selected')!.textContent === 'crate');
-await browser.close();
+const folder = mkdtempSync(join(process.cwd(), '.margo-picking-'));
+writeFileSync(join(folder, 'index.html'), '<div id="root"></div><script type="module" src="/app.tsx"></script>');
+writeFileSync(join(folder, 'app.tsx'), `
+  import { useState } from 'react';
+  import { createRoot } from 'react-dom/client';
+  import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+  function App() {
+    const [selected, select] = useState('nothing yet');
+    return <>
+      <p id="selected">{selected}</p>
+      <Canvas style={{width: 320, height: 240}} camera={{position: [0, 0, 5]}}
+        onCreated={stage => {
+          let frames = 0;
+          stage.engine.onFrame(() => {
+            if (++frames === 3) document.querySelector('canvas')!.dataset.ready = 'true';
+          });
+        }}>
+        <Mesh onClick={() => select('crate')}>
+          <BoxGeometry />
+          <PbrMaterial color="#84d6bd" />
+        </Mesh>
+      </Canvas>
+    </>;
+  }
+  createRoot(document.getElementById('root')!).render(<App />);
+`);
+const server = await createServer({
+  root: folder, configFile: false, logLevel: 'error',
+  oxc: {jsx: {runtime: 'automatic'}},
+  optimizeDeps: {include: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client']},
+  server: {host: '127.0.0.1', port: 0},
+});
+let browser;
+try {
+  await server.listen();
+  browser = await chromium.launch({
+    channel: process.env.BROWSER_CHANNEL,
+    executablePath: process.env.BROWSER_EXECUTABLE,
+    args: JSON.parse(process.env.BROWSER_ARGS ?? '["--enable-unsafe-webgpu"]'),
+  });
+  const page = await browser.newPage();
+  page.setDefaultTimeout(10_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(server.resolvedUrls!.local[0]);
+  await page.waitForFunction(() => document.querySelector('canvas[data-ready="true"], [role="alert"]'));
+  const alert = await page.evaluate(() => document.querySelector('[role="alert"]')?.textContent);
+  if (alert) throw new Error(alert);
+  await page.locator('canvas').click({position: {x: 160, y: 120}});
+  await page.waitForFunction(() => document.querySelector('#selected')!.textContent === 'crate');
+  if (errors.length) throw new Error(errors.join('\n'));
+} finally {
+  await browser?.close();
+  await server.close();
+  rmSync(folder, {recursive: true, force: true});
+}
 ```
 
 ## Models and environment

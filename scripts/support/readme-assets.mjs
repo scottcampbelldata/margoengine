@@ -24,6 +24,8 @@ export const README_FILES = {
   '/parts/bracket.3mf': 'packages/loaders/tests/fixtures/gears.3mf',
   '/scans/part.ply': 'packages/loaders/tests/fixtures/torus_colored.ply',
   '/fonts/Inter.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',
+  '/fonts/source-sans.json': 'packages/text/tests/fixtures/fonts/readme/source-sans.json',
+  '/fonts/source-sans.png': 'packages/text/tests/fixtures/fonts/readme/source-sans.png',
   '/scans/site.las': 'packages/points/tests/fixtures/laz/point-time-color.las',
   '/scans/site.laz': 'packages/points/tests/fixtures/laz/point-time-color.laz',
   '/surveys/quarry.laz': 'packages/points/tests/fixtures/laz/point-time-color.laz',

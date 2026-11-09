@@ -68,6 +68,13 @@ test('OBJ materials, image companions, TMX tilesets and waveform pairs keep thei
   assert.equal(README_DOWNLOADS['/scans/fullwave.laz'], 'laz-format10/fullwave.laz');
 });
 
+test('the README prebuilt font JSON and its relative PNG page are required tracked assets', () => {
+  const json = readmeFixture('/fonts/source-sans.json');
+  const png = readmeFixture(new URL('source-sans.png', 'http://readme.test/fonts/source-sans.json').pathname);
+  assert.match(json.path, /source-sans\.json$/);
+  assert.match(png.path, /source-sans\.png$/);
+});
+
 test('real HTTP byte-range reads return exactly the requested file bytes', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'readme-range-'));
   const file = join(folder, 'sample.bin');
@@ -96,7 +103,6 @@ test('real HTTP byte-range reads return exactly the requested file bytes', async
     rmSync(folder, { recursive: true, force: true });
   }
 });
-
 
 test('material texture aliases preserve 2D and cube shape, and E57 resolves the complete room sample', () => {
   assert.equal(README_FILES['/textures/albedo.ktx2'], README_FILES['/texture.ktx2']);

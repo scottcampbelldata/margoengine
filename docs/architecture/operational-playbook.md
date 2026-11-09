@@ -1351,6 +1351,18 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+The lane-Q README repair (2026-11-09) executes all 40 examples of React, Stage, text and worker with zero
+exceptions in that scope. The page runner prebundles React's CommonJS entries, compiles JSX automatically and writes
+named page/worker companion sources into isolated program directories. Static glTF selection follows the imported
+basic loader, including Stage's feature entry, rather than the owning package name. Browser automation stays in Node,
+receives the selected browser/GPU launch environment and fails on unfinished assertions; it cannot pass as a server
+that merely reaches its time limit. React's picking example owns its app/server and waits for real frames and the
+click's asynchronous state update. Text's BMFont sample includes a generated, OFL-licensed ASCII SDF atlas and a
+relative PNG page; its browser test fetches both and reads back rendered Hello pixels. These five exceptions are
+removed from the known list. This evidence covers Chromium on this machine, not other browser engines or fonts.
+The atlas writer is registered as a browser tool in the GPU planner; generation never replaces the planned text
+rendering suite or rewrites a committed fixture during verification.
+
 ### Procedural BSP layouts (batch 68, job 3)
 
 The optional dungeon entry owns one dungeon-kernel crate and one lazily loaded dungeon.wasm. Partitioning,

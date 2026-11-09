@@ -2,6 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseRichText, layoutRichText, RichText } from '@margoengine/text/rich';
 import { BitmapFont } from '@margoengine/text/msdf';
+import { readFileSync } from 'node:fs';
+import { decodePNG } from '@margoengine/decoders/png';
+
+test('the documented prebuilt atlas has a real SDF page and every printable ASCII glyph', () => {
+  const base = new URL('./fixtures/fonts/readme/', import.meta.url);
+  const data = JSON.parse(readFileSync(new URL('source-sans.json', base), 'utf8'));
+  const pages = data.pages.map((name) => decodePNG(readFileSync(new URL(name, base))));
+  const font = new BitmapFont(data, pages);
+  assert.equal(data.chars.length, 95);
+  assert.equal(data.distanceField.fieldType, 'sdf');
+  assert.ok(font.advance('Hello') > 1);
+  assert.equal(font.glyph(' '), null);
+  for (let id = 33; id < 127; id++) {
+    const glyph = font.glyph(String.fromCodePoint(id));
+    assert.ok(glyph, `missing ${id}`);
+    assert.ok(
+      glyph.data.some((value) => value < 128),
+      `no outside in ${id}`,
+    );
+    assert.ok(
+      glyph.data.some((value) => value > 128),
+      `no inside in ${id}`,
+    );
+  }
+  assert.notDeepEqual(font.glyph('H').data, font.glyph('o').data);
+});
 import { layoutText, Text } from '@margoengine/text';
 
 const mock = {

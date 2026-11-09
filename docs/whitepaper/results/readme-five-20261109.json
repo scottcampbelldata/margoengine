@@ -1,0 +1,208 @@
+{
+  "date": "2026-11-09",
+  "command": "node scripts/gpu-lock.mjs run --owner=codex-readme5 -- npm run check:readme-run -- --packages=react,stage,text,worker",
+  "scope": "Runtime examples only; no cross-browser or speed claim",
+  "examples": [
+    {
+      "id": "react/readme-first-scene-e7b2ea",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "react/readme-components-187b18",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-lowercase-tags-and-extend-5f310a",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-which-primitive-style-f30307",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-textured-box-sphere-and-plane-227802",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-pointer-events-and-picking-5c403d",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-pointer-events-and-picking-eb7644",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-models-and-environment-9abe40",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-batching-views-lights-and-voxels-a9f131",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-batching-views-lights-and-voxels-cbaa4f",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-batching-views-lights-and-voxels-e2b8b6",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-batching-views-lights-and-voxels-f43d08",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-hooks-20c750",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-ui-audio-2d-sprites-and-charts-690ffc",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-controls-10ddb4",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-controls-9c8231",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-next-js-e8445f",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-state-vs-the-frame-loop-d2537c",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-browsers-without-webgpu-8d1c95",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-browsers-without-webgpu-b4f91e",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-pixel-ratio-and-gpu-choice-e522a1",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-development-hints-873546",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-choosing-the-gpu-aa7c45",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "react/readme-helpers-and-development-panels-cdfb8b",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "stage/readme-margoengine-stage-01fff6",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-cad-camera-controls-29b1fc",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-feature-entries-a6844a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-enter-vr-and-enter-ar-46ad50",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-model-viewer-d943cb",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-physics-in-one-call-c6a6cb",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-saved-scenes-259214",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "stage/readme-saved-scenes-9bed10",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "text/readme-margoengine-text-cb068e",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "text/readme-shaping-36fca9",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "text/readme-rich-text-richtext-259931",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "text/readme-prebuilt-atlases-bitmapfont-ab6667",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "text/readme-per-glyph-animation-animatedtext-8e2d45",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "text/readme-extruded-3d-text-extrudetext-d9e28c",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "worker/readme-margoengine-worker-b56e85",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "worker/readme-margoengine-worker-36a26e",
+      "result": "pass",
+      "place": "page",
+      "note": "still waiting at the 20 s limit, no error"
+    }
+  ]
+}

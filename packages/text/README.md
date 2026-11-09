@@ -122,10 +122,16 @@ console.log(rich.linkAt(1, -0.5));
 `@margoengine/text/msdf` reads a BMFont JSON file with PNG pages from a distance-field generator, so text needs no installed font
 and works in workers. Multi-channel atlases reduce to their median channel, which rounds sharp corners slightly.
 
+Copy [source-sans.json](tests/fixtures/fonts/readme/source-sans.json) and
+[source-sans.png](tests/fixtures/fonts/readme/source-sans.png) together into your app's `public/fonts/` directory.
+This sample contains printable ASCII, generated with Margo's SDF code from Source Sans 3 under the
+[SIL Open Font License 1.1](tests/fixtures/fonts/OFL.txt); keep that licence with the files.
+Regenerate it in this checkout with `node packages/text/scripts/make-readme-atlas.mjs`.
+
 ```ts
 import {Text} from 'margoengine/text';
 import {BitmapFont} from 'margoengine/text/msdf';
-const font = await BitmapFont.load('/fonts/inter.json');
+const font = await BitmapFont.load('/fonts/source-sans.json');
 const label = new Text({text: 'Hello', font});
 ```
 

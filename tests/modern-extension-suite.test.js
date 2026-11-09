@@ -80,7 +80,12 @@ test('a test:* browser suite must be in a check, a copy of one, a step of the ex
 });
 
 test('a plain GPU check file no command names is found, and a step, a command or a stated reason covers it', () => {
-  const files = ['scripts/a-gpu-check.js', 'scripts/b-gpu-check.js', 'scripts/c-gpu-check.js', 'scripts/d-gpu-check.js'];
+  const files = [
+    'scripts/a-gpu-check.js',
+    'scripts/b-gpu-check.js',
+    'scripts/c-gpu-check.js',
+    'scripts/d-gpu-check.js',
+  ];
   assert.deepEqual(
     unrunCheckFiles(files, ['cd ../.. && node scripts/a-gpu-check.js'], ['scripts/b-gpu-check.js'], {
       'scripts/c-gpu-check.js': 'a reason',
@@ -95,6 +100,17 @@ test('the plan runs every GPU check file, and each one left out says why', () =>
     assert.ok(existsSync(new URL(`../${file}`, import.meta.url)), `${file} is gone; remove it from LOOSE_CHECKS`);
     assert.ok(reason.length > 20, `${file} needs a stated reason`);
   }
+});
+
+test('text atlas generation is a tool while the GPU plan retains the atlas rendering suite', () => {
+  const text = plan().filter(({ dir }) => dir === 'text');
+  assert.ok(text.some(({ script }) => script === 'test:browser'));
+  assert.ok(!text.some(({ command }) => command.includes('make-readme-atlas')));
+  assert.match(
+    read('packages/text/tests/text-browser.js'),
+    /BitmapFont\.load\('\/tests\/fixtures\/fonts\/readme\/source-sans\.json'\)/,
+  );
+  assert.match(read('packages/text/tests/text-browser.js'), /readmeInk > 500/);
 });
 
 test('every browser suite of this repo is in a check or in NOT_IN_CHECKS with a reason', () => {

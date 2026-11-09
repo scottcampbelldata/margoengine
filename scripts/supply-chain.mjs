@@ -136,7 +136,7 @@ const ASSETS = [
   ],
   [
     'packages/text/tests/fixtures/fonts/NOTICE.md',
-    'test fonts: Source Sans 3 Regular 3.052R TTF and name-keyed CFF1 OTF, unmodified binary assets from https://github.com/adobe-fonts/source-sans/tree/3.052R (TTF/SourceSans3-Regular.ttf and OTF/SourceSans3-Regular.otf), downloaded 2026-11-08; Copyright 2010-2022 Adobe, Reserved Font Name Source, SIL Open Font License 1.1 (full text in packages/text/tests/fixtures/fonts/OFL.txt, from that release LICENSE.md). The linked notice and outline-reference.json record provenance and SHA-256. Our independent native-outline reference data and its generator are test-only, never shipped',
+    'test fonts: Source Sans 3 Regular 3.052R TTF and name-keyed CFF1 OTF, unmodified binary assets from https://github.com/adobe-fonts/source-sans/tree/3.052R (TTF/SourceSans3-Regular.ttf and OTF/SourceSans3-Regular.otf), downloaded 2026-11-08; Copyright 2010-2022 Adobe, Reserved Font Name Source, SIL Open Font License 1.1 (full text in packages/text/tests/fixtures/fonts/OFL.txt, from that release LICENSE.md). The linked notice and outline-reference.json record provenance and SHA-256. Margo README Sans (readme/source-sans.json and source-sans.png) is our printable-ASCII SDF atlas generated from that TTF with Margo code and Chromium rasterization, under the same OFL 1.1 with a distinct face name. Our independent native-outline reference data, its generator and the atlas are repository-only, never shipped in package tarballs',
   ],
   [
     'site/fonts/OFL.txt',

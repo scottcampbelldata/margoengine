@@ -15,6 +15,9 @@ import {
   claimScratch,
   sampleFiles,
   collectExamples,
+  companionFiles,
+  usesMinimalGLTF,
+  writePageExample,
 } from '../scripts/run-readme-examples.mjs';
 import { workspacePackages } from '../scripts/check-readme-types.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,8 +38,24 @@ test('a promise left rejected fails an example', async () => {
   assert.match(result.reason, /lost/);
 });
 
+test('a browser assertion that never finishes fails instead of passing as an ongoing server', async () => {
+  const result = await runInNode(
+    {
+      id: 'runner-test/browser-wait',
+      code: "import { chromium } from '@playwright/test'; await new Promise(() => { setInterval(() => {}, 1000); });",
+    },
+    samples,
+    { timeout: 500 },
+  );
+  assert.equal(result.result, 'fail');
+  assert.match(result.reason, /Browser test did not finish/);
+});
+
 test('TypeScript runs as a reader would paste it', async () => {
-  const result = await runInNode({ id: 'runner-test/passes', code: 'const size: number = 2;\nconsole.log(size);' }, samples);
+  const result = await runInNode(
+    { id: 'runner-test/passes', code: 'const size: number = 2;\nconsole.log(size);' },
+    samples,
+  );
   assert.equal(result.result, 'pass');
 });
 
@@ -100,7 +119,7 @@ test('an example keeps its id when another is added above it, and across line en
 });
 
 test('identical examples under one heading get their own ids, and a # line in a code block is no heading', () => {
-  const block = '```ts\nimport \'a\';\n```\n',
+  const block = "```ts\nimport 'a';\n```\n",
     markdown = `## Real\n\n\`\`\`sh\n# not a heading\n\`\`\`\n\n${block}\n${block}`,
     ids = exampleIds('sky', 'readme', readmeEntries(markdown));
   assert.match(ids[0], /^sky\/readme-real-[0-9a-f]{6}$/);
@@ -131,6 +150,44 @@ test('an example goes where its code can run', () => {
   assert.equal(placeOf("import { readFile } from 'node:fs/promises';"), 'node');
   assert.equal(placeOf("const c = document.querySelector('canvas');"), 'page');
   assert.equal(placeOf('const a = 1;'), undefined);
+  assert.equal(
+    placeOf("import { chromium } from 'playwright'; await page.waitForFunction(() => document.title);"),
+    'node',
+  );
+  assert.equal(placeOf("import { test } from '@playwright/test'; document.title;"), 'node');
+});
+
+test('the static fixture follows the imported loader, including Stage and umbrella aliases', () => {
+  for (const name of ['@margoengine/gltf', '@margoengine/stage/gltf', 'margoengine/gltf', 'margoengine/stage/gltf']) {
+    assert.equal(usesMinimalGLTF(`import { load } from '${name}';`), true);
+    assert.equal(usesMinimalGLTF(`await import('${name}');`), true);
+  }
+  for (const name of ['@margoengine/gltf-pro', 'margoengine/gltf-pro', 'margoengine/stage/viewer'])
+    assert.equal(usesMinimalGLTF(`import { load } from '${name}';`), false);
+});
+
+test('named page and worker sources are written together, including the emitted JS worker URL', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-worker-'));
+  try {
+    const code = '// page.ts\nnew Worker(new URL("./scene-worker.js", import.meta.url), {type: "module"});',
+      worker = '// scene-worker.ts\nconst value: number = 42;\npostMessage(value);',
+      files = companionFiles([{ code }, { code: worker }, { code: '// ../outside.ts\nthrow 1;' }]);
+    assert.deepEqual(Object.keys(files), ['page.ts', 'scene-worker.ts']);
+    const url = await writePageExample({ id: 'worker/one', code, files }, folder);
+    assert.equal(url, '/worker/one/example.tsx');
+    assert.equal(readFileSync(join(folder, 'worker/one/scene-worker.ts'), 'utf8'), worker);
+    const js = readFileSync(join(folder, 'worker/one/scene-worker.js'), 'utf8');
+    assert.match(js, /postMessage\(value\)/);
+    assert.doesNotMatch(js, /: number/);
+    await writePageExample({ id: 'worker/two', code: 'export {};' }, folder);
+    assert.equal(existsSync(join(folder, 'worker/two/scene-worker.js')), false);
+    const collected = collectExamples(workspacePackages()).find(
+      ({ id }) => id === 'worker/readme-margoengine-worker-b56e85',
+    );
+    assert.match(collected.files['scene-worker.ts'], /receiveCanvas\(\)/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test('the files and elements an example asks for are found', () => {
@@ -219,7 +276,11 @@ test('a run starting never deletes the files of a run still going in the same ch
     const folder = claimScratch(base, 333, (pid) => pid === 111);
     assert.equal(folder, join(base, 'run-333'));
     assert.ok(existsSync(join(live, 'example.tsx')), 'the live run keeps its example');
-    assert.deepEqual(readdirSync(base).sort(), ['run-111', 'run-333'], 'what gone runs and the old shared layout left is removed');
+    assert.deepEqual(
+      readdirSync(base).sort(),
+      ['run-111', 'run-333'],
+      'what gone runs and the old shared layout left is removed',
+    );
     assert.deepEqual(readdirSync(folder), ['page']);
   } finally {
     rmSync(base, { recursive: true, force: true });
@@ -232,5 +293,9 @@ test('every known-list entry names an example the READMEs still hold, so an edit
   const known = JSON.parse(readFileSync(new URL('../scripts/support/readme-run-known.json', import.meta.url), 'utf8')),
     ids = new Set(collectExamples(workspacePackages()).map(({ id }) => id)),
     gone = Object.keys(known).filter((id) => !ids.has(id));
-  assert.deepEqual(gone, [], 'run npm run check:readme-run -- --only=<package> and fix the renamed example, or -- --shrink if it passes');
+  assert.deepEqual(
+    gone,
+    [],
+    'run npm run check:readme-run -- --only=<package> and fix the renamed example, or -- --shrink if it passes',
+  );
 });

@@ -1,5 +1,20 @@
 # Reproducing Margo's numbers
 
+## Five executable README repairs (2026-11-09)
+
+After `npm run build:packages`, run
+`node scripts/gpu-lock.mjs run --owner=codex-readme5 --max=15 -- npm run check:readme-run -- --packages=react,stage,text,worker`.
+The scoped result is 40/40, zero failures. React's standalone picking test receives the same selected browser/GPU
+launch environment as the page harness. It serves its own scene on a free port, waits for frames, clicks the box
+and waits for the React state update. A driver that cannot finish fails at its deadline.
+
+Regenerate the atlas with
+`node scripts/gpu-lock.mjs run --owner=codex-readme5 --max=3 -- node packages/text/scripts/make-readme-atlas.mjs`.
+This uses the pinned Source Sans 3 TTF and Margo's SDF code, not an outside atlas generator. The generated
+JSON and PNG live together under packages/text/tests/fixtures/fonts/readme. Run `npm test --workspace @margoengine/text`
+for all ASCII glyphs and `npm run test:browser --workspace @margoengine/text` under the GPU lock for JSON/PNG fetch
+and actual Hello rendering. The fixture notice records the source and OFL; no font implementation is copied.
+
 ## Poisson placement work count (batch 68, job 1)
 
 Run `npm test --workspace @margoengine/procedural` for the seeded 3,000-candidate float64 all-pairs comparison:

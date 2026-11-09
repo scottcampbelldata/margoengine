@@ -36,8 +36,6 @@
   "post/readme-smaa-10a00a": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
   "quality/readme-tier-presets-0abcba": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
   "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips",
-  "react/readme-first-scene-e7b2ea": "example: SyntaxError: The requested module ' does not provide an export named 'createContext'",
-  "react/readme-pointer-events-and-picking-8b5eb7": "example: SyntaxError: The requested module ' does not provide an export named 'default'",
   "rigging/readme-corrective-shapes-margoengine-ri-ff3e5c": "sample: RangeError: Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation",
   "rigging/readme-face-tracking-margoengine-riggin-8fff06": "sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar",
   "rigging/readme-face-tracking-margoengine-riggin-f62f83": "sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar",
@@ -50,8 +48,6 @@
   "splats/readme-margoengine-splats-f08e38": "sample: Error: Failed to load splats: 404",
   "splats/readme-ply-captures-editing-and-level-o-0d1416": "sample: Error: Failed to load splats: 404",
   "splats/readme-ply-captures-editing-and-level-o-73481e": "sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz.",
-  "stage/readme-feature-entries-a6844a": "example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro",
-  "text/readme-prebuilt-atlases-bitmapfont-5ec840": "sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL",
   "tonemap/readme-margoengine-tonemap-5802b3": "sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header",
   "usdz/readme-composition-fbebfe": "sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404",
   "usdz/readme-margoengine-usdz-087124": "sample: LoaderError: load: request for /model.usdz returned HTTP 404",
@@ -61,6 +57,5 @@
   "voxel/readme-lighting-effects-day-and-night-w-9389c7": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
   "voxel/readme-magicavoxel-vox-files-margoengin-91a7da": "sample: TypeError: Bytes are not a .vox file (no \"VOX \" header and MAIN chunk); pass a MagicaVoxel .vox file",
   "voxel/readme-rendering-margoengine-voxel-rend-1a55a2": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
-  "worker/readme-margoengine-worker-b56e85": "example: MargoError: Worker failed before it took the canvas: bad message; see https://margoengine.com/errors#worker",
   "xr/readme-ar-hit-testing-f7eedf": "example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session."
 }

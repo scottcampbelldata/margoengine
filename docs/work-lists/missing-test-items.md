@@ -11,7 +11,9 @@ the private codex-readme-five brief. Lane C should leave these rows to lane Q:
 - `text/readme-prebuilt-atlases-bitmapfont-5ec840`: missing licensed font atlas.
 - `worker/readme-margoengine-worker-b56e85`: page/worker companion setup.
 
-Claimed only; runtime fixes and evidence follow in separate pushes.
+All five repairs pass in the scoped 40/40 README run with zero exceptions. Regression tests cover
+loader selection, named worker files, finite browser-test deadlines and real atlas glyph data.
+The text browser suite also fetches both atlas files and reads back rendered Hello pixels.
 
 Started 2026-11-09 from origin/main `c1646e3ec`. This is an active work list, not a completion claim.
 The scan covers package tests, root tests and scripts; limits, known bugs, claims, build-record,
@@ -197,7 +199,7 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | points/readme-potree-folders-margoengine-point-5be661 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Pending file selection, provenance and rerun |
 | splats/readme-margoengine-splats-f08e38 | /capture.splat | sample: Error: Failed to load splats: 404 | Pending file selection, provenance and rerun |
 | splats/readme-ply-captures-editing-and-level-o-0d1416 | /capture.ply | sample: Error: Failed to load splats: 404 | Pending file selection, provenance and rerun |
-| text/readme-prebuilt-atlases-bitmapfont-5ec840 | /fonts/inter.json | sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL | Pending file selection, provenance and rerun |
+| text/readme-prebuilt-atlases-bitmapfont-5ec840 | /fonts/inter.json | sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL | FIXED by lane Q: supplied Margo-generated Source Sans 3 ASCII SDF JSON/PNG, SIL OFL 1.1; README uses source-sans.json; exception removed, scoped run 40/40 |
 | tonemap/readme-margoengine-tonemap-5802b3 | /grade.cube | sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header | Pending file selection, provenance and rerun |
 | usdz/readme-composition-fbebfe | /toy_car.usdz, /Kitchen_set/Kitchen_set.usd, /model.usd | sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404 | Pending file selection, provenance and rerun |
 | usdz/readme-margoengine-usdz-087124 | /model.usdz | sample: LoaderError: load: request for /model.usdz returned HTTP 404 | Pending file selection, provenance and rerun |
@@ -242,8 +244,8 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | post/readme-smaa-10a00a | See named example | example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments | Deferred to later README job |
 | quality/readme-tier-presets-0abcba | See named example | example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments | Deferred to later README job |
 | ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55 | /hero.glb | sample: RangeError: Unknown animator clip "GetUpFromBack"; use a clip name from animation.clips | Physics on hold |
-| react/readme-first-scene-e7b2ea | See named example | example: SyntaxError: The requested module ' does not provide an export named 'createContext' | Deferred to later README job |
-| react/readme-pointer-events-and-picking-8b5eb7 | See named example | example: SyntaxError: The requested module ' does not provide an export named 'default' | Deferred to later README job |
+| react/readme-first-scene-e7b2ea | See named example | example: SyntaxError: The requested module ' does not provide an export named 'createContext' | FIXED by lane Q: React CommonJS entries prebundled; real first scene passes; exception removed, scoped run 40/40 |
+| react/readme-pointer-events-and-picking-8b5eb7 | See named example | example: SyntaxError: The requested module ' does not provide an export named 'default' | FIXED by lane Q: self-hosted Node Playwright test waits for frames and picked state; finite driver timeout fails; exception removed, scoped run 40/40 |
 | rigging/readme-corrective-shapes-margoengine-ri-ff3e5c | /hero.glb | sample: RangeError: Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation | Deferred to later README job |
 | rigging/readme-face-tracking-margoengine-riggin-8fff06 | character.glb | sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar | Deferred to later README job |
 | rigging/readme-face-tracking-margoengine-riggin-f62f83 | /avatar.vrm | sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar | Deferred to later README job |
@@ -254,11 +256,11 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | shadows/readme-margoengine-shadows-7183ea | See named example | example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments | Deferred to later README job |
 | splats/readme-margoengine-splats-03fb4a | /capture.splat | sample: RangeError: A .splat file must hold 1 to 3,000,000 splats of 32 bytes each; check that the file is complete. | Deferred to later README job |
 | splats/readme-ply-captures-editing-and-level-o-73481e | /capture.spz, /capture.sog | sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz. | Deferred to later README job |
-| stage/readme-feature-entries-a6844a | See named example | example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro | Deferred to later README job |
+| stage/readme-feature-entries-a6844a | See named example | example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro | FIXED by lane Q: fixture selection follows the imported static glTF loader, including Stage; exception removed, scoped run 40/40 |
 | voxel-net/readme-margoengine-voxel-net-b6eba6 | See named example | example: Error: Module "node:http" has been externalized for browser compatibility: a server and a page in one example | Deferred to later README job |
 | voxel-pathtracer/readme-margoengine-voxel-pathtracer-af6ce0 | See named example | sample: TypeError: VoxelPathTracer scene.models[0].voxels has 151 entries; a 32x24x32 model needs 24576 (index = x + sx * (z + sz * y)) | Closed upstream by 418849c4a |
 | voxel/readme-codecs-and-chunk-stores-codec-st-7e6699 | See named example | sample: InvalidStateError: Failed to execute 'send' on 'WebSocket': Still in CONNECTING state. | Deferred to later README job |
-| worker/readme-margoengine-worker-b56e85 | See named example | example: MargoError: Worker failed before it took the canvas: bad message; see https://margoengine.com/errors#worker | Deferred to later README job |
+| worker/readme-margoengine-worker-b56e85 | See named example | example: MargoError: Worker failed before it took the canvas: bad message; see https://margoengine.com/errors#worker | FIXED by lane Q: named companion sources and emitted worker JS written together in isolated program folders; exception removed, scoped run 40/40 |
 | xr/readme-ar-hit-testing-f7eedf | See named example | example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session. | Deferred to later README job |
 
 ## Check results

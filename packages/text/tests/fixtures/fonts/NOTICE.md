@@ -8,6 +8,13 @@ https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/LICENSE.md.
 These are standard font/test assets under the repository's clean-room asset exception.
 No font-library or other engine code was read or copied. They are not shipped in package tarballs.
 
+`readme/source-sans.json` and `readme/source-sans.png` are the Margo README Sans SDF atlas,
+generated from the pinned TTF by `packages/text/scripts/make-readme-atlas.mjs` using Margo's own
+distance transform and Chromium's font rasterizer. They cover printable ASCII (U+0020 through U+007E)
+at 48 pixels per em with a 16-pixel distance range. The atlas uses the same SIL OFL 1.1;
+redistribute [OFL.txt](OFL.txt) with it. The derivative face name avoids Adobe's Reserved Font Name.
+No external generator code or prebuilt atlas was copied. These samples are repository assets, not tarball payload.
+
 - TTF: https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/TTF/SourceSans3-Regular.ttf
 - OTF (name-keyed CFF1): https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/OTF/SourceSans3-Regular.otf
 
