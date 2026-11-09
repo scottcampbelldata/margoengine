@@ -195,6 +195,7 @@ const prepare = (graph: readonly VFXNode[]): Prepared => {
     return `vec3f(${name})`;
   };
   const lines = ['fn nodeAccel(p:Particle)->vec3f{', 'var a=vec3f(0.0);'];
+  let norm = false;
   const opOf = (name: string) => (name === 'add' ? '+' : name === 'sub' ? '-' : name === 'mul' ? '*' : name);
   for (const index of order) {
     if (!live.has(index)) continue;
@@ -215,16 +216,20 @@ const prepare = (graph: readonly VFXNode[]): Prepared => {
       const want = widths[index] as 1 | 3;
       lines.push(`let n${index}=mix(${ref(read[0], want)},${ref(read[1], want)},${ref(read[2], 1)});`);
     } else if (node.op === 'scale') lines.push(`let n${index}=${ref(read[0], 3)}*nodeParams[${slots[index]}].x;`);
-    else if (node.op === 'normalize')
-      lines.push(
-        `let len${index}=length(n${read[0]});let n${index}=select(n${read[0]}/max(len${index},1e-20),vec3f(0.0),len${index}==0.0);`,
-      );
-    else if (node.op === 'length') lines.push(`let n${index}=length(n${read[0]});`);
+    else if (node.op === 'normalize') {
+      norm = true;
+      lines.push(`let n${index}=nodeNorm(n${read[0]});`);
+    } else if (node.op === 'length') lines.push(`let n${index}=length(n${read[0]});`);
     else if (node.op === 'force') lines.push(`a+=${ref(read[0], 3)};`);
     else lines.push(`a-=${ref(read[0], 1)}*p.velocitySize.xyz;`);
   }
   lines.push('return a;}');
   const body = lines.join('\n');
+  // Scaled Euclidean length (Blue, ACM TOMS 4(1), 1978): divide by the largest absolute component, then by that
+  // vector's length. The CPU evaluator below uses the same steps, and WebGL2 translates this function as written.
+  const scaled = norm
+    ? 'fn nodeNorm(v:vec3f)->vec3f{let a=max(abs(v.x),max(abs(v.y),abs(v.z)));if(a==0.0){return vec3f(0.0);}let s=v/a;return s/length(s);}\n'
+    : '';
   const uniform =
     pack.length === 0 ? '' : `@group(0) @binding(24) var<uniform> nodeParams:array<vec4f,${pack.length / 4}>;\n`;
   const needsCold = order.some(
@@ -248,7 +253,7 @@ const prepare = (graph: readonly VFXNode[]): Prepared => {
       return `${node.op}:${inputs[index].join('.')}:${kind}`;
     })
     .join('|');
-  return { signature, wgsl: uniform + body + '\n', constants: new Float32Array(pack), needsCold };
+  return { signature, wgsl: uniform + scaled + body + '\n', constants: new Float32Array(pack), needsCold };
 };
 
 /** Acceleration a graph adds, for the same sample the shader reads. `force` sums, `drag` subtracts coefficient times velocity. */
@@ -337,8 +342,15 @@ export const evaluateNodes = (graph: readonly VFXNode[], sample: VFXNodeSample):
       values[index] = { kind: 3, v: [v[0] * s, v[1] * s, v[2] * s] };
     } else if (node.op === 'normalize') {
       const v = vec(list[0]);
-      const len = Math.hypot(v[0], v[1], v[2]);
-      values[index] = { kind: 3, v: len === 0 ? [0, 0, 0] : [v[0] / len, v[1] / len, v[2] / len] };
+      const scale = Math.max(Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2]));
+      if (scale === 0) values[index] = { kind: 3, v: [0, 0, 0] };
+      else {
+        const sx = v[0] / scale,
+          sy = v[1] / scale,
+          sz = v[2] / scale,
+          len = Math.hypot(sx, sy, sz);
+        values[index] = { kind: 3, v: [sx / len, sy / len, sz / len] };
+      }
     } else if (node.op === 'length') values[index] = { kind: 1, n: Math.hypot(...vec(list[0])) };
     else if (node.op === 'force') {
       const v = vec(list[0]);

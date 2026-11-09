@@ -44,6 +44,22 @@ test('nodes compile to an acceleration after fields and read literals from bindi
     ),
     [0, 0, 0],
   );
+  for (const value of [
+    [1e-21, 0, 0],
+    [1e20, 0, 0],
+  ]) {
+    assert.deepEqual(
+      evaluateNodes(
+        [
+          { op: 'const', value },
+          { op: 'normalize', inputs: [0] },
+          { op: 'force', inputs: [1] },
+        ],
+        sample,
+      ),
+      [1, 0, 0],
+    );
+  }
   assert.deepEqual(
     evaluateNodes(
       [
@@ -121,6 +137,23 @@ test('nodes compile to an acceleration after fields and read literals from bindi
   assert.ok(plainCode.includes('curlNoise(p.positionLife.xyz)+nodeAccel(p)'));
   assert.equal(plainCode.includes('fieldForce'), false);
   plain.effect.dispose();
+
+  const scaled = attach({
+    capacity: 1,
+    nodes: {
+      graph: [
+        { op: 'const', value: [1e-21, 0, 0] },
+        { op: 'normalize', inputs: [0] },
+        { op: 'force', inputs: [1] },
+      ],
+    },
+  });
+  scaled.h.frame();
+  const scaledCode = scaled.h.pipelines.map(codeOf).find((code) => code.includes('fn nodeAccel'));
+  assert.match(scaledCode, /fn nodeNorm\(v:vec3f\)->vec3f\{let a=max\(abs\(v\.x\),max\(abs\(v\.y\),abs\(v\.z\)\)\);/);
+  assert.equal(scaledCode.includes('1e-20'), false);
+  assert.equal(scaledCode.includes('max(len'), false);
+  scaled.effect.dispose();
 
   const cold = attach({
     capacity: 2,

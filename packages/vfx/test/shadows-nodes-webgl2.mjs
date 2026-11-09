@@ -94,6 +94,19 @@ try {
     `ok nodes webgl2: at ${nodes.got.at.map((v) => v.toFixed(5)).join(',')} v ${nodes.got.v.map((v) => v.toFixed(5)).join(',')}`,
   );
 
+  const norm = await page.evaluate(() => window.checkNodeNorm());
+  clean(norm, 'node norm');
+  const unit = (got, label) => {
+    assert.ok(Math.abs(got[0] - 1) <= 1e-4, `node norm ${label} x ${got[0]}`);
+    assert.ok(Math.abs(got[1]) <= 1e-4, `node norm ${label} y ${got[1]}`);
+    assert.ok(Math.abs(got[2]) <= 1e-4, `node norm ${label} z ${got[2]}`);
+  };
+  unit(norm.tiny, '1e-21');
+  unit(norm.huge, '1e20');
+  console.log(
+    `ok node norm webgl2: ${norm.tiny.map((v) => v.toFixed(5)).join(',')} and ${norm.huge.map((v) => v.toFixed(5)).join(',')}`,
+  );
+
   assert.deepEqual(pageErrors, []);
   const report = {
     hardware,

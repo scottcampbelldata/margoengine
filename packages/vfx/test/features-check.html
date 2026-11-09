@@ -540,5 +540,22 @@ window.checkShadowRelease=async()=>{
   window.removeEventListener('unhandledrejection', onReject);
  }
 };
+// Scaled length of a tiny and a huge finite vector. One step from rest: velocity / dt is the unit vector.
+window.checkNodeNorm=async()=>{
+ const step=async(value)=>{
+  const graph=[{op:'const',value},{op:'normalize',inputs:[0]},{op:'force',inputs:[1]}];
+  const effect=new VFX({...still,capacity:1,lifetime:[100,100],nodes:{graph}});
+  const {buffers:[p],error}=await run(effect,{
+   frames:0,dt:0.05,
+   setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[0,0,0],velocity:[0,0,0],size:0.01,color:[1,1,1],life:100}],1)),
+   read:()=>[effect.gpuState.particles],
+  });
+  effect.dispose();
+  return {error,accel:[...p.subarray(4,7)].map((v)=>v/0.05)};
+ };
+ const tiny=await step([1e-21,0,0]);
+ const huge=await step([1e20,0,0]);
+ return {error:tiny.error??huge.error,errors:errors.splice(0),tiny:tiny.accel,huge:huge.accel};
+};
 window.ready=true;
 </script></body></html>

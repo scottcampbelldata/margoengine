@@ -227,6 +227,22 @@ try {
       `ok ${name}: at ${r.got.at.map((v) => v.toFixed(5)).join(',')} v ${r.got.v.map((v) => v.toFixed(5)).join(',')}`,
     );
   }
+  {
+    const name = 'node norm',
+      r = await page.evaluate(() => window.checkNodeNorm());
+    report.results[name] = r;
+    clean(r, name);
+    const unit = (got, label) => {
+      assert.ok(Math.abs(got[0] - 1) <= 1e-4, `${name} ${label} x ${got[0]}`);
+      assert.ok(Math.abs(got[1]) <= 1e-4, `${name} ${label} y ${got[1]}`);
+      assert.ok(Math.abs(got[2]) <= 1e-4, `${name} ${label} z ${got[2]}`);
+    };
+    unit(r.tiny, '1e-21');
+    unit(r.huge, '1e20');
+    console.log(
+      `ok ${name}: ${r.tiny.map((v) => v.toFixed(5)).join(',')} and ${r.huge.map((v) => v.toFixed(5)).join(',')}`,
+    );
+  }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/vfx-features-check.json', JSON.stringify(report, null, 1));
