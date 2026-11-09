@@ -322,8 +322,9 @@ browsers' own WebGPU compilers, where it was recorded.
   recorded compute pipelines are translated for their tier and dispatched once, none refused (the voxel path tracer's 20 are only planned here,
   because its compile times on ANGLE's Direct3D backend do not fit this check; its own check runs them on Vulkan).
 
-Nothing runs at import time, the package has no dependencies, and core, the stage and every other package never
-import it (a test in this package checks that), so the WebGPU path is byte-identical with or without it.
+Nothing runs at import time. The package depends on `@margoengine/math` and has `@margoengine/core` as a peer;
+install matching local tarballs for all three. Core, the stage and the other packages never load the compatibility
+device on the native WebGPU path (a test in this package checks that), so that path is byte-identical with or without it.
 
 Apache-2.0. Optional, tree-shakable package.
 
