@@ -15,6 +15,29 @@ import {
 import { parseIES } from '../packages/clustered/dist/ies.js';
 import { parseUSDZ } from '../packages/usdz/dist/index.js';
 import { createHash } from 'node:crypto';
+import { parsePly, parseSplat, parseSpz, parseSog, validateSplats } from '../packages/splats/dist/data.js';
+
+test('splat README aliases keep the real 8385-point capture excerpt in each documented format', async () => {
+  const examples = [
+    ['/capture.splat', 'ec80ad829ffc324798c6bd7680ce53d2dd28819639b593e1393e39b83a8b1e25', parseSplat],
+    ['/capture.ply', 'a0f8332242dd99f6b8a8c8aff6df829bafef0eb0e557d4e531ffc031906cd9a6', parsePly],
+    ['/capture.spz', '872d127cee8f9040dc7b41bd832c7caa9b1a7cec09c0e1010e03f62722eb2cee', parseSpz],
+    ['/capture.sog', 'f728da7afc311db69dd0d5876cdc5264ed230b0fc66aef486366673e46052553', parseSog],
+  ];
+  const decoded = [];
+  for (const [url, hash, parse] of examples) {
+    const fixture = readmeFixture(url);
+    assert.ok(fixture, `${url} needs its explicit capture input`);
+    const bytes = readFileSync(fixture.path);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), hash, url);
+    const data = await parse(bytes);
+    assert.equal(validateSplats(data), 8385, url);
+    decoded.push(data);
+  }
+  // .splat was serialized here from the independent PlayCanvas PLY: every source position is preserved.
+  assert.deepEqual(decoded[0].positions, decoded[1].positions);
+  assert.equal(decoded[0].sphericalHarmonics, undefined, '.splat stores base colour only');
+});
 
 test('the static USDZ introduction resolves the complete outside Blender box with its archived texture', async () => {
   const fixture = readmeFixture('/model.usdz');

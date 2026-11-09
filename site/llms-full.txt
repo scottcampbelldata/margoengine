@@ -4091,6 +4091,14 @@ physical Apple Quick Look behaviour. The composition example remains open.
 
 Optional road/banking: 1041 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.
 
+### Splat README execution evidence (2026-11-09)
+
+All 14 examples run on documented real 8,385-point raccoon excerpts. PLY/SPZ/SOG
+reuse the independent fixtures; .splat is serialized here with Margo from that PLY,
+preserving positions, quantizing colour/quaternion and omitting SH as its format
+requires. Four example-input failures close. Independent .splat encoder accuracy,
+complete-capture quality and throughput are separate; no codec/render or size budget changed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5969,6 +5977,15 @@ No open defect found in bounded authored banking. Tight-bend overlap remains out
 
 Banking audit regression: input bounds alone missed a section rotated beyond the output coordinate limit. banking.test.js reproduced the missing rejection before the fix. banking.ts now validates transformed float32 positions too; the regression passes.
 
+### Splat README input failures resolved (2026-11-09)
+
+Four explicit format aliases close all four remaining splats exceptions; all 14
+original examples execute. tests/readme-assets.test.js fails before the aliases,
+then verifies four exact hashes, 8,385 points per file and every locally serialized
+.splat position against the independent PLY. The stale skip-when-absent fixture
+notice now documents the existing strict shared downloader. No codec/render defect
+is hidden by a generic fallback, and no full-capture or encoder-accuracy claim follows.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -7240,6 +7257,12 @@ engine.start();
 // cloud.dispose() when unloading; engine.dispose() releases attached plugins.
 ```
 
+The executable README check maps `/capture.splat`, `/capture.ply`, `/capture.spz` and `/capture.sog` to
+the documented 8,385-splat excerpt of Niantic's raccoon capture (MIT), preserving the format each example
+requests. The PLY/SPZ/SOG fixtures are the documented real-data inputs; `.splat` is serialized here
+from that PLY with `encodeSplat`. This exercises the examples on a real excerpt, without a complete-capture
+quality, performance or independent `.splat` encoder-accuracy claim. See [fixture provenance](test/fixtures/NOTICE.md).
+
 For generated data, supply `SplatData`: `positions` has three Float32 values per splat; `covariances` has six (xx, xy, xz, yy, yz, zz); `colors` has four (linear RGB and opacity, each 0..1). Construction validates lengths, finite values and positive-definite covariance, then copies the data for ownership/device recovery. Colors are converted to sRGB for ordinary display targets and remain linear in HDR targets.
 
 Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with RGB interleaved for each coefficient. Evaluation uses the real SH basis through degree 3, the camera-to-splat direction, and the usual 0.5 offset. SH replaces RGB; `colors` still supplies opacity. Large SH buffers can exceed an adapter's storage binding limit even when the base cloud fits; attachment rejects before allocating. `parseSplat()` decodes the common 32-byte binary layout (xyz, positive xyz scales, byte RGBA, byte quaternion in wxyz order), converts byte sRGB to linear, normalizes quaternions and derives covariance. `parsePly()` reads Gaussian-splat PLY files (below); `parseSpz()` and `parseSog()` read compressed captures (below); training is outside this package.
@@ -7249,8 +7272,6 @@ Orthographic cameras (any `camera.matrix` with a constant clip w, such as `Camer
 Each frame creates sortable unsigned depth keys on the GPU. Eight stable 4-bit LSD radix passes run per-workgroup histograms, hierarchical exclusive prefix scans, a scan of block totals, and scatter. Workgroup bit masks and population counts preserve input order within equal digits; equal-depth splats retain source order. Off-frustum, transparent and out-of-range centers sort to the end and render no fragments. The runtime performs no CPU sorting, per-splat frame allocation or GPU readback.
 
 Base GPU allocations are approximately 128 bytes per splat (384 MB at three million), plus small histograms/uniforms and optional SH. CPU copies for recovery are additional. Center-depth sorting approximates intersecting ellipsoids; near-plane-crossing centers are culled. Multiple clouds sort independently: combine overlapping clouds into one data set when global order matters. Splats do not write depth unless `./depth` is attached (below), cast directional shadows or receive PBR lighting. They can render alongside shadows, clustered meshes, animation, VFX and TAA; temporal history uses underlying opaque depth. Frame rate and sorting time depend on hardware and fill rate, with no 1-2 ms or locked-60-FPS guarantee.
-
-`cloud.setFog(fog)` fogs the cloud with `@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each splat's colour fades toward the fog colour by the fog at its centre, in the projection pass and in linear before the display encoding; opacity is unchanged. The package does not import environment. `fog.enabled = false` clears it without recompiling; `cloud.setFog(null)` (the default) draws exactly as before.
 
 [README continues: https://margoengine.com/llms/packages/splats.md]
 

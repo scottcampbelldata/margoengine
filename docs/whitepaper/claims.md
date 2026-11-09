@@ -1453,3 +1453,12 @@ complete archive, one mesh, 36 vertices, 12 triangles, UVs, PNG and zero issues;
 `npm run check:readme-run -- --packages=usdz` executes the browser introduction.
 Source and evidence: `results/readme-usdz-static-20261109.json`. This is static
 execution evidence only; production quality, composition and Quick Look are separate.
+
+### Splat README execution evidence (2026-11-09)
+
+All 14 original examples execute; four known exceptions are removed.
+tests/readme-assets.test.js checks four exact hashes, 8,385 valid points each and
+every locally serialized .splat position against the independent PLY. Run
+`npm run check:readme-run -- --packages=splats`. Evidence:
+results/readme-splats-inputs-20261109.json. The .splat was serialized here; this
+is not independent encoder accuracy, full-capture quality or speed evidence.

@@ -1873,3 +1873,12 @@ input was accepted and no parser boundary changed.
 No open defect found in bounded authored banking. Tight-bend overlap remains outside this entry, as limits.md records. Analytic, hostile-input, abort, ownership and real backend lifecycle checks cover the contract.
 
 Banking audit regression: input bounds alone missed a section rotated beyond the output coordinate limit. banking.test.js reproduced the missing rejection before the fix. banking.ts now validates transformed float32 positions too; the regression passes.
+
+### Splat README input failures resolved (2026-11-09)
+
+Four explicit format aliases close all four remaining splats exceptions; all 14
+original examples execute. tests/readme-assets.test.js fails before the aliases,
+then verifies four exact hashes, 8,385 points per file and every locally serialized
+.splat position against the independent PLY. The stale skip-when-absent fixture
+notice now documents the existing strict shared downloader. No codec/render defect
+is hidden by a generic fallback, and no full-capture or encoder-accuracy claim follows.

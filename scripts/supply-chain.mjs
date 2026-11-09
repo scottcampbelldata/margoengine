@@ -341,7 +341,7 @@ const ASSETS = [
   ],
   [
     'packages/splats/test/fixtures/NOTICE.md',
-    'test fixtures: slices of the Niantic Labs racoonfamily.spz and hornedlizard.spz samples (MIT, github.com/nianticlabs/spz), converted with PlayCanvas splat-transform (MIT) to PLY, SPZ and SOG',
+    'test fixtures: slices of the Niantic Labs racoonfamily.spz and hornedlizard.spz samples (MIT, github.com/nianticlabs/spz), converted with PlayCanvas splat-transform (MIT) to PLY, SPZ and SOG. Test-only raccoon-v2.splat is serialized here with Margo encodeSplat from the same 8385-point PLY excerpt: 268320 bytes, SHA-256 ec80ad829ffc324798c6bd7680ce53d2dd28819639b593e1393e39b83a8b1e25, source hash and regeneration command in the fixture notice. This is a local real-data derivative, not an outside-authored .splat file or independent encoder-accuracy oracle',
   ],
   [
     'packages/exporters/tests/fixtures/NOTICE.md',

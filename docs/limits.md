@@ -1503,3 +1503,11 @@ physical Apple Quick Look behaviour. The composition example remains open.
 ### Batch 65 job 2: banking (LIM-634)
 
 Optional road/banking: 1041 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.
+
+### Splat README execution evidence (2026-11-09)
+
+All 14 examples run on documented real 8,385-point raccoon excerpts. PLY/SPZ/SOG
+reuse the independent fixtures; .splat is serialized here with Margo from that PLY,
+preserving positions, quantizing colour/quaternion and omitting SH as its format
+requires. Four example-input failures close. Independent .splat encoder accuracy,
+complete-capture quality and throughput are separate; no codec/render or size budget changed.

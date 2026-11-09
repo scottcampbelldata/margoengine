@@ -19,6 +19,12 @@ engine.start();
 // cloud.dispose() when unloading; engine.dispose() releases attached plugins.
 ```
 
+The executable README check maps `/capture.splat`, `/capture.ply`, `/capture.spz` and `/capture.sog` to
+the documented 8,385-splat excerpt of Niantic's raccoon capture (MIT), preserving the format each example
+requests. The PLY/SPZ/SOG fixtures are the documented real-data inputs; `.splat` is serialized here
+from that PLY with `encodeSplat`. This exercises the examples on a real excerpt, without a complete-capture
+quality, performance or independent `.splat` encoder-accuracy claim. See [fixture provenance](test/fixtures/NOTICE.md).
+
 For generated data, supply `SplatData`: `positions` has three Float32 values per splat; `covariances` has six (xx, xy, xz, yy, yz, zz); `colors` has four (linear RGB and opacity, each 0..1). Construction validates lengths, finite values and positive-definite covariance, then copies the data for ownership/device recovery. Colors are converted to sRGB for ordinary display targets and remain linear in HDR targets.
 
 Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with RGB interleaved for each coefficient. Evaluation uses the real SH basis through degree 3, the camera-to-splat direction, and the usual 0.5 offset. SH replaces RGB; `colors` still supplies opacity. Large SH buffers can exceed an adapter's storage binding limit even when the base cloud fits; attachment rejects before allocating. `parseSplat()` decodes the common 32-byte binary layout (xyz, positive xyz scales, byte RGBA, byte quaternion in wxyz order), converts byte sRGB to linear, normalizes quaternions and derives covariance. `parsePly()` reads Gaussian-splat PLY files (below); `parseSpz()` and `parseSog()` read compressed captures (below); training is outside this package.

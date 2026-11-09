@@ -963,3 +963,17 @@ Its 8,080-byte SHA-256 and licence are in scripts/support/external-test-assets.j
 Missing/LFS/changed bytes fail with the external fetch command. The regression
 asserts 36 expanded vertices and 12 triangles, not a visual-quality metric. The
 composition example's separate known exception remains.
+
+### Splat README inputs
+
+After building/restoring fixtures, run:
+
+```sh
+node --test --test-timeout=120000 tests/readme-assets.test.js
+npm run check:readme-run -- --packages=splats
+```
+
+All 14 examples must execute. Regenerate the local
+real-excerpt .splat with `node packages/splats/scripts/make-readme-splat.mjs`;
+its 268,320 bytes and SHA-256 are in the fixture notice. This is not an outside
+.splat oracle. Full SPZ capture proofs retain their separate required shared inputs.

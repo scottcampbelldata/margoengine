@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-09",
+  "scope": "Original example execution on the real 8385-point raccoon excerpt; no independent encoder, complete-capture quality or speed proof",
+  "source": "Niantic MIT samples/racoonfamily.spz; SPZ excerpt and PlayCanvas PLY/SOG conversion provenance in packages/splats/test/fixtures/NOTICE.md",
+  "localSplat": {
+    "generator": "node packages/splats/scripts/make-readme-splat.mjs",
+    "sourcePLYsha256": "a0f8332242dd99f6b8a8c8aff6df829bafef0eb0e557d4e531ffc031906cd9a6",
+    "sha256": "ec80ad829ffc324798c6bd7680ce53d2dd28819639b593e1393e39b83a8b1e25",
+    "bytes": 268320,
+    "points": 8385,
+    "positionsPreservedExactly": true,
+    "outsideAuthored": false
+  },
+  "regression": "tests/readme-assets.test.js; fails before explicit aliases; all four hashes/counts plus every .splat position against PLY",
+  "removedKnownExceptions": [
+    "splats/readme-margoengine-splats-03fb4a",
+    "splats/readme-margoengine-splats-f08e38",
+    "splats/readme-ply-captures-editing-and-level-o-0d1416",
+    "splats/readme-ply-captures-editing-and-level-o-73481e"
+  ],
+  "readmeResults": [
+    {
+      "id": "splats/readme-margoengine-splats-f08e38",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-margoengine-splats-03fb4a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-margoengine-splats-8cd30a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-with-glass-2e181d",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-ply-captures-editing-and-level-o-0d1416",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-ply-captures-editing-and-level-o-73481e",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-compressed-export-data-14148d",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-depth-with-meshes-depth-e5b4c6",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-streamed-level-of-detail-lod-c3b39e",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-one-sort-for-many-clouds-set-e30bdb",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-scene-light-and-shadows-lighting-736e59",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-animated-splats-animate-e23918",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-picking-and-brush-editing-edit-5e7157",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "splats/readme-picking-with-meshes-pick-d05f30",
+      "result": "pass",
+      "place": "page"
+    }
+  ]
+}

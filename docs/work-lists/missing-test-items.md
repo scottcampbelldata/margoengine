@@ -197,8 +197,8 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | points/readme-laz-decoder-margoengine-points-l-7c341a | /scans/site.laz | sample: MargoError: GET /scans/site.laz answered 404; check the URL and the server | Passed with explicit licensed sample; exception removed |
 | points/readme-potree-folders-margoengine-point-41f702 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Pending file selection, provenance and rerun |
 | points/readme-potree-folders-margoengine-point-5be661 | See named example | sample: MargoError: GET /scans/site/cloud.js answered 404; check the URL and that the server allows it | Pending file selection, provenance and rerun |
-| splats/readme-margoengine-splats-f08e38 | /capture.splat | sample: Error: Failed to load splats: 404 | Pending file selection, provenance and rerun |
-| splats/readme-ply-captures-editing-and-level-o-0d1416 | /capture.ply | sample: Error: Failed to load splats: 404 | Pending file selection, provenance and rerun |
+| splats/readme-margoengine-splats-f08e38 | /capture.splat | sample: Error: Failed to load splats: 404 | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
+| splats/readme-ply-captures-editing-and-level-o-0d1416 | /capture.ply | sample: Error: Failed to load splats: 404 | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
 | text/readme-prebuilt-atlases-bitmapfont-5ec840 | /fonts/inter.json | sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL | FIXED by lane Q: supplied Margo-generated Source Sans 3 ASCII SDF JSON/PNG, SIL OFL 1.1; README uses source-sans.json; exception removed, scoped run 40/40 |
 | tonemap/readme-margoengine-tonemap-5802b3 | /grade.cube | sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header | Pending file selection, provenance and rerun |
 | usdz/readme-composition-fbebfe | /toy_car.usdz, /Kitchen_set/Kitchen_set.usd, /model.usd | sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404 | Pending file selection, provenance and rerun |
@@ -254,8 +254,8 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | rigging/readme-spring-bones-and-jiggle-margoeng-a41e82 | /hero.glb | sample: RangeError: Spring center must be the chain's first joint or an ancestor of it | Deferred to later README job |
 | rigging/readme-vrm-avatars-margoengine-rigging-009c8e | /rigged.glb | sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum | Deferred to later README job |
 | shadows/readme-margoengine-shadows-7183ea | See named example | example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments | Deferred to later README job |
-| splats/readme-margoengine-splats-03fb4a | /capture.splat | sample: RangeError: A .splat file must hold 1 to 3,000,000 splats of 32 bytes each; check that the file is complete. | Deferred to later README job |
-| splats/readme-ply-captures-editing-and-level-o-73481e | /capture.spz, /capture.sog | sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz. | Deferred to later README job |
+| splats/readme-margoengine-splats-03fb4a | /capture.splat | sample: RangeError: A .splat file must hold 1 to 3,000,000 splats of 32 bytes each; check that the file is complete. | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
+| splats/readme-ply-captures-editing-and-level-o-73481e | /capture.spz, /capture.sog | sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz. | Passed: exact format-specific 8,385-point raccoon capture excerpt; original example passes and exception removed; .splat serialized here, no complete-capture quality/performance claim |
 | stage/readme-feature-entries-a6844a | See named example | example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro | FIXED by lane Q: fixture selection follows the imported static glTF loader, including Stage; exception removed, scoped run 40/40 |
 | voxel-net/readme-margoengine-voxel-net-b6eba6 | See named example | example: Error: Module "node:http" has been externalized for browser compatibility: a server and a page in one example | Deferred to later README job |
 | voxel-pathtracer/readme-margoengine-voxel-pathtracer-af6ce0 | See named example | sample: TypeError: VoxelPathTracer scene.models[0].voxels has 151 entries; a 32x24x32 model needs 24576 (index = x + sx * (z + sz * y)) | Closed upstream by 418849c4a |
@@ -519,7 +519,7 @@ The descriptor oracle now follows the documented backing texture and alternate v
 
 P06 landing validation: full verify 13,356 passed, zero failures/skips (299.2 s); 402 material tests, the default material GPU suite (96 shader modules, zero errors), the supplied-mip proof and all 29 material README examples pass. Lint and hygiene pass. No exports or runtime source changed.
 
-Lane C next claims all five remaining splats README exception rows (capture.splat, capture.ply, capture.spz and capture.sog); the existing USDZ introduction claim remains active. Physics stays held.
+Lane C next claims all four remaining splats README exception rows (capture.splat, capture.ply, capture.spz and capture.sog); the existing USDZ introduction claim remains active. Physics stays held.
 
 ## Static USDZ README input (2026-11-09)
 
@@ -542,3 +542,23 @@ file; nonempty data was then searched. No implementation files were read. This
 is a source-search result, not a reset-stack pass or a hardware blocker.
 
 Static USDZ landing validation: full verify passes with zero failures/skips (270.5 s), lint and hygiene pass; all 242 USDZ tests, 34 root harness/asset tests, USDZ GPU checks (16 shader modules, zero errors) and 7/8 original USDZ examples pass, retaining only composition and no fresh failures. Both download commands validate the same 353 required inputs. The introduction regression fails before the alias. No exports changed.
+
+## Splat README input group (2026-11-09)
+
+All four remaining splats exceptions now pass, and all 14 original splats examples
+execute in the browser. The earlier claim mistakenly counted five rows; there are
+four rows across four format aliases. Explicit aliases serve the existing 8,385-point
+real raccoon PLY/SPZ/SOG excerpt. The new 268,320-byte .splat is serialized here
+from that PLY with Margo encodeSplat, not an outside-authored .splat. Its SHA-256
+and generator are in the fixture notice. Every source position survives exactly;
+colour/quaternion are quantized and SH is omitted by the format. No independent
+encoder-accuracy, full-capture quality or speed claim is made. Full SPZ capture
+proofs stay with batch 160.
+
+The regression fails before the aliases, verifies four exact hashes and 8,385
+valid splats per file, and compares every .splat position with the independent PLY.
+The stale fixture notice claiming absent full captures skip is corrected: the
+existing shared required downloader supplies them; missing/LFS/changed bytes fail.
+The known README list now has 53 entries. Physics remains held.
+
+Splat input landing validation: full verify passes 13,368 tests with zero failures/skips (333.9 s); all 73 package tests, 32 root harness/asset tests, the GPU suite (20 shader modules, zero errors) and all 14 original README examples pass. Lint and hygiene pass. The alias regression fails before the mapping. No exports, codec source or runtime size budgets changed.

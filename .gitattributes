@@ -23,6 +23,7 @@ packages/*/bin/** text eol=lf
 
 # Margo-made fixtures whose CRLF line endings are part of what the tests exercise
 packages/loaders/tests/fixtures/*.ply -text
+packages/splats/test/fixtures/*.splat binary
 packages/loaders/tests/fixtures/*.pcd -text
 packages/loaders/tests/fixtures/*.xyz -text
 packages/bvh/tests/fixtures/*.obj -text

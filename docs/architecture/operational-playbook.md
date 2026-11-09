@@ -2452,3 +2452,12 @@ Look and production image quality remain separate gaps.
 ### Batch 65 job 2: banking
 
 Optional road/banking rotates the existing road sweep about its forward tangent and lazily reuses geometry/utils normals after deformation. Core and stage stay unchanged. Section 5 evidence: banking.test.js proves analytic signed tilt, width, normal direction, equal-distance transitions, grades, curved and closed inputs, finite normals, hostile bounds, float32 collapse, ownership and abort boundaries. browser-check.mjs proves road/clear pixels, exact device reboot and double mesh/engine disposal on native WebGPU and real WebGL2 compatibility. Generated geometry is stand-in proof; no survey, civil design, other-hardware or speed claim.
+
+### Splat README inputs: section 5 evidence (2026-11-09)
+
+Four explicit format aliases close four splats example failures; all 14 original
+blocks execute. The regression hashes four real-excerpt fixtures, validates 8,385
+splats each and compares every locally serialized .splat position with independent
+PLY. No codec/render, core or stage source changed. This is example-execution
+evidence; independent encoder accuracy, full-capture quality and throughput remain
+separate. Full SPZ tests keep their required shared fixtures.

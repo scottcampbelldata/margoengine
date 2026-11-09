@@ -3989,3 +3989,14 @@ A regression fails before the explicit alias and checks its archive hash, one me
 36 vertices, 12 triangles, UVs, PNG and zero issues. The missing-file exception is
 removed. Composition remains a separate open example; this is execution evidence,
 not visual-quality or Apple Quick Look proof. No parser/render code changed.
+
+## Splat README inputs (2026-11-09)
+
+Four original examples lose their missing/misserved-input exceptions; all 14 splats
+README blocks execute in the browser. Explicit aliases select the real 8,385-point
+MIT raccoon PLY/SPZ/SOG excerpt and a .splat serialized here from that PLY with Margo
+encodeSplat. The regression fails before the aliases, checks exact hashes/counts
+and every source position of the .splat. The derivative/generator are test-only.
+No rendering or codec source changed. This is example execution on a real excerpt,
+not independent encoder accuracy, complete-capture quality or speed evidence.
+Record: results/readme-splats-inputs-20261109.json.

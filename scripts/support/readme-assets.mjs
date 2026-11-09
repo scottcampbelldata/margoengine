@@ -7,6 +7,10 @@ import { externalAssetRoot, requireExternalAssets } from './external-test-assets
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/capture.splat': 'packages/splats/test/fixtures/raccoon-v2.splat',
+  '/capture.ply': 'packages/splats/test/fixtures/raccoon-v2.ply',
+  '/capture.spz': 'packages/splats/test/fixtures/raccoon-v2.spz',
+  '/capture.sog': 'packages/splats/test/fixtures/raccoon.sog',
   '/downlight.ies': 'packages/gltf-pro/tests/fixtures/lights/LightProfile.ies',
   '/textures/albedo.ktx2': decoder + 'ktx2-gpu/alpha-uastc-zstd.ktx2',
   '/textures/sky-cube.ktx2': decoder + 'ktx2-layers/cube-uastc-zstd.ktx2',
