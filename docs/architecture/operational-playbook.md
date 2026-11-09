@@ -2415,3 +2415,14 @@ sharp corner values, lazy loading, disposal and generation after device/context
 loss. Native QEF rank/constraint tests and a required downloaded Khronos Box fixture
 prove corner, plane, volume and closed-edge values. CSG and scale controls remain
 generated stand-ins; arbitrary topology and render quality are unproven (LIM-632).
+
+### Supplied mip chains: section 5 evidence (2026-11-09)
+
+Materials/mips now uploads seven outside toktx v4.0 conformance chains, five levels
+each, on a real WebGPU device. All 35 images (9,548 texel bytes) read through the
+allowed linear view match independent ktx-extract hashes exactly. Missing, LFS and
+changed fixture bytes fail before browser startup. GPU readback uses textureLoad
+and pack4x8unorm into storage, since supplied textures promise sampling rather than
+COPY_SRC. No rendering or core/stage code changes. The solid-colour density controls
+remain; these outside solid-colour patterns add upload conformance, not production
+texture quality, nonuniform authored-image evidence or speed measurements.

@@ -1,11 +1,21 @@
 // Real-GPU checks of the optional material features (features.html draws, this judges the numbers).
 // Run from the repository root after `npm run build:packages`: node packages/materials/test/features-browser.mjs
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
+const mipFixture = 'arraytex_7_mipmap_reference_u.ktx2';
+if (!process.argv[2] || process.argv[2] === 'mips') {
+  const bytes = requiredFixture(`packages/decoders/tests/fixtures/ktx2-layers/${mipFixture}`, 'git lfs pull');
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    'fce87d983f3dfa995faf3df1d3dd60b1c8ba12cd52c1a6baccff20e905357fdb',
+    `Changed required mip-chain fixture ${mipFixture}; restore with git lfs pull`);
+}
 const only = process.argv[2],
   release = await acquire({ owner: 'materials-features' });
 const context = await openBrowser({ startPath: '/packages/materials/test/features.html', port: 5271 }),
@@ -499,6 +509,17 @@ const jobs = {
     near(await run({ repeats: 5, levels: 4, canvas: true }), green, 'canvas levels');
     near(await run({ repeats: 5, levels: 4, format: 'rgba16float' }), [0, 0.5, 0], 'half floats');
     console.log('mips: each level shows at its own density, short chains stop, canvases and half floats work');
+    const real = await check('realMips');
+    assert.deepEqual(real.errors, []);
+    assert.deepEqual(real.descriptors, Array.from({ length: 7 }, () => ({
+      width: 16, height: 16, levels: 5, format: 'rgba8unorm',
+    })));
+    const records = JSON.parse(readFileSync('packages/decoders/tests/fixtures/ktx2-layers/records.json', 'utf8')).files[mipFixture];
+    assert.equal(real.images.length, 35);
+    assert.deepEqual(real.images.map(({ key }) => key).sort(), Object.keys(records).sort());
+    for (const image of real.images) assert.equal(image.sha256, records[image.key], `GPU mipTexture ${image.key}`);
+    assert.equal(real.images.reduce((sum, image) => sum + image.bytes, 0), 9548);
+    console.log('mips outside-tool conformance', JSON.stringify({ hardware: context.hardware, ...real }));
   },
   async layered() {
     const run = async (kind) => {

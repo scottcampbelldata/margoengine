@@ -842,8 +842,9 @@ cube and array textures, layers and detail, hand-made mips, and rough metal and 
   float texels failed WebGPU validation on a device without `float32-filterable`; it now throws the coded error a map slot throws
   (`env-map.test.js`).
 - **Proved:** a real GPU check per job in `packages/materials/test/features-browser.mjs`. Job 3 is on real KTX-Software files, each
-  image hashed against `ktx extract`. Job 5 is stand-in proof only: its chains are solid colours, no mip chain from a real tool
-  has been loaded. Jobs 2, 4 and 6 also draw stand-in maps. Job 7 reads the stored levels against a GGX integral worked out in the test: a
+  image hashed against `ktx extract`. Job 5 now also loads the unmodified KTX-Software conformance file through `/mips`: seven 2D chains, all
+  35 GPU-read images exact against independent `ktx extract` hashes (2026-11-09; `results/mips-real-tool-20261109.json`).
+  These are outside tool-written solid-colour patterns, not production-texture quality or nonuniform authored-image proof. Jobs 2, 4 and 6 also draw stand-in maps. Job 7 reads the stored levels against a GGX integral worked out in the test: a
   stand-in cube with one bright face holds 0.893 and 0.542 of it at roughness 0.5 and 1, against 0.897 and 0.554 integrated, where
   a box-filtered cube stays at 1. A real sky from a KTX2 file, an equirectangular image and float faces are checked only to keep
   their picture and range through the filter. Job 8 compares each lobe with the same illuminance from the sun at the

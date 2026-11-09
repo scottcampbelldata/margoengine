@@ -932,3 +932,19 @@ in test/fixtures/sdf/NOTICE.md. Other controls are generated stand-ins.
 values on real WebGPU and WebGL2 before and after loss, disposal and independent
 lazy loading. `cellEdgeUses == 4 * edgeSolves` proves shared-root work reduction;
 there is no elapsed-time or SIMD speed claim (LIM-632).
+
+### Outside-tool supplied mip chains
+
+After `git lfs pull` and `npm run build:packages`, run:
+
+```sh
+node scripts/gpu-lock.mjs run --owner=mips-proof -- node packages/materials/test/features-browser.mjs mips
+```
+
+The required unmodified KTX-Software-CTS file fails on missing/LFS/changed bytes. Its
+notice pins the public URL revision, size, licence and hash. The test splits seven
+layers into 2D chains, uploads through materials/mips, and hashes every texel from
+a compute textureLoad/pack4x8unorm read using a linear view. Expected hashes come
+from independent `ktx extract --raw --all`, not Margo's decoded data. All 35 images
+(9,548 texel bytes) must match. Solid-colour conformance only; no quality or timing
+claim. Durable record: `results/mips-real-tool-20261109.json`.

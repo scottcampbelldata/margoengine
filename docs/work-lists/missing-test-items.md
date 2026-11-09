@@ -94,7 +94,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P03 | LIM-281, FBX inherit | type 0 rig below a sheared parent | Same, independently authored FBX | Pending |
 | P04 | limits FBX deformers, LIM-296 | additive-cluster FBX | Same | Pending |
 | P05 | build-record batch 43 | 31 files' absent/PSD textures, real layer-compositing reference | Original model publishers; individual image licences | Pending; identify files from original corpus manifest |
-| P06 | build-record material features job 5 | mip chain from a real tool | Khronos KTX-Software standard texture test data, Apache-2.0 to verify | Pending |
+| P06 | build-record material features job 5 | mip chain from a real tool | KTX-Software-CTS 1815a621e92186114042aa38798b5162b7ed2520, root LICENSE Apache-2.0 | Passed: seven outside tool-written 2D chains, all 35 GPU-read images and 9,548 texel bytes exact against independent ktx-extract hashes. Solid-colour conformance patterns only; production quality/nonuniform authored images remain open |
 | P07 | build-record eyes job 6 | actual eyeball mesh/reference, not Seed-san iris plate | Openly licensed anatomy model and measurement/reference | Pending |
 | P08 | build-record glTF extensions job 1 | published mixed mesh/splat depth sample | Khronos/Cesium sample data; per-model licence | Pending; tower alone belongs to batch 160 |
 | P09 | build-record glTF extensions job 8 | published click-driven material behaviour | Khronos interactivity example corpus, CC-BY-4.0 to verify | Pending; conformance download belongs to batch 160 |
@@ -498,3 +498,25 @@ ktx-extract hashes, but they are not newly downloaded outside-authored chains. N
 proof or P06 closure is claimed. A future pass on the outside solid-colour chain must retain its conformance-pattern scope; it would not establish production-texture quality.
 
 USDZ investigation validation: lint and hygiene pass; full verify has 13,335 tests with zero failures/skips (297.9 s). All 242 USDZ package tests and the real browser checks pass (16 shader modules, zero errors). README execution is 6/8, retaining the original two known exceptions and zero fresh failures. The excluded NC archive and extracted layer were removed from this lane after inspection; only the source/hash record remains.
+
+## Outside-tool supplied mip proof (2026-11-09)
+
+P06 is closed for outside-tool chain upload conformance. The unmodified 9,928-byte
+KTX-Software-CTS array file was downloaded again at the pinned revision in its notice,
+and hashes exactly as the tracked file. Its toktx v4.0 writer supplied five levels at
+16, 8, 4, 2 and 1 texels per edge, across seven layers. Each layer is passed as a 2D
+chain through materials/mips, attached to an UnlitMaterial, and uploaded by the real
+material path. A compute shader reads every texel through the allowed rgba8unorm view
+and packs exact UNORM bytes to storage. All 35 image hashes match independent
+ktx-extract records, all 9,548 texel bytes covered, no shader or GPU errors.
+
+The earlier density-selection, short-chain, canvas and half-float controls stay.
+The outside patterns are solid colours; no production-texture quality or nonuniform
+authored-image claim is made. The harness initially queried the GPU copy before
+binding, then attempted COPY_SRC, which the texture does not promise; both harness
+errors were corrected without changing engine code or weakening any assertion.
+The descriptor oracle now follows the documented backing texture and alternate views.
+
+P06 landing validation: full verify 13,356 passed, zero failures/skips (299.2 s); 402 material tests, the default material GPU suite (96 shader modules, zero errors), the supplied-mip proof and all 29 material README examples pass. Lint and hygiene pass. No exports or runtime source changed.
+
+Lane C next claims all five remaining splats README exception rows (capture.splat, capture.ply, capture.spz and capture.sog); the existing USDZ introduction claim remains active. Physics stays held.

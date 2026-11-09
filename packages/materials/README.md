@@ -976,6 +976,11 @@ generated past it, so a far surface keeps the last level. `format: 'rgba16float'
 bits for values past 1, always linear. `loadMipTexture(urls, options)` does the same for image URLs, with `signal` and
 `fetch`. Other options are the Texture's own; `mipmaps`, `dimension` and `flipY` are fixed by the chain.
 
+The GPU test loads the unmodified KTX-Software conformance file `arraytex_7_mipmap_reference_u.ktx2`,
+passes its seven 2D chains through `mipTexture`, and checks all 35 uploaded images against independent
+`ktx extract` hashes. These are outside tool-written solid-colour patterns; they establish exact supplied
+texels at every level, not production-texture quality or a nonuniform authored-image proof.
+
 ### Alpha to coverage
 
 `alphaToCoverage: true` smooths the edges of an `alphaTest` cut-out on a multisampled target: the alpha sets how many of
