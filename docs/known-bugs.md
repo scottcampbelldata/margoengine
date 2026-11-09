@@ -250,8 +250,12 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   repaired by observing the engine's actual device (see batch 273 evidence below).
 - `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
   compressed texture because its view-copy path requires a renderable format.
-  The compressed view route needs investigation; no texture or colour work may
-  be silently removed. `materials/test:gpu:back-side` also reached the 60 s body
+  Reproduced unchanged in batch-273-more-before.log. CompatTexture.copy and
+  Replayer.sync require framebuffer storage, while writeBlocks retains no
+  compressed subresource bytes for an alternate upload. The generic repair
+  must retain exact blocks and versions across partial writes, copies, mip/layer
+  and alias views; post-filter sRGB conversion is not equivalent. This remains
+  open; no texture or colour work may be removed. `materials/test:gpu:back-side` also reached the 60 s body
   deadline without output and had its process tree killed; its awaited operation
   has not yet been isolated.
 - `materials/test:gpu:dispersion`: the fixture's `JSON.stringify` reaches the

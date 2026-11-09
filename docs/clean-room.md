@@ -3560,3 +3560,30 @@ both pass, with every original numeric bar retained. Native clipping still
 differs only along the cut (192 edge pixels, none outside). Compatibility's
 requested/unrequested feature images match exactly. Materials units pass 402/402.
 Receipts: test-results/batch-273-features-before.log and -features-after.log.
+
+### Batch 273 compatibility failure 7: compressed texture views
+
+Before investigation, compared Jacob Strom and Tomas Akenine-Moller, iPACKMAN:
+High-Quality, Low-Complexity Texture Compression for Mobile Phones (2005),
+https://fileadmin.cs.lth.se/graphics/research/papers/ipackman2005/ipackman2005.pdf
+(section 1: fixed-rate block access and filtering); Olli Etuaho and the Khronos
+WebGL Working Group, EXT_texture_compression_bptc, revision 6 (2020),
+https://registry.khronos.org/webgl/extensions/EXT_texture_compression_bptc/
+(linear and sRGB formats); and W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (view-format compatibility and texel-block copies).
+Compressed storage and colour interpretation are separate contracts. Converting
+a filtered linear sample afterward would not preserve sRGB filtering; changing
+the material or decoder's requested format would hide the generic view defect.
+No companion or rival implementation was read.
+
+Unchanged materials/test:gpu:more reproduces the BC7 linear-to-sRGB view refusal
+in test-results/batch-273-more-before.log. CompatTexture.copy requires both
+storages to be framebuffer-renderable; Replayer.sync uses framebuffer blits or
+rawCopy. Compressed blocks are uploaded from temporary tight bytes, with no
+retained compressed subresource store. Consequently these methods cannot copy
+the BC7 blocks into another view. Replayer.copyTextureToTexture also has a
+non-renderable refusal and only normalizes the uncompressed RGBA8 sRGB pair.
+A repair must preserve blocks across partial uploads, mip/layer/alias views and
+buffer/texture copies, including versions and disposal. No such complete repair
+is claimed here; no shader, colour work, assertion or limit was changed. Move
+to failure 8 rather than substitute a consumer-specific workaround.
