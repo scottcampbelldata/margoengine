@@ -78,6 +78,10 @@ test('texture backend, abort and shader compilation faults are linked and preser
   for (const source of [null, undefined, 1, 'device'])
     await assert.rejects(createTextureBaker(source), linked('unsupported'));
   await assert.rejects(createTextureBaker({ backend: 'webgl2', gpu: null }), linked('unsupported'));
+  const contextFailure = new Error('context provider failed');
+  await assert.rejects(createTextureBaker({ backend: 'webgl2', gpu: null, canvas: {
+    getContext() { throw contextFailure; },
+  } }), (e) => linked('failed')(e) && e.cause === contextFailure);
   const f = fake(),
     controller = new AbortController(),
     reason = new Error('stop');

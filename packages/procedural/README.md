@@ -484,7 +484,7 @@ await device.lost;
 | Bake option | Default | Limits |
 | --- | --- | --- |
 | pattern | bricks | noise, bricks, tiles, wood, rust |
-| width, height | 256 each | Integers 16..2048, at most the device maxTextureDimension2D |
+| width, height | 256 each | Integers 16..2048, at most maxTextureDimension2D (WebGPU) or MAX_TEXTURE_SIZE (WebGL2) |
 | seed | 1 | Unsigned 32-bit integer, including zero |
 | repeat | [4,8] | Integer columns/rows 1..64; bricks require even rows to repeat the alternate offset |
 | detail | 0.2 | 0..1; per-texel brick/tile variation, wood phase warp, rust threshold softness; ignored by noise |
@@ -494,6 +494,23 @@ await device.lost;
 | secondary | [0.15,0.12,0.1] | Mortar/secondary linear RGB, each 0..1 |
 | offset | [0,0] | UV phase, finite within +/-1024; integer parts discarded |
 | signal | absent | Cancels compilation/bake waits; caller's exact reason is preserved |
+
+Native WebGPU outputs have `backend: 'webgpu'` and a `GPUTexture`. Native WebGL2
+outputs have `backend: 'webgl2'`, a `WebGLTexture` and its owning `gl` context. They
+are native handles for their renderer; neither can be used on another context.
+The fragment pass restores GL state before yielding. Recreate the baker after
+WebGL2 context loss/restoration. Disposal releases every retained output.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+import {createTextureBaker} from '@margoengine/procedural/textures';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgl2', fallback: webglRenderer});
+using baker = await createTextureBaker(engine);
+using baked = await baker.bake({pattern: 'bricks', width: 256, height: 256});
+console.log(baked.backend, baked.width, baked.height);
+baked.dispose(); baker.dispose(); engine.dispose();
+```
 
 All presets use the same caller-controlled palette. `noise` is four-octave periodic
 value noise with lattice periods 4,8,16,32 and weights 8,4,2,1, quintic interpolation
@@ -514,7 +531,9 @@ baker on a replacement device. The entry does no work on import. Validation and
 compile/driver failures use coded errors with help links and retain original causes;
 shader errors name their source line. CPU lifecycle controls use stand-ins, while
 the actual shader, 44,415 pixel/channel checks, seam-crossing phase shifts, real
-abort/loss/disposal and replacement run on WebGPU. Native WebGL2 explicitly refuses.
+abort/loss/disposal and replacement run on WebGPU. Native WebGL2 runs the same
+shader oracle and also verifies state restoration, cancellation, disposal and
+actual context loss/restoration.
 The downloaded Lefebvre/Poulin 2000 figure 1(d) supplies a measured running-bond
 offset for a calibrated structural check only. Generated numerical controls remain
 stand-ins; no photograph reconstruction, wood/rust realism, material quality,

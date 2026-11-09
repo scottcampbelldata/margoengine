@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-09",
+  "test": "packages/procedural/test/textures-browser.mjs",
+  "nativeWebGPU": true,
+  "nativeWebGL2": true,
+  "pixelChecks": 88830,
+  "maxError": 1,
+  "webgl2Patterns": 5,
+  "externalReference": "Lefebvre/Poulin 2000 Fig. 1(d), calibrated row offsets only",
+  "otherControls": "STAND-IN",
+  "deviceLoss": true,
+  "contextLossAndRestoration": true,
+  "errors": []
+}

@@ -5,13 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 
-export interface BakedTexture {
-    readonly texture: GPUTexture;
-    readonly width: number;
-    readonly height: number;
-    dispose(): void;
-    [Symbol.dispose](): void;
-}
+export type BakedTexture = WebGPUBakedTexture | WebGLBakedTexture;
 
 export interface TextureBakeOptions {
     pattern?: TexturePattern;
@@ -28,15 +22,37 @@ export interface TextureBakeOptions {
     signal?: AbortSignal;
 }
 
-export interface TextureBaker {
-    bake(options?: TextureBakeOptions): Promise<BakedTexture>;
+export interface TextureBaker<T extends BakedTexture = BakedTexture> {
+    bake(options?: TextureBakeOptions): Promise<T>;
     dispose(): void;
     [Symbol.dispose](): void;
 }
 
 export type TexturePattern = 'noise' | 'bricks' | 'tiles' | 'wood' | 'rust';
 
-export function createTextureBaker(source: GPUDevice | Pick<EngineKernel, 'backend' | 'gpu'>, options?: {
+export interface WebGLBakedTexture {
+    readonly backend: 'webgl2';
+    readonly texture: WebGLTexture;
+    readonly gl: WebGL2RenderingContext;
+    readonly width: number;
+    readonly height: number;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface WebGPUBakedTexture {
+    readonly backend: 'webgpu';
+    readonly texture: GPUTexture;
+    readonly width: number;
+    readonly height: number;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export function createTextureBaker(source: GPUDevice, options?: {
+    signal?: AbortSignal;
+}): Promise<TextureBaker<WebGPUBakedTexture>>;
+export function createTextureBaker(source: Pick<EngineKernel, 'backend' | 'gpu'> & Partial<Pick<EngineKernel, 'canvas'>>, options?: {
     signal?: AbortSignal;
 }): Promise<TextureBaker>;
 ```

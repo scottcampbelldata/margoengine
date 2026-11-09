@@ -34,12 +34,16 @@ try {
   const page = await browser.newPage(),
     errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (message) => {
+    if (message.type() === 'log') console.log(message.text());
+  });
   await page.goto(server.resolvedUrls.local[0]);
   await page.waitForFunction(() => typeof window.createTextureBaker === 'function');
   const reference = JSON.parse(
     await readFile(new URL('./fixtures/textures/structural-reference.json', import.meta.url), 'utf8'),
   );
   const result = await page.evaluate(async (reference) => {
+    console.log('textures: native factory');
     const adapter = await navigator.gpu.requestAdapter(),
       device = await adapter.requestDevice();
     device.pushErrorScope('validation');
@@ -71,6 +75,7 @@ try {
       }
     }
     for (const pattern of ['noise', 'bricks', 'tiles', 'wood', 'rust']) {
+      console.log('textures: native ' + pattern);
       const options = {
         pattern,
         width: 63,
@@ -126,6 +131,7 @@ try {
     const beforeLoss = await device.popErrorScope();
     if (beforeLoss) throw new Error(beforeLoss.message);
     const inFlightLoss = baker.bake();
+    console.log('textures: native loss');
     device.destroy();
     let pendingLost = false;
     try {
@@ -173,7 +179,10 @@ try {
     if (!disposed) throw new Error('Disposed baker accepted bake');
     replacement.destroy();
     await replacement.lost;
-    const gl = document.createElement('canvas').getContext('webgl2');
+    const canvas = document.createElement('canvas'),
+      gl = canvas.getContext('webgl2');
+    document.body.append(canvas);
+    console.log('textures: WebGL2 factory');
     if (!gl) throw new Error('WebGL2 missing');
     let unsupported = false;
     try {
@@ -181,9 +190,121 @@ try {
     } catch (e) {
       unsupported = e.code === 'unsupported' && e.message.includes('https://margoengine.com/errors#procedural');
     }
-    if (!unsupported) throw new Error('WebGL2 did not give linked refusal');
-    gl.getExtension('WEBGL_lose_context').loseContext();
-    return { cases, bonds, lost, unsupported };
+    if (!unsupported) throw new Error('Missing WebGL2 canvas did not give linked error');
+    const fallback = await window.createTextureBaker({ backend: 'webgl2', gpu: null, canvas });
+    function readGL(out) {
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out.texture, 0);
+      const pixels = new Uint8Array(out.width * out.height * 4);
+      gl.readPixels(0, 0, out.width, out.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(fbo);
+      return [...pixels];
+    }
+    const fallbackCases = [];
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(1, 2, 3, 4);
+    gl.enable(gl.BLEND);
+    gl.colorMask(false, true, false, true);
+    gl.viewport(2, 3, 8, 9);
+    for (const pattern of ['noise', 'bricks', 'tiles', 'wood', 'rust']) {
+      console.log('textures: WebGL2 ' + pattern);
+      const options = {
+        pattern,
+        width: 63,
+        height: 47,
+        seed: 0xffffffff,
+        color: [1, 1, 1],
+        secondary: [0, 0, 0],
+        detail: 0.2,
+      };
+      const a = await fallback.bake(options),
+        pixels = readGL(a);
+      if (
+        !gl.isEnabled(gl.SCISSOR_TEST) ||
+        !gl.isEnabled(gl.BLEND) ||
+        [...gl.getParameter(gl.COLOR_WRITEMASK)].join() !== 'false,true,false,true' ||
+        [...gl.getParameter(gl.VIEWPORT)].join() !== '2,3,8,9'
+      )
+        throw new Error('Bake leaked WebGL2 state');
+      const shifted = await fallback.bake({ ...options, offset: [-1 / 63, 0] });
+      const shiftedY = await fallback.bake({ ...options, offset: [0, -1 / 47] });
+      const repeated = await fallback.bake({ ...options, offset: [1, -1] });
+      fallbackCases.push({
+        pattern,
+        pixels,
+        shifted: readGL(shifted),
+        shiftedY: readGL(shiftedY),
+        repeated: readGL(repeated),
+      });
+      for (const out of [a, shifted, shiftedY, repeated]) {
+        out.dispose();
+        out.dispose();
+      }
+    }
+    // Consecutive bakes must restore the caller's state before either promise publishes output.
+    const concurrent = await Promise.all([fallback.bake(), fallback.bake()]);
+    concurrent.forEach((out) => out.dispose());
+    const abort = new AbortController(),
+      abortReason = new Error('abort WebGL2 output');
+    const pending = fallback.bake({ signal: abort.signal });
+    abort.abort(abortReason);
+    try {
+      await pending;
+      throw new Error('GL abort was ignored');
+    } catch (e) {
+      if (e !== abortReason) throw e;
+    }
+    const disposingGL = fallback.bake();
+    fallback.dispose();
+    try {
+      await disposingGL;
+      throw new Error('GL disposal was ignored');
+    } catch (e) {
+      if (e.code !== 'disposed') throw e;
+    }
+    fallback.dispose();
+    const freshGL = await window.createTextureBaker({ backend: 'webgl2', gpu: null, canvas });
+    console.log('textures: WebGL2 loss/restore');
+    canvas.addEventListener('webglcontextlost', (e) => e.preventDefault(), { once: true });
+    const event = (type) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          canvas.removeEventListener(type, handler);
+          reject(new Error(type + ' did not arrive in 10 s'));
+        }, 10000);
+        const handler = (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        };
+        canvas.addEventListener(type, handler, { once: true });
+      });
+    const lossEvent = event('webglcontextlost');
+    const extension = gl.getExtension('WEBGL_lose_context');
+    extension.loseContext();
+    await lossEvent;
+    console.log('textures: WebGL2 lost event');
+    try {
+      await freshGL.bake();
+      throw new Error('GL loss was ignored');
+    } catch (e) {
+      if (e.code !== 'failed') throw e;
+    }
+    freshGL.dispose();
+    // Restoration is permitted after the lost-event dispatch finishes, in a later task.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const restored = event('webglcontextrestored');
+    extension.restoreContext();
+    await restored;
+    console.log('textures: WebGL2 restored event');
+    const restoredBaker = await window.createTextureBaker({ backend: 'webgl2', gpu: null, canvas });
+    const restoredOutput = await restoredBaker.bake({ width: 16, height: 16 });
+    if (readGL(restoredOutput).length !== 1024) throw new Error('Restored GL bake failed');
+    restoredOutput.dispose();
+    restoredBaker.dispose();
+    if (gl.getError() !== gl.NO_ERROR) throw new Error('WebGL2 validation error');
+    return { cases, fallbackCases, bonds, lost, unsupported };
   }, reference);
   function hash(x, y, seed) {
     let h = Math.imul(x, 1597334677) ^ Math.imul(y, 3812015801) ^ seed;
@@ -208,7 +329,7 @@ try {
   }
   let pixelChecks = 0,
     maxError = 0;
-  for (const c of result.cases) {
+  for (const c of [...result.cases, ...result.fallbackCases]) {
     assert.deepEqual(c.pixels, c.repeated, 'integer tile translation is byte exact');
     const colours = new Set();
     for (let y = 0; y < 47; y++)
@@ -250,6 +371,12 @@ try {
       }
     assert.ok(colours.size > 20, `${c.pattern} has material variation`);
   }
+  for (let i = 0; i < result.cases.length; i++) {
+    const a = result.cases[i],
+      b = result.fallbackCases[i];
+    for (let k = 0; k < a.pixels.length; k++)
+      assert.ok(Math.abs(a.pixels[k] - b.pixels[k]) <= 1, `backend parity ${a.pattern} channel ${k}`);
+  }
   // Figure 1(d) numerical measurements are from the actual downloaded source
   // raster. This checks a calibrated structural offset, not image reconstruction.
   for (const { pattern, pixels } of result.bonds) {
@@ -290,7 +417,7 @@ try {
       externalReference: 'Lefebvre/Poulin 2000 Fig. 1(d), measured calibrated row offsets only',
       otherControls: 'STAND-IN',
       lost: result.lost,
-      webgl2Refused: result.unsupported,
+      webgl2Patterns: result.fallbackCases.length,
       errors,
     }),
   );

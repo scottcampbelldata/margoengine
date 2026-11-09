@@ -1,5 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import { fault } from '../../shared/errors.js';
+import { textureSettings } from './texture-settings.js';
 import { textureShader } from './texture-shader.js';
 
 /** Periodic procedural material pattern. */
@@ -32,7 +33,8 @@ export interface TextureBakeOptions {
   signal?: AbortSignal;
 }
 /** Owned, repeat-sampled RGBA8 texture, with opaque alpha. */
-export interface BakedTexture {
+export interface WebGPUBakedTexture {
+  readonly backend: 'webgpu';
   /** TEXTURE_BINDING, STORAGE_BINDING and COPY_SRC usage. */
   readonly texture: GPUTexture;
   readonly width: number;
@@ -41,19 +43,25 @@ export interface BakedTexture {
   dispose(): void;
   [Symbol.dispose](): void;
 }
+/** Owned native WebGL2 texture on the source engine's context. */
+export interface WebGLBakedTexture {
+  readonly backend: 'webgl2';
+  readonly texture: WebGLTexture;
+  readonly gl: WebGL2RenderingContext;
+  readonly width: number;
+  readonly height: number;
+  dispose(): void;
+  [Symbol.dispose](): void;
+}
+export type BakedTexture = WebGPUBakedTexture | WebGLBakedTexture;
 /** A baker bound to one device. Create a new one after device replacement. */
-export interface TextureBaker {
-  /** Complete a compute bake; no CPU pixel loop or readback. */
-  bake(options?: TextureBakeOptions): Promise<BakedTexture>;
+export interface TextureBaker<T extends BakedTexture = BakedTexture> {
+  /** Complete a compute (WebGPU) or fragment (WebGL2) bake; no CPU pixel loop or readback. */
+  bake(options?: TextureBakeOptions): Promise<T>;
   /** Destroy all retained outputs. Idempotent. */
   dispose(): void;
   [Symbol.dispose](): void;
 }
-const patterns: TexturePattern[] = ['noise', 'bricks', 'tiles', 'wood', 'rust'];
-const bounded = (v: number, lo: number, hi: number) => Number.isFinite(v) && v >= lo && v <= hi;
-const integer = (v: number, lo: number, hi: number) => Number.isInteger(v) && bounded(v, lo, hi);
-const tuple = (v: unknown, count: number, lo: number, hi: number): v is number[] =>
-  Array.isArray(v) && v.length === count && v.every((x) => bounded(x, lo, hi));
 const lost = () =>
   fault('failed', 'Texture baker device was lost; create a baker on the replacement device', 'procedural');
 async function wait<T>(work: Promise<T>, lifecycle: AbortSignal, signal?: AbortSignal): Promise<T> {
@@ -79,56 +87,19 @@ async function wait<T>(work: Promise<T>, lifecycle: AbortSignal, signal?: AbortS
     if (abort) combined.removeEventListener('abort', abort);
   }
 }
-class Baker implements TextureBaker {
-  private outputs = new Set<BakedTexture>();
+class Baker implements TextureBaker<WebGPUBakedTexture> {
+  private outputs = new Set<WebGPUBakedTexture>();
   private disposed = false;
   constructor(
     private device: GPUDevice,
     private pipeline: GPUComputePipeline,
     private lifecycle: AbortController,
   ) {}
-  async bake(options: TextureBakeOptions = {}): Promise<BakedTexture> {
+  async bake(options: TextureBakeOptions = {}): Promise<WebGPUBakedTexture> {
     if (this.disposed) throw fault('disposed', 'Texture baker is disposed; create a new baker', 'procedural');
     this.lifecycle.signal.throwIfAborted();
-    if (!options || typeof options !== 'object' || Array.isArray(options))
-      throw fault('failed', 'Texture bake options must be an object', 'procedural');
-    options?.signal?.throwIfAborted();
-    const {
-      width = 256,
-      height = 256,
-      seed = 1,
-      pattern = 'bricks',
-      repeat = [4, 8],
-      detail = 0.2,
-      grout = 0.08,
-      stagger = 0.5,
-      color = [0.55, 0.2, 0.08],
-      secondary = [0.15, 0.12, 0.1],
-      offset = [0, 0],
-      signal,
-    } = options;
-    const kind = patterns.indexOf(pattern),
-      maximum = Math.min(2048, this.device.limits.maxTextureDimension2D);
-    if (
-      kind < 0 ||
-      !integer(width, 16, maximum) ||
-      !integer(height, 16, maximum) ||
-      !integer(seed, 0, 0xffffffff) ||
-      !tuple(repeat, 2, 1, 64) ||
-      !repeat.every(Number.isInteger) ||
-      (kind === 1 && repeat[1] % 2 !== 0) ||
-      !bounded(detail, 0, 1) ||
-      !bounded(grout, 0, 0.45) ||
-      !bounded(stagger, 0, 1) ||
-      !tuple(color, 3, 0, 1) ||
-      !tuple(secondary, 3, 0, 1) ||
-      !tuple(offset, 2, -1024, 1024)
-    )
-      throw fault(
-        'failed',
-        'Invalid texture bake settings; use bounded dimensions, colours and integer repeats (even brick rows)',
-        'procedural',
-      );
+    const { width, height, seed, repeat, detail, grout, stagger, color, secondary, offset, signal, kind } =
+      textureSettings(options, this.device.limits.maxTextureDimension2D);
     const device = this.device,
       bytes = new ArrayBuffer(80),
       ints = new Uint32Array(bytes),
@@ -168,7 +139,8 @@ class Baker implements TextureBaker {
       signal?.throwIfAborted();
       const outputs = this.outputs,
         baked = texture;
-      const output: BakedTexture = {
+      const output: WebGPUBakedTexture = {
+        backend: 'webgpu',
         texture,
         width,
         height,
@@ -203,9 +175,17 @@ class Baker implements TextureBaker {
     this.dispose();
   }
 }
-/** Compile one compute pipeline on a WebGPU engine/device; native WebGL2 rejects with a linked unsupported error. */
+/** Compile a compute pipeline on WebGPU or a fragment pipeline on a native WebGL2 engine. */
+export function createTextureBaker(
+  source: GPUDevice,
+  options?: { signal?: AbortSignal },
+): Promise<TextureBaker<WebGPUBakedTexture>>;
+export function createTextureBaker(
+  source: Pick<EngineKernel, 'backend' | 'gpu'> & Partial<Pick<EngineKernel, 'canvas'>>,
+  options?: { signal?: AbortSignal },
+): Promise<TextureBaker>;
 export async function createTextureBaker(
-  source: GPUDevice | Pick<EngineKernel, 'backend' | 'gpu'>,
+  source: GPUDevice | (Pick<EngineKernel, 'backend' | 'gpu'> & Partial<Pick<EngineKernel, 'canvas'>>),
   options: { signal?: AbortSignal } = {},
 ): Promise<TextureBaker> {
   if (!options || typeof options !== 'object' || Array.isArray(options))
@@ -213,7 +193,21 @@ export async function createTextureBaker(
   options.signal?.throwIfAborted();
   if (!source || typeof source !== 'object')
     throw fault('unsupported', 'Texture baking requires a WebGPU device or engine', 'procedural');
-  const device = source && ('backend' in source ? source.gpu : source);
+  if ('backend' in source && source.backend === 'webgl2') {
+    try {
+      const gl = source.canvas?.getContext('webgl2');
+      if (!gl)
+        throw fault('unsupported', 'Texture baking needs the WebGL2 engine canvas or a WebGPU device', 'procedural');
+      const { createWebGLBaker } = await import('./textures-webgl.js');
+      options.signal?.throwIfAborted();
+      return createWebGLBaker(gl);
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      if (error instanceof Error && error.name === 'MargoError') throw error;
+      throw Object.assign(fault('failed', 'WebGL2 texture pipeline could not load or compile', 'procedural'), { cause: error });
+    }
+  }
+  const device = 'backend' in source ? source.gpu : source;
   if (!device || ('backend' in source && source.backend !== 'webgpu'))
     throw fault('unsupported', 'Texture baking requires WebGPU compute; select the WebGPU backend', 'procedural');
   try {
