@@ -141,7 +141,8 @@ failures and meshLayer figure-publication failures leaked resources/renderer reg
 fail on the unchanged build in all four cases, including native-backend error translation. Research before
 repair: David Abrahams, *Exception-Safety in Generic Components*, 2000 (Dagstuhl 1998), author paper
 https://www.boost.org/doc/libs/1_31_0/more/generic_exception_safety.html; Bjarne Stroustrup, *Exception
-Safety: Concepts and Techniques*, 2000, https://doi.org/10.1007/3-540-39953-4_3. The basic resource guarantee
+Safety: Concepts and Techniques*, 2001, https://stroustrup.com/except.pdf
+(author publication list: https://www.stroustrup.com/papers.html). The basic resource guarantee
 and transactional publication motivate immediate cleanup followed by exact-error rethrow, never suppression.
 The owner now disposes partial construction and rolls back failed publication; native unsupported is refused
 before allocation. Four permanent regressions pass after the fix. GPU/demo/full acceptance remains pending.
