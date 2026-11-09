@@ -614,6 +614,7 @@ export const entries = [
       'Colour map stops are [t, colour] pairs or colours',
       'Figure aspect must be three positive numbers',
       'Figure disposed; create a new one',
+      'replace needs two layers belonging to this figure',
       'scatter takes { x, y, z?, color?, size? } or { positions }',
       'scatter positions must hold x, y, z per point',
       'scatter x, y and z must have one length',
