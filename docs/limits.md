@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-596). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-597). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -903,3 +903,7 @@ Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. 
 Loudness entry: 2,107 B gzip, budget 2,363 B.
 Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,626 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
+
+## 2D light masks and layers (batch 55)
+
+`@margoengine/lighting2d` supports geometric light masks (`rect`, `circle`, `polygon`) and bitmask layer filtering (`layers` on `Light2DOptions` and `layer` on `Lighting2DOptions`). Lights masked or on mismatched layers are clipped in the shader or culled before draw submission. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-597.

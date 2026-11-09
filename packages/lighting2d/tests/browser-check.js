@@ -418,6 +418,44 @@ window.check = {
       cookiePass.dispose();
       cookieTarget.destroy();
     }
+    {
+      const maskTarget = texture(),
+        maskPass = Lighting2D.attach(instance, { target: () => maskTarget, ambient: '#000000', layer: 0b01 }),
+        rectMask = { kind: 'rect', minX: 8, minY: 4, maxX: 24, maxY: 12 },
+        matchingLight = maskPass.addLight({
+          x: 16,
+          y: 8,
+          radius: 30,
+          height: 10,
+          color: '#ffffff',
+          intensity: 1,
+          layers: 0b01,
+          mask: rectMask,
+        }),
+        ignoredLight = maskPass.addLight({
+          x: 16,
+          y: 8,
+          radius: 30,
+          height: 10,
+          color: '#ffffff',
+          intensity: 1,
+          layers: 0b10,
+        });
+      frame();
+      const bytes = await read(maskTarget);
+      const wantMask = new Float64Array(WIDTH * HEIGHT * 3);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = x + 0.5;
+          const wy = y + 0.5;
+          const add = lightAt(matchingLight, wx, wy, [0, 0, 1], 0b01);
+          for (let c = 0; c < 3; c++) wantMask[(y * WIDTH + x) * 3 + c] = Math.min(1, add[c]) * 255;
+        }
+      }
+      out.checks['light mask and layer filtering'] = compare(bytes, wantMask);
+      maskPass.dispose();
+      maskTarget.destroy();
+    }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();
 

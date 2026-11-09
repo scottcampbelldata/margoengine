@@ -1240,7 +1240,9 @@
     "exports": [
       "Light2D",
       "Lighting2D",
+      "inLightMask",
       "inShadow",
+      "lightAffectsLayer",
       "lightAt",
       "occluderEdges"
     ]

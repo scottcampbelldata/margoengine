@@ -63,7 +63,7 @@ export interface GeometryGroup {
 
 export type Point2D = [number, number];
 
-export function classifyLoops(loops: readonly (readonly Point2D[])[]): PolygonShape[];
+export function classifyLoops(loops: Point2D[][]): PolygonShape[];
 
 export function extrudeText(text: string, options: ExtrudeTextOptions): ExtrudedTextGeometry;
 

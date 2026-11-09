@@ -13,6 +13,38 @@ export type Point2D = readonly [number, number];
 /** What a light is: from a point, from a point within a cone, or from far away. */
 export type LightKind2D = 'point' | 'spot' | 'directional';
 
+/** A geometric mask restricting or clipping where a light can illuminate. */
+export type LightMask2D =
+  | { kind: 'rect'; minX: number; minY: number; maxX: number; maxY: number; invert?: boolean }
+  | { kind: 'circle'; radius: number; center?: Point2D; invert?: boolean }
+  | { kind: 'polygon'; points: readonly Point2D[]; invert?: boolean };
+
+/** Tests whether point (x, y) is inside the given light mask. */
+export function inLightMask(mask: LightMask2D, x: number, y: number): boolean {
+  let inside = false;
+  if (mask.kind === 'rect') {
+    inside = x >= mask.minX && x <= mask.maxX && y >= mask.minY && y <= mask.maxY;
+  } else if (mask.kind === 'circle') {
+    const cx = mask.center ? mask.center[0] : 0,
+      cy = mask.center ? mask.center[1] : 0;
+    inside = Math.hypot(x - cx, y - cy) <= mask.radius;
+  } else if (mask.kind === 'polygon') {
+    const pts = mask.points;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1],
+        xj = pts[j][0], yj = pts[j][1],
+        intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+  }
+  return mask.invert ? !inside : inside;
+}
+
+/** Tests whether a light affects a target with the given layer bitmask. */
+export function lightAffectsLayer(light: { layers?: number }, layerMask: number): boolean {
+  return ((light.layers ?? 0xffffffff) & layerMask) !== 0;
+}
+
 /** The fields of a {@link Light2D}, each read each frame. Distances are in world units. */
 export interface Light2DOptions {
   /** Default `'point'`. */
@@ -41,10 +73,14 @@ export interface Light2DOptions {
   elevation?: number;
   /** False lets it through occluders. Default true. */
   shadows?: boolean;
+  /** Layer bitmask this light illuminates. Tested with bitwise AND against a target's layer. Default ~0 (all layers). */
+  layers?: number;
+  /** Geometric mask clipping the light. */
+  mask?: LightMask2D;
 }
 
 /** One light. Make it with {@link Lighting2D.addLight}; change any field and the next frame shows it. */
-export class Light2D implements Required<Light2DOptions> {
+export class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
   kind: LightKind2D;
   x: number;
   y: number;
@@ -58,6 +94,8 @@ export class Light2D implements Required<Light2DOptions> {
   softness: number;
   elevation: number;
   shadows: boolean;
+  layers: number;
+  mask?: LightMask2D;
   constructor(options: Light2DOptions = {}) {
     this.kind = options.kind ?? 'point';
     this.x = options.x ?? 0;
@@ -72,11 +110,24 @@ export class Light2D implements Required<Light2DOptions> {
     this.softness = options.softness ?? 0;
     this.elevation = options.elevation ?? Math.PI / 4;
     this.shadows = options.shadows ?? true;
+    this.layers = options.layers ?? 0xffffffff;
+    this.mask = options.mask;
     checkLight(this);
   }
 }
 
 const invalid = () => rangeError('Invalid light value', 'pixel-lighting');
+
+function checkMask(m: LightMask2D): boolean {
+  if (m.kind === 'rect') {
+    return [m.minX, m.minY, m.maxX, m.maxY].every(Number.isFinite) && m.minX <= m.maxX && m.minY <= m.maxY;
+  } else if (m.kind === 'circle') {
+    return Number.isFinite(m.radius) && m.radius >= 0 && (!m.center || m.center.every(Number.isFinite));
+  } else if (m.kind === 'polygon') {
+    return Array.isArray(m.points) && m.points.length >= 3 && m.points.every((p) => p.every(Number.isFinite));
+  }
+  return false;
+}
 
 function checkLight(l: Light2D): void {
   const good =
@@ -90,6 +141,9 @@ function checkLight(l: Light2D): void {
     l.softness >= 0 &&
     l.softness <= 1 &&
     [l.intensity, l.radius, l.falloff, l.height, l.cone].every(Number.isFinite) &&
+    Number.isInteger(l.layers) &&
+    l.layers >= 0 &&
+    (!l.mask || checkMask(l.mask)) &&
     !!hexColor(l.color);
   if (!good) throw invalid();
 }
@@ -104,8 +158,17 @@ const towards = (l: Light2D): [number, number, number] => [
 /**
  * The CPU form of the pass, for tools and tests: what `light` adds at world point (x, y), as `[r, g, b]` from 0 up, before
  * shadows. `normal` is the surface direction, x right and y down the screen, as a sprite's normal target holds it.
+ * If `layer` is specified, verifies `light.layers & layer !== 0`. If `light.mask` is set, verifies point is inside mask.
  */
-export function lightAt(light: Light2D, x: number, y: number, normal: readonly number[] = [0, 0, 1]): number[] {
+export function lightAt(
+  light: Light2D,
+  x: number,
+  y: number,
+  normal: readonly number[] = [0, 0, 1],
+  layer?: number,
+): number[] {
+  if (layer !== undefined && (light.layers & layer) === 0) return [0, 0, 0];
+  if (light.mask && !inLightMask(light.mask, x, y)) return [0, 0, 0];
   const size = Math.hypot(normal[0], normal[1], normal[2]),
     n = normal.map((v) => v / size),
     rgb = hexColor(light.color)!;
@@ -202,7 +265,7 @@ export function inShadow(light: Light2D, edges: ArrayLike<number>, x: number, y:
 }
 
 const shader = /* wgsl */ `
-struct L{view:vec4f,size:vec4f,at:vec4f,way:vec4f,color:vec4f}
+struct L{view:vec4f,size:vec4f,at:vec4f,way:vec4f,color:vec4f,mask_bounds:vec4f,mask_info:vec4f}
 @group(0) @binding(0) var<uniform> u:L;
 @group(0) @binding(1) var bumps:texture_2d<f32>;
 @group(0) @binding(2) var sum:texture_2d_array<f32>;
@@ -220,6 +283,15 @@ return vec4f(clip(p*u.at.w-u.at.xy),0,0);
 @fragment fn show(@builtin(position) f:vec4f)->@location(0) vec4f{let p=vec2i(f.xy);return vec4f(textureLoad(sum,p,0,0).rgb+textureLoad(sum,p,1,0).rgb+textureLoad(sum,p,2,0).rgb+textureLoad(sum,p,3,0).rgb,1);}
 @fragment fn lit(@builtin(position) f:vec4f)->@location(0) vec4f{
 let world=u.view.xy+f.xy/u.view.z;
+if(u.mask_info.x>0.5){
+let mt=u32(u.mask_info.x);
+let inv=u.mask_info.y>0.5;
+var ins=true;
+if(mt==1u){ins=world.x>=u.mask_bounds.x&&world.x<=u.mask_bounds.z&&world.y>=u.mask_bounds.y&&world.y<=u.mask_bounds.w;}
+else if(mt==2u){let d=world-u.mask_bounds.xy;ins=dot(d,d)<=u.mask_bounds.w;}
+if(inv){ins=!ins;}
+if(!ins){return vec4f(0);}
+}
 var n=vec3f(0,0,1);
 if(u.size.z>0){
 let s=textureLoad(bumps,vec2i(f.xy),0);
@@ -272,6 +344,8 @@ export interface Lighting2DOptions {
   order?: number;
   /** Plugin name, unique per scene. Default `lighting2d-1`, `lighting2d-2`, ... */
   name?: string;
+  /** Layer bitmask this pass illuminates. Lights must share at least one bit with this layer. Default ~0 (all layers). */
+  layer?: number;
 }
 
 let count = 0;
@@ -290,6 +364,8 @@ export class Lighting2D implements EnginePlugin {
   ambient: string;
   /** World units to pixels, read each frame. */
   camera: { readonly x: number; readonly y: number; readonly zoom: number };
+  /** Layer bitmask of this lighting pass. */
+  layer: number;
   /** The lights, in the order added. Use {@link addLight} and {@link removeLight} to change the list. */
   readonly lights: Light2D[] = [];
   readonly #target: GPUTexture | (() => GPUTexture);
@@ -329,6 +405,7 @@ export class Lighting2D implements EnginePlugin {
     this.#order = order;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.ambient = options.ambient ?? '#000000';
+    this.layer = options.layer ?? 0xffffffff;
     this.name = options.name ?? `lighting2d-${++count}`;
     if (options.occluders) this.setOccluders(options.occluders);
   }
@@ -406,7 +483,7 @@ export class Lighting2D implements EnginePlugin {
           {
             binding: 0,
             visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 80 },
+            buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 112 },
           },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
         ],
@@ -489,7 +566,8 @@ export class Lighting2D implements EnginePlugin {
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
     lights.forEach(checkLight);
     this.#prepare(device, target.format);
-    const wanted = Math.max(1, lights.length) * FLOATS;
+    const activeLights = lights.filter((l) => (l.layers & this.layer) !== 0);
+    const wanted = Math.max(1, activeLights.length) * FLOATS;
     if (!this.#uniform || this.#values.length < wanted) {
       this.#uniform?.destroy();
       this.#values = new Float32Array(wanted * 2);
@@ -505,7 +583,7 @@ export class Lighting2D implements EnginePlugin {
       this.#group = device.createBindGroup({
         layout: this.#layout!,
         entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 80 } },
+          { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
           { binding: 1, resource: shown.createView() },
         ],
       });
@@ -553,10 +631,25 @@ export class Lighting2D implements EnginePlugin {
       this.#edgesWritten = true;
     }
     const values = this.#values;
-    lights.forEach((l, i) => {
+    activeLights.forEach((l, i) => {
       const rgb = hexColor(l.color)!,
         far = l.kind === 'directional',
         from = far ? towards(l) : [l.x, l.y, l.height];
+      let maskType = 0,
+        maskBounds = [0, 0, 0, 0],
+        invert = 0;
+      if (l.mask) {
+        invert = l.mask.invert ? 1 : 0;
+        if (l.mask.kind === 'rect') {
+          maskType = 1;
+          maskBounds = [l.mask.minX, l.mask.minY, l.mask.maxX, l.mask.maxY];
+        } else if (l.mask.kind === 'circle') {
+          maskType = 2;
+          const cx = l.mask.center ? l.mask.center[0] : l.x,
+            cy = l.mask.center ? l.mask.center[1] : l.y;
+          maskBounds = [cx, cy, l.mask.radius, l.mask.radius * l.mask.radius];
+        }
+      }
       values.set(
         [
           camera.x,
@@ -579,6 +672,14 @@ export class Lighting2D implements EnginePlugin {
           rgb[1] * l.intensity,
           rgb[2] * l.intensity,
           l.radius,
+          maskBounds[0],
+          maskBounds[1],
+          maskBounds[2],
+          maskBounds[3],
+          maskType,
+          invert,
+          0,
+          0,
         ],
         i * FLOATS,
       );
@@ -598,7 +699,7 @@ export class Lighting2D implements EnginePlugin {
         })
         .end(),
     );
-    lights.forEach((l, i) => {
+    activeLights.forEach((l, i) => {
       const pass = c.encoder.beginRenderPass({
         colorAttachments: [{ view: this.#sumLayers[i % SUM_LAYERS]!, loadOp: 'load', storeOp: 'store' }],
         depthStencilAttachment: {

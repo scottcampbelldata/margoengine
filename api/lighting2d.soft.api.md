@@ -80,7 +80,7 @@ export function softShadowFactor(light: Light2D, edges: ArrayLike<number>, x: nu
 
 // Not exported from this entry, but used by the exports above:
 
-class Light2D implements Required<Light2DOptions> {
+class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
     kind: LightKind2D;
     x: number;
     y: number;
@@ -94,6 +94,8 @@ class Light2D implements Required<Light2DOptions> {
     softness: number;
     elevation: number;
     shadows: boolean;
+    layers: number;
+    mask?: LightMask2D;
     constructor(options?: Light2DOptions);
 }
 
@@ -111,9 +113,29 @@ interface Light2DOptions {
     softness?: number;
     elevation?: number;
     shadows?: boolean;
+    layers?: number;
+    mask?: LightMask2D;
 }
 
 type LightKind2D = 'point' | 'spot' | 'directional';
+
+type LightMask2D = {
+    kind: 'rect';
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    invert?: boolean;
+} | {
+    kind: 'circle';
+    radius: number;
+    center?: Point2D;
+    invert?: boolean;
+} | {
+    kind: 'polygon';
+    points: readonly Point2D[];
+    invert?: boolean;
+};
 
 interface Lighting2DOptions {
     target: GPUTexture | (() => GPUTexture);
@@ -127,6 +149,7 @@ interface Lighting2DOptions {
     occluders?: readonly Occluder2D[];
     order?: number;
     name?: string;
+    layer?: number;
 }
 
 type Occluder2D = {

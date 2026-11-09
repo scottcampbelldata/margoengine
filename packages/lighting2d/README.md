@@ -32,6 +32,7 @@ lamp.x += 1; // read each frame
 | `occluders` | none | What blocks light; see `setOccluders` |
 | `order` | `20` | Frame-graph order, after sprites and maps and before the compositor |
 | `name` | `lighting2d-1`, ... | Plugin name, unique per scene |
+| `layer` | `~0` (all) | Layer bitmask this pass illuminates; lights must share a bit to be drawn |
 
 `addLight(options)` returns a `Light2D`, `removeLight(light)` takes it away, and `lights` lists them.
 
@@ -53,6 +54,8 @@ Every field is read each frame. Distances are world units, angles radians, and y
 | `cone`, `softness` | `Math.PI / 4`, `0` | Spot: half the cone, and the outer part of it that fades, 0 to 1 |
 | `elevation` | `Math.PI / 4` | Directional: how far above the picture |
 | `shadows` | `true` | False lets it through occluders |
+| `layers` | `~0` (all) | Bitmask of layers this light illuminates |
+| `mask` | none | Geometric boundary (`rect`, `circle`, `polygon`) clipping the light |
 
 A surface gets the strength times the cosine between its normal and the way to the light. Normals follow the sprite
 layer's target: x right, y down the screen, z out of it. Where the normal target holds nothing (alpha 0) the surface is flat.
@@ -66,6 +69,35 @@ collision shapes cast shadows too.
 
 A pixel is in shadow when an occluder edge lies between its centre and the light, so the inside of a closed shape is dark
 to a light outside it. Shadow edges are hard: each pixel is lit or not, with no soft penumbra.
+
+## Light masks and layers
+
+Lights can be filtered to specific layers or restricted to a geometric mask. Set `layers` on `Light2D` and `layer` on `Lighting2D` to select which lights affect which passes:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {Lighting2D} from 'margoengine/lighting2d';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const lighting = Lighting2D.attach(engine, {target: shade.target, camera: shade.camera, layer: 0b01});
+const lamp = lighting.addLight({
+  x: 40,
+  y: 30,
+  radius: 80,
+  color: '#ffd9a0',
+  layers: 0b01,
+  mask: {kind: 'rect', minX: 10, minY: 10, maxX: 70, maxY: 60},
+});
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+lamp.x += 1;
+```
+
+`inLightMask(mask, x, y)` and `lightAffectsLayer(light, layerMask)` evaluate masks and layer masks in Node.
 
 ## Soft shadows
 

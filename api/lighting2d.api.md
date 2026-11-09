@@ -6,7 +6,7 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
-export class Light2D implements Required<Light2DOptions> {
+export class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
     kind: LightKind2D;
     x: number;
     y: number;
@@ -20,6 +20,8 @@ export class Light2D implements Required<Light2DOptions> {
     softness: number;
     elevation: number;
     shadows: boolean;
+    layers: number;
+    mask?: LightMask2D;
     constructor(options?: Light2DOptions);
 }
 
@@ -37,9 +39,29 @@ export interface Light2DOptions {
     softness?: number;
     elevation?: number;
     shadows?: boolean;
+    layers?: number;
+    mask?: LightMask2D;
 }
 
 export type LightKind2D = 'point' | 'spot' | 'directional';
+
+export type LightMask2D = {
+    kind: 'rect';
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    invert?: boolean;
+} | {
+    kind: 'circle';
+    radius: number;
+    center?: Point2D;
+    invert?: boolean;
+} | {
+    kind: 'polygon';
+    points: readonly Point2D[];
+    invert?: boolean;
+};
 
 export class Lighting2D implements EnginePlugin {
     readonly name: string;
@@ -49,6 +71,7 @@ export class Lighting2D implements EnginePlugin {
         readonly y: number;
         readonly zoom: number;
     };
+    layer: number;
     readonly lights: Light2D[];
     constructor(options: Lighting2DOptions);
     static attach(instance: EngineKernel, options: Lighting2DOptions): Lighting2D;
@@ -73,6 +96,7 @@ export interface Lighting2DOptions {
     occluders?: readonly Occluder2D[];
     order?: number;
     name?: string;
+    layer?: number;
 }
 
 export type Occluder2D = {
@@ -99,9 +123,15 @@ export type Occluder2D = {
 
 export type Point2D = readonly [number, number];
 
+export function inLightMask(mask: LightMask2D, x: number, y: number): boolean;
+
 export function inShadow(light: Light2D, edges: ArrayLike<number>, x: number, y: number): boolean;
 
-export function lightAt(light: Light2D, x: number, y: number, normal?: readonly number[]): number[];
+export function lightAffectsLayer(light: {
+    layers?: number;
+}, layerMask: number): boolean;
+
+export function lightAt(light: Light2D, x: number, y: number, normal?: readonly number[], layer?: number): number[];
 
 export function occluderEdges(occluders: readonly Occluder2D[]): Float32Array;
 ```

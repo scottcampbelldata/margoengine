@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-596). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-597). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3490,6 +3490,10 @@ Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. 
 Loudness entry: 2,107 B gzip, budget 2,363 B.
 Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,626 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
+
+## 2D light masks and layers (batch 55)
+
+`@margoengine/lighting2d` supports geometric light masks (`rect`, `circle`, `polygon`) and bitmask layer filtering (`layers` on `Light2DOptions` and `layer` on `Lighting2DOptions`). Lights masked or on mismatched layers are clipped in the shader or culled before draw submission. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-597.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -7333,6 +7337,7 @@ lamp.x += 1; // read each frame
 | `occluders` | none | What blocks light; see `setOccluders` |
 | `order` | `20` | Frame-graph order, after sprites and maps and before the compositor |
 | `name` | `lighting2d-1`, ... | Plugin name, unique per scene |
+| `layer` | `~0` (all) | Layer bitmask this pass illuminates; lights must share a bit to be drawn |
 
 `addLight(options)` returns a `Light2D`, `removeLight(light)` takes it away, and `lights` lists them.
 
@@ -7354,6 +7359,8 @@ Every field is read each frame. Distances are world units, angles radians, and y
 | `cone`, `softness` | `Math.PI / 4`, `0` | Spot: half the cone, and the outer part of it that fades, 0 to 1 |
 | `elevation` | `Math.PI / 4` | Directional: how far above the picture |
 | `shadows` | `true` | False lets it through occluders |
+| `layers` | `~0` (all) | Bitmask of layers this light illuminates |
+| `mask` | none | Geometric boundary (`rect`, `circle`, `polygon`) clipping the light |
 
 A surface gets the strength times the cosine between its normal and the way to the light. Normals follow the sprite
 layer's target: x right, y down the screen, z out of it. Where the normal target holds nothing (alpha 0) the surface is flat.
@@ -7368,10 +7375,9 @@ collision shapes cast shadows too.
 A pixel is in shadow when an occluder edge lies between its centre and the light, so the inside of a closed shape is dark
 to a light outside it. Shadow edges are hard: each pixel is lit or not, with no soft penumbra.
 
-## Soft shadows
+## Light masks and layers
 
-`@margoengine/lighting2d/soft` provides soft penumbra shadows that soften with distance from the occluder. Near the occluder,
-shadow edges remain crisp; as distance increases, the penumbra widens proportionally to the light's emitter radius (`sourceRadius`).
+Lights can be filtered to specific layers or restricted to a geometric mask. Set `layers` on `Light2D` and `layer` on `Lighting2D` to select which lights affect which passes:
 
 [README continues: https://margoengine.com/llms/packages/lighting2d.md]
 

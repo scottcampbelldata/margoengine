@@ -1493,3 +1493,7 @@ are derived algebraically from the published 48 kHz rational transfer function: 
 substitute old z^-1 = ((1-r)+(1+r)z^-1)/((1+r)+(1-r)z^-1). No library/engine source or reference
 implementation was read or reused. Generated cases are stand-ins; no downloaded recordings/assets.
 The existing mixer finite-FIR meter supplies true peak and a documented float32 gain margin.
+
+## 2D light masks and layers (batch 55)
+
+`@margoengine/lighting2d` light masking and layer filtering are written from standard first principles: point-in-polygon ray-crossing test derived from W. Randolph Franklin, "PNPOLY - Point Inclusion in Polygon Test", 1970 (Jordan curve theorem), and bitwise layer masking. The WGSL shader bounds tests and CPU reference functions are Margo-own clean room implementations; no other engine source or library code was read.
