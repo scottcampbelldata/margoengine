@@ -427,7 +427,12 @@ values need not be exact distances. Arbitrary callbacks, imported sampled fields
 rotated primitives, adaptive octrees and manifold repair are not implemented.
 
 Options: `resolution` is cells per axis, integer 4..64, default 24; `bounds` is two
-strictly increasing XYZ corners, default [[-1.5,-1.5,-1.5],[1.5,1.5,1.5]], with
+strictly increasing XYZ corners. When omitted, bounds derive from the analytic
+tree: primitive AABBs, union enclosure, intersection overlap and the minuend of
+a difference, plus 10% of each axis extent on both sides (at least 0.0001). A
+disjoint intersection uses an operand enclosure and produces empty output. Bounds
+that cannot fit the supported coordinate/extent limits give linked code `failed`
+and ask for explicit bounds. Explicit bounds have
 extent 0.0001..10000 per axis and coordinates within +/-10000. A nonpositive sampled
 boundary value throws code `failed` and asks for larger bounds. An empty sampled
 field returns empty arrays. Features smaller than the grid, multiple crossings of

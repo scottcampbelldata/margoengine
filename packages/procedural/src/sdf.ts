@@ -12,7 +12,7 @@ export type SdfShape =
 export interface SdfOptions {
   /** Cells on each axis, integer 4..64. Default 24. */
   resolution?: number;
-  /** Strictly increasing corners, extent 0.0001..10000 on each axis. Default [-1.5,1.5]^3. */
+  /** Strictly increasing corners, extent 0.0001..10000 per axis. Default analytic tree bounds plus 10% per-axis margin (at least 0.0001). */
   bounds?: readonly [SdfPoint, SdfPoint];
   /** Checked before synchronous work; use a worker to interrupt work in flight. */
   signal?: AbortSignal;
@@ -76,6 +76,41 @@ function encode(shape: SdfShape): number[] {
   visit(shape);
   return result;
 }
+// Work from the validated postfix tree so malformed/cyclic inputs never enter bounds traversal.
+function enclosingBounds(code: number[]): number[][] {
+  const stack: number[][][] = [];
+  for (let i = 0; i < code.length; i += 7) {
+    const op = code[i];
+    if (op < 2) {
+      const center = code.slice(i + 1, i + 4),
+        size = op === 0 ? [code[i + 4], code[i + 4], code[i + 4]] : code.slice(i + 4, i + 7);
+      stack.push([center.map((v, k) => v - size[k]), center.map((v, k) => v + size[k])]);
+    } else {
+      const b = stack.pop()!,
+        a = stack.pop()!;
+      if (op === 4)
+        stack.push(a); // Subtraction cannot extend its minuend.
+      else if (op === 2)
+        stack.push([a[0].map((v, k) => Math.min(v, b[0][k])), a[1].map((v, k) => Math.max(v, b[1][k]))]);
+      else {
+        const lo = a[0].map((v, k) => Math.max(v, b[0][k])),
+          hi = a[1].map((v, k) => Math.min(v, b[1][k]));
+        // A disjoint (or just touching) intersection has no volume; sample either enclosing operand box.
+        stack.push(lo.every((v, k) => v < hi[k]) ? [lo, hi] : a);
+      }
+    }
+  }
+  const [lo, hi] = stack[0],
+    margin = lo.map((v, k) => Math.max((hi[k] - v) * 0.1, 0.0001));
+  const bounds = [lo.map((v, k) => v - margin[k]), hi.map((v, k) => v + margin[k])];
+  if (!bounds.every(point) || bounds[0].some((v, k) => bounds[1][k] - v > 10000))
+    throw fault(
+      'failed',
+      'Cannot derive SDF bounds within the coordinate/extent limits; supply valid explicit bounds',
+      'procedural',
+    );
+  return bounds;
+}
 /** Feature-local Rust/Wasm lifecycle; independent of rendering devices. */
 export interface SdfModeler {
   /** Default model is a sharp box. Model must be strictly enclosed by the sampled bounds. */
@@ -89,11 +124,9 @@ class Modeler implements SdfModeler {
     const kernel = this.kernel;
     if (!kernel) throw fault('disposed', 'SdfModeler is disposed; create a new modeler', 'procedural');
     options?.signal?.throwIfAborted();
-    const n = options?.resolution ?? 24,
-      bounds = options?.bounds ?? [
-        [-1.5, -1.5, -1.5],
-        [1.5, 1.5, 1.5],
-      ];
+    const encoded = encode(shape),
+      n = options?.resolution ?? 24,
+      bounds = options?.bounds ?? enclosingBounds(encoded);
     if (
       !Number.isInteger(n) ||
       n < 4 ||
@@ -106,12 +139,21 @@ class Modeler implements SdfModeler {
       throw invalid();
     const step = bounds[1].map((v, k) => (v - bounds[0][k]) / n);
     if (!step.every((v) => v * n >= 0.0001 && v * n <= 10000)) throw invalid();
-    const encoded = encode(shape),
-      input = kernel.allocate(encoded.length);
+    const input = kernel.allocate(encoded.length);
     let output: number;
     try {
       new Float64Array(kernel.memory.buffer, input, encoded.length).set(encoded);
-      output = kernel.contour(input, encoded.length, n, ...bounds[0], step[0], step[1], step[2]);
+      output = kernel.contour(
+        input,
+        encoded.length,
+        n,
+        bounds[0][0],
+        bounds[0][1],
+        bounds[0][2],
+        step[0],
+        step[1],
+        step[2],
+      );
     } finally {
       kernel.release(input, encoded.length);
     }

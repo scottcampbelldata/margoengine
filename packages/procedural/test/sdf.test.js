@@ -129,11 +129,15 @@ test('generated controls: spheres, CSG cavities, translations, empty/full fields
         { resolution: 21 },
       ),
     );
-  const empty = modeler.mesh({ type: 'sphere', center: [5, 0, 0], radius: 0.2 });
+  const bounds = [
+    [-1.5, -1.5, -1.5],
+    [1.5, 1.5, 1.5],
+  ];
+  const empty = modeler.mesh({ type: 'sphere', center: [5, 0, 0], radius: 0.2 }, { bounds });
   assert.equal(empty.positions.length, 0);
   assert.equal(empty.indices.length, 0);
   assert.throws(
-    () => modeler.mesh({ type: 'sphere', radius: 100 }),
+    () => modeler.mesh({ type: 'sphere', radius: 100 }, { bounds }),
     (e) => e.code === 'failed' && /boundary/.test(e.message),
   );
   assert.ok(modeler.mesh().positions.length > 0);
