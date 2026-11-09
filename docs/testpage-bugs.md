@@ -403,3 +403,12 @@ Final local entry 44 pre-gates after the size refinement: mesh-edit units pass
 (13.9 s). Full verify is queued shared with wait-max 60 and a 40-minute hold;
 actual GPU/browser/README work is separately queued and waits for that result.
 The earlier 36/32 ten-minute queues expired without running tests. No push yet.
+
+Continuation: the handoff's two queued supervisors had exited without recording
+results. Only their unfinished stages were requeued, shared with wait-max 60;
+completed package, lint and hygiene gates were retained. Full verification then
+passed 13,561/13,562 tests with zero skips: the new research document was missing
+from the generated site/llms.txt index. Regenerating that index repairs the stale
+artifact, and all nine existing LLM-index regressions pass. Build, API and quality
+checks passed in that run. Verification must finish again with the repaired
+artifact; browser and executable README validation remain pending.
