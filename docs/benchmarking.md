@@ -414,7 +414,8 @@ The `viz` suite on the same run (`@margoengine/sciviz` figures with axes, camera
 
 Other compute libraries join through engine-bench as other engines do ([Comparing engines](#comparing-engines)).
 TensorFlow.js WebGPU is compared on matmul-256, fft-65536 and a sum of 1,048,576 values (perf history entry 100).
-That clock includes reading the result back, so it is not a row of the table above.
+That clock includes reading the result back, so it is not a row of the table above. VTK.js is compared on volume-64
+at 256 x 256 (perf history entry 102). That clock is a frame plus the pixel read, so it is not the volume-64 row above.
 
 ## The three.js parity matrix
 

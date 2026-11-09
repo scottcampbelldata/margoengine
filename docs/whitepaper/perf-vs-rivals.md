@@ -20,6 +20,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/compute` | matmul 256 x 256, f32, then read the product | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.100 ms | win |
 | `@margoengine/compute` | FFT of 65,536 real points, then read both halves | 2.400 ms | TensorFlow.js 4.22.0 WebGPU, 22.700 ms | win |
 | `@margoengine/compute` | sum of 1,048,576 values, then read the scalar | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.000 ms | win |
+| `@margoengine/sciviz` | volume-64, 256 x 256, frame plus the pixel read | 1.500 ms | VTK.js 38.0.5, 1.300 ms | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -68,3 +69,13 @@ by 16.7 and 153 (magnitude 0.06% low). The FFT rounds do not overlap (Margo 2.4 
 Margo. Busy machine, diagnostic. Rerun:
 `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
 The oracle is `packages/compute/tests/numpy-oracle.test.js`.
+
+The sciviz row is volume-64, a radial sphere whose samples sum to 32731.121874443877
+(`packages/sciviz/tests/volume-field.test.js`). Axes are off. Both use the figure camera at [2.6, 1.7, 2.9] looking at
+the origin, view up +Y, a 60 degree field of view, background #0f141c, shading on, and about 1.5 samples per voxel.
+The clock is one frame plus reading the 256 x 256 image. Two warmups, then 7 paired rounds, and the time is the
+fastest round. One headless page on an RTX A6000. The last pair differs by 1.801 per channel on average (0 to 255);
+7.48% of pixels differ by more than 8. VTK.js reports bounds half a spacing outside the point box. The rounds overlap
+(Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). The minimum still favours VTK.js, so the row is a loss. Busy machine,
+diagnostic. Rerun:
+`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.

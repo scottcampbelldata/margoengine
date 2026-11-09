@@ -2381,9 +2381,26 @@ Raw rounds, explicit diagnostic hashes, block/point accuracy outcomes and both b
 [committed record](results/physics2d-certified-faces-20261108.json). [Reproduce](reproduce.md#own-2d-certified-faces-and-solver-study-perf-history-entry-101)
 gives commands. No accuracy assertion or timing budget was weakened.
 
+### 102. volume-64 against VTK.js (diagnostic, loss)
+
+- **Measurement:** a 64-cube radial sphere, drawn at 256 x 256 with axes off. The clock is one frame plus reading the
+  pixels. Two warmups, then 7 paired rounds in one headless page, fastest round. Same camera ([2.6, 1.7, 2.9] to the
+  origin, up +Y, 60 degrees), background #0f141c, shading, about 1.5 samples per voxel. VTK.js 38.0.5 stays outside
+  the repository. RTX A6000.
+- **Result:** loss. Margo 1.500 ms, VTK.js 1.300 ms. The rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2).
+  Mean absolute channel difference of the last pair is 1.801; 7.48% of pixels differ by more than 8. The field sum
+  32731.121874443877 is locked by `packages/sciviz/tests/volume-field.test.js`. Busy machine, diagnostic. Tracked in
+  known-bugs.md. Publishing the number does not close it.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+  Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
+
+- **volume-64 against VTK.js 38.0.5 (entry 102).** 1.500 ms against 1.300 ms for one 256 x 256 frame plus the pixel
+  read. The rounds overlap. Mean absolute channel difference 1.801. Rerun:
+  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
 
 - **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
   83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,
@@ -2459,3 +2476,4 @@ These entries lack a recorded number, a named machine or a quiet run:
 23. Four-pair 2D narrow phase (entry 92): a quiet run of the paired Wasm/native and browser rows.
 
 24. Certified 2D faces and solver study (entry 101): quiet paired Wasm and browser reruns; the Box2D loss remains open.
+25. volume-64 against VTK.js (entry 102): a quiet paired rerun. The loss stays open.

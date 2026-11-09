@@ -834,6 +834,12 @@ Measured but not fixed. Their history, sources and rerun commands are in
   either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Cause not yet
   found. `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the
   hole. It does not freeze Detour's length. Publishing the number does not close it.
+- **Volume-64 frame is slower than VTK.js 38.0.5** (`@margoengine/sciviz`, perf history entry 102): 1.500 ms against
+  1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
+  rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.
+  Repro: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`
+  after the sciviz build. The rival is installed outside the repository. Cause not yet found. Publishing the number
+  does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node

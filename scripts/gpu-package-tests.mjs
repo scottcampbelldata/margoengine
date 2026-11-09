@@ -147,6 +147,8 @@ const TOOLS = {
     'exact-head placement-flow hardware proof pinned to the RTX A6000, run directly',
   'packages/compute/scripts/rival-bench.mjs':
     'paired timing against TensorFlow.js WebGPU, installed outside the repository; run directly under the GPU lock',
+  'packages/sciviz/scripts/rival-bench.mjs':
+    'paired volume timing against VTK.js, installed outside the repository; run directly under the GPU lock',
   'packages/loaders/scripts/real-files-render.mjs':
     'opt-in drawing of downloaded public files, and the Lottie frames of test:real-files, run directly by that script',
   'packages/netcode/tests/webtransport-proof/proof.mjs':

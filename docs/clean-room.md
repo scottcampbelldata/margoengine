@@ -843,7 +843,10 @@ not opened. NumPy 2.5.4, outside the repository, is the correctness oracle for t
 Written clean room from the sources below. No source code of plotting or visualisation libraries (plotly, vtk.js,
 deck.gl, regl, three.js, matplotlib, ParaView, napari, ipyvolume, anywidget and the like) was read. Margo's own colour maps are
 computed from their published definitions. The five standard maps are the authors' published tables, recorded as data
-under the standard-file exception documented above (THIRD-PARTY-NOTICES.md, `packages/sciviz/NOTICE.md`).
+under the standard-file exception documented above (THIRD-PARTY-NOTICES.md, `packages/sciviz/NOTICE.md`). The batch 167
+timing drives VTK.js 38.0.5 as a black box from the Volume, ImageData, DataArray, ColorTransferFunction,
+PiecewiseFunction, VolumeMapper, Camera and FullScreenRenderWindow pages at https://kitware.github.io/vtk-js/api/.
+The library source was not opened.
 
 | Area | Source |
 | --- | --- |
