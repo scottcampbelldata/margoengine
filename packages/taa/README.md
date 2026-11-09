@@ -192,3 +192,7 @@ Measured on `packages/taa/test/upscale-browser.mjs` (640x480, scale 0.5, 4x MSAA
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+TAA and TAAUpscale keep the source camera on their transient raster-camera wrappers. The optional
+staging still controller uses the source projection for idle detection and tracing, then restores
+the raster camera before temporal resolve; stationary jitter does not reset still convergence.

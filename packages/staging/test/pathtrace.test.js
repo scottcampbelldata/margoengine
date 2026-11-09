@@ -184,3 +184,54 @@ test('attachment snapshots caller arrays before lazy module loading, retaining c
     still.dispose();
   }
 });
+
+test('temporal raster jitter does not reset the idle timer or tracer, including zero delay', async (t) => {
+  const { temporalCameraSource } = await import('../../shared/temporal-camera.js');
+  const { jitterProjection } = await import('../../taa/dist/index.js');
+  for (const idleDelay of [0.25, 0]) {
+    const h = harness(t),
+      still = await ProgressiveStill.attach(h.engine, { scene: { models: [] }, idleDelay });
+    const camera = h.context.camera,
+      jittered = Object.assign(Object.create(camera), {
+        matrix: new Float32Array(16),
+        [temporalCameraSource]: camera,
+      });
+    for (let i = 0; i < 16; i++) {
+      jitterProjection(jittered.matrix, camera.matrix, i, 64, 64);
+      h.context.camera = jittered;
+      h.frame();
+      if (still.active) assert.equal(h.context.camera, camera, 'the integrator receives the unjittered camera');
+      h.passes[1].execute(h.context);
+      assert.equal(h.context.camera, jittered, 'raster camera restored before the temporal resolve');
+    }
+    assert(still.active);
+    assert.equal(h.tracer.resets, 1, 'one history reset for a stationary camera');
+    camera.matrix[0]++;
+    h.frame();
+    h.passes[1].execute(h.context);
+    assert.equal(h.tracer.resets, 2, 'real projection edits still invalidate');
+    still.dispose();
+  }
+});
+
+test('a failed trace frame cannot restore a stale raster camera on a later idle frame', async (t) => {
+  const { temporalCameraSource } = await import('../../shared/temporal-camera.js');
+  const h = harness(t),
+    still = await ProgressiveStill.attach(h.engine, { scene: { models: [] }, idleDelay: 0.25 });
+  const source = h.context.camera,
+    first = Object.assign(Object.create(source), { [temporalCameraSource]: source });
+  h.context.camera = first;
+  h.frame();
+  h.frame();
+  h.frame();
+  assert(still.active);
+  // A throw from the integrator would prevent the order-21 restore pass from running.
+  const moved = { ...source, position: [1, 1, 4] },
+    current = Object.assign(Object.create(moved), { [temporalCameraSource]: moved });
+  h.context.camera = current;
+  h.frame();
+  assert(!still.active);
+  h.passes[1].execute(h.context);
+  assert.equal(h.context.camera, current, 'the next raster frame retains its current camera');
+  still.dispose();
+});

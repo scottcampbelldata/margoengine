@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { temporalCameraSource } from '../../shared/temporal-camera.js';
 // Temporal upscaling: the scene renders jittered at a lower size and accumulates at output size. Sample weights and
 // the jitter idea after B. Karis, "High Quality Temporal Supersampling" (SIGGRAPH 2014); the neighbourhood range after
 // M. Salvi, "An Excursion in Temporal Supersampling" (GDC 2016, variance clipping); history reads with a Catmull-Rom
@@ -226,7 +227,10 @@ export class TAAUpscale implements EnginePlugin {
     this.resize(c, width, height);
     const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
     if (this.originalCamera !== camera || !this.cameraView)
-      this.cameraView = Object.assign(Object.create(camera), { matrix: this.values.subarray(0, 16) });
+      this.cameraView = Object.assign(Object.create(camera), {
+        matrix: this.values.subarray(0, 16),
+        [temporalCameraSource]: camera,
+      });
     this.originalCamera = camera;
     const v = this.values,
       m = camera.matrix;

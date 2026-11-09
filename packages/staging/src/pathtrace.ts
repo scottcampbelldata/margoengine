@@ -14,6 +14,7 @@ import type {
   MeshTraceImage,
 } from '@margoengine/voxel-pathtracer/mesh';
 import type { VoxelTraceCaptureOptions, VoxelTraceRenderOptions } from '@margoengine/voxel-pathtracer';
+import { unjitteredCamera } from '../../shared/temporal-camera.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Existing triangle integrator settings plus an idle interval; the owned renderer runs at order 20. */
@@ -29,6 +30,7 @@ export class ProgressiveStill implements EnginePlugin {
   readonly idleDelay: number;
   private engine?: Engine;
   private key = '';
+  private rasterCamera?: PassContext['camera'];
   private elapsed = 0;
   private disposed = false;
   private constructor(
@@ -96,6 +98,14 @@ export class ProgressiveStill implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({ name: this.name, order: 19, execute: (c) => this.update(c) });
+    graph.add({
+      name: `${this.name}:restore-camera`,
+      order: 21,
+      execute: (c) => {
+        if (this.rasterCamera) c.camera = this.rasterCamera;
+        this.rasterCamera = undefined;
+      },
+    });
   }
   /** Rebuilds a static scene atomically; a successful replacement restarts the idle interval and history. */
   async setScene(scene: MeshTraceScene, options: { signal?: AbortSignal } = {}): Promise<void> {
@@ -133,14 +143,14 @@ export class ProgressiveStill implements EnginePlugin {
     this.dispose();
   }
   private update(c: PassContext): void {
+    this.rasterCamera = undefined;
     if (this.disposed) return;
     if (c.view && c.view.count > 1)
       throw fault('unsupported', 'ProgressiveStill requires one view; use a separate engine for each still');
     if (!Number.isFinite(c.delta) || c.delta < 0)
       throw rangeError('Invalid still frame delta; use finite nonnegative seconds', 'arguments');
-    const key = [c.width, c.height, ...c.camera.matrix, ...c.camera.position, ...c.camera.target, ...c.camera.up].join(
-      '|',
-    );
+    const camera = unjitteredCamera(c.camera);
+    const key = [c.width, c.height, ...camera.matrix, ...camera.position, ...camera.target, ...camera.up].join('|');
     if (key !== this.key) {
       this.key = key;
       this.elapsed = 0;
@@ -148,5 +158,11 @@ export class ProgressiveStill implements EnginePlugin {
       this.tracer.reset();
     } else this.elapsed = Math.min(60, this.elapsed + c.delta);
     this.tracer.enabled = this.elapsed >= this.idleDelay;
+    // The integrator owns its stochastic sampling. Feed it the same unjittered projection used by
+    // the idle key, then restore raster jitter before TAA resolves and records its history.
+    if (this.tracer.enabled && camera !== c.camera) {
+      this.rasterCamera = c.camera;
+      c.camera = camera;
+    }
   }
 }

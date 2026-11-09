@@ -52,6 +52,22 @@ window.check={
   let invalid=false;try{await still.setScene({...scene,meshes:[{...scene.meshes[0],positions:new Float32Array([NaN,0,0])}]});}catch{invalid=true;}
   return {black:image.color.every(v=>v===0),cancelled,pngType:png.type,pngBytes:png.size,invalid};
  },
+ async taa(){
+  const {TAA}=await import('/packages/taa/dist/index.js');
+  still.dispose();const taa=TAA.attach(engine),rows=[];
+  try{
+   for(const idleDelay of [0.25,0]){
+    still=await ProgressiveStill.attach(engine,{scene,idleDelay,maxSamples:4,samplesPerFrame:1,denoise:false,seed:37});
+    await still.ready;
+    const frames=[];
+    // fixed-wait: exercise the review's exact sixteen-frame input and two Halton cycles after pipeline readiness.
+    for(let i=0;i<16;i++){await frame();frames.push({active:still.active,samples:still.stats.samples});}
+    rows.push({idleDelay,frames});still.dispose();
+   }
+  }finally{taa.dispose();}
+  still=await ProgressiveStill.attach(engine,{scene,idleDelay:0.25,maxSamples:4,denoise:false});await still.ready;
+  return rows;
+ },
  async finish(){
   still.dispose();still.dispose();await frame(0);
   const detached=!engine.scene.plugins.has('progressive-still')&&!engine.scene.plugins.has('voxel-pathtracer');

@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { temporalCameraSource } from '../../shared/temporal-camera.js';
 import { SceneTarget, resolveMSAA, sceneTarget } from '../../shared/msaa.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -460,7 +461,10 @@ export class TAA implements EnginePlugin {
       this.captureTarget!.begin(c);
       const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
       if (this.originalCamera !== camera || !this.cameraView)
-        this.cameraView = Object.assign(Object.create(camera), { matrix: this.jittered });
+        this.cameraView = Object.assign(Object.create(camera), {
+          matrix: this.jittered,
+          [temporalCameraSource]: camera,
+        });
       this.originalCamera = camera;
     }
     try {

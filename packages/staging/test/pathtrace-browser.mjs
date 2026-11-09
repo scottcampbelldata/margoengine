@@ -68,6 +68,11 @@ for (const compat of [false, true]) {
     assert(empty.invalid);
     assert.equal(empty.pngType, 'image/png');
     assert(empty.pngBytes > 50);
+    const temporal = await page.evaluate(() => window.check.taa());
+    for(const row of temporal){
+      assert.deepEqual(row.frames.at(-1),{active:true,samples:4},`TAA idleDelay ${row.idleDelay} converges`);
+      assert(row.frames.slice(-4).every(f=>f.samples===4),'stationary temporal frames retain convergence');
+    }
     const finished = await page.evaluate(() => window.check.finish());
     assert.equal(diff(await shot(), raster), 0, 'disposal restores every raster pixel');
     assert(finished.detached);
