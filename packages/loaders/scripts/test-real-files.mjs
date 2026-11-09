@@ -17,6 +17,7 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
+import { referenceAMF } from './amf-reference.mjs';
 import {
   LoaderError,
   flattenDAE,
@@ -76,8 +77,7 @@ async function fetchChecked(item, format) {
   const path = resolve(root, format, item.file);
   await mkdir(dirname(path), { recursive: true });
   const known = await readFile(item.repo ? resolve(repository, item.repo) : path).catch(() => null);
-  const bytes =
-    known ?? new Uint8Array(await (await download(item.url)).arrayBuffer());
+  const bytes = known ?? new Uint8Array(await (await download(item.url)).arrayBuffer());
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   assert.equal(sha256, item.sha256, `${item.file}: SHA-256 differs from the manifest (${item.url})`);
   if (!known) await writeFile(path, bytes);
@@ -124,7 +124,10 @@ function checkGeometry(geometry, { vertices, triangles, min, max, tolerance = 1e
   ])
     if (expected)
       expected.forEach((v, a) =>
-        assert.ok(Math.abs(v - actual[a]) <= tolerance * Math.max(1, Math.abs(v)), `${name}[${a}] ${actual[a]} is not ${v}`),
+        assert.ok(
+          Math.abs(v - actual[a]) <= tolerance * Math.max(1, Math.abs(v)),
+          `${name}[${a}] ${actual[a]} is not ${v}`,
+        ),
       );
   return `${positions.length / 3} vertices${geometry.indices ? `, ${geometry.indices.length / 3} triangles` : ''}, bounds ${round(box.min)} to ${round(box.max)}`;
 }
@@ -231,7 +234,10 @@ function indexedTriangles(string, pattern) {
   let triangles = 0;
   for (const [, list] of string.matchAll(pattern))
     for (const polygon of list.split(/\b-1\b|-1/)) {
-      const corners = polygon.trim().split(/[\s,]+/).filter(Boolean).length;
+      const corners = polygon
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean).length;
       if (corners >= 3) triangles += corners - 2;
     }
   return triangles;
@@ -254,8 +260,7 @@ function threeDSFacts(bytes) {
       if (id === 0x4d4d || id === 0x3d3d || id === 0x4100 || id === 0xb000 || (id >= 0xb001 && id <= 0xb007)) {
         if (id >= 0xb001 && id <= 0xb007) nodes++;
         walk(p + 6, p + length);
-      }
-      else if (id === 0x4000) {
+      } else if (id === 0x4000) {
         let q = p + 6;
         while (bytes[q]) q++;
         walk(q + 1, p + length);
@@ -383,11 +388,13 @@ const LOTTIE_CELLS = 16,
 function recordedCanvas() {
   const list = [];
   let gradients = 0;
-  const gradient = (kind) => (...args) => {
-    const id = gradients++;
-    list.push(['gradient', id, kind, args]);
-    return { id, addColorStop: (...stop) => list.push(['stop', id, stop]) };
-  };
+  const gradient =
+    (kind) =>
+    (...args) => {
+      const id = gradients++;
+      list.push(['gradient', id, kind, args]);
+      return { id, addColorStop: (...stop) => list.push(['stop', id, stop]) };
+    };
   const context = new Proxy(
     { createLinearGradient: gradient('createLinearGradient'), createRadialGradient: gradient('createRadialGradient') },
     {
@@ -425,7 +432,10 @@ const checks = {
   async threemfMaterials(bytes) {
     const files = unzip(bytes),
       triangles = threeMFTriangles(files),
-      xml = [...files].filter(([n]) => n.endsWith('.model')).map(([, read]) => text(read())).join(''),
+      xml = [...files]
+        .filter(([n]) => n.endsWith('.model'))
+        .map(([, read]) => text(read()))
+        .join(''),
       g = await parse3MFMaterials(bytes);
     assert.equal(g.textures.length, count(xml, /<m:texture2d\s/g), 'texture count');
     for (const t of g.textures) assert.ok(t.data.length > 8, 'texture has bytes');
@@ -444,7 +454,11 @@ const checks = {
     assert.ok(lines >= entity('LINE'), 'LINE');
     assert.equal(parsed.texts.length, entity('TEXT') + entity('MTEXT'), 'TEXT and MTEXT');
     for (const name of ['3DSOLID', 'HATCH'])
-      if (entity(name)) assert.ok(Object.keys(parsed.skipped).some((k) => k.startsWith(name)), `${name} is reported as skipped`);
+      if (entity(name))
+        assert.ok(
+          Object.keys(parsed.skipped).some((k) => k.startsWith(name)),
+          `${name} is reported as skipped`,
+        );
     const draw = [];
     if (triangles) {
       checkGeometry(parsed.mesh);
@@ -465,7 +479,9 @@ const checks = {
     return { result: `${points} points, ${checkGeometry(dense)}`, draw: [mesh(dense)] };
   },
   async off(bytes) {
-    const lines = text(bytes).split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')),
+    const lines = text(bytes)
+        .split(/\r?\n/)
+        .filter((l) => l.trim() && !l.startsWith('#')),
       [vertices, faces] = lines[1].trim().split(/\s+/).map(Number),
       triangles = fanned(lines.slice(2 + vertices, 2 + vertices + faces)),
       g = parseOFF(bytes);
@@ -473,11 +489,42 @@ const checks = {
   },
   async xyz(bytes, item) {
     const source = item.extract ? unzip(bytes).get(item.extract)() : bytes,
-      lines = text(source).split(/\r?\n/).filter((l) => /^\s*[-+]?[\d.]+\s+[-+]?[\d.]/.test(l)),
+      lines = text(source)
+        .split(/\r?\n/)
+        .filter((l) => /^\s*[-+]?[\d.]+\s+[-+]?[\d.]/.test(l)),
       g = parseXYZ(source),
       first = lines[0].trim().split(/\s+/).map(Number);
     assert.equal(g.positions.length / 3, lines.length, 'point lines');
     return { result: `${checkGeometry(g)}; first ${first}`, draw: [mesh(g)] };
+  },
+  async xyzAttributes(bytes, item) {
+    const lines = text(bytes).trim().split(/\r?\n/),
+      chemistry = item.variant === 'chemistry',
+      rows = lines.slice(chemistry ? 2 : 1).map((line) => line.trim().split(/\s+/)),
+      geometry = parseXYZ(bytes),
+      coordinates = rows.flatMap((row) => row.slice(chemistry ? 1 : 0, chemistry ? 4 : 3).map(Number));
+    assert.equal(rows.length, Number(lines[0]), 'declared point/atom count');
+    assert.deepEqual(Array.from(geometry.positions), coordinates.map(Math.fround), 'every coordinate');
+    if (!chemistry) {
+      assert.ok(
+        rows.every((row) => row.length === 7),
+        'PTS has xyz, intensity and RGB',
+      );
+      assert.deepEqual(
+        Array.from(geometry.attributes.intensity),
+        rows.map((row) => Math.fround(Number(row[3]))),
+        'every intensity',
+      );
+      assert.deepEqual(
+        Array.from(geometry.colors),
+        rows.flatMap((row) => row.slice(4).map((value) => Math.fround(Number(value) / 255))),
+        'every colour channel',
+      );
+    }
+    return {
+      result: `${checkGeometry(geometry)}; every coordinate${chemistry ? '' : ', intensity and RGB'} equals the source text`,
+      draw: [mesh(geometry)],
+    };
   },
   async obj(bytes, item, read) {
     const source = item.extract ? unzip(bytes).get(item.extract)() : bytes,
@@ -486,13 +533,19 @@ const checks = {
       faces = string.match(/^f\s.*$/gm) ?? [],
       triangles = faces.reduce((sum, f) => sum + f.trim().split(/\s+/).length - 3, 0),
       g = await parseOBJ(string);
-    const library = item.extractMtl ? unzip(bytes).get(item.extractMtl)() : item.companions ? await read(item.companions[0]) : null;
+    const library = item.extractMtl
+      ? unzip(bytes).get(item.extractMtl)()
+      : item.companions
+        ? await read(item.companions[0])
+        : null;
     let materials = '';
     if (library) {
       const mtl = new TextDecoder().decode(library),
         parsed = parseMTL(mtl),
         names = count(mtl, /^newmtl\s/gm);
-      const size = parsed.materials ? Object.keys(parsed.materials).length : (parsed.size ?? Object.keys(parsed).length);
+      const size = parsed.materials
+        ? Object.keys(parsed.materials).length
+        : (parsed.size ?? Object.keys(parsed).length);
       assert.equal(size, names, 'newmtl count');
       materials = `, ${names} materials`;
     }
@@ -504,13 +557,19 @@ const checks = {
     const string = new TextDecoder().decode(bytes),
       triangles =
         [...string.matchAll(/<triangles\b[^>]*count="(\d+)"/g)].reduce((s, m) => s + Number(m[1]), 0) +
-        [...string.matchAll(/<polylist\b[\s\S]*?<vcount>([^<]*)<\/vcount>/g)].reduce((s, m) => s + fanned(m[1].trim().split(/\s+/)), 0),
+        [...string.matchAll(/<polylist\b[\s\S]*?<vcount>([^<]*)<\/vcount>/g)].reduce(
+          (s, m) => s + fanned(m[1].trim().split(/\s+/)),
+          0,
+        ),
       dae = parseDAE(string),
       flat = flattenDAE(dae);
     const skins = dae.skins?.length ?? dae.controllers?.length ?? 0;
     // This suite file holds two geometries and instances one; flattened, only the instanced polygons are drawn.
     assert.ok(flat.positions.length > 0);
-    return { result: `${skins} skins, file ${triangles} triangles in all, ${checkGeometry(flat, item.facts)}`, draw: [mesh(flat)] };
+    return {
+      result: `${skins} skins, file ${triangles} triangles in all, ${checkGeometry(flat, item.facts)}`,
+      draw: [mesh(flat)],
+    };
   },
   async tmx(bytes, item, read) {
     const string = new TextDecoder().decode(bytes),
@@ -521,7 +580,9 @@ const checks = {
     assert.equal(map.layers.length, count(string, /<(layer|objectgroup)\b/g), 'layers');
     const objects = map.layers.reduce((sum, l) => sum + (l.objects?.length ?? 0), 0);
     assert.equal(objects, count(string, /<object\b/g), 'objects');
-    return { result: `${map.width}x${map.height}, ${map.layers.length} layers, ${objects} objects, warnings ${map.warnings?.length ?? 0}` };
+    return {
+      result: `${map.width}x${map.height}, ${map.layers.length} layers, ${objects} objects, warnings ${map.warnings?.length ?? 0}`,
+    };
   },
   async vtk(bytes) {
     const string = text(bytes.subarray(0, 512)),
@@ -538,7 +599,10 @@ const checks = {
   },
   async usda(bytes) {
     const string = new TextDecoder().decode(bytes),
-      triangles = [...string.matchAll(/faceVertexCounts = \[([^\]]*)\]/g)].reduce((s, m) => s + fanned(m[1].split(',')), 0),
+      triangles = [...string.matchAll(/faceVertexCounts = \[([^\]]*)\]/g)].reduce(
+        (s, m) => s + fanned(m[1].split(',')),
+        0,
+      ),
       g = parseUSDA(bytes),
       worker = await parseUSDAInWorker(bytes);
     assert.deepEqual(worker.positions, g.positions, 'the worker entry gives the same mesh');
@@ -553,7 +617,10 @@ const checks = {
   },
   async usdz(bytes) {
     const string = new TextDecoder().decode([...unzip(bytes)].find(([n]) => n.endsWith('.usda'))[1]()),
-      triangles = [...string.matchAll(/faceVertexCounts = \[([^\]]*)\]/g)].reduce((s, m) => s + fanned(m[1].split(',')), 0),
+      triangles = [...string.matchAll(/faceVertexCounts = \[([^\]]*)\]/g)].reduce(
+        (s, m) => s + fanned(m[1].split(',')),
+        0,
+      ),
       g = await parseUSDZ(bytes);
     return { result: checkGeometry(g, { triangles }), draw: [mesh(g)] };
   },
@@ -596,7 +663,9 @@ const checks = {
       drawn = count(string, /<(path|rect|circle|ellipse|line|polyline|polygon)\b/g),
       svg = parseSVG(string);
     assert.ok(svg.paths.length > 0, 'no paths');
-    return { result: `${svg.paths.length} paths, ${drawn} drawn elements in the file, warnings ${svg.warnings.length}` };
+    return {
+      result: `${svg.paths.length} paths, ${drawn} drawn elements in the file, warnings ${svg.warnings.length}`,
+    };
   },
   async bvh(bytes) {
     const string = text(bytes),
@@ -609,17 +678,25 @@ const checks = {
       last = keys.at(-1).time;
     assert.equal(keys.length, frames, 'keys per track');
     assert.ok(Math.abs(last - (frames - 1) * time) < 1e-3, `clip ends at ${last}`);
-    return { result: `${joints} joints, ${frames} frames at ${time} s, ${bvh.clip.tracks.length} tracks, ${last.toFixed(2)} s` };
+    return {
+      result: `${joints} joints, ${frames} frames at ${time} s, ${bvh.clip.tracks.length} tracks, ${last.toFixed(2)} s`,
+    };
   },
   async vrml(bytes) {
     const scene = parseVRML(bytes),
       triangles = indexedTriangles(text(bytes), /coordIndex\s*\[([^\]]*)\]/g);
-    return { result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`, draw: [mesh(scene)] };
+    return {
+      result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`,
+      draw: [mesh(scene)],
+    };
   },
   async x3d(bytes) {
     const scene = parseX3D(bytes),
       triangles = indexedTriangles(text(bytes), /coordIndex=['"]([^'"]*)['"]/g);
-    return { result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`, draw: [mesh(scene)] };
+    return {
+      result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`,
+      draw: [mesh(scene)],
+    };
   },
   /** Each frame through `draw` on a real canvas, cell by cell against the same frame as the player drew it. */
   async lottie(bytes, item) {
@@ -655,7 +732,10 @@ const checks = {
   async vdb(bytes, item) {
     const file = await parseVDB(unzip(bytes).get(item.extract)());
     assert.deepEqual(file.skipped, []);
-    assert.deepEqual(file.grids.map((grid) => grid.name), item.grids.map((grid) => grid.name));
+    assert.deepEqual(
+      file.grids.map((grid) => grid.name),
+      item.grids.map((grid) => grid.name),
+    );
     for (const expected of item.grids) {
       const grid = file.grids.find(({ name }) => name === expected.name);
       assert.equal(grid.activeVoxels, expected.activeVoxels);
@@ -665,7 +745,9 @@ const checks = {
         assert.equal(grid.isActive(x, y, z), active, `${grid.name} active at ${x} ${y} ${z}`);
       }
     }
-    return { result: `${file.grids.map((grid) => `${grid.name}: ${grid.activeVoxels} active, ${grid.leaves.length} leaves`).join('; ')}, equal to OpenVDB` };
+    return {
+      result: `${file.grids.map((grid) => `${grid.name}: ${grid.activeVoxels} active, ${grid.leaves.length} leaves`).join('; ')}, equal to OpenVDB`,
+    };
   },
   async gcode(bytes, item) {
     const source = unzip(bytes).get(item.extract)(),
@@ -674,7 +756,10 @@ const checks = {
     const claimed = Number(string.match(/; filament used \[mm\] = ([\d.]+)/)[1]),
       changes = count(string, /^;LAYER_CHANGE/gm);
     // The slicer's figure leaves out the hand-written start and end code, a few percent here.
-    assert.ok(Math.abs(gcode.filament - claimed) <= claimed * 0.05, `filament ${gcode.filament} is not near the slicer's ${claimed}`);
+    assert.ok(
+      Math.abs(gcode.filament - claimed) <= claimed * 0.05,
+      `filament ${gcode.filament} is not near the slicer's ${claimed}`,
+    );
     const positions = Float32Array.from(gcode.layers.flatMap((l) => [...l.extrusion]));
     return {
       result: `${gcode.layers.length} layers (${changes} layer changes in the file), filament ${gcode.filament.toFixed(1)} mm (slicer says ${claimed}), bounds ${gcode.min} to ${gcode.max}, warnings ${gcode.warnings?.length}`,
@@ -694,15 +779,25 @@ const checks = {
     }
     assert.ok(max > min, 'the volume is flat');
     const head = text(bytes),
-      sizes = head.match(/^sizes: (.*)$/m)[1].split(' ').map(Number),
+      sizes = head
+        .match(/^sizes: (.*)$/m)[1]
+        .split(' ')
+        .map(Number),
       samples = sizes.reduce((a, b) => a * b, 1),
       encoding = head.match(/^encoding: (\w+)/m)[1];
     assert.equal(volume.data.length, samples, 'samples');
     if (!item.companions) {
       const body = bytes.subarray(head.indexOf('\n\n') + 2);
-      assert.deepEqual(new Uint8Array(volume.data.buffer, volume.data.byteOffset, volume.data.byteLength), body, 'raw body');
+      assert.deepEqual(
+        new Uint8Array(volume.data.buffer, volume.data.byteOffset, volume.data.byteLength),
+        body,
+        'raw body',
+      );
     } else if (encoding === 'ascii') {
-      const values = text(await read(item.companions[0])).trim().split(/\s+/).map(Number);
+      const values = text(await read(item.companions[0]))
+        .trim()
+        .split(/\s+/)
+        .map(Number);
       values.forEach((v, i) => assert.ok(Math.abs(volume.data[i] - v) < 1e-6, `sample ${i}`));
     } else {
       let at = 0;
@@ -714,7 +809,9 @@ const checks = {
       }
       assert.equal(at, samples, 'every slice is in the volume');
     }
-    return { result: `dims ${volume.dims}, ${volume.data.length} samples, range ${min} to ${max}, components ${volume.components}` };
+    return {
+      result: `dims ${volume.dims}, ${volume.data.length} samples, range ${min} to ${max}, components ${volume.components}`,
+    };
   },
   async ldraw(bytes, item) {
     const { entries, read } = await zipReader(bytes);
@@ -732,7 +829,33 @@ const checks = {
       },
     });
     const references = count(file, /^\s*1\s/gm);
-    return { result: `${references} references, ${checkGeometry(model)}, ${model.groups.length} colours, missing ${model.missing.length}`, draw: [mesh(model)] };
+    return {
+      result: `${references} references, ${checkGeometry(model)}, ${model.groups.length} colours, missing ${model.missing.length}`,
+      draw: [mesh(model)],
+    };
+  },
+  async ldrawMpd(bytes, item, read) {
+    const [library, ...parts] = item.companions,
+      archive = await zipReader(await read(library)),
+      extra = new Map();
+    for (const part of parts) extra.set(`parts/${part.file}`, text(await read(part)));
+    const source = text(bytes),
+      submodels = count(source, /^0 FILE /gm);
+    assert.ok(submodels > 1, 'real MPD holds multiple embedded submodels');
+    const model = await parseLDraw(source, {
+      resolve: async (path) => {
+        if (extra.has(path)) return extra.get(path);
+        const name = archive.entries.get(`ldraw/${path}`.toLowerCase());
+        assert.ok(name, `Required LDraw dependency ${path}; restore the pinned library/companions`);
+        return text(await archive.read(name));
+      },
+    });
+    assert.deepEqual(model.missing, [], 'every external part resolves');
+    assert.deepEqual(model.warnings, [], 'published MPD has no parser warnings');
+    return {
+      result: `${submodels} embedded submodels, ${checkGeometry(model)}, ${model.groups.length} colours; zero missing parts`,
+      draw: [mesh(model)],
+    };
   },
   async vtkXml(bytes) {
     const string = text(bytes.subarray(0, 4096)),
@@ -769,7 +892,12 @@ const checks = {
           const domain = nurbs.domain,
             t = domain[0] + (domain[1] - domain[0]) * 0.37,
             ours = evaluateNurbsCurve(
-              { degree: nurbs.degree, knots: Array.from({ length: knots.count }, (_, k) => knots.get(k)), points, weights },
+              {
+                degree: nurbs.degree,
+                knots: Array.from({ length: knots.count }, (_, k) => knots.get(k)),
+                points,
+                weights,
+              },
               t,
             ),
             theirs = nurbs.pointAt(t);
@@ -815,7 +943,10 @@ const checks = {
             v = v0 + (v1 - v0) * b,
             ours = evaluateNurbsSurface(data, u, v).position,
             theirs = nurbs.pointAt(u, v);
-          surfaceWorst = Math.max(surfaceWorst, Math.hypot(ours[0] - theirs[0], ours[1] - theirs[1], ours[2] - theirs[2]));
+          surfaceWorst = Math.max(
+            surfaceWorst,
+            Math.hypot(ours[0] - theirs[0], ours[1] - theirs[1], ours[2] - theirs[2]),
+          );
         }
     }
     const parsed = parse3DM(rhino, bytes, { hidden: true }),
@@ -840,11 +971,19 @@ const checks = {
     assert.equal(g.cameras.length, expected.cameras, 'cameras');
     assert.equal(g.lights.length, expected.lights, 'lights');
     assert.equal(g.keyframes?.nodes.length ?? 0, expected.nodes, 'keyframer nodes');
-    const tracks = g.keyframes?.nodes.flatMap((node) => [node.tracks.position, node.tracks.rotation, node.tracks.scale]) ?? [];
-    assert.equal(tracks.reduce((sum, track) => sum + (track?.keys.length ?? 0), 0), expected.keys, 'position, rotation and scale keys');
+    const tracks =
+      g.keyframes?.nodes.flatMap((node) => [node.tracks.position, node.tracks.rotation, node.tracks.scale]) ?? [];
+    assert.equal(
+      tracks.reduce((sum, track) => sum + (track?.keys.length ?? 0), 0),
+      expected.keys,
+      'position, rotation and scale keys',
+    );
     const texture = g.materials.find((material) => material.texture)?.texture;
     if (texture) await readsTexture(texture);
-    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, ${g.materials.length} materials, file ${expected.vertices} vertices, ${expected.cameras} cameras, ${expected.lights} lights, ${expected.nodes} nodes with ${expected.keys} keys`, draw: [mesh(g)] };
+    return {
+      result: `${checkGeometry(g, { triangles: expected.triangles })}, ${g.materials.length} materials, file ${expected.vertices} vertices, ${expected.cameras} cameras, ${expected.lights} lights, ${expected.nodes} nodes with ${expected.keys} keys`,
+      draw: [mesh(g)],
+    };
   },
   async lwo(bytes) {
     const expected = lwoFacts(bytes),
@@ -852,21 +991,34 @@ const checks = {
     assert.deepEqual(Object.keys(g.uvMaps).sort(), expected.uvMaps, 'UV maps');
     assert.deepEqual(Object.keys(g.weightMaps).sort(), expected.weightMaps, 'weight maps');
     assert.equal(g.images.length, expected.stills, 'still images');
-    for (const map of Object.values(g.uvMaps)) assert.equal(map.length / 2, g.positions.length / 3, 'one uv per vertex');
+    for (const map of Object.values(g.uvMaps))
+      assert.equal(map.length / 2, g.positions.length / 3, 'one uv per vertex');
     const maps = g.surfaces.flatMap((surface) => surface.maps);
     for (const map of maps) if (map.path) await readsTexture(map.path);
-    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, file ${expected.points} points, ${expected.uvMaps.length} UV maps, ${expected.weightMaps.length} weight maps, ${g.images.length} images, ${maps.length} image maps, warnings ${g.warnings?.join('; ').slice(0, 160)}`, draw: [mesh(g)] };
+    return {
+      result: `${checkGeometry(g, { triangles: expected.triangles })}, file ${expected.points} points, ${expected.uvMaps.length} UV maps, ${expected.weightMaps.length} weight maps, ${g.images.length} images, ${maps.length} image maps, warnings ${g.warnings?.join('; ').slice(0, 160)}`,
+      draw: [mesh(g)],
+    };
   },
   async amf(bytes) {
-    const string = text(bytes),
-      triangles = count(string, /<triangle>/g),
+    const zipped = bytes[0] === 0x50 && bytes[1] === 0x4b,
+      entries = zipped ? unzip(bytes) : undefined,
+      payload = entries && [...entries].find(([name]) => /\.amf$/i.test(name));
+    if (zipped) assert.ok(payload, 'ZIP contains an AMF document');
+    const string = text(payload ? payload[1]() : bytes),
+      reference = referenceAMF(string),
       g = await parseAMF(bytes),
-      scale = { millimeter: 1e-3, inch: 0.0254, feet: 0.3048, meter: 1, micron: 1e-6 }[g.unit],
-      axis = (tag) => [...string.matchAll(new RegExp(`<${tag}>\\s*([-\\d.eE+]+)`, 'g'))].map((m) => Number(m[1]) * scale),
-      extent = ['x', 'y', 'z'].map(axis),
-      min = extent.map((v) => Math.min(...v)),
-      max = extent.map((v) => Math.max(...v));
-    return { result: `${checkGeometry(g, { triangles, min, max, tolerance: 1e-6 })}, unit ${g.unit}, warnings ${g.warnings?.join('; ').slice(0, 160)}`, draw: [mesh(g)] };
+      { min, max } = bounds(reference.positions),
+      triangles = reference.indices.length / 3;
+    assert.deepEqual(Array.from(g.indices), reference.indices, 'every placed triangle');
+    assert.equal(g.positions.length, reference.positions.length, 'every placed vertex');
+    reference.positions.forEach((value, index) =>
+      assert.ok(Math.abs(g.positions[index] - value) <= 1e-6, `placed coordinate ${index}`),
+    );
+    return {
+      result: `${checkGeometry(g, { triangles, min, max, tolerance: 1e-6 })}, unit ${g.unit}, warnings ${g.warnings?.join('; ').slice(0, 160)}`,
+      draw: [mesh(g)],
+    };
   },
   async md2(bytes) {
     const view = new DataView(bytes.buffer, bytes.byteOffset);
@@ -876,7 +1028,10 @@ const checks = {
       g = parseMD2(bytes);
     assert.equal(g.frames.length, frames, 'frames');
     for (const skin of g.skins) await readsTexture(skin);
-    return { result: `${checkGeometry(g, { triangles })}, ${frames} frames, clips ${Object.keys(g.clips ?? {}).length || g.clips?.length}`, draw: [mesh(g)] };
+    return {
+      result: `${checkGeometry(g, { triangles })}, ${frames} frames, clips ${Object.keys(g.clips ?? {}).length || g.clips?.length}`,
+      draw: [mesh(g)],
+    };
   },
   async pcx(bytes, item) {
     const { parsePCX } = await import('@margoengine/decoders/pcx'),
@@ -893,11 +1048,17 @@ const checks = {
       molecule = parsePDB(string);
     assert.equal(molecule.positions.length / 3, kept, 'atom rows');
     if (item.facts?.atoms) assert.equal(kept, item.facts.atoms, 'published atom count');
-    return { result: `${kept} atoms, ${molecule.bonds.length / 2} bonds, ${checkGeometry(molecule)}`, draw: [mesh(molecule)] };
+    return {
+      result: `${kept} atoms, ${molecule.bonds.length / 2} bonds, ${checkGeometry(molecule)}`,
+      draw: [mesh(molecule)],
+    };
   },
   async kmz(bytes) {
     const files = unzip(bytes),
-      kml = [...files].filter(([n]) => n.endsWith('.kml')).map(([, read]) => text(read())).join(''),
+      kml = [...files]
+        .filter(([n]) => n.endsWith('.kml'))
+        .map(([, read]) => text(read()))
+        .join(''),
       models = count(kml, /<Model\b/g),
       latitude = Number(kml.match(/<Location>[\s\S]*?<latitude>([-\d.]+)/)?.[1]),
       result = await parseKMZ(bytes, { origin: 'first' });
@@ -905,7 +1066,10 @@ const checks = {
     const first = result.models[0];
     assert.equal(first.location?.latitude, latitude, 'latitude');
     assert.ok(Math.hypot(...first.matrix.slice(12, 15)) < 1e-6, 'the first model sits at the origin');
-    return { result: `${models} model, ${checkGeometry(first.mesh ?? first.geometry ?? first)}, at ${JSON.stringify(first.location)}`, draw: [mesh(first.mesh ?? first.geometry ?? first)] };
+    return {
+      result: `${models} model, ${checkGeometry(first.mesh ?? first.geometry ?? first)}, at ${JSON.stringify(first.location)}`,
+      draw: [mesh(first.mesh ?? first.geometry ?? first)],
+    };
   },
   async las(bytes, item) {
     const cloud = await parseLAS(bytes),
@@ -924,9 +1088,15 @@ const checks = {
     [0, 1, 2].forEach((a) => {
       const low = box.min[a] + cloud.origin[a],
         high = box.max[a] + cloud.origin[a];
-      assert.ok(Math.abs(low - header[a * 2 + 1]) < 0.02 && Math.abs(high - header[a * 2]) < 0.02, `axis ${a} bounds ${low} to ${high} differ from the header ${header[a * 2 + 1]} to ${header[a * 2]}`);
+      assert.ok(
+        Math.abs(low - header[a * 2 + 1]) < 0.02 && Math.abs(high - header[a * 2]) < 0.02,
+        `axis ${a} bounds ${low} to ${high} differ from the header ${header[a * 2 + 1]} to ${header[a * 2]}`,
+      );
     });
-    return { result: `1.${version} format ${cloud.header.pointFormat}, ${total} points, bounds equal the header`, draw: total > 1 ? [mesh(cloud)] : [] }; // One point is too small to judge in a picture.
+    return {
+      result: `1.${version} format ${cloud.header.pointFormat}, ${total} points, bounds equal the header`,
+      draw: total > 1 ? [mesh(cloud)] : [],
+    }; // One point is too small to judge in a picture.
   },
   async lazRefused(bytes, item) {
     await assert.rejects(
@@ -1034,6 +1204,8 @@ if (process.env.REAL_FILES_RENDER === '1') {
 }
 const failed = report.filter((r) => r.status === 'FAIL'),
   notRun = report.filter((r) => r.status === 'NOT RUN');
-console.log(`${report.length} files: ${report.length - failed.length - notRun.length} passed, ${failed.length} failed, ${notRun.length} not run`);
+console.log(
+  `${report.length} files: ${report.length - failed.length - notRun.length} passed, ${failed.length} failed, ${notRun.length} not run`,
+);
 if (failed.length) process.exitCode = 1;
 else if (notRun.length) process.exitCode = 2;

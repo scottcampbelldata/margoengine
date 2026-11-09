@@ -1323,3 +1323,11 @@ conservative arithmetic allowance. Five fresh-buffer regressions fail on the par
 the repair; explicit `drawn: 32` still keeps 32. Proof: `packages/scatter/test/tiles-budget.test.js`, the existing
 check:merge `packages/scatter/test/grass-tiles.browser.mjs` step and [recorded GPU counts](results/scatter-tile-budget-20261109.json).
 Generated records on RTX A6000 WebGPU only. No new supported coordinate range, throughput or visual-quality claim.
+
+### Missing standard-file variants (2026-11-09)
+
+Proven on pinned outside samples: complete LDraw MPD (13 embedded submodels, 526,895 triangles, no missing parts or
+warnings), zipped Slic3r AMF (every placed coordinate/index), PDAL PTS (every coordinate/intensity/RGB channel) and
+Open Babel chemistry XYZ (all 25 labelled atom coordinates). The plain AMF rook remains a control. This proves those
+files and parser paths only; no external rendering, general tool compatibility or speed claim follows.
+[Result record](results/missing-format-proofs-20261109.json), [reproduction](reproduce.md#missing-format-proofs).

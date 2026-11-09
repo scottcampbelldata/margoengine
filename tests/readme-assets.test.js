@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { createServer } from 'node:http';
 import {
   README_FILES,
   README_DOWNLOADS,
   readmeFixture,
+  readmeNodeEnv,
   sampleRange,
   serveSample,
 } from '../scripts/support/readme-assets.mjs';
@@ -27,6 +28,22 @@ test('explicit README formats never become another extension sample, HTML, or an
     assert.ok(README_DOWNLOADS['/sims/smoke.vdb'].endsWith('.vdb'));
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('a selected FFmpeg executable is required and enters only the example child environment', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-ffmpeg-')),
+    file = join(folder, 'ffmpeg.exe');
+  try {
+    const env = { PATH: 'original', MARGO_README_FFMPEG: file };
+    assert.throws(() => readmeNodeEnv(env), /fetch-readme-assets.*--ffmpeg/);
+    writeFileSync(file, 'test executable');
+    assert.equal(readmeNodeEnv(env).PATH, folder + delimiter + 'original');
+    assert.equal(env.PATH, 'original');
+    const ordinary = { PATH: 'normal' };
+    assert.equal(readmeNodeEnv(ordinary), ordinary);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
   }
 });
 

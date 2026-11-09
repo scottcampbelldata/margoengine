@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-09",
+  "scope": "Four missing standard-file variants plus plain AMF control; parse/geometry proof only, no rendering or speed claim",
+  "sources": "packages/loaders/tests/real-files/manifest.json",
+  "results": [
+    {
+      "id": "amf-rook",
+      "format": "amf",
+      "file": "Rook.amf",
+      "status": "PASS",
+      "result": "1843 vertices, 3682 triangles, bounds 0,0,0 to 0.0020382,0.0037152,0.0020382, unit millimeter, warnings "
+    },
+    {
+      "id": "pts-pdal",
+      "format": "xyz",
+      "file": "autzen.pts",
+      "status": "PASS",
+      "result": "10 vertices, bounds 636100,848970,427.92 to 636130,849350,512.14; every coordinate, intensity and RGB equals the source text"
+    },
+    {
+      "id": "xyz-openbabel",
+      "format": "xyz",
+      "file": "test3d.xyz",
+      "status": "PASS",
+      "result": "25 vertices, bounds -2.3371,-2.2883,-2.6406 to 2.3981,2.1978,2.6229; every coordinate equals the source text"
+    },
+    {
+      "id": "mpd-robotic-arm",
+      "format": "ldraw",
+      "file": "8094-1_Robotic-Arm.mpd",
+      "status": "PASS",
+      "result": "13 embedded submodels, 1145751 vertices, 526895 triangles, bounds -0.21231,-0.00704,-0.144 to 0.272,0.18219,0.32714, 12 colours; zero missing parts"
+    },
+    {
+      "id": "amf-zipped-slic3r",
+      "format": "amf",
+      "file": "20mmbox_deflated.amf",
+      "status": "PASS",
+      "result": "8 vertices, 12 triangles, bounds 0.0575,0.025,0 to 0.0775,0.045,0.01, unit millimeter, warnings "
+    }
+  ]
+}

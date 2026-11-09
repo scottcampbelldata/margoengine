@@ -2170,3 +2170,15 @@ without reducing scene work or changing rendering output.
 ### Custom WGSL transitions: section 5 evidence (batch 76, job 1)
 
 The optional transitions/custom factory compiles a function interface before attaching, with a fixed layout preventing extra caller bindings. Root transitions supplies a protected source hook; core and stage are unchanged. CPU lifecycle tests cover rejected source, cancellation, disposal and replacement during compilation. Real GPU value assertions cover 402 generated solid-color pixels, 1x/4x MSAA, exact endpoints, a nonlinear progress curve, resize and a replacement-device redraw. Native WebGL2 is refused with linked unsupported. Device restoration previously retained active progress after destroying its outgoing image, blending cleared history; it now cancels that missing history. The regression is in transitions/test/custom.test.js. This is single-device stand-in correctness evidence, not speed, artistic quality or cross-device proof.
+
+### Missing standard format evidence (section 5, 2026-11-09)
+
+The real-file runner now proves an outside MPD with all library/sticker dependencies, zipped AMF, PTS intensity/RGB,
+and chemistry XYZ. PTS/XYZ compare all values with source text; the AMF reference applies independent elementary
+point rotations/translations, including constellations, then compares every vertex/index. The Slic3r file caught the
+old oracle's unplaced-bounds error; amf-reference.test.js covers it without changing the 1e-6 bar. The MPD has
+13 embedded submodels, 526,895 triangles and zero missing parts/warnings. These are parse/geometry results,
+not outside image or speed comparisons. A plain AMF control also passes.
+
+The pinned optional Windows FFmpeg installer preserves the GPL archive outside the repository. MARGO_README_FFMPEG
+enters only the relevant README child PATH; tests/readme-assets.test.js verifies the parent environment is unchanged.

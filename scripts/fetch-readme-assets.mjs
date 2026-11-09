@@ -1,5 +1,5 @@
 // Required public standard samples only; implementations are never downloaded.
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fetchFixture } from './support/fetch-fixture.mjs';
@@ -24,6 +24,7 @@ export const readmeDownloads = [
   'tmx-objects',
   'obj-mtl-doorman',
   'laz-format10',
+  'pcx-pil184',
 ].flatMap((id) => {
   const item = corpus.find((file) => file.id === id);
   if (!item) throw new Error(`Missing README source record: ${id}`);
@@ -43,6 +44,13 @@ readmeDownloads.push({
   size: 2594500,
   licence: 'CC-BY-4.0 (OpenVDB website LICENSE.txt)',
 });
+readmeDownloads.push({
+  local: 'brotli/alice29.txt.compressed',
+  url: 'https://raw.githubusercontent.com/google/brotli/d89c4b1c52e25ddafe047bc78bbee5c1e24b1809/tests/testdata/alice29.txt.compressed',
+  sha256: '69e902ef5cd9247302e4f66c313271bcff32eeb38e5eec7ca7744cf98106d5c2',
+  size: 50096,
+  licence: 'MIT (Brotli test data); Alice in Wonderland text public domain',
+});
 
 export async function fetchReadmeAssets() {
   for (const item of readmeDownloads) {
@@ -51,4 +59,32 @@ export async function fetchReadmeAssets() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await fetchReadmeAssets();
+/** Optional Windows tool; the original GPL archive stays in the external cache and never ships. */
+export async function fetchReadmeFFmpeg() {
+  if (process.platform !== 'win32')
+    throw new Error('This pinned FFmpeg build is Windows-only; install FFmpeg for your platform');
+  const folder = resolve(readmeCache(), 'ffmpeg'),
+    file = resolve(folder, 'ffmpeg-8.1.2-essentials_build.zip');
+  await fetchFixture(
+    'https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip',
+    file,
+    'db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec',
+    { maxBytes: 109728040 },
+  );
+  const { readZipDirectory, readZipEntry } = await import('../packages/loaders/dist/common.js');
+  const bytes = new Uint8Array(readFileSync(file)),
+    entries = readZipDirectory(bytes);
+  const executable = entries.find((entry) => entry.name.endsWith('/bin/ffmpeg.exe'));
+  if (!executable) throw new Error('Pinned FFmpeg archive has no bin/ffmpeg.exe');
+  const binary = await readZipEntry(bytes, executable, { maxEntryBytes: 128 << 20 });
+  mkdirSync(resolve(folder, 'bin'), { recursive: true });
+  writeFileSync(resolve(folder, 'bin/ffmpeg.exe'), binary);
+  console.log(
+    `FFmpeg GPL-3.0 tool: ${resolve(folder, 'bin/ffmpeg.exe')}; source/licence: https://www.gyan.dev/ffmpeg/builds/`,
+  );
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await fetchReadmeAssets();
+  if (process.argv.includes('--ffmpeg')) await fetchReadmeFFmpeg();
+}

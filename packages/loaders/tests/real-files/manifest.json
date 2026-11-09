@@ -2258,7 +2258,7 @@
        81,
        159,
        102,
-       3.248453140258789e-05,
+       0.00003248453140258789,
        true
       ],
       [
@@ -2272,7 +2272,7 @@
        100,
        120,
        42,
-       8.726119995117188e-05,
+       0.00008726119995117188,
        true
       ],
       [
@@ -2300,28 +2300,28 @@
        58,
        223,
        72,
-       0.0,
+       0,
        false
       ],
       [
        110,
        201,
        60,
-       0.0,
+       0,
        false
       ],
       [
        58,
        132,
        110,
-       0.0,
+       0,
        false
       ],
       [
        24,
        26,
        58,
-       0.0,
+       0,
        false
       ]
      ]
@@ -2386,7 +2386,7 @@
        17,
        293,
        27,
-       6.943941116333008e-05,
+       0.00006943941116333008,
        true
       ],
       [
@@ -2414,28 +2414,28 @@
        115,
        291,
        119,
-       0.0,
+       0,
        false
       ],
       [
        115,
        265,
        150,
-       0.0,
+       0,
        false
       ],
       [
        48,
        99,
        131,
-       0.0,
+       0,
        false
       ],
       [
        121,
        327,
        47,
-       0.0,
+       0,
        false
       ]
      ]
@@ -2456,7 +2456,7 @@
        115,
        289,
        119,
-       4.841382542508654e-05,
+       0.00004841382542508654,
        true
       ],
       [
@@ -2470,7 +2470,7 @@
        115,
        337,
        40,
-       2.0606164980563335e-05,
+       0.000020606164980563335,
        true
       ],
       [
@@ -2512,28 +2512,28 @@
        115,
        263,
        150,
-       0.0,
+       0,
        false
       ],
       [
        48,
        97,
        131,
-       0.0,
+       0,
        false
       ],
       [
        121,
        325,
        47,
-       0.0,
+       0,
        false
       ],
       [
        36,
        49,
        137,
-       0.0,
+       0,
        false
       ]
      ]
@@ -2757,6 +2757,101 @@
      "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe5dee2dde0eafffffffffffffffffffed2e4e5d8e4d5ffffffffffffffffffe3fefffffffff9e8ffffffffffffffffe5ffffffffffffcbfcffffffffffffffe5ffffffffffffe5ffffffffffffffffd9e5e6e6e6e6e4dffffffffffffffffffaebffffffffe6feffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     }
    ]
+  },
+  {
+   "id": "pts-pdal",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/d50ac1469169fec133b1b2e3617cceaa6004b2c5/test/data/pts/autzen.pts",
+   "sha256": "49c28ced5b5f6471f801ad853ab48cff435bfb457a72bad3849ef6aa615df40b",
+   "size": 557,
+   "licence": "BSD-3-Clause",
+   "file": "autzen.pts",
+   "format": "xyz",
+   "check": "xyzAttributes",
+   "variant": "PTS intensity and RGB",
+   "entry": "@margoengine/loaders",
+   "author": "PDAL test data; Hobu, Inc.",
+   "licenceSource": "https://raw.githubusercontent.com/PDAL/PDAL/d50ac1469169fec133b1b2e3617cceaa6004b2c5/LICENSE.txt"
+  },
+  {
+   "id": "xyz-openbabel",
+   "url": "https://raw.githubusercontent.com/openbabel/openbabel/9be528bcdb31a219637ae3d1699170a8aaa5be6d/test/files/test3d.xyz",
+   "sha256": "9b2078801c0faf1f4ca6cb12027624a463406743d7e9e9d4d6562834c1d3295b",
+   "size": 1263,
+   "licence": "GPL-2.0",
+   "file": "test3d.xyz",
+   "format": "xyz",
+   "check": "xyzAttributes",
+   "variant": "chemistry",
+   "entry": "@margoengine/loaders",
+   "author": "Open Babel test data",
+   "licenceSource": "https://raw.githubusercontent.com/openbabel/openbabel/9be528bcdb31a219637ae3d1699170a8aaa5be6d/COPYING"
+  },
+  {
+   "id": "mpd-robotic-arm",
+   "url": "https://library.ldraw.org/media/omr_models/1859/8094-1_Robotic-Arm.mpd",
+   "sha256": "779355c359d4ff222cb04ba70148a2397aa5543f1ac8afddda8006f785de93a9",
+   "size": 22004,
+   "file": "8094-1_Robotic-Arm.mpd",
+   "licence": "CC-BY-2.0 (CCAL 2.0, embedded model notice); CC-BY-4.0 supplemental parts",
+   "format": "ldraw",
+   "check": "ldrawMpd",
+   "variant": "MPD",
+   "entry": "@margoengine/loaders/ldraw",
+   "author": "Takeshi Takahashi (RainbowDolphin)",
+   "companions": [
+    {
+     "file": "complete.zip",
+     "url": "https://library.ldraw.org/library/updates/complete.zip",
+     "size": 146853687,
+     "sha256": "023083918da2d3697c794fb4267975509584f3611b993095874206a803fa610f"
+    },
+    {
+     "file": "3068bd0t.dat",
+     "url": "https://library.ldraw.org/library/unofficial/parts/3068bd0t.dat",
+     "size": 508,
+     "sha256": "c7d21ec2258a1b55d5c804b97e91f6962890e66ad130d3cc1f4e0542fd9151b2",
+     "licence": "CC-BY-4.0",
+     "author": "Takeshi Takahashi (RainbowDolphin)"
+    },
+    {
+     "file": "3068bd0s.dat",
+     "url": "https://library.ldraw.org/library/unofficial/parts/3068bd0s.dat",
+     "size": 506,
+     "sha256": "af576d79788600b0523e5b3d7e5ba92445219429f2681dbc20c8d74c24c89f6b",
+     "licence": "CC-BY-4.0",
+     "author": "Takeshi Takahashi (RainbowDolphin)"
+    },
+    {
+     "file": "820670o.dat",
+     "url": "https://library.ldraw.org/library/unofficial/parts/820670o.dat",
+     "size": 7019,
+     "sha256": "c0c2bf6d4eb4e574ed8902eb5c3b553c03c20c5d436587cce6aef20d4136260e",
+     "licence": "CC-BY-4.0",
+     "author": "Takeshi Takahashi (RainbowDolphin)"
+    },
+    {
+     "file": "820670n.dat",
+     "url": "https://library.ldraw.org/library/unofficial/parts/820670n.dat",
+     "size": 6852,
+     "sha256": "0153cd78a628bc49465881beb7b763fb1afa6e4f691c53de1c9c0d8e1791059d",
+     "licence": "CC-BY-4.0",
+     "author": "Takeshi Takahashi (RainbowDolphin)"
+    }
+   ]
+  },
+  {
+   "id": "amf-zipped-slic3r",
+   "url": "https://raw.githubusercontent.com/slic3r/Slic3r/026c1380e0ad12176dd2fc8cdf8f6f181deeb071/src/test/inputs/test_amf/20mmbox_deflated.amf",
+   "file": "20mmbox_deflated.amf",
+   "size": 619,
+   "sha256": "f707308b505efe4572b80febc707bdc0b8dac03a014d4a85e5f73b9f8bf8944f",
+   "licence": "AGPL-3.0 (repository COPYING)",
+   "format": "amf",
+   "check": "amf",
+   "variant": "ZIP deflate",
+   "entry": "@margoengine/loaders/amf",
+   "author": "Slic3r test data",
+   "licenceSource": "https://raw.githubusercontent.com/slic3r/Slic3r/026c1380e0ad12176dd2fc8cdf8f6f181deeb071/COPYING"
   }
  ]
 }

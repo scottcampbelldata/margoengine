@@ -1692,3 +1692,11 @@ test-results/webgl-merge.
 ### Fixed in batch 76 job 1: transitions retained lost history
 
 Transitions.onDeviceRestored destroyed both images but kept elapsed/request state. Restoring during a transition blended the new scene against a newly cleared outgoing image. Restoration now finishes the transition and clears its capture request before setup. packages/transitions/test/custom.test.js checks both built-in and custom progress; test/gpu-browser.js destroys a real device, restores the same instance on a replacement and checks every output pixel. WebGL2 refusal now includes the required help link, with CPU and actual WebGL2 regressions. Resize history was already retained; its stale cancellation wording in the README is corrected. No new open defect is claimed closed beyond these tests.
+
+### Fixed 2026-11-09: AMF real-file oracle ignored constellation placement
+
+The zipped Slic3r box parsed correctly, but the proof compared its placed bounds (x 0.0575..0.0775 m)
+with the object's unplaced XML coordinates. The independent AMF reference now applies elementary rotations and
+translations through nested/root constellations, checking all coordinates and triangle indices. Its coordinate
+bar stays 1e-6. Regression: packages/loaders/tests/amf-reference.test.js; translated and nested rotated builds.
+The real zipped file and existing plain rook control pass. No AMF reader or renderer changed.

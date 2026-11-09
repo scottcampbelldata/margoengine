@@ -128,7 +128,7 @@ export const BUNDLED = [
 const ASSETS = [
   [
     'scripts/fetch-readme-assets.mjs',
-    'README runner external standard samples, downloaded outside the repository with SHA-256 checks: fourteen families reuse the source/author/licence records in packages/loaders/tests/real-files/manifest.json (NASA public domain; dolphin MD2 sample-file grant; AMF MIT; PDB CC0; KMZ CC-BY-4.0; Lottie Apache-2.0; STL BSD-3-Clause; SVG and TMX public domain; 3MF BSD-2-Clause; COLLADA Khronos MIT-style; OBJ/MTL and seven PNG companions Apache-2.0; LAS/WDP BSD-2-Clause). OBJ PNG sources/hashes in scripts/support/readme-companions.json, PyVista vtk-data commit 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3. OpenVDB smoke.vdb, OpenVDB website 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0, repository LICENSE.txt. No implementation files or FFmpeg binaries ship in Margo.',
+    'README runner external standard samples, downloaded outside the repository with SHA-256 checks: fifteen families reuse the source/author/licence records in packages/loaders/tests/real-files/manifest.json (NASA public domain; dolphin MD2 sample-file grant; AMF MIT; PDB CC0; KMZ CC-BY-4.0; Lottie Apache-2.0; STL BSD-3-Clause; SVG and TMX public domain; 3MF BSD-2-Clause; COLLADA Khronos MIT-style; OBJ/MTL and seven PNG companions Apache-2.0; LAS/WDP BSD-2-Clause; Pillow PCX MIT-CMU). OBJ PNG sources/hashes in scripts/support/readme-companions.json, PyVista vtk-data commit 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3. OpenVDB smoke.vdb, OpenVDB website 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0, repository LICENSE.txt. Brotli Alice stream from google/brotli d89c4b1c52e25ddafe047bc78bbee5c1e24b1809, MIT test-data grant and public-domain Lewis Carroll text. Optional Windows FFmpeg 8.1.2 GPL-3.0 tool from Gyan; publisher-hash-checked archive stays in the external cache. No implementation files or FFmpeg binaries ship in Margo.',
   ],
   [
     'packages/audio/tests/fixtures/NOTICE.md',
@@ -301,7 +301,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/real-files/manifest.json',
-    "real-file test: 104 public sample files, downloaded by URL and never in the repository or a tarball; each one's source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)",
+    "real-file test: 123 public sample files, downloaded by URL and never in the repository or a tarball; each one's source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices). Added PDAL PTS (BSD-3-Clause), Open Babel chemistry XYZ (GPL-2.0), Slic3r zipped AMF (AGPL-3.0) and Takeshi Takahashi's LDraw MPD (CCAL/CC-BY-2.0), with four CC-BY-4.0 sticker dependencies and the existing CC-BY-2.0 library archive. Licence-source links and pinned hashes are retained per entry; no parser or implementation code is fetched.",
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',

@@ -30,7 +30,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
-import { readmeFixture, serveSample } from './support/readme-assets.mjs';
+import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   // Each run writes only its own folder: the lock gives a run one shared GPU slot, so two runs in one checkout can overlap,
@@ -265,6 +265,7 @@ export async function runInNode(example, samples) {
     const child = spawn(process.execPath, ['--unhandled-rejections=strict', file], {
       cwd: folder,
       stdio: ['ignore', 'ignore', 'pipe'],
+      env: example.code.includes('headless/ffmpeg') ? readmeNodeEnv() : process.env,
     });
     let errors = '',
       limited = false;

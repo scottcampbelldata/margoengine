@@ -1,6 +1,6 @@
 // Explicit, format-aware aliases. They prove runnable API examples, not the fictional asset's identity.
 import { createReadStream, readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { delimiter, dirname, resolve } from 'node:path';
 import { requiredFixture } from './required-fixture.mjs';
 import { readmeCache } from '../fetch-readme-assets.mjs';
 
@@ -56,6 +56,8 @@ export const README_DOWNLOADS = {
   '/crate.mtl': 'obj-mtl-doorman/doorman.mtl',
   '/scans/fullwave.laz': 'laz-format10/fullwave.laz',
   '/scans/fullwave.wdp': 'laz-format10/fullwave.wdp',
+  '/skin.pcx': 'pcx-pil184/pil184.pcx',
+  '/node.br': 'brotli/alice29.txt.compressed',
 };
 for (const { file } of JSON.parse(readFileSync(new URL('./readme-companions.json', import.meta.url), 'utf8'))) {
   README_DOWNLOADS[`/models/${file}`] = `obj-mtl-doorman/${file}`;
@@ -74,6 +76,14 @@ export function readmeFixture(pathname, base = resolve(import.meta.dirname, '../
       : 'node scripts/fetch-readme-assets.mjs',
   );
   return { path };
+}
+
+/** A caller-selected tool enters only the example child PATH. The runner environment stays intact. */
+export function readmeNodeEnv(env = process.env) {
+  const file = env.MARGO_README_FFMPEG;
+  if (!file) return env;
+  requiredFixture(file, 'node scripts/fetch-readme-assets.mjs --ffmpeg (after npm run build:packages)');
+  return { ...env, PATH: `${dirname(file)}${delimiter}${env.PATH ?? ''}` };
 }
 
 /** Single byte range, including open and suffix ranges. Null means HTTP 416. */

@@ -738,3 +738,23 @@ Build packages, then npm test --workspace @margoengine/wfc. Actual shipped class
 ### Batch 76 custom transitions
 
 Build packages, run npm test --workspace @margoengine/transitions, then node scripts/gpu-lock.mjs run --owner=codex-76 --max=10 --wait-max=30 -- npm run test:gpu --workspace @margoengine/transitions. The browser harness uses generated solid-color stand-ins and reads every tested output pixel. Expected values come from exact endpoints and the supplied p*p weight, within one UNORM code. Both 1x and 4x captures include resize and replacement-device redraw; actual WebGL2 must give coded linked unsupported. Invalid WGSL is deliberately labelled for the compile guard; incompatible bindings reject before attachment. npm run check:readme-run -- --packages=transitions runs both examples. No timing comparison was made.
+
+## Missing format proofs
+
+After npm run build:packages, run in PowerShell:
+
+```powershell
+$env:REAL_FILES_ONLY='pts-pdal,xyz-openbabel,mpd-robotic-arm,amf-zipped-slic3r,amf-rook'
+npm run test:real-files -w @margoengine/loaders
+```
+
+The script fetches pinned standard assets with SHA-256 checks; REAL_FILES_DIR chooses an external cache if desired.
+The MPD needs the 146,853,687-byte library archive plus four CC-BY-4.0 sticker parts. All sources/licences are in
+packages/loaders/tests/real-files/manifest.json. The result record is missing-format-proofs-20261109.json.
+These rows need no outside implementation runtime or GPU. Coordinate checks retain 1e-6 for AMF; XYZ compares float32
+values exactly. Re-run packages/loaders/tests/amf-reference.test.js for translated/nested-build oracle regressions.
+
+For the Windows README tool proof, run node scripts/fetch-readme-assets.mjs --ffmpeg after the build. Set
+MARGO_README_FFMPEG to the emitted cache/ffmpeg/bin/ffmpeg.exe, then run npm run check:readme-run -- --packages=headless.
+Only that example child receives the tool directory in PATH. The optional build is FFmpeg 8.1.2 GPL-3.0 from Gyan,
+publisher archive SHA-256 db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec. No tool binary ships.

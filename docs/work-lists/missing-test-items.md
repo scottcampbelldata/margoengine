@@ -94,10 +94,10 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P18 | limits Draco points | public point cloud with generic attributes | Google Draco standard test data, Apache-2.0 to verify | Pending; encoder-created proof remains labelled |
 | P19 | limits long-tail loaders, LIM-195 | rigged LWO with bones and weight maps | Freely licensed LightWave model corpus | Pending source/licence |
 | P20 | limits real files | valid real big-endian PLY | John Burkardt cow.binary.ply has an LGPL grant, but is malformed: 75,670 bytes instead of its declared 75,673; face 5,008 contains out-of-range index 3,587 | Downloaded and correctly refused. Valid-file proof remains pending; no parser tolerance or refusal changed |
-| P21 | same | LDraw MPD | LDraw models; verify model-specific CC licence | Pending |
-| P22 | same | zipped AMF | Public 3MF/AMF consortium or slicer sample data; per-file licence | Pending |
-| P23 | same | PTS with intensity and colour | Public survey dataset, CC0/CC-BY/public domain | Pending |
-| P24 | same | chemistry XYZ with clear licence | Public molecular dataset, CC0/public domain | Pending |
+| P21 | same | LDraw MPD | LDraw models; verify model-specific CC licence | Passed: 13 embedded submodels, 526,895 triangles, zero missing parts/warnings with the pinned library and four licensed sticker dependencies |
+| P22 | same | zipped AMF | Public 3MF/AMF consortium or slicer sample data; per-file licence | Passed: real Slic3r ZIP, 8 vertices/12 triangles; every placed coordinate/triangle matches the independent XML oracle. Fixed the proof harness to include constellation placement, with a regression |
+| P23 | same | PTS with intensity and colour | Public survey dataset, CC0/CC-BY/public domain | Passed: PDAL autzen.pts, all 10 coordinates, signed intensities and RGB values compared with source text |
+| P24 | same | chemistry XYZ with clear licence | Public molecular dataset, CC0/public domain | Passed: Open Babel test3d.xyz, all 25 labelled atom coordinates compared with source text; pinned GPL-2.0 data-only download |
 | P25 | limits USD reset stacks, LIM-324 | independently authored resetting USD stage | OpenUSD standard test data, Apache-2.0 to verify | Pending |
 | P26 | limits MaterialX, LIM-331/205 | RealityKit material file and MaterialX rendered reference | Apple public sample-file grant; MaterialX standard examples Apache-2.0 to verify | Pending |
 | P27 | limits LAS/LAZ | compressor 0/1 v2 items, chunk size 0 from an outside writer | LASzip/laz-rs standard data, Apache-2.0 to verify | Pending; unsupported item-v1 is not a missing proof |
@@ -105,7 +105,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P29 | limits video/codecs, LIM-575 | real AVC movie with B-frames | Same, retain source codec metadata and licence | Pending |
 | P30 | private batch-110 report and known-bugs README 404 history | pointer-show.glb and the other missing example asset | Margo-authored pointer-show now exists; current README runner selects both examples | Scoped README command rerun: 62/94 ran, 32 allowed failures; further sample work remains; do not duplicate batch 160 fix |
 | P31 | loaders README VDB example | smoke.vdb with a density grid | OpenVDB website repository 3d8fd4d3f2d670464f4390e2775cfc87274233dc, explicit CC-BY-4.0 LICENSE.txt | Sphere and smoke downloaded; real files exposed empty-half-value-block alignment bug, fixed with sphere and synthetic regressions. README density example passed with the explicit smoke mapping; exception removed |
-| P32 | headless README image-sequences-and-video-37bcc7 | discoverable ffmpeg binary | FFmpeg official download links, LGPL/GPL build configuration to record | Pending tool/path audit; not a hardware gap |
+| P32 | headless README image-sequences-and-video-37bcc7 | discoverable ffmpeg binary | FFmpeg official download links, LGPL/GPL build configuration to record | Passed: original headless FFmpeg example using publisher-hash-checked FFmpeg 8.1.2 GPL-3.0; optional fetch/install flag and child-only PATH wiring |
 | H01 | physics/scripts/test-browser.js | outside Rapier runtime named by MARGOENGINE_RAPIER | npm @dimforge/rapier3d-compat, Apache-2.0 | Physics on hold; list only, no change/rerun |
 | H02 | limits ragdoll/getup | authored get-up clips, not reversed Death_A/B | Public motion-capture dataset, verify data licence | Physics on hold; list only |
 | H03 | limits ragdoll/profile | real Mixamo-named rig, not renamed Knight | Public rig with explicit licence | Physics on hold; list only |
@@ -139,14 +139,14 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | animation/readme-geometry-caches-margoengine-anim-dcf6c5 | /flag.mgc | sample: MargoError: Geometry cache request failed with status 404; check the URL | Pending file selection, provenance and rerun |
 | decoders/readme-any-image-to-pixels-margoengine-86f34e | See named example | sample: TypeError: Failed to fetch | Pending file selection, provenance and rerun |
 | decoders/readme-basis-on-the-gpu-margoengine-dec-8314b0 | /texture.ktx2 | sample: TypeError: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
-| decoders/readme-brotli-margoengine-decoders-brot-f9820a | /node.br | sample: MargoError: Brotli stream is corrupt: a reserved bit is set | Pending file selection, provenance and rerun |
+| decoders/readme-brotli-margoengine-decoders-brot-f9820a | /node.br | sample: MargoError: Brotli stream is corrupt: a reserved bit is set | Passed with explicit licensed file/tool; exception removed |
 | decoders/readme-draco-point-clouds-margoengine-d-5f1327 | /points.drc | sample: Error: Draco: invalid header; pass an unmodified .drc buffer | Passed with explicit licensed sample; exception removed |
 | decoders/readme-hdr-ktx2-margoengine-decoders-kt-cbfebd | /environment.ktx2 | sample: Error: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-jpeg-xl-margoengine-decoders-jxl-2c0973 | /texture.jxl | sample: MargoError: JPEG XL: neither a codestream nor a container signature is there; pass the complete bytes of a .jxl file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-ktx2-cube-maps-and-arrays-margoe-d255e4 | /sky.ktx2, /terrain.ktx2 | sample: TypeError: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-margoengine-decoders-b7ae99 | /mesh.drc, /albedo.ktx2 | sample: Error: Draco: invalid header; pass an unmodified .drc buffer | Pending file selection, provenance and rerun |
 | decoders/readme-meshopt-on-wasm-simd-margoengine-2685e0 | /meshopt.bin | sample: MargoError: EXT_meshopt_compression: bad vertex stream header | Pending file selection, provenance and rerun |
-| decoders/readme-pcx-margoengine-decoders-pcx-150025 | /skin.pcx | sample: MargoError: PCX does not start with the manufacturer byte 10; pass the complete bytes of a valid PCX file | Pending file selection, provenance and rerun |
+| decoders/readme-pcx-margoengine-decoders-pcx-150025 | /skin.pcx | sample: MargoError: PCX does not start with the manufacturer byte 10; pass the complete bytes of a valid PCX file | Passed with explicit licensed file/tool; exception removed |
 | decoders/readme-pvr-margoengine-decoders-pvr-44fd95 | /texture.pvr | sample: MargoError: PVR: this is not a PVR file; check the path | Passed with explicit licensed sample; exception removed |
 | decoders/readme-streaming-ktx2-mips-margoengine-d0b4d7 | /rock.ktx2 | sample: MargoError: KTX2: could not load /rock.ktx2 (404) | Passed with explicit licensed sample; exception removed |
 | decoders/readme-tga-tiff-dds-and-ktx-1-margoengi-d480af | /image.tga, /image.tiff, /texture.dds | sample: MargoError: TIFF header is missing; pass the complete bytes of a valid TIFF file | Passed with explicit licensed sample; exception removed |
@@ -159,7 +159,7 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | fbx/readme-scale-inheritance-b099af | /assets/maya-rig.fbx | sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it | Pending file selection, provenance and rerun |
 | fbx/readme-skinning-modes-and-in-between-sh-84ddc1 | /assets/hero.fbx | sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it | Pending file selection, provenance and rerun |
 | fbx/readme-uv-sets-and-colour-layers-c13313 | /assets/room.fbx | sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it | Passed with explicit licensed sample; exception removed |
-| headless/readme-image-sequences-and-video-37bcc7 | See named example | example: Error [MargoError]: ffmpeg was not found; see https://margoengine.com/errors#headless | Pending file selection, provenance and rerun |
+| headless/readme-image-sequences-and-video-37bcc7 | See named example | example: Error [MargoError]: ffmpeg was not found; see https://margoengine.com/errors#headless | Passed with explicit licensed file/tool; exception removed |
 | loaders/readme-3ds-lwo-amf-md2-pdb-and-kmz-389243 | /models/tank.md2 | sample: LoaderError: MD2: missing the IDP2 magic | Passed with explicit licensed sample; exception removed |
 | loaders/readme-3mf-textures-and-colour-groups-3b539a | /prints/lithophane.3mf | sample: LoaderError: 3MF: not a ZIP package (missing PK signature) | Passed with explicit licensed sample; exception removed |
 | loaders/readme-collada-cameras-lights-lookat-an-174ec9 | /text.txt | sample: LoaderError: DAE: closing tag </head> does not match <meta> | Passed with explicit licensed sample; exception removed |
@@ -323,3 +323,17 @@ Run node scripts/fetch-readme-assets.mjs before npm run check:readme-run. The ex
 The runner serves real byte ranges (206/416, suffix/open ranges and HEAD), preserving the existing multi-file asset paths plus explicitly mapped OBJ/MTL/PNG, TMX/TSX and LAZ/WDP companions. Required inputs fail with recovery commands before execution; no missing alias falls through to unrelated bytes. Regression evidence: tests/readme-assets.test.js and tests/run-readme-examples.test.js.
 
 The real inputs exposed remaining nonmissing causes: FBX introduction requests Walking on the mechanical fan; inherit/deformer examples select unsupported cubic curves without the layer extension; the outside NURBS file has no renderable mesh; the second OBJ example passes MTL bytes to parseOBJ. These remain deferred to the later README job, with their failures preserved. Two examples still request example.com, and E57/Potree/Draco/meshopt/Brotli/PCX inputs remain outstanding. Physics was not run or changed.
+
+## Further licensed format proofs (2026-11-09)
+
+P21-P24 passed through the real-file runner, with source/licence/hash and all MPD dependencies in its manifest. The control AMF rook also passes. The zipped AMF exposed a proof bug, not a reader bug: the old bound oracle ignored constellation placement. The independent oracle now rotates/translates source points, follows nested/root constellations and compares all vertices and indices with the same 1e-6 coordinate bar. The owning test covers the Slic3r translation and nested rotation.
+
+The six-package README command ran 80/95 examples, 15 retained failures, zero fresh failures. Brotli, PCX and the FFmpeg video example were removed from the known list only after passing; 67 entries remain. Use node scripts/fetch-readme-assets.mjs --ffmpeg after a build, then set MARGO_README_FFMPEG to the emitted ffmpeg/bin/ffmpeg.exe when running the examples. The binary directory enters only the relevant Node child PATH, never the runner environment. The GPL archive remains outside Margo.
+
+Continued source investigations are not passes: P13 has a pinned Apache-2.0 Cesium implicit S2 tileset candidate (its subtrees remain to fetch/prove); P25 has a published OpenUSD reset stage containing only Cone/Sphere, correctly refused because it has no renderable meshes, so it does not close the mesh-bearing proof. P20 additional assimp and PDAL candidates were little-endian. P29 Blender's movie endpoint returned HTTP 403; no movie proof was run. The Draco introduction needs attribute IDs matching its explicit POSITION=0/NORMAL=1/TEXCOORD_0=2 request; Box, Avocado and the Google cube do not have that map, so no incompatible alias is claimed passing. Remaining investigations stay open.
+
+Follow-up landing checks: lint and hygiene passed; full verify passed 13,276 tests with zero failures/skips
+(329.2 s). Loader tests passed 516/516, both loader GPU suites passed, and the final six-package README rerun
+executed 80/95 with 15 retained failures, zero fresh. The 34 focused regressions and all three real AMF rows
+also passed. No public exports changed. The first group's duplicate queued GPU request was deliberately
+cancelled before it started tests; its earlier identical-code scoped run remains the recorded evidence.

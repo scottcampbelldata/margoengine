@@ -134,13 +134,23 @@ The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loade
 
 ## Real files
 
-`tests/real-files/manifest.json` names 111 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+`tests/real-files/manifest.json` names 123 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
 npm run test:real-files -w @margoengine/loaders
 ```
 
 The script downloads each file by URL into `test-results/real-files`, refuses one whose hash differs, opens it and compares it with something independent: the counts in its own header, a second reader written in the script, or a published fact. It exits 1 on a failure and 2 when a file could not be run, such as a site refusing the download.
+
+The MPD proof resolves all 13 embedded submodels and the external library/sticker parts with no missing files or warnings.
+The PDAL PTS and Open Babel chemistry XYZ checks compare every coordinate, intensity and colour against the source text.
+The real Slic3r ZIP AMF and the plain AMF control compare every placed vertex and triangle against an independent XML
+oracle, including constellation translation/rotation. To run those rows on PowerShell:
+
+```powershell
+$env:REAL_FILES_ONLY='pts-pdal,xyz-openbabel,mpd-robotic-arm,amf-zipped-slic3r,amf-rook'
+npm run test:real-files -w @margoengine/loaders
+```
 
 | Variable | Default | What it does |
 | --- | --- | --- |

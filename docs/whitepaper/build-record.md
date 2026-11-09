@@ -3888,3 +3888,15 @@ the audited aliases. A real scoped run of loaders, decoders, FBX, environment an
 Fifteen scoped failures remain, including missing inputs and deferred nonmissing README causes. OpenVDB smoke's
 density example now runs. No core, stage or physics source changed. Detailed scope, sources, accepted alias identities
 and regression paths are in docs/work-lists/missing-test-items.md. This is execution proof, not a performance claim.
+
+### Missing format proofs and tool recovery (2026-11-09)
+
+The four newly covered real-file variants pass, alongside the existing plain AMF rook: MPD (complete dependencies),
+deflated AMF, PTS intensity/RGB and chemistry XYZ. Every XYZ value and placed AMF coordinate/index is checked;
+MPD has finite in-range geometry with no missing dependencies/warnings. Source/licence/hash records remain in the
+loader manifest, which now contains 123 rows. Results: results/missing-format-proofs-20261109.json.
+
+The Slic3r sample exposed the proof harness's unplaced-bounds assumption. The independent point-rotation reference
+and regression repair that cause; no parser or tolerance changed. The README runner additionally passes real Brotli,
+PCX and the original FFmpeg example, shrinking the known list from 70 to 67. The six-package run passes 80/95,
+with 15 retained failures and zero fresh failures. Remaining source investigations and hardware boundaries stay open.
