@@ -2514,6 +2514,10 @@
       "types": "./dist/sciviz/nrrd.d.ts",
       "import": "./dist/sciviz/nrrd.js"
     },
+    "./sciviz/fallback": {
+      "types": "./dist/sciviz/fallback.d.ts",
+      "import": "./dist/sciviz/fallback.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

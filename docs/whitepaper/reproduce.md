@@ -1,5 +1,14 @@
 # Reproducing Margo's numbers
 
+CPU isosurface extraction (batch 181 job 1 foundation): run
+`npm run build:fallback --workspace @margoengine/sciviz`,
+`npm run test:fallback-kernel --workspace @margoengine/sciviz`, then
+`npm run test --workspace @margoengine/sciviz`.
+`fallback.test.js` compares every derived case, SIMD tails and chunk boundaries with a scalar oracle, and loads
+`examples/assets/sciviz/head.nrrd` at intensity 300 to check 216,150 triangles and the pinned vertex hash in claims.md.
+The Wasm is a lazy asset outside the root entry; no WebGPU device or browser is needed. These checks establish
+extraction only. Direct engine WebGL2 drawing and browser parity remain to be built and checked.
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699

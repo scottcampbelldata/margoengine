@@ -2673,6 +2673,17 @@ The MRI intensities are arbitrary scan units. The four older synthetic pages are
 The demo checks cover 1440 x 900 and 390 x 844 on native WebGPU and forced WebGL2 in Chromium; they do not
 establish a new frame-rate, clinical, forecast, browser-family or hardware-tier claim.
 
+Sciviz CPU extraction foundation (2026-11-10): `@margoengine/sciviz/fallback` exports `marchingCubes`, not a
+WebGL2 figure adapter yet. The JavaScript entry is 2,002 bytes gzip against a new 2,258-byte ceiling; it loads one
+21,851-byte feature-local Rust/Wasm asset on use (24,000-byte test ceiling). Existing entry ceilings are unchanged.
+The same derived case table produces normalized positions and unnormalized outward gradients, eight float32
+words per vertex, 96 bytes per triangle. Default `maxTriangles` is floor(128 MiB / 96); field, cases, tables and
+vertices together are capped at 2 GiB, excluding the returned copy and allocator overhead. Dimensions are at
+least two per axis; the input length must match; the level must be finite in float32. Both passes yield every
+16,384 cells for cancellation. NaN samples follow the GPU's comparison/interpolation behaviour. All 256 cases,
+non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
+The existing Figure still rejects the engine's WebGL2 preview backend. Drawing parity remains unverified.
+
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
 cannot survive device loss without a CPU copy: their layers hide and must be recreated on the replacement
@@ -4689,6 +4700,15 @@ The stale size/network pair was regenerated from the same build with matching
 commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
 verify's sole failure was this record gate; only that failed step was rerun as
 requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
+
+### Sciviz WebGL2 implementation in progress (batch 181 job 1, 2026-11-10)
+
+The existing Figure rejects engines with backend `webgl2` in `SciRenderer.setup`; its layers own WebGPU buffers
+and pipelines. The points and lines plugins also leave that preview backend undrawn, so removing the guard alone
+would silently lose the catalogue and wind data. The optional `/fallback` entry now provides the CPU marching-cubes
+foundation using the GPU's derived table, with independent scalar and real-MRI tests. Figure integration, drawing
+surfaces/volumes/slices/rectangles, points/lines for the three demos, context restoration and browser pixel parity
+remain to be implemented. No direct WebGL2 rendering support is claimed by this extraction-only piece.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 
@@ -13693,6 +13713,39 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+## CPU isosurface extraction
+
+The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
+the WebGL2 work. It does not yet attach a figure to the engine's WebGL2 preview renderer. Existing figure APIs
+still need WebGPU or the full WebGL2 compatibility layer.
+
+```ts
+import { marchingCubes } from '@margoengine/sciviz/fallback';
+
+const field = new Float32Array([1, -1, -1, -1, -1, -1, -1, -1]);
+const result = await marchingCubes(field, 0, { dims: [2, 2, 2] });
+console.log(result.triangles); // 1
+console.log(result.vertices.length); // 24 floats: three position/gradient pairs
+```
+
+This entry loads one feature-local Rust/Wasm asset on extraction, without requesting a GPU or installing globals.
+It uses the same derived case table, strict `value > level` rule, triangle order and winding as the GPU extractor.
+Positions are in the grid's unit box. Each vertex is eight float32 words: position xyz and 1, then the outward,
+unnormalised gradient xyz and 0. Transform positions by the data bounds and gradients by the inverse transpose,
+including voxel counts, as the GPU layer does. The returned array owns its memory.
+
+Pass `signal` to cancel loading or extraction. Both passes yield after each chunk of at most 16,384 cells, and
+concurrent calls own separate Wasm instances. `maxTriangles` defaults to floor(128 MiB / 96) and rejects before
+allocating output that exceeds it. Input, case and vertex allocations together are capped at 2 GiB; the returned
+copy and Wasm allocator overhead are additional. Dimensions must be integers of at least two, their product must
+match the input length, and the level must be finite in float32. Scalar samples are converted to float32 as in the
+GPU path. NaN samples retain its comparison and interpolation behaviour.
+
+Build the committed Wasm with `npm run build:fallback --workspace @margoengine/sciviz`. The normal package build
+ships the committed asset and needs no Rust toolchain. Tests compare every case, SIMD row tails and chunk
+boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
+No end-to-end rendering or public speed claim is made for this entry yet.
+
 ```ts
 import { Figure } from '@margoengine/sciviz';
 
@@ -13714,41 +13767,6 @@ fig.colorbar('coolwarm', [-1, 1], { label: 'sin x cos y' });
 - the theme's background;
 - a camera framing the plot box;
 - orbit controls (drag to orbit, scroll to zoom, right-drag to pan).
-
-`Figure.attach(engine)` adds a figure to an engine you already have. Axes and tick labels load and draw in the
-background; `await fig.ready()` waits for them and rejects if they failed. A figure maps data units into a box, with data
-z pointing up. The box spans the union of its layers' bounds, or fixed `limits`. Axes draw the box outline, grid
-lines at the ticks and HTML tick labels.
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `mode` | `'3d'` | `'3d'` box you orbit, or `'2d'` chart (see 2D charts) |
-| `margin` | see 2D charts | space around a 2D chart's plot area, in CSS px |
-| `theme` | `'dark'` | `'dark'` or `'light'` chrome and background |
-| `axes` | `true` | box, grid and tick labels |
-| `titles` | `{ x: 'x', y: 'y', z: 'z' }` | axis titles |
-| `ticks` | `5` | about how many ticks per axis |
-| `grid` | `true` | grid lines on the floor and back walls |
-| `aspect` | `[1, 1, 0.75]` | relative size of the plot box |
-| `limits` | data bounds | fixed `[xmin, xmax, ymin, ymax, zmin, zmax]` (`[xmin, xmax, ymin, ymax]` in 2D) |
-| `pointBudget` | `2_000_000` | most scatter points drawn per frame |
-| `scale` | linear | `{ x, y, z }`: `'linear'`, `'log'` or `'date'` per axis |
-| `legend` | shown for 2+ named layers | `false`, `true`, or a corner such as `'top-left'` |
-| `tooltips` | `true` | hover tooltips; `false`, or `(hit) => string \| null` for your own text |
-| `controls` (create only) | `true` | orbit controls (3D) |
-
-## Layers
-
-| Call | Draws |
-| --- | --- |
-| `await fig.scatter({ x, y, z?, color?, size? }, { colormap, range, size, edl, shape })` | point cloud with level of detail; `color` values go through the colour map |
-| `await fig.line({ x, y, z?, color? }, { width, colormap })` | fat line with round joins |
-| `fig.surface(z, { nx, ny, x, y, colormap, range, contours, grid, opacity })` | height field coloured by height, contour lines, NaN holes |
-| `fig.volume(data, { dims, bounds, colormap, range, opacity, density, mode, quality, shading, clip })` | ray-marched volume; `mode: 'mip'` for maximum intensity |
-| `volume.slice('x' \| 'y' \| 'z', position)` | a plane through the volume, coloured by its map |
-| `brickedVolume(fig, source, options)` from `/bricks` | a volume larger than one texture or the memory budget, loaded by view ([below](#bricked-volumes)) |
-| `await fig.isosurface(data, level, { dims, bounds, color })` | GPU marching cubes; `layer.update(level)` re-extracts |
-| `fig.colorbar(colormap, range, { label, ticks })` | HTML colour bar at the canvas edge |
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

@@ -11,6 +11,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/sciviz',
+    file: 'packages/sciviz/dist/fallback.wasm',
+    label: 'fallback.wasm',
+    kind: 'Rust SIMD marching cubes',
+    measure: 'file',
+    when: '`marchingCubes()`, only from the optional /fallback entry; no device or global installation',
+  },
+  {
     package: '@margoengine/voxel-pathtracer',
     file: 'packages/voxel-pathtracer/dist/mesh.wasm',
     label: 'mesh.wasm',

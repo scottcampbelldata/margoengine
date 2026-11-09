@@ -86,6 +86,17 @@ The MRI intensities are arbitrary scan units. The four older synthetic pages are
 The demo checks cover 1440 x 900 and 390 x 844 on native WebGPU and forced WebGL2 in Chromium; they do not
 establish a new frame-rate, clinical, forecast, browser-family or hardware-tier claim.
 
+Sciviz CPU extraction foundation (2026-11-10): `@margoengine/sciviz/fallback` exports `marchingCubes`, not a
+WebGL2 figure adapter yet. The JavaScript entry is 2,002 bytes gzip against a new 2,258-byte ceiling; it loads one
+21,851-byte feature-local Rust/Wasm asset on use (24,000-byte test ceiling). Existing entry ceilings are unchanged.
+The same derived case table produces normalized positions and unnormalized outward gradients, eight float32
+words per vertex, 96 bytes per triangle. Default `maxTriangles` is floor(128 MiB / 96); field, cases, tables and
+vertices together are capped at 2 GiB, excluding the returned copy and allocator overhead. Dimensions are at
+least two per axis; the input length must match; the level must be finite in float32. Both passes yield every
+16,384 cells for cancellation. NaN samples follow the GPU's comparison/interpolation behaviour. All 256 cases,
+non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
+The existing Figure still rejects the engine's WebGL2 preview backend. Drawing parity remains unverified.
+
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
 cannot survive device loss without a CPU copy: their layers hide and must be recreated on the replacement

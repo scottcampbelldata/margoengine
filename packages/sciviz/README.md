@@ -21,6 +21,39 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+## CPU isosurface extraction
+
+The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
+the WebGL2 work. It does not yet attach a figure to the engine's WebGL2 preview renderer. Existing figure APIs
+still need WebGPU or the full WebGL2 compatibility layer.
+
+```ts
+import { marchingCubes } from '@margoengine/sciviz/fallback';
+
+const field = new Float32Array([1, -1, -1, -1, -1, -1, -1, -1]);
+const result = await marchingCubes(field, 0, { dims: [2, 2, 2] });
+console.log(result.triangles); // 1
+console.log(result.vertices.length); // 24 floats: three position/gradient pairs
+```
+
+This entry loads one feature-local Rust/Wasm asset on extraction, without requesting a GPU or installing globals.
+It uses the same derived case table, strict `value > level` rule, triangle order and winding as the GPU extractor.
+Positions are in the grid's unit box. Each vertex is eight float32 words: position xyz and 1, then the outward,
+unnormalised gradient xyz and 0. Transform positions by the data bounds and gradients by the inverse transpose,
+including voxel counts, as the GPU layer does. The returned array owns its memory.
+
+Pass `signal` to cancel loading or extraction. Both passes yield after each chunk of at most 16,384 cells, and
+concurrent calls own separate Wasm instances. `maxTriangles` defaults to floor(128 MiB / 96) and rejects before
+allocating output that exceeds it. Input, case and vertex allocations together are capped at 2 GiB; the returned
+copy and Wasm allocator overhead are additional. Dimensions must be integers of at least two, their product must
+match the input length, and the level must be finite in float32. Scalar samples are converted to float32 as in the
+GPU path. NaN samples retain its comparison and interpolation behaviour.
+
+Build the committed Wasm with `npm run build:fallback --workspace @margoengine/sciviz`. The normal package build
+ships the committed asset and needs no Rust toolchain. Tests compare every case, SIMD row tails and chunk
+boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
+No end-to-end rendering or public speed claim is made for this entry yet.
+
 ```ts
 import { Figure } from '@margoengine/sciviz';
 

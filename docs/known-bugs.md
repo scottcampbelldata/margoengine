@@ -79,6 +79,15 @@ commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
 verify's sole failure was this record gate; only that failed step was rerun as
 requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
 
+### Sciviz WebGL2 implementation in progress (batch 181 job 1, 2026-11-10)
+
+The existing Figure rejects engines with backend `webgl2` in `SciRenderer.setup`; its layers own WebGPU buffers
+and pipelines. The points and lines plugins also leave that preview backend undrawn, so removing the guard alone
+would silently lose the catalogue and wind data. The optional `/fallback` entry now provides the CPU marching-cubes
+foundation using the GPU's derived table, with independent scalar and real-MRI tests. Figure integration, drawing
+surfaces/volumes/slices/rectangles, points/lines for the three demos, context restoration and browser pixel parity
+remain to be implemented. No direct WebGL2 rendering support is claimed by this extraction-only piece.
+
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 
 The bricked README investigation found real conversion work, rather than a non-settling read: the exact

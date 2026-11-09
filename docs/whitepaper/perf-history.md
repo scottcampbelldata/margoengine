@@ -1,5 +1,16 @@
 # Performance history: losses, causes and fixes
 
+### Sciviz CPU extraction foundation (2026-11-10, batch 181 job 1)
+
+The new optional `/fallback` entry puts marching-cubes classification and generation in one feature-local
+Rust/Wasm module. SIMD compares four adjacent x cells at once, with scalar row/chunk tails; the case table and
+every generated triangle remain the GPU path's. A local alternating scalar/SIMD Wasm diagnostic used the complete
+88 x 128 x 128 MRI, 1,403,223 cells and 216,150 output triangles. Full output hashes agreed in every run.
+Classification improved consistently; whole-extraction timings were noisy, including a round without a gain.
+No wall-clock ratio, frame-rate claim or rival comparison is published from this loaded machine.
+`packages/sciviz/tests/fallback.test.js` pins the output and independently checks every case and SIMD/chunk tails.
+This piece does not add direct WebGL2 drawing; its pixels and demo performance remain unverified.
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699

@@ -296,6 +296,17 @@ wait. Mixed biome timing suites, the visual frame budget and dynamically
 scheduled GPU timing steps identify their measurement reasons explicitly;
 their correctness/speed split and build-phase deferral remain separate work.
 
+Sciviz fallback foundation (2026-11-10, section 5 evidence supplement): the optional `/fallback` entry owns one
+lazy Rust/Wasm marching-cubes module. It receives the existing clean-room derived case table; core and stage
+import none of it. Classification handles four contiguous x cells per SIMD comparison group and scalar tails;
+generation preserves GPU cell/table order, interpolation and gradient conventions. The TypeScript boundary checks
+dimensions and memory/output limits, owns each invocation's memory, and yields between bounded chunks so aborts
+can settle. Native Rust tests and the package's `fallback.test.js` cover every case, an independent rounded scalar
+oracle, row tails, chunk boundaries, cancellation and the real head MRI. A local alternating scalar/SIMD Wasm probe
+used the same 1,403,223 MRI cells and identical full vertex hashes, establishing a classification gain under load;
+no public speed ratio or end-to-end rendering claim follows. The 21,851-byte Wasm has a 24,000-byte test ceiling.
+Direct WebGL2 Figure integration and native/compatibility/preview pixel comparisons are still missing.
+
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that
 were previously mixed with repository coordination instructions. It does not define task assignment, branches,
 integration, publishing, or source-control operations. Those are external workspace responsibilities.

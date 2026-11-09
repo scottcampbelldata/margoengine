@@ -59,6 +59,10 @@
     "./nrrd": {
       "types": "./dist/nrrd.d.ts",
       "import": "./dist/nrrd.js"
+    },
+    "./fallback": {
+      "types": "./dist/fallback.d.ts",
+      "import": "./dist/fallback.js"
     }
   },
   "files": [
@@ -83,9 +87,11 @@
     "@margoengine/points": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js sciviz",
+    "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "build:fallback": "node scripts/build-fallback.mjs",
+    "test:fallback-kernel": "node scripts/build-fallback.mjs --test"
   }
 }

@@ -7,6 +7,13 @@ snapshot/restore and ref identity through store growth. Core + stage: 23,837 to
 23,924 B gzip (+87 B); core alone 21,553 B, below its unchanged 21,587 B cap.
 No throughput or cross-hardware claim.
 
+CPU isosurface foundation (2026-11-10): `@margoengine/sciviz/fallback` extracts without a GPU using the existing
+derived case table and a feature-local Rust/Wasm module. `packages/sciviz/tests/fallback.test.js` compares all
+256 cases and non-cubic/chunked grids with an independent float32 scalar oracle, checks cancellation and memory
+ownership, and pins the real head MRI at 216,150 triangles for intensity 300. The full scalar and SIMD Wasm vertex
+hash is `57d02c9bce60a0d5e342b0551244d6bb12a597802945020f2b62ff60e6475cb9`. This establishes CPU extraction
+correctness; direct WebGL2 Figure support and rendering parity remain unverified. No public speed ratio is claimed.
+
 Half-float allocation correction (2026-11-10): scalar encoding now reuses two views over one four-byte buffer.
 `tests/f16-allocation.test.js` proves zero per-value view allocations, against 574,992 for a default 66-cubed brick
 on the parent, and checks every binary16 word plus signed rounding ties. Selected bricks, samples and output bits
