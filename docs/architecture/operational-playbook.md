@@ -2542,3 +2542,7 @@ node. The full package proof visits all 77 nodes and independently compares all
 341,989 coordinates and RGB values exactly. Both original examples and the whole
 18-example points README pass; 1x/4x GPU package suites remain required. No runtime,
 core, stage or held physics source changed. No surveyed/normal-decoding/quality/speed claim.
+
+### Batch 65 job 5: Lane markings
+
+The road entry only builds small placement descriptions. The existing post/decals renderer projects them from scene depth, handles angle/depth fades, backend shaders, device restoration and disposal; its built-in white texel removes image-asset requirements. Solid/dashed lines and three-stroke arrows share this renderer. No shader or new geometry solver is introduced. Core and stage are unchanged. Section 5 evidence: Authored extents, dash end trimming, arrow symmetry, headings, ownership and hostile/extreme validation; white line and arrow pixels on a road, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim. See packages/road/test/markings.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.

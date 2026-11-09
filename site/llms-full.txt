@@ -2610,7 +2610,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-637). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-638). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -4172,6 +4172,10 @@ The 18 original examples execute. This closes two missing-file examples and is n
 surveyed accuracy, NORMAL_OCT16 decoding, production-render quality or speed proof.
 No parser/render behavior, entry sizes, exports or budgets changed. The required
 shared outside manifest now has 457 files and fails if any is missing or changed.
+
+### Batch 65 job 5: Lane markings (LIM-638)
+
+Optional road/markings: 887 B min+gzip with bare package imports external; dependencies are additional downloads. Synchronous caller-owned decal descriptions, no GPU resources. At most 4096 output projectors, empty input returns empty output. Lines use one projector per dash; arrows use three strokes, with no regulatory-glyph claim. Positions within +/-1,000,000 m; positive length through 10000 m and width/depth through 1000 m; each projector half-extent must be a normal float32 value (at least 2^-126). Uses existing post/decals and a scene-depth capture, such as tonemap. Downward box projection can also paint other upward-facing surfaces inside the box. Box depth and camera/float32 precision set placement accuracy. Unlit over blending, no physical paint or retroreflection model. Authored extents, dash end trimming, arrow symmetry, headings, ownership and hostile/extreme validation; white line and arrow pixels on a road, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -6138,6 +6142,12 @@ valid Basis texture would require the promised Node runtime instead. Correct rep
 needs a complete openly licensed Basis glTF input and a Node GPU/headless setup,
 retaining the loadGLTF integration. This is still a runtime known-list exception;
 no texture-only substitute, browser fallback or passing claim has been added.
+
+### Batch 65 job 5: Lane markings audit
+
+No open defect found within the documented contract. Synchronous caller-owned decal descriptions, no GPU resources. At most 4096 output projectors, empty input returns empty output. Lines use one projector per dash; arrows use three strokes, with no regulatory-glyph claim. Positions within +/-1,000,000 m; positive length through 10000 m and width/depth through 1000 m; each projector half-extent must be a normal float32 value (at least 2^-126). Uses existing post/decals and a scene-depth capture, such as tonemap. Downward box projection can also paint other upward-facing surfaces inside the box. Box depth and camera/float32 precision set placement accuracy. Unlit over blending, no physical paint or retroreflection model.
+
+Markings audit regression: positive subnormal dimensions could underflow when the existing decal renderer packs float32 half-extents. markings.test.js reproduced missing rejection before the fix. Each resulting projector half-extent must now be a normal float32 value (at least 2^-126); tiny representable dimensions remain accepted. No renderer tolerance changed.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

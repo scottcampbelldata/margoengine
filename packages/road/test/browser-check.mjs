@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'banking', 'terrain', 'repair']) {
+  for (const feature of ['junctions', 'banking', 'terrain', 'repair', 'markings']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -61,7 +61,11 @@ try {
         throw e;
       };
       let data;
-      if (feature === 'repair') {
+      if (feature === 'markings') {
+        const {road} = await import('/packages/road/dist/index.js');
+        const {Spline} = await import('/packages/splines/dist/index.js');
+        data=road(new Spline([[0,0,-10],[0,0,10]]),{crossSection:[[-3,0],[3,0]]});
+      } else if (feature === 'repair') {
         const {repairRoad} = await import('/packages/road/dist/repair.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
         data=await repairRoad(new Spline([[-2,0,-8],[-2,0,8],[0,0,9],[2,0,8],[2,0,-8]]),{width:8});
@@ -103,6 +107,16 @@ try {
         .createMesh()
         .setGeometry(data.geometry)
         .setMaterial(new PbrMaterial({ color: '#ff0000' }));
+      let paint;
+      if(feature === 'markings') {
+        const {Tonemap}=await import('/packages/tonemap/dist/index.js');
+        const {Decals}=await import('/packages/post/dist/decals.js');
+        const {markings}=await import('/packages/road/dist/markings.js');
+        Tonemap.attach(engine,{curve:'neutral'});
+        paint=Decals.attach(engine,{minPixels:0});
+        paint.setDecals(markings([{kind:'line',position:[-1.25,0,0],length:20,width:0.5},{kind:'arrow',position:[1.25,0,0],length:5,width:1.5}]));
+        if(paint.count!==4)throw new Error('Marking projector count');
+      }
       const draw = () =>
         waitForPipelines(async () => {
           engine.render({ delta: 0 });
@@ -118,6 +132,7 @@ try {
           await draw();
         },
         async remove() {
+          paint?.dispose(); paint?.dispose();
           mesh.dispose();
           mesh.dispose();
           await draw();
@@ -137,7 +152,7 @@ try {
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of (['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
+    for (const [x, y] of (feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],
@@ -145,7 +160,12 @@ try {
       [64, 104],
     ])) {
       const [r, g, b] = rgb(first, x, y);
-      assert.ok(r > g + 30 && r > b + 30, `${mode}: road covers ${x},${y}: ${r},${g},${b}`);
+      if(feature === 'markings') assert.ok(Math.min(r,g,b)>60 && Math.max(r,g,b)-Math.min(r,g,b)<5, `${mode}: white paint at ${x},${y}: ${r},${g},${b}`);
+      else assert.ok(r > g + 30 && r > b + 30, `${mode}: road covers ${x},${y}: ${r},${g},${b}`);
+    }
+    if(feature === 'markings') {
+      let white=0;for(let y=50;y<78;y++)for(let x=67;x<78;x++){const p=rgb(first,x,y);if(Math.min(...p)>60 && Math.max(...p)-Math.min(...p)<5)white++;}
+      assert.ok(white>20,`${mode}: projected arrow paints its footprint: ${white}`);
     }
     const exterior = feature === 'terrain' ? [5,5] : [100,100];
     assert.ok(rgb(first, ...exterior)[0] < 40, `${mode}: corner outside road stays clear`);

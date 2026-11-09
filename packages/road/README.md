@@ -79,3 +79,27 @@ console.log(surface.area); // one footprint rather than overlapping strips
 ```
 
 `repairRoad` samples equal arc-distance chords and unions their full footprint before triangulation. It replaces the root sweep when a tight planar bend folds or overlaps. `width` defaults to 6 m, `segments` to 128 (1..4095), and `uvMeters` to 1. All junction bounds apply. Elevation comes from the curve; a grade rejects with coded help-linked `unsupported`. This is a flat driving surface without curbs or banking; it does not trim a 3D banked mesh. The sampled chord approximation and the polygon snap grid set geometric fidelity. Boundaries round to renderer float32 precision before triangulation; collapsed boundaries and invalid final faces still reject. Inputs snapshot before lazy loading; `signal` (default none) checks around loading. CPU output is caller-owned and needs no disposal. Rendered meshes/engines require disposal and survive device reboot on WebGPU and WebGL2 compatibility, as the pixel tests prove.
+
+## Lane markings
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {road} from 'margoengine/road';
+import {Spline} from 'margoengine/splines';
+import {markings} from 'margoengine/road/markings';
+import {Decals} from 'margoengine/post/decals';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(road(new Spline([[0,0,-10],[0,0,10]])).geometry).setMaterial(new PbrMaterial({color:'#202020'}));
+Tonemap.attach(engine); // supplies scene depth
+const paint = Decals.attach(engine);
+paint.setDecals(markings([
+  {kind:'line',position:[-1,0,0],length:18,dash:[3,1]},
+  {kind:'arrow',position:[1,0,0],length:4,width:1.5},
+]));
+console.log(paint.count);
+```
+
+Render the engine as usual. `markings` is synchronous and returns independently owned `Decal[]`; no image, loading or GPU allocation occurs. Pass the list to the existing decal renderer, with a scene-depth capture attached. The default white texel paints strokes in unlit `over` mode. Shared settings: `color` linear RGB in 0..1 (default white), `opacity` 0..1 (default 1), `depth` positive through 1000 m (default 2). Individual `angle` defaults 0 along +Z, `length` to 4 m (positive through 10000), `width` to 0.15 m for lines or 1.5 m for arrows (positive through 1000). `dash` is line-only [paint,gap], both positive through 10000 m; default solid. Its last painted segment trims to the authored end. Up to 4096 resulting projectors; empty input clears the list. Positions stay within +/-1,000,000 m. Arrows are stylized three-stroke glyphs; this is not a traffic-standard artwork library. Downward box projection can paint any upward-facing object inside it, so set its centre/depth around the road. Subpixel or imprecise world placement can disappear; use a local origin. CPU descriptions need no disposal; dispose Decals, meshes and engines. Device reboot, disposal, actual white line/arrow pixels and WebGL2 compatibility are tested.
+
+Every projector half-extent must be a normal float32 number (at least 2^-126); dimensions of 1e-30 m remain accepted. This excludes values the GPU may flush to zero.

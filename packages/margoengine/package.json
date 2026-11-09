@@ -2370,6 +2370,10 @@
       "types": "./dist/road/repair.d.ts",
       "import": "./dist/road/repair.js"
     },
+    "./road/markings": {
+      "types": "./dist/road/markings.d.ts",
+      "import": "./dist/road/markings.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

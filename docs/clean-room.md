@@ -1927,3 +1927,7 @@ Research began across all packages, including the existing CPU triangle-query AP
 - Kajiya, [The Rendering Equation](https://www.cs.cornell.edu/courses/cs667/2004sp/readings/kajiya86.pdf), 1986: surfaces in one transport integral. Both geometry types reuse Margo's existing BSDFs, path sampling, light visibility and volume integration.
 
 Generated triangles, scalar packing references and arithmetic/GPU fixtures are authored here. No outside model or decoder was added. Shared edges are tested on native WebGPU and WebGL2 compatibility; the full Float32 geometry domain is not an exact-arithmetic claim.
+
+## Batch 65 job 5: Lane markings
+
+A broad search of pavement markings and decal projection preceded implementation. FHWA [historical MUTCD 2009 chapter 3B](https://mutcd.fhwa.dot.gov/htm/2009/part3/part3b.htm) distinguishes line patterns and direction arrows. Sutherland and Hodgman, [Reentrant polygon clipping (1974)](https://doi.org/10.1145/360767.360802), describes successive clipping boundaries; projection and clipping are already implemented by Margo. Margo combines authored world-space line/arrow strokes with its existing box decal renderer. Glyphs are generated stand-ins, not copied standard artwork, and make no current traffic-rule compliance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.

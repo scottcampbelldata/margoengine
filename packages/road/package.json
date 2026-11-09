@@ -41,6 +41,10 @@
     "./repair": {
       "types": "./dist/repair.d.ts",
       "import": "./dist/repair.js"
+    },
+    "./markings": {
+      "types": "./dist/markings.d.ts",
+      "import": "./dist/markings.js"
     }
   },
   "files": [
@@ -54,7 +58,8 @@
   "dependencies": {
     "@margoengine/splines": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0"
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/post": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"

@@ -1961,3 +1961,9 @@ valid Basis texture would require the promised Node runtime instead. Correct rep
 needs a complete openly licensed Basis glTF input and a Node GPU/headless setup,
 retaining the loadGLTF integration. This is still a runtime known-list exception;
 no texture-only substitute, browser fallback or passing claim has been added.
+
+### Batch 65 job 5: Lane markings audit
+
+No open defect found within the documented contract. Synchronous caller-owned decal descriptions, no GPU resources. At most 4096 output projectors, empty input returns empty output. Lines use one projector per dash; arrows use three strokes, with no regulatory-glyph claim. Positions within +/-1,000,000 m; positive length through 10000 m and width/depth through 1000 m; each projector half-extent must be a normal float32 value (at least 2^-126). Uses existing post/decals and a scene-depth capture, such as tonemap. Downward box projection can also paint other upward-facing surfaces inside the box. Box depth and camera/float32 precision set placement accuracy. Unlit over blending, no physical paint or retroreflection model.
+
+Markings audit regression: positive subnormal dimensions could underflow when the existing decal renderer packs float32 half-extents. markings.test.js reproduced missing rejection before the fix. Each resulting projector half-extent must now be a normal float32 value (at least 2^-126); tiny representable dimensions remain accepted. No renderer tolerance changed.
