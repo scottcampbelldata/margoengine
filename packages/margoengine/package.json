@@ -3466,6 +3466,10 @@
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"
     },
+    "./water/fft": {
+      "types": "./dist/water/fft.d.ts",
+      "import": "./dist/water/fft.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

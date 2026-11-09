@@ -211,3 +211,67 @@ replaced (refraction, foam and glints stay); SSR's `maxRoughness` fades reflecti
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## FFT ocean
+
+`@margoengine/water/fft` is a separate entry. `FFTOcean` creates a deterministic
+Gaussian ocean spectrum on the GPU, evolves Tessendorf's conjugate wave pairs,
+and runs a two-dimensional radix-two inverse FFT for height, choppy XZ displacement
+and their time derivatives. Select `spectrum: 'jonswap'` (default) for fetch-limited
+seas or `'phillips'` for a fully developed wind sea. The default three disjoint
+cascades cover 512..64, 64..8 and 8..0.125 metre wavelengths at resolution 128.
+Overlapping bands reject instead of counting the same wave energy twice.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { FFTOcean } from '@margoengine/water/fft';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ocean = FFTOcean.attach(engine, {
+  spectrum: 'jonswap', windSpeed: 10, fetch: 100000,
+  windDirection: [1, 0.3], resolution: 128,
+});
+engine.render({ delta: 1 / 60 });
+```
+
+Foam forms from the horizontal displacement Jacobian determinant and persists
+with exponential decay. The default compression threshold is 0.7, choppiness is
+1 and foam lifetime is 4 seconds. Normals include horizontal displacement. The
+surface has Fresnel sky reflection, sun glints, diffuse foam, a water body colour,
+and an underside with the water-air critical angle. It writes scene depth, supports
+1x/4x MSAA and offset viewports, and rebuilds on device restoration.
+
+The 1024 m draw grid has 256 cells per axis and follows the camera in whole cells
+by default; `followCamera: false` anchors it at the world origin. The spectral
+patches remain world anchored and wrap periodically. `size`, `segments`, `height`
+and `color` configure the draw independently of the spectrum. Increase segments
+or reduce size to resolve shorter waves in geometry. There is no shoreline flow
+in this entry; `Water` remains the terrain-coupled surface.
+
+Every spectrum setting is copied on construction. `amplitude` is energy scale
+(default 1 for JONSWAP or 0.0005 for Phillips); displacement scales with its square
+root. Wind speed defaults to 10 m/s at 10 m, fetch to 100 km, peak enhancement to
+3.3, wind direction to [1, 0.3], seed to 234, mean height to 0 and body RGB to
+[0.01, 0.18, 0.25]. Resolution is a power of two from 16 to 512; one to four
+cascades can be supplied with `length`, `minWavelength` and `maxWavelength` in
+metres (defaults: twice cell width and patch length). The DC and Nyquist row/column
+are zero so choppy derivatives remain real. Spectra use deep-water gravity
+dispersion; they do not solve overturning volumes or finite-depth dispersion.
+
+`ocean.time` advances once per engine update. `setTime(seconds)` selects an
+absolute time; backwards seeking resets foam. Rendering itself has no GPU
+readback. `await ocean.readFrame({signal})` explicitly copies the last rendered
+frame into an independent CPU snapshot: time, height, patch lengths and twelve
+float32 values per point (displacement XYZ/foam, velocity XYZ/Jacobian, normal
+XYZ/unused), in cascade-major order. Render before reading; await each read before
+the next. Cancellation, disposal and restoration invalidate a pending copy.
+Snapshot time, height and patch lengths are the actual binary32 GPU values,
+including their rounding from authored JavaScript numbers.
+`dispose()` or `using` detaches the pass and frees owned buffers.
+
+The correctness demonstration uses a retained public-domain NOAA NDBC wind
+observation, with provenance in [test/data/README.md](test/data/README.md).
+Run `node packages/water/test/fft.browser.mjs`, then the same command with
+`--compat`, through the shared GPU lock. The independent Fourier-sum oracle,
+Jacobian/normal checks and lifecycle evidence are described in
+[the batch record](../../docs/water-fft.md). These are correctness checks,
+with no timing or speed claim.

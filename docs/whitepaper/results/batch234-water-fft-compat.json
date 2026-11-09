@@ -1,0 +1,74 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "margo-webgl2",
+      "architecture": "webgl2",
+      "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true,
+    "compat": true
+  },
+  "observation": {
+    "station": "46042",
+    "utc": "2023-01-01T00:00:00Z",
+    "windFrom": 314,
+    "windSpeed": 17.2
+  },
+  "spectra": [
+    {
+      "spectrum": "phillips",
+      "time": 0,
+      "maxError": 9.128910622990816e-7,
+      "maxMagnitude": 2.519158368776545,
+      "minJacobian": 0.7939836978912354,
+      "maxFoam": 0
+    },
+    {
+      "spectrum": "phillips",
+      "time": 1.25,
+      "maxError": 0.0000011505598869199218,
+      "maxMagnitude": 2.6264406611929396,
+      "minJacobian": 0.8378026485443115,
+      "maxFoam": 0
+    },
+    {
+      "spectrum": "jonswap",
+      "time": 0,
+      "maxError": 0.0000015883433734098507,
+      "maxMagnitude": 3.882756276484894,
+      "minJacobian": 0.6606188416481018,
+      "maxFoam": 0.07876229286193848
+    },
+    {
+      "spectrum": "jonswap",
+      "time": 1.25,
+      "maxError": 0.00000181080398786726,
+      "maxMagnitude": 4.2439796979687285,
+      "minJacobian": 0.6831544041633606,
+      "maxFoam": 0.0336911678314209
+    }
+  ],
+  "folding": {
+    "negative": 208,
+    "persistent": 29,
+    "maxError": 2.9802322387695312e-8
+  },
+  "lifecycle": {
+    "same": true,
+    "changed": true,
+    "restoredSame": true,
+    "flatExact": true,
+    "metadataExact": true,
+    "abortName": "AbortError"
+  }
+}

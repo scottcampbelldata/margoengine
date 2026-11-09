@@ -2302,3 +2302,14 @@ ComputeFrame's existing ownership browser proof is now selected by its owning
 package GPU plan. The regression pins that command, and the actual native and
 compatibility run passes its original exact values and ownership assertions.
 This is test registration evidence only, with no new engine capability claim.
+
+## Batch 234 spectral ocean claim
+
+Optional `@margoengine/water/fft` implements GPU Tessendorf spectrum generation,
+Phillips/JONSWAP selection, independent nonoverlapping cascades, choppy
+displacement and Jacobian foam. The claim is limited to the algorithm and
+numerical contracts in [water-fft.md](../water-fft.md), with the independent
+direct-Fourier oracle in `packages/water/test/fft-reference.js`. No speed
+or general hydrodynamic-accuracy claim is made. The batch record links passing
+native WebGPU and full WebGL2 compatibility results and the complete landing
+checks; maximum six-field Fourier-oracle error is below 0.000002.

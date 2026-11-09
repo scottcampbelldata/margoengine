@@ -1845,3 +1845,10 @@ The page checks all 32 subsets against analytic Beer attenuation, triangle ids,
 atomic scene replacement and RGB RIS shadows against the non-RIS composition.
 The existing standalone GPU suites retain their independent numeric bars.
 No timings or speed experiments run.
+
+## Batch 234 FFT ocean reproduction
+
+Follow [water-fft.md](../water-fft.md) for the research equations, real NOAA
+wind fixture, oracle tolerances and separate shared-lock WebGPU/compat commands.
+Package unit tests: `npm test --workspace @margoengine/water`. Results are
+correctness-only; no speed experiment is part of this claim.

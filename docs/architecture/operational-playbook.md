@@ -1918,6 +1918,17 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 234 water `/fft`: a separate GPU spectrum/evolution/2D-FFT/folding-foam
+pass owns all of its buffers and writes surface colour and depth at order 4.
+Core and stage are untouched. The [batch record](../water-fft.md) defines the
+independent direct Fourier oracle, real NOAA wind data and required native/
+compatibility evidence. Both backends pass the spectrum, derivative, folding
+foam and lifecycle checks against an independent direct sum; the running
+external ocean was visually inspected without reading its implementation.
+All 12 existing water GPU runs and the full verify gate pass. The scope is
+the FFT row's spectral behaviour, not a general hydrodynamics claim. No timing
+proof is run in build phase.
+
 Preview/compat continuation: the first interrupted compatibility run preserved 22
 completed suites. The later run preserved 37 results before its process ended;
 the restart confirmed it was gone and ran only the remaining 54, never a duplicate.

@@ -3461,3 +3461,18 @@ The tracked scene-owner-browser.mjs had no package script, so GPU plan validatio
 threw before selecting any package. Compute now registers test:gpu:owners;
 packages/compute/tests/gpu-registration.test.js pins the real command. Native
 and WebGL2 compatibility run the original assertions successfully.
+
+## Batch 234 FFT ocean validation
+
+The new optional ocean's initial reserved WGSL buffer identifier was caught
+by its physical shader-compilation test and corrected before landing. The
+same test must pass on native WebGPU and full WebGL2 compatibility; numerical
+and lifecycle evidence is tracked in [water-fft.md](water-fft.md). No runtime
+defect is accepted by this record.
+
+Review also found that snapshot metadata returned authored binary64 height and
+lengths instead of the uploaded binary32 values (100000.1 differed by 1.5625 mm).
+The owning FFT entry now reports the actual GPU height, lengths and evaluated
+time. The strict unit regression failed before the correction; both GPU
+backends also check nonexact decimal metadata. The new attachment error now
+links to the existing state help entry; its regression rejects the broken link.

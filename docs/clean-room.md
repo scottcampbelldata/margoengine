@@ -3246,3 +3246,22 @@ https://nodejs.org/api/test.html , with npm contributors, Scripts (2026),
 https://docs.npmjs.com/cli/v11/using-npm/scripts/ . A tracked browser driver is
 not invoked by Node unit discovery; its owning manifest must register an explicit
 GPU command. No shader algorithm, external implementation or timing test changed.
+
+## Batch 234 FFT ocean research
+
+Research was done before implementation. [water-fft.md](water-fft.md) records
+the compared Tessendorf (1999-2004), Hasselmann et al. (1973), Cooley and Tukey
+(1965), Nwogu and Demirbilek (2001) and W3C (2026) sources, exact reviewed
+sections, the synthesis and unavailable Horvath (2015) full text. Only papers,
+specifications, public demonstration pages and existing Margo code were read.
+No rival or companion implementation was opened, copied, adapted or translated.
+The independent oracle is a direct Fourier sum written from those equations.
+The real NOAA observation is public-domain government data with attribution
+beside the fixture and in THIRD-PARTY-NOTICES.md.
+
+The snapshot precision correction was preceded by comparing David Goldberg,
+*What Every Computer Scientist Should Know About Floating-Point Arithmetic*
+(1991, representation/ulp discussion), in the authorized Oracle reprint,
+<https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html>, with W3C
+WGSL (2026) binary32/host-shareable rules. The documented decimal-height
+regression proves actual uploaded values are reported; tolerances are unchanged.

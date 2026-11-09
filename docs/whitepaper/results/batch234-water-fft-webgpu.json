@@ -1,0 +1,73 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "observation": {
+    "station": "46042",
+    "utc": "2023-01-01T00:00:00Z",
+    "windFrom": 314,
+    "windSpeed": 17.2
+  },
+  "spectra": [
+    {
+      "spectrum": "phillips",
+      "time": 0,
+      "maxError": 9.04539176227459e-7,
+      "maxMagnitude": 2.519158368776545,
+      "minJacobian": 0.7939836978912354,
+      "maxFoam": 0
+    },
+    {
+      "spectrum": "phillips",
+      "time": 1.25,
+      "maxError": 0.0000011505598869199218,
+      "maxMagnitude": 2.6264406611929396,
+      "minJacobian": 0.8378026485443115,
+      "maxFoam": 0
+    },
+    {
+      "spectrum": "jonswap",
+      "time": 0,
+      "maxError": 0.0000016330468569913936,
+      "maxMagnitude": 3.882756276484894,
+      "minJacobian": 0.6606189012527466,
+      "maxFoam": 0.07876217365264893
+    },
+    {
+      "spectrum": "jonswap",
+      "time": 1.25,
+      "maxError": 0.0000019450786048480495,
+      "maxMagnitude": 4.2439796979687285,
+      "minJacobian": 0.6831544637680054,
+      "maxFoam": 0.03369104862213135
+    }
+  ],
+  "folding": {
+    "negative": 208,
+    "persistent": 29,
+    "maxError": 3.1379553289134776e-8
+  },
+  "lifecycle": {
+    "same": true,
+    "changed": true,
+    "restoredSame": true,
+    "flatExact": true,
+    "metadataExact": true,
+    "abortName": "AbortError"
+  }
+}

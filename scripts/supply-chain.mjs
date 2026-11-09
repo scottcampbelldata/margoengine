@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/water/test/data/README.md',
+    'NOAA National Data Buoy Center station 46042 standard meteorological observation, 2023-01-01 00:00 UTC. Two original headers and one row from https://www.ndbc.noaa.gov/view_text_file.php?filename=46042h2023.txt.gz&dir=data/historical/stdmet/; retrieved 2026-11-09. United States government public-domain data (https://www.weather.gov/disclaimer). The FFT correctness demo uses the recorded 17.2 m/s wind from 314 degrees; fetch is authored and missing wave values are not used. Test data only, never shipped in a package tarball.',
+  ],
+  [
     'packages/biomes/tests/fixtures/erosion-dem.json',
     'Test-only 2048x2048 Mount Rainier elevation from 64 unmodified Mapzen Terrain Tiles Terrarium PNGs, zoom 13, x 1320..1327 and y 2880..2887, https://s3.amazonaws.com/elevation-tiles-prod/terrarium/13/{x}/{y}.png (8,162,734 source bytes, downloaded 2026-11-09). United States 3DEP and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey, public domain; Mapzen attribution https://raw.githubusercontent.com/tilezen/joerd/master/docs/attribution.md. The manifest pins each URL, byte count and SHA-256; erosion-dem-crop.json contains an owned 16x16 integer-millimetre crop. Tiles are joined without resampling and rounded to millimetres by Margo code, not a USGS-endorsed modification. Original tiles stay in ignored development inputs, no data ships in package tarballs, and no terrain service implementation or paper code is copied.',
   ],

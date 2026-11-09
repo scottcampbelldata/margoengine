@@ -2751,3 +2751,20 @@ This is startup attribution only; it does not measure release throughput.
 ComputeFrame registration repair: the existing native/compatibility ownership
 proof is now in compute's GPU plan. This changes no entry bytes, algorithm,
 workload, numeric bound or timeout; core plus stage stays 23924 B.
+
+## Batch 234 FFT ocean
+
+The optional water `/fft` entry uses 16..512 Fourier samples per axis (powers
+of two), 1..4 disjoint wavelength bands and a separate 1..1024-cell draw grid.
+Its Gaussian linear Phillips/JONSWAP spectra use deep-water gravity dispersion,
+periodic patches, choppy displacement, tangent normals and folding foam. DC
+and the Nyquist row/column are omitted. Finite-depth dispersion, overturning
+volumes and shoreline flow are not solved by this entry. Its square draw grid
+is finite and follows the camera by default. A requested CPU snapshot is of
+the last rendered frame; rendering never reads the GPU back. One read can be
+pending. All buffers are rebuilt on device restoration. Details, size evidence
+and correctness reproduction: [water-fft.md](water-fft.md).
+
+The `/fft` entry is 7,334 B minified gzip (new ceiling 7,590 B); core + stage
+is unchanged at 23,924 B in the full rebuilt measurement. Snapshot time,
+mean height and patch lengths are binary32 GPU values, including rounding.

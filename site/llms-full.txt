@@ -5342,6 +5342,23 @@ ComputeFrame registration repair: the existing native/compatibility ownership
 proof is now in compute's GPU plan. This changes no entry bytes, algorithm,
 workload, numeric bound or timeout; core plus stage stays 23924 B.
 
+## Batch 234 FFT ocean
+
+The optional water `/fft` entry uses 16..512 Fourier samples per axis (powers
+of two), 1..4 disjoint wavelength bands and a separate 1..1024-cell draw grid.
+Its Gaussian linear Phillips/JONSWAP spectra use deep-water gravity dispersion,
+periodic patches, choppy displacement, tangent normals and folding foam. DC
+and the Nyquist row/column are omitted. Finite-depth dispersion, overturning
+volumes and shoreline flow are not solved by this entry. Its square draw grid
+is finite and follows the camera by default. A requested CPU snapshot is of
+the last rendered frame; rendering never reads the GPU back. One read can be
+pending. All buffers are rebuilt on device restoration. Details, size evidence
+and correctness reproduction: [water-fft.md](water-fft.md).
+
+The `/fft` entry is 7,334 B minified gzip (new ceiling 7,590 B); core + stage
+is unchanged at 23,924 B in the full rebuilt measurement. Snapshot time,
+mean height and patch lengths are binary32 GPU values, including rounding.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -8807,6 +8824,21 @@ The tracked scene-owner-browser.mjs had no package script, so GPU plan validatio
 threw before selecting any package. Compute now registers test:gpu:owners;
 packages/compute/tests/gpu-registration.test.js pins the real command. Native
 and WebGL2 compatibility run the original assertions successfully.
+
+## Batch 234 FFT ocean validation
+
+The new optional ocean's initial reserved WGSL buffer identifier was caught
+by its physical shader-compilation test and corrected before landing. The
+same test must pass on native WebGPU and full WebGL2 compatibility; numerical
+and lifecycle evidence is tracked in [water-fft.md](water-fft.md). No runtime
+defect is accepted by this record.
+
+Review also found that snapshot metadata returned authored binary64 height and
+lengths instead of the uploaded binary32 values (100000.1 differed by 1.5625 mm).
+The owning FFT entry now reports the actual GPU height, lengths and evaluated
+time. The strict unit regression failed before the correction; both GPU
+backends also check nonexact decimal metadata. The new attachment error now
+links to the existing state help entry; its regression rejects the broken link.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
