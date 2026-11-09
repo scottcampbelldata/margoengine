@@ -10,7 +10,7 @@ const generator = new WFC([4,4,4], [{neighbors: [[0],[0],[0],[0],[0],[0]]}]);
 const cells = generator.solve(123);
 ```
 
-Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; connectivity belongs in the tile rules and caller validation.
+Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
 
 ## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
 
@@ -63,3 +63,35 @@ search and throw coded failed with a help link. Invalid coordinates/rows throw R
 throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
 Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.
+
+## Global constraints (`@margoengine/wfc/constraints`, 2,337 B min+gzip)
+
+```ts
+import {ConstrainedWFC} from '@margoengine/wfc/constraints';
+const ids = [0, 1]; // wall, walkable floor
+const model = new ConstrainedWFC([4, 3, 1], ids.map(() => ({
+  neighbors: Array.from({length: 6}, () => ids),
+})), {
+  connected: [1],
+  paths: [{from: [0, 0, 0], to: [3, 2, 0], tiles: [1]}],
+  counts: [{tiles: [1], min: 8, max: 8}],
+});
+const cells = model.solve({seed: 7}); // Uint16Array, X then Y then Z
+console.log(cells[0], cells[11], model.stats.backtracks);
+```
+
+Local reciprocal adjacency, group counts and potential reachability propagate together during chronological backtracking.
+A returned layout satisfies every constraint. Connected means one nonempty six-neighbour component containing every cell
+using that tile group. Each path forces its endpoints to its own walkable group and requires a six-neighbour route between
+them. These are authored logical traversability rules; they do not infer avatar clearance, doors, jump physics or geometry.
+No external validator, callback or caller repair is needed. Exhaustive binary 3x2 truth tables test satisfiable and
+unsatisfiable combinations of counts, connectivity and corner paths; larger generated cases exercise backtracking.
+
+Defaults: connected absent, paths/counts empty; count min 0, max cell count; solve seed 1, pins empty, backtracks 10,000
+per attempt, attempts 4, signal absent. Counts group distinct tile IDs and include pinned/path endpoint cells. Input grids,
+adjacency and constraint groups are copied. Limits: 1..4096 tile IDs, 1,000,000 cells, 16,777,216 cell/tile pairs;
+Uint16 output removes the legacy root's 32-tile limit for this optional solver. Invalid inputs throw TypeError/RangeError;
+unsatisfiable or budget-exhausted searches throw coded failed with a help link. Satisfiable inputs can exhaust the budget.
+The entropy pick scans the grid; this entry does not promise fast large worlds. Domains and the undo trail scale with
+cell/tile pairs; connectivity scratch scales with cells. CPU only, tested beside real WebGPU and WebGL2 contexts with
+identical seeded output. AbortSignal checks are synchronous and cannot receive new events on the blocked thread.

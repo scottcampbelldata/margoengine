@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11498505,
+  "total": 11501098,
   "history": [
     {
       "date": "2026-10-24",
@@ -4874,6 +4874,12 @@
       "commit": "7741dda5c",
       "reason": "Scott approved the six measured lighting2d repair ceilings exactly: \"Approve new size\" (2026-11-09). No headroom. Root +242 B masks/validation; soft +296 B correct visibility; cookie +271 B restoration/masks/scalar gain; GI +1648 B spatial intervals/finite bounces/stable merges; height +509 B complete height spans/HDR sum; emissive +307 B isolated HDR extraction/real Bloom. 293 B removed without dropping work.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "73ef38b8b",
+      "reason": "WFC-optional-global-constraints-with-bounded-backtracking",
+      "grew": 1
     }
   ],
   "items": {
@@ -5814,6 +5820,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/wfc/constraints": 2593
   }
 }

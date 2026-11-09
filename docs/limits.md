@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-613). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-614). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1124,3 +1124,7 @@ no IBL, 512 x 512. RGB-byte MAE 1.6809107462565105 WebGPU and 1.6809145609537761
 compatibility, max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
 whitepaper/results/batch-160-clearcoat.json. The image residual remains an open defect, with
 formulation differences recorded separately from its unisolated complete cause.
+
+## WFC global constraints (batch 69)
+
+Optional wfc/constraints 2,337 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.

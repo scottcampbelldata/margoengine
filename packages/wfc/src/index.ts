@@ -47,7 +47,7 @@ export class WFC {
   /**
    * @param dimensions Grid size in cells: positive integers with a product of at most 1,000,000.
    * @param tiles 1 to 32 tile types.
-   * @throws RangeError for invalid dimensions or tile count.
+   * @throws RangeError for invalid dimensions, tile count or overflowing weight arithmetic.
    * @throws TypeError for a non-positive weight, a tile without six neighbor lists, or invalid or non-reciprocal adjacency.
    */
   constructor(
@@ -98,6 +98,13 @@ export class WFC {
           this.allowed[tile * 6 + direction] |= 1 << neighbor;
         }
     }
+    if (
+      !Number.isFinite(this.weights.reduce((sum, weight) => sum + weight, 0)) ||
+      !Number.isFinite(this.weightedLogs.reduce((sum, weightedLog) => sum + weightedLog, 0))
+    )
+      throw new RangeError(
+        'WFC weight arithmetic overflowed; use weights whose sum and weighted logarithms stay finite',
+      );
   }
   private random(): number {
     let x = this.randomState;

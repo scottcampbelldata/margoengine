@@ -61,3 +61,15 @@ test('thirty-two tile types solve instead of propagating forever', async () => {
   assert.equal(run.error, undefined, 'solve did not return');
   assert.equal(run.stdout.trim(), '16 31 true', run.stderr);
 });
+
+test('finite tile weights cannot overflow the entropy or weighted-choice arithmetic', () => {
+  const all = [0, 1];
+  const tiles = all.map(() => ({ weight: 1e308, neighbors: Array.from({ length: 6 }, () => all) }));
+  assert.throws(() => new WFC([2, 1, 1], tiles), RangeError);
+  assert.throws(() => new WFC([1, 1, 1], [{ weight: 1e308, neighbors: neighborLists(0) }]), RangeError);
+  const valid = new WFC(
+    [2, 1, 1],
+    all.map(() => ({ weight: 1e100, neighbors: Array.from({ length: 6 }, () => all) })),
+  );
+  assert.equal(valid.solve(1).length, 2);
+});

@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-613). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-614). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3711,6 +3711,10 @@ no IBL, 512 x 512. RGB-byte MAE 1.6809107462565105 WebGPU and 1.6809145609537761
 compatibility, max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
 whitepaper/results/batch-160-clearcoat.json. The image residual remains an open defect, with
 formulation differences recorded separately from its unisolated complete cause.
+
+## WFC global constraints (batch 69)
+
+Optional wfc/constraints 2,337 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5196,6 +5200,14 @@ Fresnel uses VdotH, while the extension's nonnormative layering example uses Ndo
 None of these has been proved to explain the full image error. Base-material, texture-filtering,
 normal-map and silhouette errors are included, not removed by masking. No reference-specific
 shader adjustment or core change is justified by this measurement alone.
+
+### Fixed 2026-11-09: WFC weight arithmetic overflow
+
+The root tile solver accepted finite weights such as 1e308 even when weight times log(weight) or the total weight overflowed. Its entropy became non-finite, so an undecided grid could look complete. Construction now rejects non-representable totals before solving. Regression: packages/wfc/test/wfc.test.js, finite tile weights cannot overflow entropy or weighted choice. The optional global solver applies the same arithmetic validation.
+
+### Fixed 2026-11-09: WFC browser harness teardown
+
+The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -9263,7 +9275,7 @@ const generator = new WFC([4,4,4], [{neighbors: [[0],[0],[0],[0],[0],[0]]}]);
 const cells = generator.solve(123);
 ```
 
-Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; connectivity belongs in the tile rules and caller validation.
+Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
 
 ## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
 
@@ -9316,6 +9328,10 @@ search and throw coded failed with a help link. Invalid coordinates/rows throw R
 throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
 Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.
+
+## Global constraints (`@margoengine/wfc/constraints`, 2,337 B min+gzip)
+
+[README continues: https://margoengine.com/llms/packages/wfc.md]
 
 === @margoengine/splines (packages/splines/README.md) ===
 

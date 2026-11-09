@@ -29,6 +29,10 @@
     "./overlapping": {
       "types": "./dist/overlapping.d.ts",
       "import": "./dist/overlapping.js"
+    },
+    "./constraints": {
+      "types": "./dist/constraints.d.ts",
+      "import": "./dist/constraints.js"
     }
   },
   "files": [

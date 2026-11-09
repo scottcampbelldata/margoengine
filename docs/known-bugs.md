@@ -1480,3 +1480,11 @@ Fresnel uses VdotH, while the extension's nonnormative layering example uses Ndo
 None of these has been proved to explain the full image error. Base-material, texture-filtering,
 normal-map and silhouette errors are included, not removed by masking. No reference-specific
 shader adjustment or core change is justified by this measurement alone.
+
+### Fixed 2026-11-09: WFC weight arithmetic overflow
+
+The root tile solver accepted finite weights such as 1e308 even when weight times log(weight) or the total weight overflowed. Its entropy became non-finite, so an undecided grid could look complete. Construction now rejects non-representable totals before solving. Regression: packages/wfc/test/wfc.test.js, finite tile weights cannot overflow entropy or weighted choice. The optional global solver applies the same arithmetic validation.
+
+### Fixed 2026-11-09: WFC browser harness teardown
+
+The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.

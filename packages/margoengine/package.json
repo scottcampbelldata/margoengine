@@ -3410,6 +3410,10 @@
       "types": "./dist/wfc/overlapping.d.ts",
       "import": "./dist/wfc/overlapping.js"
     },
+    "./wfc/constraints": {
+      "types": "./dist/wfc/constraints.d.ts",
+      "import": "./dist/wfc/constraints.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

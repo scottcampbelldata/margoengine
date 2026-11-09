@@ -1979,3 +1979,7 @@ covers startup and normal/failing assertions, with the existing repository-wide 
 regression. The 14 missing-data skip conditions were all removed for the full verify run:
 13,064 executed, zero skipped. A first-run stale-generated-doc failure is resolved by rebuilding
 llms outputs from the authored source documentation.
+
+### WFC global constraint evidence (batch 69)
+
+The optional CPU constraints solver combines arc consistency, group lower/upper counts and possible-cell breadth-first reachability. Undo restores every ban from all propagators; a connected group is nonempty. Section 5 evidence: all 112 combinations of binary 3x2 count bounds, connectivity and corner paths agree with exhaustive 64-assignment truth; generated 3D and tile ID 256 cases, backtracking and browser WebGPU/WebGL2 parity also run. Logical authored traversability only, no physical-clearance or performance proof. Root WFC also rejects finite weights whose entropy arithmetic overflows, with a constructor regression.

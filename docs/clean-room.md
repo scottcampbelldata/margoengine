@@ -1651,3 +1651,7 @@ contract: https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/
 Only the specification prose/equations and standard sample assets were read, never viewer source.
 The VdotH versus NdotV formulation difference is recorded for investigation; the nonnormative
 example alone is not evidence attributing the complete measured image loss.
+
+## WFC global constraints (batch 69, job 2)
+
+Written from the constraint-satisfaction and global reachability discussion in Karth and Smith, [WaveFunctionCollapse is Constraint Solving in the Wild (2017)](https://adamsmith.as/papers/wfc_is_constraint_solving_in_the_wild.pdf), sections 4-5. Count lower/upper bounds come from certain/possible group membership. Breadth-first search over possible walkable cells rules out impossible paths; unreachable optional cells are removed when a connected group already has a required cell. Chronological undo restores all local and global domain removals. No external implementation/code was read or copied. Generated binary and three-tile grids are stand-ins.
