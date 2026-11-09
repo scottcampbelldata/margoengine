@@ -104,3 +104,14 @@ Original `check()` failures for changed diagnostics were recorded rather than si
     and [Giles, Diaz and Yuksel, Augmented VBD, SIGGRAPH 2025](https://graphics.cs.utah.edu/research/projects/avbd/Augmented_VBD-SIGGRAPH25.pdf)
     address robust positional solves and harder constraints. Their GPU evidence does not predict CPU/Wasm speed.
     Persistent tangential anchors are relevant to creep, but would require an independently measured change.
+
+## Correctness follow-up after the study
+
+The manager made the 1:1000 contact extension mandatory and kept CCD in T-11 / 127.y. The subsequent
+[sustained-support correction](physics2d-support-proof.md) fixes the recovery-cap force ceiling and the slow
+supported-path equilibrium mode while preserving the original spring root and every physical predicate.
+The mandatory native regression is red on 47f81f909 and passes with the correction; all 29 physical cases pass.
+This result-changing fix intentionally changes only the mixed-scene pin. The earlier experiment rejections
+and measurements above remain historical evidence, not accepted production variants or current speed claims.
+The [bending analysis](physics2d-support-bending.md) distinguishes constitutive lateral instability from axial
+support and from discrete solver defects. Browser Box2D parity remains unproven.

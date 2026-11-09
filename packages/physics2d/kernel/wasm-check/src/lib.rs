@@ -6,6 +6,7 @@ extern crate alloc;
 
 #[path = "../../tests/support/bits_scenes.rs"]
 mod scenes;
+mod support_bars;
 
 fn scene(i: u32) -> u64 {
     match i {
@@ -29,6 +30,7 @@ pub extern "C" fn bits(i: u32) -> u64 {
 pub extern "C" fn check(i: u32) -> u32 {
     if i as usize >= scenes::PINNED.len() { return 3; }
     if !invalid_input_checks() { return 2; }
+    if i == 0 && !support_bars::check() { return 4; }
     (scene(i) != scenes::PINNED[i as usize]) as u32
 }
 

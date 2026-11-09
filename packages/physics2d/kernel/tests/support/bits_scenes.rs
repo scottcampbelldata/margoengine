@@ -9,7 +9,7 @@ use margoengine_physics2d_kernel::shape::Core;
 use margoengine_physics2d_kernel::world::{BodyDef, Kind, ShapeDef, World};
 
 /// The hashes of `run` over `[pyramid(100), joint_grid(), mixed()]`.
-pub const PINNED: [u64; 3] = [0x9ffe_fc83_c3a9_9be4, 0x95a4_7530_df18_0011, 0x9acb_6847_1fbe_6ba0];
+pub const PINNED: [u64; 3] = [0x9ffe_fc83_c3a9_9be4, 0x95a4_7530_df18_0011, 0x92db_6847_c4e9_19d4];
 
 /// cos and sin of 0.1 i for i in 0..30, f32 bit patterns.
 const TURN: [(u32, u32); 30] = [

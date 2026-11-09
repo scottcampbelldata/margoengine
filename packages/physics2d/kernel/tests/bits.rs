@@ -4,6 +4,8 @@
 // the contacts went to colour order (perf history entry 86); the compact solver bodies before it kept every bit (85), and
 // the four-lane solve after it keeps them, run both ways (87). The scenes and hashes live in support/bits_scenes.rs, which
 // wasm-check/ steps inside the shipped Wasm build (simd128) against the same hashes (`npm run check:rust-kernels`).
+// Mixed re-pinned intentionally for the recovery-residual cap, supported-path equilibrium correction
+// and actual-motion sleep observer (2026-11-08). Pyramid/joint-grid pins and every physical bar are unchanged.
 extern crate alloc;
 
 #[path = "support/bits_scenes.rs"]

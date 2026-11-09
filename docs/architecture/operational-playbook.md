@@ -1577,8 +1577,8 @@ regression uses one substep so zero/identity alternation cannot hide the failure
 mass and contact metrics. The row builder checks relative point velocity, approach and base before publication,
 so a NaN comparison cannot silently select a zero normal impulse. This class also runs in Wasm input checks.
 
-This first correctness change does not alter solver formulation or prove a speed gain. The separate sustained
-support and 1:1000 settling correction remains open. Owned-2D CCD belongs to T-11 / 127.y; the existing 1000:1
+The input correctness change does not alter solver formulation or prove a speed gain. The following separate
+support correction establishes the required 1:1000 centered contact bar. Owned-2D CCD belongs to T-11 / 127.y; the existing 1000:1
 joint-chain and separate 3D CCD tests do not establish it. An arithmetic error after simulation starts is
 reported without claiming rollback of the complete step. The TypeScript Rapier facade is unchanged.
 
@@ -1627,3 +1627,29 @@ fractional tap placement, stereo paths, seed repeatability and malformed geometr
 coverage. A real Edge convolution matches the computed stereo IR beside WebGPU and WebGL2,
 including early arrivals before the late tail. Geometry is static and first-order; no measured
 room, binaural-head model, other-browser or performance evidence. LIM-591.
+
+### Own 2D sustained support (batch 127, section 5 evidence)
+
+The old 3 m/s penetration-bias clamp imposed a spring-force ceiling near 995 kg. The corrected monotone NCP
+caps beta*s+C*lambda, preserving the original static spring root at every feasible representable load for P>0.
+Scalar/f64 active-set fallbacks handle exceptional capped arithmetic; certified common lanes retain SIMD.
+Per-visit shadow tests compare all live motion/cache/pushed/count results with the scalar reference.
+
+The remaining mass-ratio settling mode is corrected on certified supported paths each substep before pose
+integration, using current-J geometry and separate step-start-J physical projection. No mass freezing, cap
+increase, fitted mass-ratio threshold, changed stiffness or loosened physical assertion. Immutable original
+approach evidence prevents disconnected joint passes from changing domain decisions. Proposals stage all
+body/contact/friction state, then commit atomically only after the domain and residual certificates hold.
+Actual substep movement feeds the unchanged sleep policy.
+
+Evidence includes the unchanged native 1:1000 regression red on 47f81f909, all 29 physical cases, cap/path numerical
+units, full input/domain regressions, per-visit SIMD proof, creation/order/load/domain transitions, and the
+disconnected-joint regression. The mixed hash is intentionally re-pinned 9acb68471fbe6ba0 -> 92db6847c4e919d4;
+the other two pins and retained manifold reference remain. Final repository/Wasm/browser gates accompany
+landing. Wasm `check(0)` also applies the identical two contact-stack bars; native scalar/SIMD and shipped
+Wasm SIMD metrics agree. CCD remains separate T-11 / 127.y.
+
+The [sourced derivation](physics2d-support-proof.md) states the method domain and work costs. The independently
+verified negative bending tangent of the preserved soft law is a [constitutive limit](physics2d-support-bending.md),
+not permission to relax centered axial bars or a claim of exact discrete collapse. Supported components still
+allocate local buffers and compute two banded systems; no speed-success or allocation-free claim is made.

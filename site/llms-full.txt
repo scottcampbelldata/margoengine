@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-591). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-592). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3124,6 +3124,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Component names in React DevTools on WebKit | By the browser: JavaScriptCore replaces a tail call's frame, so a component that ends in `return <Mesh ... />` is missing from the owner stack `DevTools` names a mesh by. | Proper tail calls are in the language, and only JavaScriptCore has them. | The mesh shows its nearer owners only. | Give the mesh a `name`, or assign the element before returning it. |
 | One-frame audio buffers on WebKit | By the browser: a one-frame buffer played above rate 1 never fires `ended`. | WebKit starts it past its end. `@margoengine/audio` plays its own silent frame at rate 1, so only an app's own one-frame buffer can hit this. | `onEnded` does not fire for that sound. | Use a buffer of two frames or more. |
 | Light sum in `@margoengine/lighting2d` | Measured (43 lights, Apple M6, Chrome 157 and Playwright WebKit): within 1 level. Lights share four `rgba16float` layers, so the sum costs 32 B per pixel. | Each additive blend rounds to half precision, and the M6 rounds toward zero; a sum of a quarter of the light loses a quarter as much. | On a GPU that rounds toward zero, many lights on one pixel read slightly dark. | None needed. |
+| 2D soft shadows in `@margoengine/lighting2d/soft` | Up to 64 filter ray samples per light; occluder edge counts supported up to device storage buffer limits. | Penumbra width scales with emitter source radius and distance from occluder; WebGPU only (refuses WebGL2 with coded error). | Very dense occluder lists scale linearly with edge count per pixel. | Simplify complex tile geometry or segment lists with coarse occluder hulls. |
 | sRGB twin copies on the WebGL2 compatibility layer | Enforced ([render.ts](../packages/webgl2-compat/src/device/render.ts)): a copy into an sRGB twin passes through client memory on every driver, so it waits for the GPU. | ANGLE on Metal encodes bytes that arrive through a pixel unpack buffer, and refuses `copyTexSubImage2D` from unorm. | One stall per such copy. | Create the texture with the format you read it in. |
 | Apple GPUs: centroid varyings (scatter blades, 2026-11-06) | Measured (Chrome 157 and Playwright WebKit 27.2, Apple M6, 40,000 blades at 4x MSAA, 384 x 384): about 350 pixels of the far grass move by up to 4 levels on some frames, most often the first few of a page, rarely after. | Blades read their colour and ground weight at the centroid so a thin blade never reads past its triangle, and on an Apple GPU that point follows hidden surface removal, which varies under heavy geometry. Inputs are bit-identical on those frames. | Not seen by eye. An RTX A6000 gives the same frame every time. | A check that needs exact frames of this much grass on an Apple GPU runs at one sample a pixel (`exactSize`), as `packages/scatter/test/shadow-cull.browser.mjs` does. |
 | Compatibility feature level on WebKit | By the browser: asked for `featureLevel: 'compatibility'`, Playwright WebKit 27.2 gives a full device, which WebGPU allows. | WebKit has no such level. | The level's own checks prove nothing there; the frames are the same. | Test the level in Chrome. |
@@ -3292,10 +3293,11 @@ separation and its finite radius/speculation/result checks. These restrict eligi
 all other inputs retain the full prior collision path. [Proof](architecture/physics2d-manifold-proof.md) and
 [entry 101](whitepaper/perf-history.md) record the precise guards and unchanged native/Wasm hashes.
 
-The two-point block solver remains production behavior. New per-point alternatives did not meet all contracts
-and establish a browser gain, so none was re-pinned. All original accuracy bars remain unchanged. The new 1:1000
-contact-stack extension fails even the original block solver, and owned-2D CCD is absent; these differ from the
-existing 1000:1 joint-chain and 3D CCD coverage. See [known-bugs](known-bugs.md#own-2d-physics-acceptance-gaps).
+The two-point block solver remains production behavior. Earlier per-point alternatives did not meet all contracts
+and establish a browser gain. All original accuracy bars remain unchanged. The subsequent sustained-support fix
+establishes the required centered 1:1000 contact stack and deliberately re-pins the mixed scene; see the
+[support contract](#own-2d-sustained-contact-support). Owned-2D CCD remains separate T-11 / 127.y work, distinct
+from existing 1000:1 joint-chain and 3D CCD evidence.
 After browser diagnostics: Edge 3.66/1.69/14.52 ms and Firefox 3.50/1.52/11.20 ms for Margo/Box2D/Rapier; separate
 loaded sessions cannot prove before/after speed. The Box2D goal remains open and quiet reruns are required.
 
@@ -3355,8 +3357,8 @@ creation rollback and valid retained-reference results. Each existing Wasm `chec
 input refusal before comparing the same three production hashes. No hash was re-pinned and no speed result is
 claimed. [Reproduce](whitepaper/reproduce.md#own-2d-input-validation) lists the commands and baseline failures.
 
-This closes the input/publication and absent-candidate error class only. The 1:1000 contact support/creep/sleep
-correction remains open; owned-2D CCD is separate T-11 / 127.y work, distinct from joint-chain and 3D CCD evidence.
+Input validation closes the input/publication and absent-candidate error class. The separately derived support
+correction below establishes the required centered contact bar. Owned-2D CCD is separate T-11 / 127.y work.
 
 ## Frame-accurate video decoding (2026-11-08)
 
@@ -3422,6 +3424,46 @@ Pure Node geometry and real Edge convolution beside WebGPU/WebGL2 use generated 
 real measured rooms, other browsers, listening quality and timing remain unmeasured. LIM-591.
 Reflections entry: 3,227 B gzip, budget 3,483 B.
 
+## 2D soft shadows (batch 55)
+
+Optional `@margoengine/lighting2d/soft` adds 2D soft shadows with penumbra edges that soften with distance from the occluder. Penumbra width scales with emitter radius (`sourceRadius`) and distance from occluder edges; 0 gives hard shadows. Up to 64 radial samples per light on GPU and CPU. Occluders support polygon, polyline, segment, box and circle shapes. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU form. LIM-592.
+
+## Own 2D sustained contact support
+
+The recovery cap applies to the combined elastic residual, `max(beta*s+C*lambda,-P)`, rather than penetration
+bias alone. For positive recovery speed P, stationary positive support retains the original spring root
+`beta*s+C*lambda=0`: the cap imposes no finite force ceiling on feasible, representable loads. This is not an
+unbounded floating-point magnitude or arbitrary-geometry stability guarantee. P=0 retains disabled recovery
+and may have nonunique overpenetrated stationary states; the coupled correction declines it.
+
+The coupled equilibrium correction is limited to a certified dynamic contact path with one static terminal.
+It retains physical masses and the original compliance. Branches, cycles, multiple anchors, joints,
+kinematic/sleeping terminals, nonzero restitution, original separating motion, open rows, unsupported gravity
+wrenches or uncertified ranks use general capped dynamics. Current geometry, unilateral/friction feasibility,
+finite arithmetic, casts, rotations and residuals are certified before an atomic component commit. Recovery
+displacement uses the existing P*h substep budget. Sleep observes actual substep pose rate as well as final
+relaxed speed, with unchanged thresholds/time and island propagation.
+
+All 29 native physical bars pass, including the unchanged 1:100 and required 1:1000 centered contact predicates,
+100-row pile sag, slope creep, bounce, friction, joints and sleep. The 1:1000 result is 0.518550681 m sag versus
+0.518550736 m closed form, zero final displacement from the one-second sample, asleep at 0.8833334 s. The
+unchanged regression fails on verified main 47f81f909: 1.186208290 m sag and 92.105 mm creep. The mixed-scene pin changes
+intentionally from `9acb68471fbe6ba0` to `92db6847c4e919d4`; pyramid/joint-grid pins are unchanged.
+The same two stack predicates run inside Wasm `check(0)`; native scalar/SIMD and shipped Wasm SIMD agree on
+the stack metrics. Wasm always selects SIMD even when its stored `contact_lanes` setting is false.
+
+The preserved geometry-dependent point spring has a negative local bending direction in the sagged 1:1000
+column under small lateral perturbations, independently differentiated and checked with Margo's own manifolds.
+Centered axial acceptance does not establish arbitrary lateral stability. No artificial angular stiffness or
+mass threshold was fitted to hide it. See the [support derivation](architecture/physics2d-support-proof.md),
+[bending analysis and executable probe](architecture/physics2d-support-bending.md), and
+[reproduction commands](whitepaper/reproduce.md#own-2d-sustained-support).
+
+The frame planner is linear in bodies, contacts and joints. General branching graphs skip the extra substep
+path work; accepted components still use local allocations and two banded factorizations each substep.
+No speed parity or allocation-free behavior is claimed. Browser speed must be remeasured on this accuracy
+baseline. CCD remains outside this correction.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -3432,23 +3474,10 @@ are still open.
 
 ## Own 2D physics acceptance gaps
 
-### The contact recovery-speed clamp also caps sustained spring load
-
-- **Repro:** the existing `kernel/tests/world.rs` 1:100 heavy-on-three-light stack, extended to a 1000 kg top box,
-  otherwise unchanged defaults. Lane P's diagnostic preserves the same 3% closed-form sag, 0.1 mm x drift,
-  10 mm post-one-second creep and sleep predicates. On the unchanged `7fd5a9547` block control, sag is 1.186208 m
-  against the unclamped spring prediction 0.518551 m; creep is 0.092105 m. The same unchanged-predicate regression
-  also fails at runtime on verified main `47f81f909` (exit 101, no timeout). All 28 legacy accuracy cases pass.
-- **Cause:** `solver.rs::row` caps negative soft bias at `contact_max_push=3`. With four substeps, 60 Hz and damping
-  10, a middle contact needs 3.021895 m/s of bias to support its 1002 kg load, exceeding that cap. Its maximum
-  supported load is about 994.74 kg even at exact convergence. The linear closed form assumes no active clamp.
-  Raising the cap to 3.1 diagnoses the ceiling but is not a fix: sag approaches the closed form, while post-one-second
-  creep is 0.555621 m. Waking that settled control and continuing without sleep approaches the predicted sag.
-- **Required fix (Scott, 2026-11-08):** derive sustained soft-constraint support separately from penetration recovery
-  limiting so no finite load ceiling exists. Add the 1:1000 contact regression with the same sag, creep and sleep
-  predicates as the 1:100 fixture, and preserve all prior bars. A fitted mass-ratio threshold or a raised cap is
-  not a fix. This is a confirmed defect on main, not an unresolved acceptance decision.
-  Owned-2D CCD belongs to the separate Rapier parity row T-11 / 127.y; it is outside this correction.
+The contact support-ceiling defect is fixed by the sustained-support correction below under Fixed 2026-11-08.
+The required centered 1:1000 contact stack now uses the unchanged sag, drift, creep and sleep predicates.
+Its constitutive bending limit is documented in [limits](limits.md#own-2d-sustained-contact-support).
+Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
 
@@ -4471,6 +4500,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| Owned 2D 1:1000 contact stack sags 1.186208 m instead of 0.518551 m, with 92.105 mm creep | Capping penetration bias alone imposes C*lambda <= P, about 994.74 kg at the defaults; local split iterations also retain a slow mass-ratio equilibrium mode, while relaxed velocity can hide pose movement from sleep | Cap the elastic residual, retain the original spring root, and apply a certified physical-mass equilibrium correction on supported paths; observe actual substep motion for sleep. No cap, stiffness, iteration or physical tolerance increase | `packages/physics2d/kernel/tests/world.rs::a_heavy_box_on_light_ones_holds_at_one_to_a_thousand` fails unchanged on verified `47f81f909`; all 29 physical bars and input/domain regressions pass. Directed math, SIMD shadow and disconnected-joint regressions cover the new formulation |
 | Huge finite angular velocity can silently publish a zero rotation; tiny nonzero rotation pairs can become identity, and nonfinite integration arithmetic can also become identity | Direct f32 squared-length normalization overflows/underflows; the fallback treats NaN length like zero. A finite-only final-state check accepts zero rotation | Preserve the normal-range normalization path, scale exceptional finite pairs, propagate nonfinite arithmetic, and refuse directly mutated zero body rotations | `packages/physics2d/kernel/tests/rotation_input.rs`: four strengthened assertions fail on the retained pre-edge input implementation; the single-substep case catches zero/identity alternation hidden by four substeps |
 | Individually finite inverse masses can form an infinite contact metric and the step returns success without collision response | Adding two inverse masses near `2.5e38` overflows; reciprocal Inf becomes zero effective mass and can silently disable a row | Check derived normal/tangent metrics and required reciprocals before solving; propagate a coded arithmetic error | `packages/physics2d/kernel/tests/contact_metric_input.rs`, density `4e-39` fixed-rotation boxes in scalar/SIMD modes; fails on the retained pre-edge input implementation |
 | A huge spinning circle returns a successful step with zero contact response despite an unrepresentable contact-point velocity | Finite mass and body speed do not ensure finite `v + w cross r`; normal dot can become NaN through `0*Inf`, and a comparison can select zero without leaving nonfinite final state | Validate computed point-relative velocity, normal approach and anchor base before publishing a solver row | `packages/physics2d/kernel/tests/point_velocity_input.rs`, checked radius `1e9`/`1e10`, density `1e-40`, spin `1e30`, scalar/SIMD; all four cases returned success in the pre-guard diagnostic |
@@ -7294,12 +7324,12 @@ collision shapes cast shadows too.
 A pixel is in shadow when an occluder edge lies between its centre and the light, so the inside of a closed shape is dark
 to a light outside it. Shadow edges are hard: each pixel is lit or not, with no soft penumbra.
 
-## CPU forms
+## Soft shadows
 
-`lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and
-`inShadow(light, edges, x, y)` the shadow test. They run in Node, for tools and tests.
+`@margoengine/lighting2d/soft` provides soft penumbra shadows that soften with distance from the occluder. Near the occluder,
+shadow edges remain crisp; as distance increases, the penumbra widens proportionally to the light's emitter radius (`sourceRadius`).
 
-Trademark notice: names of other tools belong to their owners.
+[README continues: https://margoengine.com/llms/packages/lighting2d.md]
 
 === @margoengine/labels (packages/labels/README.md) ===
 

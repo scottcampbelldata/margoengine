@@ -147,5 +147,19 @@ cutoffs and invalid current core data instead of indexing a missing face or retu
 The existing [four-pair Rust doctest](kernel/src/manifold/four.rs) demonstrates the checked collision call.
 Run `cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --doc` for both examples. Native
 input/manifold regression commands are in [reproduce.md](../../docs/whitepaper/reproduce.md#own-2d-input-validation).
-Valid-scene hashes and the retained manifold reference are unchanged. This input fix makes no speed claim or
-hash re-pin; the 1:1000 support/settling correction remains open, and owned-2D CCD is the separate T-11 / 127.y work.
+Input validation preserves the retained manifold reference and the prior valid hashes. The separate support
+correction below intentionally re-pins the mixed scene. Owned-2D CCD is separate T-11 / 127.y work.
+
+### Sustained contact support in the owned kernel
+
+The default 3 m/s recovery cap limits recovery demand independently of sustained elastic support. The spring
+root, four substeps, one pass and all accuracy thresholds remain unchanged. A certified supported contact path
+uses a coupled equilibrium correction with physical masses; general graphs retain capped contact dynamics.
+Sleep also observes the motion actually integrated, so relaxation cannot hide continuing correction.
+
+The required 1:1000 centered contact stack now holds the same 3% spring-sag, 0.1 mm top drift, 10 mm post-one-second
+creep and sleep predicates as 1:100. Run `cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test world`.
+All original physical bars remain required. The mixed-scene hash is deliberately re-pinned for this correction;
+pyramid and joint-grid hashes stay unchanged. The [proof and method domain](../../docs/architecture/physics2d-support-proof.md)
+distinguish axial support from the preserved soft model's [lateral bending limit](../../docs/architecture/physics2d-support-bending.md).
+This is a correctness change; Box2D browser speed parity remains unproven.

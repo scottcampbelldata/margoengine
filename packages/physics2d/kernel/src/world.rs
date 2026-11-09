@@ -798,12 +798,13 @@ impl World {
     fn sleep(&mut self, dt: f32) {
         let threshold = self.settings.sleep_threshold;
         let mut awake_bodies = 0u64;
-        for body in self.bodies.iter_mut() {
+        for (id, body) in self.bodies.iter_mut().enumerate() {
             if body.kind == Kind::Static || !body.awake {
                 continue;
             }
             awake_bodies += 1;
-            body.sleep_time = if body.can_sleep { sleep_tick(body.sleep_time, body.sleep_speed(), threshold, dt) } else { 0.0 };
+            let actual_speed = body.sleep_speed().max(self.scratch.pose_speed.get(id).copied().unwrap_or(0.0));
+            body.sleep_time = if body.can_sleep { sleep_tick(body.sleep_time, actual_speed, threshold, dt) } else { 0.0 };
             if body.kind == Kind::Kinematic && body.sleep_time > 0.0 {
                 // A kinematic body at rest sleeps alone: it is in no island.
                 if self.settings.sleep && body.sleep_time >= self.settings.sleep_time {

@@ -2381,6 +2381,15 @@ Raw rounds, explicit diagnostic hashes, block/point accuracy outcomes and both b
 [committed record](results/physics2d-certified-faces-20261108.json). [Reproduce](reproduce.md#own-2d-certified-faces-and-solver-study-perf-history-entry-101)
 gives commands. No accuracy assertion or timing budget was weakened.
 
+#### Subsequent owned-2D accuracy baseline (2026-11-08)
+
+The later [sustained-support fix](../architecture/physics2d-support-proof.md) removes the contact recovery
+cap's force ceiling and establishes the manager-mandated centered 1:1000 contact bar with unchanged predicates.
+It intentionally re-pins mixed 9acb68471fbe6ba0 -> 92db6847c4e919d4, retaining pyramid/joint-grid pins.
+This follow-up reports no new speed timing: entry 101's browser/A-B rows retain their original provenance.
+The correction's path planner/local allocations are additional work, and current browser speed must be
+measured on the corrected accuracy baseline before any improvement or Box2D-parity claim.
+
 ### 102. volume-64 against VTK.js (diagnostic, loss)
 
 - **Measurement:** a 64-cube radial sphere, drawn at 256 x 256 with axes off. The clock is one frame plus reading the

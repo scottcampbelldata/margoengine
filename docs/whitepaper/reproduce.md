@@ -343,4 +343,60 @@ literal review call with a finite cutoff returns empty here. Preserve this disti
 zero-hit-mask/absent-candidate bug. The fixed public call returns `PhysicsError::NotFinite`; internal guards also
 refuse missing candidates or unrepresentable arithmetic before an index is used. These commands document the
 checks, not a claim that final landing gates have already run. No speed comparison or hash re-pin accompanies
-this fix. The support/settling correction remains open; owned-2D CCD stays with T-11 / 127.y.
+this input fix. The separate support correction below deliberately changes the mixed pin; CCD stays with T-11 / 127.y.
+
+## Own 2D sustained support
+
+The required native 1:1000 test in `kernel/tests/world.rs` is an exact extension of the 1:100 fixture: top mass 1000,
+matching column loads/inverse mass, and name/output label change. The 3% sag, 1e-4 m top drift, 0.01 m final movement
+from the one-second sample and sleep-by-end predicates are unchanged. It fails at runtime on verified 47f81f909 with
+1.186208290 m sag versus 0.518550736 m and 92.105 mm creep; current sag is 0.518550681 m, creep 0, asleep at 0.8833334 s.
+No named original physical test is removed or weakened.
+
+Run each command with a hard process-tree deadline (the complete Rust gate supplies one):
+
+~~~sh
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --lib -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test world --test chain --test joints -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test support_domains --test support_joint_interaction --test support_numeric -- --nocapture
+npm run test:physics2d-kernel
+npm run check:rust-kernels
+node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=0
+~~~
+
+The private per-visit SIMD shadow additionally runs original fixtures and production pins, with no copied
+ignored timing test. The ordinary ignored native timing test remains a separate paired benchmark.
+Lane P's instrumented collector uses the same 67 assertion-body digests as the post-input control, with 29 cases
+per mode and strict missing/duplicate/failure checks. It recognizes the shipped mandatory 1:1000 test instead
+of adding a duplicate; CCD is explicitly outside its scope. Pre-input 7fd5a9547 differs only by the necessary
+`world.angle(slider).unwrap()` API migration in one numeric assertion; the other 66 bodies are byte-identical.
+Current final source must pass all 29; a per-point experiment is not accepted from a partial matrix.
+
+Wasm `check(0)` additionally runs the same 1:100 and 1:1000 sag/x-drift/creep/sleep predicates in
+`kernel/wasm-check/src/support_bars.rs`, including the native fixture's 599-step truncation and snapshot
+before step 60. Failure returns code 4. `checks()` remains three; pinned scenes and benchmark workloads are
+unchanged. Native diagnostics exercise actual scalar and SIMD paths; the shipped Wasm build always uses
+SIMD, including when its stored `contact_lanes` setting is false. Native and Wasm stack metrics agree.
+On the archived input-fixed main `147c6d33a`, adding only this new checker/helper makes the official Node
+Wasm gate fail `check(0)` with code 4 while all three original scene hashes remain unchanged. Its 1:1000 sag
+is 1.186208290 m and creep 92.105 mm. This independently isolates the previously missing accuracy bar from
+the deliberate mixed-scene re-pin. Lane P retains source provenance and red/green modules in
+`.lane/p/support-wasm-final/handoff.json`.
+
+The deliberately accepted scene pins are:
+
+~~~text
+pyramid:   9ffefc83c3a99be4
+joint grid: 95a47530df180011
+mixed:     92db6847c4e919d4   (previous: 9acb68471fbe6ba0)
+~~~
+
+This is a result-changing correctness baseline. The commit names the mixed re-pin and its reason, and runs
+scalar/SIMD, shipped simd128 Node Wasm and available browser-bit paths. Firefox WebGPU without an adapter is
+unrun. No prior speed result is transplanted onto this baseline. Future timings must use paired A/B with the
+same scene/work and disclose the cost of support planning/correction; no speed claim accompanies this fix.
+
+For the separate constitutive bending analysis, run `kernel/examples/support_bending.rs` using the
+[documented 180-second process-tree wrapper](../architecture/physics2d-support-bending.md). It never steps the
+solver. Exit 0 confirms its contact/force domain and prints the directional derivative, not a passing solver
+instability condition. The proof states the nonlinear/f32/discrete-trajectory limits. CCD remains T-11 / 127.y.

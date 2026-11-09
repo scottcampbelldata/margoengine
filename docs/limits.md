@@ -706,10 +706,11 @@ separation and its finite radius/speculation/result checks. These restrict eligi
 all other inputs retain the full prior collision path. [Proof](architecture/physics2d-manifold-proof.md) and
 [entry 101](whitepaper/perf-history.md) record the precise guards and unchanged native/Wasm hashes.
 
-The two-point block solver remains production behavior. New per-point alternatives did not meet all contracts
-and establish a browser gain, so none was re-pinned. All original accuracy bars remain unchanged. The new 1:1000
-contact-stack extension fails even the original block solver, and owned-2D CCD is absent; these differ from the
-existing 1000:1 joint-chain and 3D CCD coverage. See [known-bugs](known-bugs.md#own-2d-physics-acceptance-gaps).
+The two-point block solver remains production behavior. Earlier per-point alternatives did not meet all contracts
+and establish a browser gain. All original accuracy bars remain unchanged. The subsequent sustained-support fix
+establishes the required centered 1:1000 contact stack and deliberately re-pins the mixed scene; see the
+[support contract](#own-2d-sustained-contact-support). Owned-2D CCD remains separate T-11 / 127.y work, distinct
+from existing 1000:1 joint-chain and 3D CCD evidence.
 After browser diagnostics: Edge 3.66/1.69/14.52 ms and Firefox 3.50/1.52/11.20 ms for Margo/Box2D/Rapier; separate
 loaded sessions cannot prove before/after speed. The Box2D goal remains open and quiet reruns are required.
 
@@ -769,8 +770,8 @@ creation rollback and valid retained-reference results. Each existing Wasm `chec
 input refusal before comparing the same three production hashes. No hash was re-pinned and no speed result is
 claimed. [Reproduce](whitepaper/reproduce.md#own-2d-input-validation) lists the commands and baseline failures.
 
-This closes the input/publication and absent-candidate error class only. The 1:1000 contact support/creep/sleep
-correction remains open; owned-2D CCD is separate T-11 / 127.y work, distinct from joint-chain and 3D CCD evidence.
+Input validation closes the input/publication and absent-candidate error class. The separately derived support
+correction below establishes the required centered contact bar. Owned-2D CCD is separate T-11 / 127.y work.
 
 ## Frame-accurate video decoding (2026-11-08)
 
@@ -839,3 +840,39 @@ Reflections entry: 3,227 B gzip, budget 3,483 B.
 ## 2D soft shadows (batch 55)
 
 Optional `@margoengine/lighting2d/soft` adds 2D soft shadows with penumbra edges that soften with distance from the occluder. Penumbra width scales with emitter radius (`sourceRadius`) and distance from occluder edges; 0 gives hard shadows. Up to 64 radial samples per light on GPU and CPU. Occluders support polygon, polyline, segment, box and circle shapes. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU form. LIM-592.
+
+## Own 2D sustained contact support
+
+The recovery cap applies to the combined elastic residual, `max(beta*s+C*lambda,-P)`, rather than penetration
+bias alone. For positive recovery speed P, stationary positive support retains the original spring root
+`beta*s+C*lambda=0`: the cap imposes no finite force ceiling on feasible, representable loads. This is not an
+unbounded floating-point magnitude or arbitrary-geometry stability guarantee. P=0 retains disabled recovery
+and may have nonunique overpenetrated stationary states; the coupled correction declines it.
+
+The coupled equilibrium correction is limited to a certified dynamic contact path with one static terminal.
+It retains physical masses and the original compliance. Branches, cycles, multiple anchors, joints,
+kinematic/sleeping terminals, nonzero restitution, original separating motion, open rows, unsupported gravity
+wrenches or uncertified ranks use general capped dynamics. Current geometry, unilateral/friction feasibility,
+finite arithmetic, casts, rotations and residuals are certified before an atomic component commit. Recovery
+displacement uses the existing P*h substep budget. Sleep observes actual substep pose rate as well as final
+relaxed speed, with unchanged thresholds/time and island propagation.
+
+All 29 native physical bars pass, including the unchanged 1:100 and required 1:1000 centered contact predicates,
+100-row pile sag, slope creep, bounce, friction, joints and sleep. The 1:1000 result is 0.518550681 m sag versus
+0.518550736 m closed form, zero final displacement from the one-second sample, asleep at 0.8833334 s. The
+unchanged regression fails on verified main 47f81f909: 1.186208290 m sag and 92.105 mm creep. The mixed-scene pin changes
+intentionally from `9acb68471fbe6ba0` to `92db6847c4e919d4`; pyramid/joint-grid pins are unchanged.
+The same two stack predicates run inside Wasm `check(0)`; native scalar/SIMD and shipped Wasm SIMD agree on
+the stack metrics. Wasm always selects SIMD even when its stored `contact_lanes` setting is false.
+
+The preserved geometry-dependent point spring has a negative local bending direction in the sagged 1:1000
+column under small lateral perturbations, independently differentiated and checked with Margo's own manifolds.
+Centered axial acceptance does not establish arbitrary lateral stability. No artificial angular stiffness or
+mass threshold was fitted to hide it. See the [support derivation](architecture/physics2d-support-proof.md),
+[bending analysis and executable probe](architecture/physics2d-support-bending.md), and
+[reproduction commands](whitepaper/reproduce.md#own-2d-sustained-support).
+
+The frame planner is linear in bodies, contacts and joints. General branching graphs skip the extra substep
+path work; accepted components still use local allocations and two banded factorizations each substep.
+No speed parity or allocation-free behavior is claimed. Browser speed must be remeasured on this accuracy
+baseline. CCD remains outside this correction.

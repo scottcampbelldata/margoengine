@@ -1144,5 +1144,21 @@ reference and candidate alike; GPU calls, bindings and uploads are unchanged.
 | The reproduced `47f81f909` collision panic combines a NaN pose and NaN cutoff | Direct retained reproduction and the NaN-pose regression in `packages/physics2d/kernel/tests/manifold_exact.rs` | [Input commands](reproduce.md#own-2d-input-validation) | The literal finite-cutoff review call returned empty on that baseline; the checked API rejects both nonfinite-input forms |
 
 The current public-data preflight and arithmetic domain are documented in
-[limits](../limits.md#own-2d-input-validation). The sustained-support/1:1000 transient fix remains open. Owned-2D
-CCD is separate T-11 / 127.y work and is not established by passing 3D CCD or the 1000:1 joint chain.
+[limits](../limits.md#own-2d-input-validation). The subsequent support correction below establishes the required
+centered contact bar. Owned-2D CCD is separate T-11 / 127.y work and is not established by 3D CCD or the joint chain.
+
+## Own 2D sustained support (2026-11-08)
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| The recovery cap imposes no finite stationary spring-force ceiling | [Capped-complementarity derivation](../architecture/physics2d-support-proof.md), scalar and coupled numeric/active-set units | Positive P, feasible geometry and representable derived state; zero P and arbitrary lateral stability are not implied |
+| The centered 1:1000 contact stack meets the unchanged 1:100 sag/drift/creep/sleep predicates | Native `kernel/tests/world.rs::a_heavy_box_on_light_ones_holds_at_one_to_a_thousand`, unchanged runtime-red control on `47f81f909`; all 29 physical cases pass | The new bar is mandatory; no tolerance, spring, cap, iteration or sleep-setting increase |
+| The required contact-stack predicates also hold in shipped Wasm | `kernel/wasm-check/src/support_bars.rs`, invoked by `check(0)` in Node/browser gates, with identical native/Wasm metrics for 1:100 and 1:1000 | Native scalar/SIMD and shipped Wasm SIMD; this does not claim a scalar Wasm execution path |
+| Common SIMD and exceptional scalar/f64 paths agree at every live visit | `solver/wide_tests.rs` reference shadows across original physical fixtures, domain transitions, pinned scenes and 4,096 mixed/extreme lane batches | Intermediate motions, impulses, pushed flags and counts; no compiler instruction-count or speed claim |
+| The original spring law is preserved while correcting the slow supported-path equilibrium mode | [Split-map/path proof](../architecture/physics2d-support-proof.md), rank/wrench/nullspace/recurrence/atomicity tests, independent support-domain and disconnected-joint regressions | Certified path domain; general graphs use capped dynamics; nonzero restitution is excluded from coupled support correction |
+| The sagged 1:1000 model has a negative local sticking bending direction | [Independent derivation and executable own-manifold derivative](../architecture/physics2d-support-bending.md) | Constitutive tangent, not discrete amplification, growth rate or terminal-trajectory accuracy |
+
+The mixed-scene pin intentionally changes from `9acb68471fbe6ba0` to `92db6847c4e919d4` for the capped law,
+supported-path correction and actual-motion sleep observation. Pyramid/joint-grid pins remain unchanged.
+[Reproduce](reproduce.md#own-2d-sustained-support) separates physical checks, Wasm/browser parity and the static
+force probe. This correction makes no Box2D speed-parity claim and does not implement CCD.

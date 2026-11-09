@@ -361,3 +361,29 @@ fn a_pyramid_of_a_hundred_rows_keeps_its_warm_start_and_sags_as_the_references()
     assert!(outward <= 0.1, "row 30 outward {outward} m");
     assert!(worst_cold <= 10, "{worst_cold} points lost their warm start in one step");
 }
+
+#[test]
+fn a_heavy_box_on_light_ones_holds_at_one_to_a_thousand() {
+    let mut world = World::default();
+    ground(&mut world, V2::ZERO, 10.0);
+    let mut boxes = Vec::new();
+    for i in 0..3 {
+        boxes.push(boxed(&mut world, v2(0.0, 0.5 + i as f32), 0.5, 0.5, 1.0, 0.6));
+    }
+    boxes.push(boxed(&mut world, v2(0.0, 3.5), 0.5, 0.5, 1000.0, 0.6));
+    let (_, asleep, creep) = settle_from(&mut world, &boxes, 10.0);
+    // Every pair carries over 50 light boxes' weight, so each keeps the quarter-rate spring (60 Hz). At rest a point's
+    // spring holds lambda = -s h omega^2 m_ii, m_ii its own effective mass (1 / k_ii), so a contact of two points sinks
+    // load g k_ii / (2 omega^2); the heavy box's drop is the sum down the column. A unit box's corner arm across the
+    // normal is 0.5 and its inertia 1/6, so each body adds 1/m + 0.25 / I to k_ii.
+    let omega = 2.0 * std::f64::consts::PI * 60.0;
+    let k = |inv_a: f64, inv_b: f64| inv_a + inv_b + 0.25 * 6.0 * (inv_a + inv_b);
+    let column = [(1003.0, k(1.0, 0.0)), (1002.0, k(1.0, 1.0)), (1001.0, k(1.0, 1.0)), (1000.0, k(1.0, 0.001))];
+    let expected: f64 = column.iter().map(|(load, k_ii)| load * 9.81 * k_ii / (2.0 * omega * omega)).sum();
+    let top = &world.bodies[boxes[3] as usize];
+    let drop = 3.5 - top.exact_center[1];
+    println!("1:1000 contact stack: heavy box dropped {:.2} mm, closed form {:.2} mm, creep {:.3} mm, asleep at {asleep:?}", drop * 1e3, expected * 1e3, creep * 1e3);
+    assert!((drop - expected).abs() < 0.03 * expected, "dropped {drop} m, closed form {expected} m");
+    assert!(top.exact_center[0].abs() < 1e-4 && creep < 0.01, "creep {creep} m");
+    assert!(asleep.is_some());
+}

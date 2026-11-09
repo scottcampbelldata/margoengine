@@ -6,23 +6,10 @@ are still open.
 
 ## Own 2D physics acceptance gaps
 
-### The contact recovery-speed clamp also caps sustained spring load
-
-- **Repro:** the existing `kernel/tests/world.rs` 1:100 heavy-on-three-light stack, extended to a 1000 kg top box,
-  otherwise unchanged defaults. Lane P's diagnostic preserves the same 3% closed-form sag, 0.1 mm x drift,
-  10 mm post-one-second creep and sleep predicates. On the unchanged `7fd5a9547` block control, sag is 1.186208 m
-  against the unclamped spring prediction 0.518551 m; creep is 0.092105 m. The same unchanged-predicate regression
-  also fails at runtime on verified main `47f81f909` (exit 101, no timeout). All 28 legacy accuracy cases pass.
-- **Cause:** `solver.rs::row` caps negative soft bias at `contact_max_push=3`. With four substeps, 60 Hz and damping
-  10, a middle contact needs 3.021895 m/s of bias to support its 1002 kg load, exceeding that cap. Its maximum
-  supported load is about 994.74 kg even at exact convergence. The linear closed form assumes no active clamp.
-  Raising the cap to 3.1 diagnoses the ceiling but is not a fix: sag approaches the closed form, while post-one-second
-  creep is 0.555621 m. Waking that settled control and continuing without sleep approaches the predicted sag.
-- **Required fix (Scott, 2026-11-08):** derive sustained soft-constraint support separately from penetration recovery
-  limiting so no finite load ceiling exists. Add the 1:1000 contact regression with the same sag, creep and sleep
-  predicates as the 1:100 fixture, and preserve all prior bars. A fitted mass-ratio threshold or a raised cap is
-  not a fix. This is a confirmed defect on main, not an unresolved acceptance decision.
-  Owned-2D CCD belongs to the separate Rapier parity row T-11 / 127.y; it is outside this correction.
+The contact support-ceiling defect is fixed by the sustained-support correction below under Fixed 2026-11-08.
+The required centered 1:1000 contact stack now uses the unchanged sag, drift, creep and sleep predicates.
+Its constitutive bending limit is documented in [limits](limits.md#own-2d-sustained-contact-support).
+Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
 
@@ -1045,6 +1032,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| Owned 2D 1:1000 contact stack sags 1.186208 m instead of 0.518551 m, with 92.105 mm creep | Capping penetration bias alone imposes C*lambda <= P, about 994.74 kg at the defaults; local split iterations also retain a slow mass-ratio equilibrium mode, while relaxed velocity can hide pose movement from sleep | Cap the elastic residual, retain the original spring root, and apply a certified physical-mass equilibrium correction on supported paths; observe actual substep motion for sleep. No cap, stiffness, iteration or physical tolerance increase | `packages/physics2d/kernel/tests/world.rs::a_heavy_box_on_light_ones_holds_at_one_to_a_thousand` fails unchanged on verified `47f81f909`; all 29 physical bars and input/domain regressions pass. Directed math, SIMD shadow and disconnected-joint regressions cover the new formulation |
 | Huge finite angular velocity can silently publish a zero rotation; tiny nonzero rotation pairs can become identity, and nonfinite integration arithmetic can also become identity | Direct f32 squared-length normalization overflows/underflows; the fallback treats NaN length like zero. A finite-only final-state check accepts zero rotation | Preserve the normal-range normalization path, scale exceptional finite pairs, propagate nonfinite arithmetic, and refuse directly mutated zero body rotations | `packages/physics2d/kernel/tests/rotation_input.rs`: four strengthened assertions fail on the retained pre-edge input implementation; the single-substep case catches zero/identity alternation hidden by four substeps |
 | Individually finite inverse masses can form an infinite contact metric and the step returns success without collision response | Adding two inverse masses near `2.5e38` overflows; reciprocal Inf becomes zero effective mass and can silently disable a row | Check derived normal/tangent metrics and required reciprocals before solving; propagate a coded arithmetic error | `packages/physics2d/kernel/tests/contact_metric_input.rs`, density `4e-39` fixed-rotation boxes in scalar/SIMD modes; fails on the retained pre-edge input implementation |
 | A huge spinning circle returns a successful step with zero contact response despite an unrepresentable contact-point velocity | Finite mass and body speed do not ensure finite `v + w cross r`; normal dot can become NaN through `0*Inf`, and a comparison can select zero without leaving nonfinite final state | Validate computed point-relative velocity, normal approach and anchor base before publishing a solver row | `packages/physics2d/kernel/tests/point_velocity_input.rs`, checked radius `1e9`/`1e10`, density `1e-40`, spin `1e30`, scalar/SIMD; all four cases returned success in the pre-guard diagnostic |
