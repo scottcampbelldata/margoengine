@@ -3876,3 +3876,13 @@ every mode/partition/CSEL; native vectors verify solid fields and alpha
 center/index orientation. Wasm155605raw/56363gzip bytes is an incomplete
 private build. Public integration, remaining encoders, peak memory, final
 size, GPU and deferred speed proofs stay open. No new GPU request was made.
+
+The [ETC-expanded full-container campaign](../whitepaper/results/batch-134-etc-fuzz.json)
+passes all51 primary seeds/2856 mutations with17908 decode calls, zero uncoded
+errors/traps/hard timeouts. New ETC state-recovery controls use frozen,
+independently source-quality-validated replacement outputs; other targets retain
+their strict old/spec controls. Source and compiled Wasm stay unchanged, and
+each seed pins input/adapter/Wasm. Its388s diagnostic duration is not a timing
+proof. Remaining encoders, public integration and all final acceptance bars stay
+open. Browser repair cf699846f is now rebased from origin/main; fresh shared
+correctness gates and voxel-first landing remain pending.

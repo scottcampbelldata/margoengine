@@ -1975,3 +1975,10 @@ checks selector optimality over all crafted modes/partitions/CSELs. Fixed
 block-local scratch avoids full-image RGBA staging and per-block heap
 allocation. This is subset quality/work evidence, not full jobs2/3 completion,
 peak-memory, GPU or timing acceptance.
+
+The [ETC-expanded bounded campaign](results/batch-134-etc-fuzz.json) exercises
+all51 primary seeds/2856 mutations with17908 decode calls, without an uncoded
+exception, Wasm trap or hard timeout. Frozen new ETC controls were independently
+quality validated; existing strict controls were retained. Per-seed input,
+adapter and Wasm pins and unchanged source link the result to the ETC checkpoint.
+Missing encoders/public integration keep full job3 open.

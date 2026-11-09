@@ -1562,3 +1562,13 @@ source SSE for each of52 file/target pairs, with no tolerance. All52 improve.
 The same original pixels and direct exact-area mip references are preserved.
 `measure/report13-etc-evidence.mjs` freezes source/tests and records the work
 count, selected checks and draft size. This does not complete jobs2/3.
+
+`measure/prepare-report13-fuzz.mjs` preserves prior campaigns and freezes the
+quality-validated ETC outputs. Run the distinct
+`measure/whole-container-fuzz-report13.mjs` with the1800s bounded runner; each
+seed retains180s/512MiB limits. Older controls stay strict old/spec hashes;
+new ETC controls check recovery against the independently validated replacement
+payloads. `measure/report13-fuzz-evidence.mjs` verifies every source manifest pin
+and aggregate/per-seed Wasm/adapter pins. [Result](results/batch-134-etc-fuzz.json):
+51 seeds/2856 mutations/17908 calls, no uncoded error/trap/hard timeout. Do not
+sum mixed call/refusal axes or treat end-instance pages as peak memory.

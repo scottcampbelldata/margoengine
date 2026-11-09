@@ -2237,3 +2237,11 @@ checks. Draft Wasm155605raw/56363gzip bytes uses the baseline Node gzip9
 compressor. It is not final entry/peak-memory/speed acceptance. ETC1S ETC2,
 other encoders and public lazy TS/worker/API integration remain incomplete;
 no prebuilt was removed, no GPU request or new timing proof was made.
+
+The [ETC-expanded bounded campaign](whitepaper/results/batch-134-etc-fuzz.json)
+passes51 seeds/2856 mutations/17908 decode calls, including UASTC targets0/1.
+No uncoded exception, Wasm trap or hard timeout occurred. New ETC state-recovery
+controls use frozen, independently quality-validated replacement hashes;
+older controls remain strict prebuilt/specification hashes. Each seed records
+input, adapter and Wasm hashes; source remained unchanged. This is bounded
+subset evidence, not completed fuzz acceptance or a peak-memory/speed claim.
