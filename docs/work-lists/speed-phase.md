@@ -227,3 +227,20 @@ the build phase (2026-11-10). Correctness gates still run under the shared GPU l
   Surface input texture is 4 bytes/sample plus the 1,024-byte colour map. These are work/storage counts,
   not speed measurements. Frame-time, scale-limit, GPU-memory and cross-backend speed evidence remain owed
   after the build phase. No workload was narrowed and no timing budget changed.
+
+
+## Preview contract continuation, 2026-11-10 restart
+
+Scott forbids speed and timing tests during this continuation. No new timing
+result is claimed and no threshold is changed. The following planned GPU scripts
+contain timing assertions and remain unrun in this restart:
+
+- clustered/test:gpu
+- materials/test:gpu:cutout-casters
+- shadows/test:gpu:cutout-casters
+
+All three call packages/shadows/test/cutout-casters-browser.mjs. Their existing
+budgets and assertions remain intact. The quiet speed phase must run them on
+native WebGPU and full WebGL2 compatibility after Scott ends the restriction.
+Correctness GPU suites use the shared phase and shared lock. This entry records
+deferred checks, not a performance improvement or an accepted regression.

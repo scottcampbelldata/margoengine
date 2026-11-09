@@ -3678,3 +3678,5 @@ could finish; the example now requests the dialog from a button handler, with th
 `packages/ui/tests/readme-widgets.test.js`. Gate budgets and timeouts are unchanged.
 
 The added Gemini cases 21, 22, 26, 29, 30, 31 and 33 are explicit attachment/escalation cases in the same browser gate. Native WebGPU retained by install() emits a linked state warning (device.test.js); force installs without it. Backend webgl2 without a supplied preview fallback already produces linked unsupported, now checked in the real browser. No core change is needed. Procedural main gained a native fragment preview route during integration: it must remain on preview without invoking loadCompat.
+
+Preview continuation research review: [module boundaries, conservative setup and graphics standards](../whitepaper/preview-contract-research.md). The 2026-11-10 restart keeps teardown with lane-T and defers timing suites; it does not relax correctness assertions.
