@@ -5482,6 +5482,24 @@ five known failures; 18 of 23 examples succeed. Full verify passed 13,616 tests
 with zero failures/skips before the final main rebase; all 80 scoped rebase
 regressions pass. The memory-admission fix landed first as 0d318eb86, followed
 by the separate browser repair. No timing proof or completed Basis job follows.
+### Open: secondary-scene disposal outside the batch 56 environment repair
+
+The cross-package audit reproduces orphaned post effects. With a WebGPU engine,
+`const scene = engine.createScene('product'); const effect = new FXAA();
+scene.use(effect); effect.dispose();` leaves `scene.plugins.has(effect.name)` true.
+The same reproduction with `new PostStack([new FXAA()])` leaves both the stack and
+its child registered. A same-name effect in the default scene is also at risk.
+Cause: post effect disposal calls `engine.removePlugin(name)` after scene setup
+has restored the default active scene. Stack disposal additionally checks child
+membership against that active scene. The existing `sceneOf` API can hold the
+repair in the owning optional packages; no core change is needed.
+
+This audit is not closed or accepted. Environment and temporal-effect repairs do
+not fix post effects. Other direct default-scene disposal call sites still need
+per-plugin classification and regressions, followed by their package checks.
+Do not treat the batch 56 scene-ownership finding as fully accepted until that
+work and the required GPU proofs are complete.
+
 ### Batch 56 review repair audit
 
 Reported causes: TAA's transient matrix entered the still controller/history key;
