@@ -357,7 +357,8 @@ class Checker {
   }
 
   private globalVar(d: A.ValueDecl): IRGlobalVar {
-    const type = d.type ? this.type(d.type) : undefined;
+    let init = d.init ? this.value(d.init) : undefined;
+    const type = d.type ? this.type(d.type) : init ? this.concrete(init, d.init as A.Expr).type : undefined;
     let space: AddressSpace = 'private',
       access: AccessMode = 'read_write';
     if (d.template) {
@@ -406,11 +407,10 @@ class Checker {
       throw this.fail('Uniform buffers cannot hold atomics or runtime-sized arrays', d.type as A.Expr);
     if (space !== 'storage' && space !== 'workgroup' && containsAtomic(type))
       throw this.fail(`Atomics live only in storage or workgroup memory, not ${space}`, d.type as A.Expr);
-    let init: IRExpr | undefined;
     if (d.init) {
       if (space !== 'private')
         throw this.fail(`Only private variables may have an initializer; '${d.name}' is ${space}`, d.init);
-      init = this.convertTo(this.value(d.init), type, d.init);
+      init = this.convertTo(init!, type, d.init);
       if (init.value === undefined) throw this.fail('A module-scope initializer must be a constant expression', d.init);
     }
     return { kind: 'var', name: d.name, type, space, access, group, binding, init, start: d.start, end: d.end };

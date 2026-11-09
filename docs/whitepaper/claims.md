@@ -1910,6 +1910,13 @@ Batch 99 history/artifact landing evidence: 448 current controlled history cases
 
 ### Preview attachment refusal (2026-11-09)
 
+Continuation correctness repairs: inferred module-private WGSL variables pass the
+same concrete type/conversion rules as locals; temporal DOF has independent half-image/tile
+kernels. Negative regressions are `private-inference.test.js` and
+`dof/tests/temporal-compat.test.js`. DOF's compatibility lens bounds pass;
+remaining GPU validation is pending. No performance or cross-driver identity claim.
+See `compat-continuation-research.md` for source comparison and limitations.
+
 GPU-only optional renderers reject the small preview during setup with linked `unsupported`, so awaited `autoEngine` setup can load the full compatibility layer. Proof: `tests/preview-refusal.test.js`, `packages/lod/test/preview.test.js`, `packages/webgl2-compat/test/package-tiers-browser.mjs`; the latter verifies direct refusal, one compatibility load, two setup tiers, glTF/selection pixels and procedural bake readback. Selection and gltf-pro already refused on the baseline. Real CPU/GL preview routes stay available. No performance or additional hardware support claim.
 
 Preview continuation: package-tiers-browser.mjs explicitly covers PostStack, Shadows, Video, VFX, Splats, Lighting2D, LayerCompositor and CulledInstances refusal and escalation, plus the real procedural preview baker. device.test.js proves install() warns with a linked state code when retaining native WebGPU, and force installs without warning. These are correctness and diagnostic claims, with no speed claim.

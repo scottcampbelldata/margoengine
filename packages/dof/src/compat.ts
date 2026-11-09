@@ -68,14 +68,25 @@ export const bokehAloneShader = ({ bokehShader, groupMax }: DOFShaders): string 
     ['let nearMax=groupMax(mine,local);', 'let nearMax=mine;'],
   ]);
 
+/** Half-image colour and CoC, followed by the existing independent tile-max pass. */
+const halvePixelShader = (source: string, groupMax: string): string =>
+  edit(source, [
+    ['@group(0) @binding(4) var tiles:texture_storage_2d<r32float,write>;\n', ''],
+    [groupMax, ''],
+    [shared, ''],
+    ['\n  let m=groupMax(near,local);\n  if(local==0u){textureStore(tiles,vec2i(tile.xy),vec4f(m,0,0,0));}', ''],
+  ]);
+
 /** The three pipelines of the route, compiled on `device`. */
 export function dofCompatPipelines(
   device: GPUDevice,
   shaders: DOFShaders,
+  halve?: string,
 ): {
   coc: GPUComputePipeline;
   tiles: GPUComputePipeline;
   bokeh: GPUComputePipeline;
+  halve?: GPUComputePipeline;
 } {
   const pipeline = (code: string) =>
     device.createComputePipeline({
@@ -86,5 +97,6 @@ export function dofCompatPipelines(
     coc: pipeline(cocPixelShader(shaders)),
     tiles: pipeline(tilesShader),
     bokeh: pipeline(bokehAloneShader(shaders)),
+    ...(halve && { halve: pipeline(halvePixelShader(halve, shaders.groupMax)) }),
   };
 }

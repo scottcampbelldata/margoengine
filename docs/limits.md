@@ -2138,6 +2138,15 @@ existing APIs without changing runtime behavior, exports or entry sizes.
 
 ## Optional packages on the small preview
 
+The full compatibility device accepts inferred module-private WGSL variable types.
+Temporal DOF now has a full-layer route:
+half colour/CoC writes, then half-image tile maxima, followed by the existing
+gather and join. Its existing MSAA depth approximation and finite sampling limits
+still apply. Research and regression paths are in
+`docs/whitepaper/compat-continuation-research.md`. Core plus stage is 23,924 B gzip
+after the upstream transform-reference diagnostic; these optional repairs do not
+change core or stage source.
+
 The small `/preview` engine has backend `webgl2` and no GPU device; the full WebGL2 compatibility layer exposes backend `webgpu`. GPU-only renderers refuse during setup with linked `unsupported`, allowing awaited `autoEngine` setup to escalate through `loadCompat`. Mesh/geometry LOD, screen UI, HTML, stats and picking via `/pick` retain their preview routes. Imposter levels and LOD fading require a complete tier. The texture baker runs under the full layer; current main also provides a native fragment baker on the small preview. Selection and gltf-pro already refused; their reported silent blank was not reproduced. See `packages/webgl2-compat/test/package-tiers-browser.mjs` for pixel and escalation evidence and `scripts/check-preview-contract.mjs` for the merge gate. Core and stage source are unchanged.
 
 Explicit install() retains an available native WebGPU adapter with a linked MargoError state warning, unless force is true. The full layer needs backend webgpu (or auto), while backend webgl2 requires a preview fallback. The added Gemini GPU attachments refuse preview and escalate; Lighting2D and LayerCompositor use the full device. The current procedural native fragment baker is a real preview route. No new hardware or performance claim is made.

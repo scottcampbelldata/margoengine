@@ -8,7 +8,7 @@
 // multisampled depth as one sample, which DOF's WebGL2 route widens back over silhouettes (src/compat.ts; measured
 // on the M6 Mac mini, Metal: 0.02% to 0.09% of pixels with d > 2, mean d at most 0.018; before that fix the 'focus'
 // case, no lens, drew a faint ring 72 px wide where native WebGPU draws 31). Autofocus must find the same focus on
-// both. Temporal DOF is WebGPU only: the layer refuses it.
+// both. Temporal DOF also draws on the layer through independent half-image and tile-max passes.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
@@ -17,7 +17,7 @@ import { decodePNG } from '../../../../tests/support/png.js';
 const MAX_SHARE = 0.001,
   MAX_MEAN = 0.25;
 const release = await acquire({ owner: 'dof-compat' });
-const context = await openBrowser({ startPath: '/packages/dof/tests/gpu/lens.html', port: 5289 }),
+const context = await openBrowser({ startPath: '/packages/dof/tests/gpu/lens.html', port: 5289, compat: false }),
   { page } = context;
 try {
   const origin = new URL(page.url()).origin,
@@ -118,12 +118,9 @@ try {
     'a one-sample capture blurs the same',
   );
   assert.equal(native.temporal, 'drawn');
-  assert.match(compat.temporal, /temporal needs WebGPU/, 'the layer refuses temporal DOF with a fix');
-  assert.deepEqual([...native.errors, ...compat.errors.filter((e) => !/temporal needs WebGPU/.test(e))], []);
-  assert.deepEqual(
-    pageErrors.filter((e) => !/temporal needs WebGPU/.test(e)),
-    [],
-  );
+  assert.equal(compat.temporal, 'drawn', 'temporal DOF draws on the full layer');
+  assert.deepEqual([...native.errors, ...compat.errors], []);
+  assert.deepEqual(pageErrors, []);
   console.log('dof compat check passed');
 } finally {
   // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s

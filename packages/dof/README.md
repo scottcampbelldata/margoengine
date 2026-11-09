@@ -49,6 +49,10 @@ console.log(dof.focalLength); // the focal length in metres the last frame used
 every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth for about a quarter
 of the gather's cost. Pixels in focus keep the full-resolution scene as it is.
 
+Temporal DOF works on native WebGPU and the full WebGL2 compatibility layer.
+The full layer writes the half scene and CoC first, then computes independent
+tile maxima before gathering; it does not need workgroup shared memory.
+
 ```ts
 import {createStage} from 'margoengine';
 import {DOF} from 'margoengine/dof';
@@ -86,7 +90,7 @@ engine.start();
 ```
 
 - `Autofocus` sets `dof.options.focalDistance`. It reads one depth texel into a buffer and maps it later without waiting, so the focus follows a frame or two behind and a frame never stalls. The sky leaves the focus where it was. Attach it after the `DOF`, alone or in a `PostStack`.
-- `DOFLens` is read when the effect attaches; only `tilt` and `tiltDirection` change afterwards. A perspective plane stays a plane: `1/focus` is linear across the screen, and past the horizon of the plane everything counts as in front of it. It is checked on WebGPU and on the WebGL2 layer (`install({force: true})` of `margoengine/webgl2-compat`): there autofocus finds the same focus and every lens case covers the same pixels, within the layer's parity rule (at most 0.1% of pixels more than 2 levels apart). The layer reads multisampled depth as one sample, so DOF's WebGL2 route takes the nearest depth of each pixel and its four neighbours to keep silhouettes on their object; temporal DOF stays WebGPU only.
+- `DOFLens` is read when the effect attaches; only `tilt` and `tiltDirection` change afterwards. A perspective plane stays a plane: `1/focus` is linear across the screen, and past the horizon of the plane everything counts as in front of it. It is checked on WebGPU and on the WebGL2 layer (`install({force: true})` of `margoengine/webgl2-compat`): there autofocus finds the same focus and every lens case covers the same pixels, within the layer's parity rule (at most 0.1% of pixels more than 2 levels apart). The layer reads multisampled depth as one sample, so DOF's WebGL2 route takes the nearest depth of each pixel and its four neighbours to keep silhouettes on their object; temporal DOF uses a separate half-image and tile-max route on the full layer.
 
 ## Custom bokeh shapes
 

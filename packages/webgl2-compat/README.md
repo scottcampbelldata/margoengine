@@ -6,6 +6,10 @@ deleted program; a current program owned by another plugin is preserved. The exi
 below needs no additional setup. CPU lifetime tests cover owned, foreign and null bindings; the sciviz
 native reboot pixel/error gate remains pending the browser teardown repair.
 
+The full device infers module-private WGSL variable types from constant initializers,
+including `var<private> enabled = true;`.
+
+
 This is the single WebGL2 package. Use the root `install()` entry to run the real
 renderer without WebGPU. The optional `/preview`, `/pick`, `/restore` and `/auto`
 entries preserve the smaller preview for lower-tier WebGL2. The former webgl

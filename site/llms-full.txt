@@ -4725,6 +4725,15 @@ existing APIs without changing runtime behavior, exports or entry sizes.
 
 ## Optional packages on the small preview
 
+The full compatibility device accepts inferred module-private WGSL variable types.
+Temporal DOF now has a full-layer route:
+half colour/CoC writes, then half-image tile maxima, followed by the existing
+gather and join. Its existing MSAA depth approximation and finite sampling limits
+still apply. Research and regression paths are in
+`docs/whitepaper/compat-continuation-research.md`. Core plus stage is 23,924 B gzip
+after the upstream transform-reference diagnostic; these optional repairs do not
+change core or stage source.
+
 The small `/preview` engine has backend `webgl2` and no GPU device; the full WebGL2 compatibility layer exposes backend `webgpu`. GPU-only renderers refuse during setup with linked `unsupported`, allowing awaited `autoEngine` setup to escalate through `loadCompat`. Mesh/geometry LOD, screen UI, HTML, stats and picking via `/pick` retain their preview routes. Imposter levels and LOD fading require a complete tier. The texture baker runs under the full layer; current main also provides a native fragment baker on the small preview. Selection and gltf-pro already refused; their reported silent blank was not reproduced. See `packages/webgl2-compat/test/package-tiers-browser.mjs` for pixel and escalation evidence and `scripts/check-preview-contract.mjs` for the merge gate. Core and stage source are unchanged.
 
 Explicit install() retains an available native WebGPU adapter with a linked MargoError state warning, unless force is true. The full layer needs backend webgpu (or auto), while backend webgl2 requires a preview fallback. The added Gemini GPU attachments refuse preview and escalate; Lighting2D and LayerCompositor use the full device. The current procedural native fragment baker is a real preview route. No new hardware or performance claim is made.
@@ -7758,6 +7767,10 @@ deleted program; a current program owned by another plugin is preserved. The exi
 below needs no additional setup. CPU lifetime tests cover owned, foreign and null bindings; the sciviz
 native reboot pixel/error gate remains pending the browser teardown repair.
 
+The full device infers module-private WGSL variable types from constant initializers,
+including `var<private> enabled = true;`.
+
+
 This is the single WebGL2 package. Use the root `install()` entry to run the real
 renderer without WebGPU. The optional `/preview`, `/pick`, `/restore` and `/auto`
 entries preserve the smaller preview for lower-tier WebGL2. The former webgl
@@ -10549,14 +10562,9 @@ console.log(dof.focalLength); // the focal length in metres the last frame used
 every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth for about a quarter
 of the gather's cost. Pixels in focus keep the full-resolution scene as it is.
 
-```ts
-import {createStage} from 'margoengine';
-import {DOF} from 'margoengine/dof';
-import {TAA} from 'margoengine/taa';
-const stage = await createStage('#viewport', {backend:'webgpu'});
-const dof = DOF.attach(stage.engine, {focalDistance:4, aperture:1.4, temporal:true});
-TAA.attach(stage.engine, {depth:()=>dof.depthTexture});
-```
+Temporal DOF works on native WebGPU and the full WebGL2 compatibility layer.
+The full layer writes the half scene and CoC first, then computes independent
+tile maxima before gathering; it does not need workgroup shared memory.
 
 [README continues: https://margoengine.com/llms/packages/dof.md]
 

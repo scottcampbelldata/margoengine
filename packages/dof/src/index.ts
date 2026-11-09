@@ -226,11 +226,6 @@ export class DOF implements EnginePlugin {
     this.coarsePipeline = compute(engine.gpu, shaders.coarseShader);
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
-    if (route && temporal)
-      throw new MargoError(
-        'unsupported',
-        'DOF temporal needs WebGPU; leave temporal off on the WebGL2 layer; see https://margoengine.com/errors#webgpu',
-      );
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
     // about a second a frame at 720p on a fast CPU and several on a laptop's (bug 58), so the first frames show the
     // captured scene sharp, and effects reading outputTexture (Tonemap's source) get that scene.
@@ -239,11 +234,9 @@ export class DOF implements EnginePlugin {
       ({ dofCompatPipelines }) => {
         if (this.uniform !== uniform) return;
         this.waiting = false;
-        ({
-          coc: this.cocPipeline,
-          tiles: this.tilesPipeline,
-          bokeh: this.bokehPipeline,
-        } = dofCompatPipelines(engine.gpu!, shaders));
+        const pipelines = dofCompatPipelines(engine.gpu!, shaders, temporal ? halveShader : undefined);
+        ({ coc: this.cocPipeline, tiles: this.tilesPipeline, bokeh: this.bokehPipeline } = pipelines);
+        if (temporal) this.halvePipeline = pipelines.halve;
         this.releaseTextures();
       },
       (error) => {
@@ -436,8 +429,15 @@ export class DOF implements EnginePlugin {
       blurred = this.blurred!.createView();
     this.groups[1] = group(device, this.bokehPipeline!, [u, scene, coc, blurred, tiles, this.coarseView!]);
     this.groups[3] = group(device, this.coarsePipeline!, [u, scene, coc, this.coarseView!]);
-    this.groups[5] = group(device, this.halvePipeline!, [input, this.cocView!, scene, coc, tiles]);
+    this.groups[5] = group(device, this.halvePipeline!, [
+      input,
+      this.cocView!,
+      scene,
+      coc,
+      ...(this.tilesPipeline ? [] : [tiles]),
+    ]);
     this.groups[6] = group(device, this.joinPipeline!, [input, this.cocView!, blurred, this.outputView!]);
+    if (this.tilesPipeline) this.groups[7] = group(device, this.tilesPipeline, [coc, tiles]);
   }
   /** The CoC pass's bind group; on the WebGL2 route also the tile pass's (`tilesGroup`). */
   private cocGroup(device: GPUDevice, depth: GPUTexture, direct = false): GPUBindGroup {
@@ -471,8 +471,9 @@ export class DOF implements EnginePlugin {
   /** CoC and 8x8 tile maxima: one kernel on WebGPU, two on the WebGL2 route. */
   private circles(c: Context): void {
     this.dispatch(c, this.cocPipeline!, this.groups[0]);
-    if (this.tilesPipeline) this.dispatch(c, this.tilesPipeline, this.tilesGroup!, 64);
+    if (this.tilesPipeline && !this.halvePipeline) this.dispatch(c, this.tilesPipeline, this.tilesGroup!, 64);
     if (this.halvePipeline) this.dispatch(c, this.halvePipeline, this.groups[5], 16);
+    if (this.tilesPipeline && this.halvePipeline) this.dispatch(c, this.tilesPipeline, this.groups[7], 128);
   }
   private blur(c: Context): void {
     // Temporal: the gather covers the half image (blocks twice as wide), then the join brings it back to full size.

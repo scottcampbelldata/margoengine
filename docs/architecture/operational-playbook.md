@@ -1778,6 +1778,18 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Preview/compat continuation: the interrupted compatibility run preserved 22
+completed suites and three real failures, with its environment mirror unfinished.
+The repairs add inferred module-private WGSL types and give temporal DOF
+independent half-image/tile kernels. Each has a regression that fails on its previous implementation. The
+DOF comparison fixture explicitly chooses native startup before installing the
+full layer, so a forced-compatibility outer runner cannot corrupt its baseline.
+The culling discrepancy persists when dithering is disabled, so that speculative
+change was removed. DOF passes its compatibility lens bounds; culling and the
+unfinished compatibility suites remain pending. Prior completed suites are
+preserved. Research: `docs/whitepaper/compat-continuation-research.md`.
+No teardown work or speed test is included in this continuation.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for
