@@ -3288,3 +3288,23 @@ differences in the full sequence, so invariance alone is rejected as a repair.
 The shorter three-step isolated diagnostic passes even without that change and
 cannot establish causality or readiness. No runtime or assertion was changed,
 and no rival source, companion code or prepared culling-causes script was used.
+
+### Batch 273 compatibility failure 2: KTX2 streamed/plain investigation
+
+Research before repair: Khronos KTX Working Group, KTX File Format Specification
+2.0.4 (2025), https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html;
+Christopher J. Tanner, Christopher J. Migdal and Michael T. Jones, The Clipmap:
+A Virtual Mipmap (1998), https://doi.org/10.1145/280814.280855; and W3C GPU for
+the Web Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/.
+Compared resident mip selection, byte-preserving uploads/copies and view ranges.
+These require separating residency and image reproducibility before attributing
+the exact streamed/plain mismatch to a loader. No companion or rival code read.
+
+On the rebased lane, the unchanged first streaming case fails. A diagnostic
+reports resident level 0, all 11 levels and 5,592,404 GPU bytes; one green channel
+at (208,137) is 89 versus 88. A subsequent diagnostic captures the plain model
+twice without changing it: those RGBA arrays also differ. Its streamed/plain
+pair happens to match, so that pass is not a repair. Receipts are
+test-results/batch-273-ktx2-repro, -ktx2-probe and -ktx2-repeat-probe logs.
+Actual capture/render reproducibility remains unresolved; no runtime or
+assertion changed. Checkpoint and continue to the next indexed failure.

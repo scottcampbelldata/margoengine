@@ -3228,6 +3228,16 @@ tests/package-order.test.js. No retries or declaration/type relaxations.
 
 ### Batch 273 lower-tier validation remains open
 
+Full-tier KTX2 streaming follow-up after rebase onto 4e5dbdf04: the unchanged
+first streaming comparison still fails. The diagnostic reaches level 0 with
+all 11 levels resident (5,592,404 GPU bytes) and measures one differing green
+channel, 89 versus 88 at (208,137). A repeat screenshot of the unchanged plain
+model also differs; a matching streamed/plain pair in that diagnostic does not
+prove a repair. Residency alone does not explain the failure. Capture/render
+reproducibility and the actual cause remain unresolved. Receipts:
+test-results/batch-273-ktx2-repro.log, batch-273-ktx2-probe.log and
+batch-273-ktx2-repeat-probe.log. No runtime or assertion was changed.
+
 Full-tier culling failure follow-up on b30aaa010: with MARGO_COMPAT=1,
 packages/culling/test/gpu/dynamic-check.mjs still fails at shadowed step 2
 (move every third box), exactly seven pixels differing by one channel unit on
