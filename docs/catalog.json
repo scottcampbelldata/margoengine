@@ -2193,6 +2193,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/viewcube@1.0.0",
     "imports": "import { ViewCube } from '@margoengine/viewcube';",
     "exports": [
+      "THEMES",
       "ViewCube"
     ]
   },

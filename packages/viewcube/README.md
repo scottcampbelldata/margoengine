@@ -23,6 +23,7 @@ cube.view('top');                                      // 'top' | 'bottom' | 'fr
 cube.view([1, 1, 0]);                                  // any direction from the target toward the camera
 cube.view('front', 0);                                 // jump without animating
 cube.setProjection('orthographic');
+cube.setTheme('dark');                                 // 'light' | 'dark' | 'high-contrast' | 'auto' | your own tokens
 cube.drag = false;                                     // dragging the cube orbits the camera unless turned off
 cube.setHome({position: [6, 4, 8], target: [0, 1, 0]}); // your own home view; shows the home button
 cube.home();                                           // the home button and the Home key do the same
@@ -37,7 +38,7 @@ translation), `flip` (false; also a public field: clicking the view already show
 Blender's navigation gizmo and SolidWorks' "Normal To" pressed twice do; Autodesk's ViewCube keeps the view),
 `drag` (true; also a public field: dragging the cube orbits the camera), `home` (none; a `{position, target}`, or
 `true` for the camera as it is when the cube attaches: shows the home button), `roll` (false; shows the two roll
-buttons).
+buttons), `theme` (none: the light colours; see Themes).
 `@margoengine/controls` navigation profiles carry it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. The toggle
 also follows projection changes made elsewhere (Blender's numpad 5 through a profile) on the next frame.
 `cube.element` is the widget root for your own styling.
@@ -68,6 +69,16 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   cube (a face, edge or corner, the arrow keys, Home) turns the view upright again; an up set by someone else wins
   and ends the roll; `dispose` gives the app's up back. The buttons and the home button share a row above the cube,
   so a cube in a top corner sits 38 px from the edge instead of 12 px.
+- **Themes.** The colours are six tokens, each a CSS custom property on the widget root: `--mvc-background` (face
+  and button fill), `--mvc-text`, `--mvc-line` (edges and borders), `--mvc-hover` (fill of a hovered or focused face,
+  edge, corner or button), `--mvc-hover-text` and `--mvc-focus` (keyboard focus ring). `THEMES` exports the built-in
+  `light`, `dark` and `high-contrast` sets; `theme` or `cube.setTheme(...)` takes one of their names, `'auto'`
+  (dark when the browser prefers a dark scheme, high contrast when it prefers more contrast, else light) or your own
+  tokens, for example `cube.setTheme({background: '#1b1f27', text: '#f2f4f7'})`; tokens you leave out keep the
+  stylesheet's. Without a theme the cube sets no inline colours, so your own CSS can set the properties on `.mvc`.
+  The package tests check every built-in pair against WCAG 2 contrast over both a black and a white page behind the
+  translucent fill: text and hovered text at least 4.5:1 (high contrast 7:1), edges and the focus ring at least 3:1.
+  The light theme's edges and focus ring are darker than before themes (`#6b7280`, `#0b3d91`) for that reason.
 - **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
 - **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and the stage's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
@@ -86,8 +97,9 @@ out leaves controls' bundle and dependencies unchanged.
 
 Limits: roll is in quarter turns from the cube's buttons and `roll` (any whole or fractional count, landing on a
 whole quarter turn), the home view keeps the camera's field of view and
-projection (only position and target), and the colours are fixed light-grey (restyle `.mvc-face` and `.mvc-projection`).
+projection (only position and target), and a custom theme's contrast is yours to check (only the built-in ones are
+tested).
 
-Size: 4,619 B min + gzip (the test enforces under 4,700 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
+Size: 5,065 B min + gzip (the test enforces under 5,150 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
 
 Unit tests: `npm test --workspace @margoengine/viewcube`. Browser check with real clicks: `node packages/viewcube/test/browser-check.mjs`.

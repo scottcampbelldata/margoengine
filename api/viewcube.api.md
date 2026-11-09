@@ -14,6 +14,10 @@ export interface HomeView {
 
 export type Projection = 'orthographic' | 'perspective';
 
+export const THEMES: Readonly<Record<ThemeName, Readonly<ViewCubeTheme>>>;
+
+export type ThemeName = 'light' | 'dark' | 'high-contrast';
+
 export type View = Face | 'iso' | readonly [number, number, number];
 
 export class ViewCube {
@@ -25,13 +29,14 @@ export class ViewCube {
     drag: boolean;
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
-    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, roll, view }?: ViewCubeOptions);
+    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, roll, theme, view }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
     setHome(home?: HomeView): void;
     getHome(): HomeView | undefined;
     home(duration?: number): void;
     roll(turns?: number, duration?: number): void;
     get turns(): number;
+    setTheme(theme: ThemeName | 'auto' | Partial<ViewCubeTheme>): void;
     getProjection(): Projection | undefined;
     setProjection(mode: Projection): void;
     update(delta: number): void;
@@ -55,5 +60,15 @@ export interface ViewCubeOptions {
     drag?: boolean;
     home?: HomeView | boolean;
     roll?: boolean;
+    theme?: ThemeName | 'auto' | Partial<ViewCubeTheme>;
+}
+
+export interface ViewCubeTheme {
+    background: string;
+    text: string;
+    line: string;
+    hover: string;
+    hoverText: string;
+    focus: string;
 }
 ```

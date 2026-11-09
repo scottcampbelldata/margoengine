@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-584). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-585). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -428,6 +428,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | View cube drag to orbit (`drag` on `ViewCube`, 2026-11-08) | Proved with real mouse events in Chromium on a Radeon 680M (LIM-579). By method: turntable azimuth and elevation, two radians per cube width; elevation stops at the poles. | The angles are measured from where the press went down, so the pointer always maps to the same view; a wheel zoom during a drag keeps its new distance. | Under 3 px of movement a press is a click; a drag stops wherever it is released, not on a named view. | `cube.drag = false`; click a face, edge or corner for an exact view. |
 | View cube home view (`home` and `setHome` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-580). Enforced: a home is a position and a target, three finite numbers each and apart. | The target and distance move with the eased view angles in one animation; any other camera move during it cancels it. | Only position and target are kept: the field of view, the projection and any zoom of an orthographic camera stay as they are. | Set the projection and field of view yourself after `cube.home()`, or call `camera.fitToBoundingBox` to frame a model. |
 | View cube roll (`roll` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-584). Enforced: `turns` is a finite number. | The cube writes `camera.up` every frame while rolled, so a control that sets `camera.up` itself takes over and ends the roll. | Rest positions are whole quarter turns; a fractional `roll` lands on the nearest. Any view change from the cube is upright. | Set `camera.up` yourself for a free roll angle. |
+| View cube themes (`theme` and `setTheme` on `ViewCube`, 2026-11-08) | Proved by computed WCAG 2 contrast of every built-in pair over a black and a white page, and computed styles in Chromium on a Radeon 680M (LIM-585). Enforced: a theme is a built-in name, `'auto'` or tokens that are strings. | Tokens are plain CSS colour strings and are not parsed; a bad colour falls back as CSS does. | The contrast of your own tokens is not checked; `'auto'` follows the browser's settings only, not the page's. | Start from a `THEMES` set and change single tokens, and check your colours with a WCAG contrast checker. |
 
 ## Copies of a model
 

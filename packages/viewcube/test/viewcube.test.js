@@ -6,8 +6,17 @@ import { CADCameraControls } from '../../stage/dist/controls.js';
 import { OrbitControls, AUTOCAD, BLENDER, SOLIDWORKS } from '../../controls/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { compactOutput } from '../../../scripts/measure-size.js';
-import { ViewCube } from '../dist/index.js';
+import { THEMES, ViewCube } from '../dist/index.js';
 
+/** Inline style: plain fields, plus the custom-property methods. */
+class FakeStyle {
+  setProperty(name, value) {
+    this[name] = value;
+  }
+  removeProperty(name) {
+    delete this[name];
+  }
+}
 /** Just enough DOM for the widget: elements, attributes, delegated events and `closest`. */
 class FakeElement {
   constructor(document, tag) {
@@ -16,7 +25,7 @@ class FakeElement {
       tagName: tag.toUpperCase(),
       children: [],
       parentElement: null,
-      style: {},
+      style: new FakeStyle(),
       dataset: {},
       attributes: {},
       listeners: {},
@@ -638,6 +647,84 @@ test('roll buttons turn the view 90 degrees about its axis; the roll holds while
   plain.dispose();
 });
 
+/** A CSS colour as [r, g, b, a] (0 to 255, alpha 0 to 1): #rgb, #rrggbb or rgba(). */
+const rgba = (c) => {
+  if (c.startsWith('rgba(')) return c.slice(5, -1).split(',').map(Number);
+  const h = c.length === 4 ? [...c.slice(1)].map((x) => x + x) : [c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)];
+  return [...h.map((x) => Number.parseInt(x, 16)), 1];
+};
+/** Source-over of a translucent colour on an opaque one, as browsers blend sRGB values. */
+const over = (top, under) => [...top.slice(0, 3).map((x, i) => x * top[3] + under[i] * (1 - top[3])), 1];
+/** WCAG 2.2 relative luminance and contrast ratio. */
+const luminance = (c) => {
+  const [r, g, b] = c.slice(0, 3).map((x) => {
+    const s = x / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+test('themes: every built-in colour pair meets WCAG 2 contrast over a black and a white page', () => {
+  assert.deepEqual(Object.keys(THEMES), ['light', 'dark', 'high-contrast']);
+  for (const [name, t] of Object.entries(THEMES)) {
+    const min = name === 'high-contrast' ? 7 : 4.5;
+    for (const page of [
+      [0, 0, 0],
+      [255, 255, 255],
+    ]) {
+      const fill = over(rgba(t.background), page),
+        hover = over(rgba(t.hover), fill),
+        at = `${name} over ${page}`;
+      assert.ok(contrast(rgba(t.text), fill) >= min, `${at}: text ${contrast(rgba(t.text), fill)}`);
+      assert.ok(contrast(rgba(t.hoverText), hover) >= min, `${at}: hover text ${contrast(rgba(t.hoverText), hover)}`);
+      assert.ok(contrast(rgba(t.line), fill) >= 3, `${at}: edges ${contrast(rgba(t.line), fill)}`);
+      assert.ok(contrast(rgba(t.focus), hover) >= 3, `${at}: focus ring ${contrast(rgba(t.focus), hover)}`);
+    }
+  }
+  // The checker itself: black on white is 21:1, and the old light edge colour #868d98 fails 3:1 over a black page.
+  assert.equal(contrast([0, 0, 0], [255, 255, 255]), 21);
+  assert.ok(contrast(rgba('#868d98'), over(rgba(THEMES.light.background), [0, 0, 0])) < 3);
+});
+
+test('setTheme writes the theme as custom properties; the stylesheet reads them, light by default', () => {
+  const { engine } = setup(),
+    cube = new ViewCube(engine),
+    css = cube.element.all().find((e) => e.tagName === 'STYLE').textContent,
+    props = () => Object.keys(cube.element.style).filter((k) => k.startsWith('--mvc-'));
+  // No theme: no inline colours, so app CSS can set the --mvc-* properties; the stylesheet has no fixed colours left.
+  assert.deepEqual(props(), []);
+  assert.ok(css.startsWith(`.mvc{--mvc-background:${THEMES.light.background};--mvc-text:${THEMES.light.text};`));
+  assert.ok(css.includes(`--mvc-hover-text:${THEMES.light.hoverText}`));
+  const rules = css
+    .split('\n')
+    .filter((l) => !l.includes('--mvc-background:'))
+    .join('');
+  assert.ok(!/#[0-9a-f]{3,6}\b|rgba?\(/.test(rules), `fixed colours left: ${rules}`);
+  assert.ok(css.includes('@media(prefers-color-scheme:dark){.mvc-auto{--mvc-background:rgba(36,40,47,.92)'));
+  cube.setTheme('dark');
+  assert.equal(cube.element.style['--mvc-background'], THEMES.dark.background);
+  assert.equal(cube.element.style['--mvc-hover-text'], THEMES.dark.hoverText);
+  assert.equal(props().length, 6);
+  assert.equal(cube.element.className, 'mvc');
+  // Your own tokens: the rest fall back to the stylesheet. 'auto' leaves the colours to the browser's settings.
+  cube.setTheme({ background: '#123456', text: 'white' });
+  assert.deepEqual(props(), ['--mvc-background', '--mvc-text']);
+  cube.setTheme('auto');
+  assert.deepEqual(props(), []);
+  assert.equal(cube.element.className, 'mvc mvc-auto');
+  cube.setTheme('light');
+  assert.equal(cube.element.className, 'mvc');
+  for (const bad of ['sepia', null, { text: 4 }]) assert.throws(() => cube.setTheme(bad), /Invalid theme; use/);
+  cube.dispose();
+  const hc = new ViewCube(engine, { theme: 'high-contrast' });
+  assert.equal(hc.element.style['--mvc-background'], '#000');
+  hc.dispose();
+});
+
 test('dispose removes the widget and its plugin; engine removal disposes it', () => {
   const { engine, container, plugins } = setup(),
     cube = new ViewCube(engine);
@@ -693,6 +780,6 @@ test('size budget', async (t) => {
   });
   const gzip = gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
   console.log(`viewcube gzip: ${gzip} B`);
-  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B (2026-11-08).
-  assert.ok(gzip < 4700, `${gzip} B`);
+  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B, themes 5,065 B (2026-11-08).
+  assert.ok(gzip < 5150, `${gzip} B`);
 });

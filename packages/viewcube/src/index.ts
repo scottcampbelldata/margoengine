@@ -47,7 +47,66 @@ export interface ViewCubeOptions {
   home?: HomeView | boolean;
   /** Shows two roll buttons that turn the view 90 degrees about the view axis, counter-clockwise and clockwise. Default false. */
   roll?: boolean;
+  /**
+   * Colours: 'light', 'dark', 'high-contrast', 'auto' (follows the browser's dark scheme and more-contrast settings), or
+   * your own tokens over the light ones. Default none: the light colours, which your own CSS may change through the
+   * `--mvc-*` custom properties on `.mvc`.
+   */
+  theme?: ThemeName | 'auto' | Partial<ViewCubeTheme>;
 }
+/** The widget's colours, any CSS colour each. Each is a custom property on the root: `--mvc-background`, ... */
+export interface ViewCubeTheme {
+  /** Face and button fill. */
+  background: string;
+  /** Face names and button glyphs. */
+  text: string;
+  /** Face edges and button borders. */
+  line: string;
+  /** Fill over a hovered or focused face, edge or corner. */
+  hover: string;
+  /** Face name on a hovered or focused face. */
+  hoverText: string;
+  /** Keyboard focus ring. */
+  focus: string;
+}
+/** A built-in {@link THEMES} entry. */
+export type ThemeName = 'light' | 'dark' | 'high-contrast';
+/**
+ * Built-in colours, checked by the package tests over a black and a white page behind the translucent fill: WCAG 2
+ * contrast of at least 4.5:1 (high contrast 7:1) for the text on the fill and on the hover fill, 3:1 for the edges on
+ * the fill and for the focus ring on the hover fill it is drawn on.
+ */
+export const THEMES: Readonly<Record<ThemeName, Readonly<ViewCubeTheme>>> = {
+  light: {
+    background: 'rgba(236,238,242,.92)',
+    text: '#262a31',
+    line: '#6b7280',
+    hover: 'rgba(52,128,246,.45)',
+    hoverText: '#262a31',
+    focus: '#0b3d91',
+  },
+  dark: {
+    background: 'rgba(36,40,47,.92)',
+    text: '#e6e9ee',
+    line: '#8b939f',
+    hover: 'rgba(90,160,255,.4)',
+    hoverText: '#fff',
+    focus: '#9cc7ff',
+  },
+  'high-contrast': {
+    background: '#000',
+    text: '#fff',
+    line: '#fff',
+    hover: '#ff0',
+    hoverText: '#000',
+    focus: '#000',
+  },
+};
+const TOKENS = Object.keys(THEMES.light) as (keyof ViewCubeTheme)[];
+/** `hoverText` is `--mvc-hover-text`. */
+const prop = (k: string): string => '--mvc-' + k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+/** `--mvc-background:...;--mvc-text:...` for the tokens a theme sets. */
+const vars = (t: Partial<ViewCubeTheme>): string => TOKENS.map((k) => (t[k] ? prop(k) + ':' + t[k] : '')).join(';');
 type V3 = [number, number, number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
 const FACES: Record<Face, [V3, V3, V3]> = {
@@ -85,15 +144,18 @@ const FACES: Record<Face, [V3, V3, V3]> = {
 /** Arrow-key step; polar angles within POLE of 0 or π land exactly on the pole. */
 const STEP = Math.PI / 4,
   POLE = 1e-9;
-const CSS = `.mvc{position:absolute;z-index:1;touch-action:none;user-select:none;-webkit-user-select:none;font:600 11px system-ui,sans-serif}
+const CSS = `.mvc{${vars(THEMES.light)}}
+@media(prefers-color-scheme:dark){.mvc-auto{${vars(THEMES.dark)}}}
+@media(prefers-contrast:more){.mvc-auto{${vars(THEMES['high-contrast'])}}}
+.mvc{position:absolute;z-index:1;touch-action:none;user-select:none;-webkit-user-select:none;font:600 11px system-ui,sans-serif}
 .mvc-cube{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
-.mvc-face{position:absolute;inset:0;display:grid;grid-template:20% 60% 20%/20% 60% 20%;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;box-sizing:border-box;border:1px solid #868d98;background:rgba(236,238,242,.92);color:#262a31}
+.mvc-face{position:absolute;inset:0;display:grid;grid-template:20% 60% 20%/20% 60% 20%;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;box-sizing:border-box;border:1px solid var(--mvc-line);background:var(--mvc-background);color:var(--mvc-text)}
 .mvc-face>*{border:0;margin:0;padding:0;background:none;color:inherit;font:inherit;text-transform:uppercase;cursor:pointer;outline:none}
-.mvc-face>:hover,.mvc-face>:focus-visible{background:rgba(52,128,246,.45)}
-.mvc button:focus-visible{box-shadow:inset 0 0 0 2px #1a63d6}
-.mvc-home,.mvc-roll{position:absolute;top:-26px;width:20px;height:20px;padding:0;border:1px solid #868d98;border-radius:50%;background:rgba(236,238,242,.92);color:#262a31;font:14px/1 system-ui,sans-serif;cursor:pointer}
+.mvc-face>:hover,.mvc-face>:focus-visible,.mvc>button:hover,.mvc>button:focus-visible{background:var(--mvc-hover);color:var(--mvc-hover-text)}
+.mvc button:focus-visible{box-shadow:inset 0 0 0 2px var(--mvc-focus)}
+.mvc-home,.mvc-roll{position:absolute;top:-26px;width:20px;height:20px;padding:0;border:1px solid var(--mvc-line);border-radius:50%;background:var(--mvc-background);color:var(--mvc-text);font:14px/1 system-ui,sans-serif;cursor:pointer}
 .mvc-home{left:0;font-size:15px}
-.mvc-projection{position:absolute;left:0;right:0;bottom:-26px;height:22px;border:1px solid #868d98;border-radius:4px;background:rgba(236,238,242,.92);color:#262a31;font:inherit;cursor:pointer}`;
+.mvc-projection{position:absolute;left:0;right:0;bottom:-26px;height:22px;border:1px solid var(--mvc-line);border-radius:4px;background:var(--mvc-background);color:var(--mvc-text);font:inherit;cursor:pointer}`;
 
 /** Spherical angles of a direction: azimuth about +Y from +Z (0 when vertical, so top and bottom keep -Z and +Z up), polar from +Y. */
 const angles = (d: readonly number[]): [number, number] => {
@@ -196,6 +258,7 @@ export class ViewCube {
       drag = true,
       home,
       roll = false,
+      theme,
       view,
     }: ViewCubeOptions = {},
   ) {
@@ -245,6 +308,7 @@ export class ViewCube {
     root.style[h as 'left'] = at(h, 12);
     root.style.width = root.style.height = size + 'px';
     el('style', root).textContent = CSS;
+    if (theme) this.setTheme(theme);
     this.cube = el('div', root, 'mvc-cube');
     for (const face of Object.keys(FACES) as Face[]) {
       const [n, u, w] = FACES[face],
@@ -367,6 +431,18 @@ export class ViewCube {
   /** Quarter turns the view is rolled counter-clockwise: 0 to 3 at rest, fractional while a roll animates. */
   get turns(): number {
     return this.twist / (Math.PI / 2);
+  }
+  /**
+   * Sets the colours: a built-in theme, 'auto', or tokens (any left out keep the light ones, or what your CSS sets).
+   * Written as `--mvc-*` custom properties on {@link element}.
+   */
+  setTheme(theme: ThemeName | 'auto' | Partial<ViewCubeTheme>): void {
+    const t = typeof theme === 'string' ? (theme === 'auto' ? {} : THEMES[theme]) : theme;
+    if (!t || typeof t !== 'object' || TOKENS.some((k) => t[k] !== undefined && typeof t[k] !== 'string'))
+      throw new RangeError("Invalid theme; use 'light', 'dark', 'high-contrast', 'auto' or colour strings");
+    this.element.className = theme === 'auto' ? 'mvc mvc-auto' : 'mvc';
+    for (const k of TOKENS)
+      t[k] ? this.element.style.setProperty(prop(k), t[k]) : this.element.style.removeProperty(prop(k));
   }
   /** Current projection mode, or undefined without a projection. */
   getProjection(): Projection | undefined {

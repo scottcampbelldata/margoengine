@@ -102,6 +102,19 @@ try {
   near(rolled.up, [1, 0, 0], 'rolled up', 1e-9);
   near(rolled.direction, [0, 0, 1], 'roll keeps the view', 1e-9);
   console.log('ok roll button');
+  // Themes through the browser's own CSS: the faces read the custom properties; 'auto' follows the colour scheme.
+  const dark = { background: 'rgba(36, 40, 47, 0.92)', color: 'rgb(230, 233, 238)' },
+    light = { background: 'rgba(236, 238, 242, 0.92)', color: 'rgb(38, 42, 49)' };
+  assert.deepEqual(await page.evaluate(() => window.check.theme('dark')), dark);
+  assert.deepEqual(await page.evaluate(() => window.check.theme('high-contrast')), {
+    background: 'rgb(0, 0, 0)',
+    color: 'rgb(255, 255, 255)',
+  });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  assert.deepEqual(await page.evaluate(() => window.check.theme('auto')), dark, 'auto in a dark scheme');
+  await page.emulateMedia({ colorScheme: 'light' });
+  assert.deepEqual(await page.evaluate(() => window.check.theme('auto')), light, 'auto in a light scheme');
+  console.log('ok themes');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {

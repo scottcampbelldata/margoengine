@@ -1,5 +1,5 @@
 {
-  "commit": "977fdd9cc",
+  "commit": "15f6cbca5",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3236,8 +3236,8 @@
     },
     "@margoengine/viewcube": {
       ".": {
-        "raw": 11592,
-        "gzip": 4619
+        "raw": 12793,
+        "gzip": 5065
       }
     },
     "@margoengine/voxel": {
