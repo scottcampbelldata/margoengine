@@ -3465,7 +3465,6 @@ Node began a synchronous registered test while module evaluation awaited the
 real plan context declared farther down the file. The test accessed ctx in its
 temporal dead zone. Register that complete test only after the awaited context
 exists; all assertions and expected affected/full decisions remain unchanged.
-The existing failing regression is tests/check-merge-affected.test.js, test
-' the real plan' (without the leading space). All failed gate files and compute
+The existing failing real-plan regression is in tests/check-merge-affected.test.js. All failed gate files and compute
 units pass 244 checks after the wiring and ordering repairs. No foreign source
 or companion code was read, and no wait, retry or timeout was introduced.

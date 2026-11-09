@@ -1,0 +1,172 @@
+{
+  "originalStatsCommit": "56a95be11319c2a24b4c565e4963bc2ce9e5753b",
+  "validatedCommit": "943149f889d173000878170b67c711095770f2ce",
+  "base": "5ec86fe7c",
+  "interruptedPreviousVerify": {
+    "log": "test-results/56fix/stats-verify.log",
+    "resultMissing": true,
+    "wrapperAndRecordedChildrenAbsent": true,
+    "note": "No completed result or pass claimed. The replacement started only after process inventory confirmed the old lane run was absent."
+  },
+  "verify": {
+    "code": 1,
+    "timedOut": false,
+    "seconds": 525.165,
+    "log": "test-results/56fix/stats-verify-resumed.log",
+    "testTotals": [
+      11,
+      165,
+      13881
+    ],
+    "repairedFailedSuites": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 13.191,
+      "tests": 244,
+      "log": "test-results/56fix/stats-verify-failed-tests.log",
+      "note": "All failed test files rerun whole, plus all compute units and the new gate regression. No second full verify and no fresh all-green full-run claim."
+    }
+  },
+  "gpuAndReadme": [
+    {
+      "id": "stats-browser",
+      "words": [
+        "node",
+        "scripts/test-stats-browser.mjs"
+      ],
+      "max": 1.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 5.209,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-stats-stats-browser.log"
+    },
+    {
+      "id": "stats-readme",
+      "words": [
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=stats"
+      ],
+      "max": 1.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 12.166,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-stats-stats-readme.log"
+    }
+  ],
+  "units": {
+    "code": 0,
+    "timedOut": false,
+    "seconds": 2.503
+  },
+  "lint": {
+    "code": 0,
+    "timedOut": false,
+    "seconds": 5.392
+  },
+  "hygiene": {
+    "code": 0,
+    "timedOut": false,
+    "seconds": 25.587
+  },
+  "sizes": {
+    "previousCommit": "559e2dba1",
+    "items": {
+      ".": {
+        "before": 4853,
+        "after": 4861
+      },
+      "./beacon": {
+        "before": 1383,
+        "after": 1394
+      },
+      "./compile": {
+        "before": 1802,
+        "after": 1813
+      },
+      "./phases": {
+        "before": 1458,
+        "after": 1467
+      }
+    }
+  },
+  "limitations": [
+    "Wider owner audit remains open.",
+    "Red capture regression and script wiring remain off main; core approval is pending.",
+    "No speed measurement or claim."
+  ],
+  "nextFactoryAudit": {
+    "regression": "test-results/56fix/save-owner-regression.test.mjs",
+    "parentResult": "test-results/56fix/save-owner-regression-red.log",
+    "passingDefaultControls": 3,
+    "failingSecondaryCases": 6
+  },
+  "computeGateRepair": [
+    {
+      "id": "compute-owner-gate",
+      "words": [
+        "npm.cmd",
+        "run",
+        "test:browser:scene-owner",
+        "--workspace",
+        "@margoengine/compute"
+      ],
+      "max": 1.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 2.714,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-owner-gate.log"
+    },
+    {
+      "id": "compute-browser",
+      "words": [
+        "node",
+        "packages/compute/tests/compute-browser.mjs"
+      ],
+      "max": 2.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 21.907,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-browser.log"
+    },
+    {
+      "id": "compute-readme",
+      "words": [
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=compute"
+      ],
+      "max": 1.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 6.887,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-readme.log"
+    }
+  ],
+  "finalCpu": {
+    "stats-final-lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 2.926,
+      "log": "test-results/56fix/stats-final-lint.log"
+    },
+    "stats-final-hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 10.148,
+      "log": "test-results/56fix/stats-final-hygiene.log"
+    },
+    "stats-final-doclinks": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 1.507,
+      "log": "test-results/56fix/stats-final-doclinks.log"
+    },
+    "stats-final-metadata": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 3.225,
+      "log": "test-results/56fix/stats-final-metadata.log"
+    }
+  }
+}

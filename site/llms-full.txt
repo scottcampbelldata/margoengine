@@ -5378,6 +5378,12 @@ profiling. Canonical min+gzip against the committed 559e2dba1 entry measurement:
 stats root 4853 to 4861 B, beacon 1383 to 1394 B, compile 1802 to 1813 B and
 phases 1458 to 1467 B. No ceiling is raised; core plus stage remains 23924 B.
 
+### ComputeFrame gate wiring
+
+Only the package test command and browser proof change. Runtime source, exports,
+entry ceilings and core plus stage (23924 B) are unchanged. Four intermediate
+1,024-value readbacks strengthen correctness; they make no speed claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -8938,6 +8944,32 @@ removed. Each owner now uses sceneOf(this); the eight-case real-engine test fail
 four direct cases before repair and passes all eight afterward. Scene removal,
 restoration, resource release and replacements remain covered. GPU/README and
 closing acceptance are pending; the wider audit remains open.
+
+### Fixed: ComputeFrame owner proof absent from package GPU gates
+
+The owner browser driver existed but no compute package script named it, so the
+GPU planner rejected the complete plan. Its new package script is covered by
+compute-owner-gate.test.js (fails before wiring). The script starts from the
+repository root. The owner GPU loop now checks every intermediate dispatch
+result after readback, retaining the exact four-step workload and disposal
+assertions. Native/compatibility owner proof, all 132 browser checks, all 21
+runtime examples and the full failed-gate/compute unit rerun pass.
+
+### Fixed: real-plan test could start before context initialization
+
+Node's test runner starts the registered real-plan assertion before the module's
+later top-level await initializes ctx. Register this complete test after that
+await, retaining every assertion. The collected verify's ReferenceError is
+retained; the complete failed-suite/compute rerun passes 244 checks. No timing
+wait, retry, weakened assertion or runtime engine change is involved.
+
+Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](whitepaper/results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
+
+### Open: Save factory ignores secondary restore target
+
+Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). applyPlugins calls attach outside target scene setup, so the factory registers in default; rollback removes by name from secondary instead. A same-name default plugin makes the restore reject before state loads. Nine real-engine cases retain three passing default controls and six secondary failures, covering success, immediate load failure and a later binding failure. The lane retains save-owner-regression-red.log and the regression draft; a package repair is next.
+
+Capture root-cause update from the coordinator: the red capture regression is owned by core lighting's uniform-only light-direction normalization under GPU load. The core repair waits for Scott's approval. The red regression and its package wiring stay off main; the exact-zero assertions remain unchanged.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

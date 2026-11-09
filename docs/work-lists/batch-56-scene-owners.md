@@ -1,18 +1,18 @@
 # Batch 56 wider scene-owner audit
 
-Status: OPEN. Snapshot after rebasing onto main dedf3bbfb, with the local
-shader owner repair. This is a complete syntactic call inventory, not proof
+Status: OPEN. Current syntactic snapshot includes the accepted stats repair
+and the current-main rebase onto 5ec86fe7c. This is a complete syntactic call inventory, not proof
 that every candidate is a bug or that every plugin has correct lifetime.
 
 The parser finds 181 actual removePlugin calls in package TypeScript sources:
-67 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
-binding needs review, 3 are core scene-router implementation, and 110 require
+71 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
+binding needs review, 3 are core scene-router implementation, and 106 require
 registration/receiver inspection. The old 187-line text scan included signatures
 and comments and came from older source. No calls or packages are silently
 waived by this recount. No core edit is proposed. Physics remains on hold.
 
 A second inventory finds 173 explicit EnginePlugin classes, all with dispose;
-57 contain sceneOf(this) in disposal and 87 contain an active-engine-shaped
+61 contain sceneOf(this) in disposal and 83 contain an active-engine-shaped
 removal. These are syntactic categories, not exhaustive inheritance or dataflow
 proof. Missing detachment can exist without any removePlugin call, as ScenePass
 and RawShaders demonstrated. Existing schema does not statically encode scene
@@ -79,7 +79,6 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 | sky | 8 | [Weather](../../packages/sky/src/weather.ts#L689), [WeatherFX](../../packages/sky/src/weather-fx.ts#L501), [VolumetricClouds](../../packages/sky/src/volumetric-clouds.ts#L601), [LightShafts](../../packages/sky/src/shafts.ts#L394), [HillaireSky](../../packages/sky/src/hillaire.ts#L588), [Sky](../../packages/sky/src/base.ts#L662), [AstroSky](../../packages/sky/src/astro.ts#L941), [AerialPerspective](../../packages/sky/src/aerial.ts#L334) |
 | splats | 6 | [SplatLod](../../packages/splats/src/lod.ts#L467), [SplatLighting](../../packages/splats/src/lighting.ts#L271), [Splats](../../packages/splats/src/index.ts#L611), [SplatDepth](../../packages/splats/src/depth.ts#L168), [SplatBrush](../../packages/splats/src/brush.ts#L310), [Player](../../packages/splats/src/animate.ts#L137) |
 | sprites | 3 | [SkeletalLayer](../../packages/sprites/src/skeletal.ts#L483), [SpriteLayer](../../packages/sprites/src/index.ts#L443), [BillboardLayer](../../packages/sprites/src/billboard.ts#L399) |
-| stats (repaired; closing gates pending) | 4 | [FramePhases](../../packages/stats/src/phases.ts#L215), [Stats](../../packages/stats/src/index.ts#L440), [PipelineCompiles](../../packages/stats/src/compile.ts#L314), [FrameBeacon](../../packages/stats/src/beacon.ts#L196) |
 | tilemap | 2 | [TileMap](../../packages/tilemap/src/renderer.ts#L362), [GridTileMap](../../packages/tilemap/src/iso.ts#L287) |
 | tiles | 2 | [TilesRenderer](../../packages/tiles/src/renderer.ts#L449), [TilesRenderer](../../packages/tiles/src/renderer.ts#L450) |
 | toon | 3 | [ModelOutlines](../../packages/toon/src/models.ts#L444), [Toon](../../packages/toon/src/index.ts#L110), [Hatching](../../packages/toon/src/hatch.ts#L212) |
@@ -96,4 +95,8 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 
 - [<function>](../../packages/save/src/engine.ts#L482): scene.removePlugin(made.name)
 
-Stats continuation: all four classes are reproduced and repaired with eight real-engine cases and a class-wide source guard. Package plus guard passes 95 checks. This supersedes the stats candidate row; the original inventory counts above are historical, not a fresh post-repair recount. GPU/README and closing acceptance remain pending. Save factory target and other owner groups remain unproved.
+Stats continuation: all four classes are reproduced and repaired with eight real-engine cases and a class-wide source guard. Package plus guard passes 95 checks; complete GPU and all eight runtime README examples pass. The collected full verify has 17 gate failures; all failed suites and compute units pass 244 checks after the gate repairs. Other full verify steps pass; no second full-green run is claimed. See the [stats receipt](../whitepaper/results/batch-56-stats-owner-20261109.json).
+
+The expanded inheritance inventory identifies 23 locally resolved subclasses, 24 other setup-bearing classes, 34 unresolved bases (including unrelated non-plugins) and 18 named setup object expressions. These are additional syntactic candidates, not lifetime proof or a count of defects. Imported package bases, aliases, mixins and factory dataflow still require inspection. Lane-local owner-inheritance-inventory.json retains every candidate.
+
+Save's stored scene removal is a proven bug: its factory attaches outside the target scene's setup scope. Three default controls pass and six secondary success/rollback cases fail before repair. The owning package fix is next; other owner groups remain unproved.
