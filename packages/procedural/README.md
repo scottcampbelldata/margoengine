@@ -116,9 +116,31 @@ const sphere = marchingCubes(grid, {resolution: [n, n, n]}); // normals from the
 ```
 
 ```ts
-import {generateTreeMesh, generateShrubMesh} from 'margoengine/procedural';
-const pine = generateTreeMesh('conifer'); // Also accepts 'broadleaf'.
-const bush = generateShrubMesh();
+import {Engine, Geometry} from '@margoengine/core';
+import {generateTreeMesh} from '@margoengine/procedural';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const tree = generateTreeMesh('broadleaf');
+for (const data of [tree.trunk, tree.canopy]) {
+  engine.createMesh().setGeometry(new Geometry(data.positions, data.normals, data.indices))
+    .setPosition([4, 0, 7]); // Both parts share this rooted transform.
+}
+engine.dispose();
+```
+
+For a complete tree in one call, import the optional `/tree` entry. `createTree`
+creates a root plus both child meshes, with brown trunk and green canopy materials.
+Options: `position` defaults to [0,0,0], `detail` to 2; `trunkMaterial` and
+`canopyMaterial` optionally borrow your PbrMaterials. Move/rotate/scale `root` to
+transform both parts. Dispose the returned tree to remove all three nodes.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {createTree} from '@margoengine/procedural/tree';
+const engine = await Engine.create(document.querySelector('canvas')!);
+using tree = createTree(engine, 'broadleaf', {position: [4, 0, 7]});
+tree.root.position.x = 8;
+tree.dispose();
+engine.dispose();
 ```
 
 Trees return separate `trunk` and `canopy` GeometryData plus canopy `center` and
