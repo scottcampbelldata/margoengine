@@ -172,7 +172,8 @@ export class WorkerPool {
         if (!job) return;
         slot.jobs.delete(data.id);
         this.watch(slot);
-        if (typeof data.error === 'string') job.reject(new Error(data.error));
+        if (typeof data.error === 'string')
+          job.reject(data.code === 'failed' ? decodeFailed(data.error) : new Error(data.error));
         else job.resolve(data.result);
       };
       worker.onerror = (event) => {

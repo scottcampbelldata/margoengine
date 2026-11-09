@@ -287,3 +287,7 @@ An invalid document rejects with a TypeError naming its first problem, and a ste
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 
 Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages; `npm run test:gpu --workspace packages/stage` runs the model viewer and a saved scene with a real model on real WebGPU.
+
+## Content Security Policy
+
+Creating the engine compiles core's embedded Rust transform kernel, so restricted pages need `'wasm-unsafe-eval'` in `script-src`. A stage creates that same engine. Every Margo engine page under a strict CSP needs this permission. A blocked compile or instantiate rejects with MargoError code `failed`, its original cause and a link to the CSP docs. Imports alone do not compile Wasm. See [the exact header and package requirements](../../docs/csp.md).

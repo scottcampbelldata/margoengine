@@ -1,3 +1,4 @@
+import { wasmError } from '../../shared/errors.js';
 // Runs prebuilt Wasm encoders away from the caller's frame: in a classic worker in a browser, where a long encode must not
 // stop the page, and in process in Node, where there is no Web Worker and nothing to keep responsive. Both load the
 // vendored file only when an encode starts.
@@ -23,6 +24,8 @@ export const boxed = <T>(
 ): Promise<ModuleBox<T>> =>
   new Promise<ModuleBox<T>>((resolve, reject) => {
     factory({ ...options, wasmBinary }).then((module) => resolve({ module }), reject);
+  }).catch((error) => {
+    throw wasmError(error);
   });
 
 // A name, not a literal: bundlers for the browser must not try to resolve Node's modules from this file.

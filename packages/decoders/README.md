@@ -442,7 +442,7 @@ matters more than the download. Texture video, HDR files and files that store a 
 | `target` | KTX2 | Negotiated from `device`. Set `'rgba8'` for CPU access to texels |
 | `timeout` | both | 10 s plus 4 s per MiB of input. Most milliseconds one decode may run; past it the worker is restarted and the decode rejects (`Draco decode timed out after ... ms`). `Infinity` disables it |
 
-`decode` and `transcode` also accept an `AbortSignal` as `signal`. The decoders evaluate the Emscripten wrappers inside the worker, so a strict Content Security Policy needs `'unsafe-eval'` in `worker-src`/`script-src` for the worker.
+`decode` and `transcode` also accept an `AbortSignal` as `signal`. The classic worker loads the Emscripten wrappers with `importScripts`. Wasm compilation needs `'wasm-unsafe-eval'` in `script-src` on worker responses; JavaScript `'unsafe-eval'` is unnecessary. See [Content Security Policy](../../docs/csp.md).
 
 Draco `attributeIds` selects unique attribute IDs; `componentTypes` specifies the glTF accessor type for each requested channel. Named positions, normals, UVs and colors return `Float32Array` values. Requested integer UVs retain their encoded values for the loader's accessor normalization, while colors are normalized once by the decoder. Extra channels retain their requested typed-array type. Triangle indices use `Uint16Array` below 65,536 vertices and `Uint32Array` at or above that boundary.
 
@@ -479,3 +479,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
 
 Apache-2.0 licensed.
+
+## Content Security Policy
+
+Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).

@@ -1,3 +1,4 @@
+import { wasmError } from '../../shared/errors.js';
 // Module worker of JXLDecoder. It is an ES module, unlike decoder.worker.js, because the jxl-oxide glue is one, and it is
 // named in `new Worker(new URL(...))` so bundlers follow its imports. The Wasm starts on the first job.
 import init, { JxlImage } from './jxl/jxl_oxide_wasm.js';
@@ -24,13 +25,17 @@ self.onmessage = async ({ data }) => {
   try {
     ready ??= init({ module_or_path: data.wasmURL }).catch((error) => {
       ready = undefined;
-      throw error;
+      throw wasmError(error);
     });
     await ready;
     const result = renderJXL({ JxlImage }, new Uint8Array(data.buffer), data.maxPixels);
     self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
   } catch (error) {
-    self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
+    self.postMessage({
+      id,
+      error: error instanceof Error ? error.message : String(error),
+      code: (error as { code?: string })?.code,
+    });
     // After a Wasm trap the module's memory is undefined and the glue cannot start it again: an uncaught error makes the
     // pool replace this worker.
     if (error instanceof WebAssembly.RuntimeError)

@@ -8,3 +8,6 @@ export function fault(code: MargoErrorCode, message: string, anchor?: string): E
 export function typeError(message: string, anchor: string): TypeError;
 /** RangeError whose message links to `anchor` on margoengine.com/errors. */
 export function rangeError(message: string, anchor: string): RangeError;
+
+/** Coded error with CSP help for policy-blocked Wasm initialization; other errors pass through. */
+export function wasmError(error: unknown): unknown;

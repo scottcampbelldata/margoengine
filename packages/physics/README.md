@@ -744,3 +744,7 @@ MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run te
 Rapier is Apache-2.0 and is not redistributed by this package.
 
 Apache-2.0 licensed.
+
+## Content Security Policy
+
+Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).

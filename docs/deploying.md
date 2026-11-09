@@ -45,10 +45,11 @@ isolated.
 The core kernel (vertex transforms, culling) is Wasm embedded in the JavaScript as base64. It is inflated with
 `DecompressionStream` and compiled with `WebAssembly.compile` / `WebAssembly.instantiate`. A CSP without
 `'wasm-unsafe-eval'` (or the much broader `'unsafe-eval'`) blocks every Wasm compile, so `Engine.create` rejects
-("Compiling or instantiating WebAssembly module violates the following Content Security policy directive"). The same directive covers the Draco and Basis decoders. `'wasm-unsafe-eval'` allows compiling Wasm only; it does not allow `eval` or `new Function`.
+with MargoError code `failed`, its original browser error as `cause`, and a link to [the CSP requirements](csp.md). Every Margo engine page under a strict CSP needs the permission, including stages. The same directive covers the optional Wasm decoders, solvers and encoders. `'wasm-unsafe-eval'` allows compiling Wasm only; it does not allow `eval` or `new Function`.
 
-No package calls `eval` or `new Function`, on the page or in a worker, injects inline `<script>`, or loads code from a
-CDN.
+The standard WebGPU path and decoder/encoder workers need no JavaScript `'unsafe-eval'`. The optional
+[WebGL2 CPU compute tier](../packages/webgl2-compat/README.md) uses `new Function` where allowed and otherwise
+runs its interpreter with the same results. This JavaScript permission is separate from the Wasm permission above.
 
 ### `worker-src 'self'`
 

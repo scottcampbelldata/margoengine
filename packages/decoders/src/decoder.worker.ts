@@ -68,6 +68,10 @@ self.onmessage = async ({ data }) => {
       else if (data.type === 'draco-points') dracoFull = undefined;
       else basis = undefined;
     }
-    self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
+    self.postMessage({
+      id,
+      error: error instanceof Error ? error.message : String(error),
+      code: (error as { code?: string })?.code,
+    });
   }
 };

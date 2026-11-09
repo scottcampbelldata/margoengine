@@ -1475,3 +1475,7 @@ Version 0.3.0 is under review on the selected development branch. Its source/CPU
 texture, source-rest and cancellation evidence do not certify this new native route. Source pixels, complete
 geometry/rig poses, reimport/restart, native playback and failure recovery need new bound acceptance before
 app installation. No generic GLB, Godot or Roblox quality setting is reduced by this optional support.
+
+## Content Security Policy
+
+Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).

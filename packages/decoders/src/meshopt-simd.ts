@@ -1,3 +1,4 @@
+import { wasmError } from '../../shared/errors.js';
 // glTF meshopt decoding with WebAssembly SIMD (`@margoengine/decoders/meshopt-simd`), beside the TypeScript decoder in
 // `@margoengine/decoders/meshopt`. The output is the same, byte for byte. A stream the Wasm will not read, a browser
 // without Wasm SIMD and any call before `ready` go to the TypeScript decoder, which also reports every error, so the
@@ -120,7 +121,9 @@ export const MeshoptSIMDDecoder = {
   },
   /** Compiles the module on first use. */
   get ready(): Promise<void> {
-    return (loading ??= load());
+    return (loading ??= load().catch((error) => {
+      throw wasmError(error);
+    }));
   },
   /** Decodes into `target`, which needs at least `count * stride` bytes. Throws what `MeshoptDecoder` throws. */
   decodeGltfBuffer(
@@ -132,7 +135,8 @@ export const MeshoptSIMDDecoder = {
     filter?: string,
   ): void {
     // A target too small gets the TypeScript decoder's own refusal, so the error stays the same too.
-    if (target.byteLength < count * stride) MeshoptDecoder.decodeGltfBuffer(target, count, stride, source, mode, filter);
+    if (target.byteLength < count * stride)
+      MeshoptDecoder.decodeGltfBuffer(target, count, stride, source, mode, filter);
     else target.set(meshoptDecodeGltfBufferSIMD(source, count, stride, mode, filter));
   },
 };

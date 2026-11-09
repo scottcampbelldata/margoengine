@@ -1,3 +1,5 @@
+import { wasmError } from './errors.js';
+
 // One asynchronous load shared by every caller: an app-wide solver or decoder that must be ready before synchronous
 // constructors run. Calls during a load share it, a loaded value is kept, and a failed load is tried again by the next
 // call. A signal stops one caller's wait; the load carries on for the others.
@@ -28,6 +30,8 @@ export class LoadOnce {
   async #start() {
     try {
       return (this.value = await this.#load());
+    } catch (error) {
+      throw wasmError(error);
     } finally {
       this.#pending = null;
     }

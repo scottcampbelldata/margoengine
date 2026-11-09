@@ -338,3 +338,7 @@ Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The publ
 TypeScript 7+ with DOM types, Wasm SIMD and DecompressionStream gzip support are required. WebGPU requires HTTPS or localhost. See the API and lifecycle guide and committed measurements and how to reproduce them.
 
 Apache-2.0 licensed.
+
+## Content Security Policy
+
+Creating the engine compiles core's embedded Rust transform kernel, so restricted pages need `'wasm-unsafe-eval'` in `script-src`. A stage creates that same engine. Every Margo engine page under a strict CSP needs this permission. A blocked compile or instantiate rejects with MargoError code `failed`, its original cause and a link to the CSP docs. Imports alone do not compile Wasm. See [the exact header and package requirements](../../docs/csp.md).

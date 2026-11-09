@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { staticEmbind } from '../../../scripts/static-embind.js';
-import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
@@ -60,3 +60,6 @@ for (const name of ['brotli', 'png', 'tiff', 'ktx2-file', 'ktx2-inflate', 'xz'])
   await writeFile(file, (await readFile(file, 'utf8')).replaceAll('../../shared/', './shared/'));
 }
 await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LICENSE-Apache-2.0.txt'));
+
+// Bundle shared runtime helpers into the packed package, including Wasm policy errors.
+await packageRuntime(root);

@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'csp',
+    title: 'Content Security Policy and WebAssembly',
+    kind: 'family',
+    messages: ["Wasm compilation blocked by CSP; add 'wasm-unsafe-eval' to script-src"],
+    cause:
+      'The browser refused to compile Wasm because script-src (or its default-src fallback) does not allow it. Emscripten may wrap the CompileError or EvalError in an abort.',
+    fix: "Serve Content-Security-Policy: script-src 'self' 'wasm-unsafe-eval' on the page and worker responses. Keep the other directives your app needs. This permits Wasm compilation without permitting JavaScript eval. See docs/csp.md in the repository for the packages and worker policy.",
+  },
+  {
     id: 'creative-target',
     title: '@margoengine/creative: texture render targets',
     kind: 'family',

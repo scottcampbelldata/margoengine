@@ -1910,3 +1910,9 @@ picked up by verify and check:merge. A scaled norm fixes squared-length overflow
 bound. The usual 143 pressed cells match within 1.63e-7 on RTX A6000. Native WebGL2 is exercised and refused with a
 coded unsupported error and help link. A CPU resource stand-in checks restoration and terminal disposal. Core/stage
 are unchanged; no speed claim.
+
+### Wasm policy diagnostics (2026-11-09)
+
+The shared loader translates policy-blocked compilation through the shared error helper. Core transform compilation and instantiation, physics solver and Rust kernel loads, decoder initialization and encoder initialization preserve MargoError code `failed` and the CSP help link; decoder worker responses now carry their code back through the pool. The per-path `tests/csp.test.js` suites, `tests/deep-core-csp.test.js` and `tests/wasm-csp.test.js` run in verify and therefore check:merge. Evidence is simulated blocked compilation; browser-specific policy enforcement remains unproven by these tests. [CSP deployment requirements](../csp.md) include core transform-kernel compilation and worker response headers. No Rust ABI, GPU math or rendering behavior changes.
+
+The approved core correction changes only `packages/core/src/kernel.ts`: core owns the transform-kernel compilation and instantiation, so an optional package cannot report its startup failure. Approval: Scott, "Yes approved", 2026-11-10. Core plus stage measures 23,797 B gzip with `npm run measure:size`, below 25,000 B.

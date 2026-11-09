@@ -1,5 +1,5 @@
 import { wasmBase64 } from './wasm.js';
-import { fault, rangeError } from '../../shared/errors.js';
+import { fault, rangeError, wasmError } from '../../shared/errors.js';
 
 interface Exports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -75,8 +75,12 @@ export class TransformStore {
       compiled = undefined;
       throw error;
     });
-    const instance = await WebAssembly.instantiate(await compiled);
-    return new TransformStore(instance.exports as Exports, capacity);
+    try {
+      const instance = await WebAssembly.instantiate(await compiled);
+      return new TransformStore(instance.exports as Exports, capacity);
+    } catch (error) {
+      throw wasmError(error);
+    }
   }
 
   private constructor(

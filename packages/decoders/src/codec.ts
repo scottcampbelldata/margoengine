@@ -1,3 +1,4 @@
+import { wasmError } from '../../shared/errors.js';
 // Worker-side decode functions. Kept free of worker globals so unit tests can drive them with real or mock modules.
 import { decodeFailed, deviceUnsupported } from './errors.js';
 import { hdrFormats, transcodeFormats, type HDRTranscodeTarget } from './formats.js';
@@ -62,8 +63,10 @@ export async function initDraco(
     throw decodeFailed(
       'Draco wrapper did not define DracoDecoderModule; load the unmodified draco_decoder.js from the package assets',
     );
-  return new Promise((resolve, reject) => {
+  return new Promise<ModuleBox<DracoModule>>((resolve, reject) => {
     factory({ wasmBinary }).then((module) => resolve({ module }), reject);
+  }).catch((error) => {
+    throw wasmError(error);
   });
 }
 
@@ -88,7 +91,11 @@ export type BasisFactory = (options: { wasmBinary: ArrayBuffer }) => PromiseLike
 export async function startBasis(factory: BasisFactory, wasmBinary: ArrayBuffer): Promise<ModuleBox<BasisModule>> {
   const module = await new Promise<{ m: BasisModule }>((resolve, reject) => {
     factory({ wasmBinary }).then((m) => resolve({ m }), reject);
-  }).then((box) => box.m);
+  })
+    .then((box) => box.m)
+    .catch((error) => {
+      throw wasmError(error);
+    });
   module.initializeBasis();
   if (typeof module.KTX2File !== 'function')
     throw decodeFailed(

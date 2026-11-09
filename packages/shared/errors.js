@@ -13,3 +13,19 @@ export const fault = (code, message, anchor = code) => margoError(code, linked(m
 export const typeError = (message, anchor) => new TypeError(linked(message, anchor));
 /** RangeError whose message links to `anchor` on the error help page. */
 export const rangeError = (message, anchor) => new RangeError(linked(message, anchor));
+
+/** Translate only policy-blocked Wasm initialization, including Emscripten's wrapped abort. Keep other failures intact. */
+export function wasmError(error) {
+  if (
+    !/^(Compile|Eval|Runtime)Error$/.test(error?.name) ||
+    !/wasm-unsafe-eval|content security policy|\bCSP\b|disallowed by embedder/i.test(error.message)
+  )
+    return error;
+  return Object.assign(
+    margoError(
+      'failed',
+      "Wasm compilation blocked by CSP; add 'wasm-unsafe-eval' to script-src; see https://margoengine.com/llms/docs/csp.md",
+    ),
+    { cause: error },
+  );
+}

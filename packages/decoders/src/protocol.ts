@@ -154,4 +154,4 @@ export type WorkerRequest =
 
 export type WorkerResponse =
   | { id: number; result: unknown; error?: undefined }
-  | { id: number; error: string; result?: undefined };
+  | { id: number; error: string; code?: string; result?: undefined };

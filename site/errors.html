@@ -53,6 +53,12 @@
       <p><strong>Fix.</strong> Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With <code>backend: "auto"</code> and <code>fallback: webglRenderer</code> from <code>@margoengine/webgl</code> the page draws on WebGL2 instead. Raise <code>startupTimeout</code> for a slow first compile; pass <code>signal</code> to cancel creation yourself. Branch on <code>error.code === "timeout"</code>.</p>
     </section>
     <h2>Messages</h2>
+    <section id="csp">
+      <h2><a href="#csp">Content Security Policy and WebAssembly</a></h2>
+      <p class="messages"><code>Wasm compilation blocked by CSP; add 'wasm-unsafe-eval' to script-src</code></p>
+      <p><strong>Cause.</strong> The browser refused to compile Wasm because script-src (or its default-src fallback) does not allow it. Emscripten may wrap the CompileError or EvalError in an abort.</p>
+      <p><strong>Fix.</strong> Serve Content-Security-Policy: script-src 'self' 'wasm-unsafe-eval' on the page and worker responses. Keep the other directives your app needs. This permits Wasm compilation without permitting JavaScript eval. See docs/csp.md in the repository for the packages and worker policy.</p>
+    </section>
     <section id="creative-target">
       <h2><a href="#creative-target">@margoengine/creative: texture render targets</a></h2>
       <p><strong>Cause.</strong> A texture target dimension, mip, layer, format, load operation or clear color is outside its supported range.</p>

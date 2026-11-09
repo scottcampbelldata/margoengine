@@ -184,3 +184,7 @@ Private broad-phase refits reuse the same call-stack input preflight while publi
 remain checked. The planner also skips pure eligibility predicates after rejecting a component, retaining
 its entire traversal. The [frame-preparation proof](../../docs/architecture/physics2d-frame-preparation.md)
 records exact work, accuracy and measurement limits; the Box2D browser loss remains open.
+
+## Content Security Policy
+
+Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).
