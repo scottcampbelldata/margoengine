@@ -2257,3 +2257,28 @@ Read standards and research prose only; no companion code.
 - Matt Pharr, Wenzel Jakob, Greg Humphreys, Physically Based Rendering, fourth edition (2023), section 15.1 prose, https://www.pbr-book.org/4ed/Wavefront_Rendering_on_GPUs/Mapping_Path_Tracing_to_the_GPU . Work queues and specialized kernels address throughput; throughput alone does not prove bounded packet duration.
 
 Synthesis for the pending watchdog job: preserve all pixels, samples and partial-sum order. The earlier <=65536-path row-band draft still lost AMD and is unvalidated. Must investigate command-buffer/packet boundaries and shader termination/access invariants; do not claim that awaiting onSubmittedWorkDone ensures a preemptible OS packet. Scott defers speed measurements and all exclusive locks. No new GPU diagnostic was run by this continuation.
+
+### Batch 99: nonblocking guiding example initialization
+
+Research-first comparison: Kai Ninomiya, Brandon Jones and Jim Blandy (editors),
+WebGPU (W3C Candidate Recommendation Draft, 2026),
+https://www.w3.org/TR/2026/CRD-webgpu-20260915/#asynchronous-pipeline-creation ,
+defines pipeline readiness without a fixed compilation latency. Jonathan Millard
+Ragan-Kelley, The Lightspeed Automatic Interactive Lighting Preview System
+(MIT thesis, 2007), https://hdl.handle.net/1721.1/40881 , abstract only, describes
+progressive feedback while a final image is refined. Michael D. McCool, Zheng Qin
+and Tiberiu S. Popa, Shader Metaprogramming (Graphics Hardware, 2002),
+https://www.graphicshardware.org/previous/www_2002/presentations/mccool_revised_paper.pdf ,
+introduction and specialization discussion, was compared with Brian Guenter,
+Todd B. Knoblock and Erik Ruf, Specializing Shaders (SIGGRAPH, 1995),
+https://www.microsoft.com/en-us/research/publication/specializing-shaders/ ,
+publication abstract only. No companion code was read. A smaller guide-helper
+record did not resolve the cold-start deadline and was reverted.
+
+The measured failure was the example waiting for full tracing compilation during
+module initialization, before any capture began. The selected repair uses the
+existing progressive viewport and preview, with pagehide disposal. No transport,
+shader, sample budget, readiness promise or deadline changes. A controlled-promise
+regression checks initialization, preview dispatch, eventual guided tracing and
+disposal without a wall-clock speed assertion. The real cache-disabled module
+completion probe retains the README gate's 20-second limit; no speed claim.

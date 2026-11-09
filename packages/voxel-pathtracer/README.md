@@ -108,11 +108,16 @@ const tracer = GuidedVoxelPathTracer.attach(engine, {
   guideStrength: 0.5,
   denoise: false,
 });
-await tracer.ready;
-const image = await tracer.renderImage({width: 64, height: 64, samples: 8, signal: AbortSignal.timeout(30_000)});
-tracer.dispose();
-engine.dispose();
+engine.start();
+window.addEventListener('pagehide', () => {
+  tracer.dispose();
+  engine.dispose();
+}, { once: true });
 ```
+
+This starts a progressive viewport immediately. A preview remains interactive while the guided
+pipeline compiles in the background; module initialization does not wait for a driver compilation.
+For an off-screen image, use `renderImage` as described in [Captures, float images and picks](#captures-float-images-and-picks).
 
 The guide reuses the existing deflector table: at most eight static, orthogonal glass instances whose
 used refracting material is pure smooth non-dispersive glass, plus eight mirror instances. Other objects

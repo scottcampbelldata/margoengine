@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "scope": "Module initialization and lifecycle ordering; not full compilation latency or runtime speed",
+  "diagnosticSourceHead": "dc62093e631d44edd24d9f1ba3487319ec11dc30",
+  "baseline": {
+    "finished": false,
+    "phase": "ready",
+    "deadlineMs": 20000,
+    "errors": [],
+    "pendingEntries": [
+      "trace"
+    ]
+  },
+  "replacement": {
+    "finished": true,
+    "phase": "done",
+    "deadlineMs": 20000,
+    "errors": [],
+    "fullTraceNotRequiredForInitialization": true
+  },
+  "controlledPromiseRegression": {
+    "baselineExit": 1,
+    "fixedExit": 0,
+    "previewDispatch": true,
+    "eventualTracing": true,
+    "disposal": true,
+    "wallClockAssertion": false,
+    "path": "packages/voxel-pathtracer/tests/guiding-readme.test.js"
+  },
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [
+      "--disable-gpu-shader-disk-cache"
+    ],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "landingGates": {
+    "sourceHead": "5c8022534da96028d1315a0be2937b69fed27809",
+    "target": "8a4e43d3ab27b24511cc9f0d78bbc189e9e4ad0c",
+    "coordinator": "after report-18: rerun failed API step and changed package README, no second full verify",
+    "checks": [
+      {
+        "label": "99-r6-guiding-build",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-api-update",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-llms",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-api-check",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-package",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-artifacts",
+        "code": 0,
+        "timed": false
+      },
+      {
+        "label": "99-r6-guiding-readme",
+        "code": 0,
+        "timed": false
+      }
+    ],
+    "packageTests": 134,
+    "readmeExamples": 9,
+    "coreStageGzip": 23924,
+    "measuredRecordCommit": "57cb6c0a6",
+    "verify": {
+      "code": 1,
+      "timed": false,
+      "failedStep": "api:check",
+      "cause": "API size rows generated before their entry-size input",
+      "repair": "Regenerated after entries; scoped api:check passes",
+      "fullRerun": false
+    },
+    "sourceChanges": "README and regression only; shader code unchanged"
+  }
+}

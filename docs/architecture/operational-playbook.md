@@ -3430,3 +3430,18 @@ tests with zero failures/skips (449.7 s). API reports match 887 entries and
 JSONs are byte-identical to the parked originals after line-ending normalization.
 Every fresh AMD proof, native-volume regression and runtime README gate passes.
 No benchmark, exclusive hold, tolerance increase or skipped test is included.
+
+### Guiding README initialization evidence (Batch 99)
+
+The caustic-guiding example starts the existing progressive viewport instead of
+blocking module initialization on full tracing-pipeline compilation and a capture.
+Its pagehide handler disposes the tracer and engine. The existing preview covers
+the compilation interval; full guided transport is unchanged.
+
+The controlled-promise regression guiding-readme.test.js rejects the old example
+while the tracing pipeline is deliberately unresolved, then verifies initialization,
+preview dispatch, full tracing after release, and disposal. This tests ordering,
+not a speed budget. A real native-WebGPU cache-disabled probe reproduced the old
+20-second module-completion failure at pipeline readiness and completes the revised
+example with the same limit. All 9 runtime README examples and 134 package tests pass on the rebased tree. The earlier verify stopped at stale API size rows caused by API generation preceding entry measurement. Regeneration in input order and the scoped API recheck pass; the coordinator directed no second full verify on this code. Pipeline
+compilation itself has no new latency guarantee and no gate tolerance was raised.

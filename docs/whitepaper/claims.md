@@ -1815,3 +1815,14 @@ gltf-pro shader/extensions/materials/viewer/native-volume, all materials steps
 with dispersion/cutout-casters completed by job4-material-remaining12.
 The unrelated voxel denoise-materials AMD watchdog remains an open investigation;
 these proofs do not classify it as a driver fault or close the batch.
+
+### Batch 99 guiding README initialization ordering
+
+The guiding example initializes its progressive viewport independently of full
+tracing-pipeline compilation. A controlled-promise regression fails the original
+example and verifies preview dispatch, eventual full tracing and disposal in the
+replacement. Native-WebGPU cache-disabled diagnostics reproduce the old module
+deadline failure at readiness and complete the replacement without changing the
+20-second gate. This is scoped initialization evidence, not a bound on compilation
+or a rendering-speed result. Scoped landing validation and the retained verify failure are recorded in
+results/batch-99-guiding-readme-startup-20261109.json.

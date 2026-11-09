@@ -2499,3 +2499,18 @@ Next isolate packet submission and per-ray termination/access invariants in one
 bounded diagnostic, preserving every pixel/sample and accumulation order.
 This remains an engine bug pending attribution, and is not a speed exemption.
 No new watchdog repro was run by the job 4 continuation.
+
+### Fixed: guiding README blocked module initialization (Batch 99)
+
+Repro: run the caustic-guiding README example with the shader disk cache disabled.
+The original top-level await of tracer.ready can outlast the unchanged 20-second
+module-completion limit. A diagnostic reaches readiness with only the trace
+pipeline unresolved, all auxiliary pipelines finished, and no GPU errors; the
+off-screen capture has not begun. This is an initialization dependency, not a
+transport failure or a busy-machine timing exemption.
+
+The example now starts the existing progressive viewport and disposes on pagehide.
+The new controlled-promise regression fails on the old example and verifies the
+preview-to-tracing lifecycle on the replacement. A real cold-module diagnostic
+passes with the unchanged deadline. Scoped landing checks pass, including all 9 runtime README examples;
+the history-tap repair remains separately preserved and must land afterward.

@@ -2011,3 +2011,11 @@ Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on
 WebGPU and 17.473541259765625 on compatibility; all original budgets pass.
 Proof summaries: whitepaper/results/batch-160-amd-{transmission,volume}.json.
 This measures complete pictures, retaining the transport limitations above.
+
+Guiding README startup (Batch 99):
+
+The guiding example initializes a progressive viewport while the full tracing
+pipeline compiles; it does not promise a bound on driver compilation. The existing
+20-second module-completion gate remains unchanged. Off-screen rendering still
+uses renderImage and its documented capture lifecycle. Transport and entry exports
+are unchanged, and no runtime speed claim is made.
