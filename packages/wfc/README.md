@@ -95,3 +95,29 @@ unsatisfiable or budget-exhausted searches throw coded failed with a help link. 
 The entropy pick scans the grid; this entry does not promise fast large worlds. Domains and the undo trail scale with
 cell/tile pairs; connectivity scratch scales with cells. CPU only, tested beside real WebGPU and WebGL2 contexts with
 identical seeded output. AbortSignal checks are synchronous and cannot receive new events on the blocked thread.
+
+## Sockets and rotations (optional wfc/sockets, 676 B min+gzip)
+
+```ts
+import {buildSocketTiles} from 'margoengine/wfc/sockets';
+import {ConstrainedWFC} from 'margoengine/wfc/constraints';
+const tiles = buildSocketTiles([
+  {sockets: ['road','road','air','air','air','air']},
+  {sockets: ['road','air','air','air','road','air']},
+]);
+const cells = new ConstrainedWFC([4, 1, 4], tiles).solve({seed: 7});
+const first = tiles[cells[0]];
+console.log(first.source, first.rotation, cells.length);
+```
+
+Six socket strings describe +X, -X, +Y, -Y, +Z, -Z. Opposite labels must be exactly equal; empty strings match too.
+Labels represent orientation-independent connectors, not textured face patterns or gendered plugs. Default rotations
+are four proper +Y-axis orientations; cube selects all 24 proper cube rotations, none selects identity. Identity is
+first, followed by stable signed-axis enumeration. No reflections or symmetry deduplication. Each source weight
+(default 1) is divided across its orientations, preserving total source frequency. Metadata gives the source index,
+rotated sockets and a column-major 3x3 rotation to apply to geometry. Inputs are copied.
+
+Up to 4096 expanded variants, Uint16 IDs through ConstrainedWFC; legacy root WFC remains 32 IDs. Adjacency building
+is O(variants squared), with six lists per variant; invalid inputs throw RangeError. Solver budgets and memory limits
+still apply. Pure CPU, identical on WebGPU and WebGL2 pages. Generated 48-variant tests are stand-ins; no artist
+asset compatibility claim. This entry builds rules only and imports no solver or rendering backend.

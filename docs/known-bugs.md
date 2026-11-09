@@ -1520,3 +1520,7 @@ tests/browser-teardown.test.js fails on the parent. Use closeAll for browser and
 The harness also let Vite serve the workspace directory when npm test:gpu launched it, while its imports address
 the repository root. Set root from import.meta.url; wfc/test/browser-launch.test.js fails without that change.
 The package GPU script now runs as written from npm's workspace cwd. No WFC algorithm or public API changed.
+
+### WFC sockets review (batch 69, job 3)
+
+No new open defect found in generated labelled-face, 48-ID and invalid-input checks. Orientation-independent labels and proper rotations only are documented limits.

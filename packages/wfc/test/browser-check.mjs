@@ -33,6 +33,7 @@ try {
   const result = await page.evaluate(async () => {
     const { OverlappingModel } = await import('/packages/wfc/dist/overlapping.js');
     const { ConstrainedWFC } = await import('/packages/wfc/dist/constraints.js');
+    const { buildSocketTiles } = await import('/packages/wfc/dist/sockets.js');
     const outputs = [];
     for (const route of ['webgpu', 'webgl2']) {
       const canvas = document.createElement('canvas');
@@ -44,6 +45,9 @@ try {
       } else if (!canvas.getContext('webgl2')) throw new Error('Missing WebGL2');
       const m = new OverlappingModel({ data: [0, 0, 0, 0], width: 2, height: 2 }, { N: 2 });
       const image = m.solve(8, 8, { pins: [{ position: [7, 7], value: 0 }], ground: { value: 0, rows: 2 } });
+      const variants = buildSocketTiles([0, 1].map(() => ({ sockets: Array(6).fill('open'), rotations: 'cube' })));
+      const sockets = new ConstrainedWFC([3, 2, 1], variants).solve({ pins: [{ position: [0, 0, 0], tile: 47 }] });
+      if (sockets[0] !== 47) throw new Error('Wide socket pin failed');
       const ids = [0, 1];
       const global = new ConstrainedWFC(
         [4, 3, 1],
@@ -68,13 +72,14 @@ try {
         if (error) throw new Error(error.message);
         device.destroy();
       }
-      outputs.push({ route, image: [...image], global: [...global] });
+      outputs.push({ route, image: [...image], global: [...global], sockets: [...sockets] });
     }
     return outputs;
   });
   assert.deepEqual(result[0].image, Array(64).fill(0));
   assert.deepEqual(result[1].image, result[0].image);
   assert.deepEqual(result[1].global, result[0].global);
+  assert.deepEqual(result[1].sockets, result[0].sockets);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ routes: result.map((r) => r.route), pixels: 64, errors: 0 }));
 } finally {

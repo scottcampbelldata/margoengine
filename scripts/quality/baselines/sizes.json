@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11501098,
+  "total": 11502030,
   "history": [
     {
       "date": "2026-10-24",
@@ -4880,6 +4880,12 @@
       "commit": "73ef38b8b",
       "reason": "WFC-optional-global-constraints-with-bounded-backtracking",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "0f912f407",
+      "reason": "batch-69-job-3-new-optional-socket-builder-676B",
+      "grew": 1
     }
   ],
   "items": {
@@ -5744,7 +5750,9 @@
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/webgl2-compat/xr": 103981,
     "@margoengine/wfc": 1878,
+    "@margoengine/wfc/constraints": 2593,
     "@margoengine/wfc/overlapping": 2707,
+    "@margoengine/wfc/sockets": 932,
     "@margoengine/worker": 2128,
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 8967,
@@ -5820,7 +5828,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/wfc/constraints": 2593
+    "margoengine/web": 577
   }
 }

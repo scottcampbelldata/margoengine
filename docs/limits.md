@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-615). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-616). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1153,3 +1153,7 @@ The side is positive, its product with 65,535 and its endpoint sums fit f32. Sub
 unaligned views are copied before packed-word reads. Invalid updates leave held records unchanged. The tiles entry
 measures 7,975 minified / 3,295 B gzip, within its existing 3,415 B budget. Existing slots, per-tile, GPU binding and
 drawn-ring limits still apply. No speed measurement or increase to supported world size is claimed.
+
+## WFC sockets (batch 69)
+
+Optional wfc/sockets 676 B min+gzip (peers external): up to 4096 expanded variants, four Y orientations by default or 24 proper cube rotations; no reflections/deduplication. Exact equality of orientation-independent face labels. O(variants squared) adjacency construction; output rule lists may be dense. Uses constraints Uint16 solver without changing legacy root IDs. Generated 48-variant fixture only, no physical asset proof.

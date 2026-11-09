@@ -1661,3 +1661,7 @@ Job 3 reads the ratified KHR_materials_sheen specification
 including its Charlie distribution, alternative visibility and albedo-scaling descriptions.
 It does not read any of the linked renderer implementations. Shared Margo sheen equations
 are inspected to name known differences, without claiming an ablation of the complete loss.
+
+## WFC sockets (batch 69, job 3)
+
+Clean-room equality matching on opposite face labels and the 24 determinant-positive signed-axis permutations of a cube. Rotations transform each face normal; the right-handed cross product supplies the third basis vector. Constraint formulation follows the already cited Karth and Smith (2017) description; no other implementation read or copied. Generated labelled-cube fixtures are stand-ins.

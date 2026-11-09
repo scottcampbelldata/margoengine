@@ -33,6 +33,10 @@
     "./constraints": {
       "types": "./dist/constraints.d.ts",
       "import": "./dist/constraints.js"
+    },
+    "./sockets": {
+      "types": "./dist/sockets.d.ts",
+      "import": "./dist/sockets.js"
     }
   },
   "files": [

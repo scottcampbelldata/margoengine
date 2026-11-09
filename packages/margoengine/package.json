@@ -3414,6 +3414,10 @@
       "types": "./dist/wfc/constraints.d.ts",
       "import": "./dist/wfc/constraints.js"
     },
+    "./wfc/sockets": {
+      "types": "./dist/wfc/sockets.d.ts",
+      "import": "./dist/wfc/sockets.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

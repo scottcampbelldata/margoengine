@@ -2000,3 +2000,7 @@ near/middle/far ring, two after adding a tile, one after removal and restoration
 distinct shader modules compile without errors. Native WebGL2 refusal is exercised with a help link. Existing LOD
 pixel/complementary fade tests remain the image proof; this new test asserts draw values, not artistic appearance.
 No new core/stage API, shader algorithm or speed claim. Node tests enter check:merge via the package test glob.
+
+### WFC rotation evidence (batch 69, section 5)
+
+Optional CPU socket construction checks all 24 proper signed-axis transforms, independent face-normal mapping and a 48-ID 3D solve. Browser tests run the same seeded socket rules beside real WebGPU and WebGL2 contexts. No rendering/backend code changes. Labels are logical connectors, with no texture-orientation or imported-geometry proof.
