@@ -2487,3 +2487,14 @@ Finite subnormal periods no longer overflow and poison the camera; infinite resu
 reject before loading. CPU regressions cover signed minimum/maximum finite periods and huge
 deltas, and the real-device viewer harness asserts a visible helmet at three extreme periods.
 Core and the stage root are unchanged. No new rendering or framing feature.
+
+### Physical-map resource pressure: section 5 evidence (batch 56 audit)
+
+An actual FlightHelmet viewer on WebGL2 compatibility exposed gltf-pro's eager eight missing-map
+fallback bindings. Native physical shader variants now key on the eight authored-map bits and
+substitute absent extension-map samples with their exact one-texel constants. Binding generation
+omits those same slots. The five core slots and material-hook paths keep their resource contracts.
+The variant cache has at most 256 masks, with a constant eight-slot construction loop; no CPU-heavy
+geometry or image loop is introduced. CPU renderer regressions check bindings and all eight
+authored slots independently. The full actual-device viewer assertions now pass on compatibility.
+Core, stage root and physics are untouched. No measured speed or whole-material-conformance claim.

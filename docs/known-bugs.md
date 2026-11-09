@@ -1901,3 +1901,13 @@ the period before division, bounding the trigonometric argument. Nonfinite resum
 before loading instead of silently preventing resume forever. stage/tests/viewer.test.js proves both
 regressions, finite extreme positive/negative periods and large deltas; the actual-device viewer test
 keeps the real helmet visible at extreme periods. No core change or new stage feature.
+
+### Batch 56 physical-map sampler overflow (resolved)
+
+The real FlightHelmet lens uses a transmission factor with no extension maps. gltf-pro nevertheless
+bound eight one-texel physical-map fallbacks, leaving too many fragment samplers after the
+compatibility layer adds IBL, shadow texture loads/comparisons and a storage data texture. ANGLE
+refused the program on its 16-unit device, and the viewer frame loop stopped. Native glTF physical
+shaders and group 1 now omit absent extension slots, substituting their exact fallback constants.
+Authored maps and custom hook resource contracts remain intact. Regression:
+gltf-pro/tests/physical-map-renderer.test.js and the real stage-viewer-gpu-check.js --compat.

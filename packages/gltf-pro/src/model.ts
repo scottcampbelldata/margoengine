@@ -75,6 +75,7 @@ import {
   pbrShader,
   extendedPBRShader,
   physicalShader,
+  sparsePhysicalShader,
   factorPhysicalShader,
   transmissiveShader,
   transparentPBR,
@@ -1462,6 +1463,8 @@ function textureGroup(
     pipeline,
     1,
     r.views.flatMap((view, i) => {
+      // Keep fallback views available for a hook added later, but bind only authored native physical maps.
+      if (i >= 5 && m.physical && !m.maps[i] && !m.shading && !(r.primitive.extension ?? m.extension)) return [];
       const binding = i < 5 || !m.extended ? i * 2 : 10 + planOf(m, hooks!).slots[i] * 2;
       return view && (!(r.primitive.extension ?? m.extension)?.replacesPhysical || i < 5)
         ? [
@@ -4477,7 +4480,9 @@ export class PBRModel implements EnginePlugin {
         ? pbrShader
         : m.physical
           ? m.maps.length > 5
-            ? physicalShader()
+            ? !shading && !source
+              ? sparsePhysicalShader(m.maps)
+              : physicalShader()
             : factorPhysicalShader()
           : extendedPBRShader;
     let code =

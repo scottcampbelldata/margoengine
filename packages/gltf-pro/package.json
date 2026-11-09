@@ -29,7 +29,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:shader:browser": "cd ../.. && node packages/gltf-pro/scripts/test-shader-review.js",
     "test:extensions:browser": "cd ../.. && node packages/gltf-pro/scripts/test-extensions-browser.js",
-    "test:gpu:materials": "cd ../.. && node scripts/gltf-pro-materials-gpu-check.js"
+    "test:gpu:materials": "cd ../.. && node scripts/gltf-pro-materials-gpu-check.js",
+    "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat"
   },
   "sideEffects": false,
   "exports": {

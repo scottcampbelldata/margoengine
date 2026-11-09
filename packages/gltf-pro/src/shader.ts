@@ -410,6 +410,24 @@ export const physicalShader = (): string =>
         .join('\n'),
     ),
   ));
+const sparsePhysical = new Map<number, string>();
+/** Native glTF physical maps: absent extension slots have their exact one-texel fallback value without a sampler. */
+export function sparsePhysicalShader(maps: readonly unknown[]): string {
+  const mask = physicalMaps.reduce((bits, _, i) => bits | (maps[i + 5] ? 1 << i : 0), 0);
+  let code = sparsePhysical.get(mask);
+  if (code !== undefined) return code;
+  code = physicalShader();
+  for (let i = 0; i < physicalMaps.length; i++) {
+    if (mask & (1 << i)) continue;
+    const name = physicalMaps[i];
+    code = code
+      .replace(`@group(1) @binding(${10 + i * 2}) var ${name}Map:texture_2d<f32>;`, '')
+      .replace(`@group(1) @binding(${11 + i * 2}) var ${name}Sampler:sampler;`, '')
+      .replaceAll(sample(name), name === 'clearcoatNormal' ? 'vec4f(128.0/255.0,128.0/255.0,1,1)' : 'vec4f(1)');
+  }
+  sparsePhysical.set(mask, code);
+  return code;
+}
 const transmissive = new Map<string, string>();
 // Transmission's first draw (gltf-pro blends it as dst x src): what is left of the light behind, from spare Frame lanes
 // and the material's factors. The transmitted light is in the base layer (KHR_materials_transmission), so it is scaled

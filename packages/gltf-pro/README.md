@@ -743,3 +743,16 @@ Khronos assets, and eight-influence character deformation against a CPU referenc
 These checks are also part of `npm run modern:test:extensions`.
 
 The demo at `/examples/flight-helmet.html` loads the [Khronos FlightHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) (CC0 1.0). Asset credits are in [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md).
+
+### Absent physical maps on limited devices
+
+Native glTF physical materials bind only authored extension maps. Absent maps use their existing
+constant fallback in the shader, leaving texture units available for image lighting and shadows.
+The five core map bindings stay stable. Fallback views remain available if a material hook is added
+or removed live; its full resource interface is retained. This fixes the viewer's
+transmission lens plus IBL and shadows on a 16-unit WebGL2 compatibility device. Authored maps
+are retained; a material that really exceeds hardware limits still has that limit.
+
+The existing loadGLTF examples apply unchanged. Run scripts/stage-viewer-gpu-check.js with --compat
+through the GPU lock for the licensed FlightHelmet integration regression, including cascaded
+shadows, IBL, visible product, turntable radius, failed-load rollback and disposal. No speed claim.

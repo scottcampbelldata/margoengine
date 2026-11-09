@@ -1538,3 +1538,12 @@ The existing stage/viewer accepts any finite nonzero turn period, including subn
 periods. Resume delay is finite and nonnegative. Modulo-before-division bounds the angular step.
 The camera still rotates around world Y, and the existing viewer's model/shadow/backend limits apply.
 No core or stage-root bytes change.
+
+### Native glTF physical-map bindings (batch 56 audit)
+
+Only authored physical extension maps consume group-1 texture/sampler bindings for native glTF
+materials. Missing slots use the exact existing UNORM fallback (white, or [128,128,255,255] for
+the coat normal). The five core slots stay stable. Material hooks retain their own interfaces;
+fully textured combinations can still exceed device texture limits. This repairs the FlightHelmet
+transmission lens with image lighting and shadowing on a 16-unit WebGL2 compatibility device.
+Native WebGL2 still refuses glTF PBR. No speed claim or core/stage-root size change.

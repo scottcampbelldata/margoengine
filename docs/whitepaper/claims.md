@@ -1485,3 +1485,12 @@ The CPU regression in packages/stage/tests/viewer.test.js fails on the old code 
 minimum/maximum finite periods, huge elapsed deltas, finite positions and preserved radius.
 scripts/stage-viewer-gpu-check.js also asserts the real helmet stays visible at extreme periods.
 This is numerical safety evidence, with no performance or photographic quality claim.
+
+## Batch 56 audit: physical-map fallback sampler repair
+
+The licensed real FlightHelmet viewer with IBL and cascaded shadows now runs on WebGL2
+compatibility without the former fragment texture-unit overflow. Native glTF shaders omit absent
+physical extension-map bindings and substitute their exact existing constant texels. CPU regression
+tests check five retained core slots, absent extension bindings and each authored physical map.
+The actual-device stage viewer harness retains every pixel, orbit-radius, rollback and disposal
+assertion on both backends. This proves that integration, not all fully textured combinations or speed.

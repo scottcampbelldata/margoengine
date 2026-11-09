@@ -265,12 +265,27 @@ test('the instanced vertex patch applies after material and shader-node patches,
 test('texture binding limit: over the device limit, the draw throws naming the material and effects', async () => {
   const { gpu, engine, store, view } = await scene(),
     fixture = animatedTriangle();
-  fixture.doc.materials = [{ extensions: { KHR_materials_clearcoat: { clearcoatFactor: 1 } } }];
+  // All eight extension maps are authored: missing-map constants must not turn this resource-limit test into a small shader.
+  const map = { index: 0 };
+  const uv = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+  const uvView = fixture.doc.bufferViews.length;
+  fixture.doc.bufferViews.push({ buffer: fixture.buffers.length, byteLength: uv.byteLength });
+  fixture.doc.buffers.push({ byteLength: uv.byteLength });
+  fixture.buffers.push(uv);
+  fixture.doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = fixture.doc.accessors.length;
+  fixture.doc.accessors.push({ bufferView: uvView, componentType: 5126, count: 3, type: 'VEC2' });
+  fixture.doc.textures = [{ source: 0 }];
+  fixture.doc.materials = [{ extensions: {
+    KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatTexture: map, clearcoatRoughnessTexture: map, clearcoatNormalTexture: map },
+    KHR_materials_transmission: { transmissionTexture: map },
+    KHR_materials_sheen: { sheenColorTexture: map, sheenRoughnessTexture: map },
+    KHR_materials_specular: { specularTexture: map, specularColorTexture: map },
+  } }];
   fixture.doc.extensionsUsed = ['KHR_materials_clearcoat'];
   delete fixture.doc.skins;
   delete fixture.doc.animations;
   delete fixture.doc.nodes[0].skin;
-  const model = parseGLTF(engine, fixture.doc, fixture.buffers, [], { materials: extendedMaterials });
+  const model = parseGLTF(engine, fixture.doc, fixture.buffers, [{ width: 1, height: 1 }], { materials: extendedMaterials });
   store.tick(false);
   const shadows = new Shadows({ resolution: 64 }),
     clustered = new Clustered({ grid: [4, 3, 2] });

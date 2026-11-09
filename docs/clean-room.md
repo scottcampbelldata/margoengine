@@ -1894,3 +1894,12 @@ A broad search of offset self-intersections, polygon union and snap rounding pre
 
 Existing Margo viewer wiring only. [ECMA-262 section 6.1.6.1.6](https://262.ecma-international.org/16.0/#sec-numeric-types-number-remainder) defines the finite floating remainder, allowing phase reduction before a potentially overflowing division.
 The existing Y-axis rotation is unchanged. No third-party source or asset is added.
+
+### Batch 56 native glTF physical-map resource repair
+
+Written from the [glTF 2.0 material specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials),
+whose absent texture components are unity, and the [WebGL 2.0 resource limits](https://registry.khronos.org/webgl/specs/latest/2.0/).
+The [KHR_materials_transmission specification](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
+defines the authored factor and optional map. Only specifications and existing Margo implementation
+were inspected. The exact normal fallback retains Margo's existing UNORM texel. No third-party
+implementation source was read or added. FlightHelmet is an already recorded licensed fixture.

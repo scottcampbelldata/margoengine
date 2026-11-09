@@ -12,6 +12,7 @@ import {
   compactTests,
   extendedPBRShader,
   physicalShader as physical,
+  sparsePhysicalShader,
   transmissiveShader,
   surfaceTintPBR,
   transparentPBR,
@@ -601,7 +602,7 @@ test('physical extensions select the physical shader variant, its maps and the t
       'opaque plain material draws first with the base shader, its tests behind constants',
     );
     // Transmission (5w.f): the transmissive physical variant, drawn twice: the background times the tint, then the lit surface added.
-    assert.equal(pipelines[1].vertex.module.code, viewShader(surfaceTintPBR(transmissiveShader())));
+    assert.equal(pipelines[1].vertex.module.code, viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(glass.maps)))));
     assert.equal(pipelines[2].vertex.module, pipelines[1].vertex.module);
     assert.deepEqual(
       pipelines.slice(1).map((p) => [p.fragment.entryPoint, p.fragment.targets[0].blend.color]),
@@ -610,14 +611,14 @@ test('physical extensions select the physical shader variant, its maps and the t
         ['fragment', { srcFactor: 'one', dstFactor: 'one' }],
       ],
     );
-    assert.deepEqual(groups, [10, 26, 26]);
+    assert.deepEqual(groups, [10, 16, 16]);
     assert.equal(pipelines[2].depthStencil.depthWriteEnabled, false);
     assert.ok(!calls.some((c) => c[0] === 'constant'), 'no blend constant');
     const formats = h.resources.filter((r) => r.format).map((r) => r.format);
     assert.equal(
       formats.filter((f) => f === 'rgba8unorm-srgb').length,
       4,
-      'base, emissive and specular-color defaults plus the sheen color image',
+      'base, emissive and specular-color defaults plus the sheen color image; fallbacks remain available for live hooks',
     );
     const uniform = new Float32Array(
       calls.filter((c) => c[0] === 'group' && c[1] === 0)[1][2].entries[0].resource.buffer.data,

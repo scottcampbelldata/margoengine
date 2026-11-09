@@ -4126,6 +4126,15 @@ periods. Resume delay is finite and nonnegative. Modulo-before-division bounds t
 The camera still rotates around world Y, and the existing viewer's model/shadow/backend limits apply.
 No core or stage-root bytes change.
 
+### Native glTF physical-map bindings (batch 56 audit)
+
+Only authored physical extension maps consume group-1 texture/sampler bindings for native glTF
+materials. Missing slots use the exact existing UNORM fallback (white, or [128,128,255,255] for
+the coat normal). The five core slots stay stable. Material hooks retain their own interfaces;
+fully textured combinations can still exceed device texture limits. This repairs the FlightHelmet
+transmission lens with image lighting and shadowing on a 16-unit WebGL2 compatibility device.
+Native WebGL2 still refuses glTF PBR. No speed claim or core/stage-root size change.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6031,6 +6040,16 @@ the period before division, bounding the trigonometric argument. Nonfinite resum
 before loading instead of silently preventing resume forever. stage/tests/viewer.test.js proves both
 regressions, finite extreme positive/negative periods and large deltas; the actual-device viewer test
 keeps the real helmet visible at extreme periods. No core change or new stage feature.
+
+### Batch 56 physical-map sampler overflow (resolved)
+
+The real FlightHelmet lens uses a transmission factor with no extension maps. gltf-pro nevertheless
+bound eight one-texel physical-map fallbacks, leaving too many fragment samplers after the
+compatibility layer adds IBL, shadow texture loads/comparisons and a storage data texture. ANGLE
+refused the program on its 16-unit device, and the viewer frame loop stopped. Native glTF physical
+shaders and group 1 now omit absent extension slots, substituting their exact fallback constants.
+Authored maps and custom hook resource contracts remain intact. Regression:
+gltf-pro/tests/physical-map-renderer.test.js and the real stage-viewer-gpu-check.js --compat.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

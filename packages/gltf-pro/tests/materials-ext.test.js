@@ -29,6 +29,7 @@ import {
   extendedTextureLimit,
   factorPhysicalShader,
   physicalShader,
+  sparsePhysicalShader,
   transmissiveShader,
   surfaceTintPBR,
   viewShader,
@@ -506,7 +507,8 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   let log = draw();
   const pipelines = log.filter((e) => e[0] === 'renderPipeline'),
     passes = log.filter((e) => e[0].startsWith('pass.')).map((e) => (e[0] === 'pass.setPipeline' ? e[1] : e[0]));
-  assert.equal(log.find((e) => e[0] === 'module')[2].code, viewShader(surfaceTintPBR(transmissiveShader())));
+  assert.equal(log.find((e) => e[0] === 'module')[2].code,
+    viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(model.primitives[0].material.maps)))));
   assert.deepEqual(
     pipelines.map((e) => [e[2].fragment.entryPoint, e[2].fragment.targets[0].blend.color]),
     [

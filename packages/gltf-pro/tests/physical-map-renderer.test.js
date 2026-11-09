@@ -138,6 +138,55 @@ test('physical Surface carries a neutral thickness multiplier', () => {
   assert.match(code, /s\.th=1/);
 });
 
+test('native physical materials do not bind absent extension-map fallbacks', async (t) => {
+  const f = await fixture();
+  t.after(() => f.engine.dispose());
+  const m = f.model.primitives[0].material;
+  Object.assign(m, {
+    maps: Array(13),
+    ext: [0, 1.5, 0, 0],
+    uvt: Array.from({ length: 13 }, () => textureTransform()).flat(),
+    physical: [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+  });
+  f.frame();
+  const draw = f.draws[0];
+  assert.equal(draw.groups[1].entries.length, 10, 'five core maps, no eight unused physical textures');
+  assert.equal((draw.pipeline.fragment.module.code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 5);
+  assert.match(draw.pipeline.fragment.module.code, /vec4f\(128\.0\/255\.0,128\.0\/255\.0,1,1\)/,
+    'the removed normal-map fallback retains the exact UNORM texel value');
+});
+
+test('sparse physical shaders preserve every authored extension-map slot independently', async () => {
+  const { sparsePhysicalShader, physicalMaps } = await import('../src/shader.ts');
+  for (let k = 0; k < 8; k++) {
+    const maps = Array(13);
+    maps[k + 5] = { index: k };
+    const code = sparsePhysicalShader(maps);
+    assert.equal((code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 6);
+    assert.match(code, new RegExp(`textureSample\\(${physicalMaps[k]}Map,${physicalMaps[k]}Sampler,uv\\(i,${k + 5}\\)\\)`));
+  }
+});
+
+test('adding and removing a live shading hook retains its full fallback-map resource interface', async (t) => {
+  const f = await fixture();
+  t.after(() => f.engine.dispose());
+  const m = f.model.primitives[0].material;
+  Object.assign(m, {
+    maps: Array(13), ext: [0, 1.5, 0, 0],
+    uvt: Array.from({ length: 13 }, () => textureTransform()).flat(),
+    physical: [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+  });
+  f.frame();
+  assert.equal(f.draws.at(-1).groups[1].entries.length, 10);
+  m.shading = { shader: code => code, bindings: () => [] };
+  f.frame();
+  assert.equal(f.draws.at(-1).groups[1].entries.length, 26, 'a live hook keeps all of its declared map bindings');
+  assert.equal((f.draws.at(-1).pipeline.fragment.module.code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 13);
+  delete m.shading;
+  f.frame();
+  assert.equal(f.draws.at(-1).groups[1].entries.length, 10);
+});
+
 test('physical map shader deduplicates textures and samplers while sampling each logical UV and channel', async () => {
   const module = await import('../../materials/src/physical-maps.ts');
   const slots = Array.from({ length: 17 }, (_, k) => [k % 3, k % 2]);

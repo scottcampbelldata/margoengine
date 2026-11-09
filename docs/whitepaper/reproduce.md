@@ -984,3 +984,12 @@ Build packages, run the stage package tests, then run scripts/stage-viewer-gpu-c
 the GPU lock (owner codex-56). Append --compat for the compatibility path. Extreme periods are
 Number.MIN_VALUE, -1e-309 and Number.MAX_VALUE, with a visible real helmet and no GPU errors.
 The CPU test includes both signs and huge finite deltas; old code produces nonfinite coordinates.
+
+### Batch 56 audit: physical sampler pressure
+
+After building packages, run the gltf-pro tests and scripts/stage-viewer-gpu-check.js through the
+GPU lock, on native WebGPU and with --compat. The same real FlightHelmet file, including its
+transmission-factor lens, uses IBL plus a floor shadow. Before the repair ANGLE reported fragment
+texture image units exceeding MAX_TEXTURE_IMAGE_UNITS(16), the frame loop stopped and the
+turntable assertion failed. The same unchanged assertions pass after unused physical maps are
+replaced by exact fallback constants and omitted from the bind group.
