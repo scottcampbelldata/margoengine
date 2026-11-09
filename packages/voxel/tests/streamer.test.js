@@ -443,6 +443,118 @@ test('VoxelStreamer keeps to memoryBudget: least recently used chunks outside th
   await tight.dispose();
 });
 
+test('VoxelStreamer reserves pending loads and admits only chunks that actually fit', { timeout: 10000 }, async (t) => {
+  const heavy = new VoxelChunk(STONE);
+  heavy.set(1, 2, 3, 0);
+  heavy.setLight(0, 0, 0, 0x50);
+  const size = heavy.byteLength;
+  assert.equal(size, 36876);
+  for (const chunksPerFrame of [1, Infinity]) {
+    const store = new MemoryChunkStore(),
+      world = new VoxelWorld({ blocks }),
+      seen = track(world),
+      reads = [];
+    for (const key of ring([0, 0, 0], 1, 0)) await store.put(...coords(key), heavy);
+    const get = store.get.bind(store);
+    store.get = (...at) => (reads.push(chunkKey(...at)), get(...at));
+    const streamer = new VoxelStreamer({
+      world,
+      store,
+      distance: 1,
+      verticalDistance: 0,
+      workers: 1,
+      chunksPerFrame,
+      frameBudget: Infinity,
+      memoryBudget: 3 * size,
+    });
+    t.after(() => streamer.dispose());
+    streamer.viewers = [[5, 3, 7]];
+    for (let i = 0; i < 20; i++) {
+      streamer.update();
+      assert.ok(seen.loaded.size <= 3, `${seen.loaded.size} chunks exceed the three-chunk budget`);
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(seen.loaded.size, 3);
+    assert.equal(streamer.pending, 2);
+    assert.ok(seen.loaded.has('0,0,0'), 'the closest chunk joined first');
+    assert.equal(reads.length, 4, 'the initial unknown-size batch is bounded; later loads reserve ready/loading data');
+    streamer.memoryBudget = Infinity;
+    await run(streamer);
+    assert.equal(seen.loaded.size, 5, 'budget increase admits deferred chunks and resumes loads');
+    assert.equal(reads.length, 5, 'a deferred chunk is retained rather than read again');
+    await streamer.dispose();
+  }
+});
+
+test('VoxelStreamer checks actual sizes after a small chunk and retains an oversized chunk', {
+  timeout: 10000,
+}, async (t) => {
+  const store = new MemoryChunkStore(),
+    world = new VoxelWorld({ blocks }),
+    seen = track(world),
+    light = new VoxelChunk(STONE),
+    heavy = new VoxelChunk(STONE);
+  heavy.set(1, 2, 3, 0);
+  heavy.setLight(0, 0, 0, 0x50);
+  await store.put(0, 0, 0, light);
+  for (const key of ring([0, 0, 0], 1, 0)) if (key !== '0,0,0') await store.put(...coords(key), heavy);
+  const streamer = new VoxelStreamer({
+    world,
+    store,
+    distance: 1,
+    verticalDistance: 0,
+    workers: 1,
+    chunksPerFrame: Infinity,
+    frameBudget: Infinity,
+    memoryBudget: heavy.byteLength - 1,
+  });
+  t.after(() => streamer.dispose());
+  streamer.viewers = [[0, 0, 0]];
+  for (let i = 0; i < 20; i++) {
+    streamer.update();
+    const total = [...seen.loaded].reduce((sum, key) => sum + world.getChunk(...coords(key)).byteLength, 0);
+    assert.ok(total <= streamer.memoryBudget, `${total} bytes exceed ${streamer.memoryBudget}`);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.deepEqual([...seen.loaded], ['0,0,0']);
+  streamer.memoryBudget = light.byteLength + heavy.byteLength;
+  for (let i = 0; i < 20; i++) streamer.update(), await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(seen.loaded.size, 2, 'exact remaining bytes admit one large chunk despite the small mean');
+  streamer.memoryBudget = Infinity;
+  await run(streamer);
+  assert.equal(seen.loaded.size, 5);
+});
+
+test('VoxelStreamer applies the byte admission check to packed generator replies', { timeout: 10000 }, async (t) => {
+  useWorkers(t);
+  const world = new VoxelWorld({ blocks }),
+    seen = track(world),
+    expected = new VoxelChunk();
+  expected.set(0, 0, 0, DIRT);
+  const streamer = new VoxelStreamer({
+    world,
+    generator: new URL('./generator.worker.js', import.meta.url),
+    distance: 1,
+    verticalDistance: 0,
+    workers: 1,
+    chunksPerFrame: Infinity,
+    frameBudget: Infinity,
+    memoryBudget: 2 * expected.byteLength,
+  });
+  t.after(() => streamer.dispose());
+  streamer.viewers = [[0, 0, 0]];
+  await run(streamer, () => seen.loaded.size >= 2);
+  for (let i = 0; i < 20; i++) {
+    streamer.update();
+    assert.equal(seen.loaded.size, 2);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(streamer.pending, 3);
+  streamer.memoryBudget = Infinity;
+  await run(streamer);
+  assert.equal(seen.loaded.size, 5);
+});
+
 test('VoxelStreamer.save and failed saves: an edit is never lost', async () => {
   const store = new MemoryChunkStore(),
     put = store.put.bind(store),

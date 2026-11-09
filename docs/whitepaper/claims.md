@@ -39,6 +39,12 @@ on the parent, and checks every binary16 word plus signed rounding ties. Selecte
 are preserved. This is an allocation-count claim, without a wall-clock speed claim. Reproduce with
 `node --test tests/f16-allocation.test.js`.
 
+Voxel streaming admission (2026-11-09): `packages/voxel/tests/streamer.test.js` deterministically checks that
+five wanted 36,876-byte stored chunks load only three under a 110,628-byte budget, with one or unlimited joins
+per update. Variable-size and real worker replies also respect actual admission bytes; increasing the budget
+resumes retained results. All three regressions fail on the previous streamer. This bounds loaded chunk data,
+not process memory, pending jobs or subsequent edits; see [limits](../limits.md).
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699

@@ -70,6 +70,14 @@ Half-float voxel encoding uses one reusable four-byte bit-cast buffer, with no t
 It retains IEEE binary16 rounding, subnormals and special values. This changes neither brick selection nor the
 atlas budget; `tests/f16-allocation.test.js` checks all 65,536 half words, rounding ties and allocation counts.
 
+Voxel streaming memory admission (2026-11-09): `VoxelStreamer.memoryBudget` limits loaded chunk typed-array
+bytes, not total process memory. Both ready and loading jobs reserve the loaded chunks' mean size; a finished
+stored or generated chunk joins only when its actual `byteLength` fits after LRU eviction outside the load range.
+A chunk that cannot fit remains pending, including one larger than the entire budget. Initial unknown-size loads,
+pending results, workers, stores and failed saves are outside this budget. Edits, externally added chunks and
+budget reductions can leave the protected load range over budget; further admission stops. Deterministic stored,
+variable-size and packed-worker regressions are in `packages/voxel/tests/streamer.test.js`.
+
 Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,
 with capacity checked on completion. The original 144-tile flight still generates every tile;
 all 292 unique default-world worker outputs match the parent exactly. The view entry is

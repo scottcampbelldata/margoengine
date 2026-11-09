@@ -291,8 +291,8 @@ const report = (error: unknown): void => {
  * update at most `chunksPerFrame` and no more once `frameBudget` milliseconds are spent (at least one). Lighting and
  * meshing follow through the world's onChunk and dirty set. A chunk that was edited (`world.onChange`), or that
  * someone else added, is saved to the store when it unloads; one generated or read from the store and not edited is
- * dropped. Over `memoryBudget` it unloads the least recently used chunks outside the load range, then stops loading
- * until there is room (a budget smaller than the load range loads the closest chunks only).
+ * dropped. To fit `memoryBudget` it unloads the least recently used chunks outside the load range. Each finished
+ * chunk waits until its actual byteLength fits (a budget smaller than the load range loads the closest chunks only).
  *
  * ```ts
  * const store = new IndexedDBChunkStore('world-1');
@@ -605,16 +605,16 @@ export class VoxelStreamer {
       if (!kept) this.#ceilings.delete(column);
     }
   }
-  // Over budget: unload the least recently used chunks outside the load ring; stop loading while still over.
-  #evict(): void {
+  // Make room for a load/admission: unload the least recently used chunks outside the load ring.
+  #evict(reserve = 0): void {
     let total = 0;
     for (const held of this.#loaded.values()) total += held.chunk.byteLength;
     this.#mean = this.#loaded.size ? total / this.#loaded.size : 0;
-    if (total > this.#budget)
+    if (total + reserve > this.#budget)
       for (const [key, held] of [...this.#loaded]
         .filter(([key]) => !this.#ring.has(key))
         .sort((a, b) => a[1].used - b[1].used)) {
-        if (total <= this.#budget) break;
+        if (total + reserve <= this.#budget) break;
         total -= held.chunk.byteLength;
         this.#unload(key, held);
       }
@@ -623,6 +623,7 @@ export class VoxelStreamer {
   }
   #add(): void {
     if (!this.#ready.size) return;
+    this.#evict(); // edits and a changed budget may have changed the room since the last update
     const far = (key: string) => this.#ring.get(key)?.d ?? Infinity,
       queue = [...this.#ready].sort((a, b) => far(a[0]) - far(b[0])),
       start = performance.now();
@@ -630,35 +631,47 @@ export class VoxelStreamer {
     for (const [key, ready] of queue) {
       if (added === this.#perFrame || (added && performance.now() - start >= this.#frameBudget)) break;
       const { cx, cy, cz, edited } = ready;
-      this.#ready.delete(key);
-      if (edited) this.#unsaved.delete(key);
-      if (this.world.getChunk(cx, cy, cz)) continue; // someone added one meanwhile: theirs stays
+      if (this.world.getChunk(cx, cy, cz)) {
+        this.#ready.delete(key); // someone added one meanwhile: theirs stays
+        continue;
+      }
       let chunk: VoxelChunk;
       try {
         chunk = ready.chunk instanceof VoxelChunk ? ready.chunk : VoxelChunk.unpack(ready.chunk);
       } catch (error) {
+        this.#ready.delete(key);
         this.#failed.set(key, ready); // a generator worker posted something that is not a PackedChunk
         this.onError(error);
         continue;
       }
+      // Reservations use an estimate; stored/generated chunks can be larger. Keep the closest finished chunk
+      // pending until it really fits, retaining the unpacked data and any unsaved edit while it waits.
+      ready.chunk = chunk;
+      if (chunk.byteLength > this.#room) this.#evict(chunk.byteLength);
+      if (chunk.byteLength > this.#room) break;
+      this.#ready.delete(key);
+      if (edited) this.#unsaved.delete(key);
       this.#loaded.set(key, { cx, cy, cz, chunk, edited, used: this.#ring.has(key) ? this.#tick : 0 });
       this.world.addChunk(cx, cy, cz, chunk);
+      this.#room -= chunk.byteLength;
       added++;
     }
   }
   // Starts loads closest first: at most 4 per worker running or queued, and none while as many finished chunks wait to
   // join as one update adds (at least 4 per worker), so a slow join does not pile chunks up. It runs each update and,
-  // once chunks have joined, as each load finishes, so a worker never waits for the next frame; between updates only
-  // while the memory budget has room for every chunk on its way (at the loaded chunks' mean size).
+  // once chunks have joined, as each load finishes, so a worker never waits for the next frame. Every start reserves
+  // room for all chunks on their way at the loaded chunks' mean size; admission checks the actual bytes separately.
   #start(between = false): void {
     if (this.#full || this.#disposed || (between && !this.#mean)) return;
     const waiting = Math.max(4 * this.workers, Math.min(this.#perFrame, 64));
     for (const order = this.#order; this.#next < order.length; this.#next++) {
       if (this.#loading.size >= 4 * this.workers || this.#ready.size >= waiting) return;
-      if (between && (this.#loading.size + this.#ready.size + 1) * this.#mean > this.#room) return;
       const spot = order[this.#next],
         { key } = spot;
       if (this.#loaded.has(key) || this.#loading.has(key) || this.#ready.has(key) || this.#failed.has(key)) continue;
+      const reserve = (this.#loading.size + this.#ready.size + 1) * this.#mean;
+      if (reserve > this.#room && !between) this.#evict(reserve);
+      if (reserve > this.#room) return;
       const kept = this.#unsaved.get(key);
       if (kept) this.#ready.set(key, kept);
       else this.#load(spot);

@@ -623,7 +623,11 @@ serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   they unload; chunks generated or read from the store and not edited are dropped and regenerate the same. A failed
   save is reported to `onError` and the chunk is kept in memory, where a reload finds it, until a save succeeds.
 - **Memory.** Over `memoryBudget` (default 128 MiB of `chunk.byteLength`) the least recently used chunks outside the
-  load range unload first; if the range alone is over, loading stops (closest chunks loaded) until there is room.
+  load range unload first. Loads reserve the loaded chunks' mean size for both running and finished jobs; each
+  finished chunk must fit by its actual `byteLength` before it joins. If it cannot fit, it stays pending until space
+  or a larger budget is available (even when one chunk exceeds the whole budget). The initial unknown-size batch,
+  pending results, workers, stores and failed saves are outside this loaded-data budget. Edits, externally added
+  chunks or a reduced budget can put the load range itself over budget; loading then stops until there is room.
 - **Failures.** A chunk the store or the generator fails on goes to `onError` (the engine's with `attach`) and is
   tried again only after it leaves the range and comes back.
 - **`noiseTerrain(options)`.** A fractal simplex heightmap (`height` 8, `amplitude` 32, `scale` 192 blocks) of grass

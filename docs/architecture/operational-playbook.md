@@ -1740,6 +1740,16 @@ shared lock's parent or mutex name. `makeLockDirectory` handles this as bounded 
 per name), including older clients' in-place deletion; live ownership is never changed. Native Windows and
 deterministic tests in `tests/gpu-lock-mutex.test.js` also require permanent permission failures to remain visible.
 
+### Voxel streaming budget admission (2026-11-09)
+
+The streamer reserves ready/loading jobs on every start and checks actual chunk bytes before admission,
+with LRU eviction restricted to chunks outside the load range. Three deterministic regressions in
+`packages/voxel/tests/streamer.test.js` fail on the previous implementation: stored chunk backlogs,
+variable-size/oversized results and packed real-worker results. They also prove that increasing the budget
+resumes retained chunks. The normal voxel package tests and full verify run them, including check:merge's
+affected-package verification. This is loaded-data admission evidence; total process memory and subsequent
+edits are outside that budget, and no rendering or speed claim follows from these tests.
+
 ### Sciviz asynchronous updates and trace replacement (2026-11-10)
 
 Restore audit: every sciviz `Drawable` must implement `restore`; package type checks and the layer protocol

@@ -89,6 +89,29 @@ uploads. No companion code, paper listing, outside engine source or external imp
 No CPU-heavy geometry loop or new Wasm is added. Timings are deferred; deterministic work is recorded in limits.
 The optional attacher's AbortSignal follows WHATWG contributors' [DOM Standard, section 3.3](https://dom.spec.whatwg.org/#using-abortcontroller-and-abortsignal-objects-in-apis), living standard read in 2026: reject with the exact reason, prevent late attachment and remove the listener after the module settles. Import fetching itself is not canceled.
 
+## Voxel streaming memory admission research (2026-11-09)
+
+Pre-landing research review for `packages/voxel/src/stream.ts`, following the coordinator's added research rule.
+Searches covered variable-size cache admission, asynchronous prefetch reservations and bounded queue backpressure.
+The selected primary papers were compared at the following extent; companion implementations were never opened.
+
+- Pei Cao and Sandy Irani, *Cost-Aware WWW Proxy Caching Algorithms* (1997),
+  [sections 2.2 and 4](https://static.usenix.org/publications/library/proceedings/usits97/full_papers/cao/cao_html/cao.html):
+  reviewed the LRU, size-sensitive and cost-sensitive replacement alternatives and making room for an incoming object.
+- Neal E. Young, *On-Line File Caching* (2002 journal version; 1997 technical report),
+  [section 1 and Figure 1](https://arxiv.org/pdf/cs/0205033): reviewed the total-byte capacity model and admission
+  after space is available. Its general replacement policy is broader than this streamer's protected load range.
+- Matt Welsh, David Culler and Eric Brewer, *SEDA: An Architecture for Well-Conditioned, Scalable Internet Services*
+  (2001), [sections 3.1-3.3](https://people.eecs.berkeley.edu/~prabal/teaching/resources/eecs582/welsh01seda.pdf):
+  reviewed stage boundaries, finite queues and backpressure between asynchronous producers and consumers.
+
+The review supports two separate controls: bound starts using ready/loading reservations, then check actual object
+bytes at admission because an estimate cannot enforce capacity for variable-size results. Margo retains its existing
+closest-first ordering, outside-range LRU eviction and pending results; cost-ranked replacement and dropping results
+would change the established contract. The papers supply general reasoning, not a claim of their performance bounds
+for Margo. None was read in full; the cited sections were reviewed. Three deterministic regressions exercise stored,
+variable-size and packed-worker results, including resumption after a budget increase.
+
 ## Draco replacement specification review (batch 133, 2026-11-09)
 
 The [published Draco bitstream specification](https://google.github.io/draco/spec/),
