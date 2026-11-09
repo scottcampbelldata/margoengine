@@ -167,3 +167,19 @@ engine and removes itself through sceneOf before releasing resources. The two
 new real-Engine tests in environment/tests/brdf-share.test.js fail on main and
 pass with the fix (7/7 tests). Dependent backgrounds/lighting still borrow the
 original environment; replacement does not retarget them. No core change.
+
+Entries 23 and 25 are NOT A BUG on main 1cc86b9a5 after a fresh package build.
+There is no Materials class or materials.set export in the current package;
+neither the README nor its API report declares one. The read-only page now edits
+primitive material factors directly. PbrMaterial's documented live roughness,
+metalness and clearcoat assignments work without a caller-created uniform block;
+materials/test/material-classes.test.js covers those defaults and physical options.
+The bounded test-results/testpage-23-repro.mjs records the absent exports and the
+working live properties. Adding the reported API would invent a new feature.
+
+For 25, Engine.sceneOf returns the default Scene for default-scene plugins, so
+Transitions.dispose already removes its registration. A new real-Engine check in
+transitions/test/scene-disposal.test.js passes without production changes: attach,
+dispose twice, confirm ownership/registration removed, immediately reattach.
+The existing GPU test/gpu-browser.js also checks actual scene ownership. The
+reported premise that sceneOf is undefined for direct engine attachment is false.
