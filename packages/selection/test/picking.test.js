@@ -65,6 +65,60 @@ function harness(samples = 4) {
     },
   };
 }
+
+test('100 captured picks validate the scene once and copy all tiles in one submission', async () => {
+  const h = harness(1);
+  try {
+    h.frame();
+    const matrix = h.mesh.matrix;
+    let matrixReads = 0, encoders = 0, submissions = 0, copies = 0;
+    Object.defineProperty(h.mesh, 'matrix', { get() { matrixReads++; return matrix; } });
+    const create = h.engine.gpu.createCommandEncoder;
+    h.engine.gpu.createCommandEncoder = () => { encoders++; return create(); };
+    h.engine.gpu.queue.submit = () => { submissions++; };
+    h.context.encoder.copyTextureToBuffer = (_source, target, size) => {
+      copies++;
+      const tile = new Uint32Array(target.buffer.data, target.offset, 192);
+      for (let y = 0; y < size[1]; y++) for (let x = 0; x < size[0]; x++) tile[y * 64 + x] = 1;
+    };
+    h.engine.pick = async (x, y) => h.effect.onPick(x, y);
+    const points = Array.from({ length: 100 }, (_, i) => [2 + i % 100, 2 + i % 80]);
+    const hits = await h.effect.pickMany(points);
+    assert.equal(hits.length, 100);
+    assert.ok(hits.every((hit) => hit?.mesh === h.mesh), 'every tile resolves the original mesh');
+    assert.equal(copies, 100, 'the same 100 neighborhoods are copied');
+    assert.equal(matrixReads, 16, 'one complete transform comparison for the unchanged scene');
+    assert.equal(encoders, 1, 'one command buffer for the captured IDs');
+    assert.equal(submissions, 1, 'one submission before the readback');
+  } finally {
+    h.effect.dispose();
+    h.cleanup();
+  }
+});
+
+test('100 micro picks reject horizontal misses after two exact matrix rows', async () => {
+  const h = harness(4);
+  try {
+    h.mesh.matrix[12] = 1000;
+    let reads = 0;
+    h.mesh.matrix = new Proxy(h.mesh.matrix, {
+      get(target, key) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) reads++;
+        const value = Reflect.get(target, key, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    h.frame();
+    h.engine.pick = async (x, y) => h.effect.onPick(x, y);
+    const points = Array.from({ length: 100 }, (_, i) => [2 + i % 100, 2 + i % 80]);
+    assert.deepEqual(await h.effect.pickMany(points), Array(100).fill(null));
+    assert.equal(h.copies.length, 100, 'every neighborhood is still queried');
+    assert.equal(reads, 3200, 'two rows read 32 model components per query, rather than 64');
+  } finally {
+    h.effect.dispose();
+    h.cleanup();
+  }
+});
 test('On the WebGL2 preview Picking needs webglPicking, then answers through engine.pick with the mesh', async () => {
   const mesh = { id: 3 },
     plugins = new Set(),

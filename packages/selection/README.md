@@ -45,6 +45,10 @@ order, with null for a miss or a point off the canvas. All points read the scene
 queue. Pass a `view` as the second argument to pick through it; with several views and no `view`, points outside the first
 point's view are picked one at a time.
 
+When the captured ID texture is current, the batch checks the scene once and submits all neighborhood copies in
+one command buffer. Micro passes keep their per-point submissions so each reads its own camera and instance uploads.
+Their sphere tests compute matrix rows only as each plane is reached, with unchanged arithmetic and culling results.
+
 ```ts
 import {Picking} from 'margoengine/selection';
 import {Engine} from 'margoengine/core';

@@ -2867,3 +2867,22 @@ results/biomes-slow-send-paired-20261109.json retains all twelve flights, minimu
 maxima per round and CPU occupancy. It shows no minimum-time regression beyond
 round spread, but one 7.4 ms current frame exceeds twice the 3.5 ms gate and is
 still open. Neither the timing budget nor a rival comparison row changes.
+
+### Batched picking: avoid repeated work (batch 108 job 2)
+
+- Historical loss: entry 60's 83 ms batch against 67 ms for three's WebGL loop
+  remains diagnostic; no new elapsed-time comparison is published.
+- Profile by deterministic operation counts: the desktop MSAA micro route computes
+  all four rows of camera times model before any sphere plane can reject it.
+  Lazy rows preserve every expression's evaluation order and every queried
+  neighborhood. A horizontal miss needs two rows: 3,200 instead of 6,400 model
+  component reads across 100 queries on one mesh. Both versions return 100 misses.
+- Captured route: 100 queries on one unchanged mesh previously read 1,600 matrix
+  components, made 100 encoders and 100 submissions. Now 16 components, one encoder
+  and one submission; all 100 clipped neighborhoods are copied and return that mesh.
+- Both work-count bars fail on the parent; tests are in selection/test/picking.test.js.
+  The GPU test pick-many.browser.mjs compares every hit with individual engine.pick
+  calls and checks submission counts on captured and micro routes. GPU confirmation
+  passes on the real NVIDIA adapter. No scene, result, tolerance or sample count is reduced.
+- Reproduce CPU counts: build selection, then `node --test --test-timeout=120000
+  packages/selection/test/picking.test.js`. Benchmark and release rerun: entry 60.

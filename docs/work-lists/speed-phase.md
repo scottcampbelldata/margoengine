@@ -266,3 +266,13 @@ WebGPU and full compatibility, once per backend for all three identical package
 aliases above. Only the optional --cost route remains deferred. The LOD default
 browser check also passes with its original pixel/visibility assertions and no
 measurement clock. No timing result is claimed.
+
+### Skip-audit batch 108 job 2
+
+Historical 83 ms versus 67 ms remains an open elapsed-time loss. The same
+100 captured queries now read 16 rather than 1,600 matrix components and submit
+once rather than 100 times. Horizontal micro misses read 3,200 rather than
+6,400 components with identical arithmetic, queries and results. GPU equivalence
+and all correctness cases run by default. The optional model latency loop needs
+--time and belongs to the quiet speed phase after Scott ends the build phase.
+No elapsed speed win or accepted slowdown is claimed from these work counts.

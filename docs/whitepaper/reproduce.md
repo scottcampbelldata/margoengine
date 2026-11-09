@@ -1482,3 +1482,11 @@ The package-tier browser gate also covers Gemini entries 21, 22, 26, 29, 30, 31,
 Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the shared GPU phase only; the three cutout-caster timing scripts are deferred in [the speed-phase record](../work-lists/speed-phase.md).
 
 Recording example activation: run `node --test --test-timeout=30000 packages/video/test/readme-record.test.js` and `npm run check:readme-run -- --packages=video` under the shared GPU lock. Click the README example's Record button to capture its generated picture and tone. [Research and the regression's scope](recording-example-research.md).
+
+Batched picking work counts: after building packages, run
+`node --test --test-timeout=120000 packages/selection/test/picking.test.js`.
+GPU equivalence and command counts: `node scripts/gpu-lock.mjs run
+--owner=codex-skipgaps -- node packages/selection/test/pick-many.browser.mjs`.
+This retains the same points, IDs, clipping and neighbor priority. For elapsed
+time, only after Scott ends the build phase, rerun the parity command in
+perf-history entry 60 under the speed-phase policy.

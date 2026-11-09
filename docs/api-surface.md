@@ -45,7 +45,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
 | @margoengine/inspector | `.` 12, `./frame` 17, `./history` 2, `./snapshot` 6, `./resources` 2, `./packages` 10 | 4 |  | 9,071 |
 | @margoengine/kinematics-constraints | `.` 21, `./swept` 5, `./sdf` 5 | 10 |  | 11,567 |
-| @margoengine/labels | `.` 22, `./declutter` 5, `./callouts` 2 | 34 |  | 5,450 |
+| @margoengine/labels | `.` 22, `./declutter` 5, `./callouts` 2 | 34 |  | 5,550 |
 | @margoengine/lighting2d | `.` 13, `./soft` 9, `./cookie` 13, `./gi` 8, `./height` 10, `./emissive` 7 | 26 |  | 5,394 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50, `./edges` 6, `./pick` 4, `./trail` 2, `./batch` 5, `./hidden` 2 | 39 |  | 19,635 |
@@ -77,7 +77,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2 | 5 |  | 1,713 |
 | @margoengine/scenery | `.` 2, `./sky` 2, `./presets` 10, `./scenes` 6, `./stars` 4, `./aurora` 6 | 6 |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./formats` 18, `./geo` 12, `./graph` 8, `./grids` 15, `./maths` 37, `./nrrd` 10, `./fallback` 3, `./webgl2` 2, `./flow` 5 | 435 |  | 36,916 |
-| @margoengine/selection | `.` 27 | 5 |  | 20,772 |
+| @margoengine/selection | `.` 27 | 5 |  | 20,833 |
 | @margoengine/shader | `.` 189, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 7, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,498 |
 | @margoengine/shadows | `.` 14, `./virtual` 3, `./light-function` 6, `./vsm` 3, `./transmission` 3, `./distance` 3, `./style` 3, `./rt` 5 | 45 |  | 18,481 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 9, `./sun` 19, `./volumetric-clouds` 7, `./cloud-shadows` 5, `./aerial` 6, `./hillaire` 8, `./shafts` 4, `./astro` 25, `./weather-fx` 5, `./presets` 4 | 106 |  | 17,715 |

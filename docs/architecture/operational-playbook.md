@@ -3776,3 +3776,41 @@ The completed integration validation belongs to base 17e876ee3/head 30e16454f;
 the evidence no longer attributes it to the mutable origin/main ref. Paired
 entry/network measurements are retained from c3f5f4d18. Full verify and completed
 GPU/parity suites were not repeated for this documentation rebase.
+
+### Section 5 evidence: batched picking repeated work
+
+Selection's micro sphere rejection lazily evaluates matrix rows without changing
+summation order, plane order, conservative bounds or queried neighborhoods.
+The parent reads 6,400 model components across 100 horizontal misses; the repair
+reads 3,200. Captured batch scene comparisons fall from 100 to one and its
+submissions from 100 to one. Both regressions fail on the parent. Package CPU
+checks pass; real-GPU point equivalence now passes. Desktop MSAA keeps micro
+passes because integer IDs cannot be resolved; no core/stage change or new
+elapsed-time comparison is claimed. See perf-history's batch 108 follow-up.
+
+### Batched picking pre-rebase validation (2026-11-09)
+
+Lint, hygiene, API, quality, proofs and full verify pass: 13,669 tests, zero
+failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. One
+shared GPU slot passes picking, all three captured/MSAA/micro batch comparisons,
+real-model perspective/orthographic checks and x-ray, plus all six executable
+README examples (36.9 s combined). No --time loop or benchmark was run.
+The historical 83 vs 67 ms remains an open loss for the deferred speed phase.
+Fresh genuine entry/network records share commit 1d7571281 and dirty=false;
+the actual basic scene fetches five requests and no extra file. API generation
+follows measurement. Selection is 20,808 B gzip, previously 20,745 B (+63),
+below its unchanged ceiling; core + stage stays 23,924 B under 25,000 B.
+The short network capture now explicitly limits its shared hold to one minute
+and waits at least 60 minutes, with the existing regression expanded.
+Evidence: test-results/skip-gaps/item3-*.log; research in skip-gaps-research.md.
+
+Final main rebase: inherited preview error-link and compatibility changes. Rebuilt
+all packages and regenerated genuine entry/network records together from
+375b56d0b, dirty=false, then API and llms. Lint, hygiene, API, all 83 selection
+cases and 21 record/document regressions pass. The fresh shared-slot selection
+GPU suite and all six README examples pass (20.2 s combined); the GPU suite
+includes captured/MSAA/micro counts and real-model perspective/orthographic
+equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
+second full verify or timing benchmark is claimed. Current selection: 20,833 B
+gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
+Core + stage remains 23,924 B. Logs: item3-rebased-*.log.

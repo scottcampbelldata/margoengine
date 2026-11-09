@@ -2152,3 +2152,24 @@ The small `/preview` engine has backend `webgl2` and no GPU device; the full Web
 Explicit install() retains an available native WebGPU adapter with a linked MargoError state warning, unless force is true. The full layer needs backend webgpu (or auto), while backend webgl2 requires a preview fallback. The added Gemini GPU attachments refuse preview and escalate; Lighting2D and LayerCompositor use the full device. The current procedural native fragment baker is a real preview route. No new hardware or performance claim is made.
 
 Canvas recording with audio remains subject to user activation. Its README example initializes a Record button and creates/resumes audio from the click; it does not await permission during module setup. This changes the example, with no new recording, timing or cross-browser capability claim.
+
+### Batched picking work counts (skip audit, batch 108 job 2)
+
+The historical 83 ms `p-gpu-pick-batch` against 67 ms for three's WebGL loop
+(perf history 60, busy diagnostic) remains a recorded loss, not an accepted
+speed difference. Desktop MSAA uses micro passes, not the single-sample MRT.
+Two avoidable costs are repaired in selection: a horizontal sphere miss now
+computes two matrix rows instead of four; a captured batch validates its scene
+once and shares one command submission for all copies. Both keep every queried
+3x3 neighborhood and the exact multiplication/addition order. Parent regressions
+measure 6,400 versus 3,200 model-component reads in 100 micro misses, and 1,600
+versus 16 reads for 100 captured queries on one mesh, with identical results.
+No new elapsed-time number or win over another engine is claimed. Real-GPU
+point-by-point equivalence, including the micro route, now passes.
+
+Before the final main rebase, selection measured 20,808 B versus 20,745 B before
+(+63 B), beneath its unchanged entry ceiling. Core + stage remains 23,924 B.
+
+Final rebased selection measures 20,833 B gzip versus upstream 20,772 B (+61 B),
+below its unchanged 21,142 B entry ceiling. Core + stage is 23,924 B. Genuine
+paired entry/network records use 375b56d0b with dirty=false.

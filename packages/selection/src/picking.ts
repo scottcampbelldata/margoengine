@@ -210,17 +210,26 @@ function proxySphere(device: GPUDevice): ModelPrimitiveLike {
 }
 
 function intersects(matrix: Float32Array, model: Float32Array, b: ArrayLike<number>, clip: Float64Array): boolean {
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++)
-      clip[c * 4 + r] =
-        matrix[r] * model[c * 4] +
-        matrix[4 + r] * model[c * 4 + 1] +
-        matrix[8 + r] * model[c * 4 + 2] +
-        matrix[12 + r] * model[c * 4 + 3];
   // Pull each plane into local space so nonuniform scale, mirrors and hierarchy shear stay conservative.
   for (let plane = 0; plane < 6; plane++) {
     const row = plane >> 1,
       sign = plane % 2 === 0 ? 1 : -1;
+    // Most meshes miss a 3x3 query horizontally. Compute the other rows only when their planes are reached,
+    // retaining the exact multiply/add order of the complete matrix product.
+    if (plane % 2 === 0)
+      for (let c = 0; c < 4; c++) {
+        clip[c * 4 + row] =
+          matrix[row] * model[c * 4] +
+          matrix[4 + row] * model[c * 4 + 1] +
+          matrix[8 + row] * model[c * 4 + 2] +
+          matrix[12 + row] * model[c * 4 + 3];
+        if (plane === 0)
+          clip[c * 4 + 3] =
+            matrix[3] * model[c * 4] +
+            matrix[7] * model[c * 4 + 1] +
+            matrix[11] * model[c * 4 + 2] +
+            matrix[15] * model[c * 4 + 3];
+      }
     const a = plane === 4 ? clip[2] : clip[3] + sign * clip[row],
       d = plane === 4 ? clip[6] : clip[7] + sign * clip[4 + row],
       e = plane === 4 ? clip[10] : clip[11] + sign * clip[8 + row],
@@ -556,9 +565,11 @@ export class Picking implements EnginePlugin {
     view: PickView | undefined,
     read: GPUBuffer,
     offset: number,
+    captured = !view && !scene.models.length && !scene.list.length && this.fresh(),
+    batchEncoder?: GPUCommandEncoder,
   ): PickTile | null {
     const e = this.engine!,
-      { device, models, list } = scene,
+      { device, list } = scene,
       canvas = e.canvas,
       cssWidth = canvas.clientWidth || canvas.width,
       cssHeight = canvas.clientHeight || canvas.height,
@@ -576,10 +587,10 @@ export class Picking implements EnginePlugin {
       width = Math.min(right, px + 2) - x0,
       height = Math.min(bottom, py + 2) - y0;
     if (px < left || px >= right || py < top || py >= bottom) return null;
-    const encoder = device.createCommandEncoder();
+    const encoder = batchEncoder ?? device.createCommandEncoder();
     let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
     // ModelLike and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
-    if (!view && !models.length && !list.length && this.fresh()) {
+    if (captured) {
       texture = this.ids!;
       origin = [x0, y0];
     } else {
@@ -588,7 +599,7 @@ export class Picking implements EnginePlugin {
       origin = [1 + x0 - px, 1 + y0 - py];
     }
     encoder.copyTextureToBuffer({ texture, origin }, { buffer: read, offset, bytesPerRow: 256 }, [width, height]);
-    device.queue.submit([encoder.finish()]);
+    if (!batchEncoder) device.queue.submit([encoder.finish()]);
     return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits };
   }
   /** The hit of one mapped tile: the center's ID, else the nearest neighbor's, resolved and checked against the scene. */
@@ -722,12 +733,17 @@ export class Picking implements EnginePlugin {
       tiles: (PickTile | null)[] = [];
     try {
       this.primitives.discover(e.meshes.values());
+      // No await or scene mutation between points: validate the captured IDs once for this entire turn.
+      const captured = !view && !scene.models.length && !scene.list.length && this.fresh(),
+        encoder = captured ? device.createCommandEncoder() : undefined;
       batch.points.forEach(([x, y], i) => {
         const onCanvas = x >= 0 && y >= 0 && x < cssWidth && y < cssHeight,
-          tile = onCanvas ? this.submit(scene, x, y, view, read, i * tileBytes) : null;
+          tile = onCanvas ? this.submit(scene, x, y, view, read, i * tileBytes, captured, encoder) : null;
         tiles.push(tile);
         if (onCanvas && !tile) batch.outside.push(i);
       });
+      // Micro passes retain their individual submissions: their uniforms are written through the queue per point.
+      if (encoder) device.queue.submit([encoder.finish()]);
       await read.mapAsync(GPUMapMode.READ);
       const data = new Uint32Array(read.getMappedRange());
       tiles.forEach((tile, i) => {

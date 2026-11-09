@@ -7,6 +7,10 @@ import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
+// Correctness always runs. The optional latency measurement belongs to the quiet speed phase.
+const timing = process.argv.includes('--time');
+if (timing && process.env.MARGO_GPU_LOCK_NESTED_MODE !== 'exclusive')
+  throw new Error('Model-picking timing requires an exclusive outer GPU lock; do not run it during the build phase.');
 const browser = await openBrowser(),
   { page, hardware } = browser,
   errors = [];
@@ -26,7 +30,7 @@ const outlinePixels = async () => {
 };
 try {
   await page.waitForFunction(() => window.modern);
-  const report = await page.evaluate(async () => {
+  const report = await page.evaluate(async (timing) => {
     const { Engine, box, PbrMaterial: _PbrMaterial } = await import('/packages/core/dist/extension.js'),
       { Picking, Selection } = await import('/packages/selection/dist/index.js');
     const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
@@ -154,14 +158,16 @@ try {
       perspective.rate === 1 && perspective.modelPixels > 50,
       'GPU and CPU picking disagree: ' + JSON.stringify(perspective),
     );
-    // Pick latency on the micro pass with models attached.
-    let start = performance.now();
-    for (let i = 0; i < 30; i++) await e.pick(hx, hy);
-    const pickMs = (performance.now() - start) / 30;
-    start = performance.now();
-    for (let i = 0; i < 300; i++) raycaster.setFromEngine(e, hx, hy).intersectEngine(e);
-    const rayMs = (performance.now() - start) / 300;
-    checks.push({ name: 'Latency', gpuPickMs: +pickMs.toFixed(2), raycastMs: +rayMs.toFixed(3) });
+    if (timing) {
+      // Pick latency on the micro pass with models attached. No correctness assertion depends on it.
+      let start = performance.now();
+      for (let i = 0; i < 30; i++) await e.pick(hx, hy);
+      const pickMs = (performance.now() - start) / 30;
+      start = performance.now();
+      for (let i = 0; i < 300; i++) raycaster.setFromEngine(e, hx, hy).intersectEngine(e);
+      const rayMs = (performance.now() - start) / 300;
+      checks.push({ name: 'Latency', gpuPickMs: +pickMs.toFixed(2), raycastMs: +rayMs.toFixed(3) });
+    }
     console.log('[models] perspective ' + JSON.stringify(perspective));
     // Orthographic camera from @margoengine/cameras.
     e.use(new CameraProjection({ mode: 'orthographic', height: 4 }));
@@ -193,7 +199,7 @@ try {
     };
     await e.gpu.queue.onSubmittedWorkDone();
     return { checks, gpuErrors };
-  });
+  }, timing);
   const outline = {};
   for (const which of ['none', 'helmet', 'robot', 'plane', 'occluded']) {
     if (which === 'occluded') await page.evaluate(() => window.occlude());

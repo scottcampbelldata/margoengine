@@ -137,7 +137,7 @@ assert.deepEqual(
   'the build emits no Wasm, worker or optional pack the app does not import',
 );
 
-const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });
+const release = await acquire({ owner: 'basic-scene-network', max: 1, waitMax: 60, poll: 2000 });
 let held = true;
 const releaseGpu = () => {
   if (held) release();

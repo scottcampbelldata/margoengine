@@ -1922,3 +1922,11 @@ GPU-only optional renderers reject the small preview during setup with linked `u
 Preview continuation: package-tiers-browser.mjs explicitly covers PostStack, Shadows, Video, VFX, Splats, Lighting2D, LayerCompositor and CulledInstances refusal and escalation, plus the real procedural preview baker. device.test.js proves install() warns with a linked state code when retaining native WebGPU, and force installs without warning. These are correctness and diagnostic claims, with no speed claim.
 
 Recording example initialization creates no AudioContext and requests audio only after a click. Proof: packages/video/test/readme-record.test.js executes the README snippet with a held resume promise and checks capture order and cleanup; the prior snippet fails its state assertion. This is an example lifecycle claim, with no recorder capability or speed claim.
+
+Batched picking work-count claim (batch 108 job 2): a horizontal micro-frustum
+miss needs two rows of the camera/model matrix product rather than four, with
+identical operation order and result. A captured batch validates once and copies
+all neighborhoods in one submission. Directed counts and the failing parent
+are covered by packages/selection/test/picking.test.js. Historical 83 vs 67 ms
+is still a loss. Real-GPU point equivalence and command counts pass on all
+captured/MSAA/micro routes; no elapsed-time win is claimed.

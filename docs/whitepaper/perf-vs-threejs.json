@@ -27615,5 +27615,31 @@
    "version": "0.186.1",
    "package": "three"
   }
+ },
+ "workCountFollowups": {
+  "p-gpu-pick-batch": {
+   "source": "perf-history entry 60",
+   "historicalDiagnosticMs": {
+    "margo": 83,
+    "threeWebGLLoop": 67
+   },
+   "historicalVerdict": "slower",
+   "elapsedTimeRerun": "pending",
+   "gpuEquivalence": "passed: item3-gpu-readme.log, captured and micro routes",
+   "regression": "packages/selection/test/picking.test.js",
+   "micro100HorizontalMisses": {
+    "beforeModelReads": 6400,
+    "afterModelReads": 3200,
+    "sameNullResults": 100
+   },
+   "captured100PointsOneMesh": {
+    "beforeModelReads": 1600,
+    "afterModelReads": 16,
+    "beforeSubmissions": 100,
+    "afterSubmissions": 1,
+    "copies": 100,
+    "sameHits": 100
+   }
+  }
  }
 }

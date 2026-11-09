@@ -29,6 +29,9 @@ test('basic-scene-network takes the GPU lock before its server port', () => {
     server = script.search(/\blistenWhenFree\(/);
   assert.ok(lock > 0 && server > 0, 'both calls are present');
   assert.ok(lock < server, 'acquire() comes before listenWhenFree()');
+  const settings = script.slice(lock).match(/^acquire\(\{([^}]+)\}/)?.[1];
+  assert.match(settings, /\bmax:\s*1\b/, 'the short browser capture has a one-minute GPU hold limit');
+  assert.match(settings, /\bwaitMax:\s*60\b/, 'queueing does not use a GPU slot');
 });
 
 test('the walk leaves out the scratch folder of a README check running beside it', (t) => {

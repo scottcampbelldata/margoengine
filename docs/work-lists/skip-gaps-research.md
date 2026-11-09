@@ -39,3 +39,23 @@ missing input without changing parsing or grading. The actual first README block
 is executed with fetch forbidden and the real parseCube function; it fails on
 the old external input and verifies every RGBA corner, clearing and disposal on
 the replacement. No implementation or companion code was read.
+
+## Item 3: batched picking
+
+- Timo Aila and Samuli Laine, *Understanding the Efficiency of Ray Traversal on
+  GPUs*, HPG 2009,
+  https://research.nvidia.com/publication/2009-08_understanding-efficiency-ray-traversal-gpus.
+- Sven Woop, Carsten Benthin and Ingo Wald, *Watertight Ray/Triangle Intersection*,
+  JCGT 2(1), 2013, https://jcgt.org/published/0002/01/05/.
+- W3C, *WebGPU*, above, command encoding, queue order and texture-to-buffer copies.
+- Todd Mytkowicz, Amer Diwan, Matthias Hauswirth and Peter F. Sweeney,
+  *Producing Wrong Data Without Doing Anything Obviously Wrong!*, ASPLOS 2009,
+  https://research.ibm.com/publications/producing-wrong-data-without-doing-anything-obviously-wrong.
+
+Traversal work distribution and robust intersection are distinct concerns. The
+repair retains the intersection arithmetic and complete 3x3 query workload. It
+reduces repeated invariant validation, command submissions and matrix-row reads.
+These sources do not establish a speed ratio: deterministic parent regressions
+prove work counts and identical answers, while the historical timing loss stays
+open. The measurement-bias study reinforces keeping counts separate from elapsed
+speed claims. GPU equivalence must pass independently.

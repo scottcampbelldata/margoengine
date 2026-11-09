@@ -409,3 +409,12 @@ The comparison is our own direct Moore stencil versus our own separable integer
 sums, with identical grid output. Counts include all stencil/intermediate/centre
 reads but exclude allocation, copies, initialization and Wasm startup. This work
 reduction is not a release timing or SIMD result.
+
+## Batched picking follow-up (batch 108 job 2)
+
+The historical 83 ms batch versus 67 ms WebGL loop (perf history 60) is a loss.
+Selection now removes proven repeated CPU work: horizontal micro misses compute
+2 matrix-product rows instead of 4; captured batches validate once and submit
+all 100 neighborhood copies together. Parent-failing work-count regressions keep
+identical outputs. No new elapsed-time verdict is available; the existing
+`p-gpu-pick` row remains a loss. GPU point-by-point confirmation passes; elapsed timing remains deferred.

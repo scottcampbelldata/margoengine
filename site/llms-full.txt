@@ -4740,6 +4740,27 @@ Explicit install() retains an available native WebGPU adapter with a linked Marg
 
 Canvas recording with audio remains subject to user activation. Its README example initializes a Record button and creates/resumes audio from the click; it does not await permission during module setup. This changes the example, with no new recording, timing or cross-browser capability claim.
 
+### Batched picking work counts (skip audit, batch 108 job 2)
+
+The historical 83 ms `p-gpu-pick-batch` against 67 ms for three's WebGL loop
+(perf history 60, busy diagnostic) remains a recorded loss, not an accepted
+speed difference. Desktop MSAA uses micro passes, not the single-sample MRT.
+Two avoidable costs are repaired in selection: a horizontal sphere miss now
+computes two matrix rows instead of four; a captured batch validates its scene
+once and shares one command submission for all copies. Both keep every queried
+3x3 neighborhood and the exact multiplication/addition order. Parent regressions
+measure 6,400 versus 3,200 model-component reads in 100 micro misses, and 1,600
+versus 16 reads for 100 captured queries on one mesh, with identical results.
+No new elapsed-time number or win over another engine is claimed. Real-GPU
+point-by-point equivalence, including the micro route, now passes.
+
+Before the final main rebase, selection measured 20,808 B versus 20,745 B before
+(+63 B), beneath its unchanged entry ceiling. Core + stage remains 23,924 B.
+
+Final rebased selection measures 20,833 B gzip versus upstream 20,772 B (+61 B),
+below its unchanged 21,142 B entry ceiling. Core + stage is 23,924 B. Genuine
+paired entry/network records use 375b56d0b with dirty=false.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -7528,6 +7549,44 @@ zero exceptions (59.5 s combined). No size ceiling, runtime or export changed.
 The earlier recording-enabled verify attempt was interrupted during shadow-cache
 bookkeeping before its test chains; the complete successful run disabled only
 shadow recording, never checks or result work. Evidence: test-results/skip-gaps/item5-*.log.
+
+### Batched picking historical loss and pending GPU confirmation (batch 108 job 2)
+
+The 83 ms batch versus three's 67 ms WebGL loop in perf history 60 was not
+classified. It is a loss, not an accepted difference. The previous source performed
+four matrix-product rows for every micro-frustum sphere test, even when the
+first pair of planes rejects it, and checks a captured scene per point.
+Selection now evaluates rows lazily with identical arithmetic, and validates
+and submits a captured batch once. Both directed regressions fail on the parent
+and pass on the repair (`packages/selection/test/picking.test.js`). GPU point-by-point equivalence now passes; the quiet elapsed-time comparison
+remains deferred. No speed win or full timing closure follows from CPU counts.
+
+### Batched picking pre-rebase validation (2026-11-09)
+
+Lint, hygiene, API, quality, proofs and full verify pass: 13,669 tests, zero
+failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. One
+shared GPU slot passes picking, all three captured/MSAA/micro batch comparisons,
+real-model perspective/orthographic checks and x-ray, plus all six executable
+README examples (36.9 s combined). No --time loop or benchmark was run.
+The historical 83 vs 67 ms remains an open loss for the deferred speed phase.
+Fresh genuine entry/network records share commit 1d7571281 and dirty=false;
+the actual basic scene fetches five requests and no extra file. API generation
+follows measurement. Selection is 20,808 B gzip, previously 20,745 B (+63),
+below its unchanged ceiling; core + stage stays 23,924 B under 25,000 B.
+The short network capture now explicitly limits its shared hold to one minute
+and waits at least 60 minutes, with the existing regression expanded.
+Evidence: test-results/skip-gaps/item3-*.log; research in skip-gaps-research.md.
+
+Final main rebase: inherited preview error-link and compatibility changes. Rebuilt
+all packages and regenerated genuine entry/network records together from
+375b56d0b, dirty=false, then API and llms. Lint, hygiene, API, all 83 selection
+cases and 21 record/document regressions pass. The fresh shared-slot selection
+GPU suite and all six README examples pass (20.2 s combined); the GPU suite
+includes captured/MSAA/micro counts and real-model perspective/orthographic
+equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
+second full verify or timing benchmark is claimed. Current selection: 20,833 B
+gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
+Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -12697,6 +12756,10 @@ order, with null for a miss or a point off the canvas. All points read the scene
 queue. Pass a `view` as the second argument to pick through it; with several views and no `view`, points outside the first
 point's view are picked one at a time.
 
+When the captured ID texture is current, the batch checks the scene once and submits all neighborhood copies in
+one command buffer. Micro passes keep their per-point submissions so each reads its own camera and instance uploads.
+Their sphere tests compute matrix rows only as each plane is reached, with unchanged arithmetic and culling results.
+
 ```ts
 import {Picking} from 'margoengine/selection';
 import {Engine} from 'margoengine/core';
@@ -12707,8 +12770,6 @@ const meshes = hits.map((hit) => hit?.mesh ?? null);
 ```
 
 ## Lines in picks
-
-`LinePicking.attach(picking, lines)` from `margoengine/lines/pick` makes fat lines answer `engine.pick`, `picking.pick` and `pickMany`, in one depth test with the meshes, with `hit.line` and `hit.segment` set. See the [lines README](../lines/README.md#gpu-picking). `PointPicking` from `margoengine/points/pick` does the same for point clouds (`hit.cloud`, `hit.point`), and `SplatPicking` from `margoengine/splats/pick` for Gaussian splats (`hit.splats`, `hit.splat`); see the [splats README](../splats/README.md#picking-with-meshes-pick).
 
 [README continues: https://margoengine.com/llms/packages/selection.md]
 
