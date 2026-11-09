@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-629). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-630). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1383,3 +1383,21 @@ Current transitions entry measurements after the owner-scene repair and live ent
 Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
 
 Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
+
+Batch 99 heterogeneous RGB media: optional voxel-pathtracer/media adds finite RGB extinction coefficients
+in 0..1000000 per world unit on media palette materials. Explicit extinction overrides scalar density;
+absent means [density,density,density], density default 1. Single-scattering albedo stays color and phase
+anisotropy stays -0.95..0.95, default 0. Density, colour and phase may vary by cell and model palette.
+The existing grid, instance, half-cell shape, path/bounce and finite boundary-iteration limits apply.
+This is piecewise constant RGB transport: no continuous/procedural density, overlapping-medium
+composition, VDB import, wavelength conversion or fluorescence. The root artistic uniform fog is separate.
+No additional GPU resources or CPU-heavy geometry loop; media's unused metalColor row holds normalized
+coefficients. Native WebGPU and WebGL2 compatibility execute values; plain WebGL2 gives coded linked
+unsupported. Generated analytic absorption/emission/shadow and scattering tests plus real native device
+restoration establish the recorded scope only. No external renderer or speed claim. Media boundaries
+now preserve physical distance; geometric queries use a forward numerical offset of at least 1e-6 world
+units or several Float32 coordinate steps, and restore that distance before transport integration.
+
+Optional media entry: 1954 B gzip with bare peers external, budget 2210 B.
+Tracer root after the boundary-distance repair: 80841 B (within its existing budget); core plus stage
+23797 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.

@@ -1783,3 +1783,24 @@ BrightRings is an already recorded standard test image; no third-party implement
 A wide public-reference search combined [Porter and Duff, Compositing Digital Images (1984)](https://keithp.com/~keithp/porterduff/p253-porter.pdf), [W3C Compositing and Blending Level 1](https://www.w3.org/TR/compositing-1/) on separately rendered groups, and [W3C WebGPU texture usage](https://www.w3.org/TR/webgpu/#texture-usage). The entry renders independent current images before a separate sampling pass, avoiding simultaneous writable/sampled texture usage, then linearly interpolates all four channels. This is a cross-fade rather than a claim of full Porter-Duff operators. It reuses Margo's existing multi-scene views; no external source read or adapted. The only CPU loop allocates/releases two textures, so no CPU-heavy kernel or Wasm is needed.
 
 Batch 160 job 6 consults ratified Khronos KHR_materials_anisotropy and KHR_materials_iridescence descriptions (https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos), including squared-strength alpha roughness, tangent conventions, film IOR/thickness and the distinction between shared BRDF inputs and varying BRDF implementations. Container packing is written from the glTF 2.0 GLB buffer/chunk specification, with no external conversion library or renderer source. Existing Burley/Heitz and thin-film paper citations above apply; no new full-paper audit is claimed.
+
+## Batch 99: heterogeneous RGB media
+
+Consulted public descriptions and papers only, with no implementation source from another renderer:
+[Novak et al., Monte Carlo Methods for Volumetric Light Transport Simulation (2018)](https://cs.dartmouth.edu/~wjarosz/publications/novak18monte.pdf),
+sections 2, 3, 4.1.2, 5.1 and 6.5, for collision coefficients, regular tracking, piecewise Beer-Lambert
+integration and chromatic sampling; [Kutz et al. (2017)](https://jannovak.info/publications/SDTracking/SDTracking.pdf)
+for spectral tracking context; [Miller, Georgiev and Jarosz (2019)](https://iliyan.com/publications/NullPathFormulation/)
+for the role of explicit sampling densities in chromatic transport.
+
+Margo's own palette grids already define constant regions, so exact boundary walking is reused. Within
+each region, Margo samples an equally weighted mixture of three exponential distributions. At a collision,
+the RGB weight is T(t) sigma_s / mean(T(t) sigma_t); at an exit, T(t) / mean(T(t)). Common exponentials
+cancel before division. The emission integral is analytic. No null-collision implementation is copied
+or needed. The medium-boundary repair keeps the physical origin on the boundary while advancing only
+the geometry query and restoring its distance. Generated analytic fixtures are authored here.
+
+The existing Amanatides-Woo two-level walk uses forward half-open grid intervals at exact boundaries:
+floor for nonnegative directions, ceil minus one for negative directions. This direction convention
+is derived from grid intervals and prevents zero-distance re-entry at grazing angles without
+changing the physical integration segment. No external traversal implementation was consulted.

@@ -42,6 +42,10 @@
     "./sky": {
       "types": "./dist/sky-environment.d.ts",
       "import": "./dist/sky-environment.js"
+    },
+    "./media": {
+      "types": "./dist/media.d.ts",
+      "import": "./dist/media.js"
     }
   },
   "files": [
@@ -73,7 +77,8 @@
     "test:gpu:spec-math": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs projections --spec-math-error=1",
     "test:gpu:stall": "cd ../.. && node packages/voxel-pathtracer/tests/stall-check.mjs",
     "test:gpu:guiding": "cd ../.. && node packages/voxel-pathtracer/tests/guiding-browser.mjs",
-    "test:gpu:sky": "cd ../.. && node packages/voxel-pathtracer/tests/sky-browser.mjs"
+    "test:gpu:sky": "cd ../.. && node packages/voxel-pathtracer/tests/sky-browser.mjs",
+    "test:gpu:media": "cd ../.. && node packages/voxel-pathtracer/tests/media-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -84,7 +89,8 @@
       "test:gpu:denoise-caustics": 15,
       "test:gpu:viewport": 10,
       "test:gpu:guiding": 10,
-      "test:gpu:sky": 10
+      "test:gpu:sky": 10,
+      "test:gpu:media": 10
     }
   },
   "peerDependenciesMeta": {

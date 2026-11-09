@@ -789,3 +789,61 @@ at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground
 representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
 2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
 discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
+
+## Heterogeneous coloured media
+
+`margoengine/voxel-pathtracer/media` (or `@margoengine/voxel-pathtracer/media`) exports
+`MediaVoxelPathTracer`. A media palette material adds `extinction: [red, green, blue]`, per world unit,
+each finite in 0..1000000. It overrides `density`; when absent, extinction is the existing scalar density
+(default 1) in every channel. `color` remains single-scattering albedo; `anisotropy` defaults to zero.
+Different palette indices supply different density, absorption colour, albedo and phase function throughout
+a model. Model-local palettes work too. Empty cells are vacuum, and the existing half-cell shapes apply.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { MediaVoxelPathTracer } from 'margoengine/voxel-pathtracer/media';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [3, 2, 5], target: [0, 0, 0] },
+});
+const tracer = MediaVoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{ id: 'smoke', revision: 1, size: [1, 1, 3], voxels: new Uint8Array([1, 2, 1]) }],
+    instances: [{ id: 'smoke', modelId: 'smoke', matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, -0.5,-0.5,-1.5,1] }],
+    materials: [
+      { id: 1, type: 'media', color: [0.8, 0.9, 0.95], extinction: [0.2, 0.4, 0.8] },
+      { id: 2, type: 'media', color: [0.6, 0.6, 0.7], extinction: [0.8, 0.3, 0.1], anisotropy: 0.4 },
+    ],
+    environment: { skyColor: [1, 1, 1], sunIntensity: 3, groundColor: [0.5, 0.5, 0.5] },
+  },
+  denoise: false,
+});
+await tracer.ready;
+const image = await tracer.renderImage({ width: 32, height: 32, samples: 16, signal: AbortSignal.timeout(30000) });
+tracer.dispose();
+engine.dispose();
+```
+
+The existing hierarchy walks piecewise constant palette regions. Shadow rays integrate RGB optical depth
+analytically. Free flights mix the three exponential channel distributions and divide by their actual
+mixture density (or survival probability), retaining clear channels and avoiding underflow in the ratios.
+Pure absorption is deterministic. Emissive chromatic cells integrate emission analytically, including
+zero and very small extinction. Neutral media retain the existing scalar sampling. The entry uses no
+additional GPU allocation, density resampling, majorant or Wasm. Its palette conversion reserves media's
+unused metal reflectance; `metalColor` has no meaning on a medium.
+
+This is RGB transport over a palette grid, without continuous density interpolation, procedural density,
+VDB import, fluorescence or overlapping-medium composition. The root tracer's path, scene and bounce
+limits apply, including its finite boundary-iteration guard; highly layered grids may exhaust that guard
+before the bounce limit. Disjoint instances and opaque objects beside the grid are supported. The root
+tracer's `environment.fog` remains its separate scalar artistic effect. Native WebGPU and the WebGL2
+compatibility device run the entry; plain WebGL2 reports linked `unsupported`. Lifecycle, cancellation,
+disposal and scene replacement use the root APIs. No reference-renderer equality or speed claim.
+
+Medium boundaries now offset the intersection query only, preserving the physical path length used by
+absorption, emission and scattering. This corrects the root tracer too: three one-unit vacuum-emitting
+cells produce radiance 3, rather than losing 0.006 to the old 0.002-cell offsets.
+
+At negative grazing directions, cell and brick starts use the forward half-open interval (ceil minus one),
+so a rounded point on a boundary cannot repeatedly re-enter the cell behind it. Both voxel and brick
+boundary regressions check emitted path length with Float32 camera-coordinate uncertainty included.

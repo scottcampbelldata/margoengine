@@ -2610,7 +2610,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-629). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-630). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3970,6 +3970,24 @@ Current transitions entry measurements after the owner-scene repair and live ent
 Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
 
 Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
+
+Batch 99 heterogeneous RGB media: optional voxel-pathtracer/media adds finite RGB extinction coefficients
+in 0..1000000 per world unit on media palette materials. Explicit extinction overrides scalar density;
+absent means [density,density,density], density default 1. Single-scattering albedo stays color and phase
+anisotropy stays -0.95..0.95, default 0. Density, colour and phase may vary by cell and model palette.
+The existing grid, instance, half-cell shape, path/bounce and finite boundary-iteration limits apply.
+This is piecewise constant RGB transport: no continuous/procedural density, overlapping-medium
+composition, VDB import, wavelength conversion or fluorescence. The root artistic uniform fog is separate.
+No additional GPU resources or CPU-heavy geometry loop; media's unused metalColor row holds normalized
+coefficients. Native WebGPU and WebGL2 compatibility execute values; plain WebGL2 gives coded linked
+unsupported. Generated analytic absorption/emission/shadow and scattering tests plus real native device
+restoration establish the recorded scope only. No external renderer or speed claim. Media boundaries
+now preserve physical distance; geometric queries use a forward numerical offset of at least 1e-6 world
+units or several Float32 coordinate steps, and restore that distance before transport integration.
+
+Optional media entry: 1954 B gzip with bare peers external, budget 2210 B.
+Tracer root after the boundary-distance repair: 80841 B (within its existing budget); core plus stage
+23797 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5743,6 +5761,20 @@ GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=irid
 Per Scott's manager ruling, job 4 is preserved locally as 97c74a713 on batch-160-job4-parked and job 5 as bfd887103 on batch-160-job5-parked. Neither is pushed as passing evidence. Original budgets remain unchanged: volume compatibility full-Cycles absolute error 13,792,003 exceeds 13,792,000; native IOR can measure 2,423,421 against its frozen 2,423,418. Volume varies at blue samples (213,199), (214,199), (219,199); IOR varies at RGB (403,299). The bounded shared investigation did not establish the root cause.
 
 Repro on the job 5 branch: GPU-locked node scripts/reference-rendering/repeat.mjs --case=ior and the same command with --case=volume --compat. Each captures 24 static frames, waits for GPU completion before each read and asserts identical decoded bytes. Both fail; all pictures and repeat.json are retained outside engine-bench/batch-160. Fixed GPU command replays also vary with unchanged uploads and draw order, without compute dispatches or float atomics. Native stored multisample values vary before final resolve. Splitting, merging or instrumenting passes changes the observed output, so these interventions do not establish a package-owned API defect or an inherent backend rule. No workaround, bias or tolerance is substituted. Jobs 6 to 8 are independent measurements and do not close this release-blocking defect.
+
+### Fixed: medium boundary offsets shortened physical transport (Batch 99)
+
+Root cause: the voxel tracer used its 0.002-cell geometry offset as the next physical ray origin at
+index-matched media boundaries. Three one-unit emitting cells in vacuum consequently produced 2.994
+instead of 3. The physical origin now stays on the boundary; only the intersection query advances, and
+its distance is restored before attenuation, free flight and emission. Main and refracted shadow walks
+share the repair. Regression: packages/voxel-pathtracer/tests/media-boundary.html and media-browser.mjs.
+Exact subsurface/glass/atmosphere parity and the existing moving-camera denoiser defects remain open.
+
+The same regression covers a second cause exposed by the physical-origin repair: floor-only cell/brick
+selection at a negative grazing boundary can repeatedly select the previous medium when the query
+advance rounds away. The walk now selects the forward half-open interval for each direction. A
+one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

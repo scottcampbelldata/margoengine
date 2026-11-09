@@ -1,0 +1,28 @@
+<!doctype html><html><meta charset="utf-8"><title>Physical medium boundary regressions</title><canvas></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+window.run=async()=>{
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=10/aspect;out[5]=10;out[10]=1/100;out[14]=1;out[15]=1;};
+ const scene={revision:1,models:[{id:'m',revision:1,size:[1,1,3],voxels:new Uint8Array([1,2,3])}],
+ instances:[{id:'m',modelId:'m',matrix:[1,0,0,0,0,1,0,0,0,0,1,0,-.5,-.5,-1.5,1]}],
+ materials:[1,2,3].map(id=>({id,type:'media',color:[0,0,0],density:0,emission:1,emissionColor:[1,1,1]})),environment:{skyIntensity:0,sunIntensity:0}};
+ const t=VoxelPathTracer.attach(engine,{scene,denoise:false});
+ try{
+  await t.ready;const im=await t.renderImage({width:4,height:4,samples:1,jitter:false,signal:AbortSignal.timeout(30000)});
+  const result={minimum:Math.min(...im.color),maximum:Math.max(...im.color)};
+  for(const brick of [false,true]){
+   const width=brick?16:2;
+   engine.camera.position=brick?[8+2**-13,0,4]:[1.00015,0,4];
+   engine.camera.target=brick?[8-2**-15,0,0]:[0.99995,0,0];
+   const voxels=new Uint8Array(width*3);for(let z=0;z<3;z++)for(let x=0;x<width;x++)voxels[x+width*z]=x<width/2?1:2;
+   t.setScene({...scene,revision:brick?3:2,models:[{id:'m',revision:brick?3:2,size:[width,1,3],voxels}],
+    instances:[{...scene.instances[0],matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,-.5,-1.5,1]}],
+    materials:[1,2].map(id=>({id,type:'media',color:[0,0,0],density:0,emission:id,emissionColor:[1,1,1]}))});
+   const grazing=await t.renderImage({width:1,height:1,samples:1,jitter:false,signal:AbortSignal.timeout(30000)});
+   result[brick?'grazingBrick':'grazingCell']=Array.from(grazing.color);
+  }
+  return result;
+ }finally{t.dispose();engine.dispose();}
+};window.ready=true;
+</script></html>

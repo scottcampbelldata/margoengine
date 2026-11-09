@@ -2300,3 +2300,30 @@ uses the existing digest/fetch/preflight mechanism, now 349 outside inputs. The 
 entry is 3,458 B gzip within its unchanged 3,593 B gate; core/stage are unchanged.
 
 Batch 160 section 5 job 6 extends external picture evidence to anisotropic GGX and thin film, on all 50/346 original primitives respectively. Exact separate WebGPU and WebGL2 compatibility budgets include silhouettes and all RGB channels. Native WebGL2 refuses PBR. GLB packing only relocates bytes, with hash-checked originals and invariant tests; this is not a geometry-build performance change. Full image residual causes stay open. No core/stage or shader code changed.
+
+### Batch 99 RGB media and physical medium boundaries
+
+The optional voxel tracer media entry converts palette extinction into the existing scalar density
+plus three normalized coefficients in media's unused metal-reflectance row. Scene and model palettes
+are copied and validated before replacement. Root/stage dependencies and GPU resource layouts are unchanged.
+The existing hierarchy integrates RGB shadow depth. Chromatic free-flight sampling uses a three-channel
+mixture with explicit collision/survival PDFs and cancels a common exponential before division. Pure
+absorption and chromatic emission are analytic. Scalar media keep their established sampler.
+
+The root tracer formerly moved its physical origin by 0.002 local units at media boundaries, losing
+absorption and emitted path length. It now advances only the intersection query by a representable
+forward amount and restores that distance before transport. Both path and refracted shadow walks carry
+the boundary flag. A generated three-cell vacuum-emission regression requires radiance 3 within 1e-5.
+
+Section 5 evidence: native WebGPU and compatibility value tests, zero-extinction channels, extreme RGB
+coefficients, model palettes, conservative scattering, chromatic shadows, emission, real native device
+replacement and raster restoration are exercised by media-browser.mjs. Evidence is scoped to generated
+scenes on one workstation; continuous fields, overlapping medium composition, external density files,
+cross-vendor accuracy and speed remain unmeasured. The existing finite boundary-iteration guard remains.
+
+The medium-boundary regression also covers negative grazing directions at voxel and brick planes.
+A floor-only start can select the cell behind the ray when the forward query displacement is below
+one coordinate step, repeatedly switching media at zero distance. Forward half-open cell selection
+uses ceil minus one for negative directions in the existing two-level walk. No retry or epsilon
+attenuation correction is used. The grazing test failed at radiance about 0.997 before this repair,
+against a physical path value about 3.5.

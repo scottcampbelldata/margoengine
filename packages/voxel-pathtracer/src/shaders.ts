@@ -410,6 +410,11 @@ fn found(h:ptr<function,Hit>,t:f32,v:u32,a:u32,stp:vec3i,d:vec3f,c:vec3i)->bool 
 // Two-level walk of model 'model' along o + t d (model space) for t in [tMin, tMax): the first boundary into a cell
 // whose palette index is not 'want'; with want != 0 also the exit through the model's box (value 0). want == STEP:
 // the first boundary after the cell the ray starts in, whatever its index (voxelwise volumes).
+fn forwardCell(p:vec3f,d:vec3f)->vec3i {
+ // A point exactly on a plane belongs to the cell ahead of the ray. A
+ // negative grazing component may not move by one float in the query offset.
+ return vec3i(select(floor(p),ceil(p)-vec3f(1.0),d<vec3f(0.0)));
+}
 fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit>)->bool {
  let mb=f.scene.x+model*MODEL;
  // The model's material table: hits carry slots (table << 8 | palette index), as want does.
@@ -429,7 +434,7 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  let stp=select(vec3i(-1),vec3i(1),pos);
  let up=select(vec3f(0.0),vec3f(1.0),pos);
  let ad=abs(inv);
- var bc=clamp(vec3i(floor((o+d*tEnter)*0.125)),vec3i(0),nb-1);
+ var bc=clamp(forwardCell((o+d*tEnter)*0.125,d),vec3i(0),nb-1);
  var bn=((vec3f(bc)+up)*8.0-o)*inv;
  var t=tEnter;
  let step=want==STEP;
@@ -442,10 +447,10 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
   let ue=select(0u,base|(entry&255u),entry!=0u);
   if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(ue))){
    let u=ue;
-   if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}skip=false;}
-   else if(u!=want){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}
+   if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}skip=false;}
+   else if(u!=want){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}
   } else {
-   var c=clamp(vec3i(floor(o+d*t)),lo,hi);
+   var c=clamp(forwardCell(o+d*t,d),lo,hi);
    var vn=(vec3f(c)+up-o)*inv;
    var vt=t;var va=axis;
    let uniform=entry>=0x80000000u;
@@ -639,6 +644,16 @@ fn closest(o:vec3f,d:vec3f,medium:u32,mInst:u32)->Hit {
   if(sp==0u){break;}
   sp--;node=stack[sp];
  }
+ return h;
+}
+// A medium boundary changes coefficients without changing the physical ray.
+// Offset only the intersection query to select its forward side, then restore
+// that distance before integrating extinction, emission or free flight.
+fn mediumClosest(o:vec3f,d:vec3f,medium:u32,mInst:u32,advance:bool)->Hit {
+ var shift=0.0;
+ if(advance){shift=max(1e-6,max(max(abs(o.x),abs(o.y)),abs(o.z))*4.76837158e-7)/length(d);}
+ var h=closest(o+d*shift,d,medium,mInst);
+ if(h.inst!=NONE){h.t+=shift;}
  return h;
 }
 // Transmittance toward a light: 0 when the ground or a non-medium voxel blocks it, else exp(-optical depth).
@@ -1399,6 +1414,7 @@ fn radiance(px:vec2u)->Path {
  var o=ray.o;var d=ray.d;
  var thr=vec3f(1.0);var L=vec3f(0.0);
  var medium=0u;var mInst=NONE;
+ var mediaAdvance=false;var walkAdvance=false;
  var lastPdf=0.0;
  // Light PDFs use the distance from the last scattering vertex, including
  // non-scattering medium boundaries crossed since then, rather than the last segment.
@@ -1431,7 +1447,8 @@ fn radiance(px:vec2u)->Path {
    pending=false;walking=true;wT=vec3f(1.0);wJ=1.0;wN=0u;wG=NONE;wEntered=false;wIn=wd;wSteps=0u;
   }
   if(!walking&&done){break;}
-  let h=closest(select(o,wo,walking),select(d,wd,walking),select(medium,wMedium,walking),select(mInst,wInst,walking));
+  let h=mediumClosest(select(o,wo,walking),select(d,wd,walking),select(medium,wMedium,walking),select(mInst,wInst,walking),select(mediaAdvance,walkAdvance,walking));
+  if(walking){walkAdvance=false;}else{mediaAdvance=false;}
   if(walking){
    // One step of the shadow walk.
    wSteps++;
@@ -1448,7 +1465,7 @@ fn radiance(px:vec2u)->Path {
     let ci=-dot(wn,wd);
     if(h.value==0u){
      let ma=material(wMedium);
-     if((ma.flags&MEDIA)!=0u){wMedium=0u;wInst=NONE;wo=wp-woff;}
+     if((ma.flags&MEDIA)!=0u){wMedium=0u;wInst=NONE;wo=wp;walkAdvance=true;}
      else if(!clearGlass(ma)){stop=true;}
      else {
       let fr=fresnel(ci,ma.ior);
@@ -1466,7 +1483,7 @@ fn radiance(px:vec2u)->Path {
      let mb=material(h.value);
      // Glass to media or to other glass: left to path sampling (the path side ends its chain there too).
      if(wGlass){stop=true;}
-     else if((mb.flags&MEDIA)!=0u){wMedium=h.value;wInst=h.inst;wo=wp-woff;}
+     else if((mb.flags&MEDIA)!=0u){wMedium=h.value;wInst=h.inst;wo=wp;walkAdvance=true;}
      else if(isMirror(mb)&&mirrorAt(h.inst)){wT*=schlick3(mb.metalColor,ci);wN++;wG=h.inst;wd=reflect(wd,wn);wo=wp+woff;}
      else if(mb.glass<0.999||!clearGlass(mb)){stop=true;}
      else {
@@ -1573,7 +1590,7 @@ fn radiance(px:vec2u)->Path {
     if(h.value==0u&&!inner){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
      var mm=material(medium);
-     if((mm.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p-off;continue;}
+     if((mm.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p;mediaAdvance=true;continue;}
      if(mm.disp>0.0){collapse(&lambda,&thr);mm.ior=iorAt(mm,lambda);}
      let sm=(mm.flags&SMOOTH)!=0u;
      let s=dielectric(mm.alpha,n,-d,mm.ior,sm);
@@ -1600,7 +1617,7 @@ fn radiance(px:vec2u)->Path {
     else if((m.flags&MEDIA)!=0u){
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      sunFace=dot(n,f.sun.xyz)>0.0;
-     medium=h.value;mInst=h.inst;o=p-off;continue;
+     medium=h.value;mInst=h.inst;o=p;mediaAdvance=true;continue;
     }
     if(!inner){let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;}
     // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.

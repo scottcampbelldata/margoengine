@@ -861,3 +861,13 @@ not a perceptual tolerance or an independent decoder comparison.
 ### Batch 160 anisotropy and iridescence, job 6
 
 Run fetch-assets.mjs and the existing viewer capture/run commands with --case=anisotropy and --case=iridescence, including --compat. Pinned original sources are SHA-256 checked; iridescence has no source GLB, so pack.mjs embeds its original buffer and guides.png in an aligned GLB. It preserves all authored nodes, materials, accessors, indices and bytes; no remeshing or baked material changes. Tests exercise multiple buffers/images and nonmutation. cases.mjs documents cameras, source/packed hashes and CC0 authors. All pixels at 512 x 512, same white sun as job 1, no IBL/exposure fitting. Frozen references cannot be replaced with --measure. Batch 168 sky/OIT/staging/lightmap results are reused, not repeated.
+
+## Batch 99 heterogeneous RGB media
+
+Build packages, then run `node scripts/gpu-lock.mjs run --owner=media-proof -- node packages/voxel-pathtracer/tests/media-browser.mjs`.
+Run `node --test --test-timeout=180000 packages/voxel-pathtracer/tests/media.test.js` for hostile coefficients,
+atomic replacement, input ownership, optionality and fake-device restoration. The browser driver first
+checks root physical path length, then RGB absorption/emission/shadows, clear and extreme channels and
+conservative scattering on native WebGPU and compatibility. It finally destroys and restores a real
+native device and checks the converged frame and disabled/disposed raster exactly. Generated fixtures
+are stand-ins for analytic optical media, not outside production assets or rival renders.

@@ -5,7 +5,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer as BaseVoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
-const VoxelPathTracer=new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
+const VoxelPathTracer=new URLSearchParams(location.search).has('media')?(await import('/packages/voxel-pathtracer/dist/media.js')).MediaVoxelPathTracer:new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
 import {motionCheck} from './motion-browser.js';
 const canvas=document.querySelector('canvas'),errors=[],messages=[],reports=[];
 const runtime=()=>engineRuntime(engine);
@@ -1136,6 +1136,7 @@ window.check={
   look([18,14,26],[-3,3,-2]);
   const raster=await shot();
   const scene=scenes.materials();
+  if(new URLSearchParams(location.search).has('media')){scene.materials=scene.materials.map(m=>m.type==='media'?{...m,extinction:[0.1,0.6,1.2]}:m);}
   if(new URLSearchParams(location.search).has('sky')){
    const {traceSkyEnvironment}=await import('/packages/voxel-pathtracer/dist/sky-environment.js');
    scene.environment={...scene.environment,...await traceSkyEnvironment(device(),{width:32,height:16,signal:AbortSignal.timeout(60000)})};

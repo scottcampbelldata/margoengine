@@ -1,0 +1,477 @@
+[
+  {
+    "boundary": {
+      "minimum": 3,
+      "maximum": 3,
+      "grazingCell": [
+        3.498295783996582,
+        3.498295783996582,
+        3.498295783996582
+      ],
+      "grazingBrick": [
+        3.7000036239624023,
+        3.7000036239624023,
+        3.7000036239624023
+      ]
+    }
+  },
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "layered absorption",
+          "actual": [
+            0.40656960010528564,
+            0.6065306067466736,
+            0.49658527970314026
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "scaled world extinction",
+          "actual": [
+            0.16529889404773712,
+            0.3678794205188751,
+            0.24659693241119385
+          ],
+          "expected": [
+            0.16529888822158653,
+            0.36787944117144233,
+            0.2465969639416065
+          ],
+          "finite": true
+        },
+        {
+          "name": "chromatic absorbing scattering",
+          "actual": [
+            0.5581633867695928,
+            0.8555183643475175,
+            0.8158367518335581
+          ],
+          "expected": [
+            0.5594393825158477,
+            0.8546102782711387,
+            0.8162556234747171
+          ],
+          "finite": true
+        },
+        {
+          "name": "neutral parity",
+          "actual": [
+            0.6889361655339599,
+            0.777311323210597,
+            0.8819035571068525
+          ],
+          "expected": [
+            0.6889361655339599,
+            0.777311323210597,
+            0.8819035571068525
+          ],
+          "finite": true
+        },
+        {
+          "name": "independent model palette",
+          "actual": [
+            0.40656960010528564,
+            0.6065306067466736,
+            0.49658527970314026
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "vacuum",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "huge extinction with clear channel",
+          "actual": [
+            0,
+            1,
+            0
+          ],
+          "expected": [
+            0,
+            1,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "chromatic conservative furnace",
+          "actual": [
+            1.0005121156573296,
+            1.000449470244348,
+            1.0044075977057219
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "emission including clear channel",
+          "actual": [
+            3,
+            2.25594162940979,
+            1.5537396669387817
+          ],
+          "expected": [
+            3,
+            2.255941819529868,
+            1.5537396797031404
+          ],
+          "finite": true
+        },
+        {
+          "name": "thin emission",
+          "actual": [
+            3,
+            3,
+            3
+          ],
+          "expected": [
+            3,
+            3,
+            3
+          ],
+          "finite": true
+        },
+        {
+          "name": "coloured shadow",
+          "actual": [
+            0.40656962990760803,
+            0.6065306663513184,
+            0.49658524990081787
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "empty",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "layered absorption",
+          "actual": [
+            0.40656960010528564,
+            0.6065306067466736,
+            0.49658527970314026
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "scaled world extinction",
+          "actual": [
+            0.16529889404773712,
+            0.3678794205188751,
+            0.24659693241119385
+          ],
+          "expected": [
+            0.16529888822158653,
+            0.36787944117144233,
+            0.2465969639416065
+          ],
+          "finite": true
+        },
+        {
+          "name": "chromatic absorbing scattering",
+          "actual": [
+            0.5581633858382702,
+            0.8555183671414852,
+            0.8158367462456226
+          ],
+          "expected": [
+            0.5594393871724606,
+            0.8546102764084935,
+            0.8162556225433946
+          ],
+          "finite": true
+        },
+        {
+          "name": "neutral parity",
+          "actual": [
+            0.6889361683279276,
+            0.7773113222792745,
+            0.8819035543128848
+          ],
+          "expected": [
+            0.6889361683279276,
+            0.777311323210597,
+            0.8819035543128848
+          ],
+          "finite": true
+        },
+        {
+          "name": "independent model palette",
+          "actual": [
+            0.40656960010528564,
+            0.6065306067466736,
+            0.49658527970314026
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "vacuum",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "huge extinction with clear channel",
+          "actual": [
+            0,
+            1,
+            0
+          ],
+          "expected": [
+            0,
+            1,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "chromatic conservative furnace",
+          "actual": [
+            1.0005121165886521,
+            1.000449470244348,
+            1.004407599568367
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "emission including clear channel",
+          "actual": [
+            3,
+            2.25594162940979,
+            1.5537396669387817
+          ],
+          "expected": [
+            3,
+            2.255941819529868,
+            1.5537396797031404
+          ],
+          "finite": true
+        },
+        {
+          "name": "thin emission",
+          "actual": [
+            3,
+            3,
+            3
+          ],
+          "expected": [
+            3,
+            3,
+            3
+          ],
+          "finite": true
+        },
+        {
+          "name": "coloured shadow",
+          "actual": [
+            0.40656962990760803,
+            0.6065306663513184,
+            0.49658524990081787
+          ],
+          "expected": [
+            0.4065696597405991,
+            0.6065306597126334,
+            0.4965853037914095
+          ],
+          "finite": true
+        },
+        {
+          "name": "empty",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 250
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 8.800000011920929,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 9.300000011920929,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 9.300000011920929,
+        "gpuBytes": 4980816,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

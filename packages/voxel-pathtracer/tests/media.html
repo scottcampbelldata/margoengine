@@ -1,0 +1,82 @@
+<!doctype html><html><meta charset="utf-8"><title>Heterogeneous RGB media values</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {MediaVoxelPathTracer} from '/packages/voxel-pathtracer/dist/media.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],coverage=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);
+ device.createShaderModule=d=>{const module=create(d);reports.push(module.getCompilationInfo().then(i=>messages.push(...i.messages.filter(m=>m.type==='error').map(m=>m.message))));return module;};
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=10/aspect;out[5]=10;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
+ const identity=[1,0,0,0,0,1,0,0,0,0,1,0,-0.5,-0.5,-1.5,1];
+ const map={width:4,height:2,data:new Float32Array(24).fill(1)};
+ const scene={revision:1,models:[{id:'smoke',revision:1,size:[1,1,3],voxels:new Uint8Array([1,2,3])}],
+ instances:[{id:'smoke',modelId:'smoke',matrix:identity}],
+ materials:[{id:1,type:'media',color:[0,0,0],extinction:[0.1,0.2,0.4]},
+ {id:2,type:'media',color:[0,0,0],extinction:[0.3,0,0.2]},
+ {id:3,type:'media',color:[0,0,0],extinction:[0.5,0.3,0.1]}],
+ environment:{map,skyIntensity:1,sunIntensity:0,ground:false}};
+ const mean=im=>[0,1,2].map(c=>{let s=0;for(let i=c;i<im.color.length;i+=3)s+=im.color[i];return s/(im.color.length/3);});
+ const render=async(name,expected,samples=1,Tracer=MediaVoxelPathTracer,record=true)=>{
+  const t=Tracer.attach(engine,{scene,denoise:false,maxBounces:32});
+  try{await t.ready;const im=await t.renderImage({width:8,height:8,samples,seed:173,jitter:false,signal:AbortSignal.timeout(120000)});
+   if(record)coverage.push({name,actual:mean(im),expected,finite:im.color.every(Number.isFinite)});return im;
+  }finally{t.dispose();}
+ };
+ try{
+  await render('layered absorption',[0.9,0.5,0.7].map(v=>Math.exp(-v)));
+  scene.instances[0].matrix=[2,0,0,0,0,1,0,0,0,0,2,0,-1,-0.5,-3,1];scene.revision++;
+  await render('scaled world extinction',[1.8,1,1.4].map(v=>Math.exp(-v)));
+  scene.instances[0].matrix=identity;scene.revision++;
+  const coefficients=scene.materials.map((m,i)=>({...m,color:[[0.2,0.8,0.45],[0.8,0.35,0.9],[0.1,0.6,0.9]][i],anisotropy:[-0.6,0,0.7][i]}));
+  scene.materials=coefficients;scene.revision++;
+  const coloured=await render('chromatic absorbing scattering',undefined,2048);
+  const row=coverage.at(-1),references=[];
+  for(let channel=0;channel<3;channel++){
+   scene.materials=coefficients.map(({extinction,color,...m})=>({...m,color:[color[channel],color[channel],color[channel]],density:extinction[channel]}));scene.revision++;
+   references.push(mean(await render('independent scalar reference',undefined,2048,VoxelPathTracer,false))[channel]);
+  }
+  row.expected=references;
+  scene.materials=coefficients.map(({extinction,...m})=>({...m,density:0.2}));scene.revision++;
+  const neutralBase=await render('neutral baseline',undefined,64,VoxelPathTracer,false);
+  await render('neutral parity',mean(neutralBase),64);
+  scene.materials=coefficients.map(m=>({...m,color:[0,0,0]}));scene.revision++;
+  scene.materials=scene.materials.map(m=>({...m,color:[0,0,0]}));scene.models[0].materials=scene.materials;scene.materials=[];scene.revision++;
+  await render('independent model palette',[0.9,0.5,0.7].map(v=>Math.exp(-v)));
+  scene.materials=scene.models[0].materials;delete scene.models[0].materials;
+  scene.materials=scene.materials.map(m=>({...m,extinction:[0,0,0]}));scene.revision++;
+  await render('vacuum',[1,1,1]);
+  scene.materials=scene.materials.map(m=>({...m,extinction:[1e6,0,1e6]}));scene.revision++;
+  await render('huge extinction with clear channel',[0,1,0]);
+  scene.materials=scene.materials.map(m=>({...m,color:[1,1,1],extinction:[0.3,0,0.9]}));scene.revision++;
+  await render('chromatic conservative furnace',[1,1,1],4096);
+  scene.materials=scene.materials.map(m=>({...m,color:[0,0,0],emission:1,emissionColor:[1,1,1],extinction:[0,0.2,0.5]}));scene.environment={skyIntensity:0,sunIntensity:0};scene.revision++;
+  await render('emission including clear channel',[3,(1-Math.exp(-0.6))/0.2,(1-Math.exp(-1.5))/0.5]);
+  scene.materials=scene.materials.map(m=>({...m,extinction:[1e-8,2e-8,3e-8]}));scene.revision++;
+  await render('thin emission',[3,3,3]);
+  // Direct sun on a diffuse receiver travels through the grid; the camera does not.
+  engine.camera.position=[2,0,4];engine.camera.target=[2,0,0];engine.render();
+  scene.models[0]={...scene.models[0],revision:2,size:[1,1,3],voxels:new Uint8Array([1,2,3])};
+  scene.instances[0].matrix=[1,0,0,0,0,1,0,0,0,0,1,0,1.5,-0.5,1,1];
+  scene.models.push({id:'receiver',revision:1,size:[1,1,1],voxels:new Uint8Array([4])});
+  scene.instances.push({id:'receiver',modelId:'receiver',matrix:[1,0,0,0,0,1,0,0,0,0,1,0,1.5,-0.5,-1,1]});
+  scene.materials=[{id:1,type:'media',color:[0,0,0],extinction:[0.1,0.2,0.4]},
+   {id:2,type:'media',color:[0,0,0],extinction:[0.3,0,0.2]},
+   {id:3,type:'media',color:[0,0,0],extinction:[0.5,0.3,0.1]},
+   {id:4,type:'diffuse',color:[1,1,1]}];
+  // Camera is moved between the receiver and smoke, looking away from the smoke.
+  engine.camera.position=[2,0,0.5];engine.camera.target=[2,0,-1];engine.render();
+  scene.environment={skyIntensity:0,sunIntensity:Math.PI,sunDirection:[0,0,1],sunAngularSize:0,ground:false};scene.revision++;
+  await render('coloured shadow',[0.9,0.5,0.7].map(v=>Math.exp(-v)),1);
+  scene.instances=[];scene.models=[];scene.materials=[];scene.environment={ground:false,skyIntensity:0,sunIntensity:0};scene.revision++;
+  await render('empty',[0,0,0]);
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});let refusal;
+  try{MediaVoxelPathTracer.attach(native,{scene});}catch(e){refusal={code:e.code,message:e.message};}finally{native.dispose();}
+  await Promise.all(reports);return {coverage,refusal,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>

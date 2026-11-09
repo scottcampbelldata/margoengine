@@ -1768,3 +1768,17 @@ GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=irid
 Per Scott's manager ruling, job 4 is preserved locally as 97c74a713 on batch-160-job4-parked and job 5 as bfd887103 on batch-160-job5-parked. Neither is pushed as passing evidence. Original budgets remain unchanged: volume compatibility full-Cycles absolute error 13,792,003 exceeds 13,792,000; native IOR can measure 2,423,421 against its frozen 2,423,418. Volume varies at blue samples (213,199), (214,199), (219,199); IOR varies at RGB (403,299). The bounded shared investigation did not establish the root cause.
 
 Repro on the job 5 branch: GPU-locked node scripts/reference-rendering/repeat.mjs --case=ior and the same command with --case=volume --compat. Each captures 24 static frames, waits for GPU completion before each read and asserts identical decoded bytes. Both fail; all pictures and repeat.json are retained outside engine-bench/batch-160. Fixed GPU command replays also vary with unchanged uploads and draw order, without compute dispatches or float atomics. Native stored multisample values vary before final resolve. Splitting, merging or instrumenting passes changes the observed output, so these interventions do not establish a package-owned API defect or an inherent backend rule. No workaround, bias or tolerance is substituted. Jobs 6 to 8 are independent measurements and do not close this release-blocking defect.
+
+### Fixed: medium boundary offsets shortened physical transport (Batch 99)
+
+Root cause: the voxel tracer used its 0.002-cell geometry offset as the next physical ray origin at
+index-matched media boundaries. Three one-unit emitting cells in vacuum consequently produced 2.994
+instead of 3. The physical origin now stays on the boundary; only the intersection query advances, and
+its distance is restored before attenuation, free flight and emission. Main and refracted shadow walks
+share the repair. Regression: packages/voxel-pathtracer/tests/media-boundary.html and media-browser.mjs.
+Exact subsurface/glass/atmosphere parity and the existing moving-camera denoiser defects remain open.
+
+The same regression covers a second cause exposed by the physical-origin repair: floor-only cell/brick
+selection at a negative grazing boundary can repeatedly select the previous medium when the query
+advance rounds away. The walk now selects the forward half-open interval for each direction. A
+one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
