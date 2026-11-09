@@ -1,5 +1,5 @@
 {
-  "commit": "4977f76ed",
+  "commit": "4609397ec",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -764,8 +764,8 @@
         "gzip": 3926
       },
       "./image": {
-        "raw": 1663281,
-        "gzip": 764655
+        "raw": 1663793,
+        "gzip": 764815
       },
       "./bc": {
         "raw": 9349,
@@ -800,20 +800,20 @@
         "gzip": 4401
       },
       "./ktx2-layers": {
-        "raw": 810820,
-        "gzip": 375071
+        "raw": 811332,
+        "gzip": 375230
       },
       "./ktx2-hdr": {
         "raw": 790790,
         "gzip": 367278
       },
       "./ktx2-gpu": {
-        "raw": 37013,
-        "gzip": 14364
+        "raw": 37525,
+        "gzip": 14525
       },
       "./ktx2-stream": {
-        "raw": 821332,
-        "gzip": 379142
+        "raw": 821844,
+        "gzip": 379322
       },
       "./meshopt-simd": {
         "raw": 42716,
@@ -2862,24 +2862,24 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 86413,
-        "gzip": 30450
+        "raw": 86925,
+        "gzip": 30611
       },
       "./depth": {
         "raw": 3997,
         "gzip": 1886
       },
       "./lod": {
-        "raw": 82170,
-        "gzip": 29002
+        "raw": 82682,
+        "gzip": 29160
       },
       "./lighting": {
         "raw": 7836,
         "gzip": 3373
       },
       "./set": {
-        "raw": 77997,
-        "gzip": 27794
+        "raw": 78509,
+        "gzip": 27950
       },
       "./edit": {
         "raw": 8412,
@@ -2890,12 +2890,12 @@
         "gzip": 3317
       },
       "./animate": {
-        "raw": 54000,
-        "gzip": 19696
+        "raw": 54512,
+        "gzip": 19858
       },
       "./data": {
-        "raw": 59089,
-        "gzip": 21491
+        "raw": 59601,
+        "gzip": 21661
       }
     },
     "@margoengine/splines": {
@@ -3402,8 +3402,8 @@
     },
     "@margoengine/video": {
       ".": {
-        "raw": 4778,
-        "gzip": 2115
+        "raw": 4980,
+        "gzip": 2211
       },
       "./material": {
         "raw": 2221,
@@ -3738,8 +3738,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 344188,
-        "gzip": 105105
+        "raw": 344490,
+        "gzip": 105179
       },
       "./adapter": {
         "raw": 1861,
@@ -3750,8 +3750,8 @@
         "gzip": 48345
       },
       "./device": {
-        "raw": 343397,
-        "gzip": 105160
+        "raw": 343699,
+        "gzip": 105227
       },
       "./glsl": {
         "raw": 147111,
@@ -3762,8 +3762,8 @@
         "gzip": 26482
       },
       "./xr": {
-        "raw": 343437,
-        "gzip": 104956
+        "raw": 343739,
+        "gzip": 105134
       },
       "./preview": {
         "raw": 8187,
@@ -3782,8 +3782,8 @@
         "gzip": 3810
       },
       "./tiers": {
-        "raw": 344939,
-        "gzip": 104842
+        "raw": 345241,
+        "gzip": 104916
       }
     },
     "@margoengine/wfc": {
@@ -3945,9 +3945,9 @@
       "brotli": 7900
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1428752,
-      "gzip": 576916,
-      "brotli": 470850
+      "raw": 1429264,
+      "gzip": 577077,
+      "brotli": 470915
     },
     "packages/staging/dist/index.js": {
       "raw": 23223,
@@ -4139,14 +4139,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 245911,
-        "gzip": 73957,
+        "raw": 246213,
+        "gzip": 74031,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime and read-back",
         "raw": 98276,
-        "gzip": 31548,
+        "gzip": 31549,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

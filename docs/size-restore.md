@@ -716,3 +716,9 @@ Sciviz integration at 4977f76ed rebuilds sciviz and the umbrella after the
 concurrent tubes adapter/streamline repair; both genuine records report this
 commit with dirty=false. All 17 record checks, API, links and size gate pass.
 Headless/stage remains 3140 B, core/stage 23924 B.
+
+Final headless integration at 4609397ec preserves the concurrent Zstd and
+compatibility clamp changes. Full package rebuild and genuine paired records
+report this commit with dirty=false; 17 metadata cases, API, links, 983 size
+items and merged help tests pass. Core/stage stays 23924 B. Unchanged
+headless GPU/README and repaired teardown evidence are retained.

@@ -81,7 +81,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/shader | `.` 189, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 7, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,489 |
 | @margoengine/shadows | `.` 14, `./virtual` 3, `./light-function` 6, `./vsm` 3, `./transmission` 3, `./distance` 3, `./style` 3, `./rt` 6, `./rt-alpha` 5 | 49 |  | 18,481 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 9, `./sun` 19, `./volumetric-clouds` 7, `./cloud-shadows` 5, `./aerial` 6, `./hillaire` 8, `./shafts` 4, `./astro` 25, `./weather-fx` 5, `./presets` 4 | 106 |  | 17,715 |
-| @margoengine/splats | `.` 25, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./pick` 6, `./animate` 6, `./data` 23 | 39 | 1 | 30,450 |
+| @margoengine/splats | `.` 25, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./pick` 6, `./animate` 6, `./data` 23 | 39 | 1 | 30,611 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,630 |
 | @margoengine/sprites | `.` 17, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8, `./shader` 8, `./skeletal` 11 | 11 |  | 7,404 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |
@@ -99,7 +99,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/ui | `.` 100, `./react` 23, `./world` 10, `./markup` 11 | 157 |  | 31,885 |
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3 | 95 |  | 12,337 |
 | @margoengine/vfx | `.` 27, `./base` 31, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3, `./flipbook` 1, `./shadows` 2, `./nodes` 4 | 521 |  | 31,462 |
-| @margoengine/video | `.` 2, `./material` 3, `./record` 3, `./360` 5, `./codecs` 3, `./alpha` 4 | 3 |  | 2,115 |
+| @margoengine/video | `.` 2, `./material` 3, `./record` 3, `./360` 5, `./codecs` 3, `./alpha` 4 | 3 |  | 2,211 |
 | @margoengine/viewcube | `.` 9, `./axes` 2 | 8 |  | 5,130 |
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
@@ -107,7 +107,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel-pathtracer | `.` 53, `./restir` 3, `./compose` 4, `./studio` 12, `./guiding` 3, `./sky` 2, `./media` 6, `./mesh` 6, `./spectral` 3 | 178 |  | 81,091 |
 | @margoengine/water | `.` 8, `./fft` 4, `./query` 2 | 12 |  | 20,013 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
-| @margoengine/webgl2-compat | `.` 16, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2, `./tiers` 9 | 247 |  | 105,105 |
+| @margoengine/webgl2-compat | `.` 16, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2, `./tiers` 9 | 247 |  | 105,179 |
 | @margoengine/wfc | `.` 4, `./overlapping` 6, `./constraints` 6, `./sockets` 3, `./chunks` 4, `./worker` 3 | 11 |  | 1,898 |
 | @margoengine/worker | `.` 5, `./canvas` 3 |  |  | 1,872 |
 | @margoengine/xr | `.` 31, `./device-check` 10, `./models` 11, `./ar` 13, `./layers` 19, `./interaction` 11 | 83 |  | 8,758 |
