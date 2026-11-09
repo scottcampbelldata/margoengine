@@ -6,7 +6,21 @@ import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
-import { makeLockDirectory, retireMutex } from '../scripts/gpu-lock.mjs';
+import { makeLockDirectory, retireMutex, mutexTarget } from '../scripts/gpu-lock.mjs';
+
+test('mutex target is read once without a stat/readlink race; released and legacy names have no target', () => {
+  for (const code of ['ENOENT', 'EINVAL']) {
+    let calls = 0;
+    assert.equal(mutexTarget('owned.lock/mutex', { readlink() {
+      calls++;
+      throw Object.assign(new Error('name was retired or replaced with a legacy directory'), { code });
+    } }), undefined);
+    assert.equal(calls, 1, 'no second lookup through the reusable name');
+  }
+  assert.match(mutexTarget('owned.lock/mutex', { readlink: () => '../owner-123' }), /owner-123$/);
+  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+  assert.throws(() => mutexTarget('owned.lock/mutex', { readlink() { throw denied; } }), (e) => e === denied);
+});
 
 test('Windows pending directory deletion is bounded contention; permission failures still surface', {
   timeout: 5000,

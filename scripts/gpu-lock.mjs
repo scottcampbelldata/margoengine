@@ -38,9 +38,8 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
-  lstatSync,
+  readlinkSync,
   readFileSync,
-  realpathSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -188,17 +187,21 @@ function tryMutex() {
   };
 }
 
+/** Reads the published backing name once; a released or legacy non-link name has no target. */
+export function mutexTarget(path, { readlink = readlinkSync } = {}) {
+  try {
+    return resolve(dirname(path), readlink(path));
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'EINVAL') return undefined;
+    throw error;
+  }
+}
+
 function reclaimDeadMutex() {
   // Pin the unique backing directory, not the reusable mutex name: another reclaimer can finish
   // while this process is descheduled. A later owner must never lose its metadata to that process.
-  let target;
-  try {
-    if (!lstatSync(mutexDir).isSymbolicLink()) return;
-    target = realpathSync(mutexDir);
-  } catch (error) {
-    if (error.code === 'ENOENT') return; // the owner released before we inspected the link
-    throw error;
-  }
+  const target = mutexTarget(mutexDir);
+  if (!target) return;
   let ownerFile = join(target, 'owner.json');
   let owner = read(ownerFile);
   if (!owner) {
