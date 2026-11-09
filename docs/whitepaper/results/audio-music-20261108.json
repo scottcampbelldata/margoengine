@@ -1,0 +1,27 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated 600/900 Hz stems and game-state triggers, stand-ins",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "beat": 0.5,
+      "bar": 1,
+      "maxError": 8.981595273072074e-9,
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "beat": 0.5,
+      "bar": 1,
+      "maxError": 8.981595273072074e-9,
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "beat": 0.5,
+      "bar": 1,
+      "maxError": 8.981595273072074e-9,
+      "gpuErrors": []
+    }
+  ]
+}

@@ -1375,3 +1375,7 @@ No open defect found in the tested color-only subresource scope. The generated f
 readback cover faces/layers/slices/mips, load, HDR and explicit device replacement; native WebGL2 rejects with
 a coded help link. Scene capture, depth, MSAA, automatic mip generation and other devices are design limits
 or unmeasured coverage, recorded in limits.md, not proven capabilities.
+
+### Adaptive music (batch 110)
+
+No known open defect in tested layering, beat/bar scheduling, validation and lifecycle paths. Initial Node tests inspected a bus pre-tap instead of its fader; corrected graph traversal checks the actual mixer automation without changing expectations. The quality API check found two missing exported-interface comments; both now describe the options. Generated-stem PCM proves scheduling, not authored musical quality; limits.md records scope.

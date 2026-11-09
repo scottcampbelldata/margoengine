@@ -1819,3 +1819,7 @@ Real WebGPU full texel readback covers 78 generated subresources across rgba8uno
 with load, shrinking volume mips, explicit device loss and redraw on a replacement device. A real native WebGL2
 engine gets unsupported with help link. Reproduce with packages/creative/scripts/test-targets.js under gpu-lock.
 No scene capture, depth, MSAA, automatic mip generation, other-device or speed proof. Entry 4021 B gzip.
+
+### Adaptive music evidence (batch 110, section 5)
+
+Audio/music owns one source per stem and one mixer bus per source; mixer scheduling handles all state gain changes. Audio-clock grid and common starts/loopEnd preserve phase without frame timers. LIM-607 and whitepaper/results/audio-music-20261108.json record generated-stem sample-reference PCM beside WebGPU, native WebGL2 and compatibility WebGL2. Error below 5e-8 and zero GPU errors; Node tests cover restart, validation and listener teardown. No core/stage changes or speed claim; recordings and listening quality remain unmeasured.

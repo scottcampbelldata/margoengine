@@ -1580,3 +1580,7 @@ not opened. Camera, meshes, node setup, float readback and comparison are indepe
 ## Audio event containers (batch 110)
 
 Margo-own uniform index selection with preceding-index exclusion, modular sequence order and audio-clock cooldowns. Playback, sample-rate multiplication and independent linear gain follow the [W3C Web Audio Recommendation, AudioBufferSourceNode](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode) and GainNode. Reuses the existing Margo AudioVoicePool rather than another voice manager. No engine/library source read and no downloaded assets; generated tones/triggers are stand-ins.
+
+## Adaptive music (batch 110)
+
+Written from the [W3C Web Audio Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode), common scheduled start/loop times and AudioParam exponential target automation. Beat/bar quantization is first-principles ceil((requested-origin)/grid). Existing Margo mixer buses own gain scheduling; no duplicate mixer or timer scheduler. No engine/library source read or downloaded assets. Generated stems and game-state triggers are stand-ins.

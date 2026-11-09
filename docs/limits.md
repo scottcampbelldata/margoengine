@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-606). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-607). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1014,3 +1014,9 @@ automatic cameras, mip generation or resizing. Call restore(newDevice), rebuild 
 device loss; disposed targets cannot be reused. Native WebGL2 returns unsupported with a help link.
 Generated color/triangle fixtures on real WebGPU check 78 subresources, HDR, load and replacement-device redraw.
 Other devices, browsers, camera correctness, frame rate and speed are unmeasured. Core plus stage stays 23,626 B gzip.
+
+## Adaptive music (batch 110)
+
+Optional audio/music: 1,572 B gzip (bare mixer peer external); core plus stage 23,626 B. Reuses optional mixer peer buses and fades. Defaults bpm 120, beatsPerBar 4, loopBeats 4, leadTime 0.05 s, exponential fade 0.02 s (about 98% settled). Positive finite tempo, positive integer bar/loop beats, finite grid/seconds and float32 linear gains. Buffers must cover the loop; trailing samples unused. All stems start at one origin and run continuously, including silent layers. Caller authors aligned/seamless loops and headroom. Fixed tempo, no analysis, stretching, section sequencing or streaming.
+
+States are copied stem-name/dB maps, omitted stems silent. Requests validate before mutation; exact beat/bar boundaries eligible after both requested time and now+leadTime. New requests replace automation at/after their boundary; earlier transitions survive. No frame work/timers. Suspension freezes the audio clock; stop cuts sources, restart clears pending automation and resets phase. Listener teardown disposes owned buses/sources, preserving buffers. LIM-607: Node scheduling/lifecycle stand-ins and real browser sample-reference PCM for aligned generated 600/900 Hz loops and beat/bar state changes on all three routes, error below 5e-8 and zero GPU errors. Recordings, listening quality, other browsers and speed unmeasured.

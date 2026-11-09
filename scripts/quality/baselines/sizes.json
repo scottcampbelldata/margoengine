@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11479103,
+  "total": 11480931,
   "history": [
     {
       "date": "2026-10-24",
@@ -4820,6 +4820,12 @@
       "commit": "700f5baa6",
       "reason": "Batch 77 adds cube, array, mip and 3D slice rendering to optional creative/targets. Measured 4021 B gzip stays within size class S; 256 B gate headroom yields 4277 B. Core plus stage stays 23626 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "c5d2a6fb8",
+      "reason": "New optional audio/music entry, documented in limits, core and stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -4848,6 +4854,7 @@
     "@margoengine/audio": 7716,
     "@margoengine/audio/doppler": 1346,
     "@margoengine/audio/events": 5687,
+    "@margoengine/audio/music": 1828,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/behavior": 8897,
     "@margoengine/behavior/context": 1658,

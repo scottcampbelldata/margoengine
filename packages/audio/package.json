@@ -46,6 +46,10 @@
     "./events": {
       "types": "./dist/events.d.ts",
       "import": "./dist/events.js"
+    },
+    "./music": {
+      "types": "./dist/music.d.ts",
+      "import": "./dist/music.js"
     }
   },
   "files": [
@@ -54,10 +58,14 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0"
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/mixer": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {
+      "optional": true
+    },
+    "@margoengine/mixer": {
       "optional": true
     }
   }

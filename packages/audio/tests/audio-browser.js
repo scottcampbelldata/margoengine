@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { runOcclusionTests } from './occlusion-browser.js';
 import { runDopplerTests } from './doppler-browser.js';
 import { runEventTests } from './events-browser.js';
+import { runMusicTests } from './music-browser.js';
 import {
   AudioListener,
   Audio,
@@ -439,3 +440,4 @@ window.checkGesture = async () => {
 window.runOcclusionTests = runOcclusionTests;
 window.runDopplerTests = runDopplerTests;
 window.runEventTests = runEventTests;
+window.runMusicTests = runMusicTests;

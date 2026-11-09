@@ -301,3 +301,61 @@ single-buffer play, overlap, stealing, teardown and failure atomicity. Real brow
 PCM measures generated sequence/random tones and a silent cooldown gap beside WebGPU,
 native WebGL2 and compatibility WebGL2. Generated audio/events are stand-ins; real
 recordings, listening quality, other browsers and performance are unmeasured.
+
+## Adaptive music
+
+`@margoengine/audio/music` starts decoded stems together and changes their levels on
+beat or bar boundaries. Install the optional peer `@margoengine/mixer` alongside audio;
+the entry reuses mixer buses and audio-clock gain scheduling. WebGPU, native WebGL2
+and compatibility WebGL2 share the same Web Audio graph.
+
+```ts
+import {AudioListener} from 'margoengine/audio';
+import {AudioMusic} from 'margoengine/audio/music';
+
+const context = new OfflineAudioContext(2, 72000, 48000);
+using listener = new AudioListener({context});
+const tone = (hz: number) => {
+  const buffer = context.createBuffer(1, 24000, 48000);
+  buffer.getChannelData(0).forEach((_, i, a) => { a[i] = 0.1 * Math.sin(2 * Math.PI * hz * i / 48000); });
+  return buffer;
+};
+using music = new AudioMusic(listener, {base: tone(600), drums: tone(900)}, {
+  explore: {base: -6}, combat: {base: -6, drums: -6},
+}, {loopBeats: 1, leadTime: 0});
+music.start('explore', 0);
+console.log(music.transition('combat', {quantize: 'beat', after: 0.1})); // 0.5 seconds
+console.log((await context.startRendering()).length); // 72000 frames
+```
+
+In a game, use `listener.load(url, {signal})` for authored stems and call
+`transition('combat')` when game state changes. States map stem names to dB levels;
+omitted stems and `-Infinity` are silent. States are copied at construction. Gains
+must fit finite float32 linear values. This is gain layering of continuously running
+loops: muted stems keep their phase. No tempo analysis, stretching, sequencing of
+different sections, streaming, or automatic loudness/headroom management.
+
+Options: `bpm=120` positive finite quarter-note beats/minute, `beatsPerBar=4` and
+`loopBeats=4` positive integers, `leadTime=0.05` finite nonnegative scheduling seconds,
+`fade=0.02` finite nonnegative mixer exponential fade seconds (about 98% settled;
+0 jumps). Each decoded buffer must cover `loopBeats * 60 / bpm` seconds. Only that
+interval loops; trailing samples are unused. Author seamless, aligned stems; buffers
+are shared. Tempo and loop length stay fixed for a transport.
+
+`start(state, at=currentTime+leadTime)` requires a stopped transport and a finite
+time at/after now; returns the common origin. `transition(state, {quantize='bar',
+after=currentTime, fade=constructor default})` returns the first grid time at/after
+both `after` and `currentTime+leadTime`, relative to that origin. Exact boundaries
+are eligible. Schedule ahead of time for live playback; a main-thread call that
+arrives late moves to the next eligible boundary. Audio-clock suspension freezes
+the grid. No timers or frame scheduling. A new request replaces mixer automation
+at/after its chosen boundary, preserving earlier transitions; fades are exponential,
+not equal-power crossfades. Validate requests before changing playback.
+
+`stop()` cuts sources immediately, including future starts. Restart resets phase and
+pending automation. `dispose()`, `using`, and listener teardown release owned sources
+and mixer buses, preserving buffers. Disposed use raises linked `disposed`; invalid
+states/grid use linked `state` errors. No core/stage changes. Node stand-ins cover
+scheduling and lifecycle; real browser generated-stem PCM checks phase, loop, layering
+and beat/bar boundaries on all three routes. Recordings, listening quality, other
+browsers and performance remain unmeasured.

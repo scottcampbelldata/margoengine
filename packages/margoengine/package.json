@@ -142,6 +142,10 @@
       "types": "./dist/audio/events.d.ts",
       "import": "./dist/audio/events.js"
     },
+    "./audio/music": {
+      "types": "./dist/audio/music.d.ts",
+      "import": "./dist/audio/music.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
