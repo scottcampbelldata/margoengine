@@ -124,6 +124,13 @@ try {
         const cut=await fitTerrain(surface.geometry,{base:()=>5});
         const fill=await fitTerrain(surface.geometry,{base:()=>-5});
         if(cut(0,0)!==2 || fill(0,0)!==2 || cut(10,0)!==5 || fill(10,0)!==-5) throw new Error('Cut/fill value oracle');
+        const oblique=road(new Spline([[0,2,0],[17,2,23]]),{segments:1,crossSection:[[-3,0],[3,0]]});
+        const zero=await fitTerrain(oblique.geometry,{base:()=>-10,shoulder:0});
+        if(Math.abs(zero(13.5,23)-2)>1e-6)throw new Error('Oblique zero-shoulder footprint');
+        const {bankedRoad}=await import('/packages/road/dist/banking.js');
+        const curbed=await bankedRoad(new Spline([[0,0,0],[0,0,20]]),{bank:Math.PI/4,segments:4});
+        const bed=await fitTerrain(curbed.geometry);
+        for(const z of [1,5,9]) if(Math.abs(bed(2.1,z)-2.1)>1e-6)throw new Error('Banked curb lower envelope');
         const ground=heightfieldGeometry(fill,{size:[20,20],resolution:20});
         data={geometry:new Geometry(ground.positions,ground.normals,ground.indices)};
       } else if (feature === 'banking') {
@@ -131,6 +138,9 @@ try {
         const {Spline} = await import('/packages/splines/dist/index.js');
         data = await bankedRoad(new Spline([[0,0,-10],[0,0,10]]), {bank:Math.PI/6, crossSection:[[-3,0],[3,0]]});
         if (Math.abs(data.geometry.vertices[1]+1.5)>1e-6) throw new Error('Bank height oracle');
+        const loop=await bankedRoad(new Spline([[0,0,0],[30,0,0],[30,0,30],[0,0,30]],{closed:true}),{bank:0.2});
+        const vertices=loop.geometry.vertices,row=(loop.section.length-1)*2;
+        for(let i=0;i<row*6;i++) if(vertices[i]!==vertices[128*row*6+i])throw new Error('Periodic banked positions and normals');
       } else data = await junctions([
         {
           points: [

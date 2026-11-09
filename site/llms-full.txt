@@ -4106,7 +4106,7 @@ physical Apple Quick Look behaviour. The composition example remains open.
 
 ### Batch 65 job 2: banking (LIM-634)
 
-Optional road/banking: 1041 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.
+Optional road/banking: 1226 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. The corrected road root is 1089 B min+gzip under the same method. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. Review 65 correction: closed splines have periodic frames and joined end-row corner-angle normals, with hard curb edges preserved. Closed bank lists must have equal endpoint angles. The original finite/unit-normal checks did not prove seam continuity; review65.test.js now checks exact corresponding positions and normals on the review loop and a graded loop. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.
 
 ### Splat README execution evidence (2026-11-09)
 
@@ -4118,11 +4118,11 @@ complete-capture quality and throughput are separate; no codec/render or size bu
 
 ### Batch 65 job 3: Terrain fit (LIM-635)
 
-Optional road/terrain: 887 B min+gzip with bare package imports external; dependencies are additional downloads. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim. Analytic cut/fill, shoulder/end distance, banked grades, curbs, ownership, hostile inputs and aborts; actual fitted heightfield pixels and value oracles, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.
+Optional road/terrain: 1000 B min+gzip with bare package imports external; dependencies are additional downloads. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; zero-XZ-area faces omitted from the heightfield projection. Review 65 correction: barycentric footprint containment replaces the exact-zero closest-distance gate, and overlapping projected curb/driving triangles use the lowest height. The oblique zero-shoulder review grid and banked default curbs are checked together in review65.test.js; the original separate grade/curb cases did not cover these defects. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim. Analytic cut/fill, shoulder/end distance, banked grades, curbs, ownership, hostile inputs and aborts; actual fitted heightfield pixels and value oracles, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.
 
 ### Batch 65 job 4: Self intersection repair (LIM-636)
 
-Optional road/repair: 605 B min+gzip with bare package imports external; dependencies are additional downloads. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes. A generated hairpin demonstrably folds and double-covers in the root sweep; repaired faces all have positive area and single coverage, with polygon/mesh area agreement. Closed courtyard, hostile inputs, grade rejection, ownership and aborts; real WebGPU/WebGL2 road pixels, exact reboot and disposal. No speed claim.
+Optional road/repair: 685 B min+gzip with bare package imports external; dependencies are additional downloads. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Review 65 correction: planarity is checked at four raw-parameter values on every cubic span before chord sampling, independent of segments and arc lookup divisions. review65.test.js rejects the exact hill input at segments:1 and hidden grades for all five spline bases; the original monotonic-grade test was insufficient. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes. A generated hairpin demonstrably folds and double-covers in the root sweep; repaired faces all have positive area and single coverage, with polygon/mesh area agreement. Closed courtyard, hostile inputs, grade rejection, ownership and aborts; real WebGPU/WebGL2 road pixels, exact reboot and disposal. No speed claim.
 
 Batch 65 job 4 also changes road/junctions to 1114 B min+gzip: the float32 boundary, rather than the pre-rounding boundary, defines triangulation and reported area.
 
@@ -6276,7 +6276,7 @@ input was accepted and no parser boundary changed.
 
 ### Batch 65 job 2 audit
 
-No open defect found in bounded authored banking. Tight-bend overlap remains outside this entry, as limits.md records. Analytic, hostile-input, abort, ownership and real backend lifecycle checks cover the contract.
+Review 65 found a closed-road positional crack and discontinuous end normals, missed by the original finite/unit-normal checks. Fixed with periodic road tangent frames and shared end-row corner-angle normal accumulation, preserving curb edges and UV rows. review65.test.js checks the exact reported loop, variable periodic banks, a graded loop and mismatched-bank rejection. The same clamped-endpoint class was fixed in Spline.tangent, SplineFrames and the shared geometry sweep, with periodic.test.js and periodic-sweep.test.js regressions. No open defect remains from these findings. Tight-bend overlap remains outside this entry, as limits.md records. Analytic, hostile-input, abort, ownership and real backend lifecycle checks cover the contract.
 
 Banking audit regression: input bounds alone missed a section rotated beyond the output coordinate limit. banking.test.js reproduced the missing rejection before the fix. banking.ts now validates transformed float32 positions too; the regression passes.
 
@@ -6291,11 +6291,11 @@ is hidden by a generic fallback, and no full-capture or encoder-accuracy claim f
 
 ### Batch 65 job 3: Terrain fit audit
 
-No open defect found within the documented contract. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim.
+Review 65 found interior holes with zero shoulder on an oblique road and terrain penetration through a banked driving surface under default curbs. Both are fixed: vertical BVH ray containment establishes the footprint and the lowest projected triangle height establishes the bed. review65.test.js checks the exact reported inputs, every strictly interior sampled grid vertex, signed banking, face reordering and depth. Earlier separate tests for banking and curbs did not establish their combined contract. No open defect remains from these findings. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; zero-XZ-area faces omitted from the heightfield projection; banked curb overlaps participate in the lower envelope. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim.
 
 ### Batch 65 job 4: Self intersection repair audit
 
-No open defect found within the documented contract. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes.
+Review 65 found silent flattening when coarse repair chords missed a grade. Fixed by checking every cubic span at four raw-parameter values before tessellation, independently of chord count and the arc lookup. review65.test.js rejects the exact three-point hill at segments:1 and hidden Bezier/Hermite grades, as well as B-spline, Kochanek-Bartels and closed cases. The old monotonic-grade check did not establish this. No open defect remains from this finding. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes.
 
 Closed precision defect: a local 8 m wide hairpin previously rejected after two thin ears inverted on float32 conversion. junction-bends.test.js failed before the correction and passes after rounding boundaries before choosing diagonals. The final face/boundary guards remain in force.
 
@@ -10205,6 +10205,8 @@ const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15,
 engine.createMesh().setGeometry(geometry);
 ```
 
+Closed splines use periodic tangent frames: corresponding first and last section vertices and normals meet exactly, while UV V keeps the full travelled distance.
+
 Custom crossSection entries are [lateralOffset, height]. UV V follows distance / uvMeters and U follows cross-section distance. The core is frozen and has no UV channel: uvs is separate data for a textured optional renderer/exporter. Sweeps are Y-up and reject vertical or zero tangents; banking is available in the optional entry below; self-intersection repair is available in its own optional entry below.
 
 ## Junctions
@@ -10242,10 +10244,6 @@ import {Spline} from "margoengine/splines";
 const surface = await bankedRoad(new Spline([[0,0,0],[20,2,20],[50,0,25]]), {bank:[0,0.12,0]});
 console.log(surface.geometry.indices.length);
 ```
-
-`bankedRoad` accepts all root road options and `bank` (default 0): radians about the forward tangent, bounded to +/-pi/4. Positive bank raises the positive lateral edge. A list of 2..4097 angles interpolates linearly at equal arc distances. The entire cross section, including curbs, rotates; normals are rebuilt with the existing geometry utility after deformation. `signal` (default none) checks before and after lazy normal-kernel loading. Data is snapshotted before the first await and caller-owned, with no CPU resource to dispose. Dispose rendered meshes and engines. Input and output positions must stay within +/-1,000,000 m; float32 collapsed triangles and UV overflow reject. Nonvertical tangents and the root road limits apply. Banking does not repair tight bends or design civil-engineering transitions. Both native WebGPU and real WebGL2 compatibility render the banked mesh, including exact device reboot and double disposal tests.
-
-## Terrain fit
 
 [README continues: https://margoengine.com/llms/packages/road.md]
 
@@ -10587,7 +10585,7 @@ curve.atDistance(curve.length / 2, point);
 curve.tangent(0.5, point);
 ```
 
-Bezier curves require 3n+1 points and are open. Hermite requires one tangent per point; Catmull-Rom and Hermite can be closed. at uses t in 0..1; atDistance uses world units. Returned default output is reused, so provide an output buffer to retain multiple results. After editing points, call updateArcLengths. Arc lengths/tangents are numerical approximations controlled by divisions.
+Bezier curves require 3n+1 points and are open. Hermite requires one tangent per point; Catmull-Rom and Hermite can be closed. at uses t in 0..1; atDistance uses world units. Returned default output is reused, so provide an output buffer to retain multiple results. After editing points, call updateArcLengths. Arc lengths are numerical approximations controlled by divisions. Tangents use finite differences that wrap across a closed seam; the two endpoint tangents are identical. Closed-loop frames join their reference normals after twist correction, so mesh placement and deformation use the same endpoint frame.
 
 ## More curve types
 

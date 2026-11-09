@@ -292,9 +292,10 @@ export function sweepGeometry(profile: SweepProfile, path: Curve<Vec>, options: 
     v: number[] = [];
   if (towards && !(dot(towards, towards) > 0.5)) throw new RangeError('Invalid up; pass a finite vector that is not zero');
   let lastSide: MutableVec3 | undefined;
+  let firstSide = frames.normals[0], firstLift = frames.binormals[0];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps,
-      centre = to3(path.getPointAt(t)),
+      centre = to3(path.getPointAt(closed && i === steps ? 0 : t)),
       [sizeX, sizeY] = sizeAt(t),
       turn = turnAt(t),
       cosine = Math.cos(turn),
@@ -315,6 +316,10 @@ export function sweepGeometry(profile: SweepProfile, path: Curve<Vec>, options: 
       }
       lastSide = side;
     }
+    // The end row is another copy of the initial frame, including the up-parallel fallback.
+    // Reusing it avoids choosing a different side from the last interior row at the same point.
+    if (i === 0) { firstSide = side; firstLift = lift; }
+    if (closed && i === steps) { side = firstSide; lift = firstLift; }
     v.push(t);
     rings.forEach((ring, r) => {
       const row: number[] = [];

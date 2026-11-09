@@ -93,7 +93,14 @@ export const GPU_STEPS = [
   'check:no-webgpu',
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
-export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:quickstart', 'check:text-extrude'];
+export const PLAIN_STEPS = [
+  'check:road-invariants',
+  'verify',
+  'check:fresh-clone',
+  'build:site',
+  'check:quickstart',
+  'check:text-extrude',
+];
 /** Package-level steps narrowed by packageScopes; check:readme-run is the one of them that uses the GPU. */
 export const SCOPED_STEPS = [
   'check:examples-types',
@@ -106,7 +113,13 @@ export const SCOPED_STEPS = [
 export const KERNEL_STEPS = ['check:rust-kernels'];
 
 /** Steps that never drive the GPU: no heat watch. */
-export const NO_GPU_STEPS = ['verify', 'check:fresh-clone', 'check:rust-kernels', 'check:text-extrude'];
+export const NO_GPU_STEPS = [
+  'check:road-invariants',
+  'verify',
+  'check:fresh-clone',
+  'check:rust-kernels',
+  'check:text-extrude',
+];
 /** Steps that watch the heat themselves, per test (scripts/gpu-package-tests.mjs), so check:merge does not watch them. */
 export const SELF_WATCHED_STEPS = ['check:gpu-packages'];
 /** True when check:merge itself watches `name`'s heat on a heat profile: every step but the two lists above. */
@@ -611,6 +624,7 @@ export async function runSteps(
  * catalog pages, records), and the bundler matrix installs what the tarball test packed.
  */
 export const STEP_AFTER = {
+  'check:road-invariants': ['verify'],
   'check:text-extrude': ['verify'],
   'build:site': ['verify'],
   'check:examples-types': ['verify'],

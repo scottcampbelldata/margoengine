@@ -1,0 +1,88 @@
+{
+  "batch": 65,
+  "date": "2026-11-09",
+  "machine": "SCOTT-DEV",
+  "standIn": true,
+  "scope": "Four review P2 findings and adjacent shared periodic-frame defects",
+  "regressions": [
+    "packages/road/test/review65.test.js",
+    "packages/splines/test/periodic.test.js",
+    "packages/geometry/tests/periodic-sweep.test.js"
+  ],
+  "packageTests": {
+    "passed": 335,
+    "failed": 0,
+    "skipped": 0
+  },
+  "gpu": {
+    "road": "PASS, all six features on native WebGPU and real WebGL2 compatibility; exact reboot and disposal",
+    "geometry": "PASS, closed tube, readback, drawn pixels and device restore"
+  },
+  "limits": [
+    "LIM-634",
+    "LIM-635",
+    "LIM-636"
+  ],
+  "sizes": {
+    "method": "vite minify es2022 + compactOutput, bare imports external, gzip default level",
+    "entries": {
+      "index": {
+        "raw": 2094,
+        "gzip": 1089
+      },
+      "banking": {
+        "raw": 2379,
+        "gzip": 1226
+      },
+      "terrain": {
+        "raw": 1878,
+        "gzip": 1000
+      },
+      "repair": {
+        "raw": 1268,
+        "gzip": 685
+      }
+    },
+    "coreStage": {
+      "raw": 58792,
+      "gzip": 23797
+    }
+  },
+  "speedClaim": false,
+  "gateRepairs": [
+    "Terrain correction reuses existing BVH ray containment rather than a duplicate predicate; 1000 B gzip stays below the unchanged 1143 B quality budget.",
+    "Closed sweep reuses its initial up frame at the terminal row, including up parallel to the seam tangent.",
+    "Regenerated site/llms-full.txt after README and limits edits; the unchanged generated-guide freshness test now passes."
+  ],
+  "validation": {
+    "lint": "PASS",
+    "hygiene": "PASS",
+    "verify": {
+      "status": "PASS",
+      "tests": 13443,
+      "pass": 13443,
+      "fail": 0,
+      "skipped": 0,
+      "seconds": 368.9,
+      "cacheRecording": "MARGO_RESULT_CACHE=off, supported recording-only setting; all verification steps and all tests execute"
+    },
+    "readme": {
+      "passed": 27,
+      "failed": 0,
+      "packages": [
+        "road",
+        "splines",
+        "geometry"
+      ]
+    },
+    "invariantCheck": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    "generatedGuideTests": {
+      "passed": 8,
+      "failed": 0
+    }
+  }
+}

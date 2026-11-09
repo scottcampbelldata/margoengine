@@ -12,7 +12,7 @@ curve.atDistance(curve.length / 2, point);
 curve.tangent(0.5, point);
 ```
 
-Bezier curves require 3n+1 points and are open. Hermite requires one tangent per point; Catmull-Rom and Hermite can be closed. at uses t in 0..1; atDistance uses world units. Returned default output is reused, so provide an output buffer to retain multiple results. After editing points, call updateArcLengths. Arc lengths/tangents are numerical approximations controlled by divisions.
+Bezier curves require 3n+1 points and are open. Hermite requires one tangent per point; Catmull-Rom and Hermite can be closed. at uses t in 0..1; atDistance uses world units. Returned default output is reused, so provide an output buffer to retain multiple results. After editing points, call updateArcLengths. Arc lengths are numerical approximations controlled by divisions. Tangents use finite differences that wrap across a closed seam; the two endpoint tangents are identical. Closed-loop frames join their reference normals after twist correction, so mesh placement and deformation use the same endpoint frame.
 
 ## More curve types
 

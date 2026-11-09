@@ -4217,3 +4217,13 @@ comparison. No fixture request is needed for that work. The owning biomes worklo
 still needs diagnosis and a proper fix; it is not an accepted slowdown and no
 world, output or deadline was reduced. It remains open, outside this PLY proof.
 The runtime known list stays at 48; no exception is added for it.
+
+## Batch 65 review corrections (2026-11-09)
+
+The earlier batch-65 closing record at c40022a83 passed its recorded tests but did not prove four P2 cases later reported by independent review. Its curved/closed finiteness checks did not prove seam continuity; separate curb/bank cases did not prove their combination; the axis-aligned zero-shoulder case missed projection roundoff; and monotonic grades did not prove rejection of undersampled interior excursions. The matching known-bug audits and LIM-634/635/636 evidence are corrected in this change.
+
+All four exact inputs now have regressions in packages/road/test/review65.test.js. Shared spline tangents, transported frames and the geometry sweep also receive periodic regressions, including custom Curve subclasses. Footprint containment reuses Margo's existing BVH ray queries; no external implementation was read or copied. Terrain uses the lower projected surface envelope, repair validates every cubic span before tessellation, and closed road normals share incident corner angles without smoothing across curb strips. Closed bank lists with unequal endpoint angles reject. No core, stage, physics, package export or registry change.
+
+The new check:road-invariants runs all three class-regression files unconditionally after verify in check:merge. The package suites pass 335 tests with zero failures/skips; road native WebGPU and real WebGL2 compatibility and the geometry GPU checks pass. README examples execute for road, splines and geometry. This remains generated stand-in evidence, without a speed or civil-design claim. Reproduce using the review-correction commands in reproduce.md.
+
+Current optional road entry min+gzip bytes: root 1089, banking 1226, terrain 1000, repair 685. Bare package imports are external and dependencies are additional downloads. The earlier entry sizes are historical measurements, superseded for these entries. Core plus stage stays 23797 B, below 25000 B.

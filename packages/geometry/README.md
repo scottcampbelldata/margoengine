@@ -429,6 +429,7 @@ const notched = polygonDifference(disc, [[0, -0.5], [3, -0.5], [3, 0.5], [0, 0.5
 
 `@margoengine/geometry/sweep` builds handrails, bottles, ducts and organic shapes. A sweep takes one profile along a path,
 with scale and twist that change along it. A loft skins a surface over several different profiles.
+For `closed:true`, endpoint tangent samples wrap across the path seam, including custom `Curve` subclasses using the default finite-difference tangent. The final row uses the initial centre and the corrected initial frame; matching endpoint scale/twist gives identical positions and joined normals, with a separate UV row. `periodic-sweep.test.js` checks this on a nonplanar custom loop with and without an authored up direction, including up parallel to the seam tangent.
 
 ```ts
 import {CatmullRomCurve3, Path, Shape} from 'margoengine/geometry';

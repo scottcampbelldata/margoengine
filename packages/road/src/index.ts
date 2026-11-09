@@ -1,3 +1,4 @@
+import { sampleRoadFrame } from './frame.js';
 import { Geometry } from '@margoengine/core';
 import type { Spline } from '@margoengine/splines';
 /** Options for `road`. Lengths are world units; invalid values throw a RangeError. */
@@ -73,9 +74,7 @@ export function road(
     epsilon = (curve.length / segments) * 0.01;
   for (let sample = 0; sample <= segments; sample++) {
     const distance = (curve.length * sample) / segments;
-    curve.atDistance(distance, center);
-    curve.atDistance(Math.max(0, distance - epsilon), before);
-    curve.atDistance(Math.min(curve.length, distance + epsilon), after);
+    sampleRoadFrame(curve, distance, epsilon, center, before, after);
     let tx = after[0] - before[0],
       ty = after[1] - before[1],
       tz = after[2] - before[2];

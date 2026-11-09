@@ -193,6 +193,7 @@ export class SplineFrames {
         cz = normals[e] * normals[1] - normals[e + 1] * normals[0],
         twist = Math.atan2(cx * tan[0] + cy * tan[1] + cz * tan[2], dot(normals, e, normals, 0));
       for (let i = 1; i <= samples; i++) rotate(normals, i * 3, tan, i * 3, (twist * i) / samples, normals, i * 3);
+      normals.set(normals.subarray(0,3),e);
     }
     this.normals = normals;
   }

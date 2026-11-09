@@ -101,7 +101,7 @@ export class Spline {
       kind = this.kind,
       closed = this.closed;
     const segments = kind === 'bezier' ? (count - 1) / 3 : closed ? count : count - 1;
-    const scaled = t * segments,
+    const scaled = (closed && t === 1 ? 0 : t) * segments,
       segment = Math.min(segments - 1, Math.floor(scaled)),
       u = scaled - segment,
       u2 = u * u,
@@ -170,10 +170,13 @@ export class Spline {
     return output;
   }
   tangent(t: number, output: Float64Array | Float32Array = this.output): typeof output {
-    this.at(Math.max(0, t - 1e-5), this.previous);
-    this.at(Math.min(1, t + 1e-5), this.next);
     if (output.length !== 3 || !Number.isFinite(t) || t < 0 || t > 1)
       throw new RangeError('Invalid tangent parameter; pass t from 0 to 1 and an output array of 3 elements.');
+    const at = this.closed && t === 1 ? 0 : t,
+      before = at - 1e-5,
+      after = at + 1e-5;
+    this.at(this.closed && before < 0 ? before + 1 : Math.max(0, before), this.previous);
+    this.at(this.closed && after > 1 ? after - 1 : Math.min(1, after), this.next);
     const x = this.next[0] - this.previous[0],
       y = this.next[1] - this.previous[1],
       z = this.next[2] - this.previous[2],
@@ -215,4 +218,3 @@ export class Spline {
     return this.at((low + fraction) / (lengths.length - 1), output);
   }
 }
-

@@ -159,6 +159,14 @@ export abstract class Curve<V extends Vec> {
     for (let i = 0; i <= segments; i++) tangents.push(normalize(to3(this.getTangentAt(i / segments))));
     if (tangents.length === 0) return { tangents, normals, binormals };
 
+    // A closed sweep needs the same two-sided tangent at both copies of the seam,
+    // including custom curves whose default getTangent clamps at the ends.
+    if (closed && segments > 0) {
+      const seam = normalize(sub(to3(this.getPoint(tangentStep)), to3(this.getPoint(1 - tangentStep))));
+      tangents[0] = seam;
+      tangents[segments] = [...seam];
+    }
+
     // Seed normal: the world axis least aligned with the first tangent, made perpendicular to it.
     const first = tangents[0],
       ax = Math.abs(first[0]),
@@ -179,6 +187,7 @@ export abstract class Curve<V extends Vec> {
         normals[i] = perpendicular(rotateAxis(normals[i], tangents[i], (angle * i) / last), tangents[i]);
     }
 
+    if (closed && segments > 0) normals[segments] = [...normals[0]];
     for (let i = 0; i <= segments; i++) binormals.push(normalize(cross(tangents[i], normals[i])));
     return { tangents, normals, binormals };
   }

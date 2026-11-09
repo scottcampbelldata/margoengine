@@ -1204,3 +1204,20 @@ WebGPU and forced WebGL2. Results are written to `test-results/sciviz-browser.js
 ## Batch 56 job 6: oriented staging receivers
 
 After build:packages, run node scripts/gpu-lock.mjs run --owner=codex-56 -- node packages/staging/test/orientation-browser.mjs, then the same command with --compat. --record writes the two committed evidence records under examples/package-benchmarks/results. npm test --workspace @margoengine/staging runs the independent CPU projection/fit/extreme-direction regressions. The real-product case loads the already licensed examples/assets/flight-helmet-mobile.glb; no generated model substitutes for it. Screenshots are compositor screenshots. Native preview refusal is also asserted on a real WebGL2 context.
+
+### Batch 65 review corrections
+
+After a package build, run the exact four review inputs and shared periodic consumers:
+
+```sh
+npm run check:road-invariants
+node --test --test-timeout=120000 packages/road/test/*.test.js packages/splines/test/*.test.js packages/geometry/tests/*.test.js
+node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run test:gpu --workspace @margoengine/road
+node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run test:gpu --workspace @margoengine/geometry
+node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run check:readme-run -- --packages=road,splines,geometry
+npm run lint
+npm run hygiene
+npm run verify
+```
+
+The review and corrective logs are local worktree evidence under test-results/review65 and test-results/fixes65. The committed result record is results/batch-65-review-fixes-20261109.json. The original repair implementation succeeds with area 80 and all Y values zero for the hill input; the regression now requires coded unsupported. All six new regression tests fail on the original implementation (the repair baseline was also probed directly). No performance measurement is claimed.
