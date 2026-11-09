@@ -3228,6 +3228,23 @@ tests/package-order.test.js. No retries or declaration/type relaxations.
 
 ### Batch 273 lower-tier validation remains open
 
+Full-tier culling failure follow-up on b30aaa010: with MARGO_COMPAT=1,
+packages/culling/test/gpu/dynamic-check.mjs still fails at shadowed step 2
+(move every third box), exactly seven pixels differing by one channel unit on
+RTX A6000 / ANGLE Direct3D 11. The original strict assertion is unchanged.
+In a full-sequence diagnostic the two depth arrays are bit-identical and their
+shadow matrices, uniform values and camera matrices match. This narrows the
+investigation but does not establish a cause or even independently prove populated
+depth maps. Adding invariant position outputs to both caster shaders leaves the
+same seven differences, so that hypothesis is rejected. A shorter isolated test
+passes without the change and is not accepted as repair evidence. Instrumenting
+the sequence can instead expose three differing pixels in the unshadowed move
+sequence; readiness and render/capture state remain unresolved. No runtime repair
+or closure is claimed. Local investigation logs are batch-273-compat-culling-repro-real,
+batch-273-culling-full-invariance and batch-273-culling-state-corrected under
+test-results; the clean-room section records the primary research. The prepared
+culling-causes script, separately owned teardown and voxel tracer are untouched.
+
 The new optional tiers policy is not yet a completed parity row. Repro for the repaired
 copy class: on an LDR device, create two rgba32float textures, one
 sample-only (COPY_SRC | COPY_DST | TEXTURE_BINDING) and one additionally used as
