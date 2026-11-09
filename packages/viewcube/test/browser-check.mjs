@@ -35,6 +35,13 @@ try {
     null,
     'top face is edge-on from the front and not hit',
   );
+  // The home and roll buttons sit in a row above the cube: none of the front face's nine cells is covered (batch 109:
+  // the first home button covered the top-left corner cell).
+  for (const x of [-1, 0, 1])
+    for (const y of [-1, 0, 1]) {
+      const v = `${x},${y},1`;
+      assert.ok(await page.evaluate((v) => window.check.cell(v), v), `front cell ${v} is hit`);
+    }
   // Drag to orbit with the real mouse: 40 px right on the 80 px cube turns the camera one radian left; no click view.
   const start = await page.evaluate(() => window.check.cell('0,0,1'));
   await page.mouse.move(start.x, start.y);
@@ -86,6 +93,15 @@ try {
   await page.mouse.click(home.x, home.y);
   near((await page.evaluate(() => window.check.settle())).direction, [0, 0, 1], 'home button', 1e-6);
   console.log('ok home button');
+  // The counter-clockwise roll button with the real mouse: +X is up the screen, the camera did not move.
+  const roll = await page.evaluate(() => window.check.button('roll'));
+  assert.ok(roll, 'roll button hit-tests');
+  await page.mouse.click(roll.x, roll.y);
+  const rolled = await page.evaluate(() => window.check.settle());
+  assert.equal(rolled.turns, 1);
+  near(rolled.up, [1, 0, 0], 'rolled up', 1e-9);
+  near(rolled.direction, [0, 0, 1], 'roll keeps the view', 1e-9);
+  console.log('ok roll button');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {

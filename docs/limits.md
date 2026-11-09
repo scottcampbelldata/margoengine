@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-583). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-584). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -427,6 +427,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Context steering (`@margoengine/behavior/context`, 2026-11-07) | Enforced: `resolution` is a whole number of 4 or more, `blur` a whole number of 0 or more, `memory` 0 or more and below 1, `slack` 0 or more, `chase` `range` above 0 and `spread` 0 or more, `avoid` `clearance` above 0 and `radius` 0 or more. | A behaviour sees only what it is given and steers locally. | By method: headings lie on the ground plane; the racing lane mode of the chapter is left out; a behaviour sees only what it is given, with no navmesh or walls, so it steers locally and can sit in a dead end; a gap narrower than a slot can be missed at a low `resolution`; `strength` caps at 1; `memory` is a plain blend, so two pulls that swap places every update with equal averages still swap, by a smaller margin. Not measured on a real level or at a real crowd size. | Raise `resolution` so a narrow gap is not missed. For dead ends, add a behaviour of your own (a `ContextBehavior`) that writes the direction of a `FlowField` or a path into `interest`. |
 | View cube drag to orbit (`drag` on `ViewCube`, 2026-11-08) | Proved with real mouse events in Chromium on a Radeon 680M (LIM-579). By method: turntable azimuth and elevation, two radians per cube width; elevation stops at the poles. | The angles are measured from where the press went down, so the pointer always maps to the same view; a wheel zoom during a drag keeps its new distance. | Under 3 px of movement a press is a click; a drag stops wherever it is released, not on a named view. | `cube.drag = false`; click a face, edge or corner for an exact view. |
 | View cube home view (`home` and `setHome` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-580). Enforced: a home is a position and a target, three finite numbers each and apart. | The target and distance move with the eased view angles in one animation; any other camera move during it cancels it. | Only position and target are kept: the field of view, the projection and any zoom of an orthographic camera stay as they are. | Set the projection and field of view yourself after `cube.home()`, or call `camera.fitToBoundingBox` to frame a model. |
+| View cube roll (`roll` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-584). Enforced: `turns` is a finite number. | The cube writes `camera.up` every frame while rolled, so a control that sets `camera.up` itself takes over and ends the roll. | Rest positions are whole quarter turns; a fractional `roll` lands on the nearest. Any view change from the cube is upright. | Set `camera.up` yourself for a free roll angle. |
 
 ## Copies of a model
 

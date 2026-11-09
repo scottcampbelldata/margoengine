@@ -1420,6 +1420,7 @@ gizmo source was read; Autodesk, Blender and SolidWorks behaviour is described f
 | --- | --- |
 | Drag to orbit (`drag`) | Spherical coordinates (azimuth about +Y, polar angle from +Y) as in any analytic geometry text, the same turntable the package already animates with; W3C Pointer Events Level 3 (pointer ids, `setPointerCapture`, the `touch-action` property) |
 | Home view (`home`, `setHome`) | The same spherical coordinates for the view angles, with the target and distance moved linearly under the cube's existing smoothstep easing (any analysis text); the home button's behaviour is described from Autodesk's public ViewCube user documentation ("Home" view). The button and the exact landing on the stored target are Margo's own |
+| Roll buttons (`roll`) | O. Rodrigues, "Des lois geometriques qui regissent les deplacements d'un systeme solide", J. Math. Pures Appl. 5, 1840 (rotation of a vector about an axis), applied to the camera's up about the view direction; rolling the drag offset back by the same angle is a plain 2D rotation. Autodesk's public ViewCube user documentation describes the roll arrows; the quarter-turn snapping and holding the roll while other controls orbit are Margo's own |
 
 ## Mixer automatic sidechain (batch 111)
 

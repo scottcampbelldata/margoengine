@@ -26,8 +26,8 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/clustered | `.` 19, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./physical-lobes` 1, `./units` 12, `./flicker` 5, `./budget` 2 | 106 |  | 13,694 |
 | @margoengine/compute | `.` 36, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3, `./subgroups` 5, `./nn` 38, `./graph` 9, `./autotune` 9 | 422 | 26 | 39,066 |
 | @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 10, `./transform` 7, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 98 |  | 27,266 |
-| @margoengine/core | `.` 16, `./extension` 27 | 19 |  | 21,258 |
-| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,100 |
+| @margoengine/core | `.` 16, `./extension` 27 | 19 |  | 21,285 |
+| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,154 |
 | @margoengine/culling | `.` 12, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 57 |  | 13,705 |
 | @margoengine/cutscene | `.` 48, `./shots` 9, `./render` 9, `./record` 11, `./lipsync` 13, `./vfx` 13, `./editor` 10 | 151 |  | 6,859 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 4, `./brotli` 2, `./bzip2` 2, `./xz` 3, `./image` 6, `./bc` 5, `./webp` 3, `./webp-lossless` 4, `./tga` 3, `./pcx` 3, `./dds` 5, `./ktx` 5, `./tiff` 3, `./ktx2-layers` 7, `./ktx2-hdr` 10, `./ktx2-gpu` 3, `./ktx2-stream` 8, `./meshopt-simd` 2, `./jxl` 9, `./pvr` 7, `./draco-points` 6 | 37 |  | 478,232 |
@@ -84,7 +84,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splats | `.` 25, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./pick` 6, `./animate` 6, `./data` 23 | 39 | 1 | 30,423 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,597 |
 | @margoengine/sprites | `.` 17, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8, `./shader` 8, `./skeletal` 11 | 11 |  | 7,404 |
-| @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,966 |
+| @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |
 | @margoengine/staging | `.` 4 | 2 |  | 8,036 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6 | 11 |  | 4,853 |
 | @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2 | 3 |  | 14,202 |
@@ -100,7 +100,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3 | 95 |  | 12,337 |
 | @margoengine/vfx | `.` 24, `./base` 28, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3, `./flipbook` 1, `./shadows` 2 | 458 |  | 29,209 |
 | @margoengine/video | `.` 2, `./material` 3, `./record` 3, `./360` 5, `./codecs` 3, `./alpha` 4 | 3 |  | 2,094 |
-| @margoengine/viewcube | `.` 6 |  |  | 4,101 |
+| @margoengine/viewcube | `.` 6 |  |  | 4,619 |
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 13, `./bot` 4, `./file-store` 1, `./entities` 14, `./shards` 12 | 32 |  | 8,161 |

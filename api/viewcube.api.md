@@ -25,11 +25,13 @@ export class ViewCube {
     drag: boolean;
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
-    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, view }?: ViewCubeOptions);
+    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, roll, view }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
     setHome(home?: HomeView): void;
     getHome(): HomeView | undefined;
     home(duration?: number): void;
+    roll(turns?: number, duration?: number): void;
+    get turns(): number;
     getProjection(): Projection | undefined;
     setProjection(mode: Projection): void;
     update(delta: number): void;
@@ -52,5 +54,6 @@ export interface ViewCubeOptions {
     flip?: boolean;
     drag?: boolean;
     home?: HomeView | boolean;
+    roll?: boolean;
 }
 ```

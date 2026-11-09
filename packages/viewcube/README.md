@@ -26,6 +26,7 @@ cube.setProjection('orthographic');
 cube.drag = false;                                     // dragging the cube orbits the camera unless turned off
 cube.setHome({position: [6, 4, 8], target: [0, 1, 0]}); // your own home view; shows the home button
 cube.home();                                           // the home button and the Home key do the same
+cube.roll(1);                                          // a quarter turn counter-clockwise about the view axis (-1 clockwise)
 cube.dispose();                                        // engine.dispose() also disposes it
 ```
 
@@ -35,7 +36,8 @@ Options: `container` (default: the canvas's parent; made `position: relative` if
 translation), `flip` (false; also a public field: clicking the view already shown turns to the opposite one, as
 Blender's navigation gizmo and SolidWorks' "Normal To" pressed twice do; Autodesk's ViewCube keeps the view),
 `drag` (true; also a public field: dragging the cube orbits the camera), `home` (none; a `{position, target}`, or
-`true` for the camera as it is when the cube attaches: shows the home button).
+`true` for the camera as it is when the cube attaches: shows the home button), `roll` (false; shows the two roll
+buttons).
 `@margoengine/controls` navigation profiles carry it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. The toggle
 also follows projection changes made elsewhere (Blender's numpad 5 through a profile) on the next frame.
 `cube.element` is the widget root for your own styling.
@@ -54,10 +56,18 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   click that ends a drag does nothing. The cube keeps the pointer while dragging, a drag cancels a view animation,
   and only the primary button drags (`touch-action: none` on the widget, so a touch drag does not scroll the page).
 - **Home view.** `home` or `cube.setHome(view)` sets the app's own home: a camera position and the target it looks
-  at (`cube.setHome()` takes the camera as it is now). A round home button appears at the cube's top-left corner;
+  at (`cube.setHome()` takes the camera as it is now). A round home button appears above the cube's top-left corner;
   it and the Home key animate the camera there, moving the target and the distance too, and land on them exactly.
   A vertical home is exactly vertical with the standard top or bottom orientation. `cube.getHome()` returns a copy;
   without a home, Home goes to the isometric view and there is no button. A press on the button never starts a drag.
+- **Roll.** `roll: true` shows two round buttons above the cube's top-right corner that turn the view a quarter turn
+  about its axis, counter-clockwise and clockwise; `cube.roll(turns)` does the same for any number of quarter turns
+  and `cube.turns` reads the roll (0 to 3 at rest). The camera position and target stay; the cube rolls
+  `camera.up` about the view axis again every frame, so the roll holds while OrbitControls or another control
+  orbits, on the poles too, and a drag on a rolled cube still follows the pointer on screen. A view change from the
+  cube (a face, edge or corner, the arrow keys, Home) turns the view upright again; an up set by someone else wins
+  and ends the roll; `dispose` gives the app's up back. The buttons and the home button share a row above the cube,
+  so a cube in a top corner sits 38 px from the edge instead of 12 px.
 - **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
 - **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and the stage's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
@@ -65,7 +75,7 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
 - **Accessibility.** The root is a labelled group. The six faces are buttons named "Front view", "Top view", ...; only
   faces turned toward the viewer are in the tab order (screen readers reach all six). Arrow keys step the view 45°
   around and over the target, Home goes to the home view (the isometric view without one), Enter or Space activates the focused face. Edge and
-  corner hot spots are pointer targets with tooltips. The projection toggle is a button with `aria-pressed`; the home button is named "Home view".
+  corner hot spots are pointer targets with tooltips. The projection toggle is a button with `aria-pressed`; the home button is named "Home view", the roll buttons "Roll the view counter-clockwise" and "... clockwise".
 - **Rendering.** Plain DOM and CSS 3D transforms: no GPU work, no extra pass, crisp text at any DPR, works on WebGPU
   and WebGL2. The cube turns in a frame-graph step after every control has moved the camera, so it never lags a frame,
   and touches the DOM only when the orientation changed.
@@ -74,9 +84,10 @@ Why a separate package and not `@margoengine/controls`: the cube is a DOM widget
 (including the stage's CADCameraControls, which does not use controls) and optionally `@margoengine/cameras`; keeping it
 out leaves controls' bundle and dependencies unchanged.
 
-Limits: no roll (the cube sets `camera.up` only on the poles), the home view keeps the camera's field of view and
+Limits: roll is in quarter turns from the cube's buttons and `roll` (any whole or fractional count, landing on a
+whole quarter turn), the home view keeps the camera's field of view and
 projection (only position and target), and the colours are fixed light-grey (restyle `.mvc-face` and `.mvc-projection`).
 
-Size: 4,101 B min + gzip (the test enforces under 4,200 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
+Size: 4,619 B min + gzip (the test enforces under 4,700 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
 
 Unit tests: `npm test --workspace @margoengine/viewcube`. Browser check with real clicks: `node packages/viewcube/test/browser-check.mjs`.

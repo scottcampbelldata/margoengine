@@ -66,8 +66,7 @@ class FakeElement {
   }
   closest() {
     let node = this;
-    while (node && !('view' in node.dataset || 'projection' in node.dataset || 'home' in node.dataset))
-      node = node.parentElement;
+    while (node && !['view', 'projection', 'home', 'roll'].some((k) => k in node.dataset)) node = node.parentElement;
     return node;
   }
   all() {
@@ -564,6 +563,81 @@ test('home: a button and the Home key return to the view the app set, target and
   plain.dispose();
 });
 
+test('roll buttons turn the view 90 degrees about its axis; the roll holds while orbiting and a view click ends it', () => {
+  const { engine } = setup({ position: [0, 0, 10], target: [0, 0, 0] }),
+    c = engine.camera,
+    cube = new ViewCube(engine, { roll: true, duration: 0.5 }),
+    buttons = cube.element.all().filter((e) => e.dataset.roll !== undefined),
+    [ccw, cw] = buttons;
+  assert.deepEqual(
+    buttons.map((b) => [b.tagName, b.getAttribute('aria-label'), b.dataset.roll]),
+    [
+      ['BUTTON', 'Roll the view counter-clockwise', '1'],
+      ['BUTTON', 'Roll the view clockwise', '-1'],
+    ],
+  );
+  assert.equal(cube.element.style.top, '38px', 'a top-corner cube moves down for the button row above it');
+  assert.equal(cube.turns, 0);
+  ccw.dispatch('click');
+  engine.run(0.25);
+  assert.ok(cube.turns > 0.2 && cube.turns < 0.8, `halfway: ${cube.turns}`);
+  engine.run(0.3);
+  // Counter-clockwise: world +X, right before, is now up the screen and +Y points left; the camera did not move.
+  assert.equal(cube.turns, 1);
+  assert.ok(close(c.position, [0, 0, 10], 1e-12), 'the camera stays');
+  assert.ok(close(screen(c).up, [1, 0, 0], 1e-12) && close(screen(c).right, [0, -1, 0], 1e-12));
+  assert.ok(close(matrix(cube), [0, -1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 1e-12), 'the cube shows the roll');
+  // Another control orbits to the right view: the roll holds about the new axis (never parallel to it).
+  c.position = [10, 0, 0];
+  engine.frame();
+  assert.ok(close(screen(c).up, [0, 0, -1], 1e-12), `${screen(c).up}`);
+  // A drag on the rolled view follows the pointer on screen: up the screen is what right was before the roll.
+  cube.view('front', 0);
+  assert.equal(cube.turns, 0, 'a view change is upright');
+  assert.deepEqual([...c.up], [0, 1, 0], 'with the app up');
+  cube.roll(1, 0);
+  const front = cells(cube).find((e) => e.dataset.view === '0,0,1');
+  front.dispatch('pointerdown', { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+  front.dispatch('pointermove', { pointerId: 1, clientX: 100, clientY: 60 });
+  front.dispatch('pointerup', { pointerId: 1, clientX: 100, clientY: 60 });
+  front.dispatch('click'); // the browser's click that ends the drag
+  assert.ok(close(direction(c), [Math.sin(-1), 0, Math.cos(-1)], 1e-12), `${direction(c)}`);
+  assert.equal(cube.turns, 1, 'a drag keeps the roll');
+  // Clockwise, twice round, on the top pole and the bottom pole; four quarter turns are upright again.
+  cube.view('top', 0);
+  cw.dispatch('click');
+  engine.run(0.6);
+  assert.equal(cube.turns, 3);
+  assert.deepEqual(direction(c), [0, 1, 0]);
+  assert.ok(close(screen(c).up, [-1, 0, 0], 1e-12), 'top view rolled clockwise: -X up');
+  cube.roll(1, 0);
+  assert.equal(cube.turns, 0);
+  assert.ok(close(screen(c).up, [0, 0, -1], 1e-12), 'four quarter turns: the standard top view');
+  cube.view('bottom', 0);
+  cube.roll(2, 0);
+  assert.ok(close(screen(c).up, [0, 0, -1], 1e-12) && direction(c)[1] === -1, 'bottom rolled half a turn');
+  cube.element.dispatch('keydown', { key: 'ArrowUp' });
+  engine.run(0.6);
+  assert.equal(cube.turns, 0, 'the arrow keys are upright');
+  // An up set by someone else wins and ends the roll; dispose gives the app up back; bad turns throw.
+  cube.view('front', 0);
+  cube.roll(1, 0);
+  c.up = [0, 1, 0];
+  engine.frame();
+  assert.equal(cube.turns, 0);
+  assert.deepEqual([...c.up], [0, 1, 0]);
+  cube.roll(-1, 0);
+  const rolledUp = c.up;
+  assert.ok(close(screen(c).up, [-1, 0, 0], 1e-12));
+  assert.throws(() => cube.roll(Number.NaN), /Invalid roll; use/);
+  cube.dispose();
+  assert.deepEqual([...c.up], [0, 1, 0]);
+  assert.notEqual(c.up, rolledUp);
+  const plain = new ViewCube(engine);
+  assert.ok(!plain.element.all().some((e) => e.dataset.roll !== undefined), 'no roll buttons by default');
+  plain.dispose();
+});
+
 test('dispose removes the widget and its plugin; engine removal disposes it', () => {
   const { engine, container, plugins } = setup(),
     cube = new ViewCube(engine);
@@ -619,6 +693,6 @@ test('size budget', async (t) => {
   });
   const gzip = gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
   console.log(`viewcube gzip: ${gzip} B`);
-  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B (2026-11-08).
-  assert.ok(gzip < 4200, `${gzip} B`);
+  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B (2026-11-08).
+  assert.ok(gzip < 4700, `${gzip} B`);
 });

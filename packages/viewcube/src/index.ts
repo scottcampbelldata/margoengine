@@ -45,6 +45,8 @@ export interface ViewCubeOptions {
    * distance). `true` takes the camera as it is when the cube attaches. Default none: Home goes to the isometric view.
    */
   home?: HomeView | boolean;
+  /** Shows two roll buttons that turn the view 90 degrees about the view axis, counter-clockwise and clockwise. Default false. */
+  roll?: boolean;
 }
 type V3 = [number, number, number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
@@ -89,7 +91,8 @@ const CSS = `.mvc{position:absolute;z-index:1;touch-action:none;user-select:none
 .mvc-face>*{border:0;margin:0;padding:0;background:none;color:inherit;font:inherit;text-transform:uppercase;cursor:pointer;outline:none}
 .mvc-face>:hover,.mvc-face>:focus-visible{background:rgba(52,128,246,.45)}
 .mvc button:focus-visible{box-shadow:inset 0 0 0 2px #1a63d6}
-.mvc-home{position:absolute;left:-10px;top:-10px;width:20px;height:20px;padding:0;border:1px solid #868d98;border-radius:50%;background:rgba(236,238,242,.92);color:#262a31;font:15px/1 system-ui,sans-serif;cursor:pointer}
+.mvc-home,.mvc-roll{position:absolute;top:-26px;width:20px;height:20px;padding:0;border:1px solid #868d98;border-radius:50%;background:rgba(236,238,242,.92);color:#262a31;font:14px/1 system-ui,sans-serif;cursor:pointer}
+.mvc-home{left:0;font-size:15px}
 .mvc-projection{position:absolute;left:0;right:0;bottom:-26px;height:22px;border:1px solid #868d98;border-radius:4px;background:rgba(236,238,242,.92);color:#262a31;font:inherit;cursor:pointer}`;
 
 /** Spherical angles of a direction: azimuth about +Y from +Z (0 when vertical, so top and bottom keep -Z and +Z up), polar from +Y. */
@@ -107,6 +110,19 @@ const describe = (d: readonly number[], labels: Record<Face, string>): string =>
   ]
     .filter(Boolean)
     .join(' ');
+/** Writes v turned by angle a about the direction d (Rodrigues' rotation formula) into out. */
+const rotate = (out: number[], v: readonly number[], d: readonly number[], a: number): void => {
+  const l = Math.hypot(d[0], d[1], d[2]),
+    x = d[0] / l,
+    y = d[1] / l,
+    z = d[2] / l,
+    c = Math.cos(a),
+    s = Math.sin(a),
+    k = (x * v[0] + y * v[1] + z * v[2]) * (1 - c);
+  out[0] = v[0] * c + (y * v[2] - z * v[1]) * s + x * k;
+  out[1] = v[1] * c + (z * v[0] - x * v[2]) * s + y * k;
+  out[2] = v[2] * c + (x * v[1] - y * v[0]) * s + z * k;
+};
 const css = (m: readonly number[]): string => `matrix3d(${m.map((v) => +v.toFixed(6)).join(',')})`;
 let count = 0;
 
@@ -141,16 +157,23 @@ export class ViewCube {
     dRadius: number;
     from: V3;
     to?: V3;
+    twist: number;
+    dTwist: number;
     elapsed: number;
     duration: number;
     at?: readonly number[];
   };
   private homeView?: { position: V3; target: V3 };
   private homeButton?: HTMLButtonElement;
+  /** Moves a top-corner cube down to make room for the button row above it. */
+  private readonly lift: () => void;
   private last = '';
   private disposed = false;
   private upSet?: V3;
   private upPrev?: Camera['up'];
+  /** Counter-clockwise roll of the image in radians, and the azimuth of the up the cube set on a pole. */
+  private twist = 0;
+  private az = 0;
   /** The press being dragged: pointer, where it went down, the camera's angles then, radians per CSS pixel. */
   private grab?: { id: number; x: number; y: number; theta: number; phi: number };
   private dragged = false;
@@ -172,6 +195,7 @@ export class ViewCube {
       flip = false,
       drag = true,
       home,
+      roll = false,
       view,
     }: ViewCubeOptions = {},
   ) {
@@ -215,7 +239,9 @@ export class ViewCube {
       [sx, sy] = view?.pixels ? [engine.canvas.width, engine.canvas.height] : [1, 1],
       edge = { left: x / sx, top: y / sy, right: 1 - (x + w) / sx, bottom: 1 - (y + hh) / sy },
       at = (side: string, px: number) => (view ? `calc(${edge[side as 'top'] * 100}% + ${px}px)` : px + 'px');
+    // The projection toggle sits below the cube and the home and roll buttons in a row above it.
     root.style[v as 'top'] = at(v, v === 'bottom' && projection ? 38 : 12);
+    this.lift = () => void (v === 'top' && (root.style.top = at(v, 38)));
     root.style[h as 'left'] = at(h, 12);
     root.style.width = root.style.height = size + 'px';
     el('style', root).textContent = CSS;
@@ -251,6 +277,21 @@ export class ViewCube {
       this.showProjection();
     }
     if (home) this.setHome(home === true ? undefined : home);
+    if (roll) {
+      this.lift();
+      for (const [turns, glyph, name, right] of [
+        [1, '\u21b6', 'Roll the view counter-clockwise', 22],
+        [-1, '\u21b7', 'Roll the view clockwise', 0],
+      ] as const) {
+        const b = el('button', root, 'mvc-roll');
+        b.type = 'button';
+        b.dataset.roll = String(turns);
+        b.title = name;
+        b.setAttribute('aria-label', name);
+        b.textContent = glyph;
+        b.style.right = right + 'px';
+      }
+    }
     root.addEventListener('click', this.onClick);
     root.addEventListener('keydown', this.onKey);
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'])
@@ -300,6 +341,7 @@ export class ViewCube {
     b.setAttribute('aria-label', 'Home view');
     b.textContent = '⌂';
     this.element.appendChild(b);
+    this.lift();
   }
   /** A copy of the home view, or undefined before one is set. */
   getHome(): HomeView | undefined {
@@ -312,6 +354,19 @@ export class ViewCube {
     if (!h) return this.view('iso', duration);
     const d = h.position.map((x, i) => x - h.target[i]);
     this.orbit(...angles(d), duration, h.target, Math.hypot(...d));
+  }
+  /**
+   * Rolls the view about its axis by quarter turns, counter-clockwise on screen for positive `turns` (default 1), keeping
+   * the position and target. The cube keeps the roll while other controls orbit; a view change from the cube (a face,
+   * edge or corner, the arrow keys, Home) turns the view upright again.
+   */
+  roll(turns = 1, duration = this.duration): void {
+    if (!Number.isFinite(turns)) throw new RangeError('Invalid roll; use a number of quarter turns');
+    this.orbit(...this.current(), duration, undefined, undefined, this.twist + (turns * Math.PI) / 2);
+  }
+  /** Quarter turns the view is rolled counter-clockwise: 0 to 3 at rest, fractional while a roll animates. */
+  get turns(): number {
+    return this.twist / (Math.PI / 2);
   }
   /** Current projection mode, or undefined without a projection. */
   getProjection(): Projection | undefined {
@@ -337,6 +392,11 @@ export class ViewCube {
     const t = a.duration ? Math.min(1, (a.elapsed += Math.max(0, delta)) / a.duration) : 1,
       s = t * t * (3 - 2 * t),
       theta = a.theta + a.dTheta * s;
+    // A roll ends on a whole quarter turn, 0 to 3, so the upright view is exactly the unrolled one.
+    this.twist =
+      t === 1
+        ? (((Math.round((a.twist + a.dTwist) / (Math.PI / 2)) % 4) + 4) % 4) * (Math.PI / 2)
+        : a.twist + a.dTwist * s;
     // Home moves the target too; the last step lands on it exactly.
     if (a.to) c.target = a.from.map((x, i) => (t === 1 ? a.to![i] : x + (a.to![i] - x) * s)) as V3;
     a.at = this.place(theta, a.phi + a.dPhi * s, t === 1 ? a.radius + a.dRadius : a.radius + a.dRadius * s);
@@ -414,36 +474,60 @@ export class ViewCube {
   /**
    * Core rejects an up parallel to the view. On an exactly vertical view the cube sets camera.up to the screen up the
    * view had on its way to the pole (azimuth theta), and puts the previous up back once the camera leaves the pole. An up
-   * it did not set that already works (a CameraProjection's vertical up) is left alone.
+   * it did not set that already works (a CameraProjection's vertical up) is left alone. A roll turns that up about the
+   * view axis, again every frame, so the roll holds while other controls orbit. An up set by someone else wins and ends
+   * the roll.
    */
   private pole(theta?: number): void {
     const c = this.camera,
       d = c.position.map((x, i) => x - c.target[i]);
-    if (this.upSet && c.up !== this.upSet) this.upSet = undefined;
-    if (d[0] || d[2] || !d[1]) {
+    if (this.upSet && c.up !== this.upSet) {
+      this.upSet = undefined;
+      this.twist = 0;
+    }
+    const app = this.upSet ? this.upPrev! : c.up;
+    let n: readonly number[] = app;
+    if (!d[0] && !d[2] && d[1]) {
+      if (theta === undefined) return;
+      const k = Math.sign(d[1]);
+      if (this.upSet || !Math.hypot(app[0], app[2])) {
+        n = [-k * Math.sin(theta), 0, -k * Math.cos(theta)];
+        this.az = theta;
+      } else this.az = Math.atan2(-k * app[0], -k * app[2]);
+    }
+    if (n === app && !this.twist) {
       if (this.upSet) {
-        c.up = this.upPrev!;
+        c.up = app;
         this.upSet = undefined;
       }
       return;
     }
-    if (theta === undefined || (!this.upSet && Math.hypot(c.up[0], c.up[2]))) return;
-    if (!this.upSet) this.upPrev = c.up;
-    const k = Math.sign(d[1]);
-    c.up = this.upSet = [-k * Math.sin(theta), 0, -k * Math.cos(theta)];
+    if (!this.upSet) {
+      this.upPrev = c.up;
+      c.up = this.upSet = [0, 0, 0];
+    }
+    rotate(this.upSet, n, d, -this.twist);
   }
-  /** Azimuth and polar angle of the camera; on the pole the azimuth comes from camera.up (the screen up). */
+  /** Azimuth and polar angle of the camera; on the pole the azimuth of the up the cube set, else of camera.up (the screen up). */
   private current(): [number, number] {
     const c = this.camera,
       d = c.position.map((x, i) => x - c.target[i]),
       u = c.up,
       a = angles(d);
-    if (!d[0] && !d[2] && d[1] && Math.hypot(u[0], u[2]))
-      a[0] = d[1] > 0 ? Math.atan2(-u[0], -u[2]) : Math.atan2(u[0], u[2]);
+    if (!d[0] && !d[2] && d[1])
+      if (this.upSet && u === this.upSet) a[0] = this.az;
+      else if (Math.hypot(u[0], u[2])) a[0] = d[1] > 0 ? Math.atan2(-u[0], -u[2]) : Math.atan2(u[0], u[2]);
     return a;
   }
   /** Animates the azimuth and polar angle around the target; home also moves the target to `to` and the distance to `radius`. */
-  private orbit(theta: number, phi: number, duration: number, to?: readonly number[], radius?: number): void {
+  private orbit(
+    theta: number,
+    phi: number,
+    duration: number,
+    to?: readonly number[],
+    radius?: number,
+    twist = 0,
+  ): void {
     const c = this.camera,
       r = Math.hypot(...c.position.map((x, i) => x - c.target[i])),
       [t0, p0] = this.current();
@@ -457,6 +541,8 @@ export class ViewCube {
       dRadius: (radius ?? r) - r,
       from: [...c.target] as V3,
       to: to && ([...to] as V3),
+      twist: this.twist,
+      dTwist: twist - this.twist,
       elapsed: 0,
       duration,
     };
@@ -470,7 +556,7 @@ export class ViewCube {
   }
   private readonly onClick = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest?.(
-      '[data-view],[data-projection],[data-home]',
+      '[data-view],[data-projection],[data-home],[data-roll]',
     ) as HTMLElement | null;
     // The click that ends a drag is not a click on a face.
     if (this.dragged) return void (this.dragged = false);
@@ -486,6 +572,7 @@ export class ViewCube {
         (o[0] * d[0] + o[1] * d[1] + o[2] * d[2]) / Math.hypot(...o) / Math.hypot(...d) > 1 - 1e-9;
       this.view(same ? (d.map((x) => -x) as V3) : d);
     } else if (target.dataset.home !== undefined) this.home();
+    else if (target.dataset.roll) this.roll(+target.dataset.roll);
     else this.setProjection(this.projection!.mode === 'orthographic' ? 'perspective' : 'orthographic');
   };
   /**
@@ -509,10 +596,15 @@ export class ViewCube {
       this.grab = undefined;
       return;
     }
-    const dx = event.clientX - g.x,
-      dy = event.clientY - g.y;
+    // On a rolled view the drag turns back by the roll, so the cube still follows the pointer on screen.
+    const ex = event.clientX - g.x,
+      ey = event.clientY - g.y,
+      cs = Math.cos(this.twist),
+      sn = Math.sin(this.twist),
+      dx = ex * cs - ey * sn,
+      dy = ex * sn + ey * cs;
     if (!this.dragged) {
-      if (Math.hypot(dx, dy) < 3) return;
+      if (Math.hypot(ex, ey) < 3) return;
       this.dragged = true;
       this.animation = undefined;
       c.cancelFit?.();
