@@ -439,11 +439,11 @@ Only failed/unrun cases are rerun, with no bar, tolerance or production policy
 changed. The actual static kit bundles are game 355223 B, viz 248151 B and web
 95208 B; kits.md records them and the current 23924 B root. No timing work runs.
 
-Rebase onto 449dd9676 preserves the concurrent compute registration/four-step
+Rebase through 449dd9676 preserves the concurrent compute registration/four-step
 oracle, tracer composition, FFT ocean and materials fixes. All sciviz source,
 README and precision tests are byte-identical to the tested restoration.
 The combined package build passes. Genuine paired entry/network records then
-measure c923f4389 with dirty=false, followed by api:update and llms generation;
+measure the combined source with dirty=false, followed by api:update and llms generation;
 no record is relabeled. All five restored entry sizes and the 23924 B root
 are unchanged. A fresh static kit measurement matches all three documented
 figures exactly. Successful full verification steps, sciviz GPU suites and
@@ -453,3 +453,13 @@ Merged acceptance passes: the size gate, all 17 paired-record/llms tests, full
 API currentness (897 entries, 8696 exports), both changed planner regressions
 and documentation links. No successful full unit, sciviz GPU or README suite
 is repeated after rebase, and no new full-verify success is claimed.
+
+The final rebase onto 0ba1d4f94 also preserves main's stats owner changes,
+strengthened compute owner oracle, planner regression movement and fixed-work
+classifier. No sciviz or owning regression byte changes. Retain the passing
+full combined build and rebuild only stats for its changed runtime source;
+the selective build passes. Regenerate genuine paired records from e42608c3e
+(dirty=false), then API/llms artifacts. These final records replace the earlier
+combined-tree measurements, without changing their metadata by hand. The
+sciviz sizes, 23924 B root and three kit figures remain unchanged. Main's
+already recorded stats/compute unit, GPU and README evidence is retained.

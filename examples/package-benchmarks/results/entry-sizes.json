@@ -1,5 +1,5 @@
 {
-  "commit": "c923f4389",
+  "commit": "e42608c3e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3012,24 +3012,24 @@
     },
     "@margoengine/stats": {
       ".": {
-        "raw": 14066,
-        "gzip": 4853
+        "raw": 14081,
+        "gzip": 4861
       },
       "./beacon": {
-        "raw": 3315,
-        "gzip": 1383
+        "raw": 3330,
+        "gzip": 1394
       },
       "./compile": {
-        "raw": 4654,
-        "gzip": 1802
+        "raw": 4669,
+        "gzip": 1813
       },
       "./leaks": {
         "raw": 3742,
         "gzip": 1665
       },
       "./phases": {
-        "raw": 3263,
-        "gzip": 1458
+        "raw": 3278,
+        "gzip": 1467
       },
       "./report": {
         "raw": 2346,
