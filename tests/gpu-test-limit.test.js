@@ -113,7 +113,8 @@ test('endTree waits for every process taskkill named, and returns the ones past 
   let polls = 0;
   const gone = await endTree(1, {
     kill: async () => [11, 12],
-    settle: async () => [],
+    // Exercise PID polling, used without a native identity-aware waiter. The native wait is tested below.
+    settle: null,
     alive: (pid) => {
       seen.push(pid);
       return pid === 12 && ++polls < 3;
@@ -121,7 +122,7 @@ test('endTree waits for every process taskkill named, and returns the ones past 
   });
   assert.deepEqual(gone, []);
   assert.equal(polls, 3, 'it kept asking until the last process was gone');
-  const left = await endTree(1, { kill: async () => [13], alive: () => true, waitMs: 20 });
+  const left = await endTree(1, { kill: async () => [13], alive: () => true, settle: null, waitMs: 20 });
   assert.deepEqual(left, [13]);
 });
 

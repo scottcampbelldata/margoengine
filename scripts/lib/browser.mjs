@@ -3,6 +3,7 @@ import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { closeAll, endTree } from '../support/shutdown.mjs';
 
 const ownedBrowserServers = new WeakMap();
+const ownedProcessCloses = new WeakMap();
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
@@ -188,19 +189,29 @@ export function withBoundedClose(browser, { end = endTree, server = ownedBrowser
             // the shutdown timer. End the owned process asynchronously first, then finish driver cleanup.
             const terminate = async () => {
               const child = server.process?.();
-              if (platform === 'win32' && child?.pid && child.exitCode === null && child.signalCode === null) {
-                let onExit;
-                const exited = new Promise((resolve) => child.once('exit', (onExit = resolve)));
+              if (platform === 'win32' && child?.pid) {
+                const running = child.exitCode === null && child.signalCode === null;
+                let onClose;
+                const tracked = ownedProcessCloses.get(server);
+                const closed = tracked ?? new Promise((resolve) => child.once('close', (onClose = resolve)));
                 try {
-                  const remaining = await end(child.pid);
-                  if (remaining?.length)
-                    throw Object.assign(new Error(`Chromium processes did not exit: ${remaining.join(', ')}`), {
-                      code: 'SHUTDOWN_TIMEOUT',
-                      open: remaining.map((pid) => `Chromium process ${pid}`),
-                    });
-                  await exited;
+                  if (running) {
+                    const remaining = await end(child.pid);
+                    if (remaining?.length)
+                      throw Object.assign(new Error(`Chromium processes did not exit: ${remaining.join(', ')}`), {
+                        code: 'SHUTDOWN_TIMEOUT',
+                        open: remaining.map((pid) => `Chromium process ${pid}`),
+                      });
+                  }
+                  // ChildProcess 'exit' does not close its stdio. Playwright's kill API is safe only
+                  // after 'close', which marks the driver process closed. Release every owned pipe,
+                  // including Chromium's two CDP pipes, once native termination has finished.
+                  const pipes = child.stdio ?? [child.stdin, child.stdout, child.stderr];
+                  const openPipes = pipes.some((pipe) => pipe && !pipe.closed);
+                  for (const pipe of pipes) pipe?.destroy();
+                  if (tracked || running || openPipes) await closed;
                 } finally {
-                  child.removeListener('exit', onExit);
+                  if (onClose) child.removeListener('close', onClose);
                 }
               }
               await server.kill();
@@ -287,6 +298,9 @@ export async function launchBrowser({
       // launchServer exposes explicit process ownership and an immediate kill API.
       if (typeof launchers.chromium.launchServer === 'function') {
         const server = await launchers.chromium.launchServer({...settings, host: '127.0.0.1'});
+        const child = server.process?.();
+        if (child && child.exitCode === null && child.signalCode === null)
+          ownedProcessCloses.set(server, new Promise((resolve) => child.once('close', resolve)));
         let browser;
         try {
           browser = await launchers.chromium.connect(server.wsEndpoint(), {timeout: 30_000});

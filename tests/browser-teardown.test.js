@@ -4,7 +4,7 @@
 // script that does not: a script that starts a browser and a server of its own must tear both down with `closeAll`, and
 // the shared launchers (`launchBrowser`, `openBrowser`, `startDevServer`) bound their own closes.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
@@ -184,6 +184,7 @@ test('owned Chromium terminates asynchronously before invoking the driver kill A
       calls.push('terminate');
       child.exitCode = 1;
       child.emit('exit', 1, null);
+      child.emit('close', 1, null);
       return [];
     },
   });
@@ -209,8 +210,46 @@ test('a pending owned process termination keeps the shutdown timer runnable', as
   } finally {
     child.exitCode = 1;
     child.emit('exit', 1, null);
+    child.emit('close', 1, null);
     release([]);
     await closing;
+  }
+});
+
+test('owned Chromium releases stdout, stderr and CDP pipes and observes close before driver kill', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  let processClosed = false;
+  child.on('close', () => { processClosed = true; });
+  const pipes = Array.from({ length: 4 }, () => ({
+    closed: false,
+    destroy() {
+      this.closed = true;
+      if (pipes.every((pipe) => pipe.closed) && !processClosed) child.emit('close', 1, null);
+    },
+  }));
+  child.stdio = [null, ...pipes];
+  let kills = 0;
+  const browser = withBoundedClose({ close: async () => {} }, {
+    platform: 'win32',
+    server: {
+      process: () => child,
+      kill: async () => {
+        assert.equal(processClosed, true, 'exit alone leaves the driver in its synchronous taskkill path');
+        assert.ok(pipes.every((pipe) => pipe.closed), 'every owned pipe, including CDP, must be released');
+        kills++;
+      },
+    },
+    end: async () => {
+      child.exitCode = 1;
+      child.emit('exit', 1, null);
+      return [];
+    },
+  });
+  try {
+    await browser.close();
+    assert.equal(kills, 1);
+  } finally {
+    for (const pipe of pipes) pipe.destroy();
   }
 });
 
@@ -310,17 +349,59 @@ test('a real browser: close ends its main process and everything under it', { ti
   assert.deepEqual(alive, [], `still running after the close, of ${tree.map(({ id, type }) => `${type} ${id}`)}`);
 });
 
-test('endTree waits for every process taskkill named, and returns the ones past the limit', async () => {
+test('endTree polls every killed process without a native handle waiter, and returns the ones past the limit', async () => {
   let polls = 0;
   const gone = await endTree(1, {
     kill: async () => [11, 12],
-    settle: async () => [],
+    settle: null,
     alive: (pid) => pid === 12 && ++polls < 3,
   });
   assert.deepEqual(gone, []);
   assert.equal(polls, 3, 'it kept asking until the last process was gone');
-  const left = await endTree(1, { kill: async () => [13], alive: () => true, waitMs: 20 });
+  const left = await endTree(1, { kill: async () => [13], alive: () => true, settle: null, waitMs: 20 });
   assert.deepEqual(left, [13]);
+});
+
+test('endTree uses the native identity-aware waiter before a killed PID can be mistaken for its replacement', async () => {
+  const calls = [];
+  const begun = Date.now();
+  const gone = await endTree(11, {
+    waitMs: 100,
+    kill: async () => [11, 12],
+    // PID 12 was immediately recycled by Windows. kill(pid, 0) cannot tell, so it remains alive.
+    alive: () => true,
+    settle: async (pids, left, since) => {
+      calls.push(pids);
+      assert.ok(left > 0 && left <= 100);
+      assert.ok(since >= begun && since <= Date.now());
+      return [];
+    },
+  });
+  assert.deepEqual(gone, [], 'new processes with recycled PIDs must not consume the shutdown budget');
+  assert.deepEqual(calls, [[11, 12]], 'the native waiter checks identity and process handles for every killed PID');
+});
+
+test('Windows endTree leaves a live replacement process alone after checking its creation time', { timeout: 15_000 }, async () => {
+  if (process.platform !== 'win32') return;
+  let replacement;
+  try {
+    const gone = await endTree(1, {
+      waitMs: 2000,
+      kill: async () => {
+        // The replacement is created after termination began, as happens when Windows reuses a killed PID.
+        replacement = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+          stdio: 'ignore', windowsHide: true,
+        });
+        await new Promise((resolve, reject) => replacement.once('spawn', resolve).once('error', reject));
+        return [replacement.pid];
+      },
+    });
+    assert.deepEqual(gone, []);
+    assert.equal(replacement.exitCode, null, 'the unrelated replacement must still be running');
+    process.kill(replacement.pid, 0);
+  } finally {
+    if (replacement?.pid) await endTree(replacement.pid);
+  }
 });
 
 test('the pids come from taskkill lines, never the parent it names', () => {

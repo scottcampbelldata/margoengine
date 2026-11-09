@@ -1,5 +1,17 @@
 # Build record
 
+## Batch 160: separate browser shutdown prerequisite
+
+The Windows browser wrapper now closes all four owned stdio/CDP pipes after
+native termination and awaits ChildProcess close before invoking driver cleanup.
+Awaiting exit alone left the driver on a synchronous taskkill path that blocked
+the shutdown timer. The four-pipe regression fails before the ordering repair.
+Native termination also uses the identity-aware handle waiter before PID
+polling, preventing a replacement process from consuming the shutdown budget.
+Regression tests cover both causes, including a real Windows replacement
+process. The original 30,000 ms limit remains. This prerequisite is landed
+separately from rendering jobs 4 and 5; it does not close either job or batch 160.
+
 ## Batch 134: Basis specification review and partial prebuilt baseline
 
 Scott's ruling dated 2026-11-10 supersedes the earlier byte-choice blocker:

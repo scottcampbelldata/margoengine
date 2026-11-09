@@ -124,11 +124,15 @@ export async function endTree(
     }
   }
   const killed = pids;
+  // Windows PIDs can be reused before taskkill returns. kill(pid, 0) then sees the replacement,
+  // so polling it before the identity-aware handle wait can spend the whole budget on an unrelated
+  // process. The native waiter already waits for exit and checks StartTime: let it own that wait.
+  if (settle) return settle(killed, begun + waitMs - Date.now(), begun);
   for (;;) {
     pids = pids.filter(alive);
     // wall-clock: a bound on the wait for processes already killed, far from normal.
     if (pids.length && Date.now() - begun > waitMs) return pids;
-    if (!pids.length) return settle ? settle(killed, begun + waitMs - Date.now(), begun) : [];
+    if (!pids.length) return [];
     // fixed-wait: polling the process table, which has no event to wait on.
     await new Promise((resolve) => setTimeout(resolve, 10));
   }

@@ -1,5 +1,17 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
+
+ChildProcess `exit` does not establish that its stdio has closed. The shared
+browser wrapper awaited exit before driver cleanup, leaving stdout, stderr and
+both CDP pipes open and allowing synchronous taskkill to block the unchanged
+30,000 ms shutdown timer. It now releases all owned pipes after successful native
+termination and awaits a close event latched at launch before driver cleanup.
+The four-pipe regression fails before this repair. Native termination also checks
+process creation time before waiting, so recycled PIDs cannot spend the shutdown
+budget on an unrelated replacement. Both cases have regression coverage in
+`tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
+
 ### Fixed 2026-11-09: decoder Node Basis README example
 
 The Node `nodeKTX2` example used a page's `document` and fetched the placeholder

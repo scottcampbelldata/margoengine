@@ -1,5 +1,16 @@
 # Engine architecture and quality reference
 
+## Browser shutdown evidence (batch 160, section 5 supplement)
+
+The Windows browser owner distinguishes native process exit from ChildProcess
+close. After native termination succeeds, it releases stdout, stderr and both
+CDP pipes and awaits a close event latched at launch before driver cleanup. The
+four-pipe regression fails under the previous ordering. Native handle waits
+check process creation time before polling, with a live replacement-process
+regression for PID reuse. These repairs retain the 30,000 ms shutdown budget.
+The root catalog and browser launcher tests exercise the shared owner; this
+change adds no rendering capability and does not change core or stage.
+
 ## Purpose and authority
 
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that
