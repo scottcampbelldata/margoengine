@@ -64,17 +64,21 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
   if (!ids.length) return Promise.resolve([]);
   if (!(waitMs > 0)) return Promise.resolve(ids);
   const script = [
+    "$ErrorActionPreference = 'Stop'",
     `$end = [DateTime]::UtcNow.AddMilliseconds(${Math.round(waitMs)})`,
     `$since = [DateTimeOffset]::FromUnixTimeMilliseconds(${Math.round(sinceMs)}).UtcDateTime`,
     `foreach ($id in @(${ids.join(',')})) {`,
-    '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch { continue }',
-    '  try { if ($p.StartTime.ToUniversalTime() -gt $since) { continue } } catch {}',
+    '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch [ArgumentException] { continue }',
+    '  try { if ($p.StartTime.ToUniversalTime() -gt $since) { continue } } catch { $id; continue }',
     '  $left = [int][Math]::Max(0, ($end - [DateTime]::UtcNow).TotalMilliseconds)',
     '  if (-not $p.WaitForExit($left)) { $id }',
     '}',
+    // A caught missing-process exception leaves PowerShell's last status false.
+    // The complete handled loop is a successful query, including an empty result.
+    'exit 0',
   ].join('\n');
   return new Promise((resolve) => {
-    // A PowerShell that did not answer in time says nothing about the pids, so all of them count as still running.
+    // A failed native query proves no process has exited; retain every unresolved PID.
     run(
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', script],

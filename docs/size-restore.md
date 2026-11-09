@@ -686,3 +686,28 @@ shutdown-final-native-waiter (repair). An intermediate edit failed because CRLF
 prevented several scripted replacements, leaving step undefined; its owned
 runner/browser tree was terminated, the edit corrected and affected files
 rerun. This is not a product failure or a hidden successful full-verify claim.
+
+
+The first combined network run fails in the new native child wait, naming PID
+101848; inspection finds it already gone. A direct diagnostic captures helper
+exit code 1 with empty stdout/stderr. Root: GetProcessById correctly throws for
+an absent PID and the catch handles it, but powershell.exe -Command inherits
+the last failed status despite the handled exception. Make normal loop completion
+explicitly exit 0, catch only the documented absent-process ArgumentException,
+and treat unreadable creation time as unresolved. Stop on unexpected errors;
+real helper failures still retain all unresolved PIDs. The native absent-PID
+regression fails before this correction. This is a repaired cause, not a retry.
+Research adds Microsoft PowerShell Team, *Windows PowerShell Exit Codes* (2006),
+https://devblogs.microsoft.com/powershell/windows-powershell-exit-codes/,
+and Microsoft, *Process.GetProcessById* (2026 documentation),
+https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.getprocessbyid.
+
+
+Combined headless acceptance: rebase retains Controls, Cinematic, Animator and
+Materials changes. Rebuild the three changed runtime packages, then regenerate
+genuine paired entry/network records for 2cdc69c25, dirty=false. The repaired
+native waiter passes all nine shutdown cases; the failed network step passes.
+Seventeen record cases, API currentness, documentation links and the size gate
+pass. Headless/stage stays 3140 B; core/stage stays 23924 B. Keep the original
+13997/13998 full verify and the repaired failed-file continuation as separate
+evidence; no second full verify or new GPU/README replay is claimed.

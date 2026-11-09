@@ -14,7 +14,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
 | @margoengine/animation | `.` 41, `./vat` 15, `./sampling` 12, `./pointer` 5, `./interactivity` 3, `./skeleton-utils` 6, `./morph-gpu` 4, `./lod` 6, `./clip-utils` 6, `./dqs` 4, `./instanced-skin` 8, `./geometry-cache` 10, `./point-cache` 3 | 129 |  | 22,782 |
-| @margoengine/animator | `.` 34, `./graph` 7, `./inertialize` 3, `./sync` 3, `./warping` 7, `./fbik` 6, `./motion-matching` 10, `./mirror` 4, `./spline-ik` 3 | 88 |  | 19,123 |
+| @margoengine/animator | `.` 34, `./graph` 7, `./inertialize` 3, `./sync` 3, `./warping` 7, `./fbik` 6, `./motion-matching` 10, `./mirror` 4, `./spline-ik` 3 | 88 |  | 19,150 |
 | @margoengine/audio | `.` 19, `./occlusion` 2, `./doppler` 2, `./events` 2, `./music` 4, `./zones` 3, `./ambisonics` 2 | 51 |  | 7,687 |
 | @margoengine/behavior | `.` 85, `./steering` 27, `./perception` 22, `./eqs` 18, `./goap` 9, `./smart-objects` 10, `./flowfield` 5, `./htn` 13, `./context` 11 | 8 | 1 | 8,637 |
 | @margoengine/biomes | `.` 43, `./toolkit` 34, `./presets` 6, `./region` 5, `./hydrology` 11, `./disturbance` 12, `./seasons` 6, `./erosion` 6, `./relief` 7, `./digest` 3, `./koppen` 5, `./zones` 9, `./multinoise` 7, `./view` 21, `./rivers` 10, `./cover` 10, `./far` 3, `./objects` 4, `./editor` 7, `./placement` 7, `./stats` 12, `./io` 10, `./workers` 3, `./gpu` 5, `./splines` 9, `./settlements` 6, `./graph` 5, `./ecosystem` 7, `./erosion-wasm` 5 | 603 |  | 16,516 |

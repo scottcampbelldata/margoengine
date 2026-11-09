@@ -171,3 +171,10 @@ test('a native process waiter that cannot start or fails proves no process has e
   }
   assert.deepEqual(await waitSignaled([11, 12], 50, Date.now(), (_f, _a, _o, callback) => callback(null, '12\r\n')), [12]);
 });
+
+
+test('a native waiter reports an already absent process as successful completion', { timeout: 10000 }, async () => {
+  if (process.platform !== 'win32') return;
+  // Windows process IDs are multiples of four; this positive ID cannot name a process.
+  assert.deepEqual(await waitSignaled([2147483647], 2000, Date.now()), []);
+});

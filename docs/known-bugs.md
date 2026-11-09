@@ -3847,3 +3847,11 @@ each teardown phase and requires its exact name at the hard limit. Preserve
 this record and capture those names if the original recurrence returns. No
 deadline was raised, retry loop added, full verify replayed or other lane killed.
 See [size restoration](size-restore.md) for research and retained log receipts.
+
+
+Combined-record follow-up: the failed network child wait named PID 101848, which
+was already absent. Captured native waiter output is empty with exit code 1:
+a caught GetProcessById exception leaves powershell.exe's final status false.
+Explicit successful loop exit plus the native absent-PID regression repairs
+this introduced classification defect. Unexpected query errors and unreadable
+creation times remain unresolved rather than being called successful cleanup.
