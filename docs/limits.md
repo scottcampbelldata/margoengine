@@ -1834,3 +1834,7 @@ optional complete-tree placement 3,144 B gzip. No wall-time performance claim.
 Both native texture backends pass 88,830 oracle channel checks at maximum error
 one RGBA8 step, with parity, phase seams, state restoration, loss, restoration,
 abort and disposal. Current-machine proof only; no cross-device byte guarantee.
+
+The box-only geometry consumer excludes the internal lattice helper used by
+other primitives. The existing strict 1,550 B gzip consumer check, primitive
+geometry/UV/group controls and full-package ratio check remain unchanged.

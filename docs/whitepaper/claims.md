@@ -1676,3 +1676,9 @@ intentional API contracts: ../testpage-bugs.md. Core
 accepts empty Geometry under Scott's exception; it contributes no renderer batch
 or geometry upload, proved on native WebGPU, full WebGL2 compatibility and native
 preview. Stage and physics are unchanged. Core plus stage: 23,837 B gzip.
+
+Test-page geometry packaging: a box-only import no longer retains the internal
+lattice method used by other primitives. `packages/geometry/tests/geometry.test.js`
+checks the unchanged strict 1,550 B gzip budget and excludes the unused method;
+its shape, normals, winding, UV and group controls still apply. This is a
+packaging claim, without a rendering-speed claim or a reduced mesh.

@@ -28,25 +28,6 @@ class Mesh {
     this.n.push(nx, ny, nz);
     this.t.push(u, v);
   }
-  /**
-   * Indexes a lattice of `(cols + 1) x (rows + 1)` vertices written row by row from `first`. Columns must advance
-   * along the surface's u direction and rows along v with u x v pointing to the front, so the triangles come out
-   * counter-clockwise seen from the front. `drop(row)` leaves out one triangle of each quad in that row.
-   */
-  lattice(first: number, cols: number, rows: number, drop?: (row: number) => number): void {
-    for (let r = 0; r < rows; r++) {
-      const skip = drop ? drop(r) : BOTH;
-      for (let c = 0; c < cols; c++) {
-        const a = first + r * (cols + 1) + c,
-          b = a + 1,
-          d = a + cols + 1,
-          e = d + 1;
-        // Split along a-e: the lower triangle owns the edge a-b, the upper one d-e.
-        if (skip !== NO_LOWER) this.i.push(a, b, e);
-        if (skip !== NO_UPPER) this.i.push(a, e, d);
-      }
-    }
-  }
   /** Closes a draw group over every index added since `start`; empty groups are left out. */
   group(start: number, materialIndex: number): void {
     if (this.i.length > start) this.groups.push({ start, count: this.i.length - start, materialIndex });
@@ -60,6 +41,26 @@ class Mesh {
     };
     if (withGroups) data.groups = this.groups;
     return data;
+  }
+}
+
+/**
+ * Indexes a lattice of `(cols + 1) x (rows + 1)` vertices written row by row from `first`. Columns must advance
+ * along the surface's u direction and rows along v with u x v pointing to the front, so the triangles come out
+ * counter-clockwise seen from the front. `drop(row)` leaves out one triangle of each quad in that row.
+ */
+function lattice(mesh: Mesh, first: number, cols: number, rows: number, drop?: (row: number) => number): void {
+  for (let r = 0; r < rows; r++) {
+    const skip = drop ? drop(r) : BOTH;
+    for (let c = 0; c < cols; c++) {
+      const a = first + r * (cols + 1) + c,
+        b = a + 1,
+        d = a + cols + 1,
+        e = d + 1;
+      // Split along a-e: the lower triangle owns the edge a-b, the upper one d-e.
+      if (skip !== NO_LOWER) mesh.i.push(a, b, e);
+      if (skip !== NO_UPPER) mesh.i.push(a, e, d);
+    }
   }
 }
 
@@ -128,7 +129,7 @@ export function planeGeometry(width = 1, height = 1, widthSegments = 1, heightSe
   for (let r = 0; r <= rows; r++)
     for (let c = 0; c <= cols; c++)
       mesh.add((c / cols - 0.5) * width, (r / rows - 0.5) * height, 0, 0, 0, 1, c / cols, r / rows);
-  mesh.lattice(0, cols, rows);
+  lattice(mesh, 0, cols, rows);
   return mesh.done();
 }
 
@@ -181,7 +182,7 @@ export function ringGeometry(
       mesh.add(x, y, 0, 0, 0, 1, 0.5 + x / scale, 0.5 + y / scale);
     }
   }
-  mesh.lattice(0, rings, around);
+  lattice(mesh, 0, rings, around);
   return mesh.done();
 }
 
@@ -223,7 +224,7 @@ export function cylinderGeometry(
       mesh.add(rad * s, y, rad * k, nr * s + 0, ny, nr * k + 0, c / cols, t);
     }
   }
-  mesh.lattice(0, cols, rows, (r) =>
+  lattice(mesh, 0, cols, rows, (r) =>
     r === 0 && !(radiusBottom > 0) ? NO_LOWER : r === rows - 1 && !(radiusTop > 0) ? NO_UPPER : BOTH,
   );
   mesh.group(0, 0);
@@ -305,7 +306,7 @@ export function sphereGeometry(
       mesh.add(radius * x, radius * ct, radius * z, x, ct, z, u + shift, 1 - v);
     }
   }
-  mesh.lattice(0, cols, rows, (r) => (r === 0 && bottom ? NO_LOWER : r === rows - 1 && top ? NO_UPPER : BOTH));
+  lattice(mesh, 0, cols, rows, (r) => (r === 0 && bottom ? NO_LOWER : r === rows - 1 && top ? NO_UPPER : BOTH));
   return mesh.done();
 }
 
@@ -358,7 +359,7 @@ export function capsuleGeometry(
       mesh.add(rad * x, y, rad * z, nr * x * on, ny * on, nr * z * on, c / cols + shift, total > 0 ? arc / total : 0);
     }
   });
-  mesh.lattice(0, cols, rows, (r) => (r === 0 ? NO_LOWER : r === rows - 1 ? NO_UPPER : BOTH));
+  lattice(mesh, 0, cols, rows, (r) => (r === 0 ? NO_LOWER : r === rows - 1 ? NO_UPPER : BOTH));
   return mesh.done();
 }
 
@@ -389,7 +390,7 @@ export function torusGeometry(
       mesh.add(reach * cu, reach * su, tube * sv, cv * cu, cv * su, sv, i / along, j / around);
     }
   }
-  mesh.lattice(0, along, around);
+  lattice(mesh, 0, along, around);
   return mesh.done();
 }
 
@@ -508,7 +509,7 @@ export function latheGeometry(
         [nx, ny] = normals[j];
       mesh.add(x * s, y, x * k, nx * s, ny, nx * k, c / cols, j / last);
     }
-  mesh.lattice(0, cols, last);
+  lattice(mesh, 0, cols, last);
   return mesh.done();
 }
 

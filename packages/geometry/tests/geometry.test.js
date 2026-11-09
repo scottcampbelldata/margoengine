@@ -1158,4 +1158,5 @@ test('consumers tree-shake to what they import', async (t) => {
   assert.ok(gzipSync(box).length < 1550, `box-only gzip ${gzipSync(box).length}`);
   assert.ok(gzipSync(box).length * 8 < gzipSync(all).length, 'box alone is a small fraction of the package');
   assert.doesNotMatch(box, /Catmull|steiner/, 'curves and the triangulator are dropped');
+  assert.doesNotMatch(box, /\blattice\(/, 'unused lattice generation does not follow the box-only consumer');
 });

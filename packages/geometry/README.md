@@ -12,6 +12,7 @@ opacity. Tangents must be present; occlusion callbacks must return finite 0..1.
 `footprintRadius(data)` measures the maximum local XZ distance from the origin.
 
 Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.
+Box-only consumers drop the internal lattice helper used by the other grid primitives; their vertices, indices, UVs and groups remain unchanged.
 
 Build from source with `npm run build` in `packages/geometry`.
 
