@@ -18,7 +18,9 @@ try {
     join(dir, 'main.js'),
     `import {createPoissonSampler} from '@margoengine/procedural/poisson';
      import {createDungeonGenerator} from '@margoengine/procedural/dungeon';
-     window.makeSampler = createPoissonSampler; window.makeDungeon = createDungeonGenerator;`,
+     import {createTreeGenerator} from '@margoengine/procedural/trees';
+     window.makeSampler = createPoissonSampler; window.makeDungeon = createDungeonGenerator;
+     window.makeTree = createTreeGenerator;`,
   );
   await build({
     root: dir,
@@ -29,6 +31,7 @@ try {
       alias: {
         '@margoengine/procedural/poisson': fileURLToPath(new URL('../dist/poisson.js', import.meta.url)),
         '@margoengine/procedural/dungeon': fileURLToPath(new URL('../dist/dungeon.js', import.meta.url)),
+        '@margoengine/procedural/trees': fileURLToPath(new URL('../dist/trees.js', import.meta.url)),
       },
     },
     build: { outDir: join(dir, 'dist') },
@@ -67,6 +70,9 @@ try {
       }
       const sampler = await window.makeSampler();
       const dungeon = await window.makeDungeon();
+      const trees = await window.makeTree();
+      const treeOptions = { seed: 7, attractionCount: 64, maxNodes: 256, maxIterations: 64 };
+      const tree = trees.generate(treeOptions);
       const dungeonOptions = { width: 32, height: 24, maxRooms: 12, seed: 7 };
       const layout = dungeon.generate(dungeonOptions);
       const options = { radius: 0.2, attempts: 5000, seed: 39 };
@@ -85,6 +91,16 @@ try {
       }
       const after = sampler.rectangle([-2, -2, 2, 2], options);
       const dungeonAfter = dungeon.generate(dungeonOptions);
+      const treeAfter = trees.generate(treeOptions);
+      trees.dispose();
+      trees.dispose();
+      let treeDisposed = false;
+      try {
+        trees.generate();
+      } catch (e) {
+        treeDisposed = e.code === 'disposed' && e.message.includes('https://margoengine.com/errors#procedural');
+      }
+      if (!treeDisposed) throw new Error('Disposed tree generator accepted work');
       dungeon.dispose();
       dungeon.dispose();
       let dungeonDisposed = false;
@@ -110,14 +126,41 @@ try {
         after: [...after.positions],
         dungeon: { cells: [...layout.cells], rooms: layout.rooms, corridors: layout.corridors },
         dungeonAfter: [...dungeonAfter.cells],
+        tree: {
+          positions: [...tree.positions],
+          parents: [...tree.parents],
+          remainingAttractions: tree.remainingAttractions,
+        },
+        treeAfter: {
+          positions: [...treeAfter.positions],
+          parents: [...treeAfter.parents],
+          remainingAttractions: treeAfter.remainingAttractions,
+        },
       });
     }
     return output;
   });
-  assert.equal(new Set(wasmRequests).size, 2, 'one independent lazy asset per feature');
+  assert.equal(new Set(wasmRequests).size, 3, 'one independent lazy asset per feature');
   assert.deepEqual(result[0].points, result[1].points);
   assert.deepEqual(result[0].dungeon, result[1].dungeon);
+  assert.deepEqual(result[0].tree, result[1].tree);
   for (const r of result) {
+    assert.deepEqual(r.treeAfter, r.tree);
+    const { positions, parents } = r.tree;
+    assert.ok(parents.length > 20 && parents.length <= 256);
+    assert.equal(positions.length, parents.length * 3);
+    assert.equal(parents[0], -1);
+    assert.deepEqual(positions.slice(0, 3), [0, 0, 0]);
+    assert.ok(positions.every(Number.isFinite));
+    const branches = new Uint32Array(parents.length);
+    for (let i = 1; i < parents.length; i++) {
+      assert.ok(Number.isInteger(parents[i]) && parents[i] >= 0 && parents[i] < i);
+      branches[parents[i]]++;
+      let squaredLength = 0;
+      for (let k = 0; k < 3; k++) squaredLength += (positions[i * 3 + k] - positions[parents[i] * 3 + k]) ** 2;
+      assert.ok(Math.abs(Math.sqrt(squaredLength) - 0.2) < 1e-8);
+    }
+    assert.ok(branches.some((n) => n > 1));
     const { cells, rooms, corridors } = r.dungeon;
     assert.deepEqual(r.dungeonAfter, cells);
     assert.ok(rooms.length > 1);
@@ -162,6 +205,7 @@ try {
       points: result[0].points.length / 2,
       surfacePoints: result[0].surface.length / 3,
       dungeonRooms: result[0].dungeon.rooms.length,
+      treeNodes: result[0].tree.parents.length,
       lazyWasm: true,
       deviceLossIndependent: true,
       errors,

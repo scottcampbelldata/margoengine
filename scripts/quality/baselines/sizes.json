@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11549090,
+  "total": 11550886,
   "history": [
     {
       "date": "2026-10-24",
@@ -4988,6 +4988,12 @@
       "commit": "bb95a7215",
       "reason": "Batch 99 optional RGB media: 1954 B gzip for palette conversion and the RGB transport variant, plus standard entry headroom. Root boundary bug repair stays inside its existing budget; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "1823a741e",
+      "reason": "procedural/trees: new optional entry, measured entry plus standard allowance; no root change",
+      "grew": 1
     }
   ],
   "items": {
@@ -5946,6 +5952,7 @@
     "margoengine/transitions/live": 321,
     "margoengine/transitions/mask": 321,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/procedural/trees": 1796
   }
 }

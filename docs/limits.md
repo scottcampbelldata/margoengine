@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-630). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-631). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1231,7 +1231,7 @@ Quiet-world zero-resend resume evidence assumes stationary clients with a fully 
 
 ## Poisson disk placement (LIM-621)
 
-Optional procedural/poisson: 1,290 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
+Optional procedural/poisson: 1,335 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
 CPU-only on WebGPU and WebGL2. Rectangle or area-weighted triangle-soup darts, ambient Euclidean separation,
 not geodesic spacing. Finite coordinates within +/-1,000,000; radius 0.000001..1,000,000; maximum 65,536 triangles,
 65,536 returned points and 2,000,000 candidates. Defaults: seed 1, 4,096 points, 100,000 candidates.
@@ -1350,7 +1350,7 @@ all floor cells are four-neighbour connected by construction. No 3D rooms, doors
 furnishing or agent-clearance guarantee. Abort before synchronous generation; use a worker to stop work
 in flight. Identical seeded integer output and cell-work counts are tested; no timing/SIMD acceleration,
 visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
-and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The new JS ceiling is 1,479 B, the measured entry plus the standard 256 B allowance. The shared internal loader makes Poisson JS 1,290 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
+and owns no device resources. Entry JS 1,277 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The existing JS ceiling remains 1,479 B. The shared internal loader makes Poisson JS 1,335 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
 
 ### Transitions owner-scene disposal repair
 
@@ -1403,3 +1403,24 @@ Tracer root after the boundary-distance repair: 80841 B (within its existing bud
 23797 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
 
 Batch 160 job 7: environment IBL of the complete MetalRoughSpheresNoTextures scene, 512 x 512, linear constant radiance [0.3,0.5,0.7], no direct sun, black background. Mitsuba 3.9.1 scalar_rgb, 128 spp, seed 160, no denoising, direct max depth 2 and full max depth 8. All RGB pixels after shared PBR Neutral/sRGB: native absolute 2,294,441 / 1,482,507 and compatibility 2,294,432 / 1,482,506 (direct/full). Each exact measured square/max/coverage budget is in whitepaper/results/batch-160-environment.json. Native WebGL2 explicitly refuses this PBR/IBL path; actual WebGL2 compatibility is measured. Principled/glTF BSDF differences, missing geometric IBL occlusion/reflections, finite reference noise and antialiasing remain open picture losses. A constant furnace does not prove nonuniform skies or directional prefilter accuracy; batch 168 sky evidence is reused rather than repeated. No speed or physical-equivalence claim.
+
+## Space colonisation trees (LIM-631)
+
+Optional procedural/trees generates a branching skeleton, not a surface mesh. Default root [0,0,0],
+seed 1, 512 attraction points in an ellipsoid above the root, segmentLength 0.2, influenceRadius 3,
+killRadius 0.3, maxNodes 2048 and maxIterations 128. Custom XYZ Float64Array attraction points can
+extend below a supplied root for roots; an empty cloud returns only the root. Custom point/root coordinates are finite
+within +/-1,000,000. Count is bounded to 8192, nodes to 16384, iterations to 512 and the product of
+attractors, node capacity and iteration capacity to 134,217,728. SegmentLength 0.0001..10000,
+influenceRadius 0.0001..1,000,000, killRadius at least half the segment length and at most the influence
+radius. A cap or lack of reachable attraction can stop growth with points remaining; inspect stopped
+and remainingAttractions. No guarantee all attraction points are reached, no collision avoidance,
+species, biological validity, tubes/leaves, or artistic-quality claim. Output arrays are owned.
+Loading is abortable; generation checks abort before synchronous work, with a worker needed for
+interruption in flight. One feature-local Rust/Wasm asset; CPU generation on either rendering backend
+survives device/context loss. All proof inputs are STAND-IN. No elapsed-time or SIMD speed claim.
+Entry JavaScript 1,540 B gzip, new ceiling 1,796 B; trees.wasm 39,113 B raw / 16,393 B gzip.
+Fixed seed 19 with influenceRadius 1.5: 218,405 complete distance tests versus 821,423 exhaustive,
+identical 674-node skeleton. The count excludes grid lookup and bounding-box operations. Core plus
+stage remains 23,797 B gzip below its unchanged strict 25,000 B ceiling.
+Shared loading failures now have code failed, help and original cause; caller abort reasons and specific CSP/HTTP faults are preserved. Current Poisson JS 1,335 B and dungeon JS 1,277 B remain within their unchanged ceilings of 1,525 B and 1,479 B; all Wasm assets are unchanged.

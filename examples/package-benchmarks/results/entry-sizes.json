@@ -1,6 +1,6 @@
 {
-  "commit": "8e890f958",
-  "dirty": false,
+  "commit": "a891a111a",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -2248,8 +2248,8 @@
         "gzip": 12594
       },
       "./poisson": {
-        "raw": 2408,
-        "gzip": 1290
+        "raw": 2589,
+        "gzip": 1335
       },
       "./standin": {
         "raw": 711,
@@ -2272,8 +2272,12 @@
         "gzip": 4462
       },
       "./dungeon": {
-        "raw": 2227,
-        "gzip": 1223
+        "raw": 2408,
+        "gzip": 1277
+      },
+      "./trees": {
+        "raw": 2963,
+        "gzip": 1540
       }
     },
     "@margoengine/quality": {
@@ -3326,8 +3330,8 @@
         "gzip": 1694
       },
       "./codecs": {
-        "raw": 7187,
-        "gzip": 3337
+        "raw": 7470,
+        "gzip": 3458
       },
       "./alpha": {
         "raw": 4372,
@@ -3560,8 +3564,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 229488,
-        "gzip": 80431
+        "raw": 230452,
+        "gzip": 80841
       },
       "./restir": {
         "raw": 4182,
@@ -3578,6 +3582,10 @@
       "./sky": {
         "raw": 313,
         "gzip": 212
+      },
+      "./media": {
+        "raw": 4661,
+        "gzip": 1954
       }
     },
     "@margoengine/water": {
@@ -3743,6 +3751,11 @@
       "raw": 24282,
       "gzip": 9596,
       "brotli": 8153
+    },
+    "packages/procedural/dist/trees.wasm": {
+      "raw": 39113,
+      "gzip": 16393,
+      "brotli": 13918
     },
     "packages/procedural/dist/dungeon.wasm": {
       "raw": 23281,

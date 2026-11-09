@@ -53,6 +53,10 @@
     "./dungeon": {
       "types": "./dist/dungeon.d.ts",
       "import": "./dist/dungeon.js"
+    },
+    "./trees": {
+      "types": "./dist/trees.d.ts",
+      "import": "./dist/trees.js"
     }
   },
   "files": [
@@ -71,13 +75,15 @@
     "@margoengine/core": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs",
+    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs",
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
     "test:gpu": "node test/poisson-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
-    "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test"
+    "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",
+    "build:trees": "node scripts/build-trees.mjs",
+    "test:trees-kernel": "node scripts/build-trees.mjs --test"
   }
 }

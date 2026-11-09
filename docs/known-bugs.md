@@ -1788,3 +1788,22 @@ one-pixel two-material emissive path produced about 0.997 instead of 3.5 without
 Repro: GPU-locked node scripts/reference-rendering/environment.mjs, then --compat, after fetching the pinned job 1 model and generating the Mitsuba references with --capture-reference. All 123 primitives, 528,291 vertices and 1,040,409 triangles are retained. Direct-only MAE is 2.9175326029459634 / 2.9175211588541665; full-transport MAE is 1.8851051330566406 / 1.8851038614908855 (WebGPU / compatibility). Every RGB pixel and silhouette counts.
 
 Known structural causes: Margo's split-sum/SH IBL samples only the environment, so other scene geometry neither occludes it nor appears in reflections. Mitsuba traces geometric visibility in both references and up to eight vertices in the full reference. The direct-only image truncates continued surface paths at two vertices. Mitsuba principled maps the authored base/metal/rough parameters, but its BSDF is not a bit-exact glTF implementation. Margo's shared IBL approximations, finite 128-spp reference noise, different antialiasing and all-pixel silhouettes also remain in the metric. The constant-radiance case does not isolate their individual contributions or prove directional prefilter quality. No small package defect has been isolated, and this loss is not closed by recording a budget.
+
+### Batch 68 space colonisation
+
+No open tree-generator defect is known after bounded-input, graph, reference and lifecycle tests.
+Growth caps, disconnected attraction clouds and skeleton-only output are explicit limits (LIM-631).
+The unchanged dense-crown work assertion exposed full scans of nearby grid cells. Conservative cell-box
+pruning now reduces exact distance tests while preserving the exhaustive skeleton. A browser probe
+also caught a local focused-build script that cleaned dist then copied only trees.wasm; the production
+package build already copies every feature asset. Full package builds preserve all three lazy assets,
+as checked by the production browser test. No test or tolerance was loosened.
+Review also found that rounded distances can include a point across two grid cells at a radius
+boundary (root -Number.MIN_VALUE and point 1 with radius 1). Guard cells now include that candidate;
+the existing conservative box bound prunes safely. Native and exhaustive-reference JavaScript
+regressions preserve the same distance rule, including negative/subnormal coordinates.
+The shared Wasm loader also propagated raw file, network, response-body and ordinary compilation
+failures, and a platform AbortError could replace the caller's cancellation reason. The owning loader
+now preserves linked/CSP faults and exact abort reasons, and wraps other failures with code failed,
+procedural help and the original cause. Seven loading regressions include four cases that fail on the
+parent. The missing-file fixture uses a unique absent Windows TEMP path without writing into the checkout.

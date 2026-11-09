@@ -1815,3 +1815,15 @@ then uses the WGS84 ellipsoid equations and constants (a=6378137 m, f=1/298.2572
 The implicit cell token order follows the 3DTILES_bounding_volume_S2 availability figure:
 https://github.com/CesiumGS/3d-tiles/tree/main/extensions/3DTILES_bounding_volume_S2.
 Only published CesiumJS standard data was downloaded. No engine implementation was read.
+
+## Batch 68 job 4: space colonisation trees
+
+Wide paper search combined Runions, Lane and Prusinkiewicz,
+[Modeling Trees with a Space Colonization Algorithm](https://algorithmicbotany.org/papers/colonization.egwnp2007.html)
+(2007), Runions et al., [Modeling and Visualization of Leaf Venation Patterns](https://algorithmicbotany.org/papers/venation.sig2005.html)
+(2005), and Runions, [Modeling Biological Patterns Using the Space Colonization Algorithm](https://algorithmicbotany.org/papers/runionsa.th2008.html)
+(2008). The normalized direction sum, nearest-node competition and attraction consumption are written
+here from those published descriptions. Margo's bounded seeded crown and deterministic uniform-grid
+index with conservative cell-box pruning are new implementation choices. No linked implementation,
+engine or library source was read or adapted. Tests use generated stand-in clouds and an independent
+exhaustive JavaScript reference. Tree and root output is a skeleton, without a biological claim.

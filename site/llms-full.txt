@@ -2610,7 +2610,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-630). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-631). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3818,7 +3818,7 @@ Quiet-world zero-resend resume evidence assumes stationary clients with a fully 
 
 ## Poisson disk placement (LIM-621)
 
-Optional procedural/poisson: 1,290 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
+Optional procedural/poisson: 1,335 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
 CPU-only on WebGPU and WebGL2. Rectangle or area-weighted triangle-soup darts, ambient Euclidean separation,
 not geodesic spacing. Finite coordinates within +/-1,000,000; radius 0.000001..1,000,000; maximum 65,536 triangles,
 65,536 returned points and 2,000,000 candidates. Defaults: seed 1, 4,096 points, 100,000 candidates.
@@ -3937,7 +3937,7 @@ all floor cells are four-neighbour connected by construction. No 3D rooms, doors
 furnishing or agent-clearance guarantee. Abort before synchronous generation; use a worker to stop work
 in flight. Identical seeded integer output and cell-work counts are tested; no timing/SIMD acceleration,
 visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
-and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The new JS ceiling is 1,479 B, the measured entry plus the standard 256 B allowance. The shared internal loader makes Poisson JS 1,290 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
+and owns no device resources. Entry JS 1,277 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The existing JS ceiling remains 1,479 B. The shared internal loader makes Poisson JS 1,335 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
 
 ### Transitions owner-scene disposal repair
 
@@ -3990,6 +3990,27 @@ Tracer root after the boundary-distance repair: 80841 B (within its existing bud
 23797 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
 
 Batch 160 job 7: environment IBL of the complete MetalRoughSpheresNoTextures scene, 512 x 512, linear constant radiance [0.3,0.5,0.7], no direct sun, black background. Mitsuba 3.9.1 scalar_rgb, 128 spp, seed 160, no denoising, direct max depth 2 and full max depth 8. All RGB pixels after shared PBR Neutral/sRGB: native absolute 2,294,441 / 1,482,507 and compatibility 2,294,432 / 1,482,506 (direct/full). Each exact measured square/max/coverage budget is in whitepaper/results/batch-160-environment.json. Native WebGL2 explicitly refuses this PBR/IBL path; actual WebGL2 compatibility is measured. Principled/glTF BSDF differences, missing geometric IBL occlusion/reflections, finite reference noise and antialiasing remain open picture losses. A constant furnace does not prove nonuniform skies or directional prefilter accuracy; batch 168 sky evidence is reused rather than repeated. No speed or physical-equivalence claim.
+
+## Space colonisation trees (LIM-631)
+
+Optional procedural/trees generates a branching skeleton, not a surface mesh. Default root [0,0,0],
+seed 1, 512 attraction points in an ellipsoid above the root, segmentLength 0.2, influenceRadius 3,
+killRadius 0.3, maxNodes 2048 and maxIterations 128. Custom XYZ Float64Array attraction points can
+extend below a supplied root for roots; an empty cloud returns only the root. Custom point/root coordinates are finite
+within +/-1,000,000. Count is bounded to 8192, nodes to 16384, iterations to 512 and the product of
+attractors, node capacity and iteration capacity to 134,217,728. SegmentLength 0.0001..10000,
+influenceRadius 0.0001..1,000,000, killRadius at least half the segment length and at most the influence
+radius. A cap or lack of reachable attraction can stop growth with points remaining; inspect stopped
+and remainingAttractions. No guarantee all attraction points are reached, no collision avoidance,
+species, biological validity, tubes/leaves, or artistic-quality claim. Output arrays are owned.
+Loading is abortable; generation checks abort before synchronous work, with a worker needed for
+interruption in flight. One feature-local Rust/Wasm asset; CPU generation on either rendering backend
+survives device/context loss. All proof inputs are STAND-IN. No elapsed-time or SIMD speed claim.
+Entry JavaScript 1,540 B gzip, new ceiling 1,796 B; trees.wasm 39,113 B raw / 16,393 B gzip.
+Fixed seed 19 with influenceRadius 1.5: 218,405 complete distance tests versus 821,423 exhaustive,
+identical 674-node skeleton. The count excludes grid lookup and bounding-box operations. Core plus
+stage remains 23,797 B gzip below its unchanged strict 25,000 B ceiling.
+Shared loading failures now have code failed, help and original cause; caller abort reasons and specific CSP/HTTP faults are preserved. Current Poisson JS 1,335 B and dungeon JS 1,277 B remain within their unchanged ceilings of 1,525 B and 1,479 B; all Wasm assets are unchanged.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5783,6 +5804,25 @@ one-pixel two-material emissive path produced about 0.997 instead of 3.5 without
 Repro: GPU-locked node scripts/reference-rendering/environment.mjs, then --compat, after fetching the pinned job 1 model and generating the Mitsuba references with --capture-reference. All 123 primitives, 528,291 vertices and 1,040,409 triangles are retained. Direct-only MAE is 2.9175326029459634 / 2.9175211588541665; full-transport MAE is 1.8851051330566406 / 1.8851038614908855 (WebGPU / compatibility). Every RGB pixel and silhouette counts.
 
 Known structural causes: Margo's split-sum/SH IBL samples only the environment, so other scene geometry neither occludes it nor appears in reflections. Mitsuba traces geometric visibility in both references and up to eight vertices in the full reference. The direct-only image truncates continued surface paths at two vertices. Mitsuba principled maps the authored base/metal/rough parameters, but its BSDF is not a bit-exact glTF implementation. Margo's shared IBL approximations, finite 128-spp reference noise, different antialiasing and all-pixel silhouettes also remain in the metric. The constant-radiance case does not isolate their individual contributions or prove directional prefilter quality. No small package defect has been isolated, and this loss is not closed by recording a budget.
+
+### Batch 68 space colonisation
+
+No open tree-generator defect is known after bounded-input, graph, reference and lifecycle tests.
+Growth caps, disconnected attraction clouds and skeleton-only output are explicit limits (LIM-631).
+The unchanged dense-crown work assertion exposed full scans of nearby grid cells. Conservative cell-box
+pruning now reduces exact distance tests while preserving the exhaustive skeleton. A browser probe
+also caught a local focused-build script that cleaned dist then copied only trees.wasm; the production
+package build already copies every feature asset. Full package builds preserve all three lazy assets,
+as checked by the production browser test. No test or tolerance was loosened.
+Review also found that rounded distances can include a point across two grid cells at a radius
+boundary (root -Number.MIN_VALUE and point 1 with radius 1). Guard cells now include that candidate;
+the existing conservative box bound prunes safely. Native and exhaustive-reference JavaScript
+regressions preserve the same distance rule, including negative/subnormal coordinates.
+The shared Wasm loader also propagated raw file, network, response-body and ordinary compilation
+failures, and a platform AbortError could replace the caller's cancellation reason. The owning loader
+now preserves linked/CSP faults and exact abort reasons, and wraps other failures with code failed,
+procedural help and the original cause. Seven loading regressions include four cases that fail on the
+parent. The missing-file fixture uses a unique absent Windows TEMP path without writing into the checkout.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -330,3 +330,64 @@ Use a worker for interruption of work in flight. Build the checked-in artifact w
 in this package; `npm run test:dungeon-kernel` runs the native Rust tests. SIMD compilation is enabled;
 its benefit has not been measured. Layouts are blockouts, without rendering, doors, stairs, gameplay
 furnishing, 3D meshes or navigation clearance guarantees (LIM-628). All proof maps are generated stand-ins.
+
+## Space colonisation trees and roots
+
+The optional `@margoengine/procedural/trees` entry grows a branching skeleton towards attraction points.
+Use `margoengine/procedural/trees` through the umbrella package. With no settings it creates a seeded crown
+of 512 points inside a sphere of radius 2 metres, centred 3 metres above the root. The crown samples use
+normalized cube directions and a uniform radial distance; they are not a uniform volume distribution.
+Every influenced node grows one segment along the normalized sum of normalized attraction directions.
+Reached points are consumed, while equidistant nodes use the lowest insertion index.
+
+```ts
+import { createTreeGenerator } from '@margoengine/procedural/trees';
+using generator = await createTreeGenerator();
+const tree = generator.generate({ seed: 19 });
+console.log(tree.positions.length / 3, tree.parents.length, tree.stopped);
+const roots = generator.generate({
+  attractionPoints: new Float64Array([0, -2, 0, -1, -3, 0, 1, -3, 0]),
+  root: [0, 0, 0],
+});
+console.log(roots.remainingAttractions);
+```
+
+| Option | Default | Limits |
+| --- | --- | --- |
+| attractionPoints | seeded crown | Float64Array of XYZ triples, at most 8192 points, coordinates finite within +/-1e6; empty gives only the root |
+| root | [0, 0, 0] | Three finite coordinates within +/-1e6; generated crown may extend 5 metres beyond a root coordinate |
+| attractionCount | 512 | Integer 1..8192; ignored when custom points are present |
+| seed | 1 | uint32; zero uses seed one's stream |
+| segmentLength | 0.2 | 0.0001..10000 metres |
+| influenceRadius | 3 | 0.0001..1e6 metres |
+| killRadius | 0.3 | segmentLength/2..influenceRadius |
+| maxNodes | 2048 | Integer 1..16384, including the root |
+| maxIterations | 128 | Integer 1..512 growth rounds |
+| signal | absent | Factory load is abortable; generation checks before synchronous work |
+
+The attraction point count times maxNodes times maxIterations must not exceed 134,217,728. This bounds
+nearest-distance work; it is not a generation-time guarantee. A point influences its nearest node within
+influenceRadius, including the boundary. Points at or within killRadius are consumed. Direction sums with
+length at most 1e-12 do not grow a segment. Symmetrically balanced or unreachable clouds can stop without
+consuming all points. `stopped` is `complete`, `stalled`, `maxNodes` or `maxIterations`; `remainingAttractions`
+records unreached points. The generator also consumes reached points after its final growth round.
+
+`positions` and `attractionPoints` are owned Float64Arrays. `parents` is an owned Int32Array with -1 for the
+root and an earlier node index for every other node, so every node is connected to the same root and the
+parent graph has no cycles. `iterations` counts growth rounds. `distanceTests` counts complete squared-distance
+tests in nearest-node queries, including final consumption. A spatial grid with conservative cell bounds
+avoids testing distant nodes. The fixed seed 19 crown, influenceRadius 1.5, uses 218,405 distance tests versus
+821,423 in the exhaustive independent reference, producing identical 674-node positions and parents.
+This generated stand-in proves less distance work, without a wall-time, language or SIMD speed claim.
+
+The factory lazily loads its own Rust/Wasm file; importing the entry fetches no asset. The CPU data generator
+has the same behaviour on WebGPU and WebGL2 and survives device/context loss. Idempotent `dispose()` and
+`Symbol.dispose` release the instance; previously returned data remains valid. Bad inputs and disposed use
+throw coded errors with help links. Use a worker for interruption of generation in flight.
+`npm run build:trees` rebuilds the committed Wasm; `npm run test:trees-kernel` runs its native tests.
+These skeletons do not include bark/foliage meshes, smoothing, branch radii, species calibration or intersection
+guarantees. Procedural evidence is stand-in only (LIM-631).
+
+The Poisson, dungeon and tree factories preserve the caller's exact AbortSignal reason. Other loading
+failures use code `failed` with a help link and the original error as `cause`; existing HTTP and CSP
+faults retain their specific help. This covers file reads, fetch/body errors and malformed Wasm bytes.

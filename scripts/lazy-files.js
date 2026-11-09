@@ -28,6 +28,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/trees.wasm',
+    label: 'trees.wasm',
+    kind: 'Rust Wasm space-colonisation skeletons',
+    measure: 'file',
+    when: '`createTreeGenerator()`, only from the optional /trees entry',
+  },
+  {
+    package: '@margoengine/procedural',
     file: 'packages/procedural/dist/dungeon.wasm',
     label: 'dungeon.wasm',
     kind: 'Rust Wasm BSP layouts',

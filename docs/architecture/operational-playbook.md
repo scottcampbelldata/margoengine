@@ -1351,6 +1351,34 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Procedural space colonisation (batch 68, job 4)
+
+The optional trees entry owns its Rust crate and lazy Wasm asset. Attraction assignment and growth are
+CPU operations with typed owned output and no core/stage imports. Tests compare accelerated neighbour
+assignment with an exhaustive reference, validate connected finite parent graphs, segment lengths,
+bounded hostile inputs, cancellation and disposal. Production consumer tests check lazy loading below
+a non-root base and exact values on real WebGPU/WebGL2 before and after loss. These are stand-in
+skeleton proofs; mesh appearance, biological fidelity, timing and cross-device coverage remain open
+evidence boundaries (LIM-631).
+
+The internal loader shared by Poisson, dungeon and trees now preserves exact abort reasons and
+specific linked/CSP faults while coding file, fetch, body and ordinary compilation failures with
+procedural help and the original cause. Seven regressions exercise real missing-file and malformed
+Wasm errors plus simulated transport, CSP and cancellation cases; they do not claim a real CSP-policy
+browser failure proof. Existing healthy backend values and independent feature assets are unchanged.
+
+The lane-Q README repair (2026-11-09) executes all 40 examples of React, Stage, text and worker with zero
+exceptions in that scope. The page runner prebundles React's CommonJS entries, compiles JSX automatically and writes
+named page/worker companion sources into isolated program directories. Static glTF selection follows the imported
+basic loader, including Stage's feature entry, rather than the owning package name. Browser automation stays in Node,
+receives the selected browser/GPU launch environment and fails on unfinished assertions; it cannot pass as a server
+that merely reaches its time limit. React's picking example owns its app/server and waits for real frames and the
+click's asynchronous state update. Text's BMFont sample includes a generated, OFL-licensed ASCII SDF atlas and a
+relative PNG page; its browser test fetches both and reads back rendered Hello pixels. These five exceptions are
+removed from the known list. This evidence covers Chromium on this machine, not other browser engines or fonts.
+The atlas writer is registered as a browser tool in the GPU planner; generation never replaces the planned text
+rendering suite or rewrites a committed fixture during verification.
+
 The lane-Q README repair (2026-11-09) executes all 40 examples of React, Stage, text and worker with zero
 exceptions in that scope. The page runner prebundles React's CommonJS entries, compiles JSX automatically and writes
 named page/worker companion sources into isolated program directories. Static glTF selection follows the imported

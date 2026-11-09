@@ -875,3 +875,18 @@ are stand-ins for analytic optical media, not outside production assets or rival
 ### Batch 160 environment IBL, job 7
 
 Fetch the pinned job 1 asset with node scripts/reference-rendering/fetch-assets.mjs. References and binaries stay under engine-bench. In an outside Python venv install mitsuba==3.9.1 and numpy==2.5.4; set MARGO_MITSUBA_PYTHON to its python executable (default is engine-bench/batch-168/mitsuba-venv/Scripts/python.exe). Run node scripts/gpu-lock.mjs run --owner=codex-160 --max=25 -- node scripts/reference-rendering/environment.mjs --capture-reference, then the same harness without --capture-reference and with --compat. The public Python adapter renders fixed-seed scalar_rgb direct/full images into a candidate directory; both raw and display hashes must match before any frozen artifact changes. Unchanged copies are retained outside, never committed. --measure refuses any existing budget. Root tests: node --test --test-timeout=120000 tests/reference-environment.test.js. All pixels, no crop, denoise, fitted exposure or new tone curve. Constant furnace only; use the existing batch 168 harness for sky/OIT/staging/lightmap evidence.
+
+### Space colonisation trees (batch 68 job 4)
+
+Run `npm run test:trees-kernel --workspace @margoengine/procedural`,
+`npm run build:trees --workspace @margoengine/procedural`, then
+`npm test --workspace @margoengine/procedural`. The trees tests check generated and custom clouds,
+graph and length invariants, extreme bounds, owned output, abort/dispose and an exhaustive assignment
+oracle. Work counts compare distance tests, not elapsed time or language speed. Run
+`node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+for the production consumer under /sampling/, independent lazy assets, exact backend values and real
+device/context loss. All inputs are generated stand-ins (LIM-631).
+
+`node --test packages/procedural/test/loading.test.js` checks the shared loading failure and abort
+contract, including missing TEMP paths, malformed modules, simulated transport/CSP failures and exact
+caller cancellation reasons. Four cases fail without the owning loader correction.

@@ -2154,6 +2154,10 @@
       "types": "./dist/procedural/dungeon.d.ts",
       "import": "./dist/procedural/dungeon.js"
     },
+    "./procedural/trees": {
+      "types": "./dist/procedural/trees.d.ts",
+      "import": "./dist/procedural/trees.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"
