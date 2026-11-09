@@ -367,7 +367,15 @@ radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoe
 drawing through `VATCrowd`'s pipeline code. Its proof runs the stage's own `skinned` function from a compute shader, since a
 vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its frame cost.
 
+### Particle shadow depth and node vectors
+
+`@margoengine/vfx/shadows` draws each live particle as a sphere impostor. WebGPU clips a primitive whose clip z is outside [0, w] (WebGPU specification, primitive clipping) before the fragment stage. The quad's clip z stays inside that interval when the sphere's depth interval meets [0, 1], so a centre past the cascade far plane still draws a front that is in range. The fragment writes the geometric depth, `centerZ - sqrt(max(0, 1 - x^2 - y^2)) * depthRadius`, clamped to [0, 1]. A sphere whose whole depth interval is past the far plane still clips.
+
+`@margoengine/vfx/nodes` normalizes with one scaled length on the CPU and in WGSL, function `nodeNorm`: divide by the largest absolute component, then by the length of that vector (Blue, James L., "A Portable Fortran Program to Find the Euclidean Norm of a Vector", ACM TOMS 4(1), 1978). A zero vector stays zero. WebGL2 translates that same function. Finite values 1e-21 and 1e20 both become a unit vector on the CPU, on WebGPU and on WebGL2. A finite double that is not a finite f32 is rejected for a node literal and for shadow range and intensity (`vfx-f32`) before it is stored in a uniform.
+
 ## 3. Rendering backends and hardware tiers
+
+`@margoengine/vfx/shadows` and `@margoengine/vfx/nodes` run on WebGPU and on the WebGL2 compatibility layer from the same shaders. The layer has no compute, so the particle simulation uses the existing CPU route and the shadow depth pass is a fragment shader. Disposal removes the point lights that effect published into its clustered list, and a dispose or device restore during the light read-back settles the cancelled map.
 
 **Area light integrals (2026-11-05).** `@margoengine/clustered/area` returns early from a quad with nothing to clip; the clip's own result, by the same operations. Evidence: `packages/clustered/test/ltc-edge.test.js` (bit for bit in float32) and `examples/package-benchmarks/area-lights-gpu.mjs` as the package's `test:gpu:area` (11 frames byte-equal, RTX A6000 only).
 
@@ -1728,3 +1736,7 @@ is not claimed. Entry 107 records paired/browser diagnostics without a demonstra
 ### Audio occlusion evidence (batch 110, section 5)
 
 The optional audio/occlusion entry reuses BVH CPU segment queries and owns gain/low-pass stages in the sound's existing filter chain. It registers after the sound with AudioListener, so normal frame updates supply world positions before tracing. Dynamic BVH import keeps the audio root unchanged. Real Edge OfflineAudioContext renders of generated tones beside WebGPU, native WebGL2 and the WebGL2 compatibility device prove spectral attenuation (2 kHz ratio 0.039128; 100 Hz 0.249970) and zero GPU validation errors. occlusion.test.js covers real engine transforms with stand-in renderer/audio, partial cover, visibility, endpoint/source exclusions, vertical rays, smoothing, cancellation and teardown. Stand-in content only; diffraction, deforming geometry, listening quality, other browsers and speed remain unmeasured. See LIM-602 and results/audio-occlusion-20261108.json in the whitepaper.
+
+### VFX shadows and nodes (batch 79): section 5 evidence
+
+Sphere impostor depth, including a centre at clip depth 1.02 whose front is still in range, is checked against the orthographic formula within 1e-4 on WebGPU (`packages/vfx/test/features-check.mjs`, `checkShadowFar`) and on the WebGL2 layer (`packages/vfx/test/shadows-nodes-webgl2.mjs`). The same pages check the light header 2, 5, 3, depths 0.45005, 0.48770 and 1.00000, and the node particle at (0.18781, 0.04877, 0.00000) with velocity (0.90369, 0.38525, 0.00000). `checkNodeNorm` requires normalize of (1e-21, 0, 0) and (1e20, 0, 0) to be (1, 0, 0) within 1e-4 on both backends. `checkShadowRelease` requires dispose during the light read-back to leave no unhandled rejection, and the shadows check requires the published list to be empty after dispose. Finite doubles that are not finite f32 are rejected in `checkNodeF32` on both backends. These GPU checks run on an RTX A6000. Still missing: time on any GPU, and any GPU other than the RTX A6000.
