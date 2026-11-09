@@ -2524,6 +2524,19 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   Retain all bars and profile the complete corrected hot path before selecting another redesign. Quiet release
   reruns are required; no wall-clock tuning or forecast substitutes for work/result evidence.
 
+### 108. Cornell box irradiance against Cycles (picture error)
+
+- **Measurement:** the published Cornell box, times 0.01, 15 parallelograms, 881 texels. Physical irradiance.
+  One radiosity bounce and 16 area samples on Margo. Cycles in Blender 5.3.0 Beta, CPU, 128 samples,
+  `diffuse_bounces` 2, surface color left out of the diffuse bake. The scale 9.873209 comes from a direct-only
+  unit square light at height 2 above a 0.25 m receiver. Independent 128 by 128 midpoint quadrature fixes the scale, without reading Margo output. All 15 faces remain in Cycles throughout every bake. No frame-time row.
+- **Result:** picture error. Mean absolute error 0.069543, relative 0.211475, max 0.900128. Means 0.305736
+  (Margo) and 0.328848 (Cycles). The 8-bit step is 0.016984. The short block top is snapped to (242, 165, 274).
+  Tracked in known-bugs.md. Publishing the number does not close it.
+- **Rerun:** `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap`.
+  Citation in clean-room.md. The snaps are `packages/lightmap/tests/cornell-box.test.js`.
+  [Raw result](results/batch-168-lightmap.json).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2539,6 +2552,10 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
 - **10 million points against potree-core 2.0.17 (entry 105).** 9.000 ms against 5.400 ms for one settled frame.
   Both draw every point. The rounds do not overlap. Rerun:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+
+- **Cornell box irradiance against Cycles (entry 108).** Mean absolute error 0.069543 per channel (relative
+  0.211475) over 881 texels. Blender 5.3.0 Beta, 128 samples. Not a frame time. Rerun:
+  `node packages/lightmap/scripts/rival-bench.mjs`.
 
 - **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
   83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,
@@ -2621,3 +2638,7 @@ These entries lack a recorded number, a named machine or a quiet run:
 
 29. Flat 2D planner storage (entry 106): quiet paired/browser reruns on the corrected accuracy baseline; allocation reduction is proven, browser speed parity remains open.
 30. Exact 2D finite certificates (entry 107): quiet paired/browser reruns; compiled predicate reduction is proven, speed gain and Box2D parity remain open.
+
+
+31. Cornell box irradiance against Cycles (entry 108): the picture error stays open. Not a frame time. A repeat
+    only checks the Cycles noise at 128 samples.

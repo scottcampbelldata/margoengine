@@ -1193,3 +1193,10 @@ force probe. This correction makes no Box2D speed-parity claim and does not impl
 ## Batch 79 review completion (2026-11-08)
 
 The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and WebGL2 after retaining feature declarations and bindings in the compatibility visibility kernel (`packages/vfx/test/stretch.test.js`, `packages/vfx/test/features-check.mjs`). On WebGL2, `packages/vfx/test/lit-check.mjs` requires ExactOIT to reject with `unsupported` before shader creation and checks the same lit-particle radiance through weighted OIT. Native WebGPU keeps the exact-pass pixel comparison. `packages/oit/test/oit.test.js` also checks native compatibility and explicit insufficient fragment-storage limits. One RTX A6000 only; no speed claim.
+
+
+## Batch 168 lightmap reference
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Cornell irradiance has measured error against Cycles | [Entry 108](perf-history.md), `packages/lightmap/scripts/rival-bench.mjs`, complete-scene lifecycle and direct-integral tests | MAE 0.069543, relative 0.211475 over 881 texels; no accuracy parity or convergence claim |

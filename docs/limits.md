@@ -936,3 +936,11 @@ Optional audio/occlusion uses five CPU rays (one with radius 0) and interpolated
 Real Edge 157 audio renders beside native WebGPU, WebGL2 and WebGL2 compatibility engines show 2 kHz blocked/clear RMS 0.039128 and 100 Hz 0.249970 with zero GPU validation errors. Node tests use renderer/audio stand-ins with real engine transforms and BVH. Generated tones/boxes are stand-ins; real recordings, listening quality, other browsers and performance are unmeasured. LIM-602.
 
 Occlusion entry: 1,516 B gzip, budget 1,772 B, with package dependencies external; audio root: 7,508 B gzip. BVH is a separate optional dependency loaded only on create, never through the audio root. Core plus stage remains 23,626 B gzip.
+
+
+## Batch 168 lightmap reference
+
+The modified Cornell box has 15 parallelograms and 881 irradiance texels. Against a complete Cycles
+128-sample diffuse bake, physical lightmap MAE is 0.069543 (relative 0.211475), max 0.900128.
+One coarse radiosity bounce, 16 bounce rays and 16 area samples are not a converged path tracer.
+The 8-bit step is 0.016984. This error remains open in known-bugs.md; no speed claim is made.

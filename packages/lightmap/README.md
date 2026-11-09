@@ -69,3 +69,12 @@ Beer absorption, nested volumes) and deposits them at the first receiver they re
 the native atlas with physical irradiance in its lightmap, the irradiance and hit counts per pixel, and `diagnostics`
 that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked). Receivers are
 opaque; there is no diffuse bounce, rough glass or dispersion.
+
+
+## Cycles reference measurement
+
+After building, run `node packages/lightmap/scripts/rival-bench.mjs` from the repository root.
+Requires Blender at `C:\blender\blender.exe` (override `MARGO_BLENDER`); generated data stays outside
+the repository in engine-bench/batch-168/data/cornell. The complete 15-face Cornell scene is baked
+on the CPU with 128 samples. Physical irradiance MAE is 0.069543 over 881 texels, relative 0.211475.
+This is an open accuracy loss; see [the comparison](../../docs/whitepaper/perf-vs-rivals.md).

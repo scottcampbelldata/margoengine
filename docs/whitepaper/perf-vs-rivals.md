@@ -26,6 +26,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/tiles` | quadtree, 5,461 tiles, screen-space error 16, selected set | 1,120 tiles, checksum 121586381 | 3DTilesRendererJS 0.4.21, same 1,120 tiles, same checksum | equal |
 | `@margoengine/tiles` | same view, one settled `update` | 0.300 ms | 3DTilesRendererJS 0.4.21, 2.300 ms | win |
 | `@margoengine/points` | 10,000,000 points, one settled frame | 9.000 ms | potree-core 2.0.17, 5.400 ms | loss |
+| `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels | MAE 0.069543, relative 0.211475 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -123,3 +124,17 @@ completion: `onSubmittedWorkDone` on Margo, and a one-pixel `readPixels` on the 
 machine, diagnostic. The loss stays open. The grid and the file layout round-trip in
 `packages/points/tests/points-10m.test.js`. Rerun:
 `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+
+The lightmap row is the published Cornell box, scaled by 0.01, with every face snapped to a parallelogram
+(`p2 = p1 + p3 - p0`). The short block top moves from (240, 165, 272) to (242, 165, 274). The floor, the back wall,
+the left wall and the tall block top are snapped too. The published floor and ceiling holes are omitted, and the
+rectangle light sits one published unit below the ceiling. Radiometry is physical irradiance. Reflectance is the
+published table averaged in three bands against the published emission, not a CIE match. Margo takes one radiosity
+bounce (`bounces` 1, 16 rays) and 16 samples on the area light. Cycles bakes diffuse direct plus indirect with the
+surface color left out, 128 samples, and `diffuse_bounces` 2 (a setting of 1 left the ceiling black). A direct-only
+calibration (unit square light, height 2, 0.25 m receiver) fixes the scale using independent
+128 by 128 midpoint quadrature: multiply the Cycles pixels by 9.873209. All 15 faces remain present as
+occluders and bounce surfaces during every bake; the lifecycle regression detects an isolated-face bake. Mean irradiance is 0.305736 (Margo) and 0.328848 (Cycles). Mean absolute error
+is 0.069543, which is 0.211475 of the Cycles mean. The largest texel miss is 0.900128. The 8-bit step is 0.016984.
+The picture error stays open. The snaps and the direct integral are `packages/lightmap/tests/cornell-box.test.js`.
+Rerun: `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap`.

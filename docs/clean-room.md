@@ -343,6 +343,14 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | L5 | caustic photons: point power 4pi I, area power pi L A, Snell refraction, Fresnel split | lightmap/src/refracted.ts | photometry; PBRT 4e sec. 9.3 (cited line 3) |
 | L6 | sRGB encode, defaults (texelsPerUnit 1, aoDistance 4), normal 0.5-bias encode, ray bias 1e-3 | lightmap/src/bake.ts | IEC 61966-2-1 |
 
+The batch 168 irradiance measurement drives Cycles inside Blender 5.3.0 Beta as a black box (`C:\blender\blender.exe`,
+`MARGO_BLENDER` overrides the path). The bake is the diffuse direct and indirect passes with the surface color left
+out, as the Blender manual describes those passes (https://docs.blender.org/manual/en/latest/render/cycles/baking.html
+and https://docs.blender.org/manual/en/latest/render/layers/passes.html). The renderer source was not opened. The box
+is the published Cornell data (https://bowers.cornell.edu/computer-graphics/data): corners, the white, green and red
+reflectance tables, and the emission knots at 400, 500, 600 and 700 nm. RGB is a band average of that table, not a
+CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0` on both sides.
+
 ### lod
 
 | id | formula | file | source |

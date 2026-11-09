@@ -849,6 +849,15 @@ Measured but not fixed. Their history, sources and rerun commands are in
   `readPixels`, because `fenceSync` returned `WAIT_FAILED`. Repro:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
   Cause not yet found. Publishing the number does not close it.
+- **Cornell box irradiance does not match a Cycles bake** (`@margoengine/lightmap`, perf history entry 108):
+  mean absolute error 0.069543 per channel over 881 texels, 0.211475 of the Cycles mean (0.328848). Margo's mean
+  is 0.305736. The largest miss is 0.900128. The 8-bit step is 0.016984. Blender 5.3.0 Beta, Cycles, 128 samples,
+  `diffuse_bounces` 2. Margo uses physical irradiance, one per-quad radiosity bounce and 16 area samples. The
+  short block top is snapped from (240, 165, 272) to (242, 165, 274). Repro:
+  `node packages/lightmap/scripts/rival-bench.mjs` after the lightmap build. Cycles runs outside the repository.
+  Cause: Margo gathers only 16 cosine rays from each texel using a single mean outgoing radiance per quad,
+  whereas Cycles integrates spatially varying transport. Area sampling and 8-bit irradiance quantization also
+  contribute; their individual shares of the error are not isolated. Publishing the number does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node

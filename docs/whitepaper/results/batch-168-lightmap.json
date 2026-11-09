@@ -1,0 +1,140 @@
+{
+  "mae": 0.06954289863778054,
+  "relative": 0.21147453227858257,
+  "maxAbs": 0.9001280358343977,
+  "factor": 9.873209072087167,
+  "factorRgb": [
+    9.873209072087167,
+    9.873209072087167,
+    9.873209072087167
+  ],
+  "texels": 881,
+  "lightmapScale": 4.330804700712668,
+  "quantStep": 0.01698354784593203,
+  "margoMean": 0.3057359905265247,
+  "cyclesMean": 0.3288476294921855,
+  "samples": 881,
+  "rays": 29073,
+  "blender": "5.3.0 Beta",
+  "perQuad": [
+    {
+      "name": "floor",
+      "mae": 0.10940145178935719
+    },
+    {
+      "name": "ceiling",
+      "mae": 0.06602749481048749
+    },
+    {
+      "name": "back",
+      "mae": 0.0661254866004616
+    },
+    {
+      "name": "right",
+      "mae": 0.060874452195024624
+    },
+    {
+      "name": "left",
+      "mae": 0.0611979209995995
+    },
+    {
+      "name": "short-top",
+      "mae": 0.06538282814961428
+    },
+    {
+      "name": "short-a",
+      "mae": 0.05644228827117622
+    },
+    {
+      "name": "short-b",
+      "mae": 0.03117197101734984
+    },
+    {
+      "name": "short-c",
+      "mae": 0.0338831581299252
+    },
+    {
+      "name": "short-d",
+      "mae": 0.06227748861352131
+    },
+    {
+      "name": "tall-top",
+      "mae": 0.08788688526154996
+    },
+    {
+      "name": "tall-a",
+      "mae": 0.049395335449678134
+    },
+    {
+      "name": "tall-b",
+      "mae": 0.06622462521083247
+    },
+    {
+      "name": "tall-c",
+      "mae": 0.065496213989543
+    },
+    {
+      "name": "tall-d",
+      "mae": 0.050957908852469744
+    }
+  ],
+  "snaps": [
+    {
+      "name": "floor",
+      "delta": [
+        -3.199999999999932,
+        0,
+        0
+      ],
+      "flipped": false
+    },
+    {
+      "name": "back",
+      "delta": [
+        6.399999999999977,
+        0,
+        0
+      ],
+      "flipped": false
+    },
+    {
+      "name": "left",
+      "delta": [
+        -3.199999999999932,
+        0,
+        0
+      ],
+      "flipped": false
+    },
+    {
+      "name": "short-top",
+      "delta": [
+        2,
+        0,
+        2
+      ],
+      "flipped": false
+    },
+    {
+      "name": "tall-top",
+      "delta": [
+        0,
+        0,
+        -1
+      ],
+      "flipped": false
+    }
+  ],
+  "rectangle": [
+    2.1300000000000003,
+    5.478,
+    2.27
+  ],
+  "peak": 16.999999999999996,
+  "method": "complete Cycles scene; independent direct-light quadrature calibration; physical Margo irradiance",
+  "cyclesSamples": 128,
+  "cyclesDiffuseBounces": 2,
+  "margoBounces": 1,
+  "margoBounceRays": 16,
+  "areaSamples": 16
+}
