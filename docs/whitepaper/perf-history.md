@@ -2725,3 +2725,7 @@ These entries lack a recorded number, a named machine or a quiet run:
     only checks the Cycles noise at 128 samples.
 
 32. Exact 2D frame preparation (entry 112): quiet paired/browser reruns; deterministic work reduction and loaded paired advantage do not establish release speed or Box2D parity.
+
+### Batch 69: local WFC heap and SIMD selection
+
+Loaded SCOTT-DEV diagnostics are in results/batch-69-heap.json: two cases, seven paired/interleaved rounds, three repetitions per implementation per round; every output and decisions/update/intersection count agrees. Rust SIMD minima are lower in every round, so <=32 unit-weight tile sets auto-select it. Wider or weighted sets use TypeScript. This compares Margo with Margo, not another engine; no quiet release speed number is claimed. The 192x192 TypeScript work-count check proves exactly 73,728 entropy updates for 36,864 decisions, replacing a full-grid selection scan. Dense reciprocal validation also changes from repeated opposite-list scans to constant bit membership per edge, with a read-budget regression. Existing seeded solver output remains unchanged.

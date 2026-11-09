@@ -1,6 +1,6 @@
 {
-  "commit": "52ccbbb00",
-  "dirty": true,
+  "commit": "316a02d99",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -2502,12 +2502,12 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 63305,
-        "gzip": 19024
+        "raw": 63395,
+        "gzip": 19062
       },
       "./tiles": {
-        "raw": 7975,
-        "gzip": 3295
+        "raw": 8234,
+        "gzip": 3401
       },
       "./paint": {
         "raw": 2695,
@@ -3554,6 +3554,10 @@
       "./studio": {
         "raw": 2228,
         "gzip": 1047
+      },
+      "./guiding": {
+        "raw": 5736,
+        "gzip": 2535
       }
     },
     "@margoengine/water": {
@@ -3670,12 +3674,16 @@
         "gzip": 2451
       },
       "./constraints": {
-        "raw": 5425,
-        "gzip": 2337
+        "raw": 5741,
+        "gzip": 2460
       },
       "./sockets": {
         "raw": 1183,
         "gzip": 676
+      },
+      "./chunks": {
+        "raw": 41268,
+        "gzip": 17317
       }
     },
     "@margoengine/worker": {
@@ -3716,6 +3724,11 @@
     }
   },
   "lazyFiles": {
+    "packages/wfc/dist/wfc.wasm": {
+      "raw": 24420,
+      "gzip": 9580,
+      "brotli": 8114
+    },
     "packages/procedural/dist/poisson.wasm": {
       "raw": 29914,
       "gzip": 13192,

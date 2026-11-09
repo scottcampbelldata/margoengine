@@ -34,6 +34,7 @@ try {
     const { OverlappingModel } = await import('/packages/wfc/dist/overlapping.js');
     const { ConstrainedWFC } = await import('/packages/wfc/dist/constraints.js');
     const { buildSocketTiles } = await import('/packages/wfc/dist/sockets.js');
+    const { HeapWFC, ChunkedWFC } = await import('/packages/wfc/dist/chunks.js');
     const outputs = [];
     for (const route of ['webgpu', 'webgl2']) {
       const canvas = document.createElement('canvas');
@@ -49,6 +50,20 @@ try {
       const sockets = new ConstrainedWFC([3, 2, 1], variants).solve({ pins: [{ position: [0, 0, 0], tile: 47 }] });
       if (sockets[0] !== 47) throw new Error('Wide socket pin failed');
       const ids = [0, 1];
+      const local = ids.map(() => ({ neighbors: Array.from({ length: 6 }, () => ids) }));
+      const simd = await HeapWFC.create([8, 8, 1], local, { backend: 'wasm' });
+      const heap = simd.solve({ seed: 7 });
+      if (simd.backend !== 'wasm' || heap.join() !== new HeapWFC([8, 8, 1], local).solve({ seed: 7 }).join())
+        throw new Error('SIMD heap parity failed');
+      const world = new ChunkedWFC(
+        [3, 2, 1],
+        ids.map((t) => ({ neighbors: Array.from({ length: 6 }, () => [t ^ 1]) })),
+        7,
+      );
+      const left = await world.solveChunk([-1, 0, 0]),
+        right = await world.solveChunk([0, 0, 0]);
+      for (let y = 0; y < 2; y++) if ((left[2 + 3 * y] ^ right[3 * y]) !== 1) throw new Error('Chunk seam failed');
+      world.dispose();
       const global = new ConstrainedWFC(
         [4, 3, 1],
         ids.map(() => ({ neighbors: Array.from({ length: 6 }, () => ids) })),
@@ -73,7 +88,7 @@ try {
         canvas.getContext('webgpu').unconfigure();
         device.destroy();
       }
-      outputs.push({ route, image: [...image], global: [...global], sockets: [...sockets] });
+      outputs.push({ route, image: [...image], global: [...global], sockets: [...sockets], heap: [...heap] });
     }
     return outputs;
   });
@@ -81,6 +96,7 @@ try {
   assert.deepEqual(result[1].image, result[0].image);
   assert.deepEqual(result[1].global, result[0].global);
   assert.deepEqual(result[1].sockets, result[0].sockets);
+  assert.deepEqual(result[1].heap, result[0].heap);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ routes: result.map((r) => r.route), pixels: 64, errors: 0 }));
 } finally {

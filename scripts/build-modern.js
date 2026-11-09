@@ -143,6 +143,8 @@ async function buildPackage(name) {
   );
   await build({
     configFile: false,
+    // Match optional-package builds: emitted assets travel with their installed module.
+    base: './',
     publicDir: false,
     logLevel: 'warn',
     build: {

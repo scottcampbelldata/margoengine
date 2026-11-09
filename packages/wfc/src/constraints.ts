@@ -1,3 +1,4 @@
+import { prepareGrid } from './grid.js';
 import { MargoError } from '@margoengine/math/errors';
 import type { Pin, Tile } from './index.js';
 /** Grid coordinates in X, Y, Z order. */
@@ -51,43 +52,13 @@ export class ConstrainedWFC {
   private readonly limits: { tiles: readonly number[]; min: number; max: number }[];
   /** Dimensions: positive integers, at most 1,000,000 cells and 16,777,216 cell/tile pairs. Tiles: 1..4096. */
   constructor(dimensions: CellPosition, tiles: readonly Tile[], constraints: GlobalConstraints = {}) {
-    const size = dimensions[0] * dimensions[1] * dimensions[2];
-    if (
-      dimensions.length !== 3 ||
-      dimensions.some((n) => !Number.isInteger(n) || n < 1) ||
-      size > 1_000_000 ||
-      tiles.length < 1 ||
-      tiles.length > 4096 ||
-      size * tiles.length > 16_777_216
-    )
-      throw new RangeError(
-        'Invalid constrained WFC grid; use 1..4096 tiles, positive dimensions and at most 16,777,216 cell/tile pairs',
-      );
-    this.dimensions = [...dimensions];
-    this.size = size;
-    this.weights = Float64Array.from(tiles, (t) => t.weight ?? 1);
-    this.logs = this.weights.map((w) => w * Math.log(w));
-    if (
-      this.weights.some((w) => !Number.isFinite(w) || w <= 0) ||
-      !Number.isFinite(this.weights.reduce((a, b) => a + b, 0)) ||
-      !Number.isFinite(this.logs.reduce((a, b) => a + b, 0))
-    )
-      throw new RangeError(
-        'Invalid WFC weights; use positive finite weights whose sum and weighted logarithms stay finite',
-      );
-    this.tiles = tiles.map((tile, t) => {
-      if (tile.neighbors.length !== 6)
-        throw new TypeError('Invalid WFC adjacency; give each tile exactly six neighbour lists');
-      return {
-        weight: this.weights[t],
-        neighbors: tile.neighbors.map((list, d) => {
-          for (const u of list)
-            if (!Number.isInteger(u) || u < 0 || u >= tiles.length || !tiles[u].neighbors[d ^ 1]?.includes(t))
-              throw new RangeError('Invalid WFC adjacency; use existing tile IDs and reciprocal opposite directions');
-          return [...new Set(list)];
-        }),
-      };
-    });
+    const grid = prepareGrid(dimensions, tiles);
+    const size = grid.size;
+    this.dimensions = grid.dimensions;
+    this.size = grid.size;
+    this.weights = grid.weights;
+    this.logs = grid.logs;
+    this.tiles = grid.tiles;
     const group = (ids: readonly number[]) => {
       if (
         !ids.length ||

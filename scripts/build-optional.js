@@ -37,6 +37,8 @@ await copyLegal(root);
 await build({
   root,
   configFile: false,
+  // Library assets must resolve beside the installed module, including lazily loaded Wasm.
+  base: './',
   publicDir: false,
   logLevel: 'warn',
   build: {

@@ -2605,7 +2605,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-622). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-623). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3733,7 +3733,7 @@ formulation differences recorded separately from its unisolated complete cause.
 
 ## WFC global constraints (batch 69)
 
-Optional wfc/constraints 2,337 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
+Optional wfc/constraints 2,460 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
 512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
@@ -3846,6 +3846,12 @@ analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; na
 Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
 Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,797 B remain unchanged. No existing size,
 accuracy or time gate was relaxed.
+
+## WFC heap and chunks (batch 69)
+
+Indexed heap, bitset domains and local restarts: 1..4096 tiles, <=1,000,000 cells, <=16,777,216 cell/tile pairs. Rust SIMD auto path requires <=32 unit-weight tiles; all other eligible inputs use TypeScript. One feature crate/artifact, lazily loaded with module-relative new URL; no import-time fetch. Chunk grid limits include a one-cell halo. Safe integer world/halo coordinates, serial calls, retained output memory grows until disposal. Every returned seam is valid; future chunks may fail for incompatible retained boundaries. Order affects layouts, no global count/path/connectivity guarantee. Heap ties define a new seed algorithm. Generated 192x192, 3D, wide-ID and address fixtures only; CPU works on both rendering backends. Wasm work counters wrap after 2^32-1.
+
+WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 17,317 B min+gzip. The chunks bundle measurement includes rebundled Wasm data; the separately shipped lazy artifact is 24,420 B raw / 9,580 B gzip, not an extra charge on that joined measurement. Core plus stage remains 23,797 B.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5479,6 +5485,10 @@ The voxel-net quickstart previously put Node server imports and browser Engine c
 ### Fixed: SQL-store test cleanup ordered before its dependencies
 
 A focused reproduction of the 3c97c10f4 restart test exposed EBUSY unlinking world.db in its first after hook on Windows. Node runs these hooks in registration order; the directory-removal hook failed before the later server/database hook, leaving that server tick and workers alive after the assertion result. The fixture now registers one cleanup hook before setup and owns each acquired resource immediately. Cleanup releases clients, servers, databases and then the directory in reverse order, continues through cleanup failures and reports every error. Explicit restart closes are idempotent. The original integration test failed before this repair; five subprocess regressions inject failures after directory, database, server, client and spawn acquisition and require natural process exit. They run in verify and therefore check:merge; no limit changed.
+
+### Fixed 2026-11-09: cubic WFC reciprocal validation
+
+ConstrainedWFC checked every adjacency edge with an opposite-list includes scan, making dense T-tile validation O(T cubed). The new 4096-ID heap fixture exposed it by exceeding a five-minute hard limit. Shared prepareGrid now checks a bitset in constant work per edge, preserving input order and copied rules. Regression: packages/wfc/test/chunks.test.js bounds observed adjacency reads linearly and retains the dense 4096-ID solve. Library builds also emit module-relative asset URLs so the new lazy Wasm loads from an installed package rather than the filesystem or site root. Node and real-browser loading are exercised.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -9639,9 +9649,9 @@ forbid the value elsewhere. Pins and ground may coexist; conflicts or values abs
 search and throw coded failed with a help link. Invalid coordinates/rows throw RangeError. A pre-aborted AbortSignal
 throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
-Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.
+Heap/chunk backend selection and the paired Rust/Wasm SIMD measurement are documented below. Pattern extraction and the existing overlapping solver remain TypeScript.
 
-## Global constraints (`@margoengine/wfc/constraints`, 2,337 B min+gzip)
+## Global constraints (`@margoengine/wfc/constraints`, 2,460 B min+gzip)
 
 [README continues: https://margoengine.com/llms/packages/wfc.md]
 

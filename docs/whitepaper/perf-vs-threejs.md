@@ -389,3 +389,7 @@ is the newest run after the first, when there is one.
 OIT has a separate Babylon.js 8.33.0 row in [the rival matrix](perf-vs-rivals.md): five unlit binary-colour
 panes, 2.000 versus 7.100 ms frame plus completion, busy machine, diagnostic. This is not a three.js row
 or an isolated GPU-pass comparison. Image accuracy is a loss: MAE 1.567519 versus 0.048151. Entry 109.
+
+### Batch 69 WFC scope
+
+The local heap/SIMD comparison in results/batch-69-heap.json is Margo TypeScript versus Margo Rust, with identical seeds, output hashes and work counts. No external-engine WFC result or speed claim was measured. Loaded-machine paired minima select only the <=32 unit-weight backend; wider/weighted and global-constraint solvers retain their documented implementations.

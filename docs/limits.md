@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-622). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-623). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1146,7 +1146,7 @@ formulation differences recorded separately from its unisolated complete cause.
 
 ## WFC global constraints (batch 69)
 
-Optional wfc/constraints 2,337 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
+Optional wfc/constraints 2,460 B min+gzip; root 1,824 B, overlapping 2,451 B; peers external. LIM-614: 1..4096 tiles, <=1,000,000 cells and <=16,777,216 cell/tile pairs; Uint16 output. Six-neighbour logical connectivity, nonempty connected groups and path endpoints in their walkable group. Counts include all matching cells, with inclusive 0..cell-count bounds. Bounded chronological backtracking (default 10,000 per attempt, four attempts); failure may mean budget exhaustion or unsatisfiability. Full entropy scan and possible-connectivity traversals, no large-world latency promise. Domains/trail scale with cell/tile pairs, graph scratch with cells. CPU works on WebGPU and WebGL2 pages, generated grids only; no authored-level, geometry-clearance or speed evidence. Legacy root weights now reject entropy/choice overflow before search.
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
 512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
@@ -1259,3 +1259,9 @@ analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; na
 Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
 Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,797 B remain unchanged. No existing size,
 accuracy or time gate was relaxed.
+
+## WFC heap and chunks (batch 69)
+
+Indexed heap, bitset domains and local restarts: 1..4096 tiles, <=1,000,000 cells, <=16,777,216 cell/tile pairs. Rust SIMD auto path requires <=32 unit-weight tiles; all other eligible inputs use TypeScript. One feature crate/artifact, lazily loaded with module-relative new URL; no import-time fetch. Chunk grid limits include a one-cell halo. Safe integer world/halo coordinates, serial calls, retained output memory grows until disposal. Every returned seam is valid; future chunks may fail for incompatible retained boundaries. Order affects layouts, no global count/path/connectivity guarantee. Heap ties define a new seed algorithm. Generated 192x192, 3D, wide-ID and address fixtures only; CPU works on both rendering backends. Wasm work counters wrap after 2^32-1.
+
+WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 17,317 B min+gzip. The chunks bundle measurement includes rebundled Wasm data; the separately shipped lazy artifact is 24,420 B raw / 9,580 B gzip, not an extra charge on that joined measurement. Core plus stage remains 23,797 B.

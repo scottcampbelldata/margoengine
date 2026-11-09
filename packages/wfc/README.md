@@ -62,9 +62,9 @@ forbid the value elsewhere. Pins and ground may coexist; conflicts or values abs
 search and throw coded failed with a help link. Invalid coordinates/rows throw RangeError. A pre-aborted AbortSignal
 throws its reason; synchronous checkpoints cannot receive new events while JavaScript owns the thread. No GPU resources
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
-Rust/Wasm SIMD solver selection and measurement belong to the large-output entry in batch 69, not to pattern extraction.
+Heap/chunk backend selection and the paired Rust/Wasm SIMD measurement are documented below. Pattern extraction and the existing overlapping solver remain TypeScript.
 
-## Global constraints (`@margoengine/wfc/constraints`, 2,337 B min+gzip)
+## Global constraints (`@margoengine/wfc/constraints`, 2,460 B min+gzip)
 
 ```ts
 import {ConstrainedWFC} from '@margoengine/wfc/constraints';
@@ -123,3 +123,45 @@ still apply. Pure CPU, identical on WebGPU and WebGL2 pages. Generated 48-varian
 asset compatibility claim. This entry builds rules only and imports no solver or rendering backend.
 
 `npm run test:gpu --workspace @margoengine/wfc` runs the overlapping solver beside WebGPU and WebGL2. Its server resolves the repository root from the script location, so workspace execution uses the same imports, and teardown closes the browser and server together.
+
+## Large outputs and chunks (optional wfc/chunks, 17,317 B min+gzip)
+
+```ts
+import {ChunkedWFC, HeapWFC} from 'margoengine/wfc/chunks';
+const tiles = [0,1].map(() => ({neighbors: Array.from({length:6}, () => [0,1])}));
+const large = await HeapWFC.create([192,192,1], tiles);
+console.log(large.solve({seed:7}).length, large.backend);
+using world = new ChunkedWFC([16,16,1], tiles, 7);
+const left = await world.solveChunk([-1,0,0]);
+const right = await world.solveChunk([0,0,0]);
+console.log(left.length, right.length, world.size);
+```
+
+HeapWFC uses indexed binary-heap selection, bitset propagation and fixed seeded per-cell tie keys. A domain change
+updates one heap position in O(log cells), without stale heap entries. This is a new seed algorithm; root,
+overlapping and constraints seed streams keep their previous behavior. Local adjacency and pins only; it uses
+bounded restarts, without global counts/connectivity or chronological backtracking. Defaults: seed 1, attempts 4
+(1..64), pins empty, signal absent. Grid limits: 1..4096 IDs, <=1,000,000 cells, <=16,777,216 cell/tile pairs.
+Invalid inputs throw RangeError/TypeError; exhausted attempts throw coded failed with a help link.
+
+Constructor HeapWFC is synchronous TypeScript. Async HeapWFC.create defaults to backend auto: lazily loads the
+feature's own Rust/Wasm SIMD artifact for <=32 unit-weight tiles, using new URL relative to the module; wider or
+weighted sets use TypeScript. Explicit typescript forces JS; explicit wasm rejects ineligible sets or missing SIMD
+with coded unsupported and a help link. Load accepts AbortSignal; fetch failures are coded failed. Build inputs and
+artifact hashes live in native/solver, rebuild with node packages/wfc/scripts/build-wasm.mjs (Rust wasm32 target).
+No shared Wasm bundle, core/stage import or import-time loading. Both implementations perform the same local solve
+and produce identical IDs for identical seeds; benchmark decision is recorded below. Browser WebGPU and WebGL2 use
+the same CPU code. Synchronous solving checks cancellation but cannot receive new events while blocking its thread.
+Wasm work statistics use 32-bit counters (wrap above 4,294,967,295); measured fixtures stay below that bound.
+
+ChunkedWFC solves a one-cell halo constrained by all previously committed neighbouring cells, then commits only the
+interior. Every successful seam satisfies the tile rules. Coordinates, world cell bounds and halo bounds must be safe
+integers; negative and distant addresses work. Grid/pair limits include the halo (each dimension plus 2). Chunk seed
+is the world seed mixed with all coordinate halves; generation is reproducible for the same solve order. Order can
+change layouts, and arbitrary rules may make a later chunk impossible: it throws rather than editing old chunks.
+There is no global playability guarantee across chunks. Calls must be serial; concurrent generation/clear throws
+coded failed. Cached outputs are copies. Storage grows with visited chunks; clear, dispose and Symbol.dispose release
+it. Failed or aborted calls commit nothing. The world seed defaults to 1; solveChunk takes backend auto, attempts 4 and
+signal absent. No hidden eviction, caller-authored boundary rules or caller repair is required.
+
+Rust/Wasm SIMD is selected for eligible sets because it was faster in every paired round on both the 192x192 open and 64x64x4 parity fixtures, with identical output hashes and work counts. The seven rounds interleave three runs per implementation and compare per-round minima. This is loaded SCOTT-DEV evidence, not a release speed claim; wider/weighted cases retain TypeScript because the measured Rust path supports only <=32 unit-weight IDs. See docs/whitepaper/results/batch-69-heap.json.

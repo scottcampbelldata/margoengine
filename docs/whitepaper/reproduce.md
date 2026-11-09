@@ -726,3 +726,7 @@ starts with fresh one-instance rings and 64 generated packed records; compare co
 [the recorded before/after result](results/scatter-tile-budget-20261109.json). The parent loses records in all five
 allocation regressions; controls, hard transitions, fades, outside rejection and the explicit cap remain checked.
 This is correctness evidence on one GPU, not a performance benchmark.
+
+### Batch 69 WFC heap and chunks
+
+Run npm test --workspace @margoengine/wfc for exhaustive local relations, linear validation work, 192x192 heap updates, 256x256 chunk coverage and all-axis seams. Run node packages/wfc/test/heap-bench.mjs --record with a hard timeout to reproduce paired/interleaved CPU measurements and output hashes; --record replaces only this machine-specific batch file. Current results are loaded-machine diagnostics, with no release speed promise. Rebuild the feature artifact with node packages/wfc/scripts/build-wasm.mjs (Rust wasm32-unknown-unknown, SIMD enabled by the script), then run both library builds and the WFC browser test for module-relative asset loading.

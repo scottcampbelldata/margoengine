@@ -11,6 +11,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/wfc',
+    file: 'packages/wfc/dist/wfc.wasm',
+    label: 'wfc.wasm',
+    kind: 'Wasm SIMD solver',
+    measure: 'file',
+    when: 'First eligible `HeapWFC.create()` or `ChunkedWFC.solveChunk()`: at most 32 unit-weight tiles, unless backend is typescript',
+  },
+  {
     package: '@margoengine/procedural',
     file: 'packages/procedural/dist/poisson.wasm',
     label: 'poisson.wasm',
