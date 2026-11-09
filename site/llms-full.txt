@@ -4710,17 +4710,6 @@ WebGPU and 17.473541259765625 on compatibility; all original budgets pass.
 Proof summaries: whitepaper/results/batch-160-amd-{transmission,volume}.json.
 This measures complete pictures, retaining the transport limitations above.
 
-Test-page 45 adds a shutdown failure to the existing voxel tracer D3D11 compile
-limit: disposing one second after the trace program submits can block inside
-WEBGL_lose_context.loseContext until the 180 s diagnostic process-tree limit.
-Raw WebGL reproduces it with the captured shader pair and no engine resources.
-The optional tracer still owns prevention through its submitted representation;
-browser reproduction is not an accepted difference or a completed engine fix.
-Data-texture uniform representations and a dynamic lighting-loop bound do not
-repair the full program. Smaller compile probes link, but a complete staged
-route, GPU output parity and a passing lifecycle regression are still missing.
-See known-bugs.md and testpage-research.md for the reproduction and evidence.
-
 Guiding README startup (Batch 99):
 
 The guiding example initializes a progressive viewport while the full tracing
@@ -4885,6 +4874,18 @@ under its unchanged 3,574 B ceiling; scatter root 19,100 B. Moving numerical
 comments outside shader strings preserves every non-comment WGSL token.
 Core plus stage remains 23,924 B gzip, below 25,000 B. No ceiling is raised.
 Full record: examples/package-benchmarks/results/entry-sizes.json.
+
+
+Test-page 45 adds a shutdown failure to the existing voxel tracer D3D11 compile
+limit: disposing one second after the trace program submits can block inside
+WEBGL_lose_context.loseContext until the 180 s diagnostic process-tree limit.
+Raw WebGL reproduces it with the captured shader pair and no engine resources.
+The optional tracer still owns prevention through its submitted representation;
+browser reproduction is not an accepted difference or a completed engine fix.
+Data-texture uniform representations and a dynamic lighting-loop bound do not
+repair the full program. Smaller compile probes link, but a complete staged
+route, GPU output parity and a passing lifecycle regression are still missing.
+See known-bugs.md and testpage-research.md for the reproduction and evidence.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
