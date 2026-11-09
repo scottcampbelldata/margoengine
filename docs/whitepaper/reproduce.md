@@ -1872,3 +1872,18 @@ Follow [water-fft.md](../water-fft.md) for the research equations, real NOAA
 wind fixture, oracle tolerances and separate shared-lock WebGPU/compat commands.
 Package unit tests: `npm test --workspace @margoengine/water`. Results are
 correctness-only; no speed experiment is part of this claim.
+
+Batch 273 vertex-input landing checkpoint: materials unit 402/402, compute unit
+111/111, materials base GPU native/full compatibility and the two-backend
+vertex-input regression pass. README runtime checks pass materials 29/29 and
+compute 21/21. Full verify ran once and failed its unit chain (13,856/13,873);
+all other chains passed. The original failures are repaired by the targeted
+planner/scanner evidence above. After rebase, 132/133 targeted tests passed;
+the remaining inherited feature-enumeration annotation is repaired and the
+complete affected fixed-wait file plus llms check pass. Final API, lint,
+hygiene, all five quality gates, 20 inherited affected source tests and size
+check pass. Core plus stage remains 23,924 B gzip; this fixture change adds no
+runtime entry bytes. Logs use test-results/batch-273-vertex-*, materials-main-*,
+compute-* and materials-unit. Bug 45 compilation tests remain with lane-U.
+This closes only materials/test:gpu:vertex-inputs from the 26-failure index;
+culling, KTX2 image reproducibility, sampler pressure and LOD remain open.
