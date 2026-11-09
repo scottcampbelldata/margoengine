@@ -196,3 +196,5 @@ GPU-only attachments refuse the small WebGL2 preview during setup with `MargoErr
 TAA and TAAUpscale keep the source camera on their transient raster-camera wrappers. The optional
 staging still controller uses the source projection for idle detection and tracing, then restores
 the raster camera before temporal resolve; stationary jitter does not reset still convergence.
+
+Explicit TAA and TAAUpscale disposal detaches from the owning scene and preserves effects with the same name in other scenes. The scene-owner regression covers replacement and repeated disposal.

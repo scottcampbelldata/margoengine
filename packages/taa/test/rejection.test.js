@@ -11,6 +11,9 @@ function rig(options) {
       gpu: gpu.device,
       meshes: new Map(),
       stats: { drawCalls: 0 },
+      sceneOf() {
+        return undefined;
+      },
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
@@ -47,10 +50,17 @@ test('lockResolve keeps history unclipped while a thin-feature lock lasts', () =
     const locked = lockResolve(code);
     assert.match(locked, /@binding\(10\) var lockHistory:texture_2d<f32>;/);
     assert.match(locked, /@binding\(11\) var lockOutput:texture_storage_2d<r32float,write>;/);
-    assert.match(locked, /select\((clamp|clipHistory)\(ycocg\(old\/total\),lo,hi(,m1,m2)?\),ycocg\(old\/total\),lock>0\.0\)/);
+    assert.match(
+      locked,
+      /select\((clamp|clipHistory)\(ycocg\(old\/total\),lo,hi(,m1,m2)?\),ycocg\(old\/total\),lock>0\.0\)/,
+    );
     assert.match(locked, /lock=max\(lock,lockOld-0\.125\)/, 'eight frames, the Halton cycle');
     assert.match(locked, /textureStore\(lockOutput,p,vec4f\(lock\)\);/);
-    assert.equal(/reactiveMask/.test(code), /\(1\.0-max\(react,oldReact\/total\)\)/.test(locked), 'reactive drops locks');
+    assert.equal(
+      /reactiveMask/.test(code),
+      /\(1\.0-max\(react,oldReact\/total\)\)/.test(locked),
+      'reactive drops locks',
+    );
   }
   assert.throws(() => lockResolve('fn main(){}'), /patch target missing/);
 });
@@ -64,7 +74,10 @@ test('locks add two r32float storage textures and bind them at 10 and 11; varian
   assert.equal(storage(log).length, storage(plainLog).length + 2);
   const groups = log.filter((c) => c[0] === 'group' && c[2].entries.some((e) => e.binding === 11));
   assert.equal(groups.length, 2, 'both history directions');
-  assert.ok(groups.every((g) => !g[2].entries.some((e) => e.binding === 9)), 'no mask binding without reactive');
+  assert.ok(
+    groups.every((g) => !g[2].entries.some((e) => e.binding === 9)),
+    'no mask binding without reactive',
+  );
   assert.ok(log.some((c) => c[0] === 'module' && /lockOutput/.test(c[2].code)));
   const variance = rig({ rejection: 'variance' }),
     varianceLog = variance.gpu.record(() => variance.frame());

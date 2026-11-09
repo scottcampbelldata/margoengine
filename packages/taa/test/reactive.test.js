@@ -11,6 +11,9 @@ function rig(options) {
       gpu: gpu.device,
       meshes: new Map(),
       stats: { drawCalls: 0 },
+      sceneOf() {
+        return undefined;
+      },
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
@@ -38,7 +41,11 @@ test('reactiveResolve takes the mask share away from the history weight, and onl
     assert.doesNotMatch(code, /reactiveMask/, 'without the option the resolve is the same shader');
     assert.match(masked, /@group\(0\) @binding\(9\) var reactiveMask:texture_2d<f32>;/);
     assert.match(masked, /temporal\.settings\.x\*\(1\.0-max\(react,oldReact\/total\)\)\);/, 'now or last frame');
-    assert.match(masked, /clamp\(textureLoad\(reactiveMask,[^;]+\.r,0\.0,1\.0\)/, 'a mask value outside 0 to 1 is clamped');
+    assert.match(
+      masked,
+      /clamp\(textureLoad\(reactiveMask,[^;]+\.r,0\.0,1\.0\)/,
+      'a mask value outside 0 to 1 is clamped',
+    );
     assert.match(masked, /oldReact\+=h\.a\*weight;/, 'the last mask comes back through the accepted history taps');
     assert.match(masked, /textureStore\(output,p,vec4f\(max\(result,vec3f\(0\)\),react\)\);/, 'and is kept in alpha');
     assert.equal(masked.split('reactiveMask').length - 1, 3, 'declared once, sized once, read once');

@@ -2603,3 +2603,5 @@ are applied to the planar surface, image background and colour background;
 local target passes keep local coordinates. Staging still idle/history keys
 exclude temporal raster jitter, including zero idle delay. Studio softboxes
 preserve finite extreme and subnormal directions by scaling before normalization.
+
+TAA and TAAUpscale explicit disposal uses the owning scene; another scene's effect with the same name is preserved (batch 56 ownership audit).

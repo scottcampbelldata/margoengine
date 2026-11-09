@@ -17,6 +17,9 @@ function scene(module, samples, meshCount, pbrCount) {
     gpu: gpu.device,
     meshes: new Map(),
     stats: { drawCalls: 0 },
+    sceneOf() {
+      return undefined;
+    },
     removePlugin() {},
     geometryBuffers: (geometry) => geometry.buffers,
     store: { visible: new Uint8Array(ids).fill(1), hidden: new Uint8Array(ids), parents: new Int32Array(ids).fill(-1) },

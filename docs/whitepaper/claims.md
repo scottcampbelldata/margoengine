@@ -2169,3 +2169,5 @@ repairs are retained separately. This is not an all-package parity claim.
   input [MAX_VALUE, MAX_VALUE, 0] compared with [1,1,0] in review56 tests.
 
 No new speed comparison or claim of full photographic equivalence is made.
+
+Batch 56 sibling audit: TAA and TAAUpscale owner detachment, same-name isolation and replacement are proved by packages/taa/test/scene-owner.test.js. Both regressions fail against the earlier default-scene disposal calls.

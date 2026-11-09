@@ -12,6 +12,9 @@ function rig(options, samples = 4) {
       gpu: gpu.device,
       meshes: new Map(),
       stats: { drawCalls: 0 },
+      sceneOf() {
+        return undefined;
+      },
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
@@ -84,7 +87,11 @@ test('velocityOnly: motion vectors with no jitter, capture, history or resolve',
   const made = log.filter((c) => c[0] === 'texture');
   assert.equal(made.filter((c) => c[2].format === 'rg16float').length, 1, 'one velocity target');
   assert.equal(made.filter((c) => c[2].format === 'r32float').length, 1, 'expected depth, and no history depths');
-  assert.deepEqual(made.filter((c) => c[2].usage & 8), [], 'no storage textures: no history');
+  assert.deepEqual(
+    made.filter((c) => c[2].usage & 8),
+    [],
+    'no storage textures: no history',
+  );
   assert.ok(!log.some((c) => c[0] === 'beginComputePass'), 'no history resolve');
   for (let f = 0; f < 3; f++) r.frame();
   const v = r.taa.velocity;

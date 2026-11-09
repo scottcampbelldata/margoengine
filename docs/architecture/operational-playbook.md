@@ -4279,3 +4279,5 @@ lock. The red and green logs are test-results/56fix/resume-gpu-environment-test-
 reflection-shapes-browser-10.log and resume-reflection-shapes-green.log.
 The complete environment acceptance still requires the remaining package GPU
 and runtime README gates; this fixture repair changes no rendering algorithm.
+
+Batch 56 ownership audit also applies sceneOf-based detachment to TAA and TAAUpscale. The real engine/scene unit regression keeps GPU calls inert and proves owner registry cleanup and same-name isolation.

@@ -11,6 +11,9 @@ function rig(options) {
       gpu: gpu.device,
       meshes: new Map(),
       stats: { drawCalls: 0 },
+      sceneOf() {
+        return undefined;
+      },
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
@@ -46,7 +49,9 @@ test('a velocity pass draws its own motion inside the object pass, once a frame 
   assert.throws(() => r.taa.add(drawer), /Duplicate TAA source/);
   const log = r.gpu.record(() => r.frame());
   const begins = log.filter((c) => c[0] === 'beginRenderPass'),
-    drawAt = log.findIndex((c) => c[0] === 'pass.draw' && c[1] === 3 && log.slice(0, log.indexOf(c)).some((b) => b[0] === 'beginRenderPass'));
+    drawAt = log.findIndex(
+      (c) => c[0] === 'pass.draw' && c[1] === 3 && log.slice(0, log.indexOf(c)).some((b) => b[0] === 'beginRenderPass'),
+    );
   assert.equal(frames.length, 1);
   assert.ok(drawAt > 0 && begins.length >= 2);
   const f = frames[0];
@@ -84,7 +89,11 @@ test("a displaced primitive whose graph's move reads its uniforms binds last fra
     move: ['margoPosition=i.position.xyz+vec3f(ndu.nd0,0,0);'],
     program,
   };
-  const node = { matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]), engine: r.engine, check() {} },
+  const node = {
+      matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+      engine: r.engine,
+      check() {},
+    },
     primitive = {
       primitive: {},
       node,
@@ -115,11 +124,16 @@ test("a displaced primitive whose graph's move reads its uniforms binds last fra
   sent.push(value(first), value(frame(2)), value(frame(5)));
   assert.deepEqual(sent, [1, 1, 2], 'this frame on the first, then always the frame before');
   const end = r.gpu.record(() => r.taa.dispose());
-  assert.ok(end.some((c) => c[0] === 'destroy' && c[1] === kept), 'destroyed with TAA');
+  assert.ok(
+    end.some((c) => c[0] === 'destroy' && c[1] === kept),
+    'destroyed with TAA',
+  );
   // A move that reads no uniform keeps today's shader and group.
   const plain = rig({});
   plain.taa.add({
-    shadowPrimitives: [{ ...primitive, node: { ...node, engine: plain.engine }, displacement: { ...displacement, move: [] } }],
+    shadowPrimitives: [
+      { ...primitive, node: { ...node, engine: plain.engine }, displacement: { ...displacement, move: [] } },
+    ],
   });
   const log = plain.gpu.record(() => plain.frame());
   assert.ok(!log.some((c) => c[0] === 'module' && /nduBefore/.test(c[2].code)));

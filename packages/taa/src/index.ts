@@ -1240,7 +1240,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.sources.clear();
     this.engine = this.device = undefined;

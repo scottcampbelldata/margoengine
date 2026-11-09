@@ -13,6 +13,9 @@ for (const Type of [TAA, TAAUpscale])
         hasPlugin: () => false,
         meshes: new Map(),
         stats: { drawCalls: 0 },
+        sceneOf() {
+          return undefined;
+        },
         removePlugin() {},
         store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
       };

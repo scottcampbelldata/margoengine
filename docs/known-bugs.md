@@ -3214,3 +3214,7 @@ normalized to zero. Scaling by the largest absolute component first preserves
 its direction. studio.test.js compares all texels with [1, 1, 0], including
 subnormal input. No assertion or tolerance is weakened.
 
+
+### Fixed: temporal effect owner detachment (batch 56 sibling audit)
+
+Explicit TAA/TAAUpscale disposal called removePlugin on the active default scene after setup had returned. With matching names it disposed the unrelated default effect and left the secondary effect registered. Both classes now detach through sceneOf(this). The scene-owner regression uses real engine scene registries, asserts same-name isolation, and permits replacement after repeated disposal.

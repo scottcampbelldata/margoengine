@@ -13,6 +13,9 @@ function rig(options) {
       gpu: gpu.device,
       meshes: new Map(),
       stats: { drawCalls: 0 },
+      sceneOf() {
+        return undefined;
+      },
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
@@ -43,7 +46,11 @@ test('Sharpen puts the shared unsharp mask into the present shader in place of t
 
 test('the sharpen keeps the neighbourhood range and stops at zero strength', () => {
   assert.match(sharpenCode, /if\(amount<=0\)\{return c;\}/);
-  assert.match(sharpenCode, /return clamp\(\(c\+k\*\(n\+s\+w\+e\)\)\/\(1\+4\*k\),lo,hi\);/, 'no halo: inside min/max of 5 taps');
+  assert.match(
+    sharpenCode,
+    /return clamp\(\(c\+k\*\(n\+s\+w\+e\)\)\/\(1\+4\*k\),lo,hi\);/,
+    'no halo: inside min/max of 5 taps',
+  );
 });
 
 test('a present step adds one 16-byte uniform at binding 1, written every frame; no step changes nothing', () => {
@@ -56,12 +63,16 @@ test('a present step adds one 16-byte uniform at binding 1, written every frame;
   assert.equal(uniforms(first).length, uniforms(plainLog).length + 1);
   // The present groups: the resolved frame at 0 and the step's uniform at 1, one per history direction.
   const groups = first.filter(
-    (c) => c[0] === 'group' && c[2].entries.length === 2 && c[2].entries[1].binding === 1 && c[2].entries[1].resource.buffer,
+    (c) =>
+      c[0] === 'group' && c[2].entries.length === 2 && c[2].entries[1].binding === 1 && c[2].entries[1].resource.buffer,
   );
   assert.equal(groups.length, 2, 'both history directions present with the uniform');
   const id = groups[0][2].entries[1].resource.buffer;
   assert.equal(groups[1][2].entries[1].resource.buffer, id);
-  assert.ok(uniforms(first).some((c) => c[1] === id), 'a 16-byte uniform');
+  assert.ok(
+    uniforms(first).some((c) => c[1] === id),
+    'a 16-byte uniform',
+  );
   assert.ok(first.some((c) => c[0] === 'module' && /margoSharpen/.test(c[2].code)));
   assert.ok(!plainLog.some((c) => c[0] === 'module' && /margoSharpen/.test(c[2].code)), 'defaults unchanged');
   sharpen.amount = 0.25;
@@ -70,7 +81,10 @@ test('a present step adds one 16-byte uniform at binding 1, written every frame;
   assert.equal(write.length, 1);
   assert.equal(new Float32Array(Uint8Array.from(Buffer.from(write[0][3], 'hex')).buffer)[0], 0.25);
   const end = r.gpu.record(() => r.taa.dispose());
-  assert.ok(end.some((c) => c[0] === 'destroy' && c[1] === id), 'the uniform is destroyed with TAA');
+  assert.ok(
+    end.some((c) => c[0] === 'destroy' && c[1] === id),
+    'the uniform is destroyed with TAA',
+  );
 });
 
 test('Sharpen and the present option are checked', () => {
