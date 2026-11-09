@@ -83,5 +83,13 @@
     "docLinksPassed": true,
     "generatedCorpusRegenerated": true,
     "fullVerifyRepeated": false
+  },
+  "finalIntegration": {
+    "onto": "492b6b3b892b6aebe04dcf7fc77c98be10f68733",
+    "saveSourceAndTestsIdentical": true,
+    "affectedUnitChecks": 122,
+    "documentationLinksPassed": true,
+    "fullVerifyRepeated": false,
+    "upstreamScope": "sciviz/site and documentation; no core, stage, math or Save source changes"
   }
 }
