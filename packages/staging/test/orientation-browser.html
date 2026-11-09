@@ -17,6 +17,11 @@ const watch=()=>{
 };watch();
 let effect,model,remove,world;
 const render=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+const completeCoverage=async()=>{
+  const deadline=AbortSignal.timeout(30000);
+  do{deadline.throwIfAborted();await render();}
+  while(effect instanceof AccumulatedShadows && effect.samples<(effect.options.frames??64));
+};
 const pixels=async()=>{
   const t=effect instanceof AccumulatedShadows?effect.history.textures[(effect.samples-1)&1]:effect.targets.textures[0];
   const buffer=engine.gpu.createBuffer({size:256*64,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
@@ -38,13 +43,13 @@ window.check={
     effect=kind==='contact'?ContactShadows.attach(engine,options):AccumulatedShadows.attach(engine,{...options,static:false,lightPosition:world([.7,8,-.5]),lightRadius:1.4,frames:16});
     remove=effect.add(model);
     engine.gpu.pushErrorScope('validation');
-    for(let i=0;i<(kind==='contact'?1:16);i++)await render();
+    await completeCoverage();
     const e=await engine.gpu.popErrorScope();if(e)errors.push(e.message);
     return {values:await pixels(),errors};
   },
   async opacity(v){effect.options.opacity=v;await render();return errors;},
   async below(){engine.camera.position=world([0,-4,5]);await render();},
-  async restore(){const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();for(let i=0;i<16;i++)await render();return {changed:old!==engine.gpu,values:await pixels(),errors};},
+  async restore(){const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await completeCoverage();return {changed:old!==engine.gpu,samples:effect instanceof AccumulatedShadows?effect.samples:null,values:await pixels(),errors};},
   async turn(){effect.options.up=[0,1,0];effect.options.lightPosition=[1,10,3];await render();return effect.samples;},
   async empty(){remove();remove();await render();return {values:await pixels(),samples:effect.samples,errors};},
   async product(){

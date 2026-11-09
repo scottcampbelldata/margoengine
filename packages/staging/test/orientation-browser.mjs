@@ -36,6 +36,7 @@ try{
       assert.deepEqual(below.data,belowOff.data,'receiver does not draw from its back side');
     }
     const restored=await page.evaluate(()=>window.check.restore());
+    assert.equal(restored.samples,kind==='accumulated'?16:null,'restored coverage reaches the configured sample count');
     assert(restored.changed);assert.deepEqual(restored.values,baseline);assert.deepEqual(restored.errors,[]);
   }
   assert.equal(await page.evaluate(()=>window.check.turn()),1,'changing up resets accumulated history');
