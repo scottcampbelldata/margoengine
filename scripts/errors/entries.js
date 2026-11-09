@@ -224,7 +224,7 @@ export const entries = [
     kind: 'family',
     messages: ['Invalid geometry', 'Box size: positive', 'Sphere radius', 'Sphere segments: 3..256', 'No geometry'],
     cause:
-      'Core geometry needs 3 to 1,000,000 vertices, a triangle index count that is a multiple of 3, indices inside the vertex range, and finite positions and normals. Boxes and spheres need positive sizes and 3-256 segments. Fitting needs at least one mesh with geometry.',
+      'Core geometry accepts three empty arrays, or needs 3 to 1,000,000 vertices, a triangle index count that is a multiple of 3, indices inside the vertex range, and finite positions and normals. Boxes and spheres need positive sizes and 3-256 segments. Fitting needs at least one mesh with geometry.',
     fix: 'Split meshes over 1,000,000 vertices, check index ranges, and pass positive sizes. Give the model meshes with geometry before fitting.',
   },
   {

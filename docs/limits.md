@@ -50,7 +50,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 23,797 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,449 B of its 21,587 B cap (2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,797 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 23,837 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,449 B of its 21,587 B cap (2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -561,7 +561,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Picking on the WebGL2 preview (`@margoengine/webgl2-compat/pick`, 2026-11-06) | Proved in Chromium on real WebGL2: CSS pixels, depth, single and double-sided faces, hidden meshes, views, layers, a canvas left unchanged, `Picking` and `HoverHighlight` from `selection`, which answer with the mesh only and take one pick a point in `pickMany`, and React pointer handlers ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. Mesh ids up to 16,777,216, the largest whole number a 32-bit float holds. | Core's pick refuses every renderer but WebGPU's before any plugin hook, so the plugin covers `pick` and `render` on that one engine; core stays frozen. | Each pick blocks on one `readPixels` and refreshes the scene as a frame does. A plugin's `onPick` is not called, and `Picking` from `@margoengine/selection` still needs WebGPU. | `engine.pick` on WebGPU or the compatibility layer. |
 | Context restore on the WebGL2 preview (`@margoengine/webgl2-compat/restore`, 2026-11-06) | Proved in Chromium with `WEBGL_lose_context`: identical pixels after a loss, picks, geometry added during the loss, `onDeviceRestored` in each scene, and a reboot on a live context ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. `rebootDevice` waits 30,000 ms by default (`timeout`) for a lost context. | The browser decides whether a lost context returns, and the plugin must be attached before the loss, or the browser never gives it back. | Frames draw nothing during a loss. A timed-out wait reports `timeout`, and a later restore still recovers. An app that draws on demand draws again itself, from `onDeviceRestored`. | A new engine on a new canvas. |
 | XR on the WebGL2 compatibility layer (`@margoengine/webgl2-compat/xr`, 2026-11-06) | Run on real devices with stand-ins for `navigator.xr`, `XRGPUBinding` and `XRWebGLLayer`: no pixel differs from native WebGPU in either eye (Chromium, RTX A6000, [xr-browser.mjs](../packages/webgl2-compat/test/xr-browser.mjs)). No headset or phone has run it, and Firefox and Safari have not been run. | WebGL2 sessions show an `XRWebGLLayer`, whose framebuffer takes draws only, and its depth buffer cannot be filled from another texture. | One extra full-eye copy a frame, and no depth for the compositor to reproject by. The first frame that makes a compute pipeline shows nothing while the compute runtime loads. | `installXR({ framebufferScale })` to trade sharpness for speed; WebGPU where the browser has it. |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl2-compat/test/preview-webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 23,797 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl2-compat/preview` (3,443 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl2-compat/test/preview-webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 23,837 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl2-compat/preview` (3,443 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
 | Automatic escalation from the preview (`@margoengine/webgl2-compat/auto`, 2026-11-06) | Proved in Chromium with WebGPU removed and with it present ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. Only a refusal (code `unsupported`) during `setup` escalates, and only with `loadCompat`. | The layer cannot show frames on a canvas that holds the preview's context, and a canvas keeps its first context, so the element is replaced with a copy; listeners on the old element do not carry over. The app passes the import because no package may name the layer ([isolation.test.js](../packages/webgl2-compat/test/isolation.test.js)). | `setup` runs twice when escalating. A package added after `setup` refuses as usual. The React `Canvas` does not escalate: its `loadCompat` prop installs the layer before the engine, so it sets up once and keeps its canvas, at the cost of the layer's download where the preview would have done. | Install the layer yourself before `Engine.create`, as its README shows. |
 | WebGPU pages alive at once | Measured on an Intel Arc 140V laptop (Edge and Chrome 156, headless, 2026-10-30): with 3 WebGPU pages alive in one browser process a new page's `requestDevice` took 10.6 s, and the 4th page never got a device or finished its pipeline compile (4 of 7 runs); 2 pages at once, one page at a time, or 4 separate browsers always started. The NVIDIA RTX A6000 desktop starts 4 at once. Enforced since then: each `Engine.create` startup step (`requestAdapter`, `requestDevice`, each pipeline compile) has a limit ([renderer.ts](../packages/core/src/renderer.ts), [core-startup-watchdog.test.js](../tests/core-startup-watchdog.test.js)). | The stall is in the driver or the browser's GPU process, not the page: the pages already drawing keep drawing every frame while the new one waits. | One `console.warn` (`Margo: still waiting for requestDevice after 8 s; see https://margoengine.com/errors#timeout`) after `startupWarning` ms (default 8,000), then a rejection with `MargoError` code `timeout` naming the step after `startupTimeout` ms (default 30,000); `backend: 'auto'` with a `fallback` draws on WebGL2 instead. Before, `Engine.create` never settled and the canvas stayed blank at 300 x 150. | Start several engines one at a time (each after the previous has drawn) and dispose those that leave the screen; the demo gallery must not start many engines at once. `signal` cancels creation; raise `startupTimeout` for a slow first compile. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); cube textures are sampled there as on WebGPU, seamless; CPU kernels compile with `new Function` where the page allows it (CSP `unsafe-eval`) and otherwise run on the interpreter of the next row. A NaN that a CPU-tier kernel stores, bitcasts or packs is written as the one quiet NaN 0x7fc00000 (f16 0x7e00), so its sign and payload are not kept, which WGSL 15.7.2 allows (any value) and which keeps the bytes the same on every engine and on the interpreter. A CPU-tier dispatch stops at its work budget, 100,000,000 invocations plus loop iterations by default (`cpuWorkBudget`), and is reported as a `GPUInternalError` coded `failed` with nothing stored. | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. A transform-feedback tier for own-index stores is parked (speed only: those stores already run on the scatter tier with the same pixels, about 0.09 ms more per stored word, measured in the roadmap). |
@@ -701,7 +701,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (23,797 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (23,837 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
 `@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
 `@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each
@@ -854,7 +854,7 @@ module registration is shared per context and can still complete. Real OfflineAu
 renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. Unit stand-ins
 check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
 Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
-Sidechain entry: 1,565 B gzip, budget 1,815 B; core plus stage remains 23,797 B.
+Sidechain entry: 1,565 B gzip, budget 1,815 B; core plus stage remains 23,837 B.
 
 ## Mixer snapshots (batch 111)
 
@@ -969,7 +969,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,107 B gzip, budget 2,363 B.
-Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,797 B gzip.
+Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -1013,7 +1013,7 @@ Optional audio/occlusion uses five CPU rays (one with radius 0) and interpolated
 
 Real Edge 157 audio renders beside native WebGPU, WebGL2 and WebGL2 compatibility engines show 2 kHz blocked/clear RMS 0.039128 and 100 Hz 0.249970 with zero GPU validation errors. Node tests use renderer/audio stand-ins with real engine transforms and BVH. Generated tones/boxes are stand-ins; real recordings, listening quality, other browsers and performance are unmeasured. LIM-602.
 
-Occlusion entry: 1,516 B gzip, budget 1,772 B, with package dependencies external; audio root: 7,508 B gzip. BVH is a separate optional dependency loaded only on create, never through the audio root. Core plus stage remains 23,797 B gzip.
+Occlusion entry: 1,516 B gzip, budget 1,772 B, with package dependencies external; audio root: 7,508 B gzip. BVH is a separate optional dependency loaded only on create, never through the audio root. Core plus stage remains 23,837 B gzip.
 
 
 ## Batch 168 lightmap reference
@@ -1042,7 +1042,7 @@ angular-radiance comparison, not hemisphere integration or absolute physical-uni
 
 ## Audio Doppler (batch 110)
 
-Optional audio/doppler: 1,090 B gzip; audio root unchanged at 7,508 B; core plus stage unchanged at 23,797 B. Defaults: speedOfSound 343 m/s, authored playbackRate from the sound. Positive finite sound speed; nonnegative finite rate at most float32 maximum / 39. Estimates world displacement per audio-clock second; first/coincident/backward-clock samples neutral, repeated times retain history. Reset after teleports and motion during suspension. Owns playback rate while attached, restores authored rate on disposal; use controller.playbackRate for authored changes, never Audio.sync concurrently. Buffers only; other source kinds produce unsupported with a help link. One controller per sound. Listener pose/source ordering and teardown are covered.
+Optional audio/doppler: 1,090 B gzip; audio root unchanged at 7,508 B; core plus stage unchanged at 23,837 B. Defaults: speedOfSound 343 m/s, authored playbackRate from the sound. Positive finite sound speed; nonnegative finite rate at most float32 maximum / 39. Estimates world displacement per audio-clock second; first/coincident/backward-clock samples neutral, repeated times retain history. Reset after teleports and motion during suspension. Owns playback rate while attached, restores authored rate on disposal; use controller.playbackRate for authored changes, never Audio.sync concurrently. Buffers only; other source kinds produce unsupported with a help link. One controller per sound. Listener pose/source ordering and teardown are covered.
 
 Classical instantaneous stationary-medium approximation with each radial Mach number clamped to -0.95..0.95, ratio bounded 1/39..39. Not supersonic acoustics, wind, retarded-time positions, travel delay or pitch-only time stretching. Existing listener smoothing applies. Real browser renders beside all three rendering routes measure generated 1 kHz source approach at 1111.111 Hz, recession at 909.091 Hz, listener approach at 1100 Hz and co-motion/rest at 1000 Hz, each within 0.1 Hz with zero GPU validation errors. LIM-603, generated stand-ins only; real recordings, listening quality, other browsers and performance unmeasured.
 
@@ -1063,7 +1063,7 @@ pixels as a zero-error raster oracle. No additional speed claim. See whitepaper/
 
 ## Audio event containers (batch 110)
 
-Optional audio/events: 5,491 B gzip with shared audio implementation; audio root 7,638 B and core plus stage 23,797 B. Defaults: mode random (no immediate repeated index), voices 4 per buffer, volume [1,1], pitch [0,0] cents, cooldown 0 seconds, random Math.random, voiceOptions pool defaults, play position origin. Nonempty decoded positive-duration buffers; finite ordered volume endpoints 0..1 and pitch -4800..4800 cents. Cooldown finite and nonnegative; draws finite in [0,1). Pitch changes duration. No loading or timers. Total preallocated voices = buffer count times voices; stealing is per buffer, not a global cap. Snapshot ranges, not caller arrays. Looping disabled; sequence wraps, cooldown rejection consumes no state/draw. Clock suspension freezes cooldown; backwards clock accepts a new interval.
+Optional audio/events: 5,491 B gzip with shared audio implementation; audio root 7,638 B and core plus stage 23,837 B. Defaults: mode random (no immediate repeated index), voices 4 per buffer, volume [1,1], pitch [0,0] cents, cooldown 0 seconds, random Math.random, voiceOptions pool defaults, play position origin. Nonempty decoded positive-duration buffers; finite ordered volume endpoints 0..1 and pitch -4800..4800 cents. Cooldown finite and nonnegative; draws finite in [0,1). Pitch changes duration. No loading or timers. Total preallocated voices = buffer count times voices; stealing is per buffer, not a global cap. Snapshot ranges, not caller arrays. Looping disabled; sequence wraps, cooldown rejection consumes no state/draw. Clock suspension freezes cooldown; backwards clock accepts a new interval.
 
 LIM-605: Node stand-in tests and real browser PCM beside all three rendering routes prove order, random selection, volume/pitch and silent cooldown gaps. Generated 1/1.5 kHz tones at +1200 cents give 2/3 kHz within 0.1 Hz, RMS 0.0625 within 1e-6 for 0.5 volume, and zero GPU validation errors. Shared buffers stay usable on disposal. Recordings, listening quality, other browsers, random-generator statistical quality and performance remain unmeasured.
 
@@ -1091,17 +1091,17 @@ with six faces. Volume depth shrinks at mips; array layers do not. No core scene
 automatic cameras, mip generation or resizing. Call restore(newDevice), rebuild bind groups and redraw after
 device loss; disposed targets cannot be reused. Native WebGL2 returns unsupported with a help link.
 Generated color/triangle fixtures on real WebGPU check 78 subresources, HDR, load and replacement-device redraw.
-Other devices, browsers, camera correctness, frame rate and speed are unmeasured. Core plus stage stays 23,797 B gzip.
+Other devices, browsers, camera correctness, frame rate and speed are unmeasured. Core plus stage stays 23,837 B gzip.
 
 ## Adaptive music (batch 110)
 
-Optional audio/music: 1,572 B gzip (bare mixer peer external); core plus stage 23,797 B. Reuses optional mixer peer buses and fades. Defaults bpm 120, beatsPerBar 4, loopBeats 4, leadTime 0.05 s, exponential fade 0.02 s (about 98% settled). Positive finite tempo, positive integer bar/loop beats, finite grid/seconds and float32 linear gains. Buffers must cover the loop; trailing samples unused. All stems start at one origin and run continuously, including silent layers. Caller authors aligned/seamless loops and headroom. Fixed tempo, no analysis, stretching, section sequencing or streaming.
+Optional audio/music: 1,572 B gzip (bare mixer peer external); core plus stage 23,837 B. Reuses optional mixer peer buses and fades. Defaults bpm 120, beatsPerBar 4, loopBeats 4, leadTime 0.05 s, exponential fade 0.02 s (about 98% settled). Positive finite tempo, positive integer bar/loop beats, finite grid/seconds and float32 linear gains. Buffers must cover the loop; trailing samples unused. All stems start at one origin and run continuously, including silent layers. Caller authors aligned/seamless loops and headroom. Fixed tempo, no analysis, stretching, section sequencing or streaming.
 
 States are copied stem-name/dB maps, omitted stems silent. Requests validate before mutation; exact beat/bar boundaries eligible after both requested time and now+leadTime. New requests replace automation at/after their boundary; earlier transitions survive. No frame work/timers. Suspension freezes the audio clock; stop cuts sources, restart clears pending automation and resets phase. Listener teardown disposes owned buses/sources, preserving buffers. LIM-607: Node scheduling/lifecycle stand-ins and real browser sample-reference PCM for aligned generated 600/900 Hz loops and beat/bar state changes on all three routes, error below 5e-8 and zero GPU errors. Recordings, listening quality, other browsers and speed unmeasured.
 
 ## Reverb zones (batch 110)
 
-Optional audio/zones: 1,139 B gzip (bare mixer peers external); core plus stage 23,797 B. Inclusive finite ordered AABB bounds in world metres, unique names, greatest finite priority (default 0), first-listed tie break, wet gain 0..1 (default 0.25). Empty list/outside means silent wet send. Default fade 0.1 s, finite nonnegative exponential mixer fade, about 98% settled; 0 jumps. Room settings/defaults/limits are the existing mixer/reflections ones, mix forced 1. Bounds do not define room response geometry; source/listener positions in each response remain authored and fixed.
+Optional audio/zones: 1,139 B gzip (bare mixer peers external); core plus stage 23,837 B. Inclusive finite ordered AABB bounds in world metres, unique names, greatest finite priority (default 0), first-listed tie break, wet gain 0..1 (default 0.25). Empty list/outside means silent wet send. Default fade 0.1 s, finite nonnegative exponential mixer fade, about 98% settled; 0 jumps. Room settings/defaults/limits are the existing mixer/reflections ones, mix forced 1. Bounds do not define room response geometry; source/listener positions in each response remain authored and fixed.
 
 One room response and convolution per zone, memory/work proportional to zone count and response length. Frame updates select from listener pose, audio clock handles gain changes, unchanged selection schedules nothing. Old tails continue after input fades or exits; disposal cuts them. Extra sends feed input; existing dry routes are independent. Disconnect external sends if their source outlives the controller. No loading/timers, continuous propagation, portals, diffraction or geometry inference. LIM-608: Node priority/boundary/failure-cleanup tests and real browser generated-impulse sample-reference PCM on all three routes prove selection, dry/wet routing and retained tails within 1e-6 with zero GPU errors. Recordings, listening quality, other browsers and speed unmeasured.
 
@@ -1111,7 +1111,7 @@ Flat CRT mapping uses the same integer centre-coordinate quotient as PixelScale 
 
 ## Ambisonic beds (batch 110)
 
-Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 23,797 B. First-order four-channel ACN/SN3D W,Y,Z,X buffers only, positive finite duration, explicit convention assumption. Default format ambix; other conventions/channel counts produce linked unsupported. No FuMa/N3D/A-format conversion, higher/mixed orders, appended stereo, CAF adaptor or Opus metadata parser. Loading delegates to existing listener.load with AbortSignal and browser codec support; four-channel 24-bit PCM WAV with 44.1-to-48 kHz resampling is tested.
+Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 23,837 B. First-order four-channel ACN/SN3D W,Y,Z,X buffers only, positive finite duration, explicit convention assumption. Default format ambix; other conventions/channel counts produce linked unsupported. No FuMa/N3D/A-format conversion, higher/mixed orders, appended stereo, CAF adaptor or Opus metadata parser. Loading delegates to existing listener.load with AbortSignal and browser codec support; four-channel 24-bit PCM WAV with 44.1-to-48 kHz resampling is tested.
 
 Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Collinear directions retain the last independent decoder orientation (initially -Z forward, +Y up). Camera following copies camera.up, including roll and exact poles. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
 
@@ -1131,7 +1131,7 @@ world precision still applies; the field reads XZ and does not simulate a physic
 entry measures 7,463 minified bytes / 3,318 B gzip with bare peers external. The budget rises from 3,206 to 3,574 B
 (the measured entry plus the established 256 B headroom) for input validation, atomic updates, a bounded shift and
 overflow-safe distance maths. Those extra checks and ALU preserve finite extreme inputs; no speed is measured.
-Core plus stage remains 23,797 B gzip.
+Core plus stage remains 23,837 B gzip.
 
 
 ## Batch 160 outside material pictures
@@ -1226,7 +1226,7 @@ Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics en
 | --- | --- | --- |
 | Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
 
-Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,797 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
+Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,837 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
 
 ## Painterly post effects (batch 77, LIM-619)
 
@@ -1256,7 +1256,7 @@ See [feature mapping and inventory](webgl-consolidation.md).
 Consolidation measurement (min+gzip, `entry-sizes.json`): full root 102,192 B
 before, 102,200 B after; `/preview` 3,443 B, `/pick` 4,798 B, `/restore` 850 B,
 `/auto` 3,720 B. The former preview root measured 3,442 B. Core plus stage is
-23,797 B against the unchanged strict 25,000 B ceiling. Chunk name changes can
+23,837 B against the unchanged strict 25,000 B ceiling. Chunk name changes can
 change gzip bytes even when the root implementation has not changed.
 
 Audio camera-only repair (2026-11-09): audio root then measured 7,642 B gzip, ambisonics entry 1,921 B; core plus stage unchanged at 23,626 B. Earlier batch sizes above are historical. README loading examples use WAV filenames so the runtime example gate supplies its available WAV fixture.
@@ -1304,14 +1304,14 @@ analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; na
 `unsupported` and a registered help link. Native device restoration and disposal are exercised.
 
 Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
-Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,797 B remain unchanged. No existing size,
+Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,837 B remain unchanged. No existing size,
 accuracy or time gate was relaxed.
 
 ## WFC heap and chunks (batch 69)
 
 Indexed heap, bitset domains and local restarts: 1..4096 tiles, <=1,000,000 cells, <=16,777,216 cell/tile pairs. Rust SIMD auto path requires <=32 unit-weight tiles; all other eligible inputs use TypeScript. One feature crate/artifact, lazily loaded with module-relative new URL; no import-time fetch. Chunk grid limits include a one-cell halo. Safe integer world/halo coordinates, serial calls, retained output memory grows until disposal. Every returned seam is valid; future chunks may fail for incompatible retained boundaries. Order affects layouts, no global count/path/connectivity guarantee. Heap ties define a new seed algorithm. Generated 192x192, 3D, wide-ID and address fixtures only; CPU works on both rendering backends. Wasm work counters wrap after 2^32-1.
 
-WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 3,589 B and worker 1,331 B min+gzip. The module-relative lazy Wasm is now a separate asset (24,282 B raw / 9,596 B gzip), rather than data rebundled into chunks. The classic worker is 7,967 B raw / 3,326 B gzip, fetched on construction. Core plus stage remains 23,797 B.
+WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 3,589 B and worker 1,331 B min+gzip. The module-relative lazy Wasm is now a separate asset (24,282 B raw / 9,596 B gzip), rather than data rebundled into chunks. The classic worker is 7,967 B raw / 3,326 B gzip, fetched on construction. Core plus stage remains 23,837 B.
 
 ## WFC worker solving (batch 69)
 
@@ -1324,7 +1324,7 @@ with 15 failures retained. Sources, licences and outstanding inputs: [missing-te
 
 ## Custom WGSL transitions (LIM-625)
 
-Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4300 B (budget 4303 unchanged), custom 5038 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
+Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4300 B (budget 4303 unchanged), custom 5038 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23837 B unchanged.
 
 ## Multiple-scattering tracer sky (batch 99, LIM-626)
 
@@ -1344,7 +1344,7 @@ lighting, cancellation, resource disposal and real native device restoration are
 `docs/whitepaper/results/batch-99-sky-20261109.json`. No speed or reference-renderer equality claim.
 
 Batch 99 sky entry sizes (bare peers external): lazy tracer sky 212 B gzip, sky Hillaire including the reusable
-bake 10822 B; tracer root 80431 B and core plus stage 23797 B unchanged. Entry budgets use the standard
+bake 10822 B; tracer root 80431 B and core plus stage 23837 B unchanged. Entry budgets use the standard
 max(256 B, 3%) headroom; the strict core/stage limit remains 25000 B.
 
 The environment bake requires Float32-distinct planet/atmosphere radii and vertical scattering optical depth
@@ -1365,7 +1365,7 @@ AbortSignal reasons are preserved. Worker transport retains the failure code and
 also includes its help link. These are synthetic hostile-input regressions, not a new performance claim.
 Current bare-peer entry sizes: root 1,868 B, overlapping 2,457 B, constraints 2,484 B, sockets 776 B, chunks 3,647 B,
 worker 1,331 B min+gzip; bundled worker 3,399 B gzip. Earlier batch sizes above are historical.
-Core plus stage remains 23,797 B gzip against its unchanged strict 25,000-byte gate.
+Core plus stage remains 23,837 B gzip against its unchanged strict 25,000-byte gate.
 
 ## Scatter uploaded LOD boundaries (batch 69 cross-package audit)
 
@@ -1379,7 +1379,7 @@ other scatter entries are unchanged. No speed or new rendering-quality claim.
 
 ## Texture mask wipes (LIM-627)
 
-Optional transitions/mask uses encoded red values as reveal thresholds, alpha ignored. 8-bit ImageData is snapshotted; ImageBitmap is borrowed and must stay open through restoration, and is never closed by the transition. Mask dimensions 1..min(4096, device limit), capture dimensions <=65535 and within the device limit. Integer centre addressing is overflow-free within those bounds, including odd-size exact ties. Nearest full-capture stretch, top-left origin, no tiling or aspect fitting. Softness default 0.02, zero or finite 0.000001..1. Exact endpoints bypass thresholding; built-in kind/displacement are ignored. ImageData bytes have no conversion; bitmap upload uses WebGPU default sRGB destination encoding. Resize retains history/progress; replacement cancels scene history and reuploads the mask. Closed borrowed images cause linked state errors. Native WebGL2 is linked unsupported. Generated 2x2 fixtures at 1x/4x on RTX A6000 only; no throughput or artistic-quality claim. Root 4300 B and custom 5038 B remain in existing budgets; mask 5266 B min+gzip, new budget 5522, umbrella mask 65 B, new budget 321. Core plus stage remains 23797 B.
+Optional transitions/mask uses encoded red values as reveal thresholds, alpha ignored. 8-bit ImageData is snapshotted; ImageBitmap is borrowed and must stay open through restoration, and is never closed by the transition. Mask dimensions 1..min(4096, device limit), capture dimensions <=65535 and within the device limit. Integer centre addressing is overflow-free within those bounds, including odd-size exact ties. Nearest full-capture stretch, top-left origin, no tiling or aspect fitting. Softness default 0.02, zero or finite 0.000001..1. Exact endpoints bypass thresholding; built-in kind/displacement are ignored. ImageData bytes have no conversion; bitmap upload uses WebGPU default sRGB destination encoding. Resize retains history/progress; replacement cancels scene history and reuploads the mask. Closed borrowed images cause linked state errors. Native WebGL2 is linked unsupported. Generated 2x2 fixtures at 1x/4x on RTX A6000 only; no throughput or artistic-quality claim. Root 4300 B and custom 5038 B remain in existing budgets; mask 5266 B min+gzip, new budget 5522, umbrella mask 65 B, new budget 321. Core plus stage remains 23837 B.
 
 ## BSP dungeon layouts (LIM-628)
 
@@ -1390,11 +1390,11 @@ all floor cells are four-neighbour connected by construction. No 3D rooms, doors
 furnishing or agent-clearance guarantee. Abort before synchronous generation; use a worker to stop work
 in flight. Identical seeded integer output and cell-work counts are tested; no timing/SIMD acceleration,
 visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
-and owns no device resources. Entry JS 1,277 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The existing JS ceiling remains 1,479 B. The shared internal loader makes Poisson JS 1,335 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
+and owns no device resources. Entry JS 1,277 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The existing JS ceiling remains 1,479 B. The shared internal loader makes Poisson JS 1,335 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,837 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
 
 ### Transitions owner-scene disposal repair
 
-The root entry now measures 4307 B min+gzip (7 B above job 2); its budget is 4563 B, restoring the usual 256 B headroom. Removal resolves the actual scene by plugin identity and never removes another scene's same-named effect. Core plus stage remains 23797 B.
+The root entry now measures 4307 B min+gzip (7 B above job 2); its budget is 4563 B, restoring the usual 256 B headroom. Removal resolves the actual scene by plugin identity and never removes another scene's same-named effect. Core plus stage remains 23837 B.
 
 ## Further README asset evidence (2026-11-09)
 
@@ -1416,7 +1416,7 @@ quality or performance claim. Existing root staging size and core plus stage siz
 
 ## Two live scenes (LIM-629)
 
-Optional transitions/live cross-fades two independently rendered current RGBA8 images with exact endpoints. Requires two distinct live scenes of one WebGPU engine. No cross-scene depth, HDR, custom shader or mask composition. render replaces engine.render for transition frames; both scenes update once with the same delta, including at completion. Cameras and scenes are borrowed. Duration finite (0,60], default 1; delta finite [0,1], default 0; culling default true. Captures follow output texture dimensions, otherwise drawing-buffer dimensions at call time; an automatic canvas resize is fully reflected in captures on the next call, with nearest stretch meanwhile. Use exactSize for explicit backing resolution. Dimensions 1..device maxTextureDimension2D. Two RGBA8 captures cost 8 bytes per pixel plus ordinary core render attachments. Output target must be a separate single-sample 2D normalized or float color render attachment; integer and depth/stencil formats reject before scene updates or progress changes. Device replacement and resize rebuild live images and retain progress; disposal removes its owned composite scene, leaving borrowed inputs alive. WebGL2 is linked unsupported. Measured entry 2501 B min+gzip, budget 2757 B; umbrella re-export 65 B, budget 321 B. Core plus stage stays 23797 B. Single RTX A6000 correctness evidence, generated scenes only, no speed or quality measurement.
+Optional transitions/live cross-fades two independently rendered current RGBA8 images with exact endpoints. Requires two distinct live scenes of one WebGPU engine. No cross-scene depth, HDR, custom shader or mask composition. render replaces engine.render for transition frames; both scenes update once with the same delta, including at completion. Cameras and scenes are borrowed. Duration finite (0,60], default 1; delta finite [0,1], default 0; culling default true. Captures follow output texture dimensions, otherwise drawing-buffer dimensions at call time; an automatic canvas resize is fully reflected in captures on the next call, with nearest stretch meanwhile. Use exactSize for explicit backing resolution. Dimensions 1..device maxTextureDimension2D. Two RGBA8 captures cost 8 bytes per pixel plus ordinary core render attachments. Output target must be a separate single-sample 2D normalized or float color render attachment; integer and depth/stencil formats reject before scene updates or progress changes. Device replacement and resize rebuild live images and retain progress; disposal removes its owned composite scene, leaving borrowed inputs alive. WebGL2 is linked unsupported. Measured entry 2501 B min+gzip, budget 2757 B; umbrella re-export 65 B, budget 321 B. Core plus stage stays 23837 B. Single RTX A6000 correctness evidence, generated scenes only, no speed or quality measurement.
 
 Historical transitions entry measurements after the owner-scene repair and live entry: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B min+gzip. Earlier batch-76 measurements above describe the corresponding earlier commits. Each umbrella feature re-export measures 65 B.
 
@@ -1440,7 +1440,7 @@ units or several Float32 coordinate steps, and restore that distance before tran
 
 Optional media entry: 1954 B gzip with bare peers external, budget 2210 B.
 Tracer root after the boundary-distance repair: 80841 B (within its existing budget); core plus stage
-23797 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
+23837 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
 
 Batch 160 job 7: environment IBL of the complete MetalRoughSpheresNoTextures scene, 512 x 512, linear constant radiance [0.3,0.5,0.7], no direct sun, black background. Mitsuba 3.9.1 scalar_rgb, 128 spp, seed 160, no denoising, direct max depth 2 and full max depth 8. All RGB pixels after shared PBR Neutral/sRGB: native absolute 2,294,441 / 1,482,507 and compatibility 2,294,432 / 1,482,506 (direct/full). Each exact measured square/max/coverage budget is in whitepaper/results/batch-160-environment.json. Native WebGL2 explicitly refuses this PBR/IBL path; actual WebGL2 compatibility is measured. Principled/glTF BSDF differences, missing geometric IBL occlusion/reflections, finite reference noise and antialiasing remain open picture losses. A constant furnace does not prove nonuniform skies or directional prefilter accuracy; batch 168 sky evidence is reused rather than repeated. No speed or physical-equivalence claim.
 
@@ -1464,7 +1464,7 @@ survives device/context loss. All proof inputs are STAND-IN. No elapsed-time or 
 Entry JavaScript 1,540 B gzip, new ceiling 1,796 B; trees.wasm 39,113 B raw / 16,393 B gzip.
 Fixed seed 19 with influenceRadius 1.5: 218,405 complete distance tests versus 821,423 exhaustive,
 identical 674-node skeleton. The count excludes grid lookup and bounding-box operations. Core plus
-stage remains 23,797 B gzip below its unchanged strict 25,000 B ceiling.
+stage remains 23,837 B gzip below its unchanged strict 25,000 B ceiling.
 Shared loading failures now have code failed, help and original cause; caller abort reasons and specific CSP/HTTP faults are preserved. Current Poisson JS 1,335 B and dungeon JS 1,277 B remain within their unchanged ceilings of 1,525 B and 1,479 B; all Wasm assets are unchanged.
 
 ### Accumulated planar shadows (batch 56, job 2)
@@ -1482,7 +1482,7 @@ or photographic-product quality claim. Raster resolution and hardware subpixel s
 detail. The exact GPU oracle is the Windows Direct3D eight-bit raster grid; other hardware can differ
 at subpixel boundaries. WebGPU and WebGL2 compatibility are tested; native WebGL2 refuses with
 linked unsupported. Generated geometry is a stand-in. Entry 9,314 B gzip (ceiling 9,593 B); inherited
-root 8,129 B (unchanged ceiling 8,259 B); core plus stage 23,797 B below 25,000 B. No speed claim.
+root 8,129 B (unchanged ceiling 8,259 B); core plus stage 23,837 B below 25,000 B. No speed claim.
 
 ### Studio rig reuse (batch 56, job 3)
 
@@ -1492,7 +1492,7 @@ and the environment README; the staging recipe uses width 128 and a 32-texel fil
 are infinitely distant with no parallax, inverse-square falloff, local transforms or physical shadow
 solver. The staging contact cue is separate. Both WebGPU and WebGL2 compatibility pass source-cube,
 SH and staging contact pixels, including real device replacement. Native WebGL2 remains unsupported.
-No new runtime code or size increase; staging root 8,129 B and core plus stage 23,797 B gzip.
+No new runtime code or size increase; staging root 8,129 B and core plus stage 23,837 B gzip.
 All scene geometry is generated stand-in data. No photographic quality or speed claim.
 
 ## Sharp SDF models (LIM-632)
@@ -1504,7 +1504,7 @@ within +/-10000, sizes .0001..10000, bounds extent .0001..10000 per axis. All sa
 boundary values must be positive or generation throws, never silently clips.
 Analytical primitive gradients, 40 root bisections, mass-point QEF pseudoinverse
 with absolute 1e-10 eigenvalue cutoff, 27 active constraint sets. Returns owned
-Float64 vertices and outward Uint32 triangles, no normals, UVs or materials.
+Float64 vertices and analytic unit gradient normals with outward Uint32 triangles; no UVs or materials.
 Min/max CSG fields need not be exact distances. No sampled fields, arbitrary
 callbacks, rotated primitives, adaptive octrees, topology repair or exact CAD.
 Subcell components, multiple edge crossings, tangencies and disconnected patches
@@ -1515,8 +1515,10 @@ Khronos Box (Cesium, CC-BY-4.0) is the external corner/plane/volume/topology ref
 other sphere, CSG, scale and hostile controls are generated stand-ins. No visual,
 production-scene, elapsed-time or SIMD claim. Cached edge roots have four cell uses
 per solve, a deterministic reduction in root work with identical Hermite data.
-Entry JS is 1,559 B gzip (new ceiling 1,815 B); sdf.wasm is 40,594 B raw /
-17,183 B gzip. Core plus stage is unchanged at 23,797 B gzip, strictly below 25,000 B.
+Analytic bounds default to tree enclosure plus 10% per-axis margin (at least
+0.0001). Explicit bounds retain boundary rejection; automatic bounds outside
+coordinate/extent limits give linked failed and request explicit bounds. Updated
+entry/asset sizes are recorded with the test-page validation evidence below. Core plus stage is unchanged at 23,837 B gzip, strictly below 25,000 B.
 
 ### Batch 65 job 1: road junction surface (LIM-633)
 
@@ -1530,7 +1532,7 @@ Custom WGSL must be trusted. Validation checks compilation and the reachable res
 
 Frozen-frame and live output requires a valid normalized or float color render attachment. Supported formats: r8unorm, rg8unorm, rgba8unorm, rgba8unorm-srgb, bgra8unorm, bgra8unorm-srgb, r16float, rg16float, rgba16float, rgb10a2unorm; feature-dependent r8snorm, rg8snorm, rgba8snorm, r16unorm, r16snorm, rg16unorm, rg16snorm, rgba16unorm, rgba16snorm, rg11b10ufloat require enabled WebGPU format capabilities. r32float/rg32float/rgba32float require 1x engine sampling because the 4x path needs resolve support. Output texture shape/usage limits still apply. Live captures remain RGBA8; float output does not recover HDR source data. Integer/depth rejection, unchanged source updates/progress, and baseline normalized/float acceptance are tested in live.test.js and live-browser.js. Capture-side validation shared by built-in/custom/mask is tested in transitions.test.js. See the [WebGPU capability table](https://www.w3.org/TR/webgpu/#plain-color-formats) for device feature requirements.
 
-Review-fix entry measurements: root 4478 B, custom 5207 B, mask 5429 B, live 2638 B min+gzip, all within unchanged entry budgets. Core plus stage remains 23797 B.
+Review-fix entry measurements: root 4478 B, custom 5207 B, mask 5429 B, live 2638 B min+gzip, all within unchanged entry budgets. Core plus stage remains 23837 B.
 
 ### Static USDZ README execution evidence (2026-11-09)
 
@@ -1603,7 +1605,7 @@ covered; viewer disposal leaves the camera. The existing model/material limits s
 Native WebGPU and WebGL2 compatibility pass real-model pixel, orbit, rollback, disposal and actual
 replacement-device whole-frame assertions. Native WebGL2 PBR remains unsupported.
 No staging/frame entry is added. Viewer 2,386 B gzip; staging root 8,129 B; accumulate 9,314 B;
-core plus stage 23,797 B below 25,000 B. No measured speed or photographic-product quality claim.
+core plus stage 23,837 B below 25,000 B. No measured speed or photographic-product quality claim.
 
 ### Mixed triangle and voxel tracing (batch 99 job 7, LIM-637)
 
@@ -1613,7 +1615,7 @@ Flat surfaces are double-sided. Glass requires closed outward-wound uniform-mate
 
 Uncertain ray-space edge determinants use exact integer product subtraction, with no geometric edge dilation. Transformed coordinates and transport remain Float32; no universal watertightness, ill-conditioned triangle, production-asset or outside-renderer equality claim. Builds copy caller arrays and check cancellation around synchronous Rust work; a worker is needed to interrupt that work in flight. setScene rebuilds all triangle geometry.
 
-Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method measures 22,864 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,716 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 80,918 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,797 B gzip, below the strict 25,000 B cap.
+Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method measures 22,864 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,716 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 80,918 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,837 B gzip, below the strict 25,000 B cap.
 
 ### Complete Potree README folder evidence (2026-11-09)
 
@@ -1633,7 +1635,9 @@ Optional road/markings: 887 B min+gzip with bare package imports external; depen
 ## Tileable GPU texture baking (LIM-639)
 
 The optional procedural/textures entry compiles one WebGPU compute pipeline and
-bakes RGBA8 linear RGB, alpha 1. Native WebGL2 gives linked unsupported. Five
+bakes RGBA8 linear RGB, alpha 1. Native WebGL2 uses a lazy fragment pass on the
+source engine canvas, returning an owned WebGLTexture and its gl context; native
+WebGPU returns an owned GPUTexture. Neither handle crosses devices/contexts. Five
 stylized patterns: periodic value noise, bricks, tiles, longitudinal wood-like
 bands and rust-like threshold patches. No photographic, anatomical, corrosion or
 PBR material accuracy is asserted. Four fixed noise periods 4,8,16,32, weights
@@ -1651,13 +1655,16 @@ baker disposal destroys retained outputs. No CPU pixel loop or Wasm is involved.
 44,415 GPU channel checks match an independent generated oracle within one RGBA8
 quantization step. Integer phase translations are byte exact; one-texel shifts
 cross both texture edges. Real WebGPU loss, in-flight abort/disposal and replacement
-are tested. Numerical and lifecycle controls are stand-ins. External reference is
+are tested. Native WebGL2 pixel/state/abort/disposal/loss/restoration tests use
+the same one-channel-step tolerance. Mortar on an exact floating-point threshold
+can differ across rasterizers. Numerical and lifecycle controls are stand-ins. External reference is
 limited to a calibrated row-offset measurement from Lefebvre/Poulin 2000 Fig.1(d),
 39/88 pitch with two source pixels of uncertainty, plus GPU raster quantization.
 Original PDF/JPEG downloaded for measurement, never redistributed. No external
 colour reconstruction, wood/rust realism, cross-device bytes or speed claim.
-Entry JavaScript plus shader is 2,874 B gzip (new ceiling 2,989 B); no lazy asset.
-Core plus stage remains 23,797 B gzip, strictly below 25,000 B.
+The WebGL2 shader chunk is lazy; no Wasm or external image asset is required.
+Updated entry sizes are recorded with the test-page validation evidence below.
+Core plus stage remains 23,837 B gzip, strictly below 25,000 B.
 
 ### Batch 65 job 6: Road network graph (LIM-640)
 
@@ -1692,7 +1699,7 @@ tracer subclasses are not combined by this entry. Root glass and sampling limita
 
 Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
 plain WebGL2 gives linked unsupported. The entry measures 1541 B gzip (ceiling 1797 B),
-with inherited root 80918 B gzip. Core plus stage stays 23797 B gzip, under 25,000 B.
+with inherited root 80918 B gzip. Core plus stage stays 23837 B gzip, under 25,000 B.
 
 ## Rectangular building grammar (LIM-642)
 
@@ -1712,7 +1719,7 @@ prove envelope dimensions only, not source footprint/facade reconstruction. Rema
 controls are STAND-IN. Shared scope uses2 trig calls versus2 per output vertex, exact
 paired coordinate oracle; no elapsed-time/SIMD or production-city claim.
 JS 1502 B gzip, ceiling 1758 B; buildings.wasm 31252 B raw / 12794 B gzip.
-Core plus stage stays23797 B gzip, strictly below25000 B.
+Core plus stage stays23837 B gzip, strictly below25000 B.
 
 Building grammar reference detail: CMP Facade Database cmp_b0001 supplies four
 annotated windows in a2x2 region. Mean horizontal centre pitch/width and measured
@@ -1752,7 +1759,7 @@ WebGL2 gives linked unsupported; compatibility ANGLE Direct3D retains the inheri
 and raster frame. No arbitrary photographic fidelity, outside-renderer equality or speed claim.
 The controller entry is 1213 B gzip (ceiling 1469); its dynamically loaded existing
 integrator and Wasm retain their separate budgets. Staging root 8131 B, accumulate
-9306 B; core plus stage 23797 B, strictly below 25,000 B.
+9306 B; core plus stage 23837 B, strictly below 25,000 B.
 
 ### Any-up staging receivers (batch 56, job 6)
 
@@ -1800,3 +1807,30 @@ or a noise-free moving-camera denoiser. No speed claim is made.
 The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
 entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
+
+
+### Test-page contract limits (2026-11-09)
+
+Cabins return floorElevation plus parts, whose four values are geometry. Existing
+flat fields, including scalar floor, are replaced. Optional procedural/tree
+creates one root plus a trunk/canopy pair; default position [0,0,0], detail 2,
+brown/green PbrMaterials. Dispose the returned object to remove all three nodes.
+WFC.solve accepts a fourth {signal} argument; synchronous checkpoints cannot
+service new event-loop events, so use /worker for active cancellation. Folding
+waves reject at steepness * amplitude * 2*pi/wavelength > 1/N, preserving input.
+Roads compress inside offsets at local focal bends with a 5% signed-area margin,
+while nonlocal overlaps still need planar repair/junctions. Vertical roads remain
+unsupported with linked errors; steep nonvertical ramps work. Empty core Geometry accepts three empty arrays, retains zero bounds, uploads
+no geometry and draws nothing; partial inputs still reject. History push and navigation all return owned grids; entries() retains labelled snapshots.
+Native preview selection/PBR setup rejects explicitly; full WebGL2 compatibility
+uses GPU-shaped passes. Ordered foot IK ancestry accepts intermediate bones without rewriting their local pose; disconnected/reversed chains give linked unsupported. Morph names resolve every matching target across mesh nodes; errors list actual mesh node indices/counts; unnamed clips use Animation <index>.
+Proofs and per-entry disposition: testpage-bugs.md. Only Scott's empty-core-geometry exception changes core; no new stage option,
+physics feature, speed claim or general civil-road/topology guarantee.
+
+Test-page measured sizes: core plus stage 23,837 B gzip (limit 25,000 unchanged);
+SDF entry 1,856 B gzip with feature-local asset 40,798 B raw / 17,310 B gzip;
+joined texture entry 5,008 B gzip, including its lazily loaded native fragment path;
+optional complete-tree placement 3,144 B gzip. No wall-time performance claim.
+Both native texture backends pass 88,830 oracle channel checks at maximum error
+one RGBA8 step, with parity, phase seams, state restoration, loss, restoration,
+abort and disposal. Current-machine proof only; no cross-device byte guarantee.

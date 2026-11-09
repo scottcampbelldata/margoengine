@@ -1291,3 +1291,17 @@ and save the raw 960 x 800 snapshot without denoising. Read RGB at (480,400): ga
 zero-variance measurements do not establish whole-image repeatability. A camera-slot
 reload glides to its target, and model/render mode toggling can retain accumulation.
 The independent full zero-error parity corpus remains unfinished.
+
+
+### Test-page contracts
+
+Build with `npm run build:packages`, then run `npm run check:testpage-contracts`
+and `npm run check:road-invariants`. Run native SDF tests with
+`npm run test:sdf-kernel --workspace=@margoengine/procedural`.
+GPU proof: `node scripts/gpu-lock.mjs run --owner=codex-testpage --max=10 --wait-max=10 -- node packages/procedural/test/textures-browser.mjs`.
+The shader oracle, both native backends, repeat seams, GL state restoration,
+context/device loss, cancellation and disposal use the same tolerances.
+Actual character-asset contracts: `node --test --test-timeout=120000 packages/animation/tests/testpage.test.js`.
+All generated controls are stand-ins except the existing Khronos/Cesium Box,
+RobotExpressive, RiggedFigure and calibrated brick reference noted in their
+existing source notices. No test-page source files are imported or committed.

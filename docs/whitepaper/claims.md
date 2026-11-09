@@ -1654,3 +1654,25 @@ coloured sky value 64. The authored calibration scenes are stand-ins executed on
 outside tool. The source, binary and PNGs are not redistributed. This proves those value
 regressions only. Subsurface, glass and atmosphere exact-pixel parity, independent whole-image
 repeatability and noise-free camera-move denoising remain unproven. Batch 99 remains incomplete.
+
+
+### Test-page contracts (2026-11-09)
+
+Analytic bounded SDF trees infer enclosing sample bounds; contour results include
+owned analytic outward gradient normals. Proof: procedural/test/testpage-sdf.test.js
+(exact island input, translations, CSG, empty intersections, explicit clipping
+rejection, sphere gradients and cavity orientation). Native WebGL2 texture baking
+uses the same five periodic fields in a fragment pass. Numerical agreement is
+limited to one RGBA8 channel step on the tested machine, with boundary filtering
+and floating-point limits stated in LIM-639; both native backends passed 88,830 oracle checks with maximum error one. No physical material realism or speed claim.
+
+Local road sweeps keep outward triangles through focal bends by compressing inside
+offsets, with determinant inequalities for both triangles per sampled strip;
+road/test/testpage.test.js checks mirrored, graded and exact periodic inputs.
+Global footprint overlaps remain the separate repair/junction contract. Geometry
+metadata is separated in cabins, and optional complete-tree placement cannot omit
+the trunk; procedural/test/testpage-assets.test.js proves both. Full review and
+intentional API contracts: ../testpage-bugs.md. Core
+accepts empty Geometry under Scott's exception; it contributes no renderer batch
+or geometry upload, proved on native WebGPU, full WebGL2 compatibility and native
+preview. Stage and physics are unchanged. Core plus stage: 23,837 B gzip.

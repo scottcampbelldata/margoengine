@@ -252,3 +252,18 @@ test('check:merge always runs the complete CPU font and mesh regression suite', 
   assert.ok(pkg.scripts.test.includes('tests/extrude*.test.js'));
   assert.equal(heatWatched('check:text-extrude'), false);
 });
+
+test('check:merge always covers the test-page contract and road fold regression classes', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.ok(manifest.scripts['check:merge:steps'].split(' && ').includes('npm run check:testpage-contracts'));
+  for (const path of [
+    'procedural/test/testpage',
+    'water/test/testpage',
+    'wfc/test/testpage',
+    'animation/tests/testpage',
+    'voxel-edit/tests/testpage-contracts',
+  ])
+    assert.ok(manifest.scripts['check:testpage-contracts'].includes(path));
+  assert.ok(manifest.scripts['check:road-invariants'].includes('packages/road/test/testpage.test.js'));
+  assert.equal(heatWatched('check:testpage-contracts'), false);
+});

@@ -2837,3 +2837,32 @@ input/output digests and numeric results are recorded in
 This evidence covers colour decoding. Exact subsurface, glass and atmosphere pixel parity
 and camera-move disocclusion denoising remain open. An independently restarted complete
 zero-error image corpus remains missing. No core/stage source or physics source changed.
+
+
+### Test-page contracts: section 5 evidence (2026-11-09)
+
+The test-page review is recorded in docs/testpage-bugs.md. Analytic SDF bounds
+replace a fixed default cube, and the same feature-local Rust contourer now emits
+per-vertex gradients. Its primitive field/CSG branch rules are unchanged. The
+procedural texture entry adds a lazy native WebGL2 fragment pass, sharing option
+validation with the compute path. Outputs discriminate their native handle type;
+GL state is restored before any asynchronous publication. Backend pixel and
+lifecycle proof belongs to procedural/test/textures-browser.mjs, including context
+loss and actual restoration; both native backends pass 88,830 oracle channel checks at maximum error one.
+
+Road row frames follow chord bisectors. Affine determinant constraints on each
+sample pair compress inside offsets to retain 5% of the pre-fold signed area;
+this prevents local inversions while preserving the outside offsets and section
+heights. Periodic endpoint scales are joined. This does not resolve nonlocal
+footprint overlaps; planar union remains in optional repair/junction entries.
+The regression covers the exact three-point seam, mirrored hairpins and grades,
+all triangle/normal signs, and steep versus vertical tangents. No speed claim. Core empty geometry never enters renderer batches or allocates geometry buffers; zero bounds and partial-input rejection are covered by core/tests/empty.test.js and real native/compatibility/preview rendering in empty.browser.mjs.
+
+check:merge now unconditionally runs check:testpage-contracts and the expanded
+check:road-invariants. They cover inferred bounds, normals, iterable cabin parts,
+complete tree placement/disposal, folding diagnostics, cancellation, empty-node
+updates and history return types. GPU shader parity remains in the GPU package
+suite. Actual RobotExpressive and RiggedFigure contracts cover disconnected IK,
+precise morph diagnostics and name lookup, unnamed clips and native-preview rejection. RiggedFigure proves an intermediate leg joint is carried without local rewrites. Culling instance batches skip empty vertex/index uploads and all geometry draw commands, keeping finite zero box bounds. Core accepts empty Geometry under Scott's 2026-11-10 exception;
+stage and physics remain untouched; hardware breadth beyond the tested machine
+and a quiet-machine speed study are not claimed.

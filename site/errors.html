@@ -127,7 +127,7 @@
     <section id="geometry">
       <h2><a href="#geometry">Geometry</a></h2>
       <p class="messages"><code>Invalid geometry</code> <code>Box size: positive</code> <code>Sphere radius</code> <code>Sphere segments: 3..256</code> <code>No geometry</code></p>
-      <p><strong>Cause.</strong> Core geometry needs 3 to 1,000,000 vertices, a triangle index count that is a multiple of 3, indices inside the vertex range, and finite positions and normals. Boxes and spheres need positive sizes and 3-256 segments. Fitting needs at least one mesh with geometry.</p>
+      <p><strong>Cause.</strong> Core geometry accepts three empty arrays, or needs 3 to 1,000,000 vertices, a triangle index count that is a multiple of 3, indices inside the vertex range, and finite positions and normals. Boxes and spheres need positive sizes and 3-256 segments. Fitting needs at least one mesh with geometry.</p>
       <p><strong>Fix.</strong> Split meshes over 1,000,000 vertices, check index ranges, and pass positive sizes. Give the model meshes with geometry before fitting.</p>
     </section>
     <section id="material">
