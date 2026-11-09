@@ -99,9 +99,10 @@ class FakeAnalyser extends FakeNode {
   }
 }
 
-export class FakeAudioContext {
+export class FakeAudioContext extends EventTarget {
   static created = 0;
   constructor({ state = 'suspended', sampleRate = 48000 } = {}) {
+    super();
     FakeAudioContext.created++;
     this.state = state;
     this.sampleRate = sampleRate;
@@ -168,14 +169,17 @@ export class FakeAudioContext {
   async resume() {
     this.calls.push('resume');
     this.state = 'running';
+    this.dispatchEvent(new Event('statechange'));
   }
   async suspend() {
     this.calls.push('suspend');
     this.state = 'suspended';
+    this.dispatchEvent(new Event('statechange'));
   }
   async close() {
     this.calls.push('close');
     this.state = 'closed';
+    this.dispatchEvent(new Event('statechange'));
   }
 }
 

@@ -1693,3 +1693,7 @@ luminance convolution and diagonal tone hatching. GPU bindings, viewport/scissor
 [W3C WebGPU specification](https://www.w3.org/TR/webgpu/) and [WGSL specification](https://www.w3.org/TR/WGSL/).
 Only the papers/specifications were consulted, never their linked implementations. Test images are generated
 stand-ins; no third-party artwork or code is included.
+
+## Audio review repairs (2026-11-09)
+
+Own implementation from the W3C Web Audio Recommendation (https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode), including subsample loop endpoints, and the monotonic Performance.now clock contract (https://www.w3.org/TR/hr-time-3/). Rate ownership, explicit lifecycle checks and discontinuity bounds are Margo-own. No engine/library source read or copied. Loop marker PCM is generated, not a recording. Browser gate process ownership uses only the public Playwright BrowserServer API (https://playwright.dev/docs/api/class-browserserver) and BrowserType.connect/launchServer documentation; no library implementation was read.

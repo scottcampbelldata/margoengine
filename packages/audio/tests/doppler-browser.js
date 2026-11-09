@@ -1,4 +1,5 @@
 import { Engine, box } from '@margoengine/core';
+import {measureLiveDoppler} from './doppler-live-browser.js';
 import { AudioListener, PositionalAudio } from '@margoengine/audio';
 import { AudioDoppler } from '@margoengine/audio/doppler';
 
@@ -80,5 +81,5 @@ export async function runDopplerTests() {
       compat?.uninstall();
     }
   }
-  return { fixture: 'Generated 1 kHz sine and engine mesh motion, stand-ins', reports };
+  return { fixture: 'Generated 1 kHz sine and engine mesh motion, stand-ins', reports, live: await measureLiveDoppler() };
 }

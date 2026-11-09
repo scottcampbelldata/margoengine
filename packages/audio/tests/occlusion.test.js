@@ -118,7 +118,7 @@ test('vertical propagation remains finite, smoothing affects only owned params a
   s.dispose();
 });
 
-test('invalid options and aborted creation allocate no graph; missing engine is a coded error with help', async () => {
+test('invalid options and aborted creation allocate no graph; missing engine retains state', async () => {
   const s = await scene();
   for (const options of [
     { radius: -1 },
@@ -138,9 +138,33 @@ test('invalid options and aborted creation allocate no graph; missing engine is 
   await assert.rejects(promise, { name: 'AbortError' });
   assert.deepEqual(s.sound.getFilters(), []);
   const control = await AudioOcclusion.create(s.sound);
-  assert.throws(
-    () => control.update(null),
-    (e) => e.code === 'state' && /https:/.test(e.message),
-  );
+  assert.doesNotThrow(() => control.update(null));
   s.dispose();
+});
+test('disposed occluded sounds unregister before any BVH trace or transform refresh',async t=>{
+ const s=await scene();const {Raycaster}=await import('@margoengine/bvh');let rays=0,ticks=0;
+ t.mock.method(Raycaster.prototype,'intersectEngine',()=>{rays++;return [];});
+ t.mock.method(s.engine.store,'tick',()=>{ticks++;});
+ const removed=[],remove=s.listener.removeSource.bind(s.listener);
+ t.mock.method(s.listener,'removeSource',value=>{removed.push(value);remove(value);});
+ const control=await AudioOcclusion.create(s.sound);s.sound.dispose();
+ assert.equal(s.sound.isDisposed,true);assert.doesNotThrow(()=>s.listener.update());
+ assert.equal(rays,0);assert.equal(ticks,0);assert.ok(removed.includes(control));
+ assert.throws(()=>control.update(s.engine),e=>e.code==='disposed');s.listener.update();assert.equal(rays,0);
+ await assert.rejects(AudioOcclusion.create(s.sound),e=>e.code==='disposed');s.dispose();
+});
+test('occlusion without an engine and after engine disposal retains state and permits later sources',async()=>{
+ const context=new FakeAudioContext(),listener=new AudioListener({context,autoResume:false});
+ const sound=new PositionalAudio(listener).setPosition(0,0,-10),control=await AudioOcclusion.create(sound);
+ let after=0;listener.addSource({update(){after++;},dispose(){}});
+ assert.doesNotThrow(()=>listener.update());assert.equal(after,1);assert.equal(control.blocked,0);listener.dispose();
+ const s=await scene(),blocked=await AudioOcclusion.create(s.sound);s.update();assert.equal(blocked.blocked,1);
+ let later=0;s.listener.addSource({update(){later++;},dispose(){}});s.engine.dispose();
+ assert.doesNotThrow(()=>s.listener.update());assert.equal(blocked.blocked,1);assert.equal(later,1);s.dispose();
+});
+test('disposing a sound while occlusion creation awaits its module leaves no registered graph',async()=>{
+ const context=new FakeAudioContext(),listener=new AudioListener({context,autoResume:false});
+ const sound=new PositionalAudio(listener),pending=AudioOcclusion.create(sound);
+ sound.dispose();await assert.rejects(pending,e=>e.code==='disposed');
+ assert.deepEqual(sound.getFilters(),[]);assert.doesNotThrow(()=>listener.update());listener.dispose();
 });

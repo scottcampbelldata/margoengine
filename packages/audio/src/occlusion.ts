@@ -54,6 +54,7 @@ export class AudioOcclusion {
     const signal = options.signal,
       filter = options.filter;
     signal?.throwIfAborted();
+    if (sound.isDisposed) throw fault('disposed', 'AudioOcclusion needs a live sound; create a new sound');
     const radius = bounded(options.radius ?? 0.25, 0, 100, 'Occlusion radius');
     const level = bounded(options.blockedGain ?? 0.25, 0, 1, 'Occlusion blockedGain');
     const frequency = bounded(
@@ -67,6 +68,7 @@ export class AudioOcclusion {
       throw new TypeError('Occlusion filter needs a predicate; pass a function accepting a mesh');
     const { Raycaster } = await import('@margoengine/bvh');
     signal?.throwIfAborted();
+    if (sound.isDisposed) throw fault('disposed', 'AudioOcclusion needs a live sound; create a new sound');
     return new AudioOcclusion(sound, new Raycaster(), {
       filter,
       radius,
@@ -110,11 +112,8 @@ export class AudioOcclusion {
   /** Recompute after current world matrices and sound/listener poses. Called automatically by listener.update(). */
   update(engine: EngineKernel | null = this.sound.listener.attachedEngine): void {
     if (this.disposed) throw fault('disposed', 'AudioOcclusion is disposed; create a new controller');
-    if (!engine || engine.disposed)
-      throw fault(
-        'state',
-        'AudioOcclusion needs a live engine; attach the sound listener to an engine before updating',
-      );
+    if (this.sound.isDisposed) { this.dispose(); return; }
+    if (!engine || engine.disposed) return;
     const p = this.sound.worldPosition,
       l = this.sound.listener.position;
     const dx = p[0] - l[0],
@@ -156,7 +155,7 @@ export class AudioOcclusion {
   dispose(): void {
     if (this.disposed) return;
     const filters = this.sound.getFilters();
-    if (filters.includes(this.lowpass) || filters.includes(this.attenuation))
+    if (!this.sound.isDisposed && (filters.includes(this.lowpass) || filters.includes(this.attenuation)))
       this.sound.setFilters(filters.filter((node) => node !== this.lowpass && node !== this.attenuation));
     this.lowpass.disconnect();
     this.attenuation.disconnect();

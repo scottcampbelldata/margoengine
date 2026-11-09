@@ -1,4 +1,5 @@
 import { Engine } from '@margoengine/core';
+import {measureLoopGrid} from './music-clock-browser.js';
 import { AudioListener } from '@margoengine/audio';
 import { AudioMusic } from '@margoengine/audio/music';
 
@@ -54,5 +55,5 @@ export async function runMusicTests() {
       reports.push({backend,beat,bar,maxError,gpuErrors});
     } finally { engine?.dispose(); canvas.remove(); compat?.uninstall(); }
   }
-  return {fixture:'Generated 600/900 Hz stems and game-state triggers, stand-ins',reports};
+  return {fixture:'Generated 600/900 Hz stems and game-state triggers, stand-ins',reports,loopGrid:await measureLoopGrid()};
 }

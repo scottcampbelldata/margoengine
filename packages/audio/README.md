@@ -85,7 +85,7 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 | Export | Purpose |
 | --- | --- |
 | `AudioListener` | Engine plugin: lazy context, master gain (`input`, `volume`), `suspend`/`resume`, auto-resume, `load`, `follow` (camera, a mesh or nothing), `setPose`, `update` |
-| `Audio` | Non-positional sound: `setBuffer`, `setMediaElementSource`, `setMediaStreamSource`, `setNodeSource`, `play(delay)`, `pause`, `stop(delay)`, `seek(seconds)`, `sync(timelineSeconds, playing, rate)`, `fadeIn`, `fadeOut`, `setFilters`, `loop`, `loopStart`, `loopEnd`, `playbackRate`, `detune`, `offset`, `duration`, `timelineStart`, `volume`, `currentTime`, `onEnded`, `getOutput`; static `syncTolerance` |
+| `Audio` | Non-positional sound: `setBuffer`, `setMediaElementSource`, `setMediaStreamSource`, `setNodeSource`, `play(delay)`, `pause`, `stop(delay)`, `seek(seconds)`, `sync(timelineSeconds, playing, rate)`, `fadeIn`, `fadeOut`, `setFilters`, `loop`, `loopStart`, `loopEnd`, `playbackRate`, `detune`, `offset`, `duration`, `timelineStart`, `volume`, `currentTime`, `onEnded`, `getOutput`, readonly `isDisposed`; static `syncTolerance` |
 | `PositionalAudio` | `Audio` plus a PannerNode: `attach(mesh)`, `setPosition`, `setDirection`, `setDirectionalCone`, `panningModel`, `distanceModel`, `refDistance`, `maxDistance`, `rolloffFactor`, `muteWhenHidden` |
 | `AudioVoicePool` | `voices` positional sounds on one buffer: `play(position, {volume, playbackRate})` (free voice, else steals the oldest), `stopAll`, `dispose`, `voices` |
 | `AudioAnalyser` | `getFrequencyData`, `getFloatFrequencyData`, `getWaveformData`, `getFloatWaveformData`, `getAverageFrequency`, `getDominantFrequency` |
@@ -171,7 +171,7 @@ Owned `lowpass` and `attenuation` nodes append to the existing filter chain; ord
 fades and hidden muting stay independent. Keep that chain in place while active.
 `dispose()` or `using` removes only these nodes; listener teardown also disposes controllers.
 `update(engine)` runs explicitly after world matrices and sound/listener poses are current.
-Missing engines and disposed controllers raise coded errors with help links.
+Without a live engine, updates retain the last blocked fraction and filter settings. Sound disposal detaches the controller before tracing; creating one on a disposed sound raises linked disposed. Explicit updates after controller disposal also raise linked disposed.
 
 This is a sampled geometric approximation without diffraction, thickness/material transmission,
 reflections or reverb-send control. BVH's visible CPU geometry coverage applies: fragment alpha
@@ -207,22 +207,19 @@ await paused;
 sound.setPosition(20 - 34.3 * context.currentTime, 0, 0);
 listener.update();
 console.log(doppler.ratio); // 1.111...: source approaching at 34.3 m/s
+sound.playbackRate = 1.1; // authored pitch, composed with Doppler (also works on pooled voices)
+console.log(doppler.playbackRate, sound.isDisposed); // 1.1, false
 await context.resume();
 console.log((await rendered).length); // 24000 frames, shifted tone after the motion sample
 ```
 
 Options: `speedOfSound=343` m/s (finite, positive), `playbackRate=sound.playbackRate`
-(finite, nonnegative, at most float32 maximum / 39). `doppler.playbackRate` changes
-authored pitch; `ratio` reports the motion multiplier. The controller owns
-`sound.playbackRate` until disposal and restores authored pitch then. Detune,
+(finite, nonnegative, at most float32 maximum / 39). `doppler.playbackRate` reports authored pitch; `ratio` reports the motion multiplier. Writes to either `doppler.playbackRate` or `sound.playbackRate`, including pool/event per-play pitch, set authored pitch and compose with the current multiplier. The sound getter reports the effective rate. Controlled pools validate authored rates before stopping or stealing a voice. Disposal restores the last authored pitch. Detune,
 volume, fades, filters and the panner stay independent. Use one controller per sound;
 duplicate attachment raises `attached`. Buffer sources only; other source kinds raise
-`unsupported`, with a help link. Dispose the controller before switching source kind.
+`unsupported` on attachment, with a help link. Switching an attached sound to media, stream or node sources detaches Doppler on the next listener update and restores authored pitch without interrupting other sources.
 
-Velocity is world displacement divided by audio-clock elapsed time. Initial, coincident
-and backward-clock samples are neutral; repeated timestamps retain the previous sample.
-`reset()` clears history and pitch after teleports, cuts or motion during suspension.
-Call it before the next update. Explicit `update()` needs current sound/listener poses;
+Live contexts estimate velocity with monotonic `performance.now()` frame time, independently of device-clock quantization. Offline contexts use their exact audio clock. Initial, coincident and backward-clock samples are neutral; repeated sample times retain history. Live suspension/resume state changes clear history automatically, including autoplay unlock. A live render gap over 0.25 s or displacement speed over 0.95 times speedOfSound is a discontinuity and produces a neutral sample. Smaller teleports are indistinguishable from real motion: call `reset()` before the next update after those cuts. Explicit `update()` needs current sound/listener poses;
 attached listeners do this automatically. Updates use existing playback-rate smoothing
 (`listener.smoothing=0.02` s by default). Playback speed and duration change with pitch.
 Do not combine with `Audio.sync`, which also owns playback rate.
@@ -487,3 +484,5 @@ all three routes. Evidence uses generated independent tones and a licensed exter
 rain stimulus excerpt: [source/changes](tests/fixtures/NOTICE.md). That file validates
 decoding/resampling and matrix output, not a microphone chain or recording provenance.
 Listening quality, other browsers/devices and performance remain unmeasured.
+
+Batch 110 PCM proofs use real browser Web Audio offline rendering, without output-device PCM or listening measurements. Live Doppler regressions use real AudioContext nodes/state changes with controlled 60 Hz frame times and a 10.667 ms quantized audio clock. Long-loop markers at 130 bpm cover one hour at 8 kHz and five minutes each at 44.1/48 kHz; loop endpoints keep fractional sample positions rather than accumulating sample-rounding drift. Other browsers/devices remain unmeasured.

@@ -1,0 +1,45 @@
+{
+  "browser": "157.0.4341.42",
+  "liveDoppler": {
+    "context": "AudioContext",
+    "renderHz": 60,
+    "audioClockStepSeconds": 0.010667,
+    "samples": 120,
+    "maxRatioError": 2.220446049250313e-15,
+    "resumeRatio": 1,
+    "scope": "Real live nodes/state changes; controlled frame/audio clocks. No device PCM or listening measurement."
+  },
+  "musicLoopGrid": [
+    {
+      "sampleRate": 8000,
+      "seconds": 3600,
+      "bpm": 130,
+      "framesPerLoop": 14769.23076923077,
+      "loops": 1949,
+      "maxPhaseErrorFrames": 0.42307692393660545,
+      "lastPhaseErrorFrames": -0.26923076808452606,
+      "transition": 3599.0769230769233
+    },
+    {
+      "sampleRate": 44100,
+      "seconds": 300,
+      "bpm": 130,
+      "framesPerLoop": 81415.38461538462,
+      "loops": 162,
+      "maxPhaseErrorFrames": 0.42307692393660545,
+      "lastPhaseErrorFrames": 0.15064102597534657,
+      "transition": 299.0769230769231
+    },
+    {
+      "sampleRate": 48000,
+      "seconds": 300,
+      "bpm": 130,
+      "framesPerLoop": 88615.38461538462,
+      "loops": 162,
+      "maxPhaseErrorFrames": 0.42307692393660545,
+      "lastPhaseErrorFrames": 0.15064102597534657,
+      "transition": 299.0769230769231
+    }
+  ],
+  "scope": "Live Doppler nodes and context state use AudioContext with controlled clocks. Music markers and all PCM proofs use OfflineAudioContext. Device PCM and listening remain unmeasured."
+}

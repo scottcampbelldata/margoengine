@@ -20,6 +20,7 @@ export class Audio implements ListenerSource {
     getOutput(): AudioNode;
     protected connectOutput(): void;
     get isPlaying(): boolean;
+    get isDisposed(): boolean;
     get sourceType(): SourceKind;
     setBuffer(buffer: AudioBuffer): this;
     setMediaElementSource(element: HTMLMediaElement): this;

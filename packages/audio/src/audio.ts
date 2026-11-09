@@ -5,6 +5,7 @@ import type { AudioListener, ListenerSource } from './listener.js';
 import { normalize, smoothParam, type DistanceModel, type Vec3 } from './math.js';
 import { margoError } from '../../shared/errors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { playbackRateModifiers } from './rate-control.js';
 
 /**
  * Options for {@link Audio}. Every field is optional; a sound with no options plays its buffer once at full volume.
@@ -168,6 +169,8 @@ export class Audio implements ListenerSource {
   get isPlaying(): boolean {
     return this.playing;
   }
+  /** True after dispose; controllers use this without inferring lifecycle from the source kind. */
+  get isDisposed(): boolean { return this.disposed; }
   get sourceType(): SourceKind {
     return this.kind;
   }
@@ -436,6 +439,7 @@ export class Audio implements ListenerSource {
   }
   set playbackRate(value: number) {
     checkFinite(value, 'playbackRate');
+    value = playbackRateModifiers.get(this)?.apply(value) ?? value;
     if (this.kind === 'buffer' && this.playing && this.source) {
       // Keep the position continuous: count the time so far at the old rate, then restart the clock (a delayed
       // start keeps its future start time).

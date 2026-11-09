@@ -3,6 +3,7 @@ import { margoError, rangeError } from '../../shared/errors.js';
 import { PositionalAudio, type PositionalAudioOptions } from './audio.js';
 import type { AudioListener } from './listener.js';
 import type { Vec3 } from './math.js';
+import { playbackRateModifiers } from './rate-control.js';
 
 /**
  * Options of {@link AudioVoicePool}: the {@link PositionalAudioOptions} every voice shares (distance model, cone,
@@ -70,6 +71,7 @@ export class AudioVoicePool {
     const voice = this.voices[index],
       listener = this.listener,
       smoothing = listener.smoothing;
+    playbackRateModifiers.get(voice)?.validate(playbackRate);
     voice.stop();
     listener.smoothing = 0;
     try {

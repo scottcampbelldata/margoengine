@@ -5,7 +5,9 @@ import { AudioDoppler } from '../dist/doppler.js';
 import { FakeAudioContext } from './fake-web-audio.js';
 
 function scene(options) {
+  // Exact audio-clock arithmetic fixtures; live contexts are covered in doppler-live.test.js.
   const context = new FakeAudioContext();
+  context.startRendering = () => {};
   const listener = new AudioListener({ context, smoothing: 0, autoResume: false });
   listener.follow(null);
   const sound = new PositionalAudio(listener, { playbackRate: 1.5, detune: 100, volume: 0.4 });

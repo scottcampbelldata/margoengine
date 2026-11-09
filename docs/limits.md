@@ -1017,7 +1017,7 @@ Optional audio/events: 5,491 B gzip with shared audio implementation; audio root
 
 LIM-605: Node stand-in tests and real browser PCM beside all three rendering routes prove order, random selection, volume/pitch and silent cooldown gaps. Generated 1/1.5 kHz tones at +1200 cents give 2/3 kHz within 0.1 Hz, RMS 0.0625 within 1e-6 for 0.5 volume, and zero GPU validation errors. Shared buffers stay usable on disposal. Recordings, listening quality, other browsers, random-generator statistical quality and performance remain unmeasured.
 
-Audio root size growth in this job includes pool input validation before voice stealing, fixing an existing failure that cut valid playback when new arguments were invalid. The new entry remains optional; the root gains only the owning pool bug fix. Current audio/doppler size with rebuilt shared chunks: 1,090 B gzip.
+Audio root size growth in this job includes pool input validation before voice stealing, fixing an existing failure that cut valid playback when new arguments were invalid. The new entry remains optional; the root gains only the owning pool bug fix. At batch 110, audio/doppler measured 1,090 B gzip with rebuilt shared chunks.
 
 ## Own 2D frame-preparation certificates
 
@@ -1198,3 +1198,11 @@ before, 102,200 B after; `/preview` 3,443 B, `/pick` 4,798 B, `/restore` 850 B,
 `/auto` 3,720 B. The former preview root measured 3,442 B. Core plus stage is
 23,797 B against the unchanged strict 25,000 B ceiling. Chunk name changes can
 change gzip bytes even when the root implementation has not changed.
+
+Audio camera-only repair (2026-11-09): audio root then measured 7,642 B gzip, ambisonics entry 1,921 B; core plus stage unchanged at 23,626 B. Earlier batch sizes above are historical. README loading examples use WAV filenames so the runtime example gate supplies its available WAV fixture.
+
+### Audio review corrections (2026-11-09)
+
+Current audio root 7,687 B gzip; Doppler entry 1,323 B (unchanged ceiling 1,346 B), occlusion entry 1,517 B, ambisonics 1,921 B; core plus stage stays 23,626 B. Earlier batch sizes are historical. Live velocity uses performance.now frame seconds; offline velocity uses audio time. Live suspended contexts and context state changes clear history. Gaps over 0.25 s and displacement speeds over 0.95c are cuts; smaller teleports still require reset. Radial clamps and the float32 /39 authored-rate bound remain unchanged. External sound/pool/event rate writes are authored inputs, while the sound getter returns the effective shifted rate. Source-kind switches and sound disposal detach Doppler on the next frame. Occlusion uses explicit isDisposed lifecycle state, traces nothing after sound disposal and retains its last obstruction/filter values without a live engine.
+
+LIM-603/605/607/608/610 PCM proofs are real browser Web Audio offline rendering; output-device PCM and subjective quality are unmeasured. Live AudioContext regressions cover state changes and controlled quantized clocks, not audible device output. Web Audio specifies subsample loop endpoints. At 130 bpm, marker checks cover one virtual hour at 8 kHz and five minutes each at 44.1/48 kHz, maximum phase error below 0.424 sample frames without cumulative rounding drift in Edge 157. Other browsers and hour-long 44.1/48 kHz sessions remain unmeasured. Evidence: docs/whitepaper/results/audio-review-20261109.json.
