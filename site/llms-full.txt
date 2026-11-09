@@ -8482,6 +8482,27 @@ subnormal input. No assertion or tolerance is weakened.
 
 Explicit TAA/TAAUpscale disposal called removePlugin on the active default scene after setup had returned. With matching names it disposed the unrelated default effect and left the secondary effect registered. Both classes now detach through sceneOf(this). The scene-owner regression uses real engine scene registries, asserts same-name isolation, and permits replacement after repeated disposal.
 
+### Open: batch 56 compatibility refractor capture value failure
+
+On local batch-56-fixes 780782f3c (production tree dfd006c47, based on
+f13245ca3), run node scripts/env-mirror-gpu-check.js --compat under a shared
+GPU lock after building. The 4x-MSAA check that toggles the yellow box entirely
+in front of the refractor reported maxTexelDifference 0.000244140625, against
+its unchanged exact-zero requirement. The other 64 mirror assertions passed.
+Hardware: ANGLE Direct3D11, NVIDIA RTX A6000, Windows, Node 26.12.0.
+Evidence: test-results/56fix/resume-gpu-environment-test-gpu-mirror-12.log and
+test-results/env-mirror/gpu.json. This is a value failure, not a busy-time waiver.
+
+The root cause is not established. A fresh-scene diagnostic compares alternating
+box visibility plus identical repeated states at 1x and 4x: every component is
+identical. A separate full-prefix diagnostic (including orthographic, TAA,
+roughness and normal-map cases) also sees exact equality; its negative clipBias
+control changes capture values by 0.2783203125. Thus neither clipping failure
+nor prior-state contamination is yet proved. These diagnostics do not clear the
+failed gate. Retain its exact assertion and capture differing texel coordinates,
+raw values and backend state on a reproduction before changing the owner.
+No test, tolerance, timeout or production source was changed for this failure.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -11577,17 +11598,6 @@ stage.dispose();
 
 All are off by default and compiled in only when asked for: without them the shaders, bindings and GPU calls are exactly what they were. Order: input conversion, white balance gain, exposure plus the auto-exposure stops, curve, contrast, LUT, vignette, grain, sRGB. Chromatic aberration shifts the red and blue samples radially (1 = 2% of the view at its edge) before everything else.
 
-- `autoExposure` meters the log-average luminance of the HDR source over the view with one 256-thread compute pass (4,096 samples) and moves the stored exposure toward 18% grey by `1 - exp(-speed * dt)` per frame (`min`, `max` in stops, `speed` in 1/s, `compensation` in stops; defaults -4, 4, 1.5, 0). The first frame snaps to the metered value. It adds one compute dispatch and an 8-byte storage buffer.
-- **Metering modes.** `metering` picks where the meter looks: `'average'` (default, the whole view evenly),
-  `'center'` (weighted by a Gaussian of the distance from the centre, sigma a quarter of the view height), `'spot'`
-  (only the disc `spot: {x, y, radius}`, centre as fractions of the view, defaults 0.5, 0.5, radius 0.05 of the shorter
-  side; all 4,096 samples land in it) or `'mask'` (each sample weighted by the red channel of `mask`, a texture of any
-  size stretched over the view). `method: 'histogram'` sorts the weighted samples into 64 bins of log2 luminance (-12 to
-  12) and averages only those between `percentiles` (default `[0.1, 0.9]`), so a small light or a dark corner does not
-  swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure.
-  Every mode shares one compute pipeline; checked on a real GPU against a CPU oracle of the meter within 0.002 stops in
-  all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, M6 Mac mini, Metal).
-
 [README continues: https://margoengine.com/llms/packages/tonemap.md]
 
 === @margoengine/dof (packages/dof/README.md) ===
@@ -11656,14 +11666,6 @@ console.log(dof.focalLength); // the focal length in metres the last frame used
   `PhysicalCamera` from `@margoengine/cameras/physical`.
 
 ## Temporal DOF
-
-`temporal: true` gathers the bokeh at half resolution, a quarter of the pixels, and turns its taps by the golden angle
-every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth for about a quarter
-of the gather's cost. Pixels in focus keep the full-resolution scene as it is.
-
-Temporal DOF works on native WebGPU and the full WebGL2 compatibility layer.
-The full layer writes the half scene and CoC first, then computes independent
-tile maxima before gathering; it does not need workgroup shared memory.
 
 [README continues: https://margoengine.com/llms/packages/dof.md]
 
@@ -12562,13 +12564,6 @@ engine.dispose();
 ```
 
 Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await import('@margoengine/creative')` loads the complete pack namespace; use a subpath when loading one feature independently. The stage's `addParticles` and `addEffects` (`@margoengine/stage/particles`, `/effects`) load only `/particles` and `/post`.
-
-Attach a grass field directly to an existing Stage, without extending the facade:
-
-```ts
-import {createStage} from 'margoengine';
-import {GrassField} from 'margoengine/creative/grass';
-```
 
 [README continues: https://margoengine.com/llms/packages/creative.md]
 

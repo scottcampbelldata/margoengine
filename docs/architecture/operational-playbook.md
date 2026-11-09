@@ -4324,6 +4324,17 @@ proofs pass. Lint/hygiene, 888 API reports (8,641 exports), 1,125 README type
 examples and all quality gates pass; 971 size ceilings stay unchanged. NodePass's
 backend and kind diagnostics retain their remedies within the effects entry's
 existing ceiling. Core plus stage is 23,924 B from main's approved reference fix;
-this lane changes neither core nor stage. Fresh full verify and physical GPU/
-README runs remain pending: current verify includes timed environment A/B work
-and browser tests, which conflict with the active no-speed/CPU-only restrictions.
+this lane changes neither core nor stage. The CPU-only hold has ended: main includes teardown repairs cf699846f and
+20375ea56. Full verify passed on dfd006c47 over f13245ca3: 13,675 tests, no
+failures/skips, 308.8 seconds, without an outer GPU lock. Main now separates
+speed assertions from correctness. Lint/hygiene pass; physical GPU/README
+acceptance is still pending as detailed below.
+
+Batch 56 resumed GPU evidence: ground-browser --studio --compat passes its
+seven assertions and browser teardown. All eleven environment entry-browser
+proofs pass after correcting the reflection-shapes fixture to use the real
+engine; the native mirror suite passes all 65 checks. The compatibility mirror
+suite stops on a 4x-MSAA refractor exact-value mismatch of 0.000244140625. Its
+root cause remains open in known-bugs.md; fresh and full-prefix diagnostics that
+produce exact equality do not clear that failure. Later mirror/review-pixel,
+fog and runtime README steps were not executed. No repair is accepted or pushed.

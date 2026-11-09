@@ -3258,3 +3258,24 @@ subnormal input. No assertion or tolerance is weakened.
 ### Fixed: temporal effect owner detachment (batch 56 sibling audit)
 
 Explicit TAA/TAAUpscale disposal called removePlugin on the active default scene after setup had returned. With matching names it disposed the unrelated default effect and left the secondary effect registered. Both classes now detach through sceneOf(this). The scene-owner regression uses real engine scene registries, asserts same-name isolation, and permits replacement after repeated disposal.
+
+### Open: batch 56 compatibility refractor capture value failure
+
+On local batch-56-fixes 780782f3c (production tree dfd006c47, based on
+f13245ca3), run node scripts/env-mirror-gpu-check.js --compat under a shared
+GPU lock after building. The 4x-MSAA check that toggles the yellow box entirely
+in front of the refractor reported maxTexelDifference 0.000244140625, against
+its unchanged exact-zero requirement. The other 64 mirror assertions passed.
+Hardware: ANGLE Direct3D11, NVIDIA RTX A6000, Windows, Node 26.12.0.
+Evidence: test-results/56fix/resume-gpu-environment-test-gpu-mirror-12.log and
+test-results/env-mirror/gpu.json. This is a value failure, not a busy-time waiver.
+
+The root cause is not established. A fresh-scene diagnostic compares alternating
+box visibility plus identical repeated states at 1x and 4x: every component is
+identical. A separate full-prefix diagnostic (including orthographic, TAA,
+roughness and normal-map cases) also sees exact equality; its negative clipBias
+control changes capture values by 0.2783203125. Thus neither clipping failure
+nor prior-state contamination is yet proved. These diagnostics do not clear the
+failed gate. Retain its exact assertion and capture differing texel coordinates,
+raw values and backend state on a reproduction before changing the owner.
+No test, tolerance, timeout or production source was changed for this failure.
