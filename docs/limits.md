@@ -1554,3 +1554,13 @@ The direct gltf-pro extension GPU check requires the same external cache as veri
 MARGO_SPLAT_SAMPLES override. Its helmet, IBL, skull and tower cases fail for absent or changed
 inputs rather than reporting success without running their assertions. This is a validation repair,
 with no package runtime bytes, rendering feature or performance result.
+
+### Existing product framing and turntable (batch 56, job 4 reuse)
+
+Existing stage/viewer fits glTF bounds once and turns the camera about world Y with a clean color
+background. Geometry changes need another explicit fit. Drag/wheel pause and reduced motion are
+covered; viewer disposal leaves the camera. The existing model/material limits still apply.
+Native WebGPU and WebGL2 compatibility pass real-model pixel, orbit, rollback, disposal and actual
+replacement-device whole-frame assertions. Native WebGL2 PBR remains unsupported.
+No staging/frame entry is added. Viewer 2,386 B gzip; staging root 8,129 B; accumulate 9,314 B;
+core plus stage 23,797 B below 25,000 B. No measured speed or photographic-product quality claim.

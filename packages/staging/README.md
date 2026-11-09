@@ -179,3 +179,29 @@ local light transforms or area-light shadow calculation. The catcher supplies it
 WebGPU and WebGL2 compatibility pass the existing studio value oracle and the staging composition
 test (`ground-browser.mjs --studio`, optionally `--compat`), including actual device replacement,
 caster removal and disposal. Native WebGL2 remains unsupported. Geometry is a generated stand-in.
+
+## Framing and turntable
+
+The existing optional stage viewer frames a glTF product, sets near/far to its bounds, adds a plain
+background and orbits the camera about its target. No staging/frame entry is needed:
+
+```ts
+import {createStage} from 'margoengine';
+import {addViewer} from 'margoengine/stage/viewer';
+const app = await createStage(document.body, {backend: 'webgpu'});
+const viewer = await addViewer(app, '/shoe.glb', {
+  background: '#dfe1e4', turntable: {seconds: 30, resumeAfter: 3},
+  signal: AbortSignal.timeout(30_000),
+});
+viewer.turntable = false; // set true to resume
+// Later: viewer.dispose(); app.dispose();
+```
+
+See [all viewer options and defaults](../stage/README.md#model-viewer). Fit defaults to true;
+turntable defaults to true with a 30-second period and 3-second resume delay. Reduced motion starts
+it paused. Dragging pauses rotation; disposal removes listeners and the model, leaving the camera
+where it is. The camera turns around world Y; the product and cached shadows stay fixed.
+Bounds are fitted once, so call the camera's fitToBoundingBox after changing product geometry.
+A glTF with no drawable bounds rejects; a failed setup restores camera state. Native WebGL2 is
+unsupported; WebGL2 compatibility passes the same real-model pixel and radius assertions.
+The FlightHelmet test fixture is a licensed real product model; no photographic quality or speed claim.

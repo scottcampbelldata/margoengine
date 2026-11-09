@@ -1,4 +1,5 @@
 import { createStage } from '@margoengine/stage';
+import { engineRuntime } from '@margoengine/core/extension';
 import { addScene } from '@margoengine/stage/scene';
 import { addViewer, type Viewer, type ViewerOptions } from '@margoengine/stage/viewer';
 
@@ -10,6 +11,8 @@ type Page = {
   camera(): { position: number[]; target: number[] };
   look(position: [number, number, number]): Promise<void>;
   dropShadow(): Promise<void>;
+  restore(): Promise<boolean>;
+  restored(): boolean;
   close(): Promise<{ plugins: string[]; meshes: number; gpuErrors: string[] }>;
   scene(): Promise<{ bounds: number[]; meshes: number; left: number; gpuErrors: string[] }>;
   scenery(): Promise<void>;
@@ -49,6 +52,19 @@ const page: Page = {
   async dropShadow() {
     viewer.shadows!.dispose();
     await page.frames(30);
+  },
+  async restore() {
+    const before = app.engine.gpu!;
+    app.engine.stop();
+    before.destroy();
+    await before.lost;
+    await engineRuntime(app.engine).rebootDevice();
+    app.engine.gpu!.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+    app.engine.start();
+    return app.engine.gpu !== before;
+  },
+  restored() {
+    return viewer.environment!.environment.device === app.engine.gpu;
   },
   // A saved scene with a real model under a moved parent: addScene's parenting on a real gltf-pro model.
   async scene() {

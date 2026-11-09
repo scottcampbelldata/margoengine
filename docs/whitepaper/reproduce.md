@@ -1001,3 +1001,13 @@ script through the GPU lock. No environment override is required for the normal 
 For a missing or changed input, use the named fetch-skip-assets recovery command. The four cases
 now actually consume their validated files. Run tests/external-test-assets.test.js for the cache
 failure regressions and the direct-harness contract checked by verify/check:merge.
+
+### Batch 56 job 4: existing product viewer
+
+Build packages; run npm test --workspace @margoengine/stage and the staging package tests. Through
+the GPU lock with owner codex-56, run scripts/stage-viewer-gpu-check.js and append --compat for
+the compatibility layer, or run gltf-pro's test:gpu:viewer script for both. The licensed real
+FlightHelmet is the existing mobile GLB fixture. The tests assert product coverage, ground pixels,
+orbit radius/height/target, rollback, extreme finite periods, disposal and actual device replacement
+restoring the whole frame exactly. Raw reports are test-results/stage-viewer.json and
+stage-viewer-compat.json; the committed batch-56-frame.json preserves both devices and values.

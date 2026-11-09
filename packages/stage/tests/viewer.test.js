@@ -419,6 +419,16 @@ test('a model with nothing to frame rejects and leaves nothing behind', async ()
   assert.deepEqual(log.slice(-2), ['dispose light', 'dispose model']);
 });
 
+test('zero and nonfinite model bounds reject without leaving viewer resources', async () => {
+  for (const modelBounds of [[0, 0, 0, 0, 0, 0], [NaN, 0, 0, 1, 1, 1], [0, 0, 0, Infinity, 1, 1]]) {
+    const { stage, ticks } = fixture();
+    world.modelBounds = modelBounds;
+    await assert.rejects(addViewer(stage, '/invalid-bounds.glb'), { code: 'state', message: /no geometry to frame/ });
+    assert.deepEqual(log.slice(-2), ['dispose light', 'dispose model']);
+    assert.equal(ticks.size, 0);
+  }
+});
+
 test('abort and stage disposal reject with AbortError and add nothing', async () => {
   const { stage, dispose } = fixture(),
     caller = new AbortController();

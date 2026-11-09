@@ -1501,3 +1501,12 @@ The extension GPU harness validates its FlightHelmet, EnvironmentTest, Scatterin
 input families by hash with the shared external-asset resolver. The root regression prevents the
 old silent-return branches. Existing helper tests prove missing/partial/changed/LFS-only failures.
 This closes an input-validation gap; it does not add a rendering accuracy or speed claim.
+
+## Batch 56 job 4: existing viewer framing and turntable
+
+SKIPPED implementation: stage/viewer already fits a glTF product, supplies a plain backdrop and
+turns the camera around the product target. The staging README now gives that composition.
+[Real FlightHelmet evidence](results/batch-56-frame.json) records native WebGPU and WebGL2
+compatibility coverage, shadow pixels, orbit invariants, rollback, disposal and actual device
+replacement restoring every pixel. CPU tests cover hostile bounds and turn periods, reduced motion
+and input pauses. The orbit remains Y-up and the fit one-time. No speed or photographic quality claim.

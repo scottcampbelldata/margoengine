@@ -1,0 +1,168 @@
+{
+  "batch": 56,
+  "job": 4,
+  "status": "SKIPPED",
+  "reason": "Existing optional stage/viewer already fits bounds, supplies a plain backdrop and turns the camera around the product target.",
+  "fixture": "Licensed Khronos FlightHelmet mobile GLB, real model",
+  "tests": [
+    "packages/stage/tests/viewer.test.js",
+    "scripts/stage-viewer-gpu-check.js"
+  ],
+  "checks": [
+    "product frame coverage",
+    "contact and cascaded floor pixels",
+    "orbit radius/height/target",
+    "extreme finite turn periods",
+    "failed setup rollback",
+    "disposal",
+    "actual replacement device with every pixel restored"
+  ],
+  "runs": [
+    {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "contact": {
+        "plain": 185.90317060546064,
+        "shaded": 178.1644610242972,
+        "covered": 0.140615234375
+      },
+      "restored": true,
+      "cascaded": {
+        "before": [
+          0.7453145959177562,
+          0.6057875257741989,
+          0.5640745791342803
+        ],
+        "after": [
+          0.8577616580437578,
+          0.6057875257741989,
+          -0.32851533503834496
+        ],
+        "floor": {
+          "shadowed": 219.59573308475638,
+          "plain": 220.4802723863666
+        }
+      },
+      "scene": {
+        "bounds": [
+          4.7963948249816895,
+          1.000011682510376,
+          -0.17154578864574432,
+          5.162940502166748,
+          1.7160004377365112,
+          0.2000291645526886
+        ],
+        "meshes": 9,
+        "left": 0,
+        "gpuErrors": []
+      },
+      "failures": {
+        "contact": "Invalid contact shadow options: size must be finite and above 0",
+        "cascaded": "Invalid shadow cascades: use an integer from 1 to 4",
+        "tonemap": "Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.",
+        "second": "Invalid plugin; see https://margoengine.com/errors#arguments"
+      }
+    },
+    {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      },
+      "contact": {
+        "plain": 185.90361168618983,
+        "shaded": 178.16494090710972,
+        "covered": 0.140615234375
+      },
+      "restored": true,
+      "cascaded": {
+        "before": [
+          0.7593897109312455,
+          0.6057875257741989,
+          0.5439255209478583
+        ],
+        "after": [
+          0.8485267077372284,
+          0.6057875257741989,
+          -0.3512927163908777
+        ],
+        "floor": {
+          "shadowed": 219.59617719223738,
+          "plain": 220.48064801136655
+        }
+      },
+      "scene": {
+        "bounds": [
+          4.7963948249816895,
+          1.000011682510376,
+          -0.17154578864574432,
+          5.162940502166748,
+          1.7160004377365112,
+          0.2000291645526886
+        ],
+        "meshes": 9,
+        "left": 0,
+        "gpuErrors": []
+      },
+      "failures": {
+        "contact": "Invalid contact shadow options: size must be finite and above 0",
+        "cascaded": "Invalid shadow cascades: use an integer from 1 to 4",
+        "tonemap": "Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.",
+        "second": "Invalid plugin; see https://margoengine.com/errors#arguments"
+      }
+    }
+  ],
+  "sizes": {
+    "staging": {
+      "raw": 22307,
+      "gzip": 8129
+    },
+    "accumulate": {
+      "raw": 26471,
+      "gzip": 9314
+    },
+    "viewer": {
+      "raw": 4979,
+      "gzip": 2386
+    },
+    "gltfPro": {
+      "raw": 209018,
+      "gzip": 66584
+    },
+    "coreStage": {
+      "raw": 58792,
+      "gzip": 23797
+    }
+  },
+  "scope": "Y-axis camera orbit and one-time bounds fitting. WebGPU API through native and WebGL2 compatibility. Native WebGL2 PBR unsupported. No photographic quality or speed claim."
+}

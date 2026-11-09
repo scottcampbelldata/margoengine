@@ -2506,3 +2506,16 @@ resolver. An unset environment override no longer bypasses those cases. The root
 checks helmet, IBL, skull and tower validation and bans optional-presence branches in this harness.
 The existing resolver tests exercise missing, partial, changed and LFS-only content. Real GPU
 assertions use the existing outside files; no new reference image or tolerance is substituted.
+
+### Product framing: section 5 reuse evidence (batch 56, job 4)
+
+Implementation SKIPPED: stage/viewer already frames a glTF's bounds with near/far scaling, adds a
+plain background and turns the camera around its target. No staging/frame alias or new stage feature.
+The actual FlightHelmet harness passes on native WebGPU and WebGL2 compatibility: product frame
+coverage, contact and cascaded floor pixels, orbit radius/height/target, failure rollback, disposal
+and actual device replacement with an identical whole frame. CPU tests cover reduced motion,
+drag/wheel pause, zero/nonfinite/empty/huge bounds and extreme finite/nonfinite turntable settings.
+The audit's period arithmetic, absent physical-map binding and silent external-input defects are
+resolved in separate fix commits. Raw device/value evidence: whitepaper/results/batch-56-frame.json.
+Root staging is 8,129 B gzip, accumulate 9,314 B, viewer 2,386 B and core plus stage 23,797 B.
+No CPU-heavy loop, photographic quality claim, performance measurement or core change.

@@ -1920,3 +1920,11 @@ Each case now uses externalAssetRoot and requireExternalAssets. The root externa
 regression, included in verify/check:merge, prevents optional-presence branches from returning.
 Missing, partial, changed and LFS-only caches retain the helper's tested hard failures and recovery
 command. No renderer change or new third-party input.
+
+### Batch 56 framing reuse audit
+
+The existing viewer meets job 4 without a duplicate entry. The discovered subnormal-period camera
+overflow, absent physical-map sampler overflow and silent direct-GPU input returns are resolved
+in their own fix commits and regression tests. The real-model whole frame survives actual device
+replacement on native and compatibility backends. No additional framing defect was found.
+The Y-axis orbit, one-time fit and native WebGL2 PBR refusal remain explicit limits.

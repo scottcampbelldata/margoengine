@@ -54,6 +54,11 @@ try {
   results.contact = { plain: luma(plain, ...under), shaded: luma(shaded, ...under), covered: covered(shaded) };
   assert.ok(results.contact.covered > 0.1, `the model covers ${results.contact.covered} of the frame`);
   assert.ok(results.contact.shaded < results.contact.plain - 1, `no shadow: ${JSON.stringify(results.contact)}`);
+  assert.ok(await page.evaluate(() => window.viewerPage.restore()), 'a real replacement device');
+  await page.waitForFunction(() => window.viewerPage.restored(), null, { timeout: 30000 });
+  await page.evaluate(() => window.viewerPage.frames(10));
+  assert.equal(Buffer.compare((await shot('contact-restored')).data, shaded.data), 0, 'replacement device restores every pixel');
+  results.restored = true;
   const left = await close();
   assert.deepEqual(left, { plugins: [], meshes: 0, gpuErrors: [] });
 
@@ -125,8 +130,8 @@ try {
   assert.ok(Buffer.compare((await shot('second-after')).data, frame) === 0, 'a refused second viewer changed the picture');
   assert.deepEqual(await close(), { plugins: [], meshes: 0, gpuErrors: [] });
 
-  await writeFile('test-results/stage-viewer.json', JSON.stringify({ hardware: browser.hardware, ...results }, null, 2));
-  console.log('Stage viewer passed on real WebGPU', JSON.stringify(results));
+  await writeFile(`test-results/stage-viewer${browser.hardware.compat ? '-compat' : ''}.json`, JSON.stringify({ hardware: browser.hardware, ...results }, null, 2));
+  console.log(`Stage viewer passed on real WebGPU${browser.hardware.compat ? ' through WebGL2 compatibility' : ''}`, JSON.stringify(results));
 } finally {
   await browser.close();
   release();
