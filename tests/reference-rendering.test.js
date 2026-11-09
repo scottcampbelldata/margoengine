@@ -7,6 +7,7 @@ import { pictureError, assertBudget } from '../scripts/reference-rendering/compa
 import { lookMatrix, prepareScene } from '../scripts/reference-rendering/scene.mjs';
 import { referenceCase } from '../scripts/reference-rendering/cases.mjs';
 import { saveReference } from '../scripts/reference-rendering/reference.mjs';
+import { displayImage } from '../scripts/reference-rendering/transport-image.mjs';
 
 test('changed outside deployment cannot overwrite the frozen reference', () => {
   const folder = mkdtempSync(join(tmpdir(), 'margo-reference-160-'));
@@ -143,3 +144,56 @@ for (const [family, primitives, absolute, compatAbsolute, square, compatSquare, 
     assert.equal(b.viewer.referenceSha256, b.referenceSha256);
     assert.equal(b.compat.hardware.webgpu.vendor, 'margo-webgl2');
   });
+test('path-traced floats keep their row order, byte order and fixed display transform', () => {
+  const bytes = Buffer.alloc(24);
+  for (const offset of [12, 16, 20]) bytes.writeFloatLE(0.5, offset);
+  assert.deepEqual([...displayImage(bytes, 1, 2).data], [0, 0, 0, 255, 181, 181, 181, 255]);
+  assert.throws(() => displayImage(bytes, 2, 2));
+  bytes.writeFloatLE(Infinity, 0);
+  assert.throws(() => displayImage(bytes, 1, 2), /Non-finite/);
+});
+
+for (const [family, primitives, absolute, square, max] of [
+  ['transmission', 22, 1763456, 78975278, 255],
+  ['volume', 23, 1680190, 31577626, 113],
+])
+  test(`${family} preserves the full sample and exact viewer and path-transport budgets`, () => {
+    const read = (suffix) =>
+      JSON.parse(
+        readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}${suffix}.json`, import.meta.url)),
+      );
+    const viewer = read('');
+    assert.deepEqual([viewer.metrics.absolute, viewer.metrics.square, viewer.metrics.max], [absolute, square, max]);
+    for (const row of [viewer, viewer.compat]) {
+      assert.equal(row.margo.primitives, primitives);
+      assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+      assert.equal(row.nativeWebGL2.code, 'unsupported');
+      assert.equal(row.sourceSha256, referenceCase(family).sourceSha256);
+    }
+    const transport = read('-transport');
+    assert.equal(transport.sceneSha256, viewer.sceneSha256);
+    assert.equal(transport.sourceSha256, viewer.sourceSha256);
+    assert.deepEqual(Object.keys(transport.rows), ['full', 'direct']);
+    for (const [mode, row] of Object.entries(transport.rows)) {
+      assert.equal(row.meta.samples, 128);
+      assert.equal(row.meta.seed, 160);
+      assert.equal(row.meta.sunIrradiance, 3);
+      assert.equal(row.meta.mode.startsWith(mode === 'full' ? 'full path' : 'direct-lit'), true);
+      for (const result of [row, row.compat]) {
+        assert.equal(result.metrics.pixels, 512 * 512);
+        assert.equal(result.metrics.mae, result.metrics.absolute / (512 * 512 * 3));
+      }
+      assert.match(row.referenceSha256, /^[0-9a-f]{64}$/);
+      assert.match(row.linearSha256, /^[0-9a-f]{64}$/);
+    }
+  });
+
+test('Radeon continuation retains the original volume transport budgets', () => {
+  const budget = JSON.parse(
+    readFileSync(new URL('../docs/whitepaper/results/batch-160-volume-transport.json', import.meta.url)),
+  );
+  assert.equal(budget.rows.full.metrics.absolute, 13792000);
+  assert.equal(budget.rows.full.compat.metrics.absolute, 13792000);
+  assert.equal(budget.rows.direct.metrics.absolute, 1843497);
+  assert.equal(budget.rows.direct.compat.metrics.absolute, 1843497);
+});

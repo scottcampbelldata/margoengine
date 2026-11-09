@@ -4545,6 +4545,24 @@ implicit cube sampling, retain hardware filtering. No additional texture unit,
 core/stage change or larger picture-error budget. WebGPU filtered samples do
 not promise exact f32 weights; the native regression oracle uses unfiltered loads.
 
+
+Batch 160 job 4 retains complete 512 x 512 TransmissionTest (22 primitives)
+and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
+full/direct integer budgets. Native volume estimates a homogeneous refracted
+slab in mesh space with world-space Beer attenuation, including transforms and
+instancing. It does not trace mesh boundaries, add thickness maps or reproduce
+Cycles multiple scattering. Precomputed attenuation retains an extreme-depth
+underflow limit. Native WebGL2 explicitly refuses PBR; compatibility is actual
+WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
+repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
+volume absolute ceiling stays 13,792,000. No speed or equivalence claim.
+
+
+Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on
+WebGPU and 17.473541259765625 on compatibility; all original budgets pass.
+Proof summaries: whitepaper/results/batch-160-amd-{transmission,volume}.json.
+This measures complete pictures, retaining the transport limitations above.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6948,6 +6966,58 @@ sampler spec permits implementation-dependent filtering, so NVIDIA's filtered
 assertions remain. GPU validation and the deliberately broken-weight control
 remain pending; this entry does not close job 4 or the AMD cleanup/watchdog work.
 
+
+### Batch 160 transmission and volume, job 4
+
+The default native gltf-pro volume route precomputed attenuation at mesh
+thickness, ignoring world scale and the refracted path. The package now
+transforms a refracted unit ray into mesh space and crosses its estimated slab
+there. Its regression executes the shipped WGSL across scale, obliquity, shear,
+rotation, reflection, instancing and grazing limits. Compact replacement shaders
+keep their own resource interface. Absent normal maps now use exact RGBA16F
+[0.5,0.5,1] rather than the tilted RGBA8 [128,128,255] fallback; both fallback
+and compact-shader ownership have regressions. No core or stage change.
+
+Remaining picture residuals: run the complete TransmissionTest or AttenuationTest
+with scripts/reference-rendering/proof.mjs, --case=transmission or --case=volume,
+each with and without --compat. Original viewer and Cycles full/direct budgets
+stay in the four frozen result JSONs. Full Cycles transport includes cast shadows
+and bounce light absent from this default unshadowed Margo scene. The combined
+control removes both; it does not attribute the entire residual to shadows.
+Rough refraction, filtering, mesh-boundary versus slab paths and reference noise
+remain mixed causes. No physical-equivalence claim is made. Native thickness
+textures remain unsupported by this route. Extreme precomputed Beer tint can
+underflow before an inverse world scale shortens the path; raw extinction
+storage is needed to recover that numerical range. These are open limitations,
+not accepted proof that the renderers are equivalent.
+
+NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
+driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
+proof adapter required by Scott. Fresh three-process proofs follow teardown
+fixes cf699846f/20375ea56; neither an old failed cleanup nor an archived capture
+counts as that fresh proof. Browser teardown remains with its dedicated owner.
+
+
+### Batch 160 AMD voxel denoise watchdog (open, separate from jobs 4/5)
+
+Repro: select MARGO_GPU=amd, GPU_POWER=low-power and render the unchanged
+voxel-pathtracer denoise-materials reference: 480 x 300, 16,384 spp. Earlier
+bounded diagnostics, including 4 x 480 x 300 x 7 pixel-samples and dispatch
+drain, reset AMD in 4,064/4,068 ms with LiveKernelEvent 141. WER reports
+WATCHDOG-20261109-{0950,0952,0959}.dmp are retained outside the repository.
+The original package failure is test-results/batch-160/job4-material-gpu.log.
+No out-of-bounds access, nontermination or driver fault is established.
+DXGI reports AMD packet-boundary and NVIDIA dispatch-boundary compute preemption.
+The current radiance loop is bounded by 20 * maxBounces + 32, up to 1,312
+steps, each including scene/material work. A bound on pixel-samples alone does
+not bound traversal cost or prove a preemptible OS packet. Reducing the work
+or retrying the driver reset does not repair this. The earlier row-band draft
+passes CPU sample-group/PNG-seam tests but still reset the GPU and is excluded.
+Next isolate packet submission and per-ray termination/access invariants in one
+bounded diagnostic, preserving every pixel/sample and accumulation order.
+This remains an engine bug pending attribution, and is not a speed exemption.
+No new watchdog repro was run by the job 4 continuation.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -7715,6 +7785,16 @@ constructor; `GLTFDocument` is available as a type from either entry.
 `@margoengine/gltf-pro/coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
 for material extensions that read texture coordinates without loading the renderer.
 
+The native volume tint estimates a slab through `thicknessFactor` in mesh units and
+converts the refracted path to world units before applying Beer-Lambert absorption.
+Node scale, rotation, shear, reflection and `EXT_mesh_gpu_instancing` affect that path;
+`attenuationDistance` stays in world units. This path retains its scalar thickness
+approximation and display-space blend; the optional transmission installation supplies
+screen-space refraction and thickness textures. Default normal textures use exactly
+neutral half-float texels, including when a live shading hook retains fallback bindings.
+Run `npm run test:gpu:native-volume --workspace @margoengine/gltf-pro` after the package
+build for twenty analytic slab pixels on each backend.
+
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 
 Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
@@ -7732,13 +7812,6 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
-
-The outside-reference test renders all 123 primitives of Khronos MetalRoughSpheresNoTextures with a shared
-camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.837511698404948 on the recorded
-RTX A6000; the WebGL2 compatibility layer measures 1.837506612141927. Native WebGL2 rejects PBR with code
-`unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
-settings, source hashes and coverage are in [batch 160 reproduction](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
-From a built checkout, with the outside reference PNG already captured:
 
 [README continues: https://margoengine.com/llms/packages/gltf-pro.md]
 

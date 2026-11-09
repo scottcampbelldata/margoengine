@@ -3305,3 +3305,41 @@ and all 12 runtime README examples. Removing fractional weights fails the
 unchanged native/compatibility comparison (0.875 versus 1), with its mutation
 marker retained. Core plus stage remains 23,924 B; compatibility entry remains
 within its unchanged 102,814 B ceiling. No benchmark or exclusive hold ran.
+
+
+Batch 160 job 4 restores the optional gltf-pro native volume absorption repair.
+Shipped shader math now crosses the mesh-space slab along a refracted world
+ray, retaining transforms and instancing. CPU analytic regressions and twenty
+exact GPU slab pixels per backend cover it; no core/stage code or export change.
+Frozen full-scene viewer/Cycles budgets remain independent gates. Actual AMD
+three-process repeat proofs are required after the main teardown repair, with
+one shared GPU slot per lane. Unresolved transport and numerical limits remain
+listed in known-bugs.md/limits.md; no new speed measurement is claimed.
+
+
+Fresh job 4 AMD proof (driver 32.0.21042.62): all four commands passed with
+normal teardown. Each backend/model retains 72 identical decoded RGBA captures
+across three fresh processes, four devices and six frames. Transmission
+viewer/full/direct absolute errors: native 1,749,897 / 4,120,866 / 2,622,899;
+compatibility 1,738,453 / 4,122,216 / 2,616,547. Volume viewer/full/direct:
+native 1,512,739 / 13,741,199 / 1,746,854; compatibility 1,512,128 / 13,741,752 /
+1,747,921. Every unchanged square/max/foreground gate also passes.
+Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
+results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
+to docs/whitepaper). The full volume ceiling remains 13,792,000.
+The analytic GPU test passes twenty exact slab pixels on each backend; all 47
+gltf-pro/materials runtime README examples pass with zero exceptions.
+The complete changed-package CPU run passes 783 tests with zero failures/skips.
+Earlier completed package browser/GPU steps are retained, not blindly rerun:
+gltf-pro shader/extensions/materials/viewer/native-volume, all materials steps
+with dispersion/cutout-casters completed by job4-material-remaining12.
+The unrelated voxel denoise-materials AMD watchdog remains an open investigation;
+these proofs do not classify it as a driver fault or close the batch.
+
+
+Job 4 final merge gates: lint and hygiene pass; full verify passes all 13,585
+tests with zero failures/skips (449.7 s). API reports match 887 entries and
+8,638 exports; core plus stage remains 23,924 B. The four frozen viewer/transport
+JSONs are byte-identical to the parked originals after line-ending normalization.
+Every fresh AMD proof, native-volume regression and runtime README gate passes.
+No benchmark, exclusive hold, tolerance increase or skipped test is included.

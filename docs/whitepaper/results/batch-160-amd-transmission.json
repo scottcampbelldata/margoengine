@@ -1,0 +1,214 @@
+{
+  "date": "2026-11-09",
+  "adapter": "AMD Radeon(TM) Graphics / RDNA 2",
+  "driverVersion": "32.0.21042.62",
+  "selection": {
+    "MARGO_GPU": "amd",
+    "GPU_POWER": "low-power",
+    "enginePowerPreference": "low-power"
+  },
+  "reason": "Scott ruling: NVIDIA 617.42 and Intel Arc 4x MSAA blend variation is documented separately. Fresh proofs after main teardown fixes cf699846f/20375ea56.",
+  "budgets": "All original frozen JSONs unchanged; every absolute/square/max/foreground gate passes.",
+  "proofs": [
+    {
+      "backend": "native",
+      "report": "C:\\Development\\Projects\\engine-bench\\batch-160\\transmission\\proof-native-1794248936932-84496/proof.json",
+      "reportSha256": "44b98aace467cd372527429f69ffb8f5ba0e1ad9d6c870c39f59eea4b30d195a",
+      "processes": 3,
+      "devicesPerProcess": 4,
+      "framesPerDevice": 6,
+      "variants": 1,
+      "decodedRGBAHashes": [
+        "bdde69f61f73fc03c5cc04c2775cdb45adc1b893bbdf8fed011edcc8a045ec0b"
+      ],
+      "references": [
+        {
+          "name": "viewer",
+          "hash": "d2bc4b6bce7e93eefc76ab7487267c0a3dfea3eb4134a685d7e3149df10d4281",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 1763456,
+            "square": 78975278,
+            "max": 255,
+            "mae": 2.2423502604166665,
+            "rmse": 10.021090709741035,
+            "foreground": 67050,
+            "foregroundAbsolute": 1763456,
+            "foregroundMae": 8.766870494655729,
+            "changed": 55718
+          }
+        },
+        {
+          "name": "full",
+          "hash": "d32885844e358fabc6f99102da51fff021f9ece17267b8f8f8c5c7934541904b",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 4131141,
+            "square": 227911849,
+            "max": 255,
+            "mae": 5.253017425537109,
+            "rmse": 17.023657139246332,
+            "foreground": 67217,
+            "foregroundAbsolute": 4131141,
+            "foregroundMae": 20.48658821429103,
+            "changed": 65068
+          }
+        },
+        {
+          "name": "direct",
+          "hash": "49c990f6da6a95730cb0fbf28be0a6d1eb3f1fc6fb3042bbe1c44e9d19827d39",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 2632772,
+            "square": 107202858,
+            "max": 255,
+            "mae": 3.347742716471354,
+            "rmse": 11.675422180515003,
+            "foreground": 67196,
+            "foregroundAbsolute": 2632772,
+            "foregroundMae": 13.060162311248686,
+            "changed": 64009
+          }
+        }
+      ],
+      "metrics": {
+        "viewer": {
+          "pixels": 262144,
+          "absolute": 1749897,
+          "square": 78670163,
+          "max": 255,
+          "mae": 2.225109100341797,
+          "rmse": 10.001714114463464,
+          "foreground": 67056,
+          "foregroundAbsolute": 1749897,
+          "foregroundMae": 8.698684681460271,
+          "changed": 55810
+        },
+        "full": {
+          "pixels": 262144,
+          "absolute": 4120866,
+          "square": 227608710,
+          "max": 255,
+          "mae": 5.239952087402344,
+          "rmse": 17.012332033649724,
+          "foreground": 67219,
+          "foregroundAbsolute": 4120866,
+          "foregroundMae": 20.435025811154585,
+          "changed": 65111
+        },
+        "direct": {
+          "pixels": 262144,
+          "absolute": 2622899,
+          "square": 106752271,
+          "max": 255,
+          "mae": 3.335188547770182,
+          "rmse": 11.650859714815885,
+          "foreground": 67204,
+          "foregroundAbsolute": 2622899,
+          "foregroundMae": 13.009637323175207,
+          "changed": 64021
+        }
+      }
+    },
+    {
+      "backend": "compat",
+      "report": "C:\\Development\\Projects\\engine-bench\\batch-160\\transmission\\proof-compat-1794249014924-83452/proof.json",
+      "reportSha256": "9bb826dfe78b527efe53eeecac0f4033ebe49695a0b701333b5c3eef1e25bf6b",
+      "processes": 3,
+      "devicesPerProcess": 4,
+      "framesPerDevice": 6,
+      "variants": 1,
+      "decodedRGBAHashes": [
+        "063b410570be73309fcd5dff5070e649bfd9be080e7f3db9018473949f9a8774"
+      ],
+      "references": [
+        {
+          "name": "viewer",
+          "hash": "d2bc4b6bce7e93eefc76ab7487267c0a3dfea3eb4134a685d7e3149df10d4281",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 1763453,
+            "square": 78975247,
+            "max": 255,
+            "mae": 2.242346445719401,
+            "rmse": 10.021088742961997,
+            "foreground": 67050,
+            "foregroundAbsolute": 1763453,
+            "foregroundMae": 8.766855580412628,
+            "changed": 55718
+          }
+        },
+        {
+          "name": "full",
+          "hash": "d32885844e358fabc6f99102da51fff021f9ece17267b8f8f8c5c7934541904b",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 4131146,
+            "square": 227912524,
+            "max": 255,
+            "mae": 5.253023783365886,
+            "rmse": 17.02368234846672,
+            "foreground": 67217,
+            "foregroundAbsolute": 4131146,
+            "foregroundMae": 20.486613009605705,
+            "changed": 65068
+          }
+        },
+        {
+          "name": "direct",
+          "hash": "49c990f6da6a95730cb0fbf28be0a6d1eb3f1fc6fb3042bbe1c44e9d19827d39",
+          "budget": {
+            "pixels": 262144,
+            "absolute": 2632767,
+            "square": 107202639,
+            "max": 255,
+            "mae": 3.347736358642578,
+            "rmse": 11.675410254905877,
+            "foreground": 67196,
+            "foregroundAbsolute": 2632767,
+            "foregroundMae": 13.060137508185012,
+            "changed": 64009
+          }
+        }
+      ],
+      "metrics": {
+        "viewer": {
+          "pixels": 262144,
+          "absolute": 1738453,
+          "square": 78391423,
+          "max": 255,
+          "mae": 2.210557301839193,
+          "rmse": 9.983979616808666,
+          "foreground": 67050,
+          "foregroundAbsolute": 1738453,
+          "foregroundMae": 8.64257022122794,
+          "changed": 55629
+        },
+        "full": {
+          "pixels": 262144,
+          "absolute": 4122216,
+          "square": 227802042,
+          "max": 255,
+          "mae": 5.241668701171875,
+          "rmse": 17.0195556808552,
+          "foreground": 67219,
+          "foregroundAbsolute": 4122216,
+          "foregroundMae": 20.44172034692572,
+          "changed": 65108
+        },
+        "direct": {
+          "pixels": 262144,
+          "absolute": 2616547,
+          "square": 106346179,
+          "max": 255,
+          "mae": 3.327111562093099,
+          "rmse": 11.628678317575718,
+          "foreground": 67196,
+          "foregroundAbsolute": 2616547,
+          "foregroundMae": 12.979676369625176,
+          "changed": 64034
+        }
+      }
+    }
+  ]
+}

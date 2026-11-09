@@ -2398,3 +2398,55 @@ sampler spec permits implementation-dependent filtering, so NVIDIA's filtered
 0.87499809265 was not an exact 0.875 oracle. All previous exact compatibility
 assertions remain. GPU validation and the deliberately broken-weight control
 remain pending; this entry does not close job 4 or the AMD cleanup/watchdog work.
+
+
+### Batch 160 transmission and volume, job 4
+
+The default native gltf-pro volume route precomputed attenuation at mesh
+thickness, ignoring world scale and the refracted path. The package now
+transforms a refracted unit ray into mesh space and crosses its estimated slab
+there. Its regression executes the shipped WGSL across scale, obliquity, shear,
+rotation, reflection, instancing and grazing limits. Compact replacement shaders
+keep their own resource interface. Absent normal maps now use exact RGBA16F
+[0.5,0.5,1] rather than the tilted RGBA8 [128,128,255] fallback; both fallback
+and compact-shader ownership have regressions. No core or stage change.
+
+Remaining picture residuals: run the complete TransmissionTest or AttenuationTest
+with scripts/reference-rendering/proof.mjs, --case=transmission or --case=volume,
+each with and without --compat. Original viewer and Cycles full/direct budgets
+stay in the four frozen result JSONs. Full Cycles transport includes cast shadows
+and bounce light absent from this default unshadowed Margo scene. The combined
+control removes both; it does not attribute the entire residual to shadows.
+Rough refraction, filtering, mesh-boundary versus slab paths and reference noise
+remain mixed causes. No physical-equivalence claim is made. Native thickness
+textures remain unsupported by this route. Extreme precomputed Beer tint can
+underflow before an inverse world scale shortens the path; raw extinction
+storage is needed to recover that numerical range. These are open limitations,
+not accepted proof that the renderers are equivalent.
+
+NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
+driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
+proof adapter required by Scott. Fresh three-process proofs follow teardown
+fixes cf699846f/20375ea56; neither an old failed cleanup nor an archived capture
+counts as that fresh proof. Browser teardown remains with its dedicated owner.
+
+
+### Batch 160 AMD voxel denoise watchdog (open, separate from jobs 4/5)
+
+Repro: select MARGO_GPU=amd, GPU_POWER=low-power and render the unchanged
+voxel-pathtracer denoise-materials reference: 480 x 300, 16,384 spp. Earlier
+bounded diagnostics, including 4 x 480 x 300 x 7 pixel-samples and dispatch
+drain, reset AMD in 4,064/4,068 ms with LiveKernelEvent 141. WER reports
+WATCHDOG-20261109-{0950,0952,0959}.dmp are retained outside the repository.
+The original package failure is test-results/batch-160/job4-material-gpu.log.
+No out-of-bounds access, nontermination or driver fault is established.
+DXGI reports AMD packet-boundary and NVIDIA dispatch-boundary compute preemption.
+The current radiance loop is bounded by 20 * maxBounces + 32, up to 1,312
+steps, each including scene/material work. A bound on pixel-samples alone does
+not bound traversal cost or prove a preemptible OS packet. Reducing the work
+or retrying the driver reset does not repair this. The earlier row-band draft
+passes CPU sample-group/PNG-seam tests but still reset the GPU and is excluded.
+Next isolate packet submission and per-ray termination/access invariants in one
+bounded diagnostic, preserving every pixel/sample and accumulation order.
+This remains an engine bug pending attribution, and is not a speed exemption.
+No new watchdog repro was run by the job 4 continuation.

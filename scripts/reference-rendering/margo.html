@@ -9,7 +9,7 @@ import {SETTINGS} from './scene.mjs';
 window.referenceMargo={
   async render(bytes,{backend='webgpu',settings=SETTINGS}={}){
     const canvas=document.body.appendChild(document.createElement('canvas'));
-    const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera});
+    const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera,powerPreference:settings.powerPreference});
     const errors=[];
     engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
     try{
@@ -19,7 +19,7 @@ window.referenceMargo={
       const model=await parseGLTFAsync(engine,new Uint8Array(bytes));
       await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
       if(errors.length)throw new Error(errors.join('\n'));
-      return {backend:engine.backend,draws:engine.stats.drawCalls,primitives:model.primitives.length,width:canvas.width,height:canvas.height};
+      return {adapter:engine.gpu.adapterInfo,backend:engine.backend,draws:engine.stats.drawCalls,primitives:model.primitives.length,width:canvas.width,height:canvas.height};
     }catch(e){engine.dispose();canvas.remove();throw e;}
   },
 };

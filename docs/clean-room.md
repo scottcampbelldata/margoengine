@@ -2203,3 +2203,24 @@ WebGPU Shading Language (6 November 2026), section 16.2 Reserved Words:
 https://www.w3.org/TR/2026/CRD-WGSL-20261106/#reserved-words.
 The identifier `active` is reserved; `sampled` keeps both short-circuit probes
 valid WGSL without changing their invocation-count assertions.
+
+
+### Batch 160 transformed native volume absorption
+
+- Khronos Group, KHR_materials_volume specification (ratified 2021), Properties, Refraction and Attenuation: https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_volume/README.md . Mesh thickness and attenuation distance use different coordinate spaces; the medium is homogeneous. Only normative prose/formulas read, no Sample Viewer source.
+- Bruce Walter, Stephen R. Marschner, Hongsong Li, Kenneth E. Torrance, Microfacet Models for Refraction through Rough Surfaces (EGSR 2007), section 4.2: https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf . Snell refraction controls the direction within a smooth local interface; rough-surface lobe transport remains distinct from the slab approximation.
+- Matt Pharr, Wenzel Jakob, Greg Humphreys, Physically Based Rendering, fourth edition (2023), section 11.2 Transmittance: https://www.pbr-book.org/4ed/Volume_Scattering/Transmittance . Homogeneous beam transmittance is Beer attenuation integrated over actual path length; concatenated segments multiply.
+
+Synthesis: the staged native slab repair refracts a world-space unit ray at the surface, takes its inverse linear transform into mesh space, and divides mesh thickness by its projected rate along the local slab normal. This gives a world-length ratio for the existing Beer tint. It corrects transformed thickness without claiming that a slab reproduces Cycles multiple scattering, rough refraction or arbitrary boundary intersections. Analytic scale/shear/mirror/angle regressions and the unchanged complete-model pixel budgets must pass. No code from any source was read or copied. The complete-model AMD proofs below retain the frozen reference budgets.
+
+
+### Batch 160 watchdog research (2026-11-09)
+
+Read standards and research prose only; no companion code.
+
+- Microsoft, WDDM support for timeout detection and recovery (current documentation, read 2026-11-09), https://learn.microsoft.com/en-us/windows-hardware/drivers/display/timeout-detection-and-recovery . A TDR means GPU task completion or preemption failed within the scheduler deadline; event 0x141 alone does not distinguish expensive valid work from an invalid access or driver fault.
+- Microsoft, DXGI_COMPUTE_PREEMPTION_GRANULARITY (2022), https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ne-dxgi1_2-dxgi_compute_preemption_granularity . DMA-buffer, dispatch, thread-group, thread and instruction boundaries are distinct; a dispatch is only part of a packet. Existing preemption.log reports AMD compute=0 and NVIDIA compute=1.
+- Samuli Laine, Tero Karras, Timo Aila, Megakernels Considered Harmful: Wavefront Path Tracing on GPUs (HPG 2013), https://research.nvidia.com/sites/default/files/pubs/2013-07_Megakernels-Considered-Harmful/laine2013hpg_paper.pdf . Separating divergent shading stages reduces register pressure and divergence, but is a larger restructuring than a capture submission bug repair and needs independent output proof. Do not treat this paper as evidence that a particular row bound fixes TDR.
+- Matt Pharr, Wenzel Jakob, Greg Humphreys, Physically Based Rendering, fourth edition (2023), section 15.1 prose, https://www.pbr-book.org/4ed/Wavefront_Rendering_on_GPUs/Mapping_Path_Tracing_to_the_GPU . Work queues and specialized kernels address throughput; throughput alone does not prove bounded packet duration.
+
+Synthesis for the pending watchdog job: preserve all pixels, samples and partial-sum order. The earlier <=65536-path row-band draft still lost AMD and is unvalidated. Must investigate command-buffer/packet boundaries and shader termination/access invariants; do not claim that awaiting onSubmittedWorkDone ensures a preemptible OS packet. Scott defers speed measurements and all exclusive locks. No new GPU diagnostic was run by this continuation.

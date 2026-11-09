@@ -1768,3 +1768,35 @@ The regression's native oracle uses textureLoad and exactly representable f32
 arithmetic, not implementation-dependent hardware mip filtering. CPU tests prove
 single argument evaluation and retain lazy/discard behavior; real GPU validation
 is pending. No new driver-defect or completed job 4/5 proof is claimed here.
+
+
+### Batch 160 job 4: transmission and volume
+
+Frozen all-pixel viewer and full/direct Cycles budgets are retained in
+results/batch-160-transmission.json, batch-160-volume.json and their -transport
+companions. The native volume path repairs transformed slab attenuation and
+exact absent normal-map direction, with shipped-WGSL and resource regressions.
+Fresh native and actual WebGL2 compatibility AMD repeat proofs are required,
+each three browser processes, four devices and six frames per device. No
+physical-equivalence or speed claim; unresolved transport residuals are recorded
+in known-bugs.md. Proof summaries will record actual completed reports.
+
+
+Fresh job 4 AMD proof (driver 32.0.21042.62): all four commands passed with
+normal teardown. Each backend/model retains 72 identical decoded RGBA captures
+across three fresh processes, four devices and six frames. Transmission
+viewer/full/direct absolute errors: native 1,749,897 / 4,120,866 / 2,622,899;
+compatibility 1,738,453 / 4,122,216 / 2,616,547. Volume viewer/full/direct:
+native 1,512,739 / 13,741,199 / 1,746,854; compatibility 1,512,128 / 13,741,752 /
+1,747,921. Every unchanged square/max/foreground gate also passes.
+Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
+results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
+to docs/whitepaper). The full volume ceiling remains 13,792,000.
+The analytic GPU test passes twenty exact slab pixels on each backend; all 47
+gltf-pro/materials runtime README examples pass with zero exceptions.
+The complete changed-package CPU run passes 783 tests with zero failures/skips.
+Earlier completed package browser/GPU steps are retained, not blindly rerun:
+gltf-pro shader/extensions/materials/viewer/native-volume, all materials steps
+with dispersion/cutout-casters completed by job4-material-remaining12.
+The unrelated voxel denoise-materials AMD watchdog remains an open investigation;
+these proofs do not classify it as a driver fault or close the batch.

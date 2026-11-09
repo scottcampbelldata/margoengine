@@ -1957,3 +1957,21 @@ with matching min/mag filters and integer LOD clamps (defaults 0 and 32), for
 implicit cube sampling, retain hardware filtering. No additional texture unit,
 core/stage change or larger picture-error budget. WebGPU filtered samples do
 not promise exact f32 weights; the native regression oracle uses unfiltered loads.
+
+
+Batch 160 job 4 retains complete 512 x 512 TransmissionTest (22 primitives)
+and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
+full/direct integer budgets. Native volume estimates a homogeneous refracted
+slab in mesh space with world-space Beer attenuation, including transforms and
+instancing. It does not trace mesh boundaries, add thickness maps or reproduce
+Cycles multiple scattering. Precomputed attenuation retains an extreme-depth
+underflow limit. Native WebGL2 explicitly refuses PBR; compatibility is actual
+WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
+repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
+volume absolute ceiling stays 13,792,000. No speed or equivalence claim.
+
+
+Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on
+WebGPU and 17.473541259765625 on compatibility; all original budgets pass.
+Proof summaries: whitepaper/results/batch-160-amd-{transmission,volume}.json.
+This measures complete pictures, retaining the transport limitations above.

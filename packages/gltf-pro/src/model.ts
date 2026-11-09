@@ -2788,9 +2788,11 @@ export class PBRModel implements EnginePlugin {
       const compressed = image && 'ktx2' in image ? image.ktx2 : image && 'mipmaps' in image ? image : undefined,
         format = compressed
           ? ((compressed.format.replace(/-srgb$/, '') + (srgbMaps.includes(i) ? '-srgb' : '')) as GPUTextureFormat)
-          : srgbMaps.includes(i)
-            ? 'rgba8unorm-srgb'
-            : 'rgba8unorm',
+          : !image && normalMaps.includes(i)
+            ? 'rgba16float'
+            : srgbMaps.includes(i)
+              ? 'rgba8unorm-srgb'
+              : 'rgba8unorm',
         size = image ? [image.width, image.height] : [1, 1];
       if (size.some((n) => n > device.limits.maxTextureDimension2D))
         throw new RangeError('Image exceeds device limit; load a smaller model, or reduce its textures and meshes');
@@ -2838,8 +2840,10 @@ export class PBRModel implements EnginePlugin {
         else
           device.queue.writeTexture(
             { texture },
-            new Uint8Array(normalMaps.includes(i) ? [128, 128, 255, 255] : [255, 255, 255, 255]),
-            { bytesPerRow: 4 },
+            normalMaps.includes(i)
+              ? new Uint16Array([0x3800, 0x3800, 0x3c00, 0x3c00])
+              : new Uint8Array([255, 255, 255, 255]),
+            { bytesPerRow: normalMaps.includes(i) ? 8 : 4 },
             [1, 1],
           );
         if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
@@ -4587,7 +4591,7 @@ export class PBRModel implements EnginePlugin {
     if (inst) code = inst.shader(code);
     if (side === 'back' && !topology) code = backSideShader(code);
     if (m.shading?.texturedTint) code = texturedTintPBR(code);
-    else if (surfaceTint(m)) code = surfaceTintPBR(code);
+    else if (!compact && transmits(m) && surfaceTint(m)) code = surfaceTintPBR(code);
     if (through && !transmission && this.transparency!.blends && m.tint) code = transparentTintPBR(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);

@@ -6,7 +6,7 @@ import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { factorPhysicalShader, extendedShader, extendedPlan } from '../src/shader.ts';
 
-async function fixture() {
+async function fixture(onDevice = () => {}) {
   const gpu = optionalGPU(),
     device = gpu.engine.gpu,
     store = await TransformStore.create(32);
@@ -21,6 +21,7 @@ async function fixture() {
   delete data.doc.skins;
   delete data.doc.animations;
   delete data.doc.nodes[0].skin;
+  onDevice(device);
   const model = parseGLTF(engine, data.doc, data.buffers),
     context = { ...gpu.context, camera: engine.camera },
     draws = [];
@@ -152,8 +153,11 @@ test('native physical materials do not bind absent extension-map fallbacks', asy
   const draw = f.draws[0];
   assert.equal(draw.groups[1].entries.length, 10, 'five core maps, no eight unused physical textures');
   assert.equal((draw.pipeline.fragment.module.code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 5);
-  assert.match(draw.pipeline.fragment.module.code, /vec4f\(128\.0\/255\.0,128\.0\/255\.0,1,1\)/,
-    'the removed normal-map fallback retains the exact UNORM texel value');
+  assert.match(
+    draw.pipeline.fragment.module.code,
+    /vec4f\(0\.5,0\.5,1,1\)/,
+    'an absent clearcoat normal map leaves the geometric normal unchanged',
+  );
 });
 
 test('sparse physical shaders preserve every authored extension-map slot independently', async () => {
@@ -163,7 +167,10 @@ test('sparse physical shaders preserve every authored extension-map slot indepen
     maps[k + 5] = { index: k };
     const code = sparsePhysicalShader(maps);
     assert.equal((code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 6);
-    assert.match(code, new RegExp(`textureSample\\(${physicalMaps[k]}Map,${physicalMaps[k]}Sampler,uv\\(i,${k + 5}\\)\\)`));
+    assert.match(
+      code,
+      new RegExp(`textureSample\\(${physicalMaps[k]}Map,${physicalMaps[k]}Sampler,uv\\(i,${k + 5}\\)\\)`),
+    );
   }
 });
 
@@ -172,13 +179,14 @@ test('adding and removing a live shading hook retains its full fallback-map reso
   t.after(() => f.engine.dispose());
   const m = f.model.primitives[0].material;
   Object.assign(m, {
-    maps: Array(13), ext: [0, 1.5, 0, 0],
+    maps: Array(13),
+    ext: [0, 1.5, 0, 0],
     uvt: Array.from({ length: 13 }, () => textureTransform()).flat(),
     physical: [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
   });
   f.frame();
   assert.equal(f.draws.at(-1).groups[1].entries.length, 10);
-  m.shading = { shader: code => code, bindings: () => [] };
+  m.shading = { shader: (code) => code, bindings: () => [] };
   f.frame();
   assert.equal(f.draws.at(-1).groups[1].entries.length, 26, 'a live hook keeps all of its declared map bindings');
   assert.equal((f.draws.at(-1).pipeline.fragment.module.code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 13);
@@ -236,4 +244,39 @@ test('mapped tint retains resource declarations with either WGSL attribute order
 @fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(1);}`);
   assert.match(code, /_=&reversed;/);
   assert.match(code, /_=&spaced;/);
+});
+
+test('absent normal maps decode to the exact geometric normal', async (t) => {
+  const writes = [];
+  const f = await fixture((device) => {
+    device.queue.writeTexture = (target, data, layout) => {
+      writes.push({
+        texture: target.texture,
+        bytes: new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
+        layout,
+      });
+    };
+  });
+  t.after(() => f.engine.dispose());
+  f.frame();
+  const normal = writes[2];
+  // No integer byte represents 0.5: an RGBA8 fallback tilts every absent normal map.
+  assert.equal(normal.texture.format, 'rgba16float');
+  assert.deepEqual([...new Uint16Array(normal.bytes.buffer)], [0x3800, 0x3800, 0x3c00, 0x3c00]);
+  assert.equal(normal.layout.bytesPerRow, 8);
+});
+
+
+test('a physical-shading replacement receives no native volume helper or uniforms', async (t) => {
+  const f = await fixture();
+  t.after(() => f.engine.dispose());
+  Object.assign(f.model.primitives[0].material, {
+    tint: [0.5,0.5,0.5], attenuation: [0.5,0.5,0.5],
+    ext: [0,1.5,0,0], physical: [0,0,0,1,1,1,1,1,0,0,0,0],
+    extension: { replacesPhysical: true },
+  });
+  f.frame();
+  const code = f.draws[0].pipeline.fragment.module.code;
+  assert.doesNotMatch(code,/fn margoVolumeTint\(/);
+  assert.doesNotMatch(code,/f\.ext\./);
 });

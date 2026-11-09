@@ -13,7 +13,7 @@ import { saveReference } from './reference.mjs';
 const root = join(process.env.MARGO_ENGINE_BENCH ?? 'C:/Development/Projects/engine-bench', 'batch-160');
 const family = process.argv.find((a) => a.startsWith('--case='))?.slice(7) ?? 'metallic-roughness';
 const entry = referenceCase(family),
-  SETTINGS = entry.settings;
+  SETTINGS = { ...entry.settings, powerPreference: process.env.GPU_POWER };
 const baselinePath = `docs/whitepaper/results/batch-160-${family}.json`;
 const out = join(root, family);
 mkdirSync(out, { recursive: true });

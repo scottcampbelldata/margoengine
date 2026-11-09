@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Static reference repeat capture</title>
+<style>body{margin:0}canvas{width:512px;height:512px}</style></head><body><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+window.repeatReference=async(bytes,settings)=>{
+ const shots=[];
+ for(let device=0;device<4;device++){
+  const canvas=document.body.appendChild(document.createElement('canvas'));
+  const engine=await Engine.create(canvas,{backend:'webgpu',camera:settings.camera,powerPreference:settings.powerPreference});
+  try{
+   engine.scene.background='#000000';
+   engine.lighting.direction.set([...settings.light.direction,settings.light.intensity]);
+   engine.lighting.radiance.set([1,1,1,0]);
+   const model=await parseGLTFAsync(engine,new Uint8Array(bytes));
+   await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+   for(let frame=0;frame<6;frame++){
+    engine.render({culling:false});
+    await engine.gpu.queue.onSubmittedWorkDone();
+    shots.push({device,frame,primitives:model.primitives.length,adapter:{vendor:engine.gpu.adapterInfo?.vendor,architecture:engine.gpu.adapterInfo?.architecture,description:engine.gpu.adapterInfo?.description},png:canvas.toDataURL('image/png')});
+   }
+  }finally{engine.dispose();canvas.remove();}
+ }
+ return shots;
+};
+</script></body></html>

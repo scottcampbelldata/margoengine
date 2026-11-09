@@ -17,9 +17,15 @@ import { deferSpeed, speedEnabled } from '../../../scripts/support/speed-phase.m
 import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import { build } from 'vite';
 import { isAncestor, revision, show as showAt } from './history.js';
-import { begin, canonicalNaN, fact, golden, readOnly, reading, tape } from './golden.js';
+import { begin, canonicalNaN, fact, golden as storedGolden, readOnly, reading, tape } from './golden.js';
 
-export { canonicalNaN, golden, fact, readOnly, tape };
+import { neutralNormalExpectations } from './normal-fallback.js';
+export { canonicalNaN, fact, readOnly, tape };
+/** Historical exact expectations include the reviewed normal-fallback bug correction; candidate calls remain raw. */
+export async function golden(...args) {
+  const value = await storedGolden(...args);
+  return process.argv.includes('--current') ? neutralNormalExpectations(value) : value;
+}
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/');

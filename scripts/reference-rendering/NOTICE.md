@@ -61,3 +61,13 @@ vertices to assign finite constant tints per triangle. This is a blend-state
 repeatability control. Jobs 4/5's complete reference scenes and budgets are unchanged.
 Standalone Dawn Node 0.6.2 uses the existing webgpu development dependency through
 its public API; no Dawn, ANGLE, driver or reference-renderer implementation was read.
+
+Job 4: TransmissionTest, glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
+CC0-1.0, Adobe, 2020. Original GLB SHA-256 dd9732dae5517f8605ad4324d78b077b969c3e8357c056280d0a4e4b67797d15.
+Original GLB/legal README, matched GLB, Sample Viewer PNG and Cycles EXR/linear/PNG files stay
+outside in engine-bench/batch-160/transmission; result JSON records the frozen hashes.
+
+Job 4: AttenuationTest, glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
+CC-BY-4.0, Analytical Graphics, Inc., Ed Mackey, 2021. Original GLB SHA-256 7ca161b7f8a9e4b2ac1f7f75816b5848bb31f3b4c226c4cb731b487c8809b756.
+Original GLB/legal README, matched GLB, Sample Viewer PNG and Cycles EXR/linear/PNG files stay
+outside in engine-bench/batch-160/volume; result JSON records the frozen hashes.

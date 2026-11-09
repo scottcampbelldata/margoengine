@@ -423,7 +423,7 @@ export function sparsePhysicalShader(maps: readonly unknown[]): string {
     code = code
       .replace(`@group(1) @binding(${10 + i * 2}) var ${name}Map:texture_2d<f32>;`, '')
       .replace(`@group(1) @binding(${11 + i * 2}) var ${name}Sampler:sampler;`, '')
-      .replaceAll(sample(name), name === 'clearcoatNormal' ? 'vec4f(128.0/255.0,128.0/255.0,1,1)' : 'vec4f(1)');
+      .replaceAll(sample(name), name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)');
   }
   sparsePhysical.set(mask, code);
   return code;
@@ -466,10 +466,40 @@ export function texturedTintPBR(code: string): string {
 }
 /** `code` with a tint draw that reads the whole surface: the same bindings as the lit draw, the base colour and transmission maps included. The tint lanes then hold the volume attenuation alone. */
 export function surfaceTintPBR(code: string): string {
-  return texturedTintPBR(code).replace(
+  let out = (
+    texturedTintPBR(code) +
+    `
+// thicknessFactor is in mesh units; attenuationDistance is in world units (KHR_materials_volume).
+// The native route estimates a slab. Transform its refracted ray into mesh space before crossing that slab.
+fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
+  let incident=normalize(i.position-f.eye.xyz);
+  let ray=refract(incident,s.n,1.0/max(f.ext.y,1.0));
+  let c0=cross(m[1],m[2]); let c1=cross(m[2],m[0]); let c2=cross(m[0],m[1]);
+  let determinant=abs(dot(m[0],c0));
+  let normal=normalize(vec3f(dot(m[0],i.normal),dot(m[1],i.normal),dot(m[2],i.normal)));
+  let projected=abs(dot(vec3f(dot(c0,ray),dot(c1,ray),dot(c2,ray)),normal));
+  let tint=vec3f(f.coordsB.zw,f.ext.z);
+  if(projected==0.0){return select(vec3f(0),vec3f(1),tint==vec3f(1));}
+  return pow(tint,vec3f(determinant/projected));
+}
+`
+  ).replace(
     'return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));',
-    'let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*vec3f(f.coordsB.zw,f.ext.z));',
+    'let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz)));',
   );
+  // This native volume path owns its matrix varyings; the optional instancing decoder carries no volume code.
+  if (code.includes('o.mirror=margoS;')) {
+    const fields = /struct Out \{([^}]+)\}/.exec(out)![1];
+    let location = 0;
+    while ([location, location + 1, location + 2].some(slot => fields.includes(`@location(${slot})`))) location++;
+    out = out
+      .replace(/(struct Out \{[^}]*?)\n\}/,
+        `$1, @location(${location}) @interpolate(flat) volume0:vec3f, @location(${location + 1}) @interpolate(flat) volume1:vec3f, @location(${location + 2}) @interpolate(flat) volume2:vec3f\n}`)
+      .replace('o.mirror=margoS;', 'o.mirror=margoS; o.volume0=margoI[0].xyz; o.volume1=margoI[1].xyz; o.volume2=margoI[2].xyz;')
+      .replace('margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz))',
+        'margoVolumeTint(i,s,mat3x3f(i.volume0,i.volume1,i.volume2))');
+  }
+  return out;
 }
 /**
  * `code` (physicalShader, or factorPhysicalShader for materials built in code) for KHR_materials_transmission
@@ -788,7 +818,10 @@ export function extendedShader(plan: ExtendedPlan): string {
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
       ['uvt:array<vec4f,26>', 'uvt:array<vec4f,42>'],
-      ['sheen:vec4f\n}', 'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f, scatter:vec4f, extinction:vec4f\n}'],
+      [
+        'sheen:vec4f\n}',
+        'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f, scatter:vec4f, extinction:vec4f\n}',
+      ],
       ['sh:vec4f}', `sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f${plan.scatter ? ', sc:vec3f' : ''}}`],
       [
         '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',

@@ -1376,3 +1376,31 @@ features-browser.mjs compares all original cases plus unfiltered native mip
 interpolation and exact private argument counts, including short-circuit and
 discard cases. A negative control replacing the emitted fractional weight with
 zero must fail the unchanged exact mip assertions. No tolerance is raised.
+
+
+### Batch 160 job 4: complete transmission and volume scenes
+
+Source/license and reference hashes are in scripts/reference-rendering/NOTICE.md
+and the frozen results/batch-160-{transmission,volume} JSONs. Source GLBs and
+Sample Viewer/Cycles PNGs remain outside this repository in engine-bench/batch-160.
+Use fetch-assets.mjs and cycles-gltf.py for public licensed data and black-box
+Blender Cycles; never inspect reference-renderer source. The full/direct controls
+retain all authored primitives, pixels, samples and budgets.
+
+Build packages, set MARGO_GPU=amd and GPU_POWER=low-power, then run each command
+in its own shared GPU slot with owner codex-160, wait-max at least 60 and max
+at measured runtime plus a small margin:
+
+~~~powershell
+node scripts/reference-rendering/proof.mjs --case=transmission
+node scripts/reference-rendering/proof.mjs --case=transmission --compat
+node scripts/reference-rendering/proof.mjs --case=volume
+node scripts/reference-rendering/proof.mjs --case=volume --compat
+~~~
+
+Each command preserves 72 PNGs and proof.json in a unique external directory,
+validates every original budget, actual AMD adapter and identical decoded RGBA
+bytes. The full volume ceiling remains 13,792,000. Native WebGL2 refusal is
+covered by run.mjs. Run gltf-pro's native-volume GPU test for twenty exact slab
+readbacks on each backend, and its unit tests for transformed/instanced shader
+math and exact absent normal-map fallbacks. No benchmark is part of this proof.

@@ -1,0 +1,102 @@
+{
+  "family": "volume",
+  "domain": "All RGB pixels, neutral/sRGB; black world, fixed radiometric sun 3; full transport and direct-lit refraction control separately",
+  "sourceSha256": "7ca161b7f8a9e4b2ac1f7f75816b5848bb31f3b4c226c4cb731b487c8809b756",
+  "sceneSha256": "cd8c7470b54a673a16a077a4b22d17f99ff6522725fd3c525aa2956511cdaac4",
+  "width": 512,
+  "height": 512,
+  "rows": {
+    "full": {
+      "referenceSha256": "384cf7a91a0a4a9e1c42ffbd6bb0774025327b8f8b80f1fd36feafba5f7422e8",
+      "linearSha256": "0bfaf862294a75b335f62cc351717c0889182b9d34d5b82117c57e7d88bcb839",
+      "meta": {
+        "blender": "5.3.0 Beta",
+        "samples": 128,
+        "seed": 160,
+        "threads": 4,
+        "width": 512,
+        "height": 512,
+        "maxBounces": 16,
+        "transmissionBounces": 12,
+        "filter": "BOX",
+        "filterWidth": 1,
+        "camera": "Batch 160 camera",
+        "sunIrradiance": 3,
+        "mode": "full path transport",
+        "domain": "scene-linear RGB, top row first; no IBL, no denoising"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 13792000,
+        "square": 1394430502,
+        "max": 148,
+        "mae": 17.537434895833332,
+        "rmse": 42.108313601486884,
+        "foreground": 150544,
+        "foregroundAbsolute": 13792000,
+        "foregroundMae": 30.538137244482233,
+        "changed": 146646
+      },
+      "compat": {
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 13792000,
+          "square": 1394430502,
+          "max": 148,
+          "mae": 17.537434895833332,
+          "rmse": 42.108313601486884,
+          "foreground": 150544,
+          "foregroundAbsolute": 13792000,
+          "foregroundMae": 30.538137244482233,
+          "changed": 146646
+        }
+      }
+    },
+    "direct": {
+      "referenceSha256": "a2cb0b6406c1a550857413b7cd03378992a643f9785100697a2ebaf5a2f9ae96",
+      "linearSha256": "936d1145503c757eb443b430a8914abd8b1e4ec9d35db4834bb4aa1326e02a7c",
+      "meta": {
+        "blender": "5.3.0 Beta",
+        "samples": 128,
+        "seed": 160,
+        "threads": 4,
+        "width": 512,
+        "height": 512,
+        "maxBounces": 16,
+        "transmissionBounces": 12,
+        "filter": "BOX",
+        "filterWidth": 1,
+        "camera": "Batch 160 camera",
+        "sunIrradiance": 3,
+        "mode": "direct-lit refraction, no cast shadows or diffuse/glossy bounce",
+        "domain": "scene-linear RGB, top row first; no IBL, no denoising"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 1843497,
+        "square": 70743471,
+        "max": 142,
+        "mae": 2.344127655029297,
+        "rmse": 9.484459664534075,
+        "foreground": 150544,
+        "foregroundAbsolute": 1843497,
+        "foregroundMae": 4.081856467212243,
+        "changed": 64277
+      },
+      "compat": {
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 1843497,
+          "square": 70743471,
+          "max": 142,
+          "mae": 2.344127655029297,
+          "rmse": 9.484459664534075,
+          "foreground": 150544,
+          "foregroundAbsolute": 1843497,
+          "foregroundMae": 4.081856467212243,
+          "changed": 64277
+        }
+      }
+    }
+  }
+}

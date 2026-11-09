@@ -47,6 +47,26 @@ export const cases = {
     scale: 1,
     settings: { ...SETTINGS, camera: { position: [42, 32, 53], target: [0, 0, 0], fov: 35, near: 0.01, far: 200 } },
   },
+  transmission: {
+    model: 'TransmissionTest',
+    license: 'CC0-1.0, Adobe, 2020',
+    sourceSha256: 'dd9732dae5517f8605ad4324d78b077b969c3e8357c056280d0a4e4b67797d15',
+    scale: 1,
+    settings: {
+      ...SETTINGS,
+      camera: { position: [-0.075, 0.11, 4.4], target: [-0.075, 0.11, 0.4], fov: 35, near: 0.01, far: 100 },
+    },
+  },
+  volume: {
+    model: 'AttenuationTest',
+    license: 'CC-BY-4.0, Analytical Graphics, Inc., Ed Mackey, 2021',
+    sourceSha256: '7ca161b7f8a9e4b2ac1f7f75816b5848bb31f3b4c226c4cb731b487c8809b756',
+    scale: 1,
+    settings: {
+      ...SETTINGS,
+      camera: { position: [0, 0, 40], target: [0, 0, 0], fov: 35, near: 0.01, far: 100 },
+    },
+  },
 };
 
 export function referenceCase(name) {

@@ -28,6 +28,16 @@ constructor; `GLTFDocument` is available as a type from either entry.
 `@margoengine/gltf-pro/coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
 for material extensions that read texture coordinates without loading the renderer.
 
+The native volume tint estimates a slab through `thicknessFactor` in mesh units and
+converts the refracted path to world units before applying Beer-Lambert absorption.
+Node scale, rotation, shear, reflection and `EXT_mesh_gpu_instancing` affect that path;
+`attenuationDistance` stays in world units. This path retains its scalar thickness
+approximation and display-space blend; the optional transmission installation supplies
+screen-space refraction and thickness textures. Default normal textures use exactly
+neutral half-float texels, including when a live shading hook retains fallback bindings.
+Run `npm run test:gpu:native-volume --workspace @margoengine/gltf-pro` after the package
+build for twenty analytic slab pixels on each backend.
+
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 
 Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
