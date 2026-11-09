@@ -45,8 +45,13 @@ try {
         });
         const render = () => e.render({ delta: 1 / 60, views: [{ camera: e.camera, scene, viewport: [0, 0, 1, 1] }] });
         // fixed-wait: exactly four dispatches define the asserted values and step count, not readiness.
-        for (let i = 0; i < 4; i++) render();
-        const values = Array.from(await array.read());
+        let values;
+        for (const expected of [1, 2, 3, 4]) {
+          render();
+          values = Array.from(await array.read());
+          if (!values.every((value) => value === expected))
+            throw new Error(`ComputeFrame dispatch ${expected} did not update every element exactly`);
+        }
         const gpu = frame.gpu;
         frame.dispose();
         frame.dispose();

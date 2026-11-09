@@ -3429,3 +3429,25 @@ while attached doubles track their plugin identity. The initial incomplete-host
 run hit its five-minute hard limit after cleanup exceptions left timers alive;
 its whole process tree was killed. No assertion or numerical bar was weakened.
 GPU and README acceptance are recorded separately after completion.
+
+### Batch 56 ComputeFrame GPU gate reachability
+
+Research compared Gregg Rothermel and Mary Jean Harrold, *A Safe, Efficient
+Regression Test Selection Technique* (1997),
+https://www.cs.purdue.edu/homes/xyzhang/spring07/Papers/p173-rothermel.pdf,
+with Shin Yoo and Mark Harman, *Regression testing minimization, selection and
+prioritization: a survey* (2012), https://doi.org/10.1002/stvr.430 (summary).
+The former treats safety as retaining affected tests; the latter distinguishes
+selection from minimization and ordering. Inference: a manually passing owner
+proof is insufficient if the package plan cannot reach it. Add the package
+script, retain shared correctness scheduling and assert its real planned command.
+The script changes to the repository root before starting its server; the first
+package-context attempt returned HTTP failure because that root was absent.
+No implementation from either paper or another repository was read or used.
+
+The four dispatches are an exact workload, not a pipeline-readiness delay.
+Each now awaits its readback and checks all 1,024 intermediate values against
+1, 2, 3 and 4; the unchanged final value, step-count and disposal assertions
+remain. Native and compatibility proofs pass; the complete browser suite
+passes 132 checks and 413 shader modules without errors, and 21 runtime README
+examples pass. No timeout, numerical tolerance or baseline was changed.

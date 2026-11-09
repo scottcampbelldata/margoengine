@@ -677,3 +677,5 @@ layer. It is registered in the package GPU plan, including affected merge checks
 
 It checks all 1,024 exact four-dispatch values, direct disposal, the secondary
 scene registration, the default-scene sentinel, and context/array release.
+After building packages, it checks all 1,024 values after each of four exact
+dispatches, then scene detachment and resource release.

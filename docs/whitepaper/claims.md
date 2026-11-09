@@ -2334,3 +2334,11 @@ from scene removal and preserves default-scene names and later replacements;
 four direct failures become eight passing cases including removal controls.
 The package plus source guard passes 95 checks. Real-GPU and README acceptance
 remain pending. This makes no timing, performance or scene-isolated profiling claim.
+
+### ComputeFrame owner gate reachability
+
+The package GPU plan now executes the owner regression through its rooted
+package command. Both backends check each of four exact 1,024-element updates,
+then ownership and resource release. Complete compute acceptance: 132 browser
+checks, 413 shader modules without errors, and 21 runtime README examples.
+No speed or runtime-size change is claimed.

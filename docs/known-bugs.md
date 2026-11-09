@@ -3556,3 +3556,13 @@ removed. Each owner now uses sceneOf(this); the eight-case real-engine test fail
 four direct cases before repair and passes all eight afterward. Scene removal,
 restoration, resource release and replacements remain covered. GPU/README and
 closing acceptance are pending; the wider audit remains open.
+
+### Fixed: ComputeFrame owner proof absent from package GPU gates
+
+The owner browser driver existed but no compute package script named it, so the
+GPU planner rejected the complete plan. Its new package script is covered by
+compute-owner-gate.test.js (fails before wiring). The script starts from the
+repository root. The owner GPU loop now checks every intermediate dispatch
+result after readback, retaining the exact four-step workload and disposal
+assertions. Native/compatibility owner proof, all 132 browser checks, all 21
+runtime examples and the full failed-gate/compute unit rerun pass.

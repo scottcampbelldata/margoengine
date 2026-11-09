@@ -4545,3 +4545,13 @@ An incomplete-double run was killed at its five-minute hard limit; cleanup had
 stopped at missing sceneOf methods. Explicit fixture registration contracts fix
 that cause without weakening assertions. GPU/README and closing gates remain
 pending until their receipts are recorded. No core/stage or timing claim.
+
+### Section 5 evidence: reachable ComputeFrame owner gate
+
+The real GPU plan includes compute/test:browser:scene-owner in a shared slot.
+Its package command establishes the repository server root. All 1,024 values
+are checked after each of four exact dispatches on native and compatibility
+backends. Complete compute browser acceptance remains 132 checks / 413 shader
+modules / zero errors; 21 runtime README examples pass. The first package-context
+attempt's HTTP failure is retained, then its root cause is corrected. The fixed
+wait baseline and numerical assertions are unchanged.

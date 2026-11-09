@@ -2787,3 +2787,9 @@ scene ownership governs registration and detachment, not independent per-scene
 profiling. Canonical min+gzip against the committed 559e2dba1 entry measurement:
 stats root 4853 to 4861 B, beacon 1383 to 1394 B, compile 1802 to 1813 B and
 phases 1458 to 1467 B. No ceiling is raised; core plus stage remains 23924 B.
+
+### ComputeFrame gate wiring
+
+Only the package test command and browser proof change. Runtime source, exports,
+entry ceilings and core plus stage (23924 B) are unchanged. Four intermediate
+1,024-value readbacks strengthen correctness; they make no speed claim.

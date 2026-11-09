@@ -1898,3 +1898,13 @@ in one shared GPU slot, --owner=codex-56fix --wait-max=60 --max=1.5, then
 scripts/run-readme-examples.mjs --packages=stats with --max=1.5. Both commands
 render on a real GPU; never hold a slot for the CPU suite or closing checks.
 The browser adds eight scene-owner cases to all existing profiling checks.
+
+### ComputeFrame owner package command
+
+Build packages first, then run the compute package's test:browser:scene-owner
+script under gpu-lock run --owner=codex-56fix --wait-max=60 --max=1.5. It changes
+to the repository root itself and checks both backends. Run the complete compute
+browser driver and --packages=compute runtime README command in separate shared
+slots. The CPU regression tests/compute-owner-gate.test.js asserts the real
+planner command and shared mode; it fails before the missing script is added.
+Collected results: test-results/56fix/owed-results-compute-owner-gate-gate-repair-rooted.json.
