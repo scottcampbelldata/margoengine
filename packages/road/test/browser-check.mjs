@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'banking', 'terrain', 'repair', 'markings']) {
+  for (const feature of ['junctions', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -60,6 +60,50 @@ try {
       engine.onError = (e) => {
         throw e;
       };
+      const checkNetwork = async () => {
+        if (feature !== 'graph') return;
+        const {createCompute} = await import('/packages/compute/dist/index.js');
+        const {shortestPaths, bfs} = await import('/packages/compute/dist/graph.js');
+        const {roadGraph} = await import('/packages/road/dist/graph.js');
+        const {Spline} = await import('/packages/splines/dist/index.js');
+        using gpu = await createCompute({engine});
+        if(gpu.backend !== 'webgpu') throw new Error('Expected device-backed graph');
+        const roads = [
+          {from:0,to:1,curve:new Spline([[0,0,0],[100,0,0]]),speed:10,direction:'forward'},
+          {from:0,to:2,curve:new Spline([[0,0,0],[60,0,0]]),speed:10},
+          {from:2,to:1,curve:new Spline([[0,0,0],[60,0,0]]),speed:10},
+        ];
+        const verify = async (g,start,expected,parents) => {
+          const r=await shortestPaths(g,start,{checkEvery:1});
+          try {
+            const d=Array.from(await r.distances.read()), p=Array.from(await r.predecessors.read());
+            if(r.negativeCycle || d.some((v,i)=>v!==expected[i]) || p.some((v,i)=>v!==parents[i])) throw new Error(`Road routing oracle ${d}; ${p}`);
+          } finally {r.distances.dispose();r.predecessors.dispose();}
+        };
+        using free=roadGraph(gpu,{vertices:4,roads});
+        await verify(free,0,[0,10,6,Infinity],[-1,0,0,-1]);
+        await verify(free,1,[12,0,6,Infinity],[2,-1,1,-1]);
+        using busy=roadGraph(gpu,{vertices:4,roads:[{...roads[0],traffic:2,delay:3},...roads.slice(1)]});
+        await verify(busy,0,[0,12,6,Infinity],[-1,2,0,-1]);
+        using reverse=roadGraph(gpu,{vertices:2,roads:[{...roads[0],direction:'reverse'}]});
+        await verify(reverse,0,[0,Infinity],[-1,-1]);
+        await verify(reverse,1,[10,0],[1,-1]);
+        for(const length of [2**-126,2**126]) {
+          using extreme=roadGraph(gpu,{vertices:2,roads:[{from:0,to:1,curve:{length},speed:1}]});
+          await verify(extreme,0,[0,length],[-1,0]);
+        }
+        const r=await bfs(free,0,{checkEvery:1});
+        try {if(String(await r.distances.read())!=='0,1,1,-1')throw new Error('Road reachability oracle');}
+        finally {r.distances.dispose();r.predecessors.dispose();}
+        const signal=AbortSignal.abort(new Error('cancel route'));
+        let cancelled=false;
+        try {await shortestPaths(free,0,{signal});}catch(e){cancelled=e===signal.reason;}
+        if(!cancelled)throw new Error('Routing must honor abort');
+        free.dispose();free.dispose();busy.dispose();busy.dispose();
+        using isolated=roadGraph(gpu,{vertices:2});await verify(isolated,0,[0,Infinity],[-1,-1]);
+        gpu.dispose();gpu.dispose();
+      };
+      await checkNetwork();
       let data;
       if (feature === 'markings') {
         const {road} = await import('/packages/road/dist/index.js');
@@ -129,6 +173,7 @@ try {
         draw,
         async reboot() {
           await engine.rebootDevice();
+          await checkNetwork();
           await draw();
         },
         async remove() {

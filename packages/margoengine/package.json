@@ -2378,6 +2378,10 @@
       "types": "./dist/road/markings.d.ts",
       "import": "./dist/road/markings.js"
     },
+    "./road/graph": {
+      "types": "./dist/road/graph.d.ts",
+      "import": "./dist/road/graph.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

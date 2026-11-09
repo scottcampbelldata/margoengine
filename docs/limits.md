@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-639). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-640). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1618,3 +1618,7 @@ Original PDF/JPEG downloaded for measurement, never redistributed. No external
 colour reconstruction, wood/rust realism, cross-device bytes or speed claim.
 Entry JavaScript plus shader is 2,874 B gzip (new ceiling 2,989 B); no lazy asset.
 Core plus stage remains 23,797 B gzip, strictly below 25,000 B.
+
+### Batch 65 job 6: Road network graph (LIM-640)
+
+Optional road/graph: 665 B min+gzip with bare package imports external; dependencies are additional downloads. Explicit vertex topology only; at most 65536 vertices and 65536 roads, zero allowed. No geometric intersection detection, snapping, lane/turn restrictions, traffic simulation, live updates or OpenDRIVE parser. Split links at intended junctions; bridges remain distinct IDs. Parallel arcs retain the least travel time, losing road identity; remove closed roads and rebuild for changed traffic. Weights and solver sums are float32, with normal positive edge seconds from 2^-126 to 2^127/max(1,vertices); f32 rounding and generic compute/graph predecessor limitations apply. The bounded adapter reuses the existing graph builder and solver; no new CPU-heavy solver. Dispose graph, solver output arrays and caller-owned context separately. A graph bound to a lost device must be rebuilt with a new context after engine reboot. Generated stand-in networks: arc-length/default costs, one-way/reverse links, minimum parallel edges, traffic rerouting, isolation, ownership, empty/maximum topology, hostile/extreme values and aborts. Native WebGPU and real WebGL2 compatibility verify route distances/predecessors, reachability, extreme normal f32 weights, solver abort, double disposal, and reconstruction after engine device reboot. No speed or real traffic-data claim.

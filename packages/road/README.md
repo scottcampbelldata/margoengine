@@ -103,3 +103,28 @@ console.log(paint.count);
 Render the engine as usual. `markings` is synchronous and returns independently owned `Decal[]`; no image, loading or GPU allocation occurs. Pass the list to the existing decal renderer, with a scene-depth capture attached. The default white texel paints strokes in unlit `over` mode. Shared settings: `color` linear RGB in 0..1 (default white), `opacity` 0..1 (default 1), `depth` positive through 1000 m (default 2). Individual `angle` defaults 0 along +Z, `length` to 4 m (positive through 10000), `width` to 0.15 m for lines or 1.5 m for arrows (positive through 1000). `dash` is line-only [paint,gap], both positive through 10000 m; default solid. Its last painted segment trims to the authored end. Up to 4096 resulting projectors; empty input clears the list. Positions stay within +/-1,000,000 m. Arrows are stylized three-stroke glyphs; this is not a traffic-standard artwork library. Downward box projection can paint any upward-facing object inside it, so set its centre/depth around the road. Subpixel or imprecise world placement can disappear; use a local origin. CPU descriptions need no disposal; dispose Decals, meshes and engines. Device reboot, disposal, actual white line/arrow pixels and WebGL2 compatibility are tested.
 
 Every projector half-extent must be a normal float32 number (at least 2^-126); dimensions of 1e-30 m remain accepted. This excludes values the GPU may flush to zero.
+
+## Road network graph
+
+```ts
+import {roadGraph} from 'margoengine/road/graph';
+import {Spline} from 'margoengine/splines';
+import {createCompute} from 'margoengine/compute';
+import {shortestPaths} from 'margoengine/compute/graph';
+using gpu = await createCompute();
+using network = roadGraph(gpu, {vertices:3, roads:[
+  {from:0,to:1,curve:new Spline([[0,0,0],[100,0,0]]),speed:10,direction:'forward'},
+  {from:1,to:2,curve:new Spline([[100,0,0],[160,0,0]]),speed:10,traffic:2,delay:3},
+]});
+const result = await shortestPaths(network, 0);
+using distances = result.distances;
+using predecessors = result.predecessors;
+console.log(await distances.read()); // Float32Array [0, 10, 25] seconds
+console.log(await predecessors.read()); // Int32Array [-1, 0, 1]
+```
+
+`roadGraph` synchronously returns a caller-owned `CsrMatrix` for existing `compute/graph` shortest paths, BFS and components. Junctions are integer IDs in `0..vertices-1`, explicitly shared by the roads you want connected. Split roads at intended intersections; crossings and bridge overlaps never connect automatically. No road geometry or mesh is required. Each link's `curve.length` is snapshotted as arc metres. Weight seconds are `length / speed * traffic + delay`, rounded to float32. Defaults: `roads:[]`, `speed:50/3.6` m/s (50 km/h), `direction:'both'`, `traffic:1`, `delay:0`, `signal` none. Direction can also be `'forward'` (from -> to) or `'reverse'`; use separate links for asymmetric costs. Speed and length are positive finite, traffic finite and at least 1, delay finite and nonnegative. Closed roads are omitted. Rebuild for changed traffic; this graph is a snapshot, without a traffic simulator or lane/turn restrictions.
+
+Up to 65536 vertices and 65536 input roads; zero vertices/roads, isolated vertices and positive self loops are supported. Parallel arcs keep only the minimum cost, without road identities. Edge seconds must be normal float32 values at least 2^-126 and at most 2^127/max(1,vertices), keeping simple-path sums finite. Solvers use f32 sums, so rounding affects costs; compute/graph's predecessor limitations apply. This adapter does not reconstruct road itineraries. The signal checks before reading and before upload; a synchronous build cannot yield mid-loop. Solvers and reads accept their own signal.
+
+Native WebGPU and real WebGL2 compatibility both run the existing device-backed compute route, proved by distance/predecessor and lifecycle assertions. For a CPU fallback, use `createCompute({backend:'cpu'})`; the same graph API works in Node. When sharing a render engine, pass `createCompute({engine})`; dispose graph/output arrays/context before engine disposal. Those objects do not own the engine device. After device loss/reboot, create a fresh context and rebuild the graph from your retained road descriptions. Graphs do not restore themselves. The GPU test proves the rebuilt graph has the same answers on both backends.

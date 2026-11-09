@@ -2587,3 +2587,7 @@ check cancellation/loss again after completion. Ordinary GPU failures still prop
 with their original cause, and explicit cancellation retains the caller's reason.
 The CPU regression covers both races and partial cleanup; the real GPU test invokes
 the factory on an already lost device. No core or stage source changed.
+
+### Batch 65 job 6: Road network graph
+
+road/graph adapts authored junction IDs, spline arc lengths, direction and static travel costs to compute/graph, which keeps the existing CSR ownership, solvers and WebGPU/CPU backends. The root road entry does not import compute. Its synchronous bounded pass builds at most two arcs per road; it adds no shader or solver. Both native device and real WebGL2 compatibility use the existing device-backed compute route, and CPU is available explicitly with createCompute({backend:"cpu"}). Graph/context recreation after reboot is explicit, not automatic restoration. Core and stage are unchanged. Section 5 evidence: Generated stand-in networks: arc-length/default costs, one-way/reverse links, minimum parallel edges, traffic rerouting, isolation, ownership, empty/maximum topology, hostile/extreme values and aborts. Native WebGPU and real WebGL2 compatibility verify route distances/predecessors, reachability, extreme normal f32 weights, solver abort, double disposal, and reconstruction after engine device reboot. No speed or real traffic-data claim. See packages/road/test/graph.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.

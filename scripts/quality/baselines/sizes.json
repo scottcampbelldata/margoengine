@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11594656,
+  "total": 11595577,
   "history": [
     {
       "date": "2026-10-24",
@@ -5043,6 +5043,11 @@
       "commit": "d95fe0546",
       "reason": "procedural/textures: new optional entry, measured entry plus standard allowance; no root change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "bfa1aabc6",
+      "reason": "Batch 65 job 6: Road network graph: optional road/graph 665 B gzip with 256 B headroom; existing entries, core and stage unchanged."
     }
   ],
   "items": {
@@ -6011,6 +6016,7 @@
     "@margoengine/road/terrain": 1143,
     "@margoengine/road/repair": 861,
     "@margoengine/road/markings": 1143,
-    "@margoengine/procedural/textures": 2989
+    "@margoengine/procedural/textures": 2989,
+    "@margoengine/road/graph": 921
   }
 }

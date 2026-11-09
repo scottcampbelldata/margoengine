@@ -1949,3 +1949,7 @@ fixture JSON. No original image, paper or external implementation is redistribut
 GPU shaders and CPU numeric oracle were written independently from descriptions
 and equations. This is not example-based synthesis, the paper's parameter
 extraction algorithm, Gabor convolution, biological wood or corrosion simulation.
+
+## Batch 65 job 6: Road network graph
+
+A broad search of road linkage, shortest-path papers and traffic travel-time models preceded implementation. ASAM [OpenDRIVE 1.8.1 section 10.3 Road linkage](https://publications.pages.asam.net/standards/ASAM_OpenDRIVE/ASAM_OpenDRIVE_Specification/v1.8.1/specification/10_roads/10_03_road_linkage.html) describes explicit predecessor/successor connections and isolation; section [12.4 Connecting roads](https://publications.pages.asam.net/standards/ASAM_OpenDRIVE/ASAM_OpenDRIVE_Specification/v1.8.1/specification/12_junctions/12_04_connecting_roads.html) separates junction connections from spatial overlap. Bellman, [On a routing problem (1958)](https://www.cs.yale.edu/homes/lans/readings/routing/bellman-routing-1958.pdf), models minimum travel-time routing. Margo combines explicit links with arc length / speed * traffic + delay, then reuses its existing Bellman-Ford solver; there is no new shortest-path implementation or file-format conformance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.
