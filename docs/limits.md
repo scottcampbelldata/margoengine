@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-582). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-583). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -713,3 +713,16 @@ Optional `@margoengine/video/codecs` fully buffers nonfragmented, self-contained
 ## Video alpha and chroma key (2026-11-08)
 
 Optional `@margoengine/video/alpha` reuses the external material feature. Stacked colour is top/left, raw grayscale red-channel alpha bottom/right; equal pixel halves require an even packed dimension of at least 2. Both rectangles clamp at half-texel bounds. Colour must be straight, not premultiplied. RGB keying uses sRGB Euclidean distance, threshold 0.15 and softness 0.1 by default, green key [0,1,0]. Threshold is 0..sqrt(3), softness positive through sqrt(3), with distinct float32 edges; feature parameters are fixed on creation. No despill, lighting adaptation or colour/hair recovery. One external video feature per material, UV0/flipY true defaults; caller owns playback and source lifetime. Alpha multiplies source/material alpha before colour-pass alphaTest/blending; enable transparent for soft edges. Existing direct sRGB output-space blending is preserved. Shadow/picking coverage retains its existing material inputs, without external alpha. WebGL2 refuses with code/help link. Real RTX A6000/Edge checks generated masks at 0/64/128/255 for both layouts, fractional keying and cutout; these are stand-ins, not real movies. Other GPUs/browsers, visual keying quality comparisons and speed unmeasured. Entry 1,898 B gzip, budget 2,154 B. LIM-578.
+
+## Mixer automatic sidechain (batch 111)
+
+Optional mixer/sidechain uses a two-input AudioWorklet, peak threshold, retriggerable hold and linked
+one-pole linear gain attack/release. Defaults: amount 12 dB, threshold -40 dBFS, attack 0.01 s,
+release 0.2 s, hold 0.05 s, stereo. Bounds: amount 0..96, threshold -120..0, times 0..10 s,
+channels integer 1..32. Fixed options, no lookahead or speech recognition. HTTPS/localhost and
+blob script CSP permission required, otherwise coded error/help link. Signal aborts waiting;
+module registration is shared per context and can still complete. Real OfflineAudioContext
+renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. Unit stand-ins
+check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
+Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
+Sidechain entry: 1,559 B gzip, budget 1,815 B; core plus stage remains 23,626 B.

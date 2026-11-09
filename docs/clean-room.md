@@ -1420,3 +1420,10 @@ gizmo source was read; Autodesk, Blender and SolidWorks behaviour is described f
 | --- | --- |
 | Drag to orbit (`drag`) | Spherical coordinates (azimuth about +Y, polar angle from +Y) as in any analytic geometry text, the same turntable the package already animates with; W3C Pointer Events Level 3 (pointer ids, `setPointerCapture`, the `touch-action` property) |
 | Home view (`home`, `setHome`) | The same spherical coordinates for the view angles, with the target and distance moved linearly under the cube's existing smoothstep easing (any analysis text); the home button's behaviour is described from Autodesk's public ViewCube user documentation ("Home" view). The button and the exact landing on the stored target are Margo's own |
+
+## Mixer automatic sidechain (batch 111)
+
+Written from the W3C [Web Audio Recommendation, AudioWorklet and channel configuration](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioWorklet),
+using its two-input render callback, module registration and explicit speaker channel rules.
+Gain smoothing is the directly derived discrete one-pole recurrence g = target + exp(-1/(rate*time)) * (g-target).
+No other engine/library source was read or copied. All test signals are generated stand-ins; no downloaded assets.

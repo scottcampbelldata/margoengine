@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11391405,
+  "total": 11393220,
   "history": [
     {
       "date": "2026-10-24",
@@ -4688,6 +4688,12 @@
       "commit": "9c9d266a8",
       "reason": "voxel-net gains the ./shards entry, server.disconnect and client.removeChunks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "batch-111",
+      "reason": "New optional @margoengine/mixer/sidechain, isolated from mixer root, core and stage",
+      "grew": 1
     }
   ],
   "items": {
@@ -5127,6 +5133,7 @@
     "@margoengine/mesh-edit/sculpt-view": 790,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
+    "@margoengine/mixer/sidechain": 1815,
     "@margoengine/navmesh": 7694,
     "@margoengine/navmesh/agents": 15964,
     "@margoengine/navmesh/build": 12727,

@@ -29,9 +29,13 @@ try {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.goto(`${server.resolvedUrls.local[0]}tests/browser.html`);
-  await page.waitForFunction(() => typeof window.runChecks === 'function');
-  const report = await page.evaluate(() => window.runChecks());
+  const runs = [];
+  for (const backend of ['webgpu', 'webgl2']) {
+    await page.goto(`${server.resolvedUrls.local[0]}tests/browser.html?backend=${backend}`);
+    await page.waitForFunction(() => typeof window.runChecks === 'function');
+    runs.push(await page.evaluate(() => window.runChecks()));
+  }
+  const report = { runs };
   report.browser = browser.version();
   assert.deepEqual(errors, []);
   await writeFile(resolve(results, 'mixer-browser.json'), JSON.stringify(report, null, 2));

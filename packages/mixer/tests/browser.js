@@ -11,6 +11,7 @@ import {
   measure,
   renderOffline,
 } from '@margoengine/mixer';
+import { createSidechain } from '@margoengine/mixer/sidechain';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -61,6 +62,18 @@ async function chain(seconds, bus, input, setup) {
 }
 
 export async function runChecks() {
+  const backend = new URL(location.href).searchParams.get('backend') ?? 'webgpu';
+  let device;
+  if (backend === 'webgpu') {
+    const adapter = await navigator.gpu.requestAdapter();
+    assert(adapter, 'WebGPU adapter is available beside Web Audio');
+    device = await adapter.requestDevice();
+  } else {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    assert(gl, 'WebGL2 context is available beside Web Audio');
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    assert(gl.getError() === gl.NO_ERROR, 'WebGL2 clear succeeds');
+  }
   const checks = [];
   const check = async (name, fn) => {
     await fn();
@@ -253,6 +266,23 @@ export async function runChecks() {
     }
   });
 
-  return { checks };
+  await check('automatic sidechain ducks only while the dialogue key is active, then recovers', async () => {
+    const context = new OfflineAudioContext(2, rate, rate);
+    using duck = await createSidechain(context, { amount: 20, attack: 0.01, release: 0.03, hold: 0.02 });
+    using mixer = new Mixer(context, { buses: { music: {}, voice: {} } });
+    play(context, constant(1, 0.5)).connect(duck.input);
+    const key = constant(1, 0);
+    key.fill(0.3, Math.round(rate * 0.2), Math.round(rate * 0.5));
+    play(context, key).connect(duck.sidechain);
+    duck.output.connect(mixer.bus('music').input);
+    const out = await context.startRendering();
+    near(level(out, 0.05, 0.15), 0.5, 1e-6, 'before voice');
+    near(level(out, 0.35, 0.45), 0.05, 1e-5, 'ducked without key leaking');
+    near(level(out, 0.9, 1), 0.5, 1e-5, 'released without a scheduling call');
+    near(out.getChannelData(0)[Math.round(0.21 * rate)], 0.5 * (0.1 + 0.9 * Math.exp(-((0.01 * rate + 1) / (rate * 0.01)))), 2e-5, 'attack time constant');
+    assert(out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]), 'stereo gain is linked');
+  });
+  device?.destroy();
+  return { checks, backend };
 }
 window.runChecks = runChecks;

@@ -1235,3 +1235,8 @@ Each is described with its cause and guard in
 - **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
 - **Cause:** no reference renderer or sample library in the repository.
 - **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
+
+## Mixer batch 111 acceptance
+
+Automatic sidechain has no known open defect in the tested generated-signal paths. Real-speech,
+other-browser and latency acceptance remain unmeasured design/coverage limits in [limits.md](limits.md#mixer-automatic-sidechain-batch-111).

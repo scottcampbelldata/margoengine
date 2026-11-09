@@ -35,7 +35,7 @@ const { peak, rms } = measure(buffer.getChannelData(0));
 - **Gain** in dB: `bus.setGain(-6, {at, seconds})`. Changes move smoothly (about 20 ms) unless the context has not started or `seconds` is 0, so there are no clicks and an offline render starts at the right level.
 - **Mute and solo**: `bus.setMuted(true)`, `bus.setSolo(true)`. While anything is soloed, only soloed buses, their ancestors (which carry the sound on), their descendants (which feed them) and `soloSafe` buses such as reverb returns stay audible. `audibleBuses(states)` is that rule as a pure function.
 - **Sends**: `bus.send(other, {gain, pre})` copies part of a bus to another (after the gate by default, so muting the bus mutes the send; `pre` taps before the fader). A send that would make a loop throws `RangeError`.
-- **Ducking**: `bus.duck({amount, attack, at})` lowers a bus and returns a handle; `handle.release({at, seconds})` brings it back. Overlapping ducks hold the deepest one. You decide when to duck (when a voice starts); there is no automatic sidechain.
+- **Ducking**: `bus.duck({amount, attack, at})` lowers a bus and returns a handle; `handle.release({at, seconds})` brings it back. Overlapping ducks hold the deepest one. You decide when to duck (when a voice starts); automatic audio-clock detection is available in the optional `mixer/sidechain` entry below.
 - **Routing**: `mixer.route(source, bus)` connects an AudioNode, or anything with `getOutput()` such as `Audio` and `PositionalAudio` from `margoengine/audio`, to a bus after removing its other connections. Configure the sound's filters first.
 - **Scheduling** uses AudioContext time: every `at` is `context.currentTime` seconds (default now), and `mixer.now` reads the clock.
 - `bus.peak()` reads the current output peak (it adds an AnalyserNode on first use).
@@ -78,10 +78,47 @@ The reverb room is synthetic by default: seeded noise that falls 60 dB over `dec
 - Compressor and limiter use the browser's DynamicsCompressorNode. The Web Audio specification leaves its curve to the browser and adds an automatic make-up gain, so results differ between browsers; the limiter lowers peaks hard but is not a sample-accurate brick wall. `compressorCurve` is a design aid, not a model of the node.
 - Web Audio cannot be interrupted mid-render: an aborted `renderOffline` rejects when the render ends and drops the result.
 - Web Audio cannot loop faster than 128 samples (2.7 ms at 48 kHz), so that is the shortest delay `time`, and it is fixed when the effect is created; build a new effect to change it.
-- Ducking is scheduled by you; nothing listens to a bus and ducks another automatically.
+- The root entry has manual ducking; automatic detection is in the optional `mixer/sidechain` entry.
 - The reverb is a synthetic noise tail (no early reflections) unless you give it a recorded impulse. It runs on the audio thread as a convolution, so a long `seconds` costs CPU.
 - Offline checks run in a browser (`npm run test:browser` in this package). The Node tests cover the maths and the graph wiring and scheduling through a fake context, not rendered sound.
 
 Apache-2.0. Optional, tree-shakable package; no core dependency.
 
 Build and unit tests: npm test --workspace @margoengine/mixer
+
+## Automatic sidechain ducking
+
+`createSidechain(context, options)` from `margoengine/mixer/sidechain` (or
+`@margoengine/mixer/sidechain`) lowers a music signal while a separate dialogue key is active.
+No timers or manual duck scheduling: a two-input AudioWorklet detects the maximum absolute key
+sample across channels. Connect dialogue to its audible bus as well as `duck.sidechain`; the key
+itself never reaches `duck.output`. Put the stage before the music bus input.
+
+```ts
+import { createSidechain } from 'margoengine/mixer/sidechain';
+const context = new OfflineAudioContext(2, 48000, 48000);
+using duck = await createSidechain(context, { amount: 12 });
+const music = new ConstantSourceNode(context, { offset: 0.25 });
+const dialogue = new ConstantSourceNode(context, { offset: 0.5 });
+music.connect(duck.input);
+dialogue.connect(duck.sidechain);
+duck.output.connect(context.destination);
+music.start(0); music.stop(1);
+dialogue.start(0.2); dialogue.stop(0.5);
+const rendered = await context.startRendering();
+console.log(rendered.length);
+```
+
+Options: `amount` 12 dB (0..96), `threshold` -40 dBFS (-120..0), `attack` 0.01 s,
+`release` 0.2 s, `hold` 0.05 s (all times 0..10 s), `channels` 2 (integer 1..32),
+`signal` unset. Attack/release are one-pole gain time constants (63.2% of the move in one
+constant); zero jumps. Above-threshold samples reset the hold. Channel conversion uses Web Audio's
+explicit speaker layout. This is peak-triggered ducking, not speech recognition or lookahead;
+noise above threshold also triggers it. Options are fixed; create another stage to change them.
+Disposal is idempotent and stops processing, leaving caller sources and the context owned by you.
+
+Renderer independent: identical audio beside WebGPU and WebGL2, both tested in Edge.
+Requires secure-context AudioWorklet and `blob:` in CSP `script-src`. Unsupported environments
+throw `MargoError` code `unsupported`; a registration failure throws `failed` with cause and a help
+link. `signal` cancels waiting promptly; shared context registration can finish in the background.
+Other browsers, real speech and latency/performance are unmeasured; tests use generated signals.

@@ -30,6 +30,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./sidechain": {
+      "types": "./dist/sidechain.d.ts",
+      "import": "./dist/sidechain.js"
     }
   },
   "files": [

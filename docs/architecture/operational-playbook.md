@@ -1548,3 +1548,13 @@ The optional `video/codecs` path owns MP4 demuxing and WebCodecs decode/flush li
 ### Video alpha evidence (batch 112, section 5 addendum)
 
 The optional `video/alpha` entry extends only the external material sample hook, before the colour-pass alpha test and lighting. No core/stage edit, extra texture upload or auxiliary-pass claim. `alpha-check.mjs` in video's GPU suite compiles both packing variants and keying, checks alpha 0/64/128/255 against source-over in the existing direct canvas output space, a fractional key edge, a cutout, and WebGL2 coded refusal. Generated sources are stand-ins on real RTX A6000/Edge. Unit regressions guard sparse colour tuples, float32-collapsed key intervals and packed dimensions, with unchanged numeric tolerances. Harness corrections read the final canvas in its render task (before presentation clears it), and use the direct material's documented encoding before blend. No real keyed movie, other GPU/browser, quality comparison or speed evidence. See LIM-578. No new open engine defect from this batch; other lanes' known-bugs entries remain intact.
+
+### Mixer sidechain acceptance (batch 111, section 5 evidence)
+
+The optional sidechain entry owns a two-input audio-thread detector, independent of the rendering
+backend. Root mixer, core and stage remain unchanged. Generated OfflineAudioContext renders test
+known attack, attenuation, recovery, key isolation and linked channels beside real WebGPU and WebGL2
+contexts in Edge. Node processor stand-ins additionally prove hold across blocks, missing inputs,
+zero times, shared registration, cancellation and idempotent disposal. Module loading is abortable
+and CSP/unsupported failures are coded. Real speech, other browsers and timing remain unmeasured.
+LIM-583 and the committed sidechain result identify the present evidence.
