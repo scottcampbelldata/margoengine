@@ -2583,3 +2583,10 @@ not complete package parity. Physical lower-tier hardware and cross-browser
 measurements remain separate outstanding evidence.
 Untested features of the scoped core, shadows, materials and culling packages
 also remain in T273-COVERAGE; a passing scene does not certify a whole package.
+
+### Batch 56 review: finite studio directions
+
+Studio softbox directions are scaled before normalization. Extreme finite and
+subnormal directions retain the same image as their normalized direction.
+No core, stage, size ceiling or speed claim changes.
+

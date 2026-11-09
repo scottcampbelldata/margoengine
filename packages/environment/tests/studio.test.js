@@ -121,3 +121,10 @@ test('the default lights: overhead, key front left, fill front right, rim behind
   assert.ok(STUDIO_LIGHTS[1].intensity > STUDIO_LIGHTS[2].intensity, 'key over fill');
   assert.ok(STUDIO_LIGHTS[1].direction[0] < 0 && STUDIO_LIGHTS[1].direction[2] > 0, 'key to the front left');
 });
+
+test('extreme finite and subnormal softbox directions preserve every image texel', () => {
+  const options = { width: 16, floor: [0, 0, 0], walls: [0, 0, 0], ceiling: [0, 0, 0] };
+  const image = (direction) => studio({ ...options, lights: [{ direction, width: 1, height: 1, intensity: 1 }] }).data;
+  const expected = image([1, 1, 0]);
+  for (const scale of [Number.MAX_VALUE, Number.MIN_VALUE]) assert.deepEqual(image([scale, scale, 0]), expected);
+});

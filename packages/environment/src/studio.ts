@@ -53,8 +53,10 @@ const smooth = (t: number): number => {
 type Box = { d: number[]; right: number[]; up: number[]; hw: number; hh: number; soft: number; rgb: number[] };
 
 function frame(light: StudioLight): Box {
-  const l = Math.hypot(...light.direction),
-    d = light.direction.map((x) => x / l),
+  const scale = Math.max(...light.direction.map(Math.abs)),
+    scaled = light.direction.map((x) => x / scale),
+    l = Math.hypot(...scaled),
+    d = scaled.map((x) => x / l),
     // Horizontal axis: up x d, or +X for a light straight above or below.
     side = Math.abs(d[1]) > 0.999 ? [1, 0, 0] : [d[2], 0, -d[0]],
     s = Math.hypot(...side),

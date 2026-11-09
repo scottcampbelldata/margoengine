@@ -3193,3 +3193,11 @@ also preserves an installation completed by another caller while it waited; the
 old implementation could overwrite that owner's restore chain. CPU regressions
 cover both interleavings. The selected-minimum refusal diagnostic names the missing
 half-float extension rather than the full-tier extension and changes no globals.
+
+### Fixed: batch 56 finite studio direction
+
+The review direction [MAX_VALUE, MAX_VALUE, 0] overflowed Math.hypot and
+normalized to zero. Scaling by the largest absolute component first preserves
+its direction. studio.test.js compares all texels with [1, 1, 0], including
+subnormal input. No assertion or tolerance is weakened.
+

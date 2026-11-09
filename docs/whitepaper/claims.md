@@ -2148,3 +2148,10 @@ Bloom/Tonemap stack, standalone Bloom and standalone SSAO. LDR-only FXAA remains
 pixel-identical. Half-float SSAO has mean 0.008544921875 and maximum 1; the other
 accepted scoped rows are identical. Original failures and failed-scene-only
 repairs are retained separately. This is not an all-package parity claim.
+
+### Batch 56 review: finite studio directions
+
+Studio normalizes finite directions after scaling by their largest absolute component.
+The exact review input [MAX_VALUE, MAX_VALUE, 0] and the subnormal equivalent
+produce every texel of [1, 1, 0]. Proof: environment/tests/studio.test.js.
+
