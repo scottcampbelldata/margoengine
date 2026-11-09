@@ -1,7 +1,8 @@
 # Test-page bug review
 
 Implementation is preserved in separate local commits and rebased onto origin/main
-269da2b90. Final verify, GPU package suites, README execution and push remain pending.
+bd41f0279. Corrective verify passes. Three additional GPU/README gates are queued;
+push remains pending. No next-batch bug has been taken before this landing.
 
 Source: the read-only, untracked test-page log in the main checkout. Reviewed on
 2026-11-09 against origin/main b9985bd07. Road entries 1, 2 and 6 are included by
@@ -107,3 +108,38 @@ close budget by 13.1942 ms on the loaded host (recorded for quiet release retest
 Geometry tests and merge scheduler regressions now pass together, 70 tests.
 The box consumer's existing 1,550 B budget remains unchanged. Core has no further
 change beyond the approved empty-Geometry exception.
+
+## Corrective verify and current local commits
+
+After reconciling origin/main bd41f0279, lint and hygiene pass and verify passes
+in 440.3 seconds: 13,499 unit tests passed, zero failed or skipped. API: 887
+entries, 8,638 exports; quality, all proof suites, links, sandbox checks and README
+types pass. Geometry's full package suite passes 291 tests; the box-only bundle
+measures 1,464 B, below its unchanged strict 1,550 B budget. These are packaging
+measurements, without a rendering-speed claim.
+
+Three additional gates remain queued under codex-testpage: geometry GPU after the
+private lattice-helper refactor, procedural GPU including main's new caves test,
+and geometry/margoengine README execution. Their wait and execution limits are
+hard bounded; they must pass before a fast-forward push. All 13 original package
+GPU scripts and the ten-package corrected README run already passed.
+
+| Bug | Local commit (before any subsequent rebase) | Regression |
+| --- | --- | --- |
+| 1 FIXED locally | `dd24dd7b9` | `packages/road/test/testpage.test.js` |
+| 2 FIXED locally | `958cf2051` | `packages/road/test/testpage.test.js` |
+| 6 FIXED locally | `e3d323e41` | `packages/road/test/testpage.test.js` |
+| 7 FIXED locally | `19031dc39` | `packages/procedural/test/testpage-sdf.test.js` |
+| 8 FIXED locally | `45a78ee9e` | `packages/procedural/test/testpage-sdf.test.js` |
+| 9 FIXED locally | `bc184e952` | `packages/procedural/test/textures-browser.mjs` |
+| 10 FIXED locally | `05ad1813c` | `packages/procedural/test/testpage-assets.test.js` |
+| 11 FIXED locally | `255d4e0bb` | `packages/water/test/testpage.test.js` |
+| 12 FIXED locally | `4baf9599e` | `packages/core/tests/empty.test.js and empty.browser.mjs` |
+| 13 FIXED locally | `6ff991123` | `packages/wfc/test/testpage.test.js` |
+| 14 FIXED locally | `1d26ee091` | `packages/voxel-edit/tests/testpage-contracts.test.js` |
+| 16 FIXED locally | `5a1842265` | `packages/animator/test/testpage.test.js` |
+| 18 FIXED locally | `b5e2226f3` | `packages/animation/tests/testpage.test.js` |
+| 19 FIXED locally | `d4cc76819` | `packages/animation/tests/testpage.test.js` |
+
+Bugs 20, 23, 24 and 25 remain next, after this batch lands. The other latest
+Added entries belong to lane S. Physics remains on hold.
