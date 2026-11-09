@@ -147,3 +147,12 @@ three core routers and 101 active/delegated candidates, including the proved
 CAD replacement. Explicit EnginePlugin classes: 174, identity disposal 63,
 active-shaped disposal 82. These remain syntax counts, not exhaustive proof.
 The wider audit remains OPEN. [Cinematic receipt](../whitepaper/results/batch-56-cinematic-owner-20261109.json).
+
+Animator audit: one explicit EnginePlugin and two factory registrations inspected.
+The five reproduced parent failures span disposal, factory owner selection and
+direct dependency lookup. Repaired package/guard run passes 198 checks; GPU and
+README acceptance remain pending. All other Animator entries are solver/handle
+adapters onto this Animator, with cleanup delegated to its callback registries;
+none installs another EnginePlugin or wrapper. Disposed Animator reattachment is
+intentionally rejected and proved without a retained registration. Animation is
+next; its own direct removal is a separate candidate, not accepted by this proof.

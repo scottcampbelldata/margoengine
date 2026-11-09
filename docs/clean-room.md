@@ -3994,3 +3994,25 @@ Controls source for anonymous/lost registrations
 and active-name cleanup when a source installs a wrapper. The GPU browser
 passes 17 checks including twelve owner pixel cases, all three walk checks pass,
 and all fourteen runtime README examples pass. No core or stage source changed.
+
+### Animator dependency and registration ownership (batch 56 continuation)
+
+Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with Algebraic
+Effects* (2017), https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+and Ecma International, *ECMAScript 2026 Language Specification* (2026),
+https://262.ecma-international.org/17.0/. Confinement motivates retaining and
+resolving the actual registration, structured ambient state explains why a
+temporary active scene is not a resource owner, and explicit disposal motivates
+terminal, idempotent cleanup. These are design inferences for the engine's
+synchronous protocol, not formal proofs. No companion code or other repository
+implementation was read.
+
+Animator removed by active name; its factories registered through the active
+scene and direct updates checked that temporary namespace. The optional package
+now resolves sceneOf(this), attaches factories to the registered Animation's
+scene (model root scene when Animation has no registration), and checks playback
+dependencies in its own scene. Five of fourteen real-engine cases fail on the
+parent. Repaired package and class-wide guard pass 198 checks, zero skips.
+GPU and runtime README acceptance are pending. Core and stage are untouched.

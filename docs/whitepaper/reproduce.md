@@ -2099,3 +2099,14 @@ Builds stay outside the GPU lock. All fourteen Controls runtime README examples
 pass, as do seventeen browser checks and three walk checks. Two additional CAD
 replacement controls bring the fixed owner suite to 83 and package/guard total
 to 304. No second full verify was run.
+
+### Animator owner continuation
+
+After building Animator, run node --test --test-timeout=120000
+packages/animator/test/*.test.js tests/modern-animator*.test.js
+tests/modern-game.test.js tests/animator-owner-contract.test.js. The owner file
+has fourteen cases; the full command has 198 passing checks. The unchanged parent
+fails five owner cases. Run packages/animator/test/scene-owner-browser.mjs and
+scripts/run-readme-examples.mjs --packages=animator in separate shared GPU lock
+commands with --wait-max=60, one lane slot, and a measured hold plus margin.
+Builds, units and other CPU checks stay outside the lock.

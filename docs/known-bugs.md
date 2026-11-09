@@ -3737,3 +3737,11 @@ from sceneOf(wrapper). The original expanded parent suite has eleven failures;
 all 83 owner cases and 304 package/guard checks now pass. The complete browser
 proof passes 17 checks including twelve owner pixel cases; all three walk checks
 and fourteen runtime README examples pass. See the [acceptance receipt](whitepaper/results/batch-56-controls-owner-20261109.json).
+
+### Animator secondary ownership: local repair awaiting acceptance
+
+Secondary direct/model disposal, Animator.attach, AnimatorGraph.attach and direct
+updates fail in five of fourteen parent regressions. The optional package repair
+passes 198 unit/guard checks. GPU and runtime README acceptance remain pending.
+Repro: packages/animator/test/scene-owner.test.js. Cause: using active-engine
+namespaces for registration, dependency lookup and disposal outside dispatch.

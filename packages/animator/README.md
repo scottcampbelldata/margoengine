@@ -552,3 +552,23 @@ Twist follows the curve's rotation-minimising frames (`@margoengine/splines/fram
 The hook receives the actual destination mesh and a borrowed normal JavaScript array for both sampled/blended local poses and FootIK corrections. Commit synchronously, validate finite Float32-representable and nonzero quaternion values, normalize using the application's required numeric behavior, and synchronize the mesh's quaternion and XYZ Euler state. Do not mutate or retain the borrowed array, change Animator/model structure from the callback, or reenter pose evaluation. Recursive `onPreUpdate` from a writer throws before changing update state. A thrown writer does not advance the successful rotation cache; previously successful position/scale writes keep their existing partial-update behavior. The next update compares against that earlier successful cache. If a writer restores exactly the earlier accepted quaternion/Euler state before throwing, an unchanged request can legitimately skip another callback, matching the default setter path. Throws do not guarantee callback reinvocation.
 
 Cached unchanged rotations skip the hook, just as they skip the default setter. It is not a per-frame notification or a generic purity guarantee. Construct a stable writer outside the frame loop. Default mesh setter behavior for caller-owned typed arrays is unchanged. An opted-in application is responsible for writer correctness; a hook that ignores validation or does not commit state violates this contract. No allocation-free or whole-scene performance guarantee follows from supplying a callback.
+
+## Scene ownership
+
+Animator.attach and AnimatorGraph.attach follow the registered Animation's scene,
+including when called outside scene setup. Direct updates and disposal use that
+owning registry. A same-name plugin in another scene is independent. Disposal
+restores Animation's prior playback flag and is terminal; create a new Animator
+for another attachment. Owner removal, model unloading and engine disposal also
+clean up the Animator.
+
+```ts
+const productScene = engine.createScene('product-animation');
+const productAnimation = new Animation(model);
+productScene.use(productAnimation);
+const productAnimator = Animator.attach(productAnimation, {
+  initial: 'idle', states: { idle: 'Idle' }
+});
+productAnimator.dispose(); // removes only this scene's Animator
+productScene.removePlugin(productAnimation.name);
+```

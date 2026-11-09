@@ -1,0 +1,29 @@
+{
+  "status": "LOCAL_CPU_ACCEPTED_GPU_PENDING",
+  "parent": "0ea6ec075",
+  "package": "animator",
+  "regression": "packages/animator/test/scene-owner.test.js",
+  "parentCases": {
+    "pass": 9,
+    "fail": 5
+  },
+  "units": {
+    "pass": 198,
+    "fail": 0,
+    "skip": 0
+  },
+  "guard": "tests/animator-owner-contract.test.js",
+  "coreStageChanges": false,
+  "hunterCaptureChanges": false,
+  "verify": {
+    "inherited": "batch-56-save-owner-20261109.json",
+    "fullRunRepeated": false,
+    "reason": "Scott requested affected checks only"
+  },
+  "pending": [
+    "GPU owner rendering",
+    "runtime README",
+    "affected CPU gates",
+    "entry sizes and API"
+  ]
+}

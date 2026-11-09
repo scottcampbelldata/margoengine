@@ -3021,3 +3021,11 @@ claim; no core/stage or export change and no size ceiling raised.
 | @margoengine/controls/profiles | 704 | 960 |
 | @margoengine/controls/third-person | 3118 | 3378 |
 | @margoengine/controls/walk | 13930 | 14349 |
+
+### Animator registration lifetime (batch 56)
+
+Animator and AnimatorGraph factories follow the registered Animation's scene.
+Direct updates and disposal query the owning scene. Disposal is terminal and
+idempotent; reattachment rejects without retaining a registration. Fourteen owner
+cases and 198 package/guard checks pass; GPU and README acceptance are pending.
+No core/stage source, public exports, timing budgets or size ceilings changed.

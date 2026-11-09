@@ -4819,3 +4819,11 @@ match all ten entries. The complete browser passes 17 checks, including twelve
 owner cases with at least 476 red pixels, exact detachment and listener cleanup.
 Three walk checks and fourteen runtime README examples pass. Only affected
 gates were rerun; the inherited single full verify is retained without repetition.
+
+### Section 5 pending evidence: Animator registration ownership
+
+Five parent failures in fourteen real-engine cases cover secondary direct/model
+disposal, both factories and direct dependency lookup. The optional repair passes
+198 package/guard checks. A source-wide EnginePlugin disposal and factory guard
+runs in the check:merge unit inventory. GPU and runtime README acceptance remain
+pending. The inherited full verify is retained; only affected gates are rerun.

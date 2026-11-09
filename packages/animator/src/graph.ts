@@ -139,10 +139,11 @@ export class AnimatorGraph {
     this.off = this.animator.on('statechange', (change) => this.changed(change));
   }
 
-  /** Builds the graph and attaches its Animator to the animation's engine (attach the Animation first). */
+  /** Builds the graph and attaches its Animator to the animation's scene (attach the Animation first). */
   static attach(animation: Animation, document: AnimatorGraphDocument): AnimatorGraph {
     const graph = new AnimatorGraph(animation, document);
-    animation.model.root.engine.use(graph.animator);
+    const engine = animation.model.root.engine;
+    engine.use(graph.animator, engine.sceneOf(animation) ?? animation.model.root.scene);
     return graph;
   }
 

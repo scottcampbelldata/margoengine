@@ -2549,3 +2549,11 @@ input release and owner/engine cleanup are covered. The complete browser
 passes 17 checks, including twelve owner pixel cases; three walk checks and
 fourteen runtime README examples pass. No speed claim. Research:
 [clean-room record](../clean-room.md).
+
+### Animator owner CPU proof
+
+The optional Animator package follows the registered dependency's scene for
+factory attachment and its own registration for direct updates and disposal.
+Fourteen real-engine cases pass after five failures on the parent; the complete
+package/guard run passes 198 checks. GPU and runtime README proof remain pending.
+No speed or whole-audit completion claim is added.

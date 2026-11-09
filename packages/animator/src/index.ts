@@ -340,7 +340,8 @@ export class Animator implements EnginePlugin {
   }
   static attach(animation: Animation, options: AnimatorOptions): Animator {
     const animator = new Animator(animation, options);
-    animation.model.root.engine.use(animator);
+    const engine = animation.model.root.engine;
+    engine.use(animator, engine.sceneOf(animation) ?? animation.model.root.scene);
     return animator;
   }
   private clip(name: string) {
@@ -604,7 +605,7 @@ export class Animator implements EnginePlugin {
         'Animator rotation writer cannot reenter updates; do not call onPreUpdate or change the Animator from inside writeRotation',
       );
     if (this.disposed) return;
-    if (this.engine && !this.engine.hasPlugin(this.animation.name)) {
+    if (this.engine && !this.engine.sceneOf(this)?.plugins.has(this.animation.name)) {
       this.dispose();
       return;
     }
@@ -933,7 +934,7 @@ export class Animator implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.animation.playing = this.previousPlaying;
