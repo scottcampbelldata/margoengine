@@ -32,6 +32,7 @@ export function plantStale(dir = root) {
 /** Stage 1: in order. */
 export const SERIAL = [
   'node scripts/hygiene.js --verify',
+  'node scripts/check-gpu-policy.mjs',
   'node scripts/support/external-test-assets.mjs',
   'npm run build:packages',
 ];

@@ -1,11 +1,21 @@
 // Detached GPU gate jobs keep their place while the submitting agent does CPU work.
 // Holder and waiting entries use gpu-lock's existing format, including for older clients.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { runLimited } from './support/run-limited.mjs';
 import { endTree } from './support/shutdown.mjs';
 import { speedEnabled } from './support/speed-phase.mjs';
+
+/** Status revisions are immutable: Windows readers may keep the previous name open. */
+export function readGpuQueueRecord(file) {
+  const stem = basename(file, '.json');
+  const revisions = readdirSync(dirname(file))
+    .filter((name) => name.startsWith(`${stem}.`) && /^\d{8}\.json$/.test(name.slice(stem.length + 1)))
+    .sort();
+  const record = JSON.parse(readFileSync(revisions.length ? join(dirname(file), revisions.at(-1)) : file, 'utf8'));
+  return { ...record, revision: record.revision ?? 0 };
+}
 
 export function createGpuQueue({
   acquire,
@@ -15,6 +25,7 @@ export function createGpuQueue({
   resolveMode,
   validateRequest,
   windowsCommandLine,
+  launch = spawn,
 }) {
   const MIN = 60_000;
   const jobsDir = `${lockDir}-jobs`;
@@ -26,12 +37,16 @@ export function createGpuQueue({
       });
     return join(jobsDir, `${ticket}.json`);
   };
-  const read = (ticket) => JSON.parse(readFileSync(fileFor(ticket), 'utf8'));
+  const read = (ticket) => readGpuQueueRecord(fileFor(ticket));
   function write(ticket, record) {
-    const file = fileFor(ticket),
+    const revision = (record.revision ?? -1) + 1;
+    const base = fileFor(ticket);
+    const file = revision === 0 ? base : `${base.slice(0, -5)}.${String(revision).padStart(8, '0')}.json`,
       temp = `${file}.${process.pid}.tmp`;
-    writeFileSync(temp, JSON.stringify(record));
+    const published = { ...record, revision };
+    writeFileSync(temp, JSON.stringify(published));
     renameSync(temp, file);
+    return published;
   }
   const positive = (raw, fallback, name) => {
     const n = raw === undefined ? fallback : Number(raw);
@@ -53,7 +68,7 @@ export function createGpuQueue({
     const env = { ...process.env };
     delete env.MARGO_GPU_LOCK_NESTED;
     delete env.MARGO_GPU_LOCK_NESTED_MODE;
-    const child = spawn(process.execPath, [resolve(import.meta.dirname, 'gpu-lock.mjs'), 'queue-run', ticket], {
+    const child = launch(process.execPath, [resolve(import.meta.dirname, 'gpu-lock.mjs'), 'queue-run', ticket], {
       env,
       detached: true,
       windowsHide: true,
@@ -65,6 +80,8 @@ export function createGpuQueue({
     });
     child.unref();
     for (const deadline = Date.now() + 30_000; ; ) {
+      // Snapshot the exit flag before reading the last status published before that exit.
+      const exited = child.exitCode !== null || child.signalCode !== null;
       const record = read(ticket);
       if (failed) {
         write(ticket, { ...record, state: 'failed', error: failed.message, code: failed.code });
@@ -75,11 +92,14 @@ export function createGpuQueue({
           throw Object.assign(new Error(record.error), { code: record.code });
         return { ticket, state: record.state, pid: record.pid, log };
       }
-      if (Date.now() > deadline || child.exitCode !== null) {
-        if (child.exitCode === null) await endTree(child.pid);
-        const error = 'ERR_GPU_QUEUE_START_TIMEOUT: detached owner did not queue within 30 seconds';
-        write(ticket, { ...record, state: 'failed', error, code: 'ERR_GPU_QUEUE_START_TIMEOUT' });
-        throw new Error(error);
+      if (Date.now() > deadline || exited) {
+        if (!exited) await endTree(child.pid);
+        const code = exited ? 'ERR_GPU_QUEUE_OWNER_EXIT' : 'ERR_GPU_QUEUE_START_TIMEOUT';
+        const error = exited
+          ? `${code}: detached owner exited before publishing queue admission (exit ${child.exitCode}, signal ${child.signalCode})`
+          : `${code}: detached owner did not queue within 30 seconds`;
+        write(ticket, { ...read(ticket), state: 'failed', error, code });
+        throw Object.assign(new Error(error), { code });
       }
       await pause(25);
     }
@@ -88,8 +108,7 @@ export function createGpuQueue({
   async function runQueued(ticket) {
     let record = { ...read(ticket), pid: process.pid };
     const update = (change) => {
-      record = { ...record, ...change };
-      write(ticket, record);
+      record = write(ticket, { ...record, ...change });
     };
     const { command, options } = record;
     let release;

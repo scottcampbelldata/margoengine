@@ -547,6 +547,7 @@ test('verify runs the same checks as before plus the parity count and the XR dev
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
   assert.deepEqual(SERIAL, [
     'node scripts/hygiene.js --verify',
+    'node scripts/check-gpu-policy.mjs',
     'node scripts/support/external-test-assets.mjs',
     'npm run build:packages',
   ]);

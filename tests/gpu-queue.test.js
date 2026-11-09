@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { endTree } from '../scripts/support/shutdown.mjs';
+import { readGpuQueueRecord } from '../scripts/gpu-queue.mjs';
 
 const until = async (condition) => {
   const end = Date.now() + 30_000;
@@ -35,7 +36,7 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
       timeout: 30_000,
       windowsHide: true,
     });
-  const readJob = (ticket) => JSON.parse(readFileSync(join(`${lock}-jobs`, `${ticket}.json`), 'utf8'));
+  const readJob = (ticket) => readGpuQueueRecord(join(`${lock}-jobs`, `${ticket}.json`));
   const queue = (label) => {
     const result = cli([
       'enqueue',
@@ -158,7 +159,7 @@ test('a detached command failure is retained for wait and never reported as a pa
     const completed = run(['wait', ticket]);
     assert.equal(completed.status, 1, completed.stderr);
     assert.match(completed.stdout, /failure evidence/);
-    const record = JSON.parse(readFileSync(join(`${env.MARGO_GPU_LOCK}-jobs`, `${ticket}.json`), 'utf8'));
+    const record = readGpuQueueRecord(join(`${env.MARGO_GPU_LOCK}-jobs`, `${ticket}.json`));
     assert.equal(record.state, 'failed');
     assert.equal(record.result.ok, false);
     assert.equal(record.result.timedOut, false);

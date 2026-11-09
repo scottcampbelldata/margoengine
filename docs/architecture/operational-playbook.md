@@ -124,6 +124,28 @@ client; issue reports of taskkill.exe exhausting WMI on Windows desktops
 Windows grandchild pipe inheritance discussion ([libuv PR 343](https://github.com/joyent/libuv/pull/343)).
 Only documentation and issue text were read, no other project's source.
 
+## GPU exclusive class check (section 5 supplement)
+
+Verify runs `node scripts/check-gpu-policy.mjs` before the package build. It checks
+tracked production JavaScript/TypeScript launchers and package scripts for
+exclusive CLI flags, enabled `MARGO_GPU_EXCLUSIVE` settings and calls through
+imported `acquire` aliases. Requests must be benchmark-classified or belong to
+the checked-in speed inventory; CLI callers may state a logged `--timing` reason.
+Only the lock/queue implementation, synthetic unit fixtures and historical
+whitepaper result files are outside this production syntax check. Runtime
+policy still applies to every caller, including historical reproduction scripts.
+This is a syntax check, not whole-program evaluation of computed command strings;
+runtime refusal remains the final check before any holder or ticket is created.
+
+Evidence: `tests/gpu-policy-check.test.js` plants CLI, environment and aliased API
+regressions and exercises regex/interpolated-template scanning. The whole tracked
+repository is checked without a GPU. `tests/check-merge-affected.test.js` pins the
+new verify step. Research: Murugiah Souppaya, Karen Scarfone and Donna Dodson,
+*Secure Software Development Framework (SSDF) Version 1.1*, NIST SP 800-218,
+2022, [PW.7, source review and analysis](https://csrc.nist.gov/pubs/sp/800/218/final).
+We combine an early static policy check with the reader/writer runtime admission
+rules cited below; no companion implementation was read.
+
 ## GPU mutex ownership and scheduling research (section 5 supplement)
 
 The GPU lock publishes its mutex as a directory junction on Windows (a directory
@@ -188,6 +210,23 @@ expire while the queued command continues; the same ticket can be observed
 again. A default observer bound covers the command's admission wait plus hold
 limit and one minute of shutdown allowance. The command itself retains its
 independent hard limit and process-tree termination.
+
+Queue status is published as immutable numbered JSON revisions beside the initial
+ticket record. An observer reads the newest published revision; old single-file
+records still read as revision zero. A Windows reader can pin a published name,
+so replacing that name with `rename` is unsafe: under verify's read recorder,
+the fast failing-command test reproduced `EPERM` at replacement, and a second
+failed replacement could end the owner before acknowledgement. New revisions
+are renamed only to unused names, leaving every reader's previous record valid.
+`tests/gpu-queue-publication.test.js` deterministically pins all published names
+and fails on the former writer. The real detached-failure regression remains.
+An owner that exits without publishing admission reports `ERR_GPU_QUEUE_OWNER_EXIT`,
+including exit/signal details, separately from the unchanged 30-second deadline.
+Research: Microsoft, [MoveFileExW function](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)
+and [CreateFileW function, sharing modes](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
+(2026 documentation); immutable version publication avoids the sharing conflict
+rather than retrying or hiding a refused replacement. Only status metadata
+changes; shared/exclusive holder and FIFO lock entry formats stay unchanged.
 
 All new shared and exclusive requests keep FIFO tickets in the existing
 `gpu.lock-waiting/` format. Shared admission requires a free slot and the head
