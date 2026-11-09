@@ -312,3 +312,55 @@ records from 559e2dba1 (dirty=false), followed by api:update. Core plus stage
 remains 23924 B and math/quat 1346 B. The merged size gate, nine paired-record/API
 tests, llms currentness case and documentation links pass. No successful
 consumer GPU/README suite or full verify is rerun, and no metadata is relabeled.
+
+## Readable Unity support delivery (audit finding 7)
+
+Verified on fc20cdca6: the generator still compacted C# before embedding it and
+rejected interpolated strings. Remove the compactor and embed every canonical
+UTF-8/LF source byte verbatim. The public delivery API and manifest hashing are
+unchanged; the installed support source now includes its comments and layout.
+All canonical C# files remain untouched. A full source/embedded/delivered byte
+comparison and SHA-256/length checks cover every file. A generator fixture with
+documentation, directives, UTF-8, interpolated/verbatim/raw strings and block
+comments proves the build imposes no C# parser subset.
+
+Research compared the official package workflow and language grammar:
+
+- Unity Technologies, *Unity 6.0 Manual: Create custom packages*, 2026,
+  [package workflow](https://docs.unity.com/en-us/engine/6000.0/manual/packages-list/cus-pkg-development/custom-packages):
+  an embedded package can contain reviewable C# source and assembly definitions.
+- Microsoft C# language team / Ecma TC49-TG2, *C# Language Specification,
+  section 6: Lexical structure*, living specification, accessed 2026-11-09,
+  [lexical structure](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/lexical-structure):
+  comments, whitespace, tokens and directives have separate rules. Do not
+  implement a partial lexer just to compress delivered source text.
+- Microsoft C# language team, *String interpolation*, living language reference,
+  accessed 2026-11-09,
+  [interpolated strings](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/interpolated):
+  interpolation is standard source syntax, not a packaging limitation.
+
+No third-party engine or companion implementation was read or copied. Canonical
+native sources are Margo's existing files. Keeping them embedded avoids a new
+runtime file-fetch path, asynchronous module plumbing and extra deployment
+assets solely to save optional-entry bytes. The Unity entry is already separate
+from the exporters root. Raise its ceiling rather than add that complexity.
+Regression: packages/exporters/tests/unity-support.test.js. Existing Unity
+bundle tests retain deterministic archives, unchanged GLB/atlas bytes, exact
+manifest identities and isolation across calls. This proves source delivery,
+not a new native Unity execution or performance result.
+
+Validation: lint and hygiene pass, as do all 13 targeted Unity cases. The
+exporters real-GPU suite passes. README execution has 33 of 35 passes, with the
+two prior known failures unchanged and no new exemption; the new source-reading
+example passes. Paired entry/network records measure fc20cdca6 with dirty
+packages; the basic scene has five requests and no unused built files.
+api:update records the changed Unity size, without an API shape change.
+
+The original verify invocation passed hygiene, then check-gpu-policy could not
+read the intentionally deleted compactor because that deletion was not yet in
+Git's index. Stage the authorized deletion, rerun the failed policy step and
+run all still-unrun SERIAL/PARALLEL commands exported by verify.mjs. Every step
+passes, including all 13778 unit tests with zero failures, skips or cancellations.
+The retained hygiene/GPU/README results are not replayed. Logs and the exact
+command/result manifest are test-results/size-restore/unity-verify-remaining*;
+no checker, test, tolerance or known-failure list is weakened.

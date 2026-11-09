@@ -2699,3 +2699,17 @@ Current changed-owner entries, min+gzip B (other packages external; unchanged ce
 | `@margoengine/terrain/blend` | 3452 |
 | `@margoengine/terrain/planet` | 6403 |
 | `@margoengine/compute/frame` | 31513 |
+
+### Readable Unity delivery (audit finding 7, 2026-11-10)
+
+The optional exporters/unity entry grows 40965 -> 50038 B min+gzip;
+ceiling 42194 -> 51540 B, retaining 3% headroom. Exporters root and all other
+entries remain unchanged; core plus stage remains 23924 B. Before/after records
+use fc20cdca6 plus this restoration, bare package imports external, default gzip.
+The complete source stays embedded in its existing optional entry. A separate
+runtime source download would add loading and deployment work solely for size.
+The native source, algorithms and public file-delivery API are unchanged.
+Support hashes change to identify the restored readable bytes: keep each asset
+bundle with the support manifest it names and review any existing-project
+support replacement separately. No native Unity execution or speed claim.
+Research and exact byte/digest regressions: [size restoration](size-restore.md).

@@ -3445,3 +3445,11 @@ regression description above records local evidence, not mainline gate wiring.
 The wider owner audit remains open. The post-rebase receipt records the checks
 affected by merged documentation, API metadata and GPU-lock tooling; the unchanged
 package execution proofs and historical full verify are retained honestly.
+
+### Fixed 2026-11-10: installed Unity support lost comments and source layout
+
+The generator compacted canonical C# before delivery and rejected interpolated
+strings to satisfy its partial lexer. Embed canonical source verbatim instead
+and remove the compactor. Regression compares every embedded/delivered byte and
+manifest digest to its source; an isolated generator fixture preserves modern
+string syntax and comments. See [size restoration](size-restore.md).

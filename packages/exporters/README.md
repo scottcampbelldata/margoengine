@@ -1420,6 +1420,22 @@ decoded by `ImageDecoder`, JPEG and WebM duration.
 
 ## Unity asset and support bundles (`@margoengine/exporters/unity`)
 
+Delivered C# files preserve the canonical source comments, indentation and line breaks byte for byte. The support
+manifest hashes those readable UTF-8/LF files. The optional Unity entry embeds the complete source; it needs no
+runtime source download. Source syntax, including interpolated strings, is not restricted by a custom compactor.
+
+The restored source has new manifest hashes. Keep each asset bundle with the support manifest it names; review
+replacement of an existing project support package separately. Read the install-once source from the returned files:
+
+```ts
+import {createUnityImportSupportPackage} from 'margoengine/exporters/unity';
+const support = await createUnityImportSupportPackage();
+for (const file of support.entries.filter(file => file.name.endsWith('.cs'))) {
+  const lines = new TextDecoder().decode(file.data).split('\n').length;
+  console.log(file.name, lines); // original comments and source lines remain
+}
+```
+
 The optional Unity delivery module returns files around an unchanged encoded Margo Mesh GLB. Install-once native
 support and per-asset exports are separate artifacts. The file APIs never install packages, launch an editor,
 access a destination project, resize pixels or rewrite geometry, skin data or animation keys.

@@ -2263,3 +2263,12 @@ examples and API update (891 entries/8,651 exports). Core plus stage remains
 23,924 B; no new ceiling is raised. These are local results, not landing or
 combined hunter acceptance. Full verify remains the inherited result recorded
 in the [gate receipt](results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
+## Readable Unity support source
+
+The optional exporters/unity entry delivers canonical UTF-8/LF source bytes,
+including C# comments and layout. unity-support.test.js checks every canonical,
+embedded and delivered payload, manifest length and SHA-256, and a syntax-rich
+generator fixture. Existing support bundle tests retain archive determinism
+and content hashes. This is a source-preservation claim; no new native Unity
+execution or speed claim follows. Research and bytes: size-restore.md, limits.md.

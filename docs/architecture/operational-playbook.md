@@ -4450,3 +4450,14 @@ examples and API update (891 entries/8,651 exports). Core plus stage remains
 23,924 B; no new ceiling is raised. These are local results, not landing or
 combined hunter acceptance. Full verify remains the inherited result recorded
 in the [gate receipt](../whitepaper/results/batch-56-owner-gates-20261109.json); no second full verify ran.
+
+### Section 5 evidence: readable Unity support delivery
+
+Size-restoration finding 7 removes the C# compactor from exporter packaging.
+Canonical, generated and delivered UTF-8/LF bytes match exactly, including
+comments and layout; their manifest lengths and SHA-256 hashes match each file.
+An isolated generator fixture preserves directives and interpolated, verbatim
+and raw strings without imposing a partial C# grammar. Native source is unchanged;
+this is source-delivery evidence, not a new native Unity execution claim. The
+existing Unity optional entry embeds the payload; only its ceiling grows.
+Research, tests and bytes are in size-restore.md and limits.md.
