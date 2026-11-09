@@ -1263,7 +1263,7 @@ export const entries = [
     fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. The package README lists every option with its range.',
   },
   {
-    id: 'vfx-f32',
+    id: 'vfx-float',
     title: '@margoengine/vfx: numbers that do not fit in f32',
     kind: 'family',
     messages: [

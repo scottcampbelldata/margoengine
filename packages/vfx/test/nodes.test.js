@@ -203,7 +203,7 @@ test('nodes rejects a bad graph and a base effect that did not import the entry'
 });
 
 test('nodes rejects a finite double that is not a finite f32', () => {
-  const link = /https:\/\/margoengine.com\/errors#vfx-f32/;
+  const link = /https:\/\/margoengine.com\/errors#vfx-float/;
   assert.throws(
     () =>
       evaluateNodes(

@@ -115,7 +115,7 @@ try {
 
   const f32 = await page.evaluate(() => window.checkNodeF32());
   assert.equal(f32.error?.name, 'RangeError', 'node f32');
-  assert.match(f32.error.message, /https:\/\/margoengine.com\/errors#vfx-f32/, 'node f32');
+  assert.match(f32.error.message, /https:\/\/margoengine.com\/errors#vfx-float/, 'node f32');
   assert.deepEqual(f32.errors, [], 'node f32');
   console.log('ok node f32 webgl2');
 

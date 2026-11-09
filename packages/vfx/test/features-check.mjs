@@ -254,7 +254,7 @@ try {
       r = await page.evaluate(() => window.checkNodeF32());
     report.results[name] = r;
     assert.equal(r.error?.name, 'RangeError', name);
-    assert.match(r.error.message, /https:\/\/margoengine.com\/errors#vfx-f32/, name);
+    assert.match(r.error.message, /https:\/\/margoengine.com\/errors#vfx-float/, name);
     assert.deepEqual(r.errors, [], name);
     console.log(`ok ${name}`);
   }

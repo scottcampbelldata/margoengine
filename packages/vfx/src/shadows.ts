@@ -129,12 +129,12 @@ export const shadows: VFXExtension<VFXShadows> = {
       throw new RangeError('VFX shadows count must be a whole number from 0 to 64; pass e.g. 8');
     const range = value.range ?? 4;
     if (finite(range) && !Number.isFinite(Math.fround(range)))
-      throw new RangeError('VFX shadows range is not a finite f32; see https://margoengine.com/errors#vfx-f32');
+      throw new RangeError('VFX shadows range is not a finite f32; see https://margoengine.com/errors#vfx-float');
     if (!finite(range) || range <= 0)
       throw new RangeError('VFX shadows range must be a finite distance above 0; pass e.g. 4');
     const intensity = value.intensity ?? 1;
     if (finite(intensity) && !Number.isFinite(Math.fround(intensity)))
-      throw new RangeError('VFX shadows intensity is not a finite f32; see https://margoengine.com/errors#vfx-f32');
+      throw new RangeError('VFX shadows intensity is not a finite f32; see https://margoengine.com/errors#vfx-float');
     if (!finite(intensity) || intensity < 0)
       throw new RangeError('VFX shadows intensity must be a finite number of 0 or more; pass e.g. 1');
     if (value.cast !== undefined && (typeof value.cast !== 'object' || typeof value.cast.add !== 'function'))

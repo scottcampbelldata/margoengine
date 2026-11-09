@@ -295,7 +295,7 @@ test('disposing a vfx removes the point lights it published', async () => {
 });
 
 test('shadows rejects a range or intensity that overflows f32', () => {
-  const link = /https:\/\/margoengine.com\/errors#vfx-f32/;
+  const link = /https:\/\/margoengine.com\/errors#vfx-float/;
   assert.throws(
     () => new VFX({ shadows: { range: 1e40 } }),
     (error) => error instanceof RangeError && link.test(error.message) && /range/.test(error.message),

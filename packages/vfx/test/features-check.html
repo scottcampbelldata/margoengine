@@ -523,6 +523,16 @@ window.checkShadowFar=async()=>{
 // destroys that buffer before the map resolves. The cancelled map must not reject without a handler.
 window.checkShadowRelease=async()=>{
  const rejected=[];
+ const mapped=[];
+ const createBuffer=device.createBuffer;
+ device.createBuffer=function(descriptor){
+  const buffer=createBuffer.call(this,descriptor);
+  if(descriptor.usage&GPUBufferUsage.MAP_READ){
+   const map=buffer.mapAsync;
+   buffer.mapAsync=function(...args){const promise=map.apply(this,args);mapped.push(promise);return promise;};
+  }
+  return buffer;
+ };
  const onReject=(event)=>{
   const reason=event.reason;
   rejected.push(reason&&reason.name?reason.name+': '+reason.message:String(reason));
@@ -539,12 +549,20 @@ window.checkShadowRelease=async()=>{
    effect.simulate({backend:'webgpu',device,delta:0,camera,width:size,height:size,encoder:device.createCommandEncoder()});
    if(mode==='restore')effect.onDeviceRestored({gpu:device,stats:{drawCalls:0},removePlugin(){}});
    else effect.dispose();
-   await new Promise((resolve)=>setTimeout(resolve,100));
+   await Promise.allSettled(mapped);
+   // Rejection reporting runs at the microtask checkpoint. Yield one task after the maps settle so a broken
+   // production handler reports its unhandled rejection before this check reads `rejected`.
+   await new Promise(resolve=>{
+    const channel=new MessageChannel();
+    channel.port1.onmessage=()=>{channel.port1.close();channel.port2.close();resolve();};
+    channel.port2.postMessage(null);
+   });
    effect.dispose();
    modes.push(mode);
   }
   return {error,errors:errors.splice(0),rejected,modes};
  }finally{
+  device.createBuffer=createBuffer;
   window.removeEventListener('unhandledrejection', onReject);
  }
 };
