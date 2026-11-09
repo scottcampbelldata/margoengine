@@ -30,6 +30,26 @@ test('RobotExpressive root morph diagnostic names actual mesh nodes and does not
   m.dispose();
 });
 
+test('RiggedFigure unnamed clip uses its documented indexed name; explicit empty names survive', async () => {
+  using e = await engine();
+  const data = animatorGLB(RIGGED_FIGURE);
+  assert.equal(data.doc.animations[0].name, undefined);
+  const m = model(e, data),
+    a = new Animation(m);
+  assert.equal(a.clips[0].name, 'Animation 0');
+  a.play('Animation 0');
+  a.seek(0.1);
+  a.dispose();
+  m.dispose();
+  data.doc.animations[0].name = '';
+  const named = model(e, data),
+    b = new Animation(named);
+  assert.equal(b.clips[0].name, '');
+  b.play('');
+  b.dispose();
+  named.dispose();
+});
+
 test('Khronos MorphStressTest target names resolve across mesh nodes and missing names do not change weights', async () => {
   using e = await engine();
   const m = model(

@@ -47,6 +47,11 @@ animation.setMorph('Surprised', 0.8);
 animation.dispose(); model.dispose(); engine.dispose();
 ```
 
+Clip names preserve the glTF `name`, including an explicit empty string. An absent
+name is synthesized as `Animation <i>` with the zero-based glTF animation index,
+for example `Animation 0`. `animation.clips` exposes the resulting names; `play(i)`
+also selects by the original unchanged glTF index. An unnamed RiggedFigure clip is covered by the contract test.
+
 Four-influence primitives keep their 32-byte influence records and the arithmetic of the per-primitive shader, bit for bit. An eight-influence primitive uses a 64-byte record and a second, lazily created compute pipeline; both formats can coexist in one model. Weights normalize across all present sets, including assets whose positive weights are entirely in the secondary set. Joint indices accept unsigned 8-bit or 16-bit accessors; weights accept Float32 or normalized unsigned 8-bit/16-bit accessors. Both sets require matching vertex counts, valid palette indices, nonnegative weights, and a positive combined sum.
 
 Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and the shared buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.
