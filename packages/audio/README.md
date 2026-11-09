@@ -359,3 +359,62 @@ states/grid use linked `state` errors. No core/stage changes. Node stand-ins cov
 scheduling and lifecycle; real browser generated-stem PCM checks phase, loop, layering
 and beat/bar boundaries on all three routes. Recordings, listening quality, other
 browsers and performance remain unmeasured.
+
+## Reverb zones
+
+`@margoengine/audio/zones` selects a room response as the listener moves through
+axis-aligned areas. It reuses `@margoengine/mixer/reflections` and mixer automation;
+install the optional `@margoengine/mixer` peer alongside audio. WebGPU and both
+WebGL2 routes use the same Web Audio convolution graph.
+
+```ts
+import {AudioListener, Audio} from 'margoengine/audio';
+import {AudioReverbZones} from 'margoengine/audio/zones';
+
+const context = new OfflineAudioContext(2, 24000, 48000);
+using listener = new AudioListener({context});
+using zones = new AudioReverbZones(listener, [
+  {name: 'hall', min: [-4, -2, -4], max: [4, 2, 4],
+   reverb: {room: [8, 4, 8], seconds: 0.2}},
+]);
+const buffer = context.createBuffer(1, 4800, 48000);
+buffer.getChannelData(0)[0] = 0.25;
+using sound = new Audio(listener).setBuffer(buffer);
+sound.getOutput().connect(zones.input); // additional wet send; the dry route already exists
+sound.play();
+console.log(zones.active); // hall
+console.log((await context.startRendering()).length); // 24000 frames
+sound.getOutput().disconnect(zones.input);
+```
+
+`AudioReverbZones(listener, zones, {fade=0.1})` copies finite ordered `min`/`max`
+world bounds in metres. Names must be unique and nonempty. Bounds are inclusive;
+o matching zone means a silent wet send. Greatest finite `priority=0` wins overlap;
+equal priorities select the first listed zone. `gain=0.25` is linear wet-send gain
+in 0..1, added to the unchanged dry route. Manage headroom for combined dry/wet audio.
+`reverb={}` takes the existing [mixer room settings and defaults](../mixer/README.md#early-room-reflections),
+with `mix` always 1 for wet-only output. Bounds select a response; they do not define
+the response's room geometry or move its authored source/listener positions.
+
+`fade=0.1` is finite nonnegative mixer exponential fade seconds (about 98% settled);
+0 jumps. One convolution and response buffer per zone are prepared at construction.
+Only selection/send gains change on movement. Old tails ring out after a switch or
+exit; the input feed fades, preserving convolution state. Resource cost grows with
+zone count and room response length; this is an authored zone model, without
+continuous propagation, portals, diffraction or automatic room geometry analysis.
+
+`active` reports the selected name or null. Attached listeners update selection each
+frame after their pose; otherwise call `listener.update()` or `zones.update()` after
+setting the listener pose. Selection follows game frames, fades follow the audio
+clock. Unchanged selection schedules nothing. Empty zone lists are valid wet silence.
+No loading, waits or timers. Listener loading already supports AbortSignal.
+
+`dispose()`, `using` and listener teardown disconnect owned sends/effects immediately,
+cutting tails. If a manually connected source will outlive the controller, disconnect
+its connection into `zones.input`. Shared source dry routes stay independent. Disposed
+updates raise linked `disposed`; invalid bounds/names/levels raise linked `state`.
+Room settings use the mixer's validation. Node tests cover priority, boundaries,
+immutable bounds, teardown and failure cleanup. Real browser PCM compares generated
+impulses to existing mixer responses across room entry/switch/exit, including dry
+sound and retained tails, on all three routes. Generated rooms/motion are stand-ins;
+recordings, listening quality, other browsers and performance remain unmeasured.

@@ -1584,3 +1584,7 @@ Margo-own uniform index selection with preceding-index exclusion, modular sequen
 ## Adaptive music (batch 110)
 
 Written from the [W3C Web Audio Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode), common scheduled start/loop times and AudioParam exponential target automation. Beat/bar quantization is first-principles ceil((requested-origin)/grid). Existing Margo mixer buses own gain scheduling; no duplicate mixer or timer scheduler. No engine/library source read or downloaded assets. Generated stems and game-state triggers are stand-ins.
+
+## Reverb zones (batch 110)
+
+Written from the [W3C Web Audio Recommendation, ConvolverNode](https://www.w3.org/TR/2021/REC-webaudio-20210617/#ConvolverNode) and AudioParam scheduling. Authored inclusive axis-aligned bounds and priority selection are Margo-own. Uses existing Margo mixer/reflections createRoomReverb and mixer rampParam; no second impulse generator/convolver implementation. Room acoustics references remain in the mixer clean-room record. No engine/library source read or downloaded assets; impulses, rooms and listener motion are stand-ins.

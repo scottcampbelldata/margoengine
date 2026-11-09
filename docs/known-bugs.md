@@ -1379,3 +1379,7 @@ or unmeasured coverage, recorded in limits.md, not proven capabilities.
 ### Adaptive music (batch 110)
 
 No known open defect in tested layering, beat/bar scheduling, validation and lifecycle paths. Initial Node tests inspected a bus pre-tap instead of its fader; corrected graph traversal checks the actual mixer automation without changing expectations. The quality API check found two missing exported-interface comments; both now describe the options. Generated-stem PCM proves scheduling, not authored musical quality; limits.md records scope.
+
+### Reverb zones (batch 110)
+
+No known open defect in tested zone selection, overlap, wet routing, tail preservation or lifecycle paths. Invalid bounds/levels reject before graph allocation; an invalid later room response disposes already created effects. Sparse coordinates reject explicitly. Node stand-ins and real browser generated-impulse PCM cover the stated scope; limits.md records model/resource limits.

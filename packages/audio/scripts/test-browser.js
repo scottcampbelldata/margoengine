@@ -46,6 +46,7 @@ try {
   report.doppler = await page.evaluate(() => window.runDopplerTests());
   report.events = await page.evaluate(() => window.runEventTests());
   report.music = await page.evaluate(() => window.runMusicTests());
+  report.zones = await page.evaluate(() => window.runZoneTests());
   assert.equal(await page.evaluate(() => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
   assert.equal(await page.evaluate(() => window.checkGesture()), 'running');

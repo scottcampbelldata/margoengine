@@ -1823,3 +1823,7 @@ No scene capture, depth, MSAA, automatic mip generation, other-device or speed p
 ### Adaptive music evidence (batch 110, section 5)
 
 Audio/music owns one source per stem and one mixer bus per source; mixer scheduling handles all state gain changes. Audio-clock grid and common starts/loopEnd preserve phase without frame timers. LIM-607 and whitepaper/results/audio-music-20261108.json record generated-stem sample-reference PCM beside WebGPU, native WebGL2 and compatibility WebGL2. Error below 5e-8 and zero GPU errors; Node tests cover restart, validation and listener teardown. No core/stage changes or speed claim; recordings and listening quality remain unmeasured.
+
+### Reverb-zone evidence (batch 110, section 5)
+
+Audio/zones routes additional wet sends to existing mixer/reflections effects and fades their inputs, so previous convolution tails remain intact while dry paths stay independent. Listener frame updates select copied AABBs; convolution topology is prepared once. LIM-608 and whitepaper/results/audio-zones-20261108.json record generated-impulse PCM against existing response sums beside WebGPU, native WebGL2 and compatibility WebGL2, within 1e-6 and zero GPU errors. No core/stage changes or speed claim. Real room recordings, listening quality and other browsers remain unmeasured.

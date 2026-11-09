@@ -50,6 +50,10 @@
     "./music": {
       "types": "./dist/music.d.ts",
       "import": "./dist/music.js"
+    },
+    "./zones": {
+      "types": "./dist/zones.d.ts",
+      "import": "./dist/zones.js"
     }
   },
   "files": [

@@ -1,0 +1,39 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated impulses, room responses and listener motion, stand-ins",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "maxError": 2.0604886685759993e-9,
+      "selection": [
+        "small",
+        "large",
+        null
+      ],
+      "tails": "preserved",
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "maxError": 2.0604886685759993e-9,
+      "selection": [
+        "small",
+        "large",
+        null
+      ],
+      "tails": "preserved",
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "maxError": 2.0604886685759993e-9,
+      "selection": [
+        "small",
+        "large",
+        null
+      ],
+      "tails": "preserved",
+      "gpuErrors": []
+    }
+  ]
+}

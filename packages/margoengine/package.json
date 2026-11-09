@@ -146,6 +146,10 @@
       "types": "./dist/audio/music.d.ts",
       "import": "./dist/audio/music.js"
     },
+    "./audio/zones": {
+      "types": "./dist/audio/zones.d.ts",
+      "import": "./dist/audio/zones.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
