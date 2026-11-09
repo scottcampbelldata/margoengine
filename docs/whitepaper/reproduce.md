@@ -1535,3 +1535,14 @@ the explicit table. All primary BC7 mip/layer/face payloads compare strictly.
 `measure/report12-bc7-evidence.mjs` records source hashes, the exact corpus and
 crafted outputs, and the baseline-compatible raw/gzip draft size. Remaining
 encoders/public integration and full job 2/3 acceptance remain pending.
+
+`measure/whole-container-fuzz-report12.mjs` preserves the prior deterministic
+campaign and adds UASTC BC7 target 6. Run it through `report12-cpu.mjs` with a
+1,800-second outer hard limit; it spawns each seed with a 180-second limit and
+512 MiB Node heap. It retains separate report12 seed logs/results and preserves
+the report11 evidence. `measure/report12-fuzz-evidence.mjs` verifies unchanged
+decoder sources and aggregate Wasm/adapter hashes against the BC7 checkpoint.
+[Result](results/batch-134-bc7-fuzz.json): 51 seeds, 2,856 mutations and 14,974
+decode calls, with no uncoded error, trap or hard timeout. Per-seed input and
+adapter hashes are logged; the Wasm hash is aggregate. The same caveats about
+mixed call counts, implemented subsets and end-instance memory still apply.

@@ -1957,3 +1957,9 @@ The implementation consumes input blocks directly and emits 16-byte BC7 blocks
 without full-image RGBA staging or per-block heap allocation. This is a
 deterministic work/allocation claim; final timing and memory acceptance remain
 open. ETC1S BC7 and public decoder integration are outside this checkpoint.
+
+The [BC7-expanded bounded campaign](results/batch-134-bc7-fuzz.json) adds target 6
+to the implemented UASTC paths over all 51 primary seeds and 2,856 deterministic
+mutations. Its 14,974 decode calls produced no uncoded exception, Wasm trap or
+hard-limit failure. This extends implemented-subset evidence; it does not close
+job 3 while target encoders remain missing or claim statistical fuzz coverage.

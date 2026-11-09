@@ -4802,6 +4802,15 @@ ETC1S BC7, other encoders and public package/worker integration remain pending.
 Jobs 2-5 are incomplete; GPU requests stay stopped until the new browser
 teardown repair is on origin/main, and job 4 timing remains deferred.
 
+The [BC7-expanded mutation campaign](whitepaper/results/batch-134-bc7-fuzz.json)
+retains all 51 primary seeds and 2,856 mutations, now including UASTC target 6.
+It performs 14,974 decode calls with no uncoded exception, Wasm trap or hard
+timeout. Before/after controls preserve strict output contracts, including
+specification-defined RGB9E5. Source/compiled Wasm stayed unchanged; the result
+records aggregate Wasm and adapter hashes, plus per-seed input/adapter hashes.
+Counts mix whole-file and image/target calls; end-instance pages are not a
+per-pair peak-memory bar. Full job 3 remains open until every encoder exists.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

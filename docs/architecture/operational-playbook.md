@@ -3850,3 +3850,14 @@ These facts do not establish old/new timing or isolated per-pair peak memory.
 No new GPU requests are allowed before the pending teardown repair reaches
 origin/main. Other target encoders, public integration and job 2/3 closure
 remain open; job 4 timing stays in the deferred speed phase.
+
+The [BC7-expanded full-container campaign](../whitepaper/results/batch-134-bc7-fuzz.json)
+passed all 51 seeds, 2,856 mutations and 14,974 decode calls under 180-second
+per-seed and 1,800-second whole-campaign limits, with no uncoded error, Wasm
+trap or hard timeout. Decoder source and compiled Wasm stayed unchanged during
+the campaign; the evidence writer verifies the final source manifest and
+aggregate hashes against the BC7 checkpoint. Per-seed records log input and
+adapter hashes. Controls retain strict RGB9E5 specification output; other
+implemented outputs retain frozen prebuilt hashes. Counts mix ABI image/target
+and whole-file/target jobs. Remaining encoders, full job 3 and isolated peak
+memory acceptance remain open.
