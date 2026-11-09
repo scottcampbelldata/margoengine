@@ -1363,6 +1363,48 @@
     "metadataTests": 62,
     "qualityEntries": 975,
     "fullVerify": "Reused historical once-run result with sole failure already fixed on main and focused regression passing; no new full verify claimed.",
-    "coreStageGzip": 23924
+    "coreStageGzip": 23924,
+    "finalRebase": {
+      "base": "68a03f32c",
+      "tip": "d616ea17f",
+      "checks": {
+        "landing-final-build": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 2.974,
+          "log": "test-results/56fix/landing-final-build.log"
+        },
+        "landing-final-api": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 14.233,
+          "log": "test-results/56fix/landing-final-api.log"
+        },
+        "landing-final-quality": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 26.963,
+          "log": "test-results/56fix/landing-final-quality.log"
+        },
+        "landing-final-lint": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 3.091,
+          "log": "test-results/56fix/landing-final-lint.log"
+        },
+        "landing-final-hygiene": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 14.081,
+          "log": "test-results/56fix/landing-final-hygiene.log"
+        }
+      },
+      "api": {
+        "entries": 894,
+        "exports": 8673
+      },
+      "qualityEntries": 977,
+      "inheritedProofInputs": "Byte-identical to 826a6b2e9 in all repaired packages and GPU-lock. New main commit adds separate bvh/shadows entries and documentation. Existing passing GPU, unit, README and lock results are reused; only affected build/API/quality/docs gates rechecked."
+    }
   }
 }
