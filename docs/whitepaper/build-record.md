@@ -3312,3 +3312,32 @@ together after the batch).
   `picking.pick` for hits and `engine.pick` for the stand-in mesh. Found before any commit.
 - **Limits and unmeasured:** row in `docs/limits.md`. Every pick projects every splat of the cloud again, so its cost
   grows with the cloud; that cost is not measured.
+
+## Batch 167: rival measurements
+
+Nine measurements, one push each, on this PC. Each rival is installed outside the repository and driven as a black
+box. Margo's harness is the package's `scripts/rival-bench.mjs` (save uses `scripts/fuzz-roundtrip.mjs`). Times are
+paired turns in one process, the fastest of 7 rounds, on a busy machine, and are diagnostic. Core and stage are
+untouched. A loss stays open in `docs/known-bugs.md`; publishing the number does not close it.
+
+| # | Package | Commit | Result | Known bugs opened |
+| --- | --- | --- | --- | --- |
+| 1 | behavior | `432f3a37b` | win: flock of 1,000, 3.098 ms against Yuka 0.7.8 at 9.472 ms | none |
+| 2 | navmesh | `84eab222d` | build loss 3.190 ms against recast-navigation 0.44.0 at 1.130 ms; query win 0.064 ms against 0.082 ms; gapped path loss 24.212 against 23.778; open floor equal, both 22.627416997969522 | navmesh build; navmesh gapped path |
+| 3 | ecs | `6601c232e` | win: 100,000 entities, 1.249 ms against bitECS 0.4.0 at 11.054 ms | none |
+| 4 | fsm | `6580a55d7` | win: 10,000 transitions, 1.443 ms against XState 5.33.4 at 27.935 ms | none |
+| 5 | tween | `277abf1b5` | win: 10,000 tweens, 0.371 ms against tween.js 25.0.0 at 1.018 ms | none |
+| 6 | netcode | `2667d5e37` | published: rollback 0.0176 ms/frame against a forward run at 0.0086 ms/frame; no JavaScript rollback rival | none |
+| 7 | save | `6efb0e392` | published: 200 migration round trips, 0.086 ms each, 0 failures; no rival package | none |
+| 8 | compute | `8d1b0a355` | win: matmul 0.900 ms against TensorFlow.js 4.22.0 WebGPU at 3.100 ms; FFT 2.400 ms against 22.700 ms; sum 0.900 ms against 3.000 ms | none |
+| 9 | sciviz | `55b3a84ee` | loss: volume-64 frame 1.500 ms against VTK.js 38.0.5 at 1.300 ms; mean absolute channel difference 1.801 | volume-64 |
+
+- **Rows:** `docs/whitepaper/perf-vs-rivals.md`, perf history entries 93 to 100 and 102, reproduce.md commands, and
+  `docs/clean-room.md` for each rival. Entry 101 is an unrelated physics2d note that landed on main between the
+  compute and sciviz pushes.
+- **Oracles:** open-floor path length and the gapped hole (`packages/navmesh/test/path-length.test.js`), linear
+  halfway (`packages/tween/test/linear-oracle.test.js`), migration seed 167 (`packages/save/tests/migration-fuzz.test.js`),
+  NumPy matmul, FFT and sum (`packages/compute/tests/numpy-oracle.test.js`), volume field sum
+  (`packages/sciviz/tests/volume-field.test.js`).
+- **Known bugs:** the navmesh build, the navmesh gapped path, and the sciviz volume-64 frame. Causes are not yet
+  found. The picture difference on volume-64 is recorded with the loss.
