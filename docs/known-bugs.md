@@ -3503,3 +3503,11 @@ The owning FFT entry now reports the actual GPU height, lengths and evaluated
 time. The strict unit regression failed before the correction; both GPU
 backends also check nonexact decimal metadata. The new attachment error now
 links to the existing state help entry; its regression rejects the broken link.
+Batch 273 full materials follow-up: unchanged gltf-pro-materials-gpu-check.js
+still fails the composed worst-case and transmissive pipelines at the actual
+16 fragment texture-unit cap, with no shader-module, GPU or page errors.
+The translator already shares nondynamic storage buffers per bind group, but
+that representation still consumes extra samplers beyond the 16 sampled
+textures. No sampler-count reduction, effect omission or raised limit is a
+repair. Cross-group storage packing or another representation remains open.
+Receipt: test-results/batch-273-materials-sampler-repro.log (10.0 s).

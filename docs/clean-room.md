@@ -3308,3 +3308,24 @@ pair happens to match, so that pass is not a repair. Receipts are
 test-results/batch-273-ktx2-repro, -ktx2-probe and -ktx2-repeat-probe logs.
 Actual capture/render reproducibility remains unresolved; no runtime or
 assertion changed. Checkpoint and continue to the next indexed failure.
+
+### Batch 273 compatibility failure 3: material sampler pressure
+
+Compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (separate sampled-texture/storage limits),
+Khronos OpenGL ES Working Group, OpenGL ES 3.0.6 (2019),
+https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf (fragment texture
+units), and Aaron E. Lefohn, Joe Kniss, Robert Strzodka, Shubhabrata Sengupta
+and John D. Owens, Glift: Generic, Efficient, Random-Access GPU Data Structures
+(2006), https://escholarship.org/uc/item/6gc3x9w1 (abstract only).
+The distinction is API bindings versus the backing representation's resources;
+data-texture addressing also consumes samplers. No companion/library code read.
+
+The unchanged full materials GPU probe still fails on the worst composed and
+transmissive composed shaders at MAX_TEXTURE_IMAGE_UNITS(16), with no module,
+GPU or page errors. Receipt: test-results/batch-273-materials-sampler-repro.log.
+The existing translator already shares nondynamic storage bindings per bind
+group, so simply deduplicating bindings inside a group is not a new repair.
+Cross-group packing or another storage representation needs a complete design
+and regressions, not smaller materials, missing effects or a raised hardware
+limit. No runtime/test change is claimed. Checkpoint and continue.
