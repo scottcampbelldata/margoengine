@@ -2369,6 +2369,8 @@ against a physical path value about 3.5.
 
 Batch 160 section 5 job 7 adds external constant-furnace IBL evidence for the full 123-primitive glTF scene, with Mitsuba direct/full transport references, unchanged display mapping and exact independent backend budgets. Raw/display hashes protect reference recapture; unit contracts cover ordering, finite radiance, source preservation and frozen counts/budgets. Native WebGL2 refuses the path; real compatibility renders it. Geometric IBL visibility/reflections and principled/glTF differences remain open. Constant radiance does not establish directional prefilter or nonuniform-sky accuracy; batch 168 evidence remains in force. No production renderer code changed.
 
+Batch 160 section 5 job 8 adds independent direct-light picture evidence on the existing Cornell fixture: directional bounded orthographic shadows and point compute selection/six-face shadows, each with unshadowed control, on WebGPU and real compatibility. All pixels, default PCF/bias and exact first budgets are retained. Tests preserve every fixture quad/reflectance and frozen reference count/hash/budget; native WebGL2 explicitly refuses. Contact/visibility residuals stay open, and point finite-range attenuation differs from the ray-traced emitter. This does not repeat the batch 168 bake or prove GI, many-light stress or all shadow types. No core, package renderer or speed result changed.
+
 ### Accumulated planar shadows: section 5 evidence (batch 56, job 2)
 
 staging/accumulate reuses the contact receiver, caster variants and lifecycle through protected projection,

@@ -3944,6 +3944,14 @@ The complete job 1 source scene (123 primitives, 528,291 vertices, 1,040,409 tri
 
 Job 7 checks passed: lint, hygiene, all four new reference contracts, full verify and the frozen GPU-locked direct/full budgets on both backends. Root harness/docs only; package README execution and API regeneration are not applicable.
 
+### Job 8: clustered and shadowed Cornell lights
+
+Mitsuba 3.9.1 scalar_rgb direct-only, 128 spp, seed 160, depth 2, reuses all fifteen/thirty batch 168 Cornell quads/triangles. The new pictures cover a clustered directional light with bounded orthographic LocalShadows and a point light with compute selection and six-face LocalShadows. Both also keep unshadowed controls. Default 512 maps, PCF and biases are retained. Shadowed MAE: directional 0.7214571634928385 on both backends; point 0.9285901387532552 / 0.9285939534505209. Independent first budgets, hashes, all-pixel counts and real WebGL2 compatibility metadata are committed. Native WebGL2 explicitly refuses this path. Range-window, hard/filter visibility, contact, sampling and finite-reference-noise differences are documented; no renderer/package change or speed claim. Batch 168 lightmap/sky/OIT/staging measurements are reused. Jobs 4 and 5 remain parked and the batch row stays open under the manager ruling.
+
+Job 8 preflight initially found a missing dist/media.d.ts for the voxel-pathtracer export just brought in by rebase. Origin/main was checked; a package build restored the expected declaration before hygiene resumed. This was stale local build output, not a renderer fix. The original failed hygiene log is retained; no test or budget was edited to bypass it. Root harness/docs only; package README execution and API regeneration are not applicable to this job.
+
+Job 8 checks passed: lint, hygiene after the fresh build, three Cornell contracts, full verify (13,336 tests, zero failures or skips), and all four directional/point native/compatibility GPU runs with their original independent unshadowed/shadowed budgets. No budget changed. The batch row records the manager-authorized partial completion rather than closing the parked release blockers.
+
 ## Missing-input continuation: S2 and IES (2026-11-09)
 
 - P13: outside CesiumJS S2 standard data, three pinned files; 21 cells, 45,738 independently

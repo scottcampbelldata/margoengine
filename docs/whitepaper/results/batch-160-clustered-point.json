@@ -1,0 +1,255 @@
+{
+  "family": "clustered-point",
+  "domain": "All RGB pixels, PBR Neutral/sRGB; diffuse Cornell quads, no ambient/indirect, direct-only hard-visibility reference; unshadowed control and default LocalShadows separately",
+  "sceneSha256": "31a417b175469c9bfeaa5b7d8fd16ec3a3d5a949442454b7e4e954cf8b65b379",
+  "settings": {
+    "width": 512,
+    "height": 512,
+    "camera": {
+      "position": [
+        2.78,
+        2.744,
+        -8
+      ],
+      "target": [
+        2.78,
+        2.744,
+        2.796
+      ],
+      "fov": 35,
+      "near": 0.1,
+      "far": 30
+    },
+    "light": {
+      "position": [
+        2.78,
+        4.8,
+        1
+      ],
+      "intensity": 70,
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "range": 20
+    },
+    "bounds": {
+      "min": [
+        -0.1,
+        -0.1,
+        -0.1
+      ],
+      "max": [
+        5.7,
+        5.6,
+        5.7
+      ]
+    }
+  },
+  "reference": {
+    "linearSha256": "a88afe6cbe25e24a86542343b980908bdedaf77e0f2403ce164a53232f5ab5b6",
+    "referenceSha256": "e5e82e07e153b758d2a417df340563366045cc4eaac260b5e06b55da460df572",
+    "meta": {
+      "version": "3.9.1",
+      "variant": "scalar_rgb",
+      "quads": 15,
+      "triangles": 30,
+      "samples": 128,
+      "seed": 160,
+      "maxDepth": 2,
+      "threadCount": 4,
+      "model": "Lambert diffuse; point inverse square or directional irradiance; hard visibility; no indirect bounce; no authored range window"
+    }
+  },
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "nativeWebGL2": {
+    "code": "unsupported",
+    "message": "Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine"
+  },
+  "rows": {
+    "unshadowed": {
+      "margo": {
+        "backend": "webgpu",
+        "quads": 15,
+        "draws": 15
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 6010641,
+        "square": 842857153,
+        "max": 214,
+        "mae": 7.642925262451172,
+        "rmse": 32.73756698789925,
+        "foreground": 255386,
+        "foregroundAbsolute": 6010641,
+        "foregroundMae": 7.845171622563492,
+        "changed": 165752
+      }
+    },
+    "shadowed": {
+      "margo": {
+        "backend": "webgpu",
+        "quads": 15,
+        "draws": 15
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 730273,
+        "square": 19557045,
+        "max": 156,
+        "mae": 0.9285901387532552,
+        "rmse": 4.98678941755799,
+        "foreground": 241029,
+        "foregroundAbsolute": 730273,
+        "foregroundMae": 1.0099379466094676,
+        "changed": 164649
+      }
+    }
+  },
+  "compat": {
+    "family": "clustered-point",
+    "domain": "All RGB pixels, PBR Neutral/sRGB; diffuse Cornell quads, no ambient/indirect, direct-only hard-visibility reference; unshadowed control and default LocalShadows separately",
+    "sceneSha256": "31a417b175469c9bfeaa5b7d8fd16ec3a3d5a949442454b7e4e954cf8b65b379",
+    "settings": {
+      "width": 512,
+      "height": 512,
+      "camera": {
+        "position": [
+          2.78,
+          2.744,
+          -8
+        ],
+        "target": [
+          2.78,
+          2.744,
+          2.796
+        ],
+        "fov": 35,
+        "near": 0.1,
+        "far": 30
+      },
+      "light": {
+        "position": [
+          2.78,
+          4.8,
+          1
+        ],
+        "intensity": 70,
+        "color": [
+          1,
+          1,
+          1
+        ],
+        "range": 20
+      },
+      "bounds": {
+        "min": [
+          -0.1,
+          -0.1,
+          -0.1
+        ],
+        "max": [
+          5.7,
+          5.6,
+          5.7
+        ]
+      }
+    },
+    "reference": {
+      "linearSha256": "a88afe6cbe25e24a86542343b980908bdedaf77e0f2403ce164a53232f5ab5b6",
+      "referenceSha256": "e5e82e07e153b758d2a417df340563366045cc4eaac260b5e06b55da460df572",
+      "meta": {
+        "version": "3.9.1",
+        "variant": "scalar_rgb",
+        "quads": 15,
+        "triangles": 30,
+        "samples": 128,
+        "seed": 160,
+        "maxDepth": 2,
+        "threadCount": 4,
+        "model": "Lambert diffuse; point inverse square or directional irradiance; hard visibility; no indirect bounce; no authored range window"
+      }
+    },
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "nativeWebGL2": {
+      "code": "unsupported",
+      "message": "Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine"
+    },
+    "rows": {
+      "unshadowed": {
+        "margo": {
+          "backend": "webgpu",
+          "quads": 15,
+          "draws": 15
+        },
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 6010645,
+          "square": 842857493,
+          "max": 214,
+          "mae": 7.642930348714192,
+          "rmse": 32.7375735908993,
+          "foreground": 255386,
+          "foregroundAbsolute": 6010645,
+          "foregroundMae": 7.84517684341872,
+          "changed": 165752
+        }
+      },
+      "shadowed": {
+        "margo": {
+          "backend": "webgpu",
+          "quads": 15,
+          "draws": 15
+        },
+        "metrics": {
+          "pixels": 262144,
+          "absolute": 730276,
+          "square": 19557048,
+          "max": 156,
+          "mae": 0.9285939534505209,
+          "rmse": 4.98678980003826,
+          "foreground": 241029,
+          "foregroundAbsolute": 730276,
+          "foregroundMae": 1.0099420954878182,
+          "changed": 164649
+        }
+      }
+    }
+  }
+}

@@ -1408,6 +1408,13 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 | Direct-only RGB-byte MAE 2.9175326029459634 / 2.9175211588541665 | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
 | Full-transport MAE 1.8851051330566406 / 1.8851038614908855 | Same result and contracts; GPU-locked environment.mjs | Mitsuba max depth 8, constant radiance, no sun, shared display transform. Geometric IBL occlusion/reflections and BSDF mismatch remain open; no path-tracing equivalence or nonuniform-sky claim. |
 
+### Batch 160 clustered and shadowed Cornell, job 8
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| Directional default-shadow MAE 0.7214571634928385 on both backends | [Frozen result](results/batch-160-clustered.json), tests/reference-cornell.test.js | Complete 15-quad scene; native WebGPU / actual WebGL2 compatibility; Mitsuba direct-only hard visibility. Unshadowed control MAE 48.63041687011719. |
+| Point default-shadow MAE 0.9285901387532552 / 0.9285939534505209 | [Frozen result](results/batch-160-clustered-point.json), same contracts and GPU-locked cornell.mjs --point | Exercises clustered selection and six-face LocalShadows. Unshadowed MAE 7.642925262451172 / 7.642930348714192. Authored range window, filtering/bias, contacts and antialiasing differences remain; no physical equivalence or speed claim. |
+
 ## Batch 56 job 2: accumulated planar visibility
 
 The optional staging/accumulate entry samples one disk-light position per frame, sums binary

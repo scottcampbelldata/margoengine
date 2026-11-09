@@ -1,0 +1,29 @@
+<!doctype html><style>body{margin:0;background:black}canvas{display:block;width:512px;height:512px}</style><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {LambertMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {DirectionalLights} from '/packages/clustered/dist/directional.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+window.renderCornell=async(payload,shadowed,backend='webgpu')=>{
+ const canvas=document.body.appendChild(document.createElement('canvas')),settings=payload.settings;
+ const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera});
+ const errors=[];engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ try{
+  engine.scene.background='#000000';engine.lighting.radiance.fill(0);engine.lighting.direction.set([0,1,0,0]);
+  const lights=Clustered.attach(engine),suns=DirectionalLights.attach(engine,{lights});
+  const local=shadowed?LocalShadows.attach(engine,{lights}):undefined;
+  if(settings.light.position)lights.setLights([{...settings.light,castShadow:shadowed}]);
+  else suns.setLights([{...settings.light,castShadow:shadowed,shadow:{bounds:settings.bounds}}]);
+  for(const q of payload.quads){
+   const p=q.positions,u=[0,1,2].map(i=>p[i+3]-p[i]),v=[0,1,2].map(i=>p[i+9]-p[i]);
+   const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],len=Math.hypot(...n);
+   const mesh=createMesh(engine,{positions:p,normals:Array.from({length:4},()=>n.map(x=>x/len)).flat(),uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]},new LambertMaterial({color:q.albedo}));
+   lights.add(mesh);local?.add(mesh);
+  }
+  await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+  if(errors.length)throw Error(errors.join('\n'));
+  return{backend:engine.backend,quads:payload.quads.length,draws:engine.stats.drawCalls,png:canvas.toDataURL('image/png')};
+ }finally{engine.dispose();canvas.remove();}
+};</script>
