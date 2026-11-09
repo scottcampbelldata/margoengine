@@ -3458,6 +3458,10 @@
       "types": "./dist/wfc/chunks.d.ts",
       "import": "./dist/wfc/chunks.js"
     },
+    "./wfc/worker": {
+      "types": "./dist/wfc/worker.d.ts",
+      "import": "./dist/wfc/worker.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

@@ -12,6 +12,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/wfc',
+    file: 'packages/wfc/dist/workers/wfc.js',
+    label: 'workers/wfc.js',
+    kind: 'Classic solve worker',
+    measure: 'file',
+    when: 'Each WFCWorkerSolve constructor, only from the optional /worker entry; Wasm is fetched in the worker only when eligible',
+  },
+  {
+    package: '@margoengine/wfc',
     file: 'packages/wfc/dist/wfc.wasm',
     label: 'wfc.wasm',
     kind: 'Wasm SIMD solver',

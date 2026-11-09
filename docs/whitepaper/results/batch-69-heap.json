@@ -2,7 +2,7 @@
   "machine": "SCOTT-DEV",
   "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
   "node": "v26.12.0",
-  "date": "2026-11-09T06:25:33.290Z",
+  "date": "2026-11-09T08:06:03.372Z",
   "status": "LOADED-MACHINE DIAGNOSTIC; paired/interleaved minima; no published release speed claim",
   "rows": [
     {
@@ -15,8 +15,8 @@
       "tiles": 8,
       "rounds": [
         {
-          "typescriptMinMs": 54.61809999999997,
-          "wasmMinMs": 8.376199999999983,
+          "typescriptMinMs": 31.85850000000002,
+          "wasmMinMs": 5.606700000000046,
           "hash": "66215fcd0fd08c86aebd7c9be29e2cc7d21c33b716a2695cb43a5663b976e506",
           "stats": {
             "decisions": 36864,
@@ -26,8 +26,8 @@
           }
         },
         {
-          "typescriptMinMs": 61.60419999999999,
-          "wasmMinMs": 8.589799999999968,
+          "typescriptMinMs": 21.010299999999972,
+          "wasmMinMs": 5.347699999999975,
           "hash": "285e07731e25ac5621b5d97cf684abd7aaba41389fd9b9e56734f7e2ab178675",
           "stats": {
             "decisions": 36864,
@@ -37,8 +37,8 @@
           }
         },
         {
-          "typescriptMinMs": 46.555900000000065,
-          "wasmMinMs": 8.384800000000041,
+          "typescriptMinMs": 25.388199999999983,
+          "wasmMinMs": 5.379799999999989,
           "hash": "8e490d6d61f3997b06761cceb00c8038ea377ae50a09ada2ff62136750f09375",
           "stats": {
             "decisions": 36864,
@@ -48,8 +48,8 @@
           }
         },
         {
-          "typescriptMinMs": 57.122299999999996,
-          "wasmMinMs": 11.156600000000026,
+          "typescriptMinMs": 21.98320000000001,
+          "wasmMinMs": 5.2864000000000715,
           "hash": "835e3f42f965ff9f5250b5f90b61f261449688aea450361e10f09e5721e2f474",
           "stats": {
             "decisions": 36864,
@@ -59,8 +59,8 @@
           }
         },
         {
-          "typescriptMinMs": 54.46140000000014,
-          "wasmMinMs": 7.812799999999925,
+          "typescriptMinMs": 21.204600000000028,
+          "wasmMinMs": 5.289100000000076,
           "hash": "2719492628c0ef86dbc06ddc48520e496f11170dc027bde99d4253686fe68873",
           "stats": {
             "decisions": 36864,
@@ -70,8 +70,8 @@
           }
         },
         {
-          "typescriptMinMs": 40.57540000000017,
-          "wasmMinMs": 9.46569999999997,
+          "typescriptMinMs": 22.737499999999955,
+          "wasmMinMs": 5.366300000000024,
           "hash": "04730d136580d14486c3d8c62ab7df76f6785a3e758664236f0f2f9cb0b25a0d",
           "stats": {
             "decisions": 36864,
@@ -81,8 +81,8 @@
           }
         },
         {
-          "typescriptMinMs": 39.52970000000005,
-          "wasmMinMs": 9.85590000000002,
+          "typescriptMinMs": 21.552999999999997,
+          "wasmMinMs": 5.307299999999941,
           "hash": "19499772c497accd9665705863aad24b312521756ab348e04bad101f04c42bf2",
           "stats": {
             "decisions": 36864,
@@ -104,8 +104,8 @@
       "tiles": 8,
       "rounds": [
         {
-          "typescriptMinMs": 16.903699999999844,
-          "wasmMinMs": 3.0920000000000982,
+          "typescriptMinMs": 11.11909999999989,
+          "wasmMinMs": 2.7814999999998236,
           "hash": "7e202b86a66f18f1fa94eed8a46f8eb0996944ec018230889597ab8019f72730",
           "stats": {
             "decisions": 16384,
@@ -115,8 +115,8 @@
           }
         },
         {
-          "typescriptMinMs": 18.009100000000217,
-          "wasmMinMs": 3.5396999999998116,
+          "typescriptMinMs": 10.777299999999968,
+          "wasmMinMs": 2.777699999999868,
           "hash": "1593a11ec3be1478bcf24f983e782f0d2ab75b430dd24143f9391d7c1c598a2f",
           "stats": {
             "decisions": 16384,
@@ -126,8 +126,8 @@
           }
         },
         {
-          "typescriptMinMs": 17.920799999999872,
-          "wasmMinMs": 4.015699999999924,
+          "typescriptMinMs": 11.007900000000063,
+          "wasmMinMs": 2.8115999999999985,
           "hash": "c17a4b76e09702a06d96cec8d2f8d4e421ce1273c345c86cb38f01cedbbf8574",
           "stats": {
             "decisions": 16384,
@@ -137,8 +137,8 @@
           }
         },
         {
-          "typescriptMinMs": 17.274000000000342,
-          "wasmMinMs": 4.016599999999926,
+          "typescriptMinMs": 13.048199999999952,
+          "wasmMinMs": 2.8659000000000106,
           "hash": "3e155e866755e002c24fcb817eb6fcb757d934cfc8073586d929814bb888fe57",
           "stats": {
             "decisions": 16384,
@@ -148,8 +148,8 @@
           }
         },
         {
-          "typescriptMinMs": 17.86869999999999,
-          "wasmMinMs": 4.151100000000042,
+          "typescriptMinMs": 11.193399999999883,
+          "wasmMinMs": 2.854899999999816,
           "hash": "c428720752e946f553a582a83ca30c2300501075c192884ccdfdf1e3d5298688",
           "stats": {
             "decisions": 16384,
@@ -159,8 +159,8 @@
           }
         },
         {
-          "typescriptMinMs": 17.216699999999946,
-          "wasmMinMs": 4.092799999999897,
+          "typescriptMinMs": 11.104499999999916,
+          "wasmMinMs": 2.835900000000038,
           "hash": "60392f3e15ac5b50681a7ba0d69069ee689239dc0b2703f21318d66183d84b18",
           "stats": {
             "decisions": 16384,
@@ -170,8 +170,8 @@
           }
         },
         {
-          "typescriptMinMs": 18.64260000000013,
-          "wasmMinMs": 4.359300000000076,
+          "typescriptMinMs": 10.98129999999992,
+          "wasmMinMs": 2.8512000000000626,
           "hash": "3f1749d763bbc34aac50156c7c99bc2fa260fa5b1604d9d389d6997c2a64fdb1",
           "stats": {
             "decisions": 16384,

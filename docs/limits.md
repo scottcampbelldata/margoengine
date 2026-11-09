@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-623). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-624). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1264,4 +1264,8 @@ accuracy or time gate was relaxed.
 
 Indexed heap, bitset domains and local restarts: 1..4096 tiles, <=1,000,000 cells, <=16,777,216 cell/tile pairs. Rust SIMD auto path requires <=32 unit-weight tiles; all other eligible inputs use TypeScript. One feature crate/artifact, lazily loaded with module-relative new URL; no import-time fetch. Chunk grid limits include a one-cell halo. Safe integer world/halo coordinates, serial calls, retained output memory grows until disposal. Every returned seam is valid; future chunks may fail for incompatible retained boundaries. Order affects layouts, no global count/path/connectivity guarantee. Heap ties define a new seed algorithm. Generated 192x192, 3D, wide-ID and address fixtures only; CPU works on both rendering backends. Wasm work counters wrap after 2^32-1.
 
-WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 17,317 B min+gzip. The chunks bundle measurement includes rebundled Wasm data; the separately shipped lazy artifact is 24,420 B raw / 9,580 B gzip, not an extra charge on that joined measurement. Core plus stage remains 23,797 B.
+WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constraints 2,460 B, sockets 676 B, chunks 3,589 B and worker 1,331 B min+gzip. The module-relative lazy Wasm is now a separate asset (24,282 B raw / 9,596 B gzip), rather than data rebundled into chunks. The classic worker is 7,967 B raw / 3,326 B gzip, fetched on construction. Core plus stage remains 23,797 B.
+
+## WFC worker solving (batch 69)
+
+Local heap solves only, same grid/rule/pair/restart bounds and backend selection as chunks. One dedicated browser worker per job, rules/pins cloned, Uint16 result transferred. Main-thread cloning has a cost. Latest-only single-consumer progress is real work, not a percentage; restarts may revisit cells and Wasm counters wrap after 2^32-1. Defaults seed 1, pins empty, attempts 4, auto backend, signal absent and timeout 60000 ms including startup/loading; timeout integer 1..2147483647. Abort/dispose/timeout terminate active work and close progress; result must be awaited for errors. Stopping progress iteration leaves the solve running. Node/SSR construction is coded unsupported. Same-origin worker/CSP and Wasm support apply. Real rendering/progress/abort proof on WebGPU and WebGL2, no frame-time guarantee (LIM-624).

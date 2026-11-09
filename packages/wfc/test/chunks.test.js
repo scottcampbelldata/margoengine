@@ -15,6 +15,7 @@ test('SIMD artifact matches its own Rust source and has SIMD instructions', () =
   const record = JSON.parse(readFileSync(new URL('../native/solver/artifact.json', import.meta.url)));
   const wasm = readFileSync(new URL('../src/wfc.wasm', import.meta.url));
   assert.equal(hash(wasm), record.wasm);
+  assert.deepEqual(readFileSync(new URL('../dist/wfc.wasm', import.meta.url)), wasm, 'installed build copies the single artifact');
   assert.equal(wasm.length, record.bytes);
   assert.equal(
     hash(readFileSync(new URL('../native/solver/src/lib.rs', import.meta.url), 'utf8').replaceAll('\r\n', '\n')),

@@ -1,5 +1,5 @@
 {
-  "commit": "316a02d99",
+  "commit": "2959f9aeb",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1598,8 +1598,8 @@
         "gzip": 1210
       },
       "./vdb": {
-        "raw": 15537,
-        "gzip": 6156
+        "raw": 15638,
+        "gzip": 6184
       },
       "./materialx": {
         "raw": 13848,
@@ -3682,8 +3682,16 @@
         "gzip": 676
       },
       "./chunks": {
-        "raw": 41268,
-        "gzip": 17317
+        "raw": 8935,
+        "gzip": 3589
+      },
+      "./worker": {
+        "raw": 2726,
+        "gzip": 1331
+      },
+      "dist/workers/wfc.js": {
+        "raw": 7999,
+        "gzip": 3345
       }
     },
     "@margoengine/worker": {
@@ -3724,10 +3732,15 @@
     }
   },
   "lazyFiles": {
+    "packages/wfc/dist/workers/wfc.js": {
+      "raw": 7967,
+      "gzip": 3326,
+      "brotli": 3015
+    },
     "packages/wfc/dist/wfc.wasm": {
-      "raw": 24420,
-      "gzip": 9580,
-      "brotli": 8114
+      "raw": 24282,
+      "gzip": 9596,
+      "brotli": 8153
     },
     "packages/procedural/dist/poisson.wasm": {
       "raw": 29914,

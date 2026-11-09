@@ -2729,3 +2729,7 @@ These entries lack a recorded number, a named machine or a quiet run:
 ### Batch 69: local WFC heap and SIMD selection
 
 Loaded SCOTT-DEV diagnostics are in results/batch-69-heap.json: two cases, seven paired/interleaved rounds, three repetitions per implementation per round; every output and decisions/update/intersection count agrees. Rust SIMD minima are lower in every round, so <=32 unit-weight tile sets auto-select it. Wider or weighted sets use TypeScript. This compares Margo with Margo, not another engine; no quiet release speed number is claimed. The 192x192 TypeScript work-count check proves exactly 73,728 entropy updates for 36,864 decisions, replacing a full-grid selection scan. Dense reciprocal validation also changes from repeated opposite-list scans to constant bit membership per edge, with a read-budget regression. Existing seeded solver output remains unchanged.
+
+### Batch 69 worker orchestration
+
+Optional worker solving keeps the heap algorithm and seed stream. Bounded TS/host-imported SIMD work reports make progress visible during synchronous work; no search reduction. Device evidence records frames during actual solves on both backends, without a frame-time or throughput claim. The paired heap fixture is rerun on the instrumented artifact; loaded-machine minima are diagnostic, not published release performance.

@@ -25,7 +25,7 @@
   <main id="main" class="sizes">
     <section class="sizes-intro">
       <h1>Package sizes</h1>
-      <p class="section-lede">Every number on this page was measured from the build of commit <code>316a02d99</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
+      <p class="section-lede">Every number on this page was measured from the build of commit <code>2959f9aeb</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
       <div class="budget">
         <h2 id="core-stage">Core + stage</h2>
         <p class="budget-figure"><strong>23,797 B</strong> min+gzip, limit 25,000 B</p>
@@ -81,7 +81,8 @@
   <thead><tr><th scope="col">File</th><th scope="col">Kind</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Gzip (B)</th><th scope="col" class="num">Brotli (B)</th><th scope="col">Loads when</th></tr></thead>
 <tbody data-lazy-package="@margoengine/wfc">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/wfc</code></th></tr>
-<tr><th scope="row"><code>wfc.wasm</code></th><td>Wasm SIMD solver</td><td class="num">24,420</td><td class="num">9,580</td><td class="num">8,114</td><td>First eligible <code>HeapWFC.create()</code> or <code>ChunkedWFC.solveChunk()</code>: at most 32 unit-weight tiles, unless backend is typescript</td></tr>
+<tr><th scope="row"><code>workers/wfc.js</code></th><td>Classic solve worker</td><td class="num">7,967</td><td class="num">3,326</td><td class="num">3,015</td><td>Each WFCWorkerSolve constructor, only from the optional /worker entry; Wasm is fetched in the worker only when eligible</td></tr>
+<tr><th scope="row"><code>wfc.wasm</code></th><td>Wasm SIMD solver</td><td class="num">24,282</td><td class="num">9,596</td><td class="num">8,153</td><td>First eligible <code>HeapWFC.create()</code> or <code>ChunkedWFC.solveChunk()</code>: at most 32 unit-weight tiles, unless backend is typescript</td></tr>
 </tbody>
 <tbody data-lazy-package="@margoengine/procedural">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/procedural</code></th></tr>
@@ -368,7 +369,7 @@
 <tr><td><code>./kmz</code></td><td class="num">47,349</td><td class="num">17,068</td></tr>
 <tr><td><code>./nurbs</code></td><td class="num">6,021</td><td class="num">2,507</td></tr>
 <tr><td><code>./las</code></td><td class="num">2,509</td><td class="num">1,210</td></tr>
-<tr><td><code>./vdb</code></td><td class="num">15,537</td><td class="num">6,156</td></tr>
+<tr><td><code>./vdb</code></td><td class="num">15,638</td><td class="num">6,184</td></tr>
 <tr><td><code>./materialx</code></td><td class="num">13,848</td><td class="num">5,044</td></tr>
 <tr><td><code>./lottie</code></td><td class="num">18,713</td><td class="num">7,873</td></tr>
 <tr><td><code>./xml</code></td><td class="num">2,562</td><td class="num">1,305</td></tr>
@@ -973,11 +974,13 @@
 <tr><td><code>./expression</code></td><td class="num">11,133</td><td class="num">4,462</td></tr>
 </tbody>
 <tbody data-package="@margoengine/wfc">
-<tr><th scope="rowgroup" rowspan="5"><a href="./catalog/#wfc">@margoengine/wfc</a></th><td><code>root</code></td><td class="num">4,269</td><td class="num">1,824</td><td rowspan="5"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="7"><a href="./catalog/#wfc">@margoengine/wfc</a></th><td><code>root</code></td><td class="num">4,269</td><td class="num">1,824</td><td rowspan="7"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./overlapping</code></td><td class="num">5,233</td><td class="num">2,451</td></tr>
 <tr><td><code>./constraints</code></td><td class="num">5,741</td><td class="num">2,460</td></tr>
 <tr><td><code>./sockets</code></td><td class="num">1,183</td><td class="num">676</td></tr>
-<tr><td><code>./chunks</code></td><td class="num">41,268</td><td class="num">17,317</td></tr>
+<tr><td><code>./chunks</code></td><td class="num">8,935</td><td class="num">3,589</td></tr>
+<tr><td><code>./worker</code></td><td class="num">2,726</td><td class="num">1,331</td></tr>
+<tr><td><code>dist/workers/wfc.js (worker)</code></td><td class="num">7,999</td><td class="num">3,345</td></tr>
 </tbody>
 <tbody data-package="@margoengine/splines">
 <tr><th scope="rowgroup" rowspan="6"><a href="./catalog/#splines">@margoengine/splines</a></th><td><code>root</code></td><td class="num">3,807</td><td class="num">1,597</td><td rowspan="6"><code>@margoengine/core</code></td></tr>

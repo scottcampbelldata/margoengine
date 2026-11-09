@@ -227,7 +227,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 20 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 9 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 7 entry points
-- [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 5 entry points
+- [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 6 entry points
 - [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 6 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 13 entry points
 - [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 9 entry points

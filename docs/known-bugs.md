@@ -1645,3 +1645,9 @@ A focused reproduction of the 3c97c10f4 restart test exposed EBUSY unlinking wor
 ### Fixed 2026-11-09: cubic WFC reciprocal validation
 
 ConstrainedWFC checked every adjacency edge with an opposite-list includes scan, making dense T-tile validation O(T cubed). The new 4096-ID heap fixture exposed it by exceeding a five-minute hard limit. Shared prepareGrid now checks a bitset in constant work per edge, preserving input order and copied rules. Regression: packages/wfc/test/chunks.test.js bounds observed adjacency reads linearly and retains the dense 4096-ID solve. Library builds also emit module-relative asset URLs so the new lazy Wasm loads from an installed package rather than the filesystem or site root. Node and real-browser loading are exercised.
+
+### WFC worker lifecycle coverage (batch 69)
+
+No open WFC worker defect after lifecycle, actual classic-worker and dual-backend browser checks. Progress is coalesced work counters, not completion percentage; await result for errors. SSR construction deliberately reports coded unsupported. Synchronous heap APIs still cannot receive new abort events while blocking their thread; the optional worker entry supplies termination-based cancellation.
+
+The worker build initially stopped Vite from implicitly emitting wfc.wasm when URL resolution moved behind the classic-worker boundary. The package build now explicitly copies its own single artifact; chunks.test.js compares installed bytes with the source artifact, and actual TS/SIMD worker tests exercise installed loading. The browser-launch harness fixture was updated to its new evidence result shape while retaining its workspace-root assertion.

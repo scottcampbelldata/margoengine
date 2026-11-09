@@ -32,6 +32,8 @@ export class HeapWFC {
         attempts: number;
     };
     backend: 'typescript' | 'wasm';
+    protected report(_decisions: number, _updates: number, _intersections: number, _attempts: number): void;
+    protected static wasmURL(): URL;
     constructor(dimensions: CellPosition, tiles: readonly Tile[]);
     static create(dimensions: CellPosition, tiles: readonly Tile[], options?: HeapBackendOptions): Promise<HeapWFC>;
     solve({ seed, pins, attempts, signal }?: HeapSolveOptions): Uint16Array;

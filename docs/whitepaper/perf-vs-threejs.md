@@ -393,3 +393,7 @@ or an isolated GPU-pass comparison. Image accuracy is a loss: MAE 1.567519 versu
 ### Batch 69 WFC scope
 
 The local heap/SIMD comparison in results/batch-69-heap.json is Margo TypeScript versus Margo Rust, with identical seeds, output hashes and work counts. No external-engine WFC result or speed claim was measured. Loaded-machine paired minima select only the <=32 unit-weight backend; wider/weighted and global-constraint solvers retain their documented implementations.
+
+### Batch 69 worker evidence
+
+The WFC worker entry has no rival rendering-speed comparison. Its real WebGPU/WebGL2 page records show rendered frames during TS/SIMD heap work and active aborts. Seed output and solver work are preserved; startup and input cloning remain costs. No comparative or release speed claim is inferred from frame counts.

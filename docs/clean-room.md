@@ -1723,3 +1723,7 @@ Written from these public papers and Margo's existing transport APIs only. No pa
 ## WFC heap, chunks and SIMD (batch 69, job 4)
 
 Clean-room bitset arc propagation, an indexed binary heap with seeded fixed tie keys, and pinned one-cell chunk halos. The constraint description is Karth and Smith (2017), already cited above. Rust uses std::arch::wasm32 SIMD OR to combine four directional support masks per vector, not external solver code. Source, manifest and artifact hashes are checked in packages/wfc/test/chunks.test.js. No third-party code, crate dependency or copied engine file. Generated parity/open grids are stand-ins.
+
+## WFC worker transport and progress
+
+Clean-room orchestration from the [WHATWG HTML Web Workers specification](https://html.spec.whatwg.org/multipage/workers.html), dedicated workers, postMessage, structured clone, transferable buffers, runtime errors and termination; [WebAssembly imports](https://webassembly.github.io/spec/core/syntax/modules.html#imports) for bounded in-flight work reports from the same SIMD solver. Reuses Margo shared/worker.js serve, error revival and transferable collection. Existing canvas transport is canvas-specific; decoder/biome pools do not terminate running Wasm on abort or expose live progress. No external source code read or adapted. The optional entry supplies the installed Wasm URL to its classic worker, avoiding a second artifact.

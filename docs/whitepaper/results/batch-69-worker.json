@@ -1,0 +1,40 @@
+{
+  "machine": "SCOTT-DEV",
+  "recorded": "2026-11-09T08:07:35.301Z",
+  "routes": [
+    "webgpu",
+    "webgl2"
+  ],
+  "pixels": 64,
+  "errors": 0,
+  "workers": [
+    {
+      "route": "webgpu",
+      "backend": "typescript",
+      "activeFrames": 21,
+      "cells": 262144,
+      "abort": "terminated"
+    },
+    {
+      "route": "webgpu",
+      "backend": "wasm",
+      "activeFrames": 5,
+      "cells": 262144,
+      "abort": "terminated"
+    },
+    {
+      "route": "webgl2",
+      "backend": "typescript",
+      "activeFrames": 13,
+      "cells": 262144,
+      "abort": "terminated"
+    },
+    {
+      "route": "webgl2",
+      "backend": "wasm",
+      "activeFrames": 8,
+      "cells": 262144,
+      "abort": "terminated"
+    }
+  ]
+}

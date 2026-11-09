@@ -50,6 +50,12 @@ export class HeapWFC {
   private readonly tiles: Tile[];
   private readonly weights: number[];
   private readonly equal: boolean;
+  /** @internal Worker subclasses publish bounded work snapshots without changing the seed stream. */
+  protected report(_decisions: number, _updates: number, _intersections: number, _attempts: number): void {}
+  /** @internal Workers receive the installed asset URL from the importing entry. */
+  protected static wasmURL(): URL {
+    return new URL(/* @vite-ignore */ './wfc.wasm?no-inline', import.meta.url);
+  }
   /** Snapshot dimensions/rules. Limits match ConstrainedWFC. */
   constructor(dimensions: CellPosition, tiles: readonly Tile[]) {
     const grid = prepareGrid(dimensions, tiles);
@@ -64,7 +70,7 @@ export class HeapWFC {
     tiles: readonly Tile[],
     options: HeapBackendOptions = {},
   ): Promise<HeapWFC> {
-    const model = new HeapWFC(dimensions, tiles),
+    const model = new this(dimensions, tiles),
       { backend = 'auto', signal } = options;
     signal?.throwIfAborted();
     if (!['auto', 'typescript', 'wasm'].includes(backend))
@@ -76,7 +82,7 @@ export class HeapWFC {
         `WFC SIMD needs at most 32 unit-weight tiles; use typescript or auto. ${help}`,
       );
     if (backend === 'typescript' || !eligible) return model;
-    const url = new URL('./wfc.wasm?no-inline', import.meta.url);
+    const url = this.wasmURL();
     let bytes: ArrayBuffer | Uint8Array;
     if (url.protocol === 'file:') {
       const { readFile } = await import(/* @vite-ignore */ 'node:fs/promises');
@@ -92,7 +98,11 @@ export class HeapWFC {
       if (backend === 'auto') return model;
       throw new MargoError('unsupported', `WFC SIMD unavailable; use the typescript backend. ${help}`);
     }
-    const instance = await WebAssembly.instantiate(bytes as BufferSource, {});
+    const instance = await WebAssembly.instantiate(bytes as BufferSource, {
+      progress: {
+        report: (a: number, b: number, c: number, d: number) => model.report(a >>> 0, b >>> 0, c >>> 0, d >>> 0),
+      },
+    });
     signal?.throwIfAborted();
     model.wasm = instance.instance.exports as unknown as Wasm;
     model.backend = 'wasm';
@@ -153,6 +163,9 @@ export class HeapWFC {
       queue: number[] = [],
       queued = new Uint8Array(C),
       support = new Uint32Array(6 * B);
+    let propagated = 0;
+    const report = () =>
+      this.report(this.stats.decisions, this.stats.updates, this.stats.intersections, this.stats.attempts);
     for (let t = 0; t < T; t++)
       for (let d = 0; d < 6; d++)
         for (const u of this.tiles[t].neighbors[d]) allowed[(t * 6 + d) * B + (u >>> 5)] |= 1 << (u & 31);
@@ -249,6 +262,7 @@ export class HeapWFC {
       for (;;) {
         while (queue.length && !bad) {
           signal?.throwIfAborted();
+          if (++propagated % 1024 === 0) report();
           const i = queue.pop()!;
           queued[i] = 0;
           support.fill(0);
@@ -321,6 +335,7 @@ export class HeapWFC {
         update(cell);
         enqueue(cell);
         this.stats.decisions++;
+        if (this.stats.decisions % 256 === 0) report();
       }
     }
     throw new MargoError('failed', `Heap WFC exhausted attempts; check pins/rules or raise attempts. ${help}`);

@@ -124,7 +124,7 @@ asset compatibility claim. This entry builds rules only and imports no solver or
 
 `npm run test:gpu --workspace @margoengine/wfc` runs the overlapping solver beside WebGPU and WebGL2. Its server resolves the repository root from the script location, so workspace execution uses the same imports, and teardown closes the browser and server together.
 
-## Large outputs and chunks (optional wfc/chunks, 17,317 B min+gzip)
+## Large outputs and chunks (optional wfc/chunks, 3,589 B min+gzip)
 
 ```ts
 import {ChunkedWFC, HeapWFC} from 'margoengine/wfc/chunks';
@@ -165,3 +165,41 @@ it. Failed or aborted calls commit nothing. The world seed defaults to 1; solveC
 signal absent. No hidden eviction, caller-authored boundary rules or caller repair is required.
 
 Rust/Wasm SIMD is selected for eligible sets because it was faster in every paired round on both the 192x192 open and 64x64x4 parity fixtures, with identical output hashes and work counts. The seven rounds interleave three runs per implementation and compare per-round minima. This is loaded SCOTT-DEV evidence, not a release speed claim; wider/weighted cases retain TypeScript because the measured Rust path supports only <=32 unit-weight IDs. See docs/whitepaper/results/batch-69-heap.json.
+
+## Worker solving (optional wfc/worker, 1,331 B min+gzip)
+
+```ts
+import {WFCWorkerSolve} from 'margoengine/wfc/worker';
+const tiles = [0,1].map(() => ({neighbors: Array.from({length:6}, () => [0,1])}));
+const controller = new AbortController();
+using job = new WFCWorkerSolve([64,64,1], tiles, {seed:7, signal:controller.signal});
+const progress = (async () => {
+  for await (const work of job) document.body.dataset.wfcDecisions = String(work.decisions);
+})();
+const cells = await job.result;
+await progress;
+console.log(cells.length); // 4096. controller.abort(reason) terminates an active worker.
+```
+
+One dedicated classic Web Worker runs the same HeapWFC algorithm and the same eligible Rust SIMD artifact as chunks.
+Rules, dimensions and pins are structured-cloned; the resulting Uint16Array transfers back without a copy. Construction
+starts the worker immediately. No grid validation, heap construction or search runs on the calling thread; cloning
+large input rules still has a cost. Auto, typescript and wasm have the same selection rules as HeapWFC.create, preserving
+its seed stream exactly. This entry solves local adjacency and pins; it does not run the overlapping/global solvers or
+maintain a chunk cache. Existing grid, tile, pair and restart limits apply.
+
+Defaults: seed 1, pins empty, attempts 4, backend auto, signal absent, timeout 60000 ms including startup/downloads.
+Timeout must be an integer from 1 to 2147483647 ms. Progress is a single-consumer async iterable of actual cumulative
+decisions, heap updates, intersections, current attempt and selected backend, emitted during both TS and synchronous
+Wasm work and once at completion. It is not a percentage: restarts can revisit cells. Slow readers retain only the latest
+snapshot, so memory stays bounded. Completion closes the stream; always await result to observe errors. Stopping progress
+iteration leaves the solve running. Abort, timeout and dispose terminate the worker, remove listeners and close progress.
+Abort rejects with the signal reason, timeout with coded timeout, disposal with coded disposed. Dispose/Symbol.dispose
+are idempotent. Crashes, message and clone failures reject with coded failed; solver TypeError/RangeError and coded
+errors survive transport. Coded errors carry a help link. A pre-aborted signal starts no worker.
+
+Browser WebGPU and WebGL2 both run real solves while submitting rendered animation frames, with in-flight progress,
+abort and synchronous parity checks. There is no GPU work in the solver and no shared-memory/isolation requirement.
+Node/SSR imports are safe; construction throws coded unsupported there (use HeapWFC). CSP must allow the same-origin
+worker asset and Wasm where selected. No Blob, eval or caller-authored worker is needed. The optional entry downloads
+workers/wfc.js only when constructed, and wfc.wasm only for an eligible backend; it imports no rendering backend.

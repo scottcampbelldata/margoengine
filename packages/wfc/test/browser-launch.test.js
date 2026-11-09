@@ -19,7 +19,7 @@ test('WFC browser harness serves the repository from a workspace launch', () => 
     function resolvePath(value) { return value && value.replace(/[\\\\/]+$/, ''); }
     mock.module(${JSON.stringify(launcher)}, { namedExports: { launchBrowser: async () => ({
       newPage: async () => ({ on() {}, goto: async () => {}, evaluate: async () =>
-        [{route:'webgpu',image:Array(64).fill(0)},{route:'webgl2',image:Array(64).fill(0)}] })
+        ({outputs:[{route:'webgpu',image:Array(64).fill(0)},{route:'webgl2',image:Array(64).fill(0)}], workers:[]}) })
     }) } });
     mock.module(${JSON.stringify(shutdown)}, { namedExports: { closeAll: async () => {} } });
     await import(${JSON.stringify(script)});

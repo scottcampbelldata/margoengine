@@ -730,3 +730,7 @@ This is correctness evidence on one GPU, not a performance benchmark.
 ### Batch 69 WFC heap and chunks
 
 Run npm test --workspace @margoengine/wfc for exhaustive local relations, linear validation work, 192x192 heap updates, 256x256 chunk coverage and all-axis seams. Run node packages/wfc/test/heap-bench.mjs --record with a hard timeout to reproduce paired/interleaved CPU measurements and output hashes; --record replaces only this machine-specific batch file. Current results are loaded-machine diagnostics, with no release speed promise. Rebuild the feature artifact with node packages/wfc/scripts/build-wasm.mjs (Rust wasm32-unknown-unknown, SIMD enabled by the script), then run both library builds and the WFC browser test for module-relative asset loading.
+
+### Batch 69 WFC worker solving
+
+Build packages, then npm test --workspace @margoengine/wfc. Actual shipped classic scripts run on worker threads for TS/SIMD parity, pins, weighted/wide fallback and solver errors, beside transport lifecycle tests. Run node scripts/gpu-lock.mjs run --owner=codex-69 --max=8 -- node packages/wfc/test/browser-check.mjs --record for the device record. It solves 512x512 with both implementations beside real WebGPU and WebGL2 render loops, requires positive in-flight work plus rendered frames, compares synchronous seeded output and aborts a second active solve. npm run check:readme-run -- --packages=wfc executes the browser example. Generated rules are stand-ins; frame counts demonstrate scheduling, not a speed or frame-time claim.

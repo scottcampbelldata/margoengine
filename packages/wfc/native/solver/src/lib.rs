@@ -1,5 +1,7 @@
 //! Clean-room local WFC: indexed cardinality-entropy heap, bit domains, SIMD direction unions.
 use core::arch::wasm32::*;
+#[link(wasm_import_module = "progress")]
+extern "C" { fn report(decisions: u32, updates: u32, intersections: u32, attempts: u32); }
 
 #[no_mangle]
 pub extern "C" fn alloc(n: usize) -> *mut u32 {
@@ -48,6 +50,7 @@ pub unsafe extern "C" fn solve(p: *mut u32) -> u32 {
     let mut state=header[4];
     let ties: Vec<u32>=(0..c).map(|i|mix(i as u32^header[11])).collect();
     let mut wave=vec![full;c];let mut queued=vec![false;c];let mut queue=Vec::with_capacity(c);
+    let mut propagated=0u32;
     for attempt in 1..=header[5] {
         header[10]=attempt;
         let mut heap=Heap{cells:(0..c).collect(),positions:(0..c).collect(),counts:vec![0;c],ties:ties.clone()};
@@ -60,6 +63,8 @@ pub unsafe extern "C" fn solve(p: *mut u32) -> u32 {
         }
         loop {
             while !bad && !queue.is_empty() {
+                propagated=propagated.wrapping_add(1);
+                if propagated%1024==0 {report(header[7],header[8],header[9],header[10]);}
                 let i=queue.pop().unwrap();queued[i]=false;
                 let mut lo=u32x4_splat(0);let mut hi=u32x4_splat(0);let mut bits=wave[i];
                 while bits!=0 {
@@ -87,6 +92,7 @@ pub unsafe extern "C" fn solve(p: *mut u32) -> u32 {
             let mut bits=wave[cell];let mut tile=0;
             while bits!=0 {tile=bits.trailing_zeros();bits&=bits-1;choice-=1.0;if choice<=0.0{break;}}
             wave[cell]=1u32<<tile;heap.update(cell,1);header[8]+=1;header[7]+=1;
+            if header[7]%256==0 {report(header[7],header[8],header[9],header[10]);}
             if !queued[cell]{queued[cell]=true;queue.push(cell);}
         }
     }
