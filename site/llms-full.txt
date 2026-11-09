@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-577). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-578). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3292,6 +3292,10 @@ loaded sessions cannot prove before/after speed. The Box2D goal remains open and
 ## Frame-accurate video decoding (2026-11-08)
 
 Optional `@margoengine/video/codecs` fully buffers nonfragmented, self-contained, unencrypted AVC avc1 MP4. It reads the first video track, one sample description, stsz/stsc/stco/co64/stts/ctts/stss and a rate-1 media edit optionally after an empty edit, including 64-bit headers and edit versions 0/1. Movie times have microsecond precision; colliding timestamps are refused. Each request decodes from sync through the GOP, flushing reordering, selecting the requested timestamp and closing other frames. Requests are exclusive and abortable; caller closes returned frames. Edits expose only frames whose PTS starts inside the media edit; empty lead-in clamps to the first visible frame. No audio, streaming, playback scheduler, arbitrary edits, fragmented MP4, WebM, other codecs, rotation/display transforms or external media references. Large files/long GOPs can need substantial memory/CPU. WebCodecs/AVC support is browser-specific and checked; renderer independent, including beside WebGL2 (the external material remains WebGPU-only). Unit stand-ins prove reordered sample tables, edit boundary regression and ownership. Generated AVC MP4 is decoded/rendered on RTX A6000/Edge, not a third-party movie or a real B-frame test. Other browsers/GPUs and speed unmeasured. Entry 3,337 B gzip, budget 3,593 B. LIM-575.
+
+## Video alpha and chroma key (2026-11-08)
+
+Optional `@margoengine/video/alpha` reuses the external material feature. Stacked colour is top/left, raw grayscale red-channel alpha bottom/right; equal pixel halves require an even packed dimension of at least 2. Both rectangles clamp at half-texel bounds. Colour must be straight, not premultiplied. RGB keying uses sRGB Euclidean distance, threshold 0.15 and softness 0.1 by default, green key [0,1,0]. Threshold is 0..sqrt(3), softness positive through sqrt(3), with distinct float32 edges; feature parameters are fixed on creation. No despill, lighting adaptation or colour/hair recovery. One external video feature per material, UV0/flipY true defaults; caller owns playback and source lifetime. Alpha multiplies source/material alpha before colour-pass alphaTest/blending; enable transparent for soft edges. Existing direct sRGB output-space blending is preserved. Shadow/picking coverage retains its existing material inputs, without external alpha. WebGL2 refuses with code/help link. Real RTX A6000/Edge checks generated masks at 0/64/128/255 for both layouts, fractional keying and cutout; these are stand-ins, not real movies. Other GPUs/browsers, visual keying quality comparisons and speed unmeasured. Entry 1,898 B gzip, budget 2,154 B. LIM-578.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

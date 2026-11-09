@@ -1,0 +1,159 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "source": "generated stacked masks and key colours, stand-ins",
+  "results": [
+    {
+      "layout": "top-bottom",
+      "alpha": 0,
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    {
+      "layout": "top-bottom",
+      "alpha": 64,
+      "pixel": [
+        64,
+        0,
+        191,
+        255
+      ]
+    },
+    {
+      "layout": "top-bottom",
+      "alpha": 128,
+      "pixel": [
+        128,
+        0,
+        127,
+        255
+      ]
+    },
+    {
+      "layout": "top-bottom",
+      "alpha": 255,
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "layout": "left-right",
+      "alpha": 0,
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    {
+      "layout": "left-right",
+      "alpha": 64,
+      "pixel": [
+        64,
+        0,
+        191,
+        255
+      ]
+    },
+    {
+      "layout": "left-right",
+      "alpha": 128,
+      "pixel": [
+        128,
+        0,
+        127,
+        255
+      ]
+    },
+    {
+      "layout": "left-right",
+      "alpha": 255,
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "key": [
+        0,
+        255,
+        0
+      ],
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    {
+      "key": [
+        255,
+        0,
+        0
+      ],
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "key": [
+        0,
+        204,
+        0
+      ],
+      "pixel": [
+        0,
+        102,
+        128,
+        255
+      ]
+    }
+  ],
+  "cutout": [
+    0,
+    0,
+    255,
+    255
+  ],
+  "refusals": [
+    {
+      "code": "unsupported",
+      "message": "Video materials require WebGPU; select a WebGPU engine; see https://margoengine.com/errors#unsupported"
+    },
+    {
+      "code": "unsupported",
+      "message": "Video materials require WebGPU; select a WebGPU engine; see https://margoengine.com/errors#unsupported"
+    }
+  ],
+  "errors": []
+}

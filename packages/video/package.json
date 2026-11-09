@@ -41,6 +41,10 @@
     "./codecs": {
       "types": "./dist/codecs.d.ts",
       "import": "./dist/codecs.js"
+    },
+    "./alpha": {
+      "types": "./dist/alpha.d.ts",
+      "import": "./dist/alpha.js"
     }
   },
   "files": [
@@ -61,6 +65,6 @@
     "build": "node ../../scripts/build-optional.js video",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/material-check.mjs && node test/record-check.mjs && node test/panorama-check.mjs && node test/codecs-check.mjs"
+    "test:gpu": "node test/material-check.mjs && node test/record-check.mjs && node test/panorama-check.mjs && node test/codecs-check.mjs && node test/alpha-check.mjs"
   }
 }

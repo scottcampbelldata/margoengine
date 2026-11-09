@@ -3026,6 +3026,10 @@
       "types": "./dist/video/codecs.d.ts",
       "import": "./dist/video/codecs.js"
     },
+    "./video/alpha": {
+      "types": "./dist/video/alpha.d.ts",
+      "import": "./dist/video/alpha.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

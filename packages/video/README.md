@@ -253,3 +253,79 @@ cancellation and WebGPU material integration on RTX A6000/Edge. Reordered sample
 chunk layouts, edit boundaries and ownership use unit stand-ins. No third-party movie,
 real B-frame bitstream, other browser/GPU or speed measurement is claimed.
 
+## Stacked alpha and chroma key
+
+`stackedAlphaMaterial` and `chromaKeyMaterial` from `margoengine/video/alpha` (or
+`@margoengine/video/alpha`) reuse the external-texture material path. Each returns a
+`Material.features` entry. Use `transparent: true` for soft alpha, or an `alphaTest`
+for cutouts. This example creates both kinds of source locally:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {UnlitMaterial, createMesh} from 'margoengine/materials';
+import {stackedAlphaMaterial, chromaKeyMaterial} from 'margoengine/video/alpha';
+
+const art = new OffscreenCanvas(32, 64);
+const paint = art.getContext('2d')!;
+paint.fillStyle = 'red';
+paint.fillRect(0, 0, 32, 32); // Straight colour in the top half.
+paint.fillStyle = '#808080';
+paint.fillRect(0, 32, 32, 32); // Raw 128/255 alpha in the bottom half.
+const packed = new VideoFrame(art, {timestamp: 0});
+const screen = new OffscreenCanvas(32, 32);
+const drawing = screen.getContext('2d')!;
+drawing.fillStyle = 'lime';
+drawing.fillRect(0, 0, 32, 32);
+drawing.fillStyle = 'red';
+drawing.fillRect(8, 8, 16, 16);
+const keyed = new VideoFrame(screen, {timestamp: 0});
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const material = new UnlitMaterial({transparent: true, features: [stackedAlphaMaterial(packed)]});
+const mesh = createMesh(engine, {
+  positions: [-1,-1,0, 1,-1,0, 1,1,0, -1,1,0],
+  normals: [0,0,1, 0,0,1, 0,0,1, 0,0,1],
+  uvs: [0,0, 1,0, 1,1, 0,1], indices: [0,1,2, 0,2,3],
+}, material);
+engine.stop();
+engine.render({delta: 0});
+await engine.gpu!.queue.onSubmittedWorkDone();
+material.features = [chromaKeyMaterial(keyed)]; // Default green key, soft edge.
+engine.render({delta: 0});
+await engine.gpu!.queue.onSubmittedWorkDone();
+mesh.dispose();
+material.dispose();
+engine.dispose();
+packed.close();
+keyed.close();
+```
+
+For movies, pass a ready playing HTMLVideoElement instead of a generated frame.
+Stacked packing defaults to `layout: 'top-bottom'`: colour above, grayscale mask below.
+`'left-right'` means colour left, mask right. Both halves must have equal integer pixel
+dimensions; an odd or one-pixel packed dimension is rejected before binding. Sampling
+clamps half a texel inside each half, preventing filtering across the seam. The mask's
+red channel is a raw 0..1 opacity, with no sRGB-to-linear conversion; author grayscale
+mask values accordingly. Colour must be straight/unassociated, not premultiplied by
+the mask. The source's own alpha is also multiplied.
+
+Chroma key compares the sampled sRGB RGB to `color` (default `[0,1,0]`, channels 0..1)
+with Euclidean distance. Alpha is zero through `threshold` (default 0.15), then follows
+`smoothstep` to full alpha at `threshold + softness` (`softness` defaults to 0.1).
+Threshold is 0..sqrt(3); softness is positive, at most sqrt(3), and must make distinct
+float32 edge values. Parameters are fixed when creating a feature; replace it to change
+them. This is RGB keying, without despill, lighting adaptation, hair reconstruction or
+foreground colour recovery. Colours close to the key disappear even if they belong to
+the subject; compression or key-colour spill can leave fringes.
+
+Both modes inherit `texCoord: 0` and `flipY: true` from `videoMaterial`. Alpha multiplies
+the existing material/vertex/map alpha before its colour-pass alpha test and blending.
+Lighting still uses linear colour. The engine's direct canvas material path encodes
+sRGB before output-space blending; these features preserve that behavior. Auxiliary
+shadow/picking passes retain their existing material alpha inputs and do not sample
+this external mask. Choose one external video feature per material, including panorama
+or ordinary video. Playback, frame lifetime, origin access, sampling limits and WebGPU
+requirements follow `videoMaterial`; WebGL2 receives coded `unsupported` with a help link.
+Generated colour/mask stand-ins prove both packings, raw mask alpha, fractional key
+coverage and cutouts on RTX A6000/Edge. No real transparent/keyed movie, other adapter,
+browser, keying quality comparison or speed measurement is claimed.
+

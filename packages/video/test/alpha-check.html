@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>Video alpha GPU check</title>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {stackedAlphaMaterial,chromaKeyMaterial} from '/packages/video/dist/alpha.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const geometry={positions:[-2,-2,0,2,-2,0,2,2,0,-2,2,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]};
+const make=(layout,alpha)=>{
+  const c=new OffscreenCanvas(layout==='left-right'?64:32,layout==='left-right'?32:64),p=c.getContext('2d');
+  p.fillStyle='red';p.fillRect(0,0,c.width,c.height);p.fillStyle=`rgb(${alpha},${alpha},${alpha})`;
+  if(layout==='left-right')p.fillRect(32,0,32,32);else p.fillRect(0,32,32,32);
+  return new VideoFrame(c,{timestamp:0});
+};
+const keyFrame=rgb=>{const c=new OffscreenCanvas(32,32),p=c.getContext('2d');p.fillStyle=`rgb(${rgb.join(',')})`;p.fillRect(0,0,32,32);return new VideoFrame(c,{timestamp:0});};
+const pixel=c=>{const p=new OffscreenCanvas(64,64).getContext('2d');p.drawImage(c,0,0);return [...p.getImageData(32,32,1,1).data];};
+window.check=async()=>{
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;canvas.style.width=canvas.style.height='64px';document.body.append(canvas);
+  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,5],target:[0,0,0]}});engine.stop();
+  const background=new UnlitMaterial({color:'#0000ff'}),back=createMesh(engine,{...geometry,positions:geometry.positions.map((v,i)=>i%3===2?-.1:v)},background);
+  const material=new UnlitMaterial({transparent:true}),mesh=createMesh(engine,geometry,material),results=[],errors=[];
+  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  const draw=async()=>{await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});engine.render({delta:0});const result=pixel(canvas);await engine.gpu.queue.onSubmittedWorkDone();return result;};
+  try{
+    for(const layout of ['top-bottom','left-right'])for(const alpha of [0,64,128,255]){
+      const frame=make(layout,alpha);
+      try{material.features=[stackedAlphaMaterial(frame,{layout})];results.push({layout,alpha,pixel:await draw()});}finally{frame.close();}
+    }
+    for(const rgb of [[0,255,0],[255,0,0],[0,204,0]]){
+      const frame=keyFrame(rgb);
+      try{material.features=[chromaKeyMaterial(frame)];results.push({key:rgb,pixel:await draw()});}finally{frame.close();}
+    }
+    const frame=keyFrame([0,255,0]);let cutout;
+    try{material.transparent=false;material.alphaTest=.5;material.features=[chromaKeyMaterial(frame)];cutout=await draw();}finally{frame.close();}
+    const c=document.createElement('canvas');document.body.append(c);const fallback=await Engine.create(c,{backend:'webgl2',fallback:webglRenderer});fallback.stop();const source=keyFrame([0,255,0]),refusals=[];
+    try{for(const feature of [stackedAlphaMaterial(source),chromaKeyMaterial(source)]){try{feature.bindings(fallback.gpu??{},fallback);}catch(e){refusals.push({code:e.code,message:e.message});}}}
+    finally{source.close();fallback.dispose();c.remove();}
+    return {source:'generated stacked masks and key colours, stand-ins',results,cutout,refusals,errors};
+  }finally{mesh.dispose();material.dispose();back.dispose();background.dispose();engine.dispose();canvas.remove();}
+};
+</script>

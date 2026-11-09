@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11373217,
+  "total": 11375371,
   "history": [
     {
       "date": "2026-10-24",
@@ -4658,6 +4658,12 @@
       "commit": "affb4cadf",
       "reason": "feat(text): add per-glyph animation entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "e165bfedf",
+      "reason": "Batch 112 adds optional video/alpha, reusing external video sampling for stacked masks and RGB chroma key. Existing entry budgets unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5419,6 +5425,7 @@
     "@margoengine/vfx/wrap": 496,
     "@margoengine/video": 2199,
     "@margoengine/video/360": 1881,
+    "@margoengine/video/alpha": 2154,
     "@margoengine/video/codecs": 3593,
     "@margoengine/video/material": 1407,
     "@margoengine/video/record": 1396,
