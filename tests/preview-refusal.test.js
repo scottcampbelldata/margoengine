@@ -1,5 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { box, PbrMaterial } from '../packages/core/dist/index.js';
+import { PostStack, Bloom } from '../packages/post/dist/index.js';
+import { Shadows } from '../packages/shadows/dist/index.js';
+import { VFX } from '../packages/vfx/dist/index.js';
+import { Splats } from '../packages/splats/dist/index.js';
+import { Lighting2D } from '../packages/lighting2d/dist/index.js';
+import { LayerCompositor } from '../packages/pixel/dist/index.js';
+import { CulledInstances } from '../packages/culling/dist/index.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { MargoError } from '../packages/math/dist/errors.js';
 import { requireWebGPU } from '../packages/shared/require-webgpu.js';
@@ -64,6 +72,28 @@ test('GPU-only optional packages refuse during attachment without retaining a pl
       () => new TextRenderer(),
       () => new WorldPanels(),
       () => new Selection(),
+      () => new PostStack([new Bloom({ strength: 0.5 })]),
+      () => new Shadows({ cascades: 3, resolution: 128 }),
+      () => new VFX({ capacity: 16, rate: 1 }),
+      () =>
+        new Splats({
+          positions: new Float32Array([0, 0, 0]),
+          covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1]),
+          colors: new Float32Array([1, 0, 0, 1]),
+        }),
+      () => new Lighting2D({ target: () => undefined }),
+      () => new LayerCompositor({ camera: { width: 16, height: 16 } }),
+      () =>
+        new CulledInstances(
+          [
+            {
+              geometry: box(),
+              material: new PbrMaterial(),
+              transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+            },
+          ],
+          { culling: 'frustum' },
+        ),
     ];
     for (const create of make) {
       const plugin = create();

@@ -100,7 +100,7 @@ try {
     const { LODFade } = await import('/packages/lod/dist/fade.js');
     const { TerrainColors } = await import('/packages/terrain/dist/index.js');
     const { createTextureBaker } = await import('/packages/procedural/dist/textures.js');
-    const { PostStack } = await import('/packages/post/dist/index.js');
+    const { PostStack, Bloom } = await import('/packages/post/dist/index.js');
     const { Shadows } = await import('/packages/shadows/dist/index.js');
     const { Video } = await import('/packages/video/dist/index.js');
     const { VFX } = await import('/packages/vfx/dist/index.js');
@@ -108,6 +108,7 @@ try {
     const { LayerCompositor } = await import('/packages/pixel/dist/index.js');
     const { Lighting2D } = await import('/packages/lighting2d/dist/index.js');
     const { CulledInstances } = await import('/packages/culling/dist/index.js');
+    const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
     const make = () => {
       const c = document.createElement('canvas');
       c.style.cssText = 'width:96px;height:64px';
@@ -173,7 +174,7 @@ try {
             wetDarkening: 0.5,
           }),
       ],
-      ['PostStack', (e) => PostStack.attach(e, { bloom: { intensity: 0.5 } })],
+      ['PostStack', (e) => PostStack.attach(e, [new Bloom({ strength: 0.5 })])],
       ['Shadows', (e) => Shadows.attach(e, { cascades: 3, resolution: 128 })],
       ['Video', (e) => Video.attach(e, document.createElement('video'))],
       ['VFX', (e) => VFX.attach(e, { capacity: 16, rate: 1 })],
@@ -256,6 +257,8 @@ try {
       } finally {
         direct.dispose();
       }
+      if (refusal.code !== 'unsupported' || !refusal.message.includes('https://margoengine.com/errors#'))
+        throw new Error(name + ' did not provide its linked preview refusal: ' + JSON.stringify(refusal));
       const seen = [];
       let loads = 0;
       const live = await autoEngine(
@@ -273,8 +276,10 @@ try {
           },
         },
       );
-      live.render();
-      await live.gpu.queue.onSubmittedWorkDone();
+      await waitForPipelines(async () => {
+        live.render();
+        await live.gpu.queue.onSubmittedWorkDone();
+      });
       results.push({ name, refusal, seen, loads, backend: live.backend, vendor: live.gpu.adapterInfo.vendor });
       live.dispose();
     }
