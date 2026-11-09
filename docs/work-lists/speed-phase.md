@@ -210,3 +210,17 @@ no gate silently enables the phase.
 Every build-phase exclusive request is refused and logged before queue/holder
 creation. Only the coordinator, with Scott's OK, may add an exact command, reason,
 approvedBy and future expiry to `scripts/gpu-exclusive-allow.json`; it is empty.
+
+# Deferred speed evidence
+
+Scott deferred all benchmarks, paired wall-clock A/Bs, timing-only assertions and exclusive GPU use during
+the build phase (2026-11-10). Correctness gates still run under the shared GPU lock.
+
+- Batch 181 CPU marching-cubes foundation: retain the existing scalar/SIMD output equality and case/triangle
+  work evidence. A consistent end-to-end extraction gain still needs the quiet speed phase; no new A/B ran
+  after deferral and no public ratio is claimed.
+- Batch 181 native surface/rectangle drawing: every `(nx-1)*(ny-1)` cell draws six vertices without a CPU
+  expanded mesh; rectangle instances retain all four bounds and one packed colour (20 bytes/rectangle).
+  Surface input texture is 4 bytes/sample plus the 1,024-byte colour map. These are work/storage counts,
+  not speed measurements. Frame-time, scale-limit, GPU-memory and cross-backend speed evidence remain owed
+  after the build phase. No workload was narrowed and no timing budget changed.

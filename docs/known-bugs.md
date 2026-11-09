@@ -79,14 +79,28 @@ commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
 verify's sole failure was this record gate; only that failed step was rerun as
 requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
 
+Continuation: all 28 demo cases passed their assertions, including the existing 8 CSS-pixel axis/colour-bar
+clearance checks. All eight current head/star screenshots were visually reviewed at the two viewport sizes;
+`test-results/sciviz-fixes/label-review.json` pins the captures. Browser shutdown still fails, so the suite as a
+whole remains failed. No screenshot or timing assertion was loosened.
+
 ### Sciviz WebGL2 implementation in progress (batch 181 job 1, 2026-11-10)
 
 The existing Figure rejects engines with backend `webgl2` in `SciRenderer.setup`; its layers own WebGPU buffers
 and pipelines. The points and lines plugins also leave that preview backend undrawn, so removing the guard alone
 would silently lose the catalogue and wind data. The optional `/fallback` entry now provides the CPU marching-cubes
-foundation using the GPU's derived table, with independent scalar and real-MRI tests. Figure integration, drawing
-surfaces/volumes/slices/rectangles, points/lines for the three demos, context restoration and browser pixel parity
-remain to be implemented. No direct WebGL2 rendering support is claimed by this extraction-only piece.
+foundation using the GPU's derived table, with independent scalar and real-MRI tests. A separate optional
+`/webgl2` drawing piece now connects Figure surfaces and rectangles to native GL, with retained-data restoration
+and explicit state ownership. Its correctness run is queued; execution/parity is not yet claimed. Axes, points/lines,
+volumes/slices, integrated CPU isosurfaces and the three demos remain to be implemented. The adapter requires
+axes:false and unsupported Figure calls reject before publishing, so it cannot silently lose star or wind data.
+
+First native drawing run: all eight WebGPU cases passed; the native WebGL2 bar produced/restored the same
+pixels and passed hostile-state image/identity comparisons, but its final `gl.getError() === NO_ERROR` assertion
+failed. Reproduce with the shared lock around `node packages/sciviz/tests/webgl2-browser.mjs` after building.
+The invalid operation is in the creation/reboot/draw/state-cleanup path; the exact GL call and root cause are
+not isolated yet. New strict checks at each phase and console warnings are queued, not waived or loosened.
+Evidence: `test-results/sciviz-fixes/webgl-gpu.log/json`; next run: `webgl-gl-diagnostic.*`. This piece stays local.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 

@@ -8,12 +8,20 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
+import type { FallbackBackend } from './fallback-types.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; VERTEX: number; INDIRECT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number; COMPUTE: number };
 
 /** @internal The WebGPU frame context. */
 export type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** @internal The native WebGL2 engine frame context. */
+export type GlContext = Extract<PassContext, { backend: 'webgl2' }>;
+
+/** @internal Refuses a GPU-only layer before allocation or publication. */
+export function requireGPU(renderer: SciRenderer): void {
+  if (!renderer.device) throw fault('unsupported', 'Use WebGPU or webgl2-compat', 'sciviz');
+}
 
 /** @internal What the renderer draws: a layer with its own pipeline. */
 export interface Drawable {
@@ -29,6 +37,8 @@ export interface Drawable {
   prepare?(context: GpuContext, renderer: SciRenderer): void;
   /** Draws into the open pass (group 0 is the frame). */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
+  /** Draws through the optional native WebGL2 backend. */
+  drawGL?(context: GlContext): void;
   /** Frees GPU resources. */
   dispose(): void;
 }
@@ -64,6 +74,8 @@ export class SciRenderer implements EnginePlugin {
   readonly name = `sciviz:${serial++}`;
   /** Frame-graph order: after the scene (0), before points (10) and fat lines (20). */
   readonly order: number;
+  /** @internal Optional driver; the root does not import its implementation. */
+  readonly fallback: FallbackBackend | undefined;
   /** @internal */ device: GPUDevice | undefined;
   /** @internal */ frameLayout: GPUBindGroupLayout | undefined;
   /** @internal */ frameGroup: GPUBindGroup | undefined;
@@ -81,6 +93,7 @@ export class SciRenderer implements EnginePlugin {
 
   /** @internal One lazily created compute context shared by the figure's CPU-backed extractions. */
   compute(): Promise<ComputeContext> {
+    requireGPU(this);
     const device = this.device!;
     return (this.#compute ??= import('@margoengine/compute').then(({ createCompute }) => createCompute({ device })));
   }
@@ -101,15 +114,17 @@ export class SciRenderer implements EnginePlugin {
   }
 
   /** @param options `order` in the frame graph (default 5). Attach with {@link SciRenderer.attach}. */
-  constructor(options: { readonly order?: number } = {}) {
+  constructor(options: { readonly order?: number; readonly fallback?: FallbackBackend } = {}) {
     this.order = options.order ?? 5;
+    this.fallback = options.fallback;
   }
 
   /** @internal EnginePlugin hook. */
   setup(engine: Engine): void {
-    if (!engine.gpu) throw fault('unsupported', 'sciviz needs the WebGPU backend; the engine runs WebGL2', 'sciviz');
+    if (!engine.gpu && !this.fallback) throw fault('unsupported', 'Use attachWebGL2 from sciviz/webgl2', 'sciviz');
     this.#engine = engine;
-    this.#create(engine.gpu);
+    if (engine.gpu) this.#create(engine.gpu);
+    else this.fallback!.setup(engine);
   }
 
   #create(device: GPUDevice): void {
@@ -157,7 +172,7 @@ export class SciRenderer implements EnginePlugin {
 
   /** The engine the renderer is attached to. */
   get engine(): Engine {
-    if (!this.#engine) throw fault('state', 'sciviz renderer is not attached; create a Figure on an engine', 'sciviz');
+    if (!this.#engine) throw fault('state', 'Attach SciRenderer first', 'sciviz');
     return this.#engine;
   }
 
@@ -195,9 +210,13 @@ export class SciRenderer implements EnginePlugin {
 
   #execute(context: PassContext): void {
     if (this.#restoreError) throw this.#restoreError;
-    if (context.backend !== 'webgpu' || this.#disposed || !this.#drawables.size) return;
+    if (this.#disposed || !this.#drawables.size) return;
     const visible = [...this.#drawables].filter((d) => d.visible);
     if (!visible.length) return;
+    if (context.backend === 'webgl2') {
+      this.fallback!.render(context, visible);
+      return;
+    }
     const camera = context.camera,
       f = this.#frame,
       clip = camera.matrix;

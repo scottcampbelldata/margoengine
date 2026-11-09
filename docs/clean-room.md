@@ -33,6 +33,25 @@ record, omit a lazy asset or change a size ceiling. Existing sizes-page tests
 are the regression gate and already participate in verify/check:merge. No code
 or file from another repository was read or copied; no speed measurement ran.
 
+## Batch 181 job 1: native sciviz surface and rectangle drawing (2026-11-10)
+
+Research-first survey, before implementation, compared these primary papers and standards:
+
+- Frank Losasso and Hugues Hoppe, [Geometry Clipmaps: Terrain Rendering Using Nested Regular Grids](https://hhoppe.com/geomclipmap.pdf), SIGGRAPH 2004, abstract and introduction: regular height grids and retained GPU geometry.
+- Arul Asirvatham and Hugues Hoppe, [Terrain Rendering Using GPU-Based Geometry Clipmaps](https://hhoppe.com/proj/gpugcm/), GPU Gems 2, 2005, authors' abstract and hindsight: vertex textures instead of CPU-expanded geometry.
+- Malte Clasen and Hans-Christian Hege, [Terrain Rendering Using Spherical Clipmaps](https://doi.org/10.2312/VisSym/EuroVis06/091-098), EuroVis 2006, publisher abstract: texture displacement of static vertices; spherical mapping is unnecessary for a Cartesian scientific grid.
+- Khronos WebGL Working Group, [WebGL 2.0 Specification](https://registry.khronos.org/webgl/specs/latest/2.0/), 2017 onward, buffer/vertex-array, pixel-store, texture and state-query rules.
+- Robert J. Simpson (editor), Khronos, [The OpenGL ES Shading Language 3.00, revision 6](https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf), 2016, integer texel fetches and derivative functions.
+
+We combine regular-grid vertex generation with exact R32F vertex texture fetches. Unlike the clipmap papers,
+this draws every scientific cell with no view-dependent reduction, resampling or invented detail. Central and
+one-sided differences, light/colour/contour formulae and triangle ordering are independently transcribed from
+Margo's own WGSL. Rectangles use integer packed-colour attributes and instancing, with no CPU expansion.
+The engine supplies its native GL camera convention and current depth buffer. State scopes cover drawing and
+uploads. No companion code, paper listing, outside engine source or external implementation was read or copied.
+No CPU-heavy geometry loop or new Wasm is added. Timings are deferred; deterministic work is recorded in limits.
+The optional attacher's AbortSignal follows WHATWG contributors' [DOM Standard, section 3.3](https://dom.spec.whatwg.org/#using-abortcontroller-and-abortsignal-objects-in-apis), living standard read in 2026: reject with the exact reason, prevent late attachment and remove the listener after the module settles. Import fetching itself is not canceled.
+
 ## Draco replacement specification review (batch 133, 2026-11-09)
 
 The [published Draco bitstream specification](https://google.github.io/draco/spec/),

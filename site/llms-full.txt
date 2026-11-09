@@ -2682,7 +2682,25 @@ vertices together are capped at 2 GiB, excluding the returned copy and allocator
 least two per axis; the input length must match; the level must be finite in float32. Both passes yield every
 16,384 cells for cancellation. NaN samples follow the GPU's comparison/interpolation behaviour. All 256 cases,
 non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
-The existing Figure still rejects the engine's WebGL2 preview backend. Drawing parity remains unverified.
+Root Figure attachment still rejects the engine's WebGL2 preview backend; the optional `sciviz/webgl2`
+adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
+Drawing parity remains unverified until its queued correctness run finishes.
+
+Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
+returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
+`signal` defaults absent and cancels module waiting/attachment with its exact reason; the module fetch may continue.
+no shim, globals or WebGPU device. Root Figure.create remains WebGPU. R32F heights need nx and ny within
+MAX_TEXTURE_SIZE and six vertices per cell within a signed GL draw count. The colour map is 256 sRGB8 texels.
+Surface uploads use 4 bytes/sample plus 1,024 colour-map bytes; rectangle instance data uses 20 bytes/cell.
+No per-cell CPU mesh building is added. The driver shares core depth and respects view viewport/scissor,
+restoring GL state after drawing and uploads. Restoration uses retained data, including setHeights' owned copy.
+Axes, points/lines, volumes/slices, integrated CPU isosurfaces and the real-data demos are still pending;
+unsupported Figure calls reject with coded help before publishing. The browser test's preselected all-pixel
+bound is share(d > 2/255) <= 0.001 and mean(max RGB channel difference) <= 0.25/255, at 320 x 240,
+single-sampled on the test machine. Execution evidence is pending; no cross-hardware or speed claim.
+The drawing entry is 4,288 B min+gzip with bare imports external (new ceiling 4,442 B), plus the shared
+Figure root at 36,802 B under its unchanged 36,802 B ceiling. All existing ceilings are unchanged.
+Core plus stage remains 23,837 B gzip, below 25,000. The CPU extractor remains 2,002 B plus its lazy Wasm.
 
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
@@ -4701,14 +4719,28 @@ commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
 verify's sole failure was this record gate; only that failed step was rerun as
 requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
 
+Continuation: all 28 demo cases passed their assertions, including the existing 8 CSS-pixel axis/colour-bar
+clearance checks. All eight current head/star screenshots were visually reviewed at the two viewport sizes;
+`test-results/sciviz-fixes/label-review.json` pins the captures. Browser shutdown still fails, so the suite as a
+whole remains failed. No screenshot or timing assertion was loosened.
+
 ### Sciviz WebGL2 implementation in progress (batch 181 job 1, 2026-11-10)
 
 The existing Figure rejects engines with backend `webgl2` in `SciRenderer.setup`; its layers own WebGPU buffers
 and pipelines. The points and lines plugins also leave that preview backend undrawn, so removing the guard alone
 would silently lose the catalogue and wind data. The optional `/fallback` entry now provides the CPU marching-cubes
-foundation using the GPU's derived table, with independent scalar and real-MRI tests. Figure integration, drawing
-surfaces/volumes/slices/rectangles, points/lines for the three demos, context restoration and browser pixel parity
-remain to be implemented. No direct WebGL2 rendering support is claimed by this extraction-only piece.
+foundation using the GPU's derived table, with independent scalar and real-MRI tests. A separate optional
+`/webgl2` drawing piece now connects Figure surfaces and rectangles to native GL, with retained-data restoration
+and explicit state ownership. Its correctness run is queued; execution/parity is not yet claimed. Axes, points/lines,
+volumes/slices, integrated CPU isosurfaces and the three demos remain to be implemented. The adapter requires
+axes:false and unsupported Figure calls reject before publishing, so it cannot silently lose star or wind data.
+
+First native drawing run: all eight WebGPU cases passed; the native WebGL2 bar produced/restored the same
+pixels and passed hostile-state image/identity comparisons, but its final `gl.getError() === NO_ERROR` assertion
+failed. Reproduce with the shared lock around `node packages/sciviz/tests/webgl2-browser.mjs` after building.
+The invalid operation is in the creation/reboot/draw/state-cleanup path; the exact GL call and root cause are
+not isolated yet. New strict checks at each phase and console warnings are queued, not waived or loosened.
+Evidence: `test-results/sciviz-fixes/webgl-gpu.log/json`; next run: `webgl-gl-diagnostic.*`. This piece stays local.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 
@@ -13716,8 +13748,8 @@ compute packages load with `import()` only when a figure uses them.
 ## CPU isosurface extraction
 
 The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
-the WebGL2 work. It does not yet attach a figure to the engine's WebGL2 preview renderer. Existing figure APIs
-still need WebGPU or the full WebGL2 compatibility layer.
+the WebGL2 work. Extraction is separate from drawing and requests no device. The new `webgl2` entry below
+attaches the first native drawing paths; the complete WebGL2 job is still in progress.
 
 ```ts
 import { marchingCubes } from '@margoengine/sciviz/fallback';
@@ -13746,27 +13778,16 @@ ships the committed asset and needs no Rust toolchain. Tests compare every case,
 boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
 No end-to-end rendering or public speed claim is made for this entry yet.
 
-```ts
-import { Figure } from '@margoengine/sciviz';
+## Native WebGL2 drawing (batch 181, first drawing piece)
 
-const canvas = document.querySelector('canvas')!;
-const fig = await Figure.create(canvas); // engine, camera, orbit controls and dark theme, running
-const n = 100_000;
-const x = Float32Array.from({ length: n }, () => Math.random() * 10);
-const y = Float32Array.from({ length: n }, () => Math.random() * 10);
-const z = x.map((v, i) => Math.sin(v) * Math.cos(y[i]));
-await fig.scatter({ x, y, z, color: z }, { colormap: 'coolwarm' });
-fig.colorbar('coolwarm', [-1, 1], { label: 'sin x cos y' });
-```
-
-## Figures
-
-`Figure.create(canvas, options)` sets up everything with zero configuration:
-
-- a WebGPU engine on the canvas;
-- the theme's background;
-- a camera framing the plot box;
-- orbit controls (drag to orbit, scroll to zoom, right-drag to pan).
+`attachWebGL2(engine, options)` from `@margoengine/sciviz/webgl2` attaches the existing surface, bar,
+histogram and heatmap APIs to an engine with `backend: 'webgl2'`. It returns an ordinary `Figure`;
+the caller owns the engine, camera, controls and rendering loop. It installs no WebGPU compatibility shim.
+An optional `signal` cancels waiting for the Figure module and prevents attachment with the exact abort reason;
+module fetching itself may continue. The default is no signal.
+Pass `axes: false` explicitly. Axes, scatter, lines, volumes, slices and integrated CPU isosurfaces are
+still pending, and their Figure calls reject with a help-linked `unsupported` error before publishing a layer.
+The three real-data demos still need those paths. This is a committed piece of job 1, not its completion.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

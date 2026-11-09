@@ -1693,6 +1693,26 @@ the same commit and packages-dirty flag. Core + stage measures 23,924 B gzip und
 a second full run. Later native drawing and temporal-flow pieces have separate
 validation and are not included in these review-only counts.
 
+Batch 181 native sciviz drawing (2026-11-10): optional `sciviz/webgl2` injects a typed driver into SciRenderer;
+the root has no runtime import of it. Figure returns its existing surface and rectangle layer classes. R32F
+vertex fetches and instanced integer-colour attributes retain all cells with no CPU tessellation. The driver
+owns its programs/VAOs/buffers/textures, scopes caller GL state around uploads/draws, shares the engine depth
+buffer and applies top-left view rectangles to GL's bottom-left viewport/scissor. Layer restore replaces those
+resources from retained CPU data, including updated heights; use the existing optional webglRestore plugin.
+Unit protocol/limit/ownership checks exist. Native WebGPU versus real native WebGL2 all-pixel parity, live
+restoration and hostile-state checks are queued in `packages/sciviz/tests/webgl2-browser.mjs`, not yet proved.
+The first run passed all eight WebGPU cases, then native WebGL2 bar failed its final no-GL-error assertion
+after image/restore/state comparisons. Per-phase strict checks are queued to identify the invalid operation;
+no successful native GL surface run or parity result is claimed. CPU tests pass 149/149 from a serialized build.
+Axes, points/lines, volume/slice and CPU-isosurface integration, plus the real-data demos, remain open. Their
+Figure APIs reject with coded help before publication. The original 28-case demos now pass every assertion,
+including label/colour-bar clearance, but their browser teardown still fails; lane-A owns that repair.
+All eight current head/star screenshots were visually reviewed at 390 x 844 and 1440 x 900 on both existing
+backends: titles, ticks and colour bars remain separate and visible. Hashes and the precise backend distinction
+are recorded in `test-results/sciviz-fixes/label-review.json`. This closes the visual-review gap, not teardown.
+No exclusive lock, benchmark, paired wall-clock measurement or timing assertion is part of this piece.
+
+
 Half-float conversion retains the same source samples and output words while
 removing two temporary views per voxel. tests/f16-allocation.test.js checks all
 half words, signed ties and 574,992 fewer allocations for the default brick.

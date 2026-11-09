@@ -24,8 +24,8 @@ compute packages load with `import()` only when a figure uses them.
 ## CPU isosurface extraction
 
 The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
-the WebGL2 work. It does not yet attach a figure to the engine's WebGL2 preview renderer. Existing figure APIs
-still need WebGPU or the full WebGL2 compatibility layer.
+the WebGL2 work. Extraction is separate from drawing and requests no device. The new `webgl2` entry below
+attaches the first native drawing paths; the complete WebGL2 job is still in progress.
 
 ```ts
 import { marchingCubes } from '@margoengine/sciviz/fallback';
@@ -53,6 +53,52 @@ Build the committed Wasm with `npm run build:fallback --workspace @margoengine/s
 ships the committed asset and needs no Rust toolchain. Tests compare every case, SIMD row tails and chunk
 boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
 No end-to-end rendering or public speed claim is made for this entry yet.
+
+## Native WebGL2 drawing (batch 181, first drawing piece)
+
+`attachWebGL2(engine, options)` from `@margoengine/sciviz/webgl2` attaches the existing surface, bar,
+histogram and heatmap APIs to an engine with `backend: 'webgl2'`. It returns an ordinary `Figure`;
+the caller owns the engine, camera, controls and rendering loop. It installs no WebGPU compatibility shim.
+An optional `signal` cancels waiting for the Figure module and prevents attachment with the exact abort reason;
+module fetching itself may continue. The default is no signal.
+Pass `axes: false` explicitly. Axes, scatter, lines, volumes, slices and integrated CPU isosurfaces are
+still pending, and their Figure calls reject with a help-linked `unsupported` error before publishing a layer.
+The three real-data demos still need those paths. This is a committed piece of job 1, not its completion.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
+import { webglRestore } from '@margoengine/webgl2-compat/restore';
+import { attachWebGL2 } from '@margoengine/sciviz/webgl2';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgl2', fallback: webglRenderer });
+engine.use(webglRestore());
+const fig = await attachWebGL2(engine, { axes: false, mode: '2d' });
+await fig.heatmap([0, 1, 2, 3, 4, 5], { nx: 3, ny: 2 });
+await fig.ready();
+fig.render();
+// Dispose fig and engine separately when finished. Call engine.start() for a running view.
+```
+
+Surface heights must be CPU arrays (read a `GpuArray` first). They use an R32F 2D texture and integer vertex
+fetches, retaining every grid cell, central-difference normals, contours, grid styling, opacity and
+`setHeights` updates. No float render-target extension is needed. Each grid dimension must fit
+`MAX_TEXTURE_SIZE`. Rectangles use one instanced draw with packed colours. The optional driver preserves
+the caller's GL state, uses the engine view's viewport/scissor and shares its depth buffer with core meshes.
+`webglRestore()` rebuilds layer resources from retained data, including the latest height update.
+Root `Figure.create` continues to select WebGPU. Importing the root or CPU extractor never loads this driver.
+
+`npm run test:webgl2 --workspace @margoengine/sciviz` checks the two real engine backends, restoration,
+updates, NaN holes and caller GL state. Its fixed parity bound counts every pixel: at most 0.1% with any
+RGB channel difference above 2/255, mean per-pixel maximum-channel difference at most 0.25/255.
+Run it under the shared GPU lock. The first run passed all eight WebGPU cases, then native WebGL2's bar case
+failed its no-GL-error assertion. Phase checks are queued to isolate the invalid call; parity is not yet proved.
+No speed or other-browser/hardware claim is made.
+The driver entry measures 4,288 B min+gzip, plus the separately shared Figure root. The CPU extraction entry
+does not load it. Existing size ceilings are unchanged.
+
+## A first WebGPU figure
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

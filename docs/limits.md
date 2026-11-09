@@ -95,7 +95,25 @@ vertices together are capped at 2 GiB, excluding the returned copy and allocator
 least two per axis; the input length must match; the level must be finite in float32. Both passes yield every
 16,384 cells for cancellation. NaN samples follow the GPU's comparison/interpolation behaviour. All 256 cases,
 non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
-The existing Figure still rejects the engine's WebGL2 preview backend. Drawing parity remains unverified.
+Root Figure attachment still rejects the engine's WebGL2 preview backend; the optional `sciviz/webgl2`
+adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
+Drawing parity remains unverified until its queued correctness run finishes.
+
+Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
+returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
+`signal` defaults absent and cancels module waiting/attachment with its exact reason; the module fetch may continue.
+no shim, globals or WebGPU device. Root Figure.create remains WebGPU. R32F heights need nx and ny within
+MAX_TEXTURE_SIZE and six vertices per cell within a signed GL draw count. The colour map is 256 sRGB8 texels.
+Surface uploads use 4 bytes/sample plus 1,024 colour-map bytes; rectangle instance data uses 20 bytes/cell.
+No per-cell CPU mesh building is added. The driver shares core depth and respects view viewport/scissor,
+restoring GL state after drawing and uploads. Restoration uses retained data, including setHeights' owned copy.
+Axes, points/lines, volumes/slices, integrated CPU isosurfaces and the real-data demos are still pending;
+unsupported Figure calls reject with coded help before publishing. The browser test's preselected all-pixel
+bound is share(d > 2/255) <= 0.001 and mean(max RGB channel difference) <= 0.25/255, at 320 x 240,
+single-sampled on the test machine. Execution evidence is pending; no cross-hardware or speed claim.
+The drawing entry is 4,288 B min+gzip with bare imports external (new ceiling 4,442 B), plus the shared
+Figure root at 36,802 B under its unchanged 36,802 B ceiling. All existing ceilings are unchanged.
+Core plus stage remains 23,837 B gzip, below 25,000. The CPU extractor remains 2,002 B plus its lazy Wasm.
 
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays

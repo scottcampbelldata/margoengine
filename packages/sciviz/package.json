@@ -63,6 +63,10 @@
     "./fallback": {
       "types": "./dist/fallback.d.ts",
       "import": "./dist/fallback.js"
+    },
+    "./webgl2": {
+      "types": "./dist/webgl2.d.ts",
+      "import": "./dist/webgl2.js"
     }
   },
   "files": [
@@ -89,9 +93,10 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
-    "test:fallback-kernel": "node scripts/build-fallback.mjs --test"
+    "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
+    "test:webgl2": "npm run build && node tests/webgl2-browser.mjs"
   }
 }

@@ -2518,6 +2518,10 @@
       "types": "./dist/sciviz/fallback.d.ts",
       "import": "./dist/sciviz/fallback.js"
     },
+    "./sciviz/webgl2": {
+      "types": "./dist/sciviz/webgl2.d.ts",
+      "import": "./dist/sciviz/webgl2.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

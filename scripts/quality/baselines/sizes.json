@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11614435,
+  "total": 11618877,
   "history": [
     {
       "date": "2026-10-24",
@@ -5096,6 +5096,12 @@
       "commit": "5e358bf3f",
       "reason": "Batch 181 job 1 foundation: new optional sciviz/fallback CPU extraction entry; existing budgets unchanged; feature-local Wasm separately limited by fallback.test.js",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d9e616a92",
+      "reason": "Batch 181 job 1 native surface/rectangle drawing piece: new optional sciviz/webgl2 entry, 4288 B gzip plus the separately shared Figure root; new ceiling 4442 B, all existing ceilings unchanged. No speed claim.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6071,6 +6077,7 @@
     "@margoengine/staging/pathtrace": 1469,
     "@margoengine/procedural/caves": 1680,
     "@margoengine/procedural/tree": 3400,
-    "@margoengine/sciviz/fallback": 2258
+    "@margoengine/sciviz/fallback": 2258,
+    "@margoengine/sciviz/webgl2": 4442
   }
 }

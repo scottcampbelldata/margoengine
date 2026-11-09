@@ -7,6 +7,16 @@ snapshot/restore and ref identity through store growth. Core + stage: 23,837 to
 23,924 B gzip (+87 B); core alone 21,553 B, below its unchanged 21,587 B cap.
 No throughput or cross-hardware claim.
 
+Batch 181 native drawing piece (2026-11-10): `sciviz/webgl2` implements CPU-backed height surfaces and
+instanced rectangles on an engine whose actual backend is WebGL2, without a WebGPU shim. The root and the CPU
+extractor do not load that optional implementation. `packages/sciviz/tests/webgl2.test.js` checks delegation,
+latest-height restore, ownership, resource limits and explicit unsupported paths. The browser test checks
+both real engine backends, all-pixel parity, update/NaN/opacity/contour cases, live reconstruction and GL state.
+Its GPU run is queued; no observed parity, full-job completion, speed or other-hardware claim is made yet.
+The first attempt passed all eight WebGPU cases and failed native WebGL2 bar's no-error check; strict phase
+diagnostics are queued. This is an open failure, not accepted pixel or performance variance.
+Axes, points/lines, volume/slice and CPU-isosurface integration and all three real-data demos are still owed.
+
 CPU isosurface foundation (2026-11-10): `@margoengine/sciviz/fallback` extracts without a GPU using the existing
 derived case table and a feature-local Rust/Wasm module. `packages/sciviz/tests/fallback.test.js` compares all
 256 cases and non-cubic/chunked grids with an independent float32 scalar oracle, checks cancellation and memory

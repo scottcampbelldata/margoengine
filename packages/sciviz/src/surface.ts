@@ -2,7 +2,7 @@
 // place, so a surface computed on the GPU never comes back to the CPU). The vertex shader builds the grid from the
 // vertex index and takes normals from central differences; the fragment shader colours by height through a colour
 // map, lights the surface, and draws contour lines at even height steps with screen-space widths (fwidth).
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import {
   colormapTexture,
   extent,
@@ -14,7 +14,8 @@ import {
   type ColormapSource,
   type DataSource,
 } from './layer.js';
-import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
+import { frameWGSL, type Drawable, type GlContext, type GpuContext, type SciRenderer } from './render.js';
+import type { FallbackDraw } from './fallback-types.js';
 import type { Colormap } from './colormaps.js';
 import { rayHeightField } from './pick.js';
 
@@ -136,6 +137,7 @@ export class SurfaceLayer implements Drawable {
   #model: Float32Array = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   #dirty = true;
   #disposed = false;
+  #fallback: (FallbackDraw & { setHeights(data: Float32Array): void }) | undefined;
 
   /** @internal Use `figure.surface()`. */
   constructor(renderer: SciRenderer, z: DataSource, options: SurfaceLayerOptions = {}) {
@@ -177,6 +179,13 @@ export class SurfaceLayer implements Drawable {
   }
 
   #build(): void {
+    this.#dirty = true;
+    if (this.#renderer.fallback) {
+      if (!this.#cpu) throw fault('unsupported', 'WebGL2: read GpuArray heights first', 'sciviz');
+      this.#fallback?.dispose();
+      this.#fallback = this.#renderer.fallback.surface(this.#cpu, this.nx, this.ny, this.colormap);
+      return;
+    }
     const device = this.#renderer.device!;
     this.#heights = storageOf(device, this.#cpu ?? this.#data, 'Surface heights');
     this.#texture = colormapTexture(device, this.colormap);
@@ -201,7 +210,6 @@ export class SurfaceLayer implements Drawable {
         { binding: 3, resource: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) },
       ],
     });
-    this.#dirty = true;
   }
 
   /** @internal The device was restored: rebuild from the CPU data (a GpuArray source must be rebuilt by you). */
@@ -247,11 +255,12 @@ export class SurfaceLayer implements Drawable {
   setHeights(values: ArrayLike<number>): void {
     if (values.length !== this.nx * this.ny)
       throw rangeError(`setHeights needs ${this.nx * this.ny} values, got ${values.length}`, 'sciviz');
-    if (!this.#heights?.owned)
+    if (!this.#fallback && !this.#heights?.owned)
       throw typeError('This surface reads a GpuArray; write to the GpuArray instead', 'sciviz');
     const copy = Float32Array.from(values);
     this.#cpu = copy;
-    this.#renderer.device!.queue.writeBuffer(this.#heights.buffer, 0, copy);
+    if (this.#fallback) this.#fallback.setHeights(copy);
+    else this.#renderer.device!.queue.writeBuffer(this.#heights!.buffer, 0, copy);
   }
 
   /**
@@ -282,7 +291,7 @@ export class SurfaceLayer implements Drawable {
 
   /** @internal */
   prepare(): void {
-    if (!this.#group) return;
+    if (!this.#group && !this.#fallback) return;
     if (!this.#dirty) return;
     const v = this.#values,
       m = this.#model;
@@ -293,7 +302,8 @@ export class SurfaceLayer implements Drawable {
     v.set([this.x[0], (this.x[1] - this.x[0]) / (this.nx - 1), this.y[0], (this.y[1] - this.y[0]) / (this.ny - 1)], 32);
     new Uint32Array(v.buffer, 36 * 4, 4).set([this.nx, this.ny, this.#grid, 0]);
     v.set([this.#range[0], this.#range[1], this.#contours, this.#opacity], 40);
-    this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
+    if (this.#fallback) this.#fallback.update(v);
+    else this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
     this.#dirty = false;
   }
 
@@ -332,6 +342,12 @@ export class SurfaceLayer implements Drawable {
     pass.draw((this.nx - 1) * (this.ny - 1) * 6);
   }
 
+  /** @internal */
+  drawGL(context: GlContext): void {
+    this.prepare();
+    this.#fallback!.draw(context);
+  }
+
   /** Frees the GPU resources (not a GpuArray source). */
   dispose(): void {
     if (this.#disposed) return;
@@ -340,6 +356,7 @@ export class SurfaceLayer implements Drawable {
     if (this.#heights?.owned) this.#heights.buffer.destroy();
     this.#texture?.destroy();
     this.#uniform?.destroy();
+    this.#fallback?.dispose();
   }
 
   /** Same as `dispose()`, for `using`. */

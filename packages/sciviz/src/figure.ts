@@ -36,7 +36,7 @@ import {
   type ColormapSource,
   type DataSource,
 } from './layer.js';
-import { SciRenderer } from './render.js';
+import { SciRenderer, requireGPU } from './render.js';
 import { SurfaceLayer, type SurfaceLayerOptions } from './surface.js';
 import { VolumeLayer, type VolumeLayerOptions } from './volume.js';
 
@@ -446,7 +446,7 @@ export class Figure extends EventTarget {
   }
 
   /** @internal Use {@link Figure.attach} or {@link Figure.create}. */
-  constructor(engine: EngineKernel, options: FigureOptions = {}) {
+  constructor(engine: EngineKernel, options: FigureOptions = {}, renderer?: SciRenderer) {
     super();
     const theme = options.theme ?? 'dark';
     if (theme !== 'dark' && theme !== 'light')
@@ -465,7 +465,8 @@ export class Figure extends EventTarget {
     this.engine = engine;
     this.theme = THEMES[theme];
     this.#options = options;
-    this.renderer = SciRenderer.attach(engine);
+    this.renderer = renderer ?? new SciRenderer();
+    (engine as unknown as Engine).use(this.renderer);
     if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin());
     this.#model = dataToScene(this.#bounds, aspect);
     const canvas = (engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
@@ -778,6 +779,7 @@ export class Figure extends EventTarget {
 
   // The one lines plugin per figure, shared by line layers and the axes.
   #linesPlugin(): Promise<Lines> {
+    requireGPU(this.renderer);
     return (this.#lines ??= import('@margoengine/lines').then(({ Lines }) => Lines.attach(this.engine)));
   }
 
@@ -925,6 +927,7 @@ export class Figure extends EventTarget {
    */
   async scatter(data: ScatterData, options: ScatterLayerOptions = {}): Promise<ScatterLayer> {
     this.#check();
+    requireGPU(this.renderer);
     if (!data || typeof data !== 'object')
       throw typeError('scatter takes { x, y, z?, color?, size? } or { positions }', 'sciviz');
     let positions: Float32Array;
@@ -1202,6 +1205,7 @@ export class Figure extends EventTarget {
   /** A volume rendering of a 3D grid (x fastest; a GpuArray of shape [nz, ny, nx] is uploaded on the GPU). */
   volume(data: DataSource, options: VolumeLayerOptions = {}): VolumeLayer {
     this.#check();
+    requireGPU(this.renderer);
     this.#need3d('A volume');
     this.#linear('A volume');
     const layer = new VolumeLayer(this.renderer, data, options);
