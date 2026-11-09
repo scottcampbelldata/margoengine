@@ -9,20 +9,6 @@ For exposure driven by aperture, shutter time and ISO, use
 Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
 sets Tonemap's exposure in stops.
 
-`Tonemap` detaches from its owning scene on disposal, preserving same-name
-effects in other scenes. Use `scene.use()` for a secondary scene:
-
-```ts
-import {Engine} from 'margoengine/core';
-import {Tonemap} from 'margoengine/tonemap';
-const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
-const product = engine.createScene('product');
-const tonemap = new Tonemap();
-product.use(tonemap);
-tonemap.dispose();
-engine.dispose();
-```
-
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
@@ -44,6 +30,20 @@ tonemap.setLUT(`LUT_3D_SIZE 2
 tonemap.setLUT(null);
 tonemap.dispose();
 stage.dispose();
+```
+
+`Tonemap` detaches from its owning scene on disposal, preserving same-name
+effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const tonemap = new Tonemap();
+product.use(tonemap);
+tonemap.dispose();
+engine.dispose();
 ```
 
 `agx` is the AgX Base display transform computed in the shader: Rec.2020 inset, log2 encoding over 16.5 stops around 18% grey, the parametric AgX sigmoid, hue restoration, then the outset back to Rec.709. 18% grey stays 18% grey. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).

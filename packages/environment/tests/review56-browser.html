@@ -13,11 +13,15 @@ window.check={
   engine.scene.background='#cccccc';engine.onError=e=>errors.push(e.message);engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
   engine.render();await engine.gpu.queue.onSubmittedWorkDone();
  },
- async draw(kind,scissor){
-  if(kind==='floor'){effect=Reflector.attach(engine,{width:8,height:8,color:[1,0,0],autoUpdate:false,roughness:.4});effect.node.setRotation([-Math.PI/2,0,0]);effect.update();}
+ async draw(kind,scissor,unscoped=false){
+  if(kind==='floor'){
+   effect=Reflector.attach(engine,{width:8,height:8,color:[1,0,0],autoUpdate:false,roughness:.4});effect.node.setRotation([-Math.PI/2,0,0]);effect.update();
+   // Negative control: the actual surface pass receives no view state, as before the repair.
+   if(unscoped){const draw=effect.draw.bind(effect);effect.draw=c=>draw({...c,view:undefined});}
+  }
   if(kind==='color')effect=ColorBackground.attach(engine,{color:'#ff0000'});
   if(kind==='image')effect=ImageBackground.attach(engine,{shape:'sphere',images:[{width:1,height:1,data:new Uint8ClampedArray([255,0,0,255])}]});
-  engine.render({views:[{camera:engine.camera,viewport:[0,0,64,64],pixels:true,clear:'#cccccc',...(scissor?{scissor:[0,0,32,64]}:{})}]});
+  engine.render({views:[{camera:engine.camera,viewport:[0,0,64,64],pixels:true,clear:{color:'#cccccc'},...(scissor?{scissor:[0,0,32,64]}:{})}]});
   await engine.gpu.queue.onSubmittedWorkDone();return errors;
  },
  async owner(kind){

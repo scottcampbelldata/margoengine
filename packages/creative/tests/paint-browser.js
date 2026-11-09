@@ -63,7 +63,8 @@ export async function paintChecks() {
   const options = {},
     effect = new Painterly(options),
     stage = effect.joinStack(),
-    host = () => ({ gpu: d, removePlugin() {} });
+    // This numerical harness calls setup directly; it registers no scene plugin.
+    host = () => ({ gpu: d, sceneOf: () => undefined });
   effect.setup(host());
   async function run(w, h, opts, { flat = false, step = false, views, samples = 1, bgra = false } = {}) {
     Object.keys(options).forEach((k) => delete options[k]);

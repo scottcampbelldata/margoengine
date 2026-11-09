@@ -8,12 +8,18 @@ page.on('pageerror', (e) => errors.push(e.message));
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
   const shot = async () => decodePNG(await page.locator('canvas').screenshot());
-  for (const kind of ['floor', 'color', 'image'])
+  for (const kind of ['unscoped-floor', 'floor', 'color', 'image'])
     for (const scissor of [false, true]) {
       await page.evaluate(() => window.check.init());
+      // Match the partial frame's clear and view layout before adding the surface.
+      assert.deepEqual(await page.evaluate((s) => window.check.draw('control', s), scissor), []);
       const before = await shot();
       assert.deepEqual(
-        await page.evaluate(({ kind, scissor }) => window.check.draw(kind, scissor), { kind, scissor }),
+        await page.evaluate(
+          ({ kind, scissor }) =>
+            window.check.draw(kind === 'unscoped-floor' ? 'floor' : kind, scissor, kind === 'unscoped-floor'),
+          { kind, scissor },
+        ),
         [],
       );
       const after = await shot();
@@ -29,7 +35,8 @@ try {
             }
           }
       assert(inside > 100, `${kind} draws within its view`);
-      assert.equal(outside, 0, `${kind} preserves every component outside viewport/scissor`);
+      if (kind === 'unscoped-floor') assert(outside > 100, 'negative control exposes an unscoped surface');
+      else assert.equal(outside, 0, `${kind} preserves every component outside viewport/scissor`);
     }
   for (const kind of ['Reflector', 'Refractor', 'CubeCamera']) {
     const row = await page.evaluate((kind) => window.check.owner(kind), kind);

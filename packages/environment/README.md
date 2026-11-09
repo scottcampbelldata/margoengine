@@ -764,3 +764,7 @@ the real engine and checks owner removal before the next fixture uses its name:
 ```sh
 npm run test:reflection-shapes:browser --workspace @margoengine/environment
 ```
+
+The review56 proof compares matching partial-view frames. Two deliberate unscoped
+surface controls must leak pixels; the six repaired viewport/scissor cases preserve
+every outside RGB component exactly on both backends.
