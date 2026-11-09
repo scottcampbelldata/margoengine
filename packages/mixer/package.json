@@ -46,6 +46,10 @@
     "./reflections": {
       "types": "./dist/reflections.d.ts",
       "import": "./dist/reflections.js"
+    },
+    "./loudness": {
+      "types": "./dist/loudness.d.ts",
+      "import": "./dist/loudness.js"
     }
   },
   "files": [

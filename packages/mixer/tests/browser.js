@@ -15,6 +15,7 @@ import { createSidechain } from '@margoengine/mixer/sidechain';
 import { captureSnapshot, recallSnapshot } from '@margoengine/mixer/snapshots';
 import { createDynamics, measureTruePeak } from '@margoengine/mixer/worklet';
 import { createRoomReverb, roomImpulseResponse } from '@margoengine/mixer/reflections';
+import { measureLoudness, normalizeLoudness } from '@margoengine/mixer/loudness';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -339,6 +340,18 @@ export async function runChecks() {
       assert(worst < 2e-5, `convolution error ${worst}`);
       assert(measure(out.getChannelData(c), 0, Math.round(0.03 * rate)).peak > 0.01, 'discrete early arrivals precede the tail');
     }
+  });
+  await check('LUFS measures real rendered stereo calibration audio and normalises it by gain', async () => {
+    const context = new OfflineAudioContext(2, rate * 4, rate);
+    play(context, sine(1000, 4, dbToGain(-23))).connect(context.destination);
+    const buffer = await context.startRendering();
+    const pcm = [buffer.getChannelData(0), buffer.getChannelData(1)];
+    const report = measureLoudness(pcm, rate);
+    for (const field of ['integrated', 'momentary', 'shortTerm']) near(report[field], -23, 0.1, `EBU calibration ${field}`);
+    const adjusted = normalizeLoudness(pcm, rate, { target: -20 });
+    near(adjusted.after.integrated, -20, 1e-5, 'normalised LUFS');
+    assert(!adjusted.peakLimited, 'ordinary target is reachable by gain');
+    assert(adjusted.after.truePeak <= dbToGain(-1), 'normalisation respects its peak cap');
   });
   device?.destroy();
   return { checks, backend };

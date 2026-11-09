@@ -1260,3 +1260,13 @@ immediately before allocating nodes. Regression: sidechain.test.js and worklet.t
 
 Early reflections have no known open defect in tested static rectangular rooms. First-order
 geometry, interpolation colouration and unmeasured room/listening coverage are documented limits.
+
+Loudness has no known open defect in supported PCM formats and tested generated standard cases.
+Coverage/normalisation limits are recorded in limits.md; no full certification or authentic-programme proof.
+The snapshots public budget was stale after a shared ratchet shrink (1,983 to 1,956 B). It is
+corrected, with docs.test.js covering the whole mixer class of stale entry/budget records.
+Existing mixer mutators changed gain/mute/solo targets and duck membership before a rejected fade;
+invalid values could also cancel prior automation. The owning scheduler now validates inputs first,
+setGain commits metadata only after scheduling succeeds, and duck release validates before removal.
+The undefined-release/gate default inconsistency is fixed too. mixer.test.js adds regressions that
+fail on the prior implementation; no known open scheduling defect remains in these tested paths.

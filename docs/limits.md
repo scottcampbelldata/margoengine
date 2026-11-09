@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-595). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-596). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -807,7 +807,7 @@ Effect order/kinds/parameter names must match; subset bus recalls are allowed. N
 filter types, delay times, impulses, external worklets or active duck envelopes are captured.
 Generated OfflineAudioContext and Node graph stand-ins prove the paths; real WebGPU/WebGL2 contexts
 in Edge coexist with the audio. Other browsers, real recordings and timing remain unmeasured. LIM-586.
-Snapshots entry: 1,700 B gzip, budget 1,983 B.
+Snapshots entry: 1,810 B gzip, budget 1,956 B.
 
 ## Mixer exact dynamics (batch 111)
 
@@ -882,3 +882,24 @@ baseline. CCD remains outside this correction.
 ## 2D light textures and cookies (batch 55)
 
 Optional `@margoengine/lighting2d/cookie` projects 2D textures (cookies / gobos) onto light footprints to shape lights with window patterns and flashlights. Supports scale, offset, rotation, wrapping modes (zero, clamp, repeat, mirror) and blend modes (multiply, alpha, color). WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-593.
+
+## Mixer loudness (batch 111)
+
+Optional mixer/loudness analyses finite Float32 PCM, mono/stereo or Web Audio 5.1 order
+L/R/C/LFE/SL/SR. LFE is excluded from loudness, surrounds weight 1.41, others 1. All channels
+contribute to true peak. Rates: 32/44.1/48/88.2/96/176.4/192 kHz. Published 48 kHz K filters
+are bilinearly re-expressed at the other rates; tests preserve 1 kHz calibration within 0.1 LU.
+Ungated M/S windows are 400 ms/3 s every 10 ms. Integrated blocks overlap 75%, with absolute
+-70 LUFS and relative -10 LU gates. Incomplete windows are discarded; unavailable/silent
+measurements are -Infinity. Histories/energy memory scales with duration. No file decoding,
+live worklet metering, LRA, UI or full EBU certification. Generated standard tone/offset tests
+are stand-ins, not the downloaded corpus or authentic programmes. Real Edge rendered calibration
+and normalisation pass beside WebGPU/WebGL2; other browsers and speed are unmeasured.
+Normalisation copies PCM, defaults -23 LUFS/-1 dBTP, target above -70 through 0 and peak cap
+-96..0 dBTP. It applies constant gain, not compression/clipping; cap and changed absolute-gate
+membership may prevent the requested loudness, and the after report exposes the actual outcome.
+A programme with no qualifying complete 400 ms block raises coded state with help link.
+Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
+Loudness entry: 2,107 B gzip, budget 2,363 B.
+Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,626 B gzip.
+Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.

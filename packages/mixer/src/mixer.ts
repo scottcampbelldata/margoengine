@@ -105,16 +105,33 @@ export function audibleBuses(buses: readonly BusState[]): Map<string, boolean> {
   return result;
 }
 
-/** Moves a parameter to `value`: immediately while the context has not started (or when `seconds` is 0), else smoothly. */
+function rampSettings(context: BaseAudioContext, { at = context.currentTime, seconds = 0.02 }: RampOptions = {}): { at: number; seconds: number } {
+  if (typeof at !== 'number' || typeof seconds !== 'number')
+    throw new TypeError('Ramp time and seconds need numbers; pass nonnegative finite audio times');
+  if (!Number.isFinite(at) || at < 0 || !Number.isFinite(seconds) || seconds < 0)
+    throw new RangeError('Ramp time and seconds must be finite and nonnegative; use context.currentTime and a valid fade duration');
+  return { at, seconds };
+}
+
+function linearGain(db: number): number {
+  if (typeof db !== 'number' || Number.isNaN(db))
+    throw new TypeError('Gain needs a number of dB; pass -Infinity for silence or a finite level');
+  const gain = dbToGain(db);
+  if (!Number.isFinite(Math.fround(gain)))
+    throw new RangeError('Gain exceeds the AudioParam float32 range; use a smaller dB level');
+  return gain;
+}
+
+/** Moves a float32 parameter immediately while suspended (or seconds 0), else smoothly. Bad values/times preserve automation. */
 export function rampParam(
   context: BaseAudioContext,
   param: AudioParam,
   value: number,
-  { at, seconds = 0.02 }: RampOptions = {},
+  options: RampOptions = {},
 ): void {
-  if (!Number.isFinite(value)) throw new RangeError(`Parameter value must be a finite number, got ${value}`);
-  if (seconds < 0 || !Number.isFinite(seconds)) throw new RangeError(`seconds must be 0 or more, got ${seconds}`);
-  const time = at ?? context.currentTime;
+  if (typeof value !== 'number') throw new TypeError('Parameter value needs a number; pass a finite float32 value');
+  if (!Number.isFinite(Math.fround(value))) throw new RangeError('Parameter value must fit finite float32; pass a smaller finite number');
+  const { at: time, seconds } = rampSettings(context, options);
   param.cancelScheduledValues(time);
   if (seconds === 0 || (time <= context.currentTime && context.state !== 'running')) param.setValueAtTime(value, time);
   else param.setTargetAtTime(value, time, seconds / 4);
@@ -153,6 +170,7 @@ export class Bus implements Disposable {
     options: BusOptions,
   ) {
     const context = mixer.context;
+    const gainDb = options.gain ?? 0, gain = linearGain(gainDb);
     this.name = name;
     this.input = context.createGain();
     this.preTap = context.createGain();
@@ -160,8 +178,8 @@ export class Bus implements Disposable {
     this.duckNode = context.createGain();
     this.gate = context.createGain();
     this.output = context.createGain();
-    this.gainDb = options.gain ?? 0;
-    this.fader.gain.value = dbToGain(this.gainDb);
+    this.gainDb = gainDb;
+    this.fader.gain.value = gain;
     this.state = { name, parent, muted: !!options.muted, solo: !!options.solo, soloSafe: !!options.soloSafe };
     this.preTap.connect(this.fader).connect(this.duckNode).connect(this.gate).connect(this.output);
     this.setEffects(options.effects ?? []);
@@ -191,26 +209,26 @@ export class Bus implements Disposable {
   /** Sets the fader in dB (`-Infinity` for silence). */
   setGain(db: number, options?: RampOptions): this {
     this.alive();
-    if (typeof db !== 'number' || Number.isNaN(db))
-      throw new TypeError(`Bus gain must be a number of dB, got ${String(db)}`);
+    rampParam(this.mixer.context, this.fader.gain, linearGain(db), options);
     this.gainDb = db;
-    rampParam(this.mixer.context, this.fader.gain, dbToGain(db), options);
     return this;
   }
 
   /** Mutes or unmutes (the gate closes over a few milliseconds). */
   setMuted(muted: boolean, options?: RampOptions): this {
     this.alive();
+    const settings = rampSettings(this.mixer.context, { at: options?.at, seconds: options?.seconds ?? 0.01 });
     this.state.muted = !!muted;
-    this.mixer.refreshGates(options);
+    this.mixer.refreshGates(settings);
     return this;
   }
 
   /** Solos or unsolos; see {@link audibleBuses} for what stays audible. */
   setSolo(solo: boolean, options?: RampOptions): this {
     this.alive();
+    const settings = rampSettings(this.mixer.context, { at: options?.at, seconds: options?.seconds ?? 0.01 });
     this.state.solo = !!solo;
-    this.mixer.refreshGates(options);
+    this.mixer.refreshGates(settings);
     return this;
   }
 
@@ -247,16 +265,15 @@ export class Bus implements Disposable {
         `Sending "${this.name}" to "${to.name}" would make a loop; send to a bus that does not feed it`,
       );
     const context = this.mixer.context;
+    const value = linearGain(gain);
     const node = context.createGain();
-    node.gain.value = dbToGain(gain);
+    node.gain.value = value;
     const record = { node, target: to };
     (pre ? this.preTap : this.output).connect(node).connect(to.input);
     this.sends.add(record);
     return {
       setGain: (db, options) => {
-        if (typeof db !== 'number' || Number.isNaN(db))
-          throw new TypeError(`Send gain must be a number of dB, got ${String(db)}`);
-        rampParam(context, node.gain, dbToGain(db), options);
+        rampParam(context, node.gain, linearGain(db), options);
       },
       remove: () => {
         node.disconnect();
@@ -280,16 +297,18 @@ export class Bus implements Disposable {
     this.alive();
     if (!(amount >= 0) || !Number.isFinite(amount))
       throw new RangeError(`duck amount must be 0 or more dB, got ${amount}`);
+    const settings = rampSettings(this.mixer.context, { at, seconds: attack });
     const entry = { depth: amount };
     this.ducks.add(entry);
-    this.applyDuck({ at, seconds: attack });
+    this.applyDuck(settings);
     let active = true;
     return {
       release: (options = {}) => {
         if (!active) return;
+        const settings = rampSettings(this.mixer.context, { ...options, seconds: options.seconds ?? 0.4 });
         active = false;
         this.ducks.delete(entry);
-        if (!this.disposed) this.applyDuck({ seconds: 0.4, ...options });
+        if (!this.disposed) this.applyDuck(settings);
       },
       get active() {
         return active;
@@ -452,7 +471,7 @@ export class Mixer implements Disposable {
     if (this.disposed) return;
     const audible = audibleBuses([...this.all.values()].map((bus) => bus.state));
     for (const bus of this.all.values())
-      rampParam(this.context, bus.gate.gain, audible.get(bus.name) ? 1 : 0, { seconds: 0.01, ...options });
+      rampParam(this.context, bus.gate.gain, audible.get(bus.name) ? 1 : 0, { at: options?.at, seconds: options?.seconds ?? 0.01 });
   }
 
   /**

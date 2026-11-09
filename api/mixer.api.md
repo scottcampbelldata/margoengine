@@ -257,7 +257,7 @@ export function measure(samples: ArrayLike<number>, from?: number, to?: number):
     rms: number;
 };
 
-export function rampParam(context: BaseAudioContext, param: AudioParam, value: number, { at, seconds }?: RampOptions): void;
+export function rampParam(context: BaseAudioContext, param: AudioParam, value: number, options?: RampOptions): void;
 
 export function renderOffline(options: RenderOptions, setup: (scene: RenderScene) => void | Promise<void>): Promise<AudioBuffer>;
 

@@ -1653,3 +1653,22 @@ The [sourced derivation](physics2d-support-proof.md) states the method domain an
 verified negative bending tangent of the preserved soft law is a [constitutive limit](physics2d-support-bending.md),
 not permission to relax centered axial bars or a claim of exact discrete collapse. Supported components still
 allocate local buffers and compute two banded systems; no speed-success or allocation-free claim is made.
+
+### Mixer loudness (batch 111): section 5 evidence
+
+The optional CPU entry owns double-precision K filters, weighted 10 ms energies, 400 ms/3 s
+window histories, two-stage integrated gating and copied PCM gain normalisation. No core/stage
+or backend math change. Generated EBU cases 1/2 use the prescribed 20 s duration and 0.1 LU bars;
+all twenty file offsets in cases 10/13 check window alignment. Node coverage includes rate
+profiles, absolute/relative gates, gain covariance, 5.1 surround weight and LFE exclusion,
+silence/short inputs, immutable PCM and true-peak-capped outcomes. Real Edge audio renders are
+measured/normalised beside both renderers. No downloaded corpus, authentic programme, LRA,
+live-meter, other-browser, certification or timing claim. LIM-596.
+Mixer docs.test.js now measures every current mixer entry and compares its public bytes/budget
+with the built entry and shared size baseline. It fails on stale public numbers after a size-ratchet
+shrink, and runs in verify/check:merge through the package unit suite. No budget is raised.
+The closing batch also fixes fail-atomic numeric scheduling in the existing mixer owner, not core:
+validate audio times, durations and float32 values before state changes or cancellation, and retain
+active ducks on invalid release. mixer.test.js proves target/flag/envelope and complete automation
+trace preservation, plus unchanged valid/default fades. Root grows 6,670 to 6,901 B and snapshots
+1,700 to 1,810 B, within their existing budgets; no budget or accuracy/time bar is raised.

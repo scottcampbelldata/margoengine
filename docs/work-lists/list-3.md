@@ -30,7 +30,7 @@ For the third account. Starts when Scott is home and opens it.
 | J | water, generation, audio | 68 | procedural | 8 | todo |
 | J | water, generation, audio | 69 | wfc | 5 | todo |
 | J | water, generation, audio | 110 | audio | 6 | todo |
-| J | water, generation, audio | 111 | mixer | 5 | list 1 (dev PC) |
+| J | water, generation, audio | 111 | mixer | 5 | done |
 | J | water, generation, audio | 112 | video | 5 | done |
 
 When a batch is finished and pushed, change its status to `done` in the same push as its last job. Only the account running this list edits this file.

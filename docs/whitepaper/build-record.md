@@ -3434,3 +3434,59 @@ Three jobs for `@margoengine/vfx` on the dev PC (lane N, work list 1): three new
 - **Not proved:** time on any GPU; other GPUs; the WebGL2 route for shadows and nodes.
 - **Sizes (gzip B):** flipbook 911 (budget 1,167), shadows 2,805 (budget 3,061), nodes 3,093 (budget 3,349). The vfx root is 31,135 (budget 32,070). Base stays within 11,336.
 - **Docs:** each job updates the vfx README, limits, claims and the clean-room table. This push marks list-2 row 79 done.
+
+## Batch 111: mixer
+
+Five optional audio entries, built in order on the dev PC, with no core/stage changes.
+The initial all-package search and per-job README/export checks found none already implemented.
+Manual duck scheduling, native dynamics, a noise-only tail and peak/RMS existed and are reused
+where appropriate. No job was skipped. The claim landed first as dc727f60a.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Automatic sidechain ducking | DONE | e86358de0 | mixer/sidechain | sidechain.test.js and browser.js |
+| 2 | Mixer snapshots | DONE | 87d8e4dd2 | mixer/snapshots | snapshots.test.js and browser.js |
+| 3 | Exact limiter/compressor | DONE | 352e20d0c | mixer/worklet | worklet.test.js, finite-FIR proof and browser.js |
+| 4 | Early reflections | DONE | 8909d3172 | mixer/reflections | reflections.test.js and browser.js |
+| 5 | LUFS measurement/normalisation | DONE | this commit | mixer/loudness | loudness.test.js and browser.js |
+
+- **Built from:** W3C Web Audio Recommendation, ITU-R BS.1770-5 numeric tables and algorithms,
+  EBU Tech 3341 windows/test definitions, Giannoulis/Massberg/Reiss compressor analysis, and
+  Allen/Berkley image-source theory. References/derivations in clean-room.md; no external engine
+  or library source, paper-linked implementations, downloaded assets or paid packages.
+- **Proved:** package Node tests and real OfflineAudioContext/AudioWorklet graphs beside WebGPU
+  and WebGL2 in Edge. Generated signals are stand-ins. Sidechain follows the key without timers;
+  snapshots restore JSON silence, gain/mute/solo and numeric effects, including underwater fades;
+  dynamics checks exact static knees/attack, linked channels, independent FIR convolution,
+  adversarial ceilings and quantum independence; room convolution matches computed early/tail IR;
+  loudness checks generated EBU 20 s calibration and all file offsets of cases 10/13, gates,
+  rate profiles, channel weighting, normalisation and peak-constrained outcomes. Per-job result
+  JSON files under whitepaper/results/mixer-*.json. Each job ran lint, hygiene, verify, package
+  tests, locked browser tests and runnable README checks before its push; API records regenerated.
+- **Slips and bugs:** initial constructor mocking lost inherited fake methods (test harness fixed).
+  The dynamics browser helper disposed its using stage before a returned render promise finished;
+  it now awaits rendering inside the scope. Snapshot time validation now gives TypeError for a
+  string, with regression. A cached-module cancellation race created nodes after abort; job 3
+  fixes both factories, with microtask-order regressions failing before and passing after.
+  Concurrent pushes required ordinary rebases; no force-push, skipped checks or loosened bars.
+  The final job also checks mixer public entry bytes/budgets against actual builds, catching a
+  stale snapshots budget after the shared size ratchet shrank it.
+- **Docs per job:** 1, 2, 3, 4 and 5 each update packages/mixer/README.md, docs/limits.md,
+  docs/whitepaper/claims.md, docs/clean-room.md, docs/architecture/operational-playbook.md and
+  docs/known-bugs.md, plus generated API/LLM records. Job 3 adds mixer-true-peak.md. Job 5 adds
+  this record and sets list-3 row 111 done. Perf files do not apply: no speed number was measured.
+- **Limits/unmeasured:** static peak-key ducking is not speech recognition; snapshots require the
+  same effect topology; the limiter's conservative absolute-FIR bound may over-attenuate and is
+  not every DAC/codec; room acoustics are first-order/static/rectangular with interpolation
+  colouration; loudness is finite-PCM file/segment analysis, not a decoder, live meter, LRA or
+  EBU certification. Other browsers, authentic speech/music, measured rooms, listening comparisons
+  and performance remain unmeasured. No open defect from this batch remains in its supported paths.
+- **Final entry sizes (gzip B / budget B):** root 6,901 / 6,926; sidechain 1,565 / 1,815;
+  snapshots 1,810 / 1,956; worklet 2,574 / 2,825; reflections 3,227 / 3,483;
+  loudness 2,107 / 2,363. Core plus stage stays 23,626 B, under 25,000 B.
+- **Closing root-cause fix:** pre-existing mixer gain/mute/solo/duck mutators changed state before
+  rejecting invalid fades, and invalid float32 values/times could cancel automation. The mixer owner
+  now validates first, commits gain metadata after success and retains a duck on failed release.
+  Undefined release/gate defaults are consistent. New mixer.test.js regressions fail before the fix
+  and pass after; valid fade constants remain unchanged. Root/snapshots growth stays within existing
+  budgets, checked by docs.test.js. No core/stage changes and no raised size/time/accuracy bar.

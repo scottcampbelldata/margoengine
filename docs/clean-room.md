@@ -1477,3 +1477,14 @@ No engine/library source or external assets. Generated impulses are stand-ins.
 ## 2D light textures and cookies (batch 55)
 
 `@margoengine/lighting2d/cookie` is written from published descriptions of projective texture masks: M. Segal, C. Korobkin, R. van Widenfelt, J. Foran, and P. Haeberli, "Fast Shadows and Lighting Effects Using Texture Masks", Computer Graphics (SIGGRAPH '92 Proceedings), vol. 26, no. 2, 1992, pp. 249-252. The 2D coordinate transformation, wrapping modes, blend modes and sampling math are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.
+
+## Mixer loudness (batch 111)
+
+Written from [ITU-R BS.1770-5 Annex 1](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf)
+(K-filter numeric tables, channel power weights, 400 ms/75% overlap and -70/-10 gates),
+[EBU Tech 3341](https://tech.ebu.ch/docs/tech/tech3341.pdf) (400 ms/3 s rectangular windows,
+calibration and synthetic case definitions) and its R128 -23 LUFS target. Other-rate filters
+are derived algebraically from the published 48 kHz rational transfer function: for r=rate/48000,
+substitute old z^-1 = ((1-r)+(1+r)z^-1)/((1+r)+(1-r)z^-1). No library/engine source or reference
+implementation was read or reused. Generated cases are stand-ins; no downloaded recordings/assets.
+The existing mixer finite-FIR meter supplies true peak and a documented float32 gain margin.

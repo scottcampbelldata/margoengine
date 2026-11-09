@@ -92,6 +92,51 @@ test('fader: dB to gain, silence at -Infinity, immediate on a context that has n
   assert.throws(() => rampParam(live, new FakeParam(), Infinity), RangeError);
 });
 
+test('rejected numeric fades preserve bus targets, gates and duck membership', () => {
+  for (const options of [{ seconds: -1 }, { seconds: NaN }, { seconds: Infinity }, { at: -1 }, { at: NaN }, { at: Infinity }]) {
+    using mixer = new Mixer(new FakeContext(), { buses: { a: {}, b: {} } });
+    const bus = mixer.bus('a');
+    assert.throws(() => bus.setGain(-12, options), RangeError);
+    assert.equal(bus.gain, 0, 'failed fader change preserves target');
+    assert.throws(() => bus.setMuted(true, options), RangeError);
+    assert.equal(bus.muted, false, 'failed mute preserves state');
+    assert.throws(() => bus.setSolo(true, options), RangeError);
+    assert.equal(bus.solo, false, 'failed solo preserves state');
+    assert.throws(() => bus.duck({ attack: options.seconds ?? 0.05, at: options.at }), RangeError);
+    const duck = bus.duck({ amount: 3 });
+    duck.release({ seconds: 0 });
+    assert.equal(bus.duckNode.gain.last().value, 1, 'failed duck leaves no orphan holding the gain down');
+  }
+  using mixer = new Mixer(new FakeContext(), { buses: { a: {} } });
+  const bus = mixer.bus('a');
+  for (const db of [Infinity, 1000]) {
+    assert.throws(() => bus.setGain(db), RangeError);
+    assert.equal(bus.gain, 0);
+  }
+  const duck = bus.duck();
+  assert.throws(() => duck.release({ seconds: -1 }), RangeError);
+  assert.equal(duck.active, true, 'failed release leaves the handle active and usable');
+  duck.release({ seconds: undefined });
+  assert.equal(duck.active, false);
+  assert.equal(bus.duckNode.gain.last().constant, 0.1, 'undefined release duration keeps the documented 0.4 second default');
+  bus.setMuted(true);
+  assert.equal(bus.gate.gain.last().constant, 0.0025, 'the existing default 10 ms mute fade is preserved');
+  bus.setMuted(false, { seconds: undefined });
+  assert.equal(bus.gate.gain.last().constant, 0.0025, 'undefined keeps the gate default');
+});
+
+test('invalid parameter values and times never cancel existing automation', () => {
+  const context = new FakeContext(), param = new FakeParam();
+  rampParam(context, param, 0.5, { at: 1, seconds: 0.2 });
+  const before = JSON.stringify(param);
+  for (const [value, options] of [[1e100, {}], [1, { at: -1 }], [1, { at: NaN }], [1, { seconds: -1 }]]) {
+    assert.throws(() => rampParam(context, param, value, options), RangeError);
+    assert.equal(JSON.stringify(param), before);
+  }
+  assert.throws(() => rampParam(context, param, '0.5'), TypeError);
+  assert.equal(JSON.stringify(param), before);
+});
+
 test('mute closes the gate and unmute opens it; a muted parent silences its children by the graph', () => {
   const mixer = new Mixer(new FakeContext(), { buses: { sfx: {}, steps: { parent: 'sfx' } } });
   mixer.bus('sfx').setMuted(true);

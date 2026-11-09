@@ -40,6 +40,12 @@ const { peak, rms } = measure(buffer.getChannelData(0));
 - **Scheduling** uses AudioContext time: every `at` is `context.currentTime` seconds (default now), and `mixer.now` reads the clock.
 - `bus.peak()` reads the current output peak (it adds an AnalyserNode on first use).
 
+Invalid numeric fades are rejected before bus targets, gates, duck membership or existing automation
+change. Times/durations must be finite and nonnegative; parameter values must fit finite float32.
+Gain is checked before it reaches a node (-Infinity dB remains silence). Invalid duck releases
+leave the handle active so it can be released correctly. An omitted or undefined release duration
+keeps 0.4 s; gate fades keep their 0.01 s default.
+
 ## Effects
 
 Effects are plain objects, so a chain can be stored as JSON: `bus.setEffects([...])`, or `createEffect(context, spec)` for one effect.
@@ -246,3 +252,46 @@ can clip for loud inputs/close walls; lower levels or use the optional limiter. 
 share the same audio graph, tested beside both in Edge. Missing Web Audio throws code `unsupported`
 with a help link. Node geometry and real convolution use generated impulses, not measured rooms;
 real room recordings, listening comparisons, other browsers and timing are unmeasured.
+
+## LUFS loudness and normalisation
+
+`margoengine/mixer/loudness` (or `@margoengine/mixer/loudness`) measures decoded PCM without
+Web Audio or a renderer. `measureLoudness(channels, sampleRate = 48000)` applies the published
+BS.1770 K-weighting, channel power weights and two-stage integrated gate. `normalizeLoudness`
+returns new PCM arrays with a constant gain and measurements before/after; inputs stay unchanged.
+
+```ts
+import { measureLoudness, normalizeLoudness } from 'margoengine/mixer/loudness';
+const rate = 48000;
+const left = Float32Array.from({ length: rate * 4 }, (_, i) => 0.1 * Math.sin(2 * Math.PI * 1000 * i / rate));
+const measured = measureLoudness([left, left], rate);
+const adjusted = normalizeLoudness([left, left], rate, { target: -23, maxTruePeak: -1 });
+console.log(measured.integrated, adjusted.after.integrated, adjusted.peakLimited);
+```
+
+Input is 1, 2 or 6 equal-length finite Float32Array channels. Six-channel order is Web Audio 5.1:
+L, R, C, LFE, SL, SR; LFE is excluded from loudness, surrounds have 1.41 power weight, other
+programme channels weight 1. True peak includes every channel, including LFE. Supported rates:
+32000, 44100, 48000, 88200, 96000, 176400 and 192000 Hz. The 48 kHz filter coefficients are the
+published tables; other rates bilinearly re-express that transfer function, with calibration tests.
+
+Report fields: `integrated`, `momentary` (last full 400 ms window), `shortTerm` (last full 3 s
+window), `maximumMomentary`, `maximumShortTerm`, `momentaryHistory` and `shortTermHistory`
+(Float64Array LUFS, 10 ms step, first endpoint 0.4 s or 3 s), `blocks`, `gatedBlocks`, `duration`
+and linear `truePeak`. Integrated uses 400 ms blocks every 100 ms, an absolute -70 LUFS gate
+and a relative gate 10 LU below the absolute-gated mean. Incomplete windows are discarded.
+Unavailable or silent loudness is -Infinity. True peak uses the optional worklet entry's published
+four-phase FIR model, including zero-padded ends and original sample peaks, with no browser API.
+
+Normalisation defaults: `target: -23` LUFS (above -70, at most 0), `maxTruePeak: -1` dBTP
+(-96..0). Result fields: owned `channels`, applied `gainDb`, `peakLimited`, `before` and `after`.
+The peak cap can prevent reaching the target. This is constant gain, with a float32 safety margin;
+no compression or clipping. Absolute-gate membership may change after scaling; `after` reports
+the achieved loudness. No complete block above the gate throws `MargoError` code `state` with
+help link; use a measurable programme of at least 400 ms. This entry is synchronous PCM analysis,
+not a file decoder, live AudioWorklet meter, UI, LRA implementation or EBU certification claim.
+It stores 10 ms energy/history values and makes PCM copies for normalisation; large programmes
+cost proportionate memory/CPU. WebGPU and WebGL2 use the same independent maths; real rendered
+calibration and normalisation pass beside both in Edge. Generated EBU tone/offset cases are
+stand-ins, not the downloaded compliance corpus or authentic programme recordings. Other
+browsers, recorded programmes, full certification and performance are unmeasured.
