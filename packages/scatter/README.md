@@ -471,6 +471,52 @@ console.log(left.length / 16, indices.length, boundsOf(new Float32Array([0, 0, 0
   transforms. An instance scaled to 0 is never hit. The picker keeps a copy of the transforms (64 bytes an instance)
   plus 125 bytes of world box, inverse and flags an instance, and 4 bytes a grid entry.
 
+## Interaction and trampling: `@margoengine/scatter/interact`
+
+`TrampledScatter` is a `Scatter` whose grass bends away from players, animals and vehicles and springs back. A square
+push field follows the camera; pass the interactors each frame and every instance in it turns about its root away
+from them, in the colour and the shadow passes alike.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { TrampledScatter } from '@margoengine/scatter/interact';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const grass = TrampledScatter.attach(
+  engine,
+  box(0.06, 1, 0.02),
+  { count: 40000, area: [40, 40], lod: [30, 60, 90], blades: {} },
+  { size: 32, resolution: 64, recover: 1.5, bend: 1.2 },
+);
+const player = { position: [0, 0, 0] as [number, number, number], radius: 0.8 };
+engine.onFrame(() => {
+  player.position[0] += 0.02; // the app moves its player
+  grass.setInteractors([player, { position: [4, 0, -2], radius: 2.5, strength: 0.7 }]); // feet and a wheel
+});
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `size` | 64 | side of the square field around the camera, world units; grass outside it is not pushed |
+| `resolution` | 128 | cells along a side, 8 to 1,024 |
+| `recover` | 1.5 | seconds for a push to fall to 5% once nothing presses it |
+| `bend` | 1.2 | turn of fully pressed grass about its root, radians, at most pi / 2 |
+
+- An interactor is `{ position, radius, strength? }`: within `radius` of `position` (x and z; the field is flat) the
+  push points away from it with amount `strength * (1 - (d / radius)^2)`, and a cell keeps the stronger of its own
+  push and the new one, so grass under a standing player stays down. Up to 4,096 interactors a frame.
+- How it works: one compute pass a frame, before the distribute pass, moves the field with the camera in whole cells,
+  scales every cell by `exp(-3 dt / recover)` and stamps the interactors; a cell below 0.001 is upright again, so a
+  recovered meadow draws exactly as a plain `Scatter`. The vertex stages read the push at each root (bilinear between
+  cell centres) and turn the instance about its root (Rodrigues), so a vertex keeps its distance from the root and the
+  cull radii still hold.
+- Cost: 8 bytes a cell (128 KB at the default 128 cells) twice, one thread a cell that loops over the interactors, and
+  five storage reads a vertex.
+- Limits: the field is flat (an interactor's height is not read; pass only the ones on the ground) and moves with the
+  camera, so grass more than `size / 2` from it is not pushed and a push is lost once its cell leaves the field. The
+  push field is not shared between scatters: give each its own interactors.
+- Real-GPU proof: `npm run test:browser:interact --workspace @margoengine/scatter` (build the packages first).
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 

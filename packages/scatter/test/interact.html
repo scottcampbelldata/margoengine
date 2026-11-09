@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter trample check</title><style>body{margin:0}canvas{display:block;width:320px;height:320px}</style></head><body><canvas width="320" height="320"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/scatter/interact (interact.browser.mjs drives it): a meadow of blades as a
+// TrampledScatter and as a plain Scatter with the same options; the push field is read back after each step.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {TrampledScatter} from '/packages/scatter/dist/interact.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,9,9],target:[0,0,0],near:0.1,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.createMesh().setGeometry(box(200,0.1,200)).setPosition([0,-0.05,0]);
+const options={count:40000,area:[40,40],lod:[30,60,90],blades:{},color:[0.3,0.6,0.2]};
+const blade=box(0.06,1,0.02);
+const trample={size:32,resolution:64,recover:1.5,bend:1.2};
+let current;
+const read=async(buffer)=>{
+ const out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+ const data=Array.from(new Float32Array(out.getMappedRange().slice(0)));out.destroy();return data;
+};
+window.check={
+ // kind 'plain' or 'trampled': a fresh scatter, one frame at delta 0.
+ async make(kind){
+  current?.dispose();
+  current=kind==='plain'?Scatter.attach(engine,blade,options):TrampledScatter.attach(engine,blade,options,trample);
+  device.pushErrorScope('validation');
+  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  return {field:current.field?await read(current.field):null,errors:errors.splice(0)};
+ },
+ // Exactly one frame of `delta` seconds with `movers` (null keeps the last list); returns the field (or null) and errors.
+ async step(delta,movers,camera){
+  device.pushErrorScope('validation');
+  if(camera){engine.camera.position=camera[0];engine.camera.target=camera[1];}
+  if(movers)current.setInteractors(movers);
+  engine.render({delta});await device.queue.onSubmittedWorkDone();
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  return {field:current.field?await read(current.field):null,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>

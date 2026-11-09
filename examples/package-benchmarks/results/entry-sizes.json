@@ -1,10 +1,10 @@
 {
-  "commit": "e81f2af6c",
+  "commit": "fd13ff3df",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -104,6 +104,14 @@
       ".": {
         "raw": 24719,
         "gzip": 7508
+      },
+      "./occlusion": {
+        "raw": 3315,
+        "gzip": 1516
+      },
+      "./doppler": {
+        "raw": 2515,
+        "gzip": 1090
       }
     },
     "@margoengine/behavior": {
@@ -597,17 +605,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -626,16 +634,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -1410,6 +1418,18 @@
       "./cookie": {
         "raw": 19331,
         "gzip": 6823
+      },
+      "./gi": {
+        "raw": 19277,
+        "gzip": 6685
+      },
+      "./height": {
+        "raw": 17637,
+        "gzip": 6067
+      },
+      "./emissive": {
+        "raw": 9724,
+        "gzip": 3524
       }
     },
     "@margoengine/lightmap": {
@@ -2000,8 +2020,8 @@
         "gzip": 491
       },
       "./exact": {
-        "raw": 11795,
-        "gzip": 4564
+        "raw": 11989,
+        "gzip": 4663
       },
       "./moments": {
         "raw": 13471,
@@ -2458,8 +2478,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 62649,
-        "gzip": 18820
+        "raw": 62849,
+        "gzip": 18879
       },
       "./tiles": {
         "raw": 7525,
@@ -2472,6 +2492,10 @@
       "./pick": {
         "raw": 8467,
         "gzip": 3537
+      },
+      "./interact": {
+        "raw": 6730,
+        "gzip": 2950
       }
     },
     "@margoengine/scene": {
@@ -2820,8 +2844,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3160,12 +3184,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 101677,
-        "gzip": 31135
+        "raw": 102667,
+        "gzip": 31435
       },
       "./base": {
-        "raw": 34034,
-        "gzip": 11188
+        "raw": 34059,
+        "gzip": 11191
       },
       "./obstacles": {
         "raw": 2388,
@@ -3232,12 +3256,12 @@
         "gzip": 911
       },
       "./shadows": {
-        "raw": 7048,
-        "gzip": 2805
+        "raw": 7783,
+        "gzip": 3055
       },
       "./nodes": {
-        "raw": 8156,
-        "gzip": 3093
+        "raw": 8481,
+        "gzip": 3238
       }
     },
     "@margoengine/video": {
@@ -3635,9 +3659,9 @@
       "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
-      "raw": 44584,
-      "gzip": 15111,
-      "brotli": 13495
+      "raw": 44609,
+      "gzip": 15115,
+      "brotli": 13494
     },
     "packages/creative/dist/post.js": {
       "raw": 19250,

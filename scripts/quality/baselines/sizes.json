@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11468755,
+  "total": 11471960,
   "history": [
     {
       "date": "2026-10-24",
@@ -4802,6 +4802,12 @@
       "commit": "4068cec2f",
       "reason": "Batch-110-optional-Doppler-entry-with-unchanged-root",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "fd13ff3df",
+      "reason": "scatter interact entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -4828,7 +4834,7 @@
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
-    "@margoengine/audio/doppler": 1347,
+    "@margoengine/audio/doppler": 1346,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/behavior": 8897,
     "@margoengine/behavior/context": 1658,
@@ -5394,6 +5400,7 @@
     "@margoengine/save/safe": 2102,
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,
+    "@margoengine/scatter/interact": 3206,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
     "@margoengine/scatter/tiles": 3415,

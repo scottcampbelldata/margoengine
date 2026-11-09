@@ -851,6 +851,19 @@ export class Scatter implements EnginePlugin {
     return this.count;
   }
 
+  /**
+   * Every vertex stage that poses instances (colour and shadow), before its module is made: the interact entry adds
+   * its bend here, reading what `poseEntries` binds from `binding` on in bind group `group`.
+   */
+  protected poseCode(code: string, _group: number, _binding: number): string {
+    return code;
+  }
+
+  /** Bindings after the built-in ones of each posing vertex stage's instance group (see `poseCode`). */
+  protected poseEntries(): { buffer: GPUBuffer }[] {
+    return [];
+  }
+
   /** Runs before the frame values are uploaded (the tiles entry uploads new tiles here). */
   protected beforeDistribute(_c: ScatterPassContext): void {}
 
@@ -944,6 +957,7 @@ export class Scatter implements EnginePlugin {
             'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));',
           );
       }
+      code = this.poseCode(code, lit ? 1 : 0, 2);
       const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -983,12 +997,12 @@ export class Scatter implements EnginePlugin {
         return lit
           ? c.device.createBindGroup({
               layout: pipeline!.getBindGroupLayout(1),
-              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count].map((resource, binding) => ({
+              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map((resource, binding) => ({
                 binding,
                 resource,
               })),
             })
-          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count]);
+          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
       });
       this.renderGroups.set(pipeline, groups);
     }
@@ -1108,8 +1122,8 @@ export class Scatter implements EnginePlugin {
       cull = this.cascadeCull,
       culled = !!cull && context.encoder === cull.encoder && cascade < cull.cascades,
       pipeline = culled
-        ? (this.listPipeline ??= shadowDepth(d, shadowListCode))
-        : (this.shadowPipeline ??= shadowDepth(d, shadowCode));
+        ? (this.listPipeline ??= shadowDepth(d, this.poseCode(shadowListCode, 0, 3)))
+        : (this.shadowPipeline ??= shadowDepth(d, this.poseCode(shadowCode, 0, 2)));
     // One uniform per cascade: every cascade's pass is recorded before the queue writes reach the GPU.
     const uniform = (this.shadowUniforms[cascade] ??= d.createBuffer({
       size: 128,
@@ -1122,10 +1136,11 @@ export class Scatter implements EnginePlugin {
               { buffer: uniform },
               { buffer },
               { buffer: cull!.lists!, offset: (cascade * o[3] + o[ring]) * 4, size: (o[ring + 1] - o[ring]) * 4 },
+              ...this.poseEntries(),
             ]),
           ))
         : (this.shadowGroups[cascade] ??= this.instances.map((buffer) =>
-            group(d, pipeline, [{ buffer: uniform }, { buffer }]),
+            group(d, pipeline, [{ buffer: uniform }, { buffer }, ...this.poseEntries()]),
           ));
     const values = this.shadowValues;
     values.set(matrix);

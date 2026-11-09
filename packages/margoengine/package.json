@@ -2358,6 +2358,10 @@
       "types": "./dist/scatter/pick.d.ts",
       "import": "./dist/scatter/pick.js"
     },
+    "./scatter/interact": {
+      "types": "./dist/scatter/interact.d.ts",
+      "import": "./dist/scatter/interact.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

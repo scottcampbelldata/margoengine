@@ -50,6 +50,10 @@ export class Scatter implements EnginePlugin {
     } | GPUTextureView)[];
     protected extraChanged: boolean;
     protected dispatched(): number;
+    protected poseCode(code: string, _group: number, _binding: number): string;
+    protected poseEntries(): {
+        buffer: GPUBuffer;
+    }[];
     protected beforeDistribute(_c: ScatterPassContext): void;
     prepareShadow({ context, matrices, cascades }: {
         context: ScatterPassContext;
