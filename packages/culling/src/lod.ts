@@ -130,8 +130,7 @@ export class LodInstances implements EnginePlugin {
   constructor({ levels, material, transforms, mirrored = false }: LodInstancesOptions) {
     if (!Array.isArray(levels) || levels.length < 1 || levels.length > 4)
       throw new RangeError('Invalid LOD levels; pass 1 to 4 levels, most detailed first');
-    if (!(material?.data instanceof Float32Array))
-      throw new TypeError('Invalid LOD material; pass a core PbrMaterial');
+    if (!(material?.data instanceof Float32Array)) throw new TypeError('Invalid LOD material; pass a core PbrMaterial');
     if (!(transforms instanceof Float32Array) || transforms.length < 16 || transforms.length % 16)
       throw new TypeError('Invalid LOD transforms; pass a Float32Array of 16 floats per instance');
     let last = Infinity;
@@ -209,7 +208,7 @@ export class LodInstances implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'LodInstances requires WebGPU; attach a new LodInstances to a WebGPU engine',
+        'LodInstances requires WebGPU; attach a new LodInstances to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     const d = engine.gpu;
     if (this.count * 96 > d.limits.maxStorageBufferBindingSize)
@@ -284,7 +283,13 @@ export class LodInstances implements EnginePlugin {
       changed = this.high > this.low || this.hiddenHigh > this.hiddenLow;
     if (this.high > this.low) {
       const { low, high } = this;
-      d.queue.writeBuffer(gpu.records, low * 96, this.records as Float32Array<ArrayBuffer>, low * 24, (high - low) * 24);
+      d.queue.writeBuffer(
+        gpu.records,
+        low * 96,
+        this.records as Float32Array<ArrayBuffer>,
+        low * 24,
+        (high - low) * 24,
+      );
     }
     if (this.hiddenHigh > this.hiddenLow) {
       const { hiddenLow: low, hiddenHigh: high } = this;
@@ -346,7 +351,8 @@ export class LodInstances implements EnginePlugin {
       level.batch = level.drawn = level.args = undefined;
     }
     const gpu = this.gpu;
-    if (gpu) for (const buffer of [gpu.frame, gpu.part, gpu.records, gpu.hidden, gpu.counts, gpu.reset]) buffer.destroy();
+    if (gpu)
+      for (const buffer of [gpu.frame, gpu.part, gpu.records, gpu.hidden, gpu.counts, gpu.reset]) buffer.destroy();
     this.gpu = undefined;
   }
   onDeviceRestored(engine: Engine): void {

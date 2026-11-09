@@ -2,9 +2,10 @@
 import { PBRModel } from '../../packages/gltf-pro/dist/index.js';
 import { Engine, TransformStore } from '../../packages/core/dist/extension.js';
 
-export const headless = async () =>
+export const headless = async (gpu = null) =>
   new Engine({ width: 64, height: 64, clientWidth: 64, clientHeight: 64 }, await TransformStore.create(4096), {
-    backend: 'webgl2',
+    backend: gpu ? 'webgpu' : 'webgl2',
+    gpu,
     add() {},
     remove() {},
     render() {},

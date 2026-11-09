@@ -293,7 +293,24 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
         z1 = Math.ceil((Math.max(a[1], b[1]) + reach) / this.texel),
         ox = x0 * this.texel,
         oz = z0 * this.texel;
-      this.#queue([1, depth, width / 2, 0, a[0] - ox, a[1] - oz, b[0] - ox, b[1] - oz, 1, 0, 0, 0, x0, z0, x1 - x0 + 1, z1 - z0 + 1]);
+      this.#queue([
+        1,
+        depth,
+        width / 2,
+        0,
+        a[0] - ox,
+        a[1] - oz,
+        b[0] - ox,
+        b[1] - oz,
+        1,
+        0,
+        0,
+        0,
+        x0,
+        z0,
+        x1 - x0 + 1,
+        z1 - z0 + 1,
+      ]);
     }
     return this;
   }
@@ -354,7 +371,7 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Terrain deformation requires WebGPU and a live module; attach a new one to a WebGPU engine',
+        'Terrain deformation requires WebGPU and a live module; attach a new one to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     const gpu = engine.gpu,
       n = this.size,

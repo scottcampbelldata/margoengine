@@ -1479,3 +1479,7 @@ app installation. No generic GLB, Godot or Roblox quality setting is reduced by 
 ## Content Security Policy
 
 Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).
+
+## Engine tiers for material meshes
+
+The format writers and core mesh exports remain CPU operations. Constructing an `@margoengine/materials` mesh also attaches its GPU draw queue, so that constructor requires native WebGPU or the full WebGL2 compatibility layer and refuses the small preview. The Node export proofs use a WebGPU device stand-in for those material constructors; their glTF/GLB values and independent validator checks are unchanged.

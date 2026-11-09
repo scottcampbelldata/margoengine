@@ -436,7 +436,7 @@ test('emissiveIntensity scales the emission gltf-pro draws, live and validated, 
 
 test('exportModel writes emissiveIntensity as KHR_materials_emissive_strength over the emissive factor', () =>
   headlessModels(async () => {
-    const engine = await headless(),
+    const engine = await headless(mockGPU().device),
       material = async (m) =>
         readGLB(await exportModel(createMesh(engine, quad, m), { binary: true })).json.materials[0];
     const strong = await material(new PbrMaterial({ emissive: [1, 0.5, 0], emissiveIntensity: 3 }));

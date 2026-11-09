@@ -18,7 +18,13 @@
 // "Texturing and Modeling: A Procedural Approach", chapter 16), its lattice hashed as in Wellons 2018, "Prospecting for
 // Hash Functions"; octaves finer than a patch's vertex spacing are left out, so coarse patches do not alias.
 import type { EngineKernel } from '@margoengine/core';
-import { type Camera, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  type Camera,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
@@ -98,7 +104,12 @@ const FACES = [
  * the equal-angle warp. Writes `out` (float64) and returns it. Points just past a face's edge continue onto its
  * neighbour's ground.
  */
-export function cubeSphere(face: number, s: number, t: number, out: number[] | Float64Array = [0, 0, 0]): number[] | Float64Array {
+export function cubeSphere(
+  face: number,
+  s: number,
+  t: number,
+  out: number[] | Float64Array = [0, 0, 0],
+): number[] | Float64Array {
   const f = FACES[face];
   if (!f) throw new RangeError('Invalid cube face; pass 0 to 5');
   const a = Math.tan((s * Math.PI) / 4),
@@ -153,8 +164,22 @@ function valueNoise(x: number, y: number, z: number, seed: number): number {
  * wavelength of `radius / 2^(k+1)` and an amplitude of `relief / 2^(k+1)`; octaves shorter than twice the `detail` asked
  * for are left out (at most 24).
  */
-export function planetNoise({ radius = 6371000, relief = 8000, seed = 1 }: { radius?: number; relief?: number; seed?: number } = {}): PlanetHeight {
-  if (!(radius > 0) || !Number.isFinite(radius) || !(relief >= 0) || !Number.isFinite(relief) || !Number.isInteger(seed))
+export function planetNoise({
+  radius = 6371000,
+  relief = 8000,
+  seed = 1,
+}: {
+  radius?: number;
+  relief?: number;
+  seed?: number;
+} = {}): PlanetHeight {
+  if (
+    !(radius > 0) ||
+    !Number.isFinite(radius) ||
+    !(relief >= 0) ||
+    !Number.isFinite(relief) ||
+    !Number.isInteger(seed)
+  )
     throw new RangeError('Invalid planetNoise options; pass radius above 0, relief 0 or more and an integer seed');
   return (x, y, z, detail) => {
     let sum = 0,
@@ -195,7 +220,8 @@ function patchIndices(n: number): Uint16Array {
   const grid = n + 1,
     out: number[] = [];
   const quad = (a: number, b: number, c: number, d: number) => out.push(a, b, d, a, d, c);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) quad(j * grid + i, j * grid + i + 1, (j + 1) * grid + i, (j + 1) * grid + i + 1);
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) quad(j * grid + i, j * grid + i + 1, (j + 1) * grid + i, (j + 1) * grid + i + 1);
   const edges = [(k: number) => k, (k: number) => n * grid + k, (k: number) => k * grid, (k: number) => k * grid + n];
   edges.forEach((edge, e) => {
     const skirt = grid * grid + e * grid;
@@ -301,15 +327,19 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     if (center.length !== 3 || ![0, 1, 2].every((i) => Number.isFinite(center[i])))
       throw new RangeError('Invalid center; pass 3 finite numbers');
     if (!(relief >= 0) || !Number.isFinite(relief)) throw new RangeError('Invalid relief; pass metres, 0 or more');
-    if (seaLevel !== false && !Number.isFinite(seaLevel)) throw new RangeError('Invalid seaLevel; pass metres or false');
+    if (seaLevel !== false && !Number.isFinite(seaLevel))
+      throw new RangeError('Invalid seaLevel; pass metres or false');
     if (!Number.isInteger(resolution) || resolution < 4 || resolution > 64 || resolution % 2)
       throw new RangeError('Invalid resolution; pass an even integer 4 to 64');
-    if (!Number.isInteger(maxLevel) || maxLevel < 0 || maxLevel > 24) throw new RangeError('Invalid maxLevel; pass an integer 0 to 24');
-    if (!(screenError > 0) || !Number.isFinite(screenError)) throw new RangeError('Invalid screenError; pass pixels above 0');
+    if (!Number.isInteger(maxLevel) || maxLevel < 0 || maxLevel > 24)
+      throw new RangeError('Invalid maxLevel; pass an integer 0 to 24');
+    if (!(screenError > 0) || !Number.isFinite(screenError))
+      throw new RangeError('Invalid screenError; pass pixels above 0');
     if (!(budget >= 0)) throw new RangeError('Invalid budget; pass milliseconds, 0 or more');
     if (!Number.isInteger(maxPatches) || maxPatches < 6 || maxPatches > 16384)
       throw new RangeError('Invalid maxPatches; pass an integer 6 to 16384');
-    if (options.height !== undefined && typeof options.height !== 'function') throw new TypeError('Invalid height; pass a function');
+    if (options.height !== undefined && typeof options.height !== 'function')
+      throw new TypeError('Invalid height; pass a function');
     if (origin !== undefined && (typeof origin.onRebase !== 'function' || origin.origin?.length !== 3))
       throw new TypeError('Invalid origin; pass a FloatingOrigin');
     this.radius = radius;
@@ -383,7 +413,10 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
 
   #raw(x: number, y: number, z: number, detail: number): number {
     const h = this.#height(x, y, z, detail);
-    if (!Number.isFinite(h)) throw new RangeError('PlanetTerrain height returned a value that is not finite; return finite metres from height');
+    if (!Number.isFinite(h))
+      throw new RangeError(
+        'PlanetTerrain height returned a value that is not finite; return finite metres from height',
+      );
     return h;
   }
 
@@ -394,7 +427,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       a = cubeSphere(face, s0, t0),
       b = cubeSphere(face, s0 + size, t0),
       c = cubeSphere(face, s0, t0 + size),
-      angle = (p: ArrayLike<number>, q: ArrayLike<number>) => Math.acos(Math.min(1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]));
+      angle = (p: ArrayLike<number>, q: ArrayLike<number>) =>
+        Math.acos(Math.min(1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]));
     return {
       face,
       level,
@@ -667,7 +701,14 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       r1 = rowOf(1),
       r2 = rowOf(2),
       r3 = rowOf(3);
-    [r3.map((v, i) => v + r0[i]), r3.map((v, i) => v - r0[i]), r3.map((v, i) => v + r1[i]), r3.map((v, i) => v - r1[i]), r2, r3.map((v, i) => v - r2[i])].forEach((q, i) => {
+    [
+      r3.map((v, i) => v + r0[i]),
+      r3.map((v, i) => v - r0[i]),
+      r3.map((v, i) => v + r1[i]),
+      r3.map((v, i) => v - r1[i]),
+      r2,
+      r3.map((v, i) => v - r2[i]),
+    ].forEach((q, i) => {
       const l = Math.hypot(q[0], q[1], q[2]) || 1;
       for (let j = 0; j < 4; j++) pl[i * 4 + j] = q[j] / l;
     });
@@ -675,7 +716,10 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
 
   setup(engine: Engine): void {
     if (this.#disposed || !engine.gpu)
-      throw margoError(this.#disposed ? 'disposed' : 'unsupported', 'PlanetTerrain requires WebGPU and a live planet; attach a new PlanetTerrain to a WebGPU engine');
+      throw margoError(
+        this.#disposed ? 'disposed' : 'unsupported',
+        'PlanetTerrain requires WebGPU and a live planet; attach a new PlanetTerrain to a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.#engine = engine;
     this.#create(engine.gpu);
   }
@@ -692,7 +736,10 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.#layout = device.createBindGroupLayout({
       entries: [{ binding: 0, visibility: 1 | 2, buffer: { type: 'uniform' } }],
     });
-    this.#group = device.createBindGroup({ layout: this.#layout, entries: [{ binding: 0, resource: { buffer: this.#uniformBuffer } }] });
+    this.#group = device.createBindGroup({
+      layout: this.#layout,
+      entries: [{ binding: 0, resource: { buffer: this.#uniformBuffer } }],
+    });
     // Every slot is empty on a new device: the tree is planned again from the roots.
     this.#resident.length = 0;
     this.#free.length = 0;
@@ -732,9 +779,24 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     u.set([l[0] - eye[0], l[1] - eye[1], l[2] - eye[2], this.radius], 16);
     u.set(e.lighting.direction, 20);
     u.set(e.lighting.radiance, 24);
-    u.set([this.seaLevel === false ? 0 : this.seaLevel, +(c.format === 'rgba16float'), this.relief, +(this.seaLevel !== false)], 28);
+    u.set(
+      [
+        this.seaLevel === false ? 0 : this.seaLevel,
+        +(c.format === 'rgba16float'),
+        this.relief,
+        +(this.seaLevel !== false),
+      ],
+      28,
+    );
     c.device.queue.writeBuffer(this.#uniformBuffer!, 0, u as Float32Array<ArrayBuffer>);
-    if (this.#drawn.length) c.device.queue.writeBuffer(this.#instanceBuffer!, 0, this.#offsets as Float32Array<ArrayBuffer>, 0, this.#drawn.length * 4);
+    if (this.#drawn.length)
+      c.device.queue.writeBuffer(
+        this.#instanceBuffer!,
+        0,
+        this.#offsets as Float32Array<ArrayBuffer>,
+        0,
+        this.#drawn.length * 4,
+      );
   }
 
   #draw(c: PassContext & { backend: 'webgpu' }): void {
@@ -758,7 +820,11 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
                 { shaderLocation: 2, offset: 16, format: 'float32' },
               ],
             },
-            { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x3' }] },
+            {
+              arrayStride: 16,
+              stepMode: 'instance',
+              attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x3' }],
+            },
           ],
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },

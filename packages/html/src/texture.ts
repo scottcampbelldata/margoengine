@@ -306,7 +306,7 @@ export class HTMLTexture {
     if (!engine.gpu)
       throw margoError(
         'unsupported',
-        'HTMLTexture requires WebGPU, not the WebGL2 fallback; create the engine where WebGPU is available',
+        'HTMLTexture requires WebGPU, not the WebGL2 fallback; create the engine where WebGPU is available; see https://margoengine.com/errors#webgpu',
       );
     this.runtime = engine;
     engine.canvas.ownerDocument.addEventListener('pointermove', this.pointer, true);

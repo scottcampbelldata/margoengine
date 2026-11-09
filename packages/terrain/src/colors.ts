@@ -1,3 +1,4 @@
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import {
@@ -192,6 +193,7 @@ fn terrainWet(position:vec3f)->f32 {
     return colors;
   }
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'TerrainColors');
     const mesh = meshRuntime(this.mesh);
     mesh.check();
     if (this.engine || this.disposed || mesh.engine !== engine)
@@ -201,7 +203,6 @@ fn terrainWet(position:vec3f)->f32 {
       );
     this.engine = engine;
     if (this.wetness) {
-      if (!engine.gpu) throw new MargoError('unsupported', 'Terrain wetness requires WebGPU; use a WebGPU engine');
       this.dry = engine.gpu.createTexture({
         size: [1, 1],
         format: 'r32float',

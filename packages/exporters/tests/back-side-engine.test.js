@@ -7,8 +7,8 @@ import { readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { exportModel } from '../dist/model.js';
 import { exportDAE, exportGLTF, exportGLB, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
 import { exportUSDZ } from '../dist/usdz.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, readGLB, parseOBJ, parsePLY, parseASCIISTL } from './helpers.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { materialEngine as headless, accessor, readGLB, parseOBJ, parsePLY, parseASCIISTL } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],

@@ -125,7 +125,7 @@ export class FXAA implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw margoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'FXAA requires WebGPU and a live effect; attach a new FXAA to a WebGPU engine',
+        'FXAA requires WebGPU and a live effect; attach a new FXAA to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     if (engine.hasPlugin('smaa'))
       throw margoError('attached', 'FXAA cannot run next to SMAA; remove SMAA or keep it instead of FXAA');

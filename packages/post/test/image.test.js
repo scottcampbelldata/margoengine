@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import * as post from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
+test('ImagePost refuses preview setup and unattached capture with linked unsupported', async () => {
+  const effect = new post.ImagePost();
+  const refused = (error) =>
+    error.code === 'unsupported' && error.message.includes('https://margoengine.com/errors#webgpu');
+  assert.throws(() => effect.setup({ backend: 'webgl2', gpu: null }), refused);
+  await assert.rejects(effect.renderImage({ width: 1, height: 1, color: new Float32Array(3) }), refused);
+  effect.dispose();
+});
+
 test('isolated Bloom encodes the existing HDR kernel without attaching or removing a viewport plugin', () => {
   const h = optionalGPU(),
     effect = new post.Bloom({ strength: 1.2, radius: 0.7 });

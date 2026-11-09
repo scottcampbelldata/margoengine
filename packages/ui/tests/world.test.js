@@ -154,14 +154,14 @@ test('screenRay goes from the camera through the pixel', () => {
   near(d[2], -1 / Math.sqrt(3), 'top right z');
 });
 
-test('WorldPanels on the WebGL2 backend warns once and draws nothing; panels still step', () => {
+test('WorldPanels refuses the WebGL2 preview before installing input or taking ownership', () => {
   const { ui, panel } = setup();
-  const warnings = [];
-  const warn = console.warn;
-  console.warn = (m) => warnings.push(m);
+  const plugin = new WorldPanels({ input: false }).add(panel);
   try {
-    const plugin = new WorldPanels({ input: false }).add(panel);
-    plugin.setup({ backend: 'webgl2' });
+    assert.throws(
+      () => plugin.setup({ backend: 'webgl2' }),
+      (error) => error.code === 'unsupported' && /https:\/\/margoengine.com\/errors#webgpu/.test(error.message),
+    );
     let updated = 0;
     const update = ui.update.bind(ui);
     ui.update = (dt) => {
@@ -170,9 +170,7 @@ test('WorldPanels on the WebGL2 backend warns once and draws nothing; panels sti
     };
     plugin.onPreUpdate(1 / 60);
     assert.equal(updated, 1);
-    assert.equal(warnings.length, 1);
-    plugin.dispose();
   } finally {
-    console.warn = warn;
+    plugin.dispose();
   }
 });

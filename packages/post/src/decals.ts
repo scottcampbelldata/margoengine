@@ -263,7 +263,7 @@ export class Decals implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw margoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Decals require WebGPU and a live effect; attach new Decals to a WebGPU engine',
+        'Decals require WebGPU and a live effect; attach new Decals to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

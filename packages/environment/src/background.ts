@@ -139,7 +139,7 @@ export class EnvironmentBackground {
     if (engine.backend !== 'webgpu')
       throw new MargoError(
         'unsupported',
-        'EnvironmentBackground requires the WebGPU backend; use an engine on the WebGPU backend',
+        'EnvironmentBackground requires the WebGPU backend; use an engine on the WebGPU backend; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const device = engineRuntime(engine).gpu;
@@ -501,7 +501,10 @@ export class ImageBackground {
   setup(engine: EngineKernel): void {
     if (this.disposed) throw new MargoError('disposed', 'ImageBackground is disposed; create a new one');
     if (engine.backend !== 'webgpu')
-      throw new MargoError('unsupported', 'ImageBackground requires the WebGPU backend; create the engine with WebGPU');
+      throw new MargoError(
+        'unsupported',
+        'ImageBackground requires the WebGPU backend; create the engine with WebGPU; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {

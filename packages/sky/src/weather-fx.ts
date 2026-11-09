@@ -234,7 +234,7 @@ export class WeatherFX implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'WeatherFX requires WebGPU; attach a new WeatherFX to a WebGPU engine',
+        'WeatherFX requires WebGPU; attach a new WeatherFX to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu,

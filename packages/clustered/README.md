@@ -380,3 +380,7 @@ Custom shadow-aware materials use `clusteredSampling(group,true)` with the
 bindings of a shadow-enabled effect; the default second argument is false.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

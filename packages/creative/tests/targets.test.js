@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
 import { TextureRenderTarget } from '../dist/targets.js';
 
 globalThis.GPUTextureUsage = { RENDER_ATTACHMENT: 16, TEXTURE_BINDING: 4, COPY_SRC: 1 };
+
+test('the browser target regression imports the supported preview entry', () => {
+  const code = readFileSync(new URL('./targets-browser.js', import.meta.url), 'utf8');
+  const target = /webglRenderer.*?import\('([^']+)'\)/.exec(code)?.[1];
+  assert.equal(target, '../../webgl2-compat/dist/preview.js');
+  assert.ok(existsSync(new URL(target, import.meta.url)));
+});
 const device = (limits = {}) => ({
   limits: { maxTextureDimension2D: 8192, maxTextureDimension3D: 2048, maxTextureArrayLayers: 256, ...limits },
   textures: [],

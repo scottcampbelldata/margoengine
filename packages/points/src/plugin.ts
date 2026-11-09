@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
@@ -154,13 +155,6 @@ export interface PointsPickResult {
   depth: number;
 }
 
-let warned = false;
-const warnOnce = (message: string) => {
-  if (!warned) {
-    warned = true;
-    console.warn(`@margoengine/points: ${message}`);
-  }
-};
 let warnedTexture = false;
 
 const isGpuTexture = (value: PointsTextureSource): value is GPUTexture =>
@@ -365,11 +359,8 @@ export class PointsPlugin implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'PointsPlugin');
     this.engine = engine;
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      warnOnce('the WebGL2 backend is not supported, points and sprites will not be drawn.');
-      return;
-    }
     const device = (this.device = engine.gpu);
     const VF = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
       V = GPUShaderStage.VERTEX,
@@ -706,7 +697,8 @@ export class PointsPlugin implements EnginePlugin {
       if (r.sizes) q.writeBuffer(r.sizes, 0, cloud.sizes! as Float32Array<ArrayBuffer>, 0, n);
       if (r.order) q.writeBuffer(r.order, 0, cloud.blocks.order as Uint32Array<ArrayBuffer>, 0, n);
       this.stats.uploads += 1 + +!!r.colors + +!!r.sizes + +!!r.order;
-      this.stats.uploadBytes += n * (12 + (r.colors ? 4 * cloud.colorStride : 0) + (r.sizes ? 4 : 0) + (r.order ? 4 : 0));
+      this.stats.uploadBytes +=
+        n * (12 + (r.colors ? 4 * cloud.colorStride : 0) + (r.sizes ? 4 : 0) + (r.order ? 4 : 0));
     }
     cloud.dirty.positions.length = cloud.dirty.colors.length = cloud.dirty.sizes.length = 0;
     this.cloudGpu.set(cloud, r);
@@ -958,10 +950,7 @@ export class PointsPlugin implements EnginePlugin {
   private hookLayout(hook: SurfaceTransparency): GPUBindGroupLayout {
     let layout = this.hookLayouts.get(hook.layout);
     if (!layout)
-      this.hookLayouts.set(
-        hook.layout,
-        (layout = this.device!.createBindGroupLayout({ entries: [...hook.layout] })),
-      );
+      this.hookLayouts.set(hook.layout, (layout = this.device!.createBindGroupLayout({ entries: [...hook.layout] })));
     return layout;
   }
 
@@ -1027,10 +1016,7 @@ export class PointsPlugin implements EnginePlugin {
       pass = hook.begin();
     pass.setBindGroup(0, gpu.frameGroup);
     pass.setBindGroup(2, this.fogResources().group);
-    pass.setBindGroup(
-      3,
-      this.device!.createBindGroup({ layout: this.hookLayout(hook), entries: hook.bindings() }),
-    );
+    pass.setBindGroup(3, this.device!.createBindGroup({ layout: this.hookLayout(hook), entries: hook.bindings() }));
     for (let i = this.cloudCount; i < this.cloudEnd; i++) {
       const { cloud, r, view, first, end } = this.cloudDraws[i];
       pass.setPipeline(this.surfacePipeline(target, 'point', cloud.material, hook));
@@ -1473,7 +1459,12 @@ export class PointsPlugin implements EnginePlugin {
       this.pointColor.view = context.color;
       if (edlUsed) {
         const count = context.descriptor.multisample?.count ?? 1;
-        const target = this.edlTarget(context.width, context.height, count, this.edlPipelines(context.format, count)[0]!);
+        const target = this.edlTarget(
+          context.width,
+          context.height,
+          count,
+          this.edlPipelines(context.format, count)[0]!,
+        );
         this.edlColor.view = target.view;
         colorAttachments[1] = this.edlColor;
         colorAttachments.length = edlApart ? 1 : 2;
@@ -1520,7 +1511,10 @@ export class PointsPlugin implements EnginePlugin {
         for (let i = 0; i < cloudDrawCount; i++) {
           const { cloud, r, view } = draws[i];
           depthPass.setPipeline(this.pointPipeline(context as GpuContext, cloud.material, 'alone'));
-          depthPass.setBindGroup(1, this.cloudGroup(r, view, cloud.material.mapFilter === 'nearest' ? gpu.nearest : gpu.linear));
+          depthPass.setBindGroup(
+            1,
+            this.cloudGroup(r, view, cloud.material.mapFilter === 'nearest' ? gpu.nearest : gpu.linear),
+          );
           // `drawn` holds this frame's blocks of every cloud in draw order, as block and count pairs.
           for (let n = 0; n < r.drawn.length; n += 2) {
             depthPass.draw(4, r.drawn[n + 1]!, 0, cloud.blocks.starts[r.drawn[n]!]);

@@ -39,7 +39,11 @@ export class StencilBuffer implements EnginePlugin {
   /** Bind the plugin to its owning WebGPU engine; called by engine.use. */
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'StencilBuffer is disposed; create a new StencilBuffer');
-    if (!engine.gpu) throw new MargoError('unsupported', 'StencilBuffer requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'StencilBuffer requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     if (this.engine && this.engine !== engine)
       throw new MargoError(
         'attached',

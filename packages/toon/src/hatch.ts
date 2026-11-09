@@ -148,7 +148,7 @@ export class Hatching implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Hatching requires WebGPU; attach a new Hatching to a WebGPU engine',
+        'Hatching requires WebGPU; attach a new Hatching to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.buffer = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

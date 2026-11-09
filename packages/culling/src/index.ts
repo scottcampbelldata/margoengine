@@ -257,7 +257,7 @@ export class CulledInstances implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'CulledInstances requires WebGPU; attach a new CulledInstances to a WebGPU engine',
+        'CulledInstances requires WebGPU; attach a new CulledInstances to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = (this.device = engine.gpu);

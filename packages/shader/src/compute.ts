@@ -176,10 +176,16 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   }
   /** Element `i` (an `atomicLoad` on an atomic buffer inside a ComputePass; use `atomicLoad` to fix when it reads relative to other atomics). */
   element(i: Index): Node<T> {
-    return new Node(this.type, 'e' + this.id, [index(i)], (b, n) => {
-      const at = `${b.resource(this)}[${b.expr(n.args[0])}]`;
-      return this.atomic && b.stage.kind === 'compute' ? `atomicLoad(&${at})` : at;
-    }, MUTABLE);
+    return new Node(
+      this.type,
+      'e' + this.id,
+      [index(i)],
+      (b, n) => {
+        const at = `${b.resource(this)}[${b.expr(n.args[0])}]`;
+        return this.atomic && b.stage.kind === 'compute' ? `atomicLoad(&${at})` : at;
+      },
+      MUTABLE,
+    );
   }
   /** A write made at the end of the ComputePass body (`atomicStore` on an atomic buffer); inside `If`, `Loop` and other statement bodies it happens right where it is called. */
   store(i: Index, value: NodeInput<T>): Store {
@@ -229,7 +235,12 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
    * Sets element `i` to `value` if it equals `compare`. It may fail even when they are equal (WGSL's weak form), so
    * retry in a `Loop` or `While` on `exchanged`.
    */
-  atomicCompareExchange(this: StorageBuffer<T & Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T> {
+  atomicCompareExchange(
+    this: StorageBuffer<T & Atomic>,
+    i: Index,
+    compare: NodeInput<T>,
+    value: NodeInput<T>,
+  ): Exchange<T> {
     return exchange(this.rmw('atomicCompareExchangeWeak', i, compare, value)) as never;
   }
   /** Reads element `i` at this point of the body, after the atomics made before it (unlike `element`, which reads up front). */
@@ -303,7 +314,8 @@ export const wholeGroups = (program: Program): void => void barriers.add(program
 const barrier = (name: string) =>
   push(
     statement([], (b) => {
-      if (b.stage.kind !== 'compute') throw new TypeError(`${name} is only available in ComputePass nodes; move it into a ComputePass body`);
+      if (b.stage.kind !== 'compute')
+        throw new TypeError(`${name} is only available in ComputePass nodes; move it into a ComputePass body`);
       barriers.add(b.program);
       b.line(`${name}();`);
       b.epoch++;
@@ -340,9 +352,12 @@ export class WorkgroupArray<T extends WorkgroupType = WorkgroupType> implements 
     readonly type: T,
     readonly atomic = false,
   ) {
-    if (!Number.isInteger(count) || count < 1) throw new RangeError('Workgroup memory needs a whole count of at least 1');
+    if (!Number.isInteger(count) || count < 1)
+      throw new RangeError('Workgroup memory needs a whole count of at least 1');
     if (atomic && type !== 'u32' && type !== 'i32')
-      throw new TypeError('Atomic workgroup memory must be u32 or i32; pass one of those types or drop {atomic: true}.');
+      throw new TypeError(
+        'Atomic workgroup memory must be u32 or i32; pass one of those types or drop {atomic: true}.',
+      );
   }
   /** @internal */ declare(name: string): string {
     return `var<workgroup> ${name}:array<${this.atomic ? `atomic<${this.type}>` : this.type}, ${this.count}>;`;
@@ -357,7 +372,10 @@ export class WorkgroupArray<T extends WorkgroupType = WorkgroupType> implements 
       'g' + this.id,
       [index(i)],
       (b, n) => {
-        if (b.stage.kind !== 'compute') throw new TypeError('Workgroup memory is only available in ComputePass nodes; move it into a ComputePass body');
+        if (b.stage.kind !== 'compute')
+          throw new TypeError(
+            'Workgroup memory is only available in ComputePass nodes; move it into a ComputePass body',
+          );
         const at = `${b.resource(this)}[${b.expr(n.args[0])}]`;
         return this.atomic ? `atomicLoad(&${at})` : at;
       },
@@ -527,10 +545,7 @@ export class ComputePass implements EnginePlugin {
     }
     const out = [result ?? []].flat(),
       returned = out.filter((s) => !(s instanceof Node)) as Store[];
-    if (
-      (!out.length && !made.length && !kept.length) ||
-      returned.some((s) => !(s?.buffer instanceof StorageBuffer))
-    )
+    if ((!out.length && !made.length && !kept.length) || returned.some((s) => !(s?.buffer instanceof StorageBuffer)))
       throw new TypeError(
         'A ComputePass body must make storage.store(...) writes, statements or atomic operations; add one to the body.',
       );
@@ -540,14 +555,22 @@ export class ComputePass implements EnginePlugin {
       p = this.program;
     const axes = counted(count),
       params = new Set<string>(),
-      linear = axes === 1 ? 'gid.x' : axes === 2 ? `(gid.y * ${size[0]}u + gid.x)` : `((gid.z * ${size[1]}u + gid.y) * ${size[0]}u + gid.x)`,
+      linear =
+        axes === 1
+          ? 'gid.x'
+          : axes === 2
+            ? `(gid.y * ${size[0]}u + gid.x)`
+            : `((gid.z * ${size[1]}u + gid.y) * ${size[0]}u + gid.x)`,
       builtins: Record<string, string | ((b: Builder) => string)> = { instanceIndex: linear, globalId: 'gid' };
     for (const key in inputs)
       builtins[key] = (b) => {
         params.add(key);
         return b.local(inputs[key][0]);
       };
-    const s = this.program.stage({ kind: 'compute', builtins }, [...first, ...stores.flatMap((w) => [w.index, w.value])]),
+    const s = this.program.stage({ kind: 'compute', builtins }, [
+        ...first,
+        ...stores.flatMap((w) => [w.index, w.value]),
+      ]),
       k0 = first.length;
     // Every write's reads come first: with two writes, an inline read in the second would see the first.
     const early: string[] = [],
@@ -597,7 +620,7 @@ export class ComputePass implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (!engine.gpu)
-      throw new MargoError('unsupported', 'ComputePass requires WebGPU; it does not run on the WebGL2 fallback');
+      throw new MargoError('unsupported', 'ComputePass requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {

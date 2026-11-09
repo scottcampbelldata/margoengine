@@ -474,21 +474,15 @@ test('materials validate and expose the sizeAttenuation aliases', () => {
   assert.equal(s.mapVersion, version + 1);
 });
 
-test('SSR-safe construction and a one-time WebGL2 warning', () => {
+test('SSR-safe construction and a linked WebGL2 preview refusal', () => {
   const plugin = new PointsPlugin({ pointBudget: 10 });
   const cloud = plugin.add(new PointCloud({ positions: [0, 0, 0] }));
   assert.equal(plugin.pick(0, 0), null);
-  const warnings = [],
-    warn = console.warn;
-  console.warn = (message) => warnings.push(message);
-  try {
-    plugin.setup({ backend: 'webgl2', gpu: null });
-    new PointsPlugin({ name: 'other' }).setup({ backend: 'webgl2', gpu: null });
-  } finally {
-    console.warn = warn;
-  }
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /WebGL2/);
+  for (const value of [plugin, new PointsPlugin({ name: 'other' })])
+    assert.throws(
+      () => value.setup({ backend: 'webgl2', gpu: null }),
+      (error) => error.code === 'unsupported' && /https:\/\/margoengine.com\/errors#webgpu/.test(error.message),
+    );
   cloud.dispose();
   assert.equal(plugin.pointClouds.size, 0);
   assert.throws(() => new PointsPlugin({ pointBudget: -1 }), RangeError);

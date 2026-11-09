@@ -299,7 +299,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'The terrain virtual texture requires WebGPU and a live module; attach a new one to a WebGPU engine',
+        'The terrain virtual texture requires WebGPU and a live module; attach a new one to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.owner = engine;
     const device = (this.#device = engine.gpu);
@@ -322,7 +322,9 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
         !['rgba8unorm', 'rgba8unorm-srgb'].includes(pictures.format))
     ) {
       pictures.destroy();
-      throw new TypeError('Terrain decal pictures must be one texture; return one rgba8unorm or rgba8unorm-srgb 2D array texture from options.decals.');
+      throw new TypeError(
+        'Terrain decal pictures must be one texture; return one rgba8unorm or rgba8unorm-srgb 2D array texture from options.decals.',
+      );
     }
     if (!pictures) {
       pictures = device.createTexture({
@@ -480,7 +482,8 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       throw new RangeError(
         'Invalid terrain decal; give a finite center, a size above 0, a whole layer of the decals texture, opacity 0..1 and repeat above 0.',
       );
-    if (this.#decals.size >= MAX_DECALS) throw new RangeError(`Terrain decals are limited to ${MAX_DECALS}; remove one before adding another.`);
+    if (this.#decals.size >= MAX_DECALS)
+      throw new RangeError(`Terrain decals are limited to ${MAX_DECALS}; remove one before adding another.`);
     const id = this.#nextDecal++;
     this.#decals.set(id, d as Required<TerrainDecal>);
     this.#decalsChanged = true;
@@ -602,7 +605,12 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
           this.#origins[k],
           origin,
           n,
-          dirty.map(([x0, z0, x1, z1]) => [Math.floor(x0 / s), Math.floor(z0 / s), Math.ceil(x1 / s), Math.ceil(z1 / s)]),
+          dirty.map(([x0, z0, x1, z1]) => [
+            Math.floor(x0 / s),
+            Math.floor(z0 / s),
+            Math.ceil(x1 / s),
+            Math.ceil(z1 / s),
+          ]),
         );
       this.#origins[k] = origin;
       if (!rects.length) continue;

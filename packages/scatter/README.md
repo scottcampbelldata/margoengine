@@ -574,3 +574,7 @@ throws before replacing held records.
 Stream clumped grass with the same entry: use `generateGrassMesh(7)`, `(3)` and `(1)` from
 `@margoengine/procedural` as the three geometries, with `blades: {}` and the usual `lod` distances. Each record
 places a clump; adding and removing tiles manages the held area.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

@@ -185,7 +185,11 @@ export class PostProcessing implements EnginePlugin {
     if (!Math.hypot(...s)) throw new RangeError('Sun direction must be nonzero');
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new MargoError('unsupported', 'PostProcessing requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'PostProcessing requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.resolve = this.device.createComputePipeline({

@@ -111,7 +111,7 @@ export abstract class ShaderEffect {
     if (engine.backend === 'webgl2')
       throw new MargoError(
         'unsupported',
-        `${this.name} requires the WebGPU backend; use an engine on the WebGPU backend`,
+        `${this.name} requires the WebGPU backend; use an engine on the WebGPU backend; see https://margoengine.com/errors#webgpu`,
       );
     this.engine = engine;
   }

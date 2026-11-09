@@ -7,8 +7,8 @@ import { parseGLTF, parseGLTFAsync } from '@margoengine/gltf-pro';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, glTFRows, glTFUV, readGLB, validate } from './helpers.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { materialEngine as headless, accessor, glTFRows, glTFUV, readGLB, validate } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],

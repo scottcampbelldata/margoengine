@@ -207,7 +207,7 @@ explicitly; with no constructor it returns the attribute data.
 
 ## Limits
 
-- WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
+- Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
 - Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. Shaped runs size dynamically without clipping, and letter spacing applies between clusters within shaped runs.
 - Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
@@ -219,8 +219,14 @@ explicitly; with no constructor it returns the attribute data.
 
 `npm test` in `packages/text` runs Node checks with a deterministic mock measurer: grapheme clusters, advances, kerning, letter spacing, font size and line metrics, wrapping (spaces, hanging spaces, long words, ideographs, `nowrap`), paragraphs, all four alignments including justify, every anchor, right-to-left reordering with numbers, bracket pairs and mirroring, hit testing and carets, option validation, the distance transform and `alphaToSdf` against brute-force references on random binary, sampled and antialiased bitmaps, shelf packing without overlaps, and SSR-safe construction.
 
-`npm run test:browser` (a real-GPU script, not in CI) uses a real engine in Chromium (or Edge with `BROWSER_CHANNEL`): ink position and area within 2.5 px of the layout for all 12 anchor combinations, fill, outline and shadow colors, opacity, overlapping glyphs keeping their fills under outlines, depth against a mesh with `onTop`, billboards after orbiting, mesh attachment and visibility, buffer reuse on string updates with one draw call per block, emoji in color, atlas growth with 2,000 CJK glyphs (Latin, Greek and Cyrillic when no CJK font is installed) with earlier glyphs unchanged, device restore, disposal, the WebGL2 no-op, and zero validation errors. It saves `test-results/text-gallery.png`.
+`npm run test:browser` (a real-GPU script, not in CI) uses a real engine in Chromium (or Edge with `BROWSER_CHANNEL`): ink position and area within 2.5 px of the layout for all 12 anchor combinations, fill, outline and shadow colors, opacity, overlapping glyphs keeping their fills under outlines, depth against a mesh with `onTop`, billboards after orbiting, mesh attachment and visibility, buffer reuse on string updates with one draw call per block, emoji in color, atlas growth with 2,000 CJK glyphs (Latin, Greek and Cyrillic when no CJK font is installed) with earlier glyphs unchanged, device restore, disposal, the WebGL2 preview refusal, and zero validation errors. It saves `test-results/text-gallery.png`.
 
 The emoji checks do not depend on the machine's fonts. `tests/color-font.js` builds a tiny COLR/CPAL colour font in memory (written from the OpenType specification), and the test loads it with `FontFace` and checks that its flat yellow and green palette colours reach the screen through the colour atlas. The same check also runs with the system's colour emoji font when there is one. A machine without one, such as a headless Linux server, skips that part and prints the reason.
 
 Apache-2.0 licensed.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.

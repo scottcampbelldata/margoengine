@@ -197,7 +197,7 @@ export class DOF implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'DOF requires WebGPU and a live effect; attach a new DOF to a WebGPU engine',
+        'DOF requires WebGPU and a live effect; attach a new DOF to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     if (
       !this.host &&
@@ -227,7 +227,10 @@ export class DOF implements EnginePlugin {
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
     if (route && temporal)
-      throw new MargoError('unsupported', 'DOF temporal needs WebGPU; leave temporal off on the WebGL2 layer');
+      throw new MargoError(
+        'unsupported',
+        'DOF temporal needs WebGPU; leave temporal off on the WebGL2 layer; see https://margoengine.com/errors#webgpu',
+      );
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
     // about a second a frame at 720p on a fast CPU and several on a laptop's (bug 58), so the first frames show the
     // captured scene sharp, and effects reading outputTexture (Tonemap's source) get that scene.

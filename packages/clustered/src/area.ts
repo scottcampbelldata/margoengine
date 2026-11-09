@@ -206,7 +206,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Area lights require WebGPU and a live effect; attach a new AreaLights to a WebGPU engine',
+        'Attach new AreaLights on WebGPU; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

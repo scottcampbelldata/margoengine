@@ -1,3 +1,4 @@
+import { materialEngine as headless } from './helpers.js';
 // exportOBJ of a loaded model whose base colour is held in WebP, KTX2, DDS or a file beside it: writeTextures decodes each
 // to the PNG the MTL names. The images are real files: cwebp's and the Khronos sample textures of @margoengine/decoders.
 import test from 'node:test';
@@ -10,9 +11,10 @@ import { loadGLTF, parseGLTF } from '@margoengine/gltf-pro';
 import { encodePNG } from '../dist/capture.js';
 import { exportDAE, exportOBJ, writeOpacityMaps, writeTextures } from '../dist/index.js';
 import { dds } from '../../decoders/tests/support/texture-encoders.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
 
-const fixture = (name) => new Uint8Array(readFileSync(new URL(`../../decoders/tests/fixtures/${name}`, import.meta.url))),
+const fixture = (name) =>
+    new Uint8Array(readFileSync(new URL(`../../decoders/tests/fixtures/${name}`, import.meta.url))),
   webp = () => fixture('webp/lossless.webp'),
   options = { materials: true, textures: true };
 
@@ -82,7 +84,12 @@ const held = (extension, bytes, mimeType) =>
 for (const [name, file, mimeType, extension] of [
   ['WebP', webp, 'image/webp', 'EXT_texture_webp'],
   ['KTX2', () => fixture('Dot_C.ktx2'), 'image/ktx2', 'KHR_texture_basisu'],
-  ['DDS', () => dds({ width: 16, height: 16, fourCC: 'DXT1', data: new Uint8Array(128) }), 'image/vnd-ms.dds', 'MSFT_texture_dds'],
+  [
+    'DDS',
+    () => dds({ width: 16, height: 16, fourCC: 'DXT1', data: new Uint8Array(128) }),
+    'image/vnd-ms.dds',
+    'MSFT_texture_dds',
+  ],
 ])
   test(`exportOBJ writes a base colour held in ${name} as the PNG its MTL names`, () =>
     headlessModels(async () => {

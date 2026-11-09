@@ -70,7 +70,12 @@ test('bakeBones holds each frame of each clip, in the root space, and restores t
   for (const t of [0, 0.25, 0.5, 0.875]) {
     poseBones(bake, { clip: 0 }, t, pose);
     for (let v = 0; v < bake.vertexCount; v++)
-      near([...pose.subarray(v * 3, v * 3 + 3)], bent(positions.slice(v * 3, v * 3 + 2), t * 90), 0.01, `t ${t} v ${v}`);
+      near(
+        [...pose.subarray(v * 3, v * 3 + 3)],
+        bent(positions.slice(v * 3, v * 3 + 2), t * 90),
+        0.01,
+        `t ${t} v ${v}`,
+      );
   }
   // Each frame row is exact; between rows the matrices mix, so a small error above is the frame gap.
   poseBones(bake, { clip: 0 }, 0.5, pose);
@@ -155,6 +160,7 @@ test('SkinnedCrowd draws every member in one indexed call, and a member takes it
   const gpu = mockGPU(),
     crowd = new SkinnedCrowd(bake),
     host = {
+      gpu: gpu.device,
       lighting: { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.2]) },
       stats: { visible: 0, drawCalls: 0 },
     };
@@ -164,7 +170,10 @@ test('SkinnedCrowd draws every member in one indexed call, and a member takes it
   for (let i = 0; i < 40; i++) crowd.add({ clip: i % 2, blendClip: 1, blend: 0.25, blendOffset: 0.5, offset: i * 0.1 });
   const rows = crowd['data'],
     o = 3 * SKINNED_CROWD_STRIDE;
-  assert.deepEqual([...rows.subarray(o + 16, o + 20)].map((v) => Math.fround(v)), [1, Math.fround(0.3), 1, 0.25]);
+  assert.deepEqual(
+    [...rows.subarray(o + 16, o + 20)].map((v) => Math.fround(v)),
+    [1, Math.fround(0.3), 1, 0.25],
+  );
   assert.deepEqual([...rows.subarray(o + 24, o + 28)], [1, 0.5, 1, 0]);
   const plain = crowd.add();
   assert.equal(rows[plain * SKINNED_CROWD_STRIDE + 26], 1, 'the second clip defaults to full speed');

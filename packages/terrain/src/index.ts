@@ -270,7 +270,7 @@ export class Terrain implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Terrain requires WebGPU and a live module; attach a new Terrain to a WebGPU engine',
+        'Terrain requires WebGPU and a live module; attach a new Terrain to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

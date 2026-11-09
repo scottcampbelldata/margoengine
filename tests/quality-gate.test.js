@@ -143,6 +143,33 @@ test('normalise drops comments, blank lines, imports and dispose boilerplate', (
   ]);
 });
 
+test('multiline imports and re-exports are excluded as complete declarations, while implementation stays', () => {
+  const source = [
+    'import {',
+    '  engineRuntime,',
+    '  type Engine,',
+    '  type EnginePlugin,',
+    '  type FrameGraph,',
+    '  type PassContext,',
+    "} from '@margoengine/core/extension';",
+    'export {',
+    '  thing,',
+    "} from './other.js';",
+    'export function sharedWork() {',
+    '  const rows = [];',
+    '  for (let i = 0; i < 10; i++) {',
+    '    rows.push(i * i);',
+    '  }',
+    '  return rows;',
+    '}',
+  ].join('\n');
+  const lines = normalise(source);
+  assert.equal(lines[0].line, 11);
+  assert.ok(lines.every((l) => !/engineRuntime|EnginePlugin|FrameGraph|PassContext|thing/.test(l.text)));
+  assert.ok(lines.some((l) => l.text === 'rows.push(i * i);'));
+  assert.ok(lines.some((l) => l.text.startsWith('export function sharedWork')));
+});
+
 test('family signatures match the known copies', () => {
   assert.ok(FAMILIES['crc32-table'].test('c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1'));
   assert.ok(FAMILIES['ggx-ndf'].test('let k=nh*nh*(a2-1.0)+1.0;'));

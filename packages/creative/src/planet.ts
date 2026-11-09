@@ -238,7 +238,11 @@ export class Planet implements EnginePlugin {
   setup(engine: Engine): void {
     this.check();
     if (this.engine) throw new MargoError('attached', 'Planet is already attached; create a new Planet');
-    if (!engine.gpu) throw new MargoError('unsupported', 'Planet requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'Planet requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.parent = engine.createMesh();
     this.parent.rotation.z = this.tilt;

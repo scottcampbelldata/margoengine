@@ -33,7 +33,11 @@ export class ToonShading implements EnginePlugin {
     this.values = new Float32Array([bands, rim, 0, 0]);
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new MargoError('unsupported', 'ToonShading requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'ToonShading requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.buffer = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.entry = { binding: 19, resource: { buffer: this.buffer } };
     engine.gpu.queue.writeBuffer(this.buffer, 0, this.values as Float32Array<ArrayBuffer>);

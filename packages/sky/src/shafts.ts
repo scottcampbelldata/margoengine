@@ -199,7 +199,7 @@ export class LightShafts implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'LightShafts requires WebGPU; attach new LightShafts to a WebGPU engine',
+        'LightShafts requires WebGPU; attach new LightShafts to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu;

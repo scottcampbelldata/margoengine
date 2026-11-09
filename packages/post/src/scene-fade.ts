@@ -103,12 +103,16 @@ export class SceneFade implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw margoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'SceneFade requires WebGPU and a live effect; attach a new SceneFade to a WebGPU engine',
+        'SceneFade requires WebGPU and a live effect; attach a new SceneFade to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;
     const context = engine.canvas.getContext('webgpu') as GPUCanvasContext | null;
-    if (!context) throw margoError('unsupported', "SceneFade requires a WebGPU canvas; use the engine's own canvas");
+    if (!context)
+      throw margoError(
+        'unsupported',
+        "SceneFade requires a WebGPU canvas; use the engine's own canvas; see https://margoengine.com/errors#webgpu",
+      );
     const configuration = context.getConfiguration();
     if (!configuration || configuration.device !== this.device)
       throw margoError(

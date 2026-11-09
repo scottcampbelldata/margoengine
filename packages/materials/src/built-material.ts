@@ -1,3 +1,4 @@
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine } from '@margoengine/core/extension';
@@ -68,7 +69,12 @@ export type {
   TranscodedMip,
   TranscodedTexture,
 } from './texture-kinds.js';
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number; RENDER_ATTACHMENT: number };
+declare const GPUTextureUsage: {
+  TEXTURE_BINDING: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  RENDER_ATTACHMENT: number;
+};
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Raw pixels for `new Texture({ data, width, height })`: tightly packed RGBA8 rows, top row first. */
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
@@ -3732,7 +3738,9 @@ function queue(runtime: Engine): MaterialDraws {
   };
   runtime.use({
     name,
-    setup() {},
+    setup(engine) {
+      requireWebGPU(engine, 'Material draw queue');
+    },
     dispose() {
       queues.delete(runtime);
     },

@@ -102,7 +102,7 @@ export class TerrainBlend implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Terrain blending requires WebGPU and a live module; attach a new TerrainBlend to a WebGPU engine',
+        'Terrain blending requires WebGPU and a live module; attach a new TerrainBlend to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     if (this.virtualTexture.owner !== engine || this.virtualTexture.disposed)
       throw new MargoError(

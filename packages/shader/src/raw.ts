@@ -845,11 +845,7 @@ export class RawShaderMaterial {
       velocity = kind === 'velocity',
       vertex = module(velocity ? 'velocity' : 'vertex'),
       fragment =
-        kind === 'pick'
-          ? module('pick')
-          : velocity || this.fragmentCode === undefined
-            ? vertex
-            : module('fragment'),
+        kind === 'pick' ? module('pick') : velocity || this.fragmentCode === undefined ? vertex : module('fragment'),
       scope = device.popErrorScope?.(),
       descriptor: GPURenderPipelineDescriptor = {
         label: 'shader:raw:' + this.name,
@@ -858,7 +854,11 @@ export class RawShaderMaterial {
               bindGroupLayouts: [frameLayout(device, true), ...gpu.groupLayouts],
             }))
           : gpu.pipelineLayout,
-        vertex: { module: vertex, entryPoint: velocity ? this.velocityName! : this.vertexName, buffers: mesh.buffers() },
+        vertex: {
+          module: vertex,
+          entryPoint: velocity ? this.velocityName! : this.vertexName,
+          buffers: mesh.buffers(),
+        },
         ...(fragmentEntry ? { fragment: { module: fragment, entryPoint: fragmentEntry, targets } } : {}),
         primitive: {
           topology: mesh.topology,
@@ -1548,7 +1548,10 @@ interface VelocityState {
   camera: GPUBuffer;
   frame: number;
   time?: number;
-  meshes: Map<RawMesh, { before: GPUBuffer; group: GPUBindGroup; object: GPUBuffer; world: Float32Array; frame: number }>;
+  meshes: Map<
+    RawMesh,
+    { before: GPUBuffer; group: GPUBindGroup; object: GPUBuffer; world: Float32Array; frame: number }
+  >;
 }
 interface Draw {
   mesh: RawMesh;
@@ -1668,7 +1671,7 @@ export class RawShaders implements EnginePlugin {
     if (this.engine && this.engine !== engine)
       throw new MargoError('attached', `${this.name} is attached to another engine; create a new RawShaders`);
     if (!engine.gpu)
-      throw new MargoError('unsupported', 'RawShaders requires WebGPU; it does not run on the WebGL2 fallback');
+      throw new MargoError('unsupported', 'RawShaders requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
     this.device = engine.gpu ?? undefined;
   }
@@ -1719,7 +1722,11 @@ export class RawShaders implements EnginePlugin {
     const device = c.device;
     this.camera ??= this.cameraBuffer(device);
     const encoding = c.format.includes('float') ? 0 : c.format.endsWith('-srgb') ? 2 : 1;
-    device.queue.writeBuffer(this.camera, 0, this.cameraBlock(c.camera, c.camera.matrix, c.width, c.height, c.delta, encoding));
+    device.queue.writeBuffer(
+      this.camera,
+      0,
+      this.cameraBlock(c.camera, c.camera.matrix, c.width, c.height, c.delta, encoding),
+    );
     return this.camera;
   }
   /** @internal The camera block of `camera` seen through view-projection `m`. */
@@ -1805,7 +1812,8 @@ export class RawShaders implements EnginePlugin {
     const c = context,
       device = this.device,
       engine = this.engine as unknown as EngineKernel;
-    if (mode !== 'occlusion' || !external || c.backend !== 'webgpu' || !device || !engine || c.device !== device) return;
+    if (mode !== 'occlusion' || !external || c.backend !== 'webgpu' || !device || !engine || c.device !== device)
+      return;
     const token = this.nextPass(),
       draws: Draw[] = [];
     let camera: GPUBuffer | undefined;
@@ -1828,22 +1836,21 @@ export class RawShaders implements EnginePlugin {
    * `velocityEntry` draw their own motion into TAA's object velocity pass, with last frame's view-projection, world
    * matrix and time in `margoBefore`, kept per TAA view.
    */
-  drawVelocity(
-    pass: GPURenderPassEncoder,
-    frame: { context: PassContext; camera: Float32Array; key: object },
-  ): void {
+  drawVelocity(pass: GPURenderPassEncoder, frame: { context: PassContext; camera: Float32Array; key: object }): void {
     const c = frame.context,
       device = this.device,
       engine = this.engine as unknown as EngineKernel;
     // The colour pass drew first (frame-graph order 0.5 before TAA's 9) and made the camera block meshes bind there.
     if (c.backend !== 'webgpu' || !device || !engine || c.device !== device || !this.camera) return;
     let state = this.velocityStates.get(frame.key);
-    if (!state) this.velocityStates.set(frame.key, (state = { camera: this.cameraBuffer(device), frame: 0, meshes: new Map() }));
+    if (!state)
+      this.velocityStates.set(frame.key, (state = { camera: this.cameraBuffer(device), frame: 0, meshes: new Map() }));
     state.frame++;
     const rows = frame.camera,
       now = rows.subarray(0, 16),
       token = this.nextPass(),
-      draws: { mesh: RawMesh; pipeline: GPURenderPipeline; gpu: MaterialGpu; call: number[]; group: GPUBindGroup }[] = [];
+      draws: { mesh: RawMesh; pipeline: GPURenderPipeline; gpu: MaterialGpu; call: number[]; group: GPUBindGroup }[] =
+        [];
     let time: number | undefined;
     for (const mesh of this.meshes) {
       const material = mesh.material;
@@ -1981,7 +1988,10 @@ export interface RawPickContext {
 }
 /** What `RawPicking.attach` needs of `@margoengine/selection`'s Picking. */
 export interface RawPickHost {
-  addOverlay(overlay: { drawPick(context: RawPickContext): void; pickHit(index: number): { mesh: Mesh } | null }): () => void;
+  addOverlay(overlay: {
+    drawPick(context: RawPickContext): void;
+    pickHit(index: number): { mesh: Mesh } | null;
+  }): () => void;
 }
 /**
  * Makes the meshes of a {@link RawShaders} pickable by `@margoengine/selection`'s `Picking`, and so by `engine.pick` once

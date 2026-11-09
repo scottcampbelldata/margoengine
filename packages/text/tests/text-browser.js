@@ -670,7 +670,7 @@ window.runTextTests = async () => {
   report.released = { buffers, textures };
   engine.dispose();
 
-  // 11. WebGL2 backend: a documented no-op that warns once.
+  // 11. The small WebGL2 preview refuses GPU text; extruded core geometry still draws there.
   const glCanvas = document.createElement('canvas');
   glCanvas.width = glCanvas.height = 64;
   document.body.append(glCanvas);
@@ -684,13 +684,19 @@ window.runTextTests = async () => {
         camera: { position: [0, 0, 6], target: [0, 0, 0], fov: 60, near: 0.1, far: 100 },
       }),
       glText = new TextRenderer({ name: 'gl-text' });
-    gl.use(glText);
-    glText.add(new Text({ text: 'noop', font }));
-    gl.render();
-    gl.render();
-    gl.use(new TextRenderer({ name: 'gl-text-2' }));
-    gl.render();
-    assert(gl.backend === 'webgl2' && glText.stats.drawCalls === 0, 'WebGL2 text should not draw');
+    for (const value of [glText, new TextRenderer({ name: 'gl-text-2' })]) {
+      let error;
+      try {
+        gl.use(value);
+      } catch (caught) {
+        error = caught;
+      }
+      assert(
+        error?.code === 'unsupported' && error.message.includes('https://margoengine.com/errors#webgpu'),
+        'Preview text must refuse with linked unsupported during setup',
+      );
+      assert(!gl.hasPlugin(value.name), 'A refused renderer is not retained');
+    }
     const glMesh = gl
       .createMesh()
       .setGeometry(new Geometry(geomData.positions, geomData.normals, geomData.indices))
@@ -719,10 +725,10 @@ window.runTextTests = async () => {
     glCanvas.remove();
   }
   assert(
-    warnings.filter((w) => w.includes('@margoengine/text')).length === 1,
-    `Expected one WebGL2 warning: ${JSON.stringify(warnings)}`,
+    warnings.filter((w) => w.includes('@margoengine/text')).length === 0,
+    `Expected linked refusals without warning: ${JSON.stringify(warnings)}`,
   );
-  report.checks.push('WebGL2 backend is a no-op that warns once');
+  report.checks.push('WebGL2 preview rejects text during setup with linked unsupported');
   return report;
 };
 

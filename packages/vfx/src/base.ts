@@ -781,7 +781,7 @@ export class VFX implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'VFX requires WebGPU and a live effect; attach a new VFX to a WebGPU engine',
+        'VFX requires WebGPU and a live effect; attach a new VFX to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

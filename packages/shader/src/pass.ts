@@ -197,7 +197,8 @@ export class ScenePass implements EnginePlugin {
   }
   /** Output `name` as a texture for `texture()` in a NodeMaterial or NodePass. Linear, the size of the drawing buffer. */
   texture(name: string): BindableTexture {
-    if (!this.names.includes(name)) throw new RangeError(`ScenePass has no output "${name}"; it has ${this.names.join(', ')}`);
+    if (!this.names.includes(name))
+      throw new RangeError(`ScenePass has no output "${name}"; it has ${this.names.join(', ')}`);
     let t = this.bound.get(name);
     if (!t) {
       t = { bind: () => (this.views.has(name) ? [this.views.get(name)!, this.sampler!] : undefined) };
@@ -217,7 +218,8 @@ export class ScenePass implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'ScenePass is disposed; create a new ScenePass.');
-    if (!engine.gpu) throw new MargoError('unsupported', 'ScenePass requires WebGPU; it does not run on the WebGL2 fallback');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'ScenePass requires WebGPU; see https://margoengine.com/errors#webgpu');
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -230,7 +232,8 @@ export class ScenePass implements EnginePlugin {
   }
   private resize(c: Context): void {
     const format = c.descriptor.depthStencil!.format;
-    if (this.device === c.device && this.width === c.width && this.height === c.height && this.depthFormat === format) return;
+    if (this.device === c.device && this.width === c.width && this.height === c.height && this.depthFormat === format)
+      return;
     this.release();
     this.device = c.device;
     this.width = c.width;
@@ -238,7 +241,12 @@ export class ScenePass implements EnginePlugin {
     this.depthFormat = format;
     const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
     this.textures = this.formats.map((target, i) =>
-      c.device.createTexture({ label: `${this.name}:${this.names[i]}`, size: [c.width, c.height], format: target, usage }),
+      c.device.createTexture({
+        label: `${this.name}:${this.names[i]}`,
+        size: [c.width, c.height],
+        format: target,
+        usage,
+      }),
     );
     this.textures.forEach((texture, i) => this.views.set(this.names[i], texture.createView()));
     this.depth = c.device.createTexture({ label: this.name + ':depth', size: [c.width, c.height], format, usage });
@@ -310,7 +318,8 @@ export function sceneColor(engine: EngineKernel): SceneColor {
     source: BindableTexture = {
       bind(device) {
         let sampler = samplers.get(device);
-        if (!sampler) samplers.set(device, (sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' })));
+        if (!sampler)
+          samplers.set(device, (sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' })));
         return [capture.view, sampler];
       },
     },

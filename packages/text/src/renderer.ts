@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
@@ -41,8 +42,6 @@ interface Resources {
   model: Float32Array;
   depth: number;
 }
-
-let warned = false;
 
 /**
  * Options for the `TextRenderer` plugin. Throws a TypeError for an empty name or non-finite order, and a
@@ -195,14 +194,8 @@ export class TextRenderer implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'TextRenderer');
     this.engine = engine;
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) {
-        warned = true;
-        console.warn('@margoengine/text: the WebGL2 backend is not supported, text will not be drawn.');
-      }
-      return;
-    }
     const device = (this.device = engine.gpu),
       both = STAGE_VERTEX | STAGE_FRAGMENT;
     const frame = device.createBindGroupLayout({

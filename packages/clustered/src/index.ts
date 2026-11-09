@@ -185,7 +185,10 @@ export class Clustered implements EnginePlugin {
   private readonly shaders = new Map<string, Map<string, string>>();
   private readonly localShadows?: LocalShadowMaps;
   private lobesHook?: ClusteredLobes;
-  private readonly hooks = new Map<number, { declarations: string; light: string; finish?: (code: string) => string }>();
+  private readonly hooks = new Map<
+    number,
+    { declarations: string; light: string; finish?: (code: string) => string }
+  >();
   private shadowHook?: ClusteredShadow;
   private areaHook?: ClusteredArea;
   private directionalHook?: ClusteredDirectional;
@@ -504,7 +507,7 @@ export class Clustered implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine',
+        'Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

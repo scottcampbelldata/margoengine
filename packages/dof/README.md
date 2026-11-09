@@ -173,3 +173,7 @@ uses the package's built `dist` entry and marks readiness after the complete sce
 GPU submission/completion and two later animation callbacks. npm publication
 is separate: use this repository's workspace or packed local archives until the
 package is published.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

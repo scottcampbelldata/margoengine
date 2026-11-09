@@ -419,7 +419,7 @@ export class VolumetricClouds implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'VolumetricClouds requires WebGPU; attach new VolumetricClouds to a WebGPU engine',
+        'VolumetricClouds requires WebGPU; attach new VolumetricClouds to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu;

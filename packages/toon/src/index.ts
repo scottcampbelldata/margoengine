@@ -51,7 +51,7 @@ export class Toon implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Toon requires WebGPU; attach a new Toon to a WebGPU engine',
+        'Toon requires WebGPU; attach a new Toon to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.shading.setup(engine);

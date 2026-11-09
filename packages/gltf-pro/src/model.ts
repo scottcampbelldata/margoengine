@@ -260,7 +260,13 @@ const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.rende
     if (kind === undefined) {
       const { srcFactor, dstFactor } = s.blend.color,
         alone = Object.entries(s).every(([name, value]) => name === 'blend' || value === undefined);
-      kind = !alone ? 0 : srcFactor === 'src-alpha' && dstFactor === 'one' ? 1 : srcFactor === 'zero' && dstFactor === 'src' ? 2 : 0;
+      kind = !alone
+        ? 0
+        : srcFactor === 'src-alpha' && dstFactor === 'one'
+          ? 1
+          : srcFactor === 'zero' && dstFactor === 'src'
+            ? 2
+            : 0;
       blendKinds.set(s, kind);
     }
     return kind;
@@ -2358,7 +2364,11 @@ export class PBRModel implements EnginePlugin {
   setup(engine: Engine, device = engine.gpu): void {
     if (engine !== this.engine || this.disposed)
       throw margoError('attached', 'PBRModel belongs to another engine or is disposed; load it into this engine');
-    if (!device) throw margoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
+    if (!device)
+      throw margoError(
+        'unsupported',
+        'PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu',
+      );
     const mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
     const upload = this.bufferUpload(device);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
@@ -2472,9 +2482,12 @@ export class PBRModel implements EnginePlugin {
       )
         throw new RangeError('A ranged PBR geometry write keeps the vertex and index counts; omit the range to resize');
       if (g.uvs) checkLaterUVs(g);
-      if (g.uvs && !p.uvs) throw new TypeError('This primitive has no TEXCOORD_2 or 3 buffer; remove uvs from the write');
+      if (g.uvs && !p.uvs)
+        throw new TypeError('This primitive has no TEXCOORD_2 or 3 buffer; remove uvs from the write');
       if (p.uvs && !g.uvs && g.vertices.length !== p.vertices.length)
-        throw new RangeError('A primitive with TEXCOORD_2 or 3 keeps its vertex count; pass uvs with the write to resize it');
+        throw new RangeError(
+          'A primitive with TEXCOORD_2 or 3 keeps its vertex count; pass uvs with the write to resize it',
+        );
       if (g.topology) throw new TypeError('PBR geometry writes take triangle lists; remove topology');
       if (g.vertices.byteLength > max || g.indices.byteLength > max)
         throw new RangeError('PBR buffer exceeds device limit; split the geometry into smaller meshes');
@@ -3020,7 +3033,10 @@ export class PBRModel implements EnginePlugin {
   uploadImage(index: number, device: GPUDevice, srgb = false): GPUTexture {
     const image = this.image(index);
     if ('streamed' in image)
-      throw margoError('unsupported', 'A streamed texture has no whole image to upload; load the model without `textures`');
+      throw margoError(
+        'unsupported',
+        'A streamed texture has no whole image to upload; load the model without `textures`',
+      );
     if ('ktx2' in image || 'mipmaps' in image)
       return uploadCompressedImage(device, 'ktx2' in image ? image.ktx2 : image, srgb);
     const size = [image.width, image.height],
@@ -3058,7 +3074,8 @@ export class PBRModel implements EnginePlugin {
   private takesTransparent(m: PBRMaterial): boolean {
     const hook = this.transparency;
     return (
-      !!hook && (separable(m) || (!!hook.blends && !(m.tint && this.transmission && !hook.depthWrite) && blendKind(m) > 0))
+      !!hook &&
+      (separable(m) || (!!hook.blends && !(m.tint && this.transmission && !hook.depthWrite) && blendKind(m) > 0))
     );
   }
   /**
@@ -4433,7 +4450,8 @@ export class PBRModel implements EnginePlugin {
       revision = shading?.shaderRevision,
       // A compact record with no hook has no revision: `plainShape` names all that composes its shader instead. Instances
       // stay out: their mirrored state and layout change the pipeline with no change to the record.
-      plain = compact && !inst && !shading && !source && !m.renderState && !m.attenuation ? plainShape(m, v, wireframe) : -1;
+      plain =
+        compact && !inst && !shading && !source && !m.renderState && !m.attenuation ? plainShape(m, v, wireframe) : -1;
     // The same shader and pipeline as `d` from an earlier frame (draw-memo.ts): the shading hook reports the same
     // revision or a plain record the same shape, nothing else that composes the shader changed, and no lighting effect
     // or transparency hook patches it. Only the rows (above) and group 2's bindings are read again.
@@ -4755,7 +4773,8 @@ export class PBRModel implements EnginePlugin {
           format: c.descriptor.depthStencil!.format,
           depthWriteEnabled:
             state?.depthWrite ??
-            (((mode === 'beauty' || capture) && !blend) || (through && !transmission && !!this.transparency!.depthWrite)),
+            (((mode === 'beauty' || capture) && !blend) ||
+              (through && !transmission && !!this.transparency!.depthWrite)),
           depthCompare:
             external?.depthCompare ??
             state?.depthCompare ??

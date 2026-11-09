@@ -369,17 +369,11 @@ test('world-unit widths match the projection under perspective and orthographic 
   close(shaderScale(zoomed, 0), 128, 1e-4, 'zoom 2');
 });
 
-test('WebGL2 engines get a single warning and no passes draw', () => {
-  const warnings = [],
-    original = console.warn;
-  console.warn = (message) => warnings.push(message);
-  try {
-    const engine = { backend: 'webgl2', gpu: null };
-    new Lines().setup(engine);
-    new Lines({ name: 'more' }).setup(engine);
-  } finally {
-    console.warn = original;
-  }
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /WebGL2/);
+test('WebGL2 preview refuses every Lines attachment with linked unsupported', () => {
+  const engine = { backend: 'webgl2', gpu: null };
+  for (const lines of [new Lines(), new Lines({ name: 'more' })])
+    assert.throws(
+      () => lines.setup(engine),
+      (error) => error.code === 'unsupported' && /https:\/\/margoengine.com\/errors#webgpu/.test(error.message),
+    );
 });

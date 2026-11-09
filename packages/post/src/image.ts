@@ -15,6 +15,12 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { Bloom, type BloomOptions } from './bloom.js';
 import { PostStack } from './stack.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+
+function imageDevice(engine?: Engine): GPUDevice {
+  const device = engine?.gpu;
+  if (!device) throw margoError('unsupported', 'ImagePost needs WebGPU; see https://margoengine.com/errors#webgpu');
+  return device;
+}
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
   COPY_DST: number;
@@ -120,8 +126,7 @@ class ImageDisplay implements EnginePlugin {
     return { kind: 'display', render: (c, input, output) => this.encode(c, input, output, false, false) };
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw margoError('unsupported', 'ImagePost requires WebGPU');
-    this.initialize(engine.gpu);
+    this.initialize(imageDevice(engine));
   }
   registerPasses(_graph: FrameGraph): void {}
   private initialize(device: GPUDevice): void {
@@ -280,7 +285,7 @@ export class ImagePost implements EnginePlugin {
   }
   setup(engine: Engine): void {
     this.alive();
-    if (!engine.gpu) throw margoError('unsupported', 'ImagePost requires a WebGPU engine');
+    imageDevice(engine);
     this.engine = engine;
     this.stack = PostStack.attach(engine, [this.previewBloom, this.display]);
   }
@@ -290,10 +295,8 @@ export class ImagePost implements EnginePlugin {
   async renderImage(image: LinearPostImage, controls: { signal?: AbortSignal } = {}): Promise<PostImagePixels> {
     this.alive();
     controls.signal?.throwIfAborted();
-    if (this.active)
-      throw margoError('state', 'ImagePost is already capturing; await or cancel the running capture first');
-    const device = this.engine?.gpu;
-    if (!device) throw margoError('unsupported', 'ImagePost: attach to a live WebGPU engine before capture');
+    if (this.active) throw margoError('state', 'ImagePost is already capturing; await or cancel it first');
+    const device = imageDevice(this.engine);
     validateImage(image, device, controls.signal);
     const controller = new AbortController(),
       cancel = () => controller.abort(controls.signal!.reason);

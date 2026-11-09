@@ -74,7 +74,7 @@ export class Autofocus implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Autofocus requires WebGPU and a live effect; attach a new Autofocus to a WebGPU engine',
+        'Autofocus requires WebGPU and a live effect; attach a new Autofocus to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     const d = engine.gpu;
     this.engine = engine;

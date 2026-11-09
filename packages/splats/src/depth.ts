@@ -6,7 +6,13 @@
 // `threshold`: alpha-tested depth from the same ellipses and the same 3 sigma falloff the colour pass draws
 // (Kerbl et al. 2023, App. C; EWA ellipses: Zwicker et al. 2001), written by the rasteriser at the splat's centre depth.
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import type { Splats } from './index.js';
@@ -54,7 +60,8 @@ export class SplatDepth implements EnginePlugin {
   private group?: { group: GPUBindGroup; ellipses: GPUBuffer; sorted: GPUBuffer; layout: GPUBindGroupLayout };
   private disposed = false;
   constructor(cloud: Splats, options: SplatDepthOptions = {}) {
-    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud)) throw new TypeError('SplatDepth needs a Splats cloud');
+    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud))
+      throw new TypeError('SplatDepth needs a Splats cloud');
     this.cloud = cloud;
     this.value = check(options.threshold ?? 0.5);
     this.order = options.order ?? 3.5;
@@ -77,7 +84,7 @@ export class SplatDepth implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'SplatDepth needs WebGPU and a live depth pass; attach a new SplatDepth to a WebGPU engine',
+        'SplatDepth needs WebGPU and a live depth pass; attach a new SplatDepth to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -113,11 +120,19 @@ export class SplatDepth implements EnginePlugin {
     }
     const layout = pipeline.getBindGroupLayout(0);
     // A restored device or a re-attached cloud hands new buffers: the group follows them.
-    if (!this.group || this.group.ellipses !== state.ellipses || this.group.sorted !== state.sorted || this.group.layout !== layout)
+    if (
+      !this.group ||
+      this.group.ellipses !== state.ellipses ||
+      this.group.sorted !== state.sorted ||
+      this.group.layout !== layout
+    )
       this.group = {
         group: c.device.createBindGroup({
           layout,
-          entries: [this.uniform!, state.ellipses, state.sorted].map((buffer, binding) => ({ binding, resource: { buffer } })),
+          entries: [this.uniform!, state.ellipses, state.sorted].map((buffer, binding) => ({
+            binding,
+            resource: { buffer },
+          })),
         }),
         ellipses: state.ellipses,
         sorted: state.sorted,
@@ -162,6 +177,7 @@ export class SplatDepth implements EnginePlugin {
 }
 
 function check(value: number): number {
-  if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError('SplatDepth threshold must be 0 to 1');
+  if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+    throw new RangeError('SplatDepth threshold must be 0 to 1');
   return value;
 }

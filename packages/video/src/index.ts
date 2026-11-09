@@ -135,7 +135,7 @@ export class Video implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Video requires WebGPU and a live effect; attach a new Video to a WebGPU engine.',
+        'Video requires WebGPU and a live effect; attach a new Video to a WebGPU engine.; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

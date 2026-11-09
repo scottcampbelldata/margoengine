@@ -4723,6 +4723,10 @@ it is an example using the existing 2..65 parser bound, not a new LUT limit.
 Smooth PixelCamera and the physical-camera and terrain-grass pointers expose
 existing APIs without changing runtime behavior, exports or entry sizes.
 
+## Optional packages on the small preview
+
+The small `/preview` engine has backend `webgl2` and no GPU device; the full WebGL2 compatibility layer exposes backend `webgpu`. GPU-only renderers refuse during setup with linked `unsupported`, allowing awaited `autoEngine` setup to escalate through `loadCompat`. Mesh/geometry LOD, screen UI, HTML, stats and picking via `/pick` retain their preview routes. Imposter levels and LOD fading require a complete tier. The texture baker runs under the full layer and correctly refuses the small preview. Selection and gltf-pro already refused; their reported silent blank was not reproduced. See `packages/webgl2-compat/test/package-tiers-browser.mjs` for pixel and escalation evidence and `scripts/check-preview-contract.mjs` for the merge gate. Core and stage source are unchanged.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

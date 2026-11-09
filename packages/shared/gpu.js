@@ -56,7 +56,7 @@ const key = Symbol.for('margoengine.optional.scene-depth');
 /** Shared across independently bundled optional packages on the same engine. */
 export function acquireDepth(engine) {
   if (!engine.gpu)
-    throw margoError('unsupported', 'Scene depth requires WebGPU; it does not run on the WebGL2 fallback');
+    throw margoError('unsupported', 'Scene depth requires WebGPU; see https://margoengine.com/errors#webgpu');
   if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
     throw margoError('state', 'Another effect owns scene capture; use its depth texture');
   let value = engine[key];

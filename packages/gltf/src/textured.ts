@@ -1,7 +1,14 @@
 // Base colour maps and MASK cut-outs for the light loader. Core's meshes have one constant colour, so this entry keeps
 // the mesh in core (bounds, picking, instances) and claims its batch: its own pass draws those instances with core's
 // shader plus a UV input and a texture read, so a package that patches core's shader applies here too.
-import { uploadRows, type Engine, type EnginePlugin, type FrameGraph, type Geometry, type PassContext } from '@margoengine/core/extension';
+import {
+  uploadRows,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type Geometry,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { setGeometrySurface } from '../../shared/mesh-source.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
@@ -15,7 +22,9 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 const TRANSFORM = 'KHR_texture_transform',
   invalid = (what: string) =>
-    new TypeError(`Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`),
+    new TypeError(
+      `Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
+    ),
   refused = (what: string) =>
     new MargoError('unsupported', `${what} is not on the light path; load the file with @margoengine/gltf-pro`);
 
@@ -74,7 +83,8 @@ async function imageBytes(file: GLTFFile, id: number): Promise<Uint8Array> {
       buffer = file.buffers[integer(view.buffer, 'buffer reference')],
       start = integer(view.byteOffset ?? 0, 'view offset'),
       length = integer(view.byteLength, 'view length', 1);
-    if (!buffer || start + length > buffer.length) throw new RangeError('glTF image is outside its buffer; re-export the file');
+    if (!buffer || start + length > buffer.length)
+      throw new RangeError('glTF image is outside its buffer; re-export the file');
     return buffer.subarray(start, start + length);
   }
   if (typeof image.uri !== 'string') throw invalid('image');
@@ -117,7 +127,10 @@ function texturedShader(shader: string): string {
         '@fragment fn fragment(source:Output$1{var i=source;let texel=textureSample(baseMap,baseSampler,i.uv);if(texel.a*surface.x<surface.y){discard;}i.color*=texel.rgb;',
       );
   if (!code.includes('o.uv=i.uv') || !code.includes('var i=source'))
-    throw new MargoError('failed', 'A package replaced the core shader parts @margoengine/gltf/textured patches; remove that package or load the file with @margoengine/gltf-pro');
+    throw new MargoError(
+      'failed',
+      'A package replaced the core shader parts @margoengine/gltf/textured patches; remove that package or load the file with @margoengine/gltf-pro',
+    );
   return code;
 }
 /** One geometry this entry draws. */
@@ -148,11 +161,22 @@ class TexturedDraw implements EnginePlugin {
   private white?: GPUTexture;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly shaders = new Map<string, string>();
-  private readonly frameGroups = new WeakMap<GPURenderPipeline, { group: GPUBindGroup; bindings: GPUBindGroupEntry[] }>();
-  private readonly color: GPURenderPassColorAttachment = { view: null as unknown as GPUTextureView, loadOp: 'load', storeOp: 'store' };
+  private readonly frameGroups = new WeakMap<
+    GPURenderPipeline,
+    { group: GPUBindGroup; bindings: GPUBindGroupEntry[] }
+  >();
+  private readonly color: GPURenderPassColorAttachment = {
+    view: null as unknown as GPUTextureView,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
   private readonly depth: GPURenderPassDepthStencilAttachment = { view: null as unknown as GPUTextureView };
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new MargoError('unsupported', 'Textured glTF requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'Textured glTF requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.frame = engine.gpu.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
@@ -217,7 +241,10 @@ class TexturedDraw implements EnginePlugin {
   private upload(part: Part): void {
     const device = this.engine.gpu!,
       texture = this.texture(part.bitmap);
-    setGeometrySurface(part.geometry, { uv: part.uv, caster: part.surface.cutoff > 0 ? this.caster(part, texture) : undefined });
+    setGeometrySurface(part.geometry, {
+      uv: part.uv,
+      caster: part.surface.cutoff > 0 ? this.caster(part, texture) : undefined,
+    });
     part.uvBuffer = device.createBuffer({
       size: part.uv.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -238,7 +265,10 @@ class TexturedDraw implements EnginePlugin {
       vertices.set(points.subarray(i * 6, i * 6 + 3), i * 20);
       vertices.set(part.uv.subarray(i * 2, i * 2 + 2), i * 20 + 12);
     }
-    part.casterBuffer = device.createBuffer({ size: vertices.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+    part.casterBuffer = device.createBuffer({
+      size: vertices.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(part.casterBuffer, 0, vertices);
     return {
       vertex: part.casterBuffer,
@@ -402,7 +432,10 @@ class TexturedDraw implements EnginePlugin {
   }
 }
 /** A file's decoded images and surfaces, from `load` to `finish`. */
-const files = /* @__PURE__ */ new WeakMap<GLTFFile, { images: Map<number, ImageBitmap>; surfaces: Map<number, Surface> }>();
+const files = /* @__PURE__ */ new WeakMap<
+  GLTFFile,
+  { images: Map<number, ImageBitmap>; surfaces: Map<number, Surface> }
+>();
 /** The parts each loaded model draws here, for `texturedAlphaMasks`. */
 const modelParts = /* @__PURE__ */ new WeakMap<Model, Part[]>();
 
@@ -437,7 +470,10 @@ const wrapOf = (mode: GPUAddressMode | undefined) =>
  */
 export async function texturedAlphaMasks(
   model: Model,
-  { signal, pixels = canvasPixels }: { signal?: AbortSignal; pixels?: (image: ImageBitmap) => TexturedPixels | Promise<TexturedPixels> } = {},
+  {
+    signal,
+    pixels = canvasPixels,
+  }: { signal?: AbortSignal; pixels?: (image: ImageBitmap) => TexturedPixels | Promise<TexturedPixels> } = {},
 ): Promise<(hit: { mesh: object }) => TexturedAlphaMask | null> {
   const masks = new Map<Geometry, TexturedAlphaMask>(),
     read = new Map<ImageBitmap, TexturedPixels>();
@@ -502,7 +538,11 @@ export const textured: GLTFExtension = {
       materials: file.doc.materials?.map((m, id) => {
         if (!surfaces.has(id)) return m;
         const { alphaMode: _mode, alphaCutoff: _cutoff, ...rest } = m,
-          { baseColorTexture: _texture, baseColorFactor: factor = [1, 1, 1, 1], ...values } = m.pbrMetallicRoughness ?? {};
+          {
+            baseColorTexture: _texture,
+            baseColorFactor: factor = [1, 1, 1, 1],
+            ...values
+          } = m.pbrMetallicRoughness ?? {};
         return { ...rest, pbrMetallicRoughness: { ...values, baseColorFactor: [factor[0], factor[1], factor[2], 1] } };
       }),
     };
@@ -533,7 +573,8 @@ export const textured: GLTFExtension = {
         const from = expanded ? expanded[i] : i,
           u = stored[from * 2],
           v = stored[from * 2 + 1];
-        if (u === undefined || v === undefined) throw new RangeError('glTF TEXCOORD has fewer vertices than POSITION; re-export the file');
+        if (u === undefined || v === undefined)
+          throw new RangeError('glTF TEXCOORD has fewer vertices than POSITION; re-export the file');
         uv[i * 2] = t[0] * u + t[1] * v + t[2];
         uv[i * 2 + 1] = t[3] * u + t[4] * v + t[5];
       }

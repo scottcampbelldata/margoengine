@@ -1047,3 +1047,7 @@ and after the alpha changes (it writes frames only, no committed result yet).
 - **DOF** (`@margoengine/dof`) keeps the sharp alpha: out-of-focus silhouettes spill colour onto
   transparent pixels. **TAA** (`@margoengine/taa`) writes opaque alpha. **SceneFade** darkens empty
   pixels while it fades. Use these on opaque canvases.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

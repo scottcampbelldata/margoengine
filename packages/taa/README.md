@@ -188,3 +188,7 @@ through depth and colour, not per-object velocity, so thin fast objects can ghos
 
 Measured on `packages/taa/test/upscale-browser.mjs` (640x480, scale 0.5, 4x MSAA, 50 frames, against a full-size frame):
 31.8 dB accumulated against 30.5 dB for Lanczos, no red pixels trailing a box that crosses the frame.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

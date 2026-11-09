@@ -8,13 +8,25 @@
 // Painting a cloud with spherical harmonics sets the DC term to the blended colour and fades the higher bands by the
 // same strength (the 3DGS SH convention: colour = 0.5 + 0.2820948 DC + ...; Sloan 2008, App. A).
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import type { SplatData } from './data.js';
 import type { Splats } from './index.js';
 
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; MAP_READ: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  STORAGE: number;
+  MAP_READ: number;
+};
 declare const GPUMapMode: { READ: number };
 
 /**
@@ -22,7 +34,9 @@ declare const GPUMapMode: { READ: number };
  * (`x`, `y`, `radius`) or a rectangle (`x`, `y`, `width`, `height`). A splat is in the region when its projected
  * centre is, and it was drawn in that frame.
  */
-export type BrushRegion = { x: number; y: number; radius: number } | { x: number; y: number; width: number; height: number };
+export type BrushRegion =
+  | { x: number; y: number; radius: number }
+  | { x: number; y: number; width: number; height: number };
 /** How `select` combines a region with the current selection. */
 export type SelectMode = 'replace' | 'add' | 'subtract';
 /** What `erase` and `paint` change: the splats in a region, the selected splats, or every splat. */
@@ -96,7 +110,8 @@ export class SplatBrush implements EnginePlugin {
   private group?: { group: GPUBindGroup; ellipses: GPUBuffer };
   private dead = false;
   constructor(cloud: Splats) {
-    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud)) throw new TypeError('SplatBrush needs a Splats cloud');
+    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud))
+      throw new TypeError('SplatBrush needs a Splats cloud');
     this.cloud = cloud;
   }
   /** Same as `engine.use(new SplatBrush(cloud))`; returns it. */
@@ -111,7 +126,10 @@ export class SplatBrush implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.dead || !engine.gpu)
-      throw new MargoError(this.dead ? 'disposed' : 'unsupported', 'SplatBrush needs WebGPU; attach a new SplatBrush to a WebGPU engine');
+      throw new MargoError(
+        this.dead ? 'disposed' : 'unsupported',
+        'SplatBrush needs WebGPU; attach a new SplatBrush to a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = engine.gpu.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -207,7 +225,8 @@ export class SplatBrush implements EnginePlugin {
   }
   /** Checks the state and writes the region, ready for a dispatch; returns the device. */
   private ready(region: BrushTarget): GPUDevice {
-    if (this.dead || !this.device) throw new MargoError('disposed', 'SplatBrush is disposed or not attached; attach a new one');
+    if (this.dead || !this.device)
+      throw new MargoError('disposed', 'SplatBrush is disposed or not attached; attach a new one');
     if (!this.width || !this.cloud.attached)
       throw new MargoError('state', 'SplatBrush works on a drawn frame; render the engine once before editing');
     const d = this.device,
@@ -221,7 +240,12 @@ export class SplatBrush implements EnginePlugin {
       if (!values.every(Number.isFinite) || values.slice(2).some((s) => s < 0))
         throw new RangeError('A brush region needs finite x and y and a radius, or a width and height, of 0 or more');
       target = circle ? 0 : 1;
-      v.set(circle ? [region.x, region.y, region.radius, 0] : [region.x, region.y, region.x + values[2], region.y + values[3]], 16);
+      v.set(
+        circle
+          ? [region.x, region.y, region.radius, 0]
+          : [region.x, region.y, region.x + values[2], region.y + values[3]],
+        16,
+      );
     }
     if (target === undefined) throw new RangeError("A brush target must be a region, 'selection' or 'all'");
     v[25] = this.width;
@@ -243,9 +267,15 @@ export class SplatBrush implements EnginePlugin {
       this.group = {
         group: d.createBindGroup({
           layout: this.pipeline.getBindGroupLayout(0),
-          entries: [this.uniform!, state.ellipses, state.positions, state.inputColors, state.sh, this.mask, this.result!].map(
-            (buffer, binding) => ({ binding, resource: { buffer } }),
-          ),
+          entries: [
+            this.uniform!,
+            state.ellipses,
+            state.positions,
+            state.inputColors,
+            state.sh,
+            this.mask,
+            this.result!,
+          ].map((buffer, binding) => ({ binding, resource: { buffer } })),
         }),
         ellipses: state.ellipses,
       };

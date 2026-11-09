@@ -393,7 +393,11 @@ export class SSR implements EnginePlugin {
         'state',
         'SSR runs in a PostStack; use SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...]).',
       );
-    if (!engine.gpu) throw margoError('unsupported', 'SSR requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw margoError(
+        'unsupported',
+        'SSR requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     const device = engine.gpu;

@@ -207,3 +207,7 @@ folds and rays are a Margo model, not a measured display; the field lines are ve
 
 This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky` (the scenes entry also `@margoengine/post` and `@margoengine/tonemap`), and supported
 WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

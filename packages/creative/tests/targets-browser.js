@@ -2,7 +2,7 @@
 export async function targetChecks() {
   const { TextureRenderTarget } = await import('../dist/targets.js');
   const { Engine } = await import('../../core/dist/extension.js');
-  const { webglRenderer } = await import('../../webgl/dist/index.js');
+  const { webglRenderer } = await import('../../webgl2-compat/dist/preview.js');
   const assert = (condition, message) => {
     if (!condition) throw new Error(message);
   };

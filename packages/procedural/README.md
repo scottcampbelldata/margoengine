@@ -683,3 +683,7 @@ include intermediate and centre reads, exclude initialization, copies, allocatio
 and compilation. No elapsed-time, SIMD gain or rival-speed claim is made.
 
 Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23797 B gzip, strictly below 25000 B.
+
+## Texture baker and WebGL2 tiers
+
+`createTextureBaker` refuses the small `/preview` engine with linked `unsupported`, because it has no WebGPU-shaped device. That refusal is correct: `autoEngine` can escalate when the call is awaited during setup. The full `webgl2-compat` layer reports `backend: 'webgpu'` and runs the texture baker through its compute route. `packages/webgl2-compat/test/package-tiers-browser.mjs` exercises both complete tiers and direct preview refusal.

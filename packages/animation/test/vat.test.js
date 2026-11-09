@@ -120,6 +120,7 @@ test('VATCrowd draws every instance in one indexed call and uploads instance dat
   const gpu = mockGPU(),
     crowd = new VATCrowd(vat, { color: [1, 0.5, 0.25, 1], roughness: 0.3 }),
     host = {
+      gpu: gpu.device,
       lighting: { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.2]) },
       stats: { visible: 0, drawCalls: 0 },
     };

@@ -395,3 +395,7 @@ engine.start();
   `hit.splat` is the splat's index in the cloud (a pool index under `SplatSet` and `SplatLod`). `dispose()` leaves
   Picking and frees the stand-in; the cloud stays.
 - A pick's cost grows with the cloud: four vertices of projection per splat, every pick. Picking takes up to 8 overlays.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

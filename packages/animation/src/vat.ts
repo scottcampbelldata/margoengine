@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -302,7 +303,9 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
 // GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf-pro's).
-const unlitShader = (vertex: string) => `${neutralShader}${vertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
+const unlitShader = (
+  vertex: string,
+) => `${neutralShader}${vertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -487,6 +490,7 @@ export class VATCrowd implements EnginePlugin {
     this.n = n;
   }
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'VATCrowd');
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {
@@ -741,7 +745,17 @@ export class VATCrowd implements EnginePlugin {
   private release(): void {
     const g = this.gpu;
     if (g)
-      for (const r of [g.vat, g.white, g.uvs, ...g.vertices, g.index, g.frame, g.clips, g.instances, this.shadow?.frames])
+      for (const r of [
+        g.vat,
+        g.white,
+        g.uvs,
+        ...g.vertices,
+        g.index,
+        g.frame,
+        g.clips,
+        g.instances,
+        this.shadow?.frames,
+      ])
         r?.destroy();
     this.gpu = this.pipeline = this.group = this.light = this.shadow = undefined;
     this.key = '';

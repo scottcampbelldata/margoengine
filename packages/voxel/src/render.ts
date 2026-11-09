@@ -1052,7 +1052,10 @@ export class VoxelRenderer implements EnginePlugin {
     this.#mesher.warm?.();
     const device = engine.gpu;
     if (!device)
-      throw new MargoError('unsupported', 'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU');
+      throw new MargoError(
+        'unsupported',
+        'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU; see https://margoengine.com/errors#webgpu',
+      );
     const limit = device.limits.maxStorageBufferBindingSize;
     if (this.#maxPages * PAGE_BYTES > limit)
       throw new RangeError(

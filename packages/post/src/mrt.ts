@@ -216,7 +216,11 @@ export class SceneTargets implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');
-    if (!engine.gpu) throw margoError('unsupported', 'SceneTargets needs WebGPU; create the engine with webgpu');
+    if (!engine.gpu)
+      throw margoError(
+        'unsupported',
+        'SceneTargets needs WebGPU; create the engine with webgpu; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
   }

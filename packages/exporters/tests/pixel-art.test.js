@@ -7,9 +7,9 @@ import { readFile } from 'node:fs/promises';
 import { parseGLTFAsync } from '@margoengine/gltf-pro';
 import { exportDAE, exportGLB, exportGLTF, paletteTexture, pixelArtTexture } from '../dist/index.js';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { findPython } from '../../../scripts/support/find-python.mjs';
-import { readGLB } from './helpers.js';
+import { materialEngine as headless, readGLB } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],

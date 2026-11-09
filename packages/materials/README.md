@@ -1385,3 +1385,9 @@ RGB-watts-to-lumens conversion.
 GPU scalars (`normalScale`, `clearcoatNormalScale`, `ior`, `iridescenceIOR`, `thickness`, `shininess` and
 `iridescenceThicknessRange`) must stay finite as float32; a value such as `1e39` throws `RangeError` and leaves the
 material unchanged. A white attenuation channel stays white at any attenuation distance.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.

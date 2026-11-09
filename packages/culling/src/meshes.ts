@@ -136,7 +136,7 @@ export class CulledMeshes implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'CulledMeshes requires WebGPU; attach a new CulledMeshes to a WebGPU engine',
+        'CulledMeshes requires WebGPU; attach a new CulledMeshes to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = (this.device = engine.gpu);
@@ -217,7 +217,8 @@ export class CulledMeshes implements EnginePlugin {
       active.push(batch);
     }
     // The depth prepass must see core's own shader unchanged; other frames cull like `occlusion: false`.
-    const occluding = this.occlusion && !route && active.length && exactShader(c.shader) ? this.occlude(c, active) : undefined,
+    const occluding =
+        this.occlusion && !route && active.length && exactShader(c.shader) ? this.occlude(c, active) : undefined,
       pass = route ? undefined : c.encoder.beginComputePass();
     for (const batch of active) {
       const slot = this.slots.get(batch.geometry)!;
@@ -273,7 +274,9 @@ export class CulledMeshes implements EnginePlugin {
     const pyramid = o.pyramid,
       [width, height] = viewSize(c);
     // Views of different sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
-    if (c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height)
+    if (
+      c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height
+    )
       pyramid.resize(Math.max(width, c.view ? pyramid.width : 0), Math.max(height, c.view ? pyramid.height : 0));
     pyramid.plan(width, height);
     const m = c.camera.matrix,

@@ -486,3 +486,34 @@ Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 Build and unit tests: npm test --workspace @margoengine/webgl2-compat
 
 The native preview initialises the whole first frame before applying a view scissor, matching the WebGPU canvas background outside plot margins. Later views retain that frame. Invalid draw rectangles reject before any clear. Live resource rebuilds unbind only the preview's own current program before deletion.
+
+## Package attachment on each tier
+
+| Tier | engine.backend | engine.gpu | GPU-only package setup |
+| --- | --- | --- | --- |
+| Native WebGPU | webgpu | native device | Runs |
+| Full WebGL2 compatibility layer | webgpu | compatibility device | Runs within the layer's documented limits |
+| Small /preview | webgl2 | null | Throws linked MargoError unsupported |
+
+Lines, line batches, points, surfels, text, world UI panels, VAT crowds, GPU morph playback,
+terrain colors and LOD fading refuse the small preview before taking ownership or allocating resources.
+Mesh/geometry LOD keeps its CPU route; imposter levels refuse when added. Screen UI, HTML labels,
+statistics and picking with /pick retain their real preview routes. ColorOutput retains its documented
+sRGB/SDR preview behavior and registers no GPU passes there.
+
+Selection outlines and gltf-pro already refused on main before this change; the reported silent blank
+for those two could not be reproduced with a real preview engine. Their regression uses an HTTP glTF
+fixture, verifies both refusals, proves loadCompat runs once and setup runs on both tiers, and checks
+red model pixels and magenta selection pixels on native and compatibility devices.
+The procedural texture baker's preview refusal is correct; it runs on the full layer.
+
+Use the existing /auto example above and await asynchronous loads inside setup. Only an unsupported
+error during setup triggers escalation, and setup builds the scene again on a fresh canvas. Packages
+attached later report the same refusal to the caller. Low-tier WebGL2 devices which cannot install
+the full layer still reject clearly.
+
+Evidence: test/package-tiers-browser.mjs (GPU lock, test:gpu:preview-contract),
+tests/preview-refusal.test.js, packages/lod/test/preview.test.js and
+npm run check:preview-contract. The source gate is in verify, therefore in check:merge.
+It parses package pass owners and requires an attach-time unsupported refusal or a reviewed,
+tested preview route; it includes guarded work reached through class methods and shared helpers.

@@ -177,7 +177,10 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'Transmission is disposed; create a new Transmission.');
     if (!engine.gpu)
-      throw margoError('unsupported', 'Transmission requires WebGPU: create the engine with a WebGPU device');
+      throw margoError(
+        'unsupported',
+        'Transmission requires WebGPU: create the engine with a WebGPU device; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
   }

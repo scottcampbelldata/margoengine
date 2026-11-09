@@ -1,11 +1,21 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { fillFrame } from './math.js';
-import { biasedShader, dashCapShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader, ribbonShader } from './shader.js';
+import {
+  biasedShader,
+  dashCapShader,
+  filledShader,
+  foggedLineShader,
+  lineShader,
+  phasedShader,
+  pointWidthShader,
+  ribbonShader,
+} from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -27,8 +37,6 @@ interface Resources {
   /** The buffer of the line's solid triangles, with `group` over it in place of the points. */
   fill?: { buffer: GPUBuffer; group: GPUBindGroup; bytes: number; version: number };
 }
-
-let warned = false;
 
 /**
  * Bytes of the per-line Style uniform: model (0), color (64), a (80), b (96), flags (112: mode, count, bits, clipping
@@ -159,14 +167,8 @@ export class Lines implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'Lines');
     this.engine = engine;
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) {
-        warned = true;
-        console.warn('@margoengine/lines: the WebGL2 backend is not supported, lines will not be drawn.');
-      }
-      return;
-    }
     const device = (this.device = engine.gpu);
     const uniform = (size: number, visibility: number): GPUBindGroupLayoutEntry => ({
       binding: 0,

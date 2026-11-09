@@ -10,10 +10,10 @@ import { instancing } from '@margoengine/gltf-pro/instancing';
 import { Animation } from '@margoengine/animation';
 import { Material, Texture, createMesh, createInstancedMesh } from '@margoengine/materials';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
-import { glTFRows, readGLB, validate } from './helpers.js';
+import { materialEngine as headless, glTFRows, readGLB, validate } from './helpers.js';
 
 const asset = (name) =>
   readFile(new URL(`../../../examples/assets/${name}`, import.meta.url)).then((b) => new Uint8Array(b));

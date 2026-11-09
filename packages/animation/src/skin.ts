@@ -384,7 +384,11 @@ export class Skin implements EnginePlugin {
       );
     if (mesh.disposed) throw new MargoError('disposed', 'Skin mesh is disposed; attach the skin to a live mesh');
     const device = engine.gpu;
-    if (!device) throw new MargoError('unsupported', 'Skin needs WebGPU; create the engine with the webgpu backend');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'Skin needs WebGPU; create the engine with the webgpu backend; see https://margoengine.com/errors#webgpu',
+      );
     const pipeline =
       pipelines.get(device) ??
       device.createComputePipeline({

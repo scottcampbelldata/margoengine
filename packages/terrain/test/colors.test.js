@@ -28,9 +28,10 @@ const balanced = (code) => {
     else if (char === '}' && --depth < 0) return false;
   return depth === 0;
 };
-const webgl = async () =>
+const shaderEngine = async () =>
   new Engine({ width: 10, height: 10 }, await TransformStore.create(8), {
-    backend: 'webgl2',
+    backend: 'webgpu',
+    gpu: optionalGPU().engine.gpu,
     add() {},
     remove() {},
     render() {},
@@ -75,7 +76,7 @@ test('multiple wet terrains share the mesh ID varying and keep distinct textures
   }
 });
 test('terrain colors shade one mesh per pixel inside core lighting and cache the patch', async () => {
-  const engine = await webgl();
+  const engine = await shaderEngine();
   const mesh = engine.createMesh(),
     other = engine.createMesh(),
     colors = new TerrainColors(mesh, options);
@@ -109,7 +110,7 @@ test('terrain colors shade one mesh per pixel inside core lighting and cache the
 });
 
 test('the per-pixel block keeps the anchors later core patches use and survives their rewrites', async () => {
-  const engine = await webgl(),
+  const engine = await shaderEngine(),
     mesh = engine.createMesh();
   engine.use(new TerrainColors(mesh, { ...options, variation: 0.1 }));
   const c = { backend: 'webgpu', shader: wgsl, bindings: [], draw() {} };
@@ -145,7 +146,7 @@ test('the per-pixel block keeps the anchors later core patches use and survives 
 
 test('detail adds noisy borders, height-blended materials and triplanar stone, and 0 removes them', async () => {
   const shader = async (extra) => {
-    const engine = await webgl(),
+    const engine = await shaderEngine(),
       mesh = engine.createMesh();
     engine.use(new TerrainColors(mesh, { ...options, ...extra }));
     const c = { backend: 'webgpu', shader: wgsl, bindings: [], draw() {} };
@@ -178,7 +179,7 @@ test('detail adds noisy borders, height-blended materials and triplanar stone, a
   assert.equal(varied.surface.match(/terrainNoise\(/g)?.length, 2);
   assert.match(varied.surface, /\*\(0\.8\+0\.4\*\(0\.65\*large\+0\.35\*fine\)\)/);
   assert.doesNotMatch(varied.code, /terrainBlend\(/);
-  const engine = await webgl(),
+  const engine = await shaderEngine(),
     mesh = engine.createMesh();
   for (const detail of [-0.1, 1.5, Number.NaN, '1'])
     assert.throws(() => new TerrainColors(mesh, { ...options, detail }), {
@@ -277,7 +278,7 @@ test('wet sand borrows depth through a stable view without moving terrain colors
 
 // 968c88bec: terrainId sat at a fixed @location(6); a struct another patch had already extended declared it twice.
 test('terrainId takes the first location the Output struct does not use', async () => {
-  const engine = await webgl(),
+  const engine = await shaderEngine(),
     mesh = engine.createMesh();
   engine.use(new TerrainColors(mesh, { ...options, variation: 0.1 }));
   const c = {

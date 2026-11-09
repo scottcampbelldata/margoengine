@@ -86,7 +86,7 @@ test('exportModel writes lambert and phong as dielectrics with a roughness from 
         positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
         normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
       },
-      engine = await headless(),
+      engine = await headless(optionalGPU().engine.gpu),
       material = async (m) =>
         readGLB(await exportModel(createMesh(engine, quad, m), { binary: true })).json.materials[0],
       pbr = async (m) => (await material(m)).pbrMetallicRoughness;

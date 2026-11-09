@@ -157,7 +157,7 @@ export class ScatterInstances implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'PBR scatter requires WebGPU; attach a new ScatterInstances to a WebGPU engine',
+        'PBR scatter requires WebGPU; attach a new ScatterInstances to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu;

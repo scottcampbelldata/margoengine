@@ -335,7 +335,11 @@ export class BatchedMesh implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'BatchedMesh is disposed; create a new batch');
     const device = engine.gpu;
-    if (!device) throw new MargoError('unsupported', 'BatchedMesh needs WebGPU; create the engine with webgpu');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'BatchedMesh needs WebGPU; create the engine with webgpu; see https://margoengine.com/errors#webgpu',
+      );
     const vertices = this.mesh.primitives[0].vertices;
     if (
       Math.max(vertices.byteLength, this.items.byteLength) >

@@ -498,3 +498,7 @@ Empty core geometries are valid instance batches. They keep finite zero local
 bounds and their batch/slot indices, but upload no vertex/index buffers and emit
 no geometry draw commands, including depth and part-shadow passes. Refill by
 replacing geometry through the entry's existing update/reconstruction contract.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

@@ -373,7 +373,7 @@ export class SSGI implements EnginePlugin {
         'state',
         'SSGI runs in a PostStack: use SSGI.attach(engine) or PostStack.attach(engine, [..., new SSGI(), ...])',
       );
-    if (!engine.gpu) throw margoError('unsupported', 'SSGI requires WebGPU');
+    if (!engine.gpu) throw margoError('unsupported', 'SSGI requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
     this.device = engine.gpu;
     const device = engine.gpu;

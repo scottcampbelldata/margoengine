@@ -6,8 +6,8 @@ import { Material, Texture, createMesh, createInstancedMesh } from '@margoengine
 import { parseGLTF, parseGLTFAsync } from '@margoengine/gltf-pro';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, glTFUV, readGLB, validate, validator } from './helpers.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { materialEngine as headless, accessor, glTFUV, readGLB, validate, validator } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],

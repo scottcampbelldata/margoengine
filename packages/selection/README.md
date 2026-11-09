@@ -180,3 +180,8 @@ HoverHighlight.attach(engine, {picking, onHover: (mesh) => console.log(mesh)});
 
 Real WebGPU checks: npm run test:browser --workspace @margoengine/selection
 
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+`Selection` outlines already refused the preview; `Picking` can use the real `/pick` route when `webglPicking()` is attached first.

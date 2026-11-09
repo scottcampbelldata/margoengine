@@ -1463,3 +1463,7 @@ case remains an additional camera-motion quality check, without a noise-free
 claim. No baseline test or tolerance was weakened.
 
 Batch 99 history/artifact landing: build the current workspace, run voxel-pathtracer package tests and test:gpu:history-taps, then check:readme-run -- --packages=voxel-pathtracer. GPU commands use one shared slot per lane, wait-max at least 60 and measured holds plus a small margin. Preserve successful equivalent-source checks and rerun failed steps only, as the coordinator directs. Commit package inputs, regenerate examples/package-benchmarks/entry-sizes.mjs and scripts/basic-scene-network.mjs from that same clean revision, api:update after entries, api:check, and scripts/build-llms.mjs after final docs. Do not edit provenance metadata. Current scoped receipts and retained historical verify evidence are in results/batch-99-history-landing-20261109.json.
+
+### Preview attachment contract
+
+After `npm run build:packages`, run `npm run check:preview-contract` and `node --test --test-timeout=120000 tests/preview-contract.test.js tests/preview-refusal.test.js packages/lod/test/preview.test.js`. Run browser evidence under `node scripts/gpu-lock.mjs run --owner=preview-contract --max=15 -- node packages/webgl2-compat/test/package-tiers-browser.mjs`; add `--compat` to exercise the first scene on the full layer too. Results: `test-results/preview-package-tiers.json`. The fixture is a clean-room triangle embedded in an HTTP glTF, with selected magenta edges. No external asset or rival source is needed.

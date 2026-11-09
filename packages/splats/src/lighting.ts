@@ -10,7 +10,13 @@
 // block light as their accumulated opacity does on average: stochastic transparency, Enderton et al. 2010,
 // "Stochastic Transparency" (I3D); hash: PCG of Jarzynski and Olano 2020, "Hash Functions for GPU Rendering" (JCGT).
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Splats } from './index.js';
 
@@ -123,7 +129,8 @@ export class SplatLighting implements EnginePlugin {
   private shadows?: { options?: { resolution?: number | readonly [number, number] } };
   private dead = false;
   constructor(cloud: Splats, options: SplatLightingOptions = {}) {
-    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud)) throw new TypeError('SplatLighting needs a Splats cloud');
+    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud))
+      throw new TypeError('SplatLighting needs a Splats cloud');
     this.cloud = cloud;
     this.value = options.threshold === undefined ? undefined : check(options.threshold);
     this.relight = options.relight ?? true;
@@ -149,7 +156,7 @@ export class SplatLighting implements EnginePlugin {
     if (this.dead || !engine.gpu)
       throw new MargoError(
         this.dead ? 'disposed' : 'unsupported',
-        'SplatLighting needs WebGPU; attach a new SplatLighting to a WebGPU engine',
+        'SplatLighting needs WebGPU; attach a new SplatLighting to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -273,6 +280,7 @@ export class SplatLighting implements EnginePlugin {
 }
 
 function check(value: number): number {
-  if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError('SplatLighting threshold must be 0 to 1');
+  if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+    throw new RangeError('SplatLighting threshold must be 0 to 1');
   return value;
 }

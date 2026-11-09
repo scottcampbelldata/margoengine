@@ -180,7 +180,11 @@ export class DirectionalLights implements EnginePlugin, ClusteredDirectional {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'DirectionalLights is disposed; create new DirectionalLights');
-    if (!engine.gpu) throw new MargoError('unsupported', 'DirectionalLights requires the WebGPU backend');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'DirectionalLights requires the WebGPU backend; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.dirty = true;

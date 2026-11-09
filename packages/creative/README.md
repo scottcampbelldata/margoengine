@@ -254,3 +254,7 @@ also reads eight Sobel neighbours); sketch reads eight neighbours plus the centr
 3073 B gzip with bare dependencies external. No speed, aesthetic quality or other-device claim. Tests use
 generated images as stand-ins on a real RTX A6000, against an independent CPU pixel reference. Run
 `npm run test:gpu:paint --workspace @margoengine/creative` through the repository GPU lock.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

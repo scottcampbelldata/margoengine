@@ -491,7 +491,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Local shadows require WebGPU and a live effect; attach a new LocalShadows to a WebGPU engine',
+        'Local shadows require WebGPU and a live effect; attach a new LocalShadows to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.validate();
     this.engine = engine;

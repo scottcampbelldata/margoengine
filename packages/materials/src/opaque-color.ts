@@ -1,3 +1,4 @@
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { MargoError } from '@margoengine/math/errors';
 import { PBRModel } from '@margoengine/gltf-pro/model';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
@@ -60,7 +61,8 @@ class OpaqueColor implements EnginePlugin {
     return this.capture?.snapshot ?? this.placeholder;
   }
   setup(engine: Engine): void {
-    if (this.disposed || engine !== this.engine || !engine.gpu)
+    requireWebGPU(engine, 'Opaque color capture');
+    if (this.disposed || engine !== this.engine)
       throw new MargoError(
         'state',
         'Opaque color capture requires its WebGPU engine; attach it to the engine it was created for, with a WebGPU device.',

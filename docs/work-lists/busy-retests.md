@@ -20,3 +20,9 @@ Quiet release rerun required: default weighted OIT versus Babylon.js 8.33.0 dual
 `node packages/oit/scripts/rival-bench.mjs` under the exclusive GPU lock. Current diagnostic minima
 2.000 versus 7.100 ms on the busy RTX A6000 machine. This is a measurement rerun, not a failed budget
 or a waiver. The image loss remains open independently of timing. Raw rounds: perf history 109.
+
+### Preview tier validation (2026-11-09)
+
+| Test | Commit | Machine | Measured against budget | CPU load | Date | Rerun result |
+| --- | --- | --- | --- | --- | --- | --- |
+| `tests/page-ready.test.js`: delayed last-module proof, browser shutdown | `b9985bd07`; this test, browser launcher and shutdown source are unchanged by preview-silent-skip | Windows workstation, Node 26.12 | 30,000 ms browser close budget exceeded; first test 33,141.4642 ms, no readiness/value failure or outer test hang. Same-session alternating parent/current tests (identical source): parent 10,864 / 4,957 ms, current 4,982 / 5,206 ms. Current minimum differs by 25 ms, within the 249 ms current-round spread. No browser or shutdown speed change. | not sampled at the instant of failure; immediately following full unit run, Win32_Processor reported 99 percent | 2026-11-09 | quiet release rerun required; four diagnostic runs closed successfully, budget and test unchanged |

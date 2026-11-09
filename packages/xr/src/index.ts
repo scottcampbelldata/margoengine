@@ -157,7 +157,12 @@ export class XR implements EnginePlugin {
   static async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<XR> {
     signal?.throwIfAborted();
     const runtime = engineRuntime(engine);
-    if (runtime.disposed || runtime.backend !== 'webgpu' || runtime.hasPlugin('xr'))
+    if (runtime.backend !== 'webgpu')
+      throw new MargoError(
+        'unsupported',
+        'XR requires WebGPU or the full WebGL2 compatibility layer; use autoEngine with loadCompat; see https://margoengine.com/errors#webgpu',
+      );
+    if (runtime.disposed || runtime.hasPlugin('xr'))
       throw new MargoError(
         'state',
         "XR requires a live WebGPU engine without an XR plugin; create the engine with backend 'webgpu' and call XR.create once.",
@@ -175,13 +180,13 @@ export class XR implements EnginePlugin {
     if (!adapter)
       throw new MargoError(
         'unsupported',
-        'XR-compatible WebGPU adapter unavailable; use a headset browser with WebGPU XR support.',
+        'XR-compatible WebGPU adapter unavailable; use a headset browser with WebGPU XR support.; see https://margoengine.com/errors#webgpu',
       );
     // WebXR on WebGL2 draws through XRWebGLLayer, which only the layer's own binding knows.
     if ((adapter as { info?: { vendor?: string } }).info?.vendor === COMPAT_VENDOR && !platform().XRGPUBinding?.webgl)
       throw new MargoError(
         'unsupported',
-        "XR needs the browser's own WebGPU (XRGPUBinding) or, on the WebGL2 compatibility layer, its route: call installXR() from the layer's xr entry first",
+        "XR needs the browser's own WebGPU (XRGPUBinding) or, on the WebGL2 compatibility layer, its route: call installXR() from the layer's xr entry first; see https://margoengine.com/errors#webgpu",
       );
     signal?.throwIfAborted();
     const requiredFeatures = runtime.gpu

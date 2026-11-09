@@ -844,7 +844,7 @@ export class AstroSky implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'AstroSky requires WebGPU; attach a new AstroSky to a WebGPU engine',
+        'AstroSky requires WebGPU; attach a new AstroSky to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({

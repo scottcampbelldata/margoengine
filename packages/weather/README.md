@@ -274,3 +274,7 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
 Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail`, `./puddles` and `./snow` import core).
 
 Build and unit tests: npm test --workspace @margoengine/weather
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

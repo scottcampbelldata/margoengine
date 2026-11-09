@@ -6,6 +6,11 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '@margoengine/core/extension';
+import { headless } from '../../../tests/support/pbr-snapshot.js';
+import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+/** A material constructor registers a GPU draw queue, so CPU export proofs supply its real device stand-in. */
+export const materialEngine = () => headless(optionalGPU().engine.gpu);
 
 // An override remains available for external toolchains; CI uses the local test dependency.
 export const toolsDir = process.env.MARGOENGINE_EXPORTERS_TOOLS ?? fileURLToPath(new URL('../../../', import.meta.url));

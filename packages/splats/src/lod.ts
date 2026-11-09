@@ -11,7 +11,13 @@
 // Hierarchical Gaussians: Kerbl et al. 2024, "A Hierarchical 3D Gaussian Representation for Real-Time Rendering of
 // Very Large Datasets", ACM TOG 43(4) (merged interior Gaussians, cut by projected size).
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { validateSplats, type SplatData } from './data.js';
 import { decimateSplats } from './edit.js';
@@ -54,7 +60,8 @@ export interface BuildSplatLodOptions {
 export function buildSplatLod(data: SplatData, options: BuildSplatLodOptions = {}): SplatLodSource {
   const count = validateSplats(data),
     leafSize = options.leafSize ?? 65536;
-  if (!Number.isInteger(leafSize) || leafSize < 64) throw new RangeError('buildSplatLod leafSize must be an integer of 64 or more');
+  if (!Number.isInteger(leafSize) || leafSize < 64)
+    throw new RangeError('buildSplatLod leafSize must be an integer of 64 or more');
   const coefficients = data.sphericalHarmonics ? data.sphericalHarmonics.length / count / 3 : 0,
     nodes: SplatLodNode[] = [],
     clouds: SplatData[] = [],
@@ -84,7 +91,14 @@ export function buildSplatLod(data: SplatData, options: BuildSplatLodOptions = {
         indices.forEach((s, k) => {
           if (octant[k] === o) part[n++] = s;
         });
-        children.push(build(part, [0, 1, 2].map((a) => min[a] + ((o >> a) & 1) * half), half, depth + 1));
+        children.push(
+          build(
+            part,
+            [0, 1, 2].map((a) => min[a] + ((o >> a) & 1) * half),
+            half,
+            depth + 1,
+          ),
+        );
       }
       // Every splat in one octant down to the depth cap: keep them together as a leaf.
       if (children.length === 1 && nodes[children[0]].children.length === 0 && depth >= 20) children = [];
@@ -100,7 +114,10 @@ export function buildSplatLod(data: SplatData, options: BuildSplatLodOptions = {
         if (cloud.positions.length / 3 <= leafSize) break;
       }
     }
-    const sphere = bound(cloud.positions, children.map((c) => nodes[c]));
+    const sphere = bound(
+      cloud.positions,
+      children.map((c) => nodes[c]),
+    );
     nodes[at] = { center: sphere.center, radius: sphere.radius, error, count: cloud.positions.length / 3, children };
     clouds[at] = cloud;
     return at;
@@ -142,7 +159,10 @@ function gather(data: SplatData, indices: Uint32Array, coefficients: number): Sp
 }
 
 /** A sphere around `positions` and the children's spheres (centre: the box middle). */
-function bound(positions: Float32Array, children: SplatLodNode[]): { center: [number, number, number]; radius: number } {
+function bound(
+  positions: Float32Array,
+  children: SplatLodNode[],
+): { center: [number, number, number]; radius: number } {
   const lo = [Infinity, Infinity, Infinity],
     hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < positions.length; i += 3)
@@ -158,9 +178,16 @@ function bound(positions: Float32Array, children: SplatLodNode[]): { center: [nu
   const center: [number, number, number] = [0, 1, 2].map((a) => (lo[a] + hi[a]) / 2) as [number, number, number];
   let r2 = 0;
   for (let i = 0; i < positions.length; i += 3)
-    r2 = Math.max(r2, (positions[i] - center[0]) ** 2 + (positions[i + 1] - center[1]) ** 2 + (positions[i + 2] - center[2]) ** 2);
+    r2 = Math.max(
+      r2,
+      (positions[i] - center[0]) ** 2 + (positions[i + 1] - center[1]) ** 2 + (positions[i + 2] - center[2]) ** 2,
+    );
   let radius = Math.sqrt(r2);
-  for (const c of children) radius = Math.max(radius, Math.hypot(c.center[0] - center[0], c.center[1] - center[1], c.center[2] - center[2]) + c.radius);
+  for (const c of children)
+    radius = Math.max(
+      radius,
+      Math.hypot(c.center[0] - center[0], c.center[1] - center[1], c.center[2] - center[2]) + c.radius,
+    );
   return { center, radius };
 }
 
@@ -270,7 +297,8 @@ export class SplatLod implements EnginePlugin {
     const nodes = source?.nodes;
     if (!Array.isArray(nodes) || !nodes.length || typeof source.load !== 'function')
       throw new TypeError('SplatLod needs a source with nodes and load(index, signal)');
-    if (![0, 4, 9, 16].includes(source.coefficients)) throw new RangeError('SplatLod source coefficients must be 0, 4, 9 or 16');
+    if (![0, 4, 9, 16].includes(source.coefficients))
+      throw new RangeError('SplatLod source coefficients must be 0, 4, 9 or 16');
     const budget = options.budget ?? 1_000_000;
     this.maxError = options.maxError ?? 2;
     this.concurrency = options.concurrency ?? 4;
@@ -282,11 +310,22 @@ export class SplatLod implements EnginePlugin {
       if (!(value >= min) || !Number.isFinite(value)) throw new RangeError(`SplatLod ${name} must be ${min} or more`);
     let largest = 0;
     nodes.forEach((n: SplatLodNode, i: number) => {
-      if (!(n.count >= 1) || !Number.isInteger(n.count) || !(n.radius >= 0) || !(n.error >= 0) || n.children.some((c: number) => !(c > i && c < nodes.length)))
-        throw new RangeError(`SplatLod node ${i} is invalid (count, radius, error, or a child that is not a later node); give each node a count of 1 or more and only later children`);
+      if (
+        !(n.count >= 1) ||
+        !Number.isInteger(n.count) ||
+        !(n.radius >= 0) ||
+        !(n.error >= 0) ||
+        n.children.some((c: number) => !(c > i && c < nodes.length))
+      )
+        throw new RangeError(
+          `SplatLod node ${i} is invalid (count, radius, error, or a child that is not a later node); give each node a count of 1 or more and only later children`,
+        );
       largest = Math.max(largest, n.count);
     });
-    if (largest > budget) throw new RangeError(`SplatLod budget ${budget} is under the largest node, ${largest} splats; raise the budget or split the node`);
+    if (largest > budget)
+      throw new RangeError(
+        `SplatLod budget ${budget} is under the largest node, ${largest} splats; raise the budget or split the node`,
+      );
     this.source = source;
     this.slot = largest;
     // A cut never holds more nodes than the tree has leaves, so a pool past that only wastes GPU memory (a 1,000,000
@@ -334,7 +373,7 @@ export class SplatLod implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'SplatLod needs WebGPU and a live hierarchy; attach a new SplatLod to a WebGPU engine',
+        'SplatLod needs WebGPU and a live hierarchy; attach a new SplatLod to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
   }
@@ -392,12 +431,20 @@ export class SplatLod implements EnginePlugin {
         const n = validateSplats(data),
           coefficients = data.sphericalHarmonics ? data.sphericalHarmonics.length / n / 3 : 0;
         if (n !== this.source.nodes[index].count || coefficients !== this.source.coefficients)
-          this.failures.push(Object.assign(new RangeError(`Splat node ${index} loaded ${n} splats with ${coefficients} SH coefficients, not ${this.source.nodes[index].count} with ${this.source.coefficients}`), { node: index }));
+          this.failures.push(
+            Object.assign(
+              new RangeError(
+                `Splat node ${index} loaded ${n} splats with ${coefficients} SH coefficients, not ${this.source.nodes[index].count} with ${this.source.coefficients}`,
+              ),
+              { node: index },
+            ),
+          );
         else this.loaded.set(index, data);
       },
       (error) => {
         this.pending.delete(index);
-        if (!this.abort.signal.aborted) this.failures.push(Object.assign(error instanceof Error ? error : new Error(String(error)), { node: index }));
+        if (!this.abort.signal.aborted)
+          this.failures.push(Object.assign(error instanceof Error ? error : new Error(String(error)), { node: index }));
       },
     );
   }

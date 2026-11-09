@@ -1,6 +1,7 @@
 // GPU morph weight evaluation: the weight tracks of one clip live on the GPU and one dispatch a frame samples them for
 // every copy, straight into the deformation arena's weights, so the CPU writes 16 bytes a frame however many copies
 // play. The deformation pass (order -10) then blends the morph deltas as usual.
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -171,6 +172,7 @@ export class MorphWeightPlayer implements EnginePlugin {
     return removed;
   }
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'MorphWeightPlayer');
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {

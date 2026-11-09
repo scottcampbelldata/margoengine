@@ -7,7 +7,13 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
 
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_SRC: number; COPY_DST: number; MAP_READ: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  STORAGE: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+  MAP_READ: number;
+};
 declare const GPUMapMode: { READ: number };
 
 /** A bounding sphere as `[x, y, z, radius]`, or just its radius around the origin. */
@@ -355,7 +361,13 @@ export class GpuGeometry {
   readonly owner: GeometryGenerator;
 
   /** @internal */
-  constructor(owner: GeometryGenerator, spec: GeneratedSpec, columns: number, rows: number, options: GpuGeometryOptions) {
+  constructor(
+    owner: GeometryGenerator,
+    spec: GeneratedSpec,
+    columns: number,
+    rows: number,
+    options: GpuGeometryOptions,
+  ) {
     const vertices = (columns + 1) * (rows + 1);
     if (vertices > MAX_VERTICES)
       throw new RangeError(`Generated geometry of ${vertices} vertices; pass at most ${MAX_VERTICES}`);
@@ -370,7 +382,11 @@ export class GpuGeometry {
     this.params = Float32Array.from(options.params ?? [0, 0, 0, 0]);
     if (this.params.length !== 4 || !this.params.every(Number.isFinite))
       throw new RangeError('Invalid params; pass four finite numbers');
-    this.geometry = new Geometry(new Float32Array(vertices * 3), new Float32Array(vertices * 3), gridIndices(columns, rows));
+    this.geometry = new Geometry(
+      new Float32Array(vertices * 3),
+      new Float32Array(vertices * 3),
+      gridIndices(columns, rows),
+    );
     this.geometry.bounds.set(sphere);
   }
 
@@ -492,7 +508,11 @@ export class GeometryGenerator implements EnginePlugin {
 
   /** @internal EnginePlugin hook. */
   setup(engine: Engine): void {
-    if (!engine.gpu) throw margoError('unsupported', 'GeometryGenerator needs the WebGPU backend; the engine runs WebGL2');
+    if (!engine.gpu)
+      throw margoError(
+        'unsupported',
+        'GeometryGenerator needs the WebGPU backend; the engine runs WebGL2; see https://margoengine.com/errors#webgpu',
+      );
     this.#engine = engine;
     this.#device = engine.gpu;
   }
@@ -580,7 +600,14 @@ export class GeometryGenerator implements EnginePlugin {
     const spec: GeneratedSpec = { code: HEADER + PATH_HEADER + main, closed, up, points },
       rows = cells(options.segments, points * 16, 'segments');
     return this.#add(
-      new GpuPath(this, spec, columns, rows, { ...options, params: params as [number, number, number, number] }, points),
+      new GpuPath(
+        this,
+        spec,
+        columns,
+        rows,
+        { ...options, params: params as [number, number, number, number] },
+        points,
+      ),
     );
   }
 
@@ -590,7 +617,8 @@ export class GeometryGenerator implements EnginePlugin {
   }
 
   #need(): GPUDevice {
-    if (!this.#device) throw margoError('state', 'GeometryGenerator is not attached; call GeometryGenerator.attach(engine)');
+    if (!this.#device)
+      throw margoError('state', 'GeometryGenerator is not attached; call GeometryGenerator.attach(engine)');
     return this.#device;
   }
 
@@ -619,7 +647,9 @@ export class GeometryGenerator implements EnginePlugin {
       module = device.createShaderModule({ label: 'geometry generator', code }),
       made = {
         main: device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
-        walk: path ? device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'walk' } }) : undefined,
+        walk: path
+          ? device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'walk' } })
+          : undefined,
       };
     this.#pipelines.set(code, made);
     return made;

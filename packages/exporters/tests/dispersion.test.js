@@ -5,8 +5,8 @@ import { Material, createMesh } from '@margoengine/materials';
 import { parseGLTF } from '@margoengine/gltf-pro';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { readGLB, validate, validator } from './helpers.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { materialEngine as headless, readGLB, validate, validator } from './helpers.js';
 
 const triangle = {
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],

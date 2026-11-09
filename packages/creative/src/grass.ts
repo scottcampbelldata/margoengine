@@ -171,7 +171,11 @@ export class GrassField implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.device) throw new MargoError('attached', 'Grass field already attached; create a new GrassField');
     const device = engine.gpu;
-    if (!device) throw new MargoError('unsupported', 'GrassField requires WebGPU; use a WebGPU engine');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'GrassField requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     if (
       this.blades * 24 > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize) ||
       Math.ceil(this.blades / 64) > device.limits.maxComputeWorkgroupsPerDimension

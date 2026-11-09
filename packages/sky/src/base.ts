@@ -464,7 +464,7 @@ export class Sky implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Sky requires WebGPU; attach a new Sky to a WebGPU engine',
+        'Sky requires WebGPU; attach a new Sky to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu,

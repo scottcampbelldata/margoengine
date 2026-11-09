@@ -45,7 +45,7 @@ export class ContactGround implements EnginePlugin {
     if (!engine.gpu)
       throw new MargoError(
         'unsupported',
-        'ContactShadows requires WebGPU; use an engine created with a WebGPU backend.',
+        'ContactShadows requires WebGPU; use an engine created with a WebGPU backend.; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
   }

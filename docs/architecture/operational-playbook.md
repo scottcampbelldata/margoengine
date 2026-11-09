@@ -3662,3 +3662,17 @@ camera oracle and its thresholds are unchanged. This proves tap rejection,
 not noise-free disocclusions or the requested optional /denoise entry.
 
 History landing evidence (Batch 99): all 448 history cases pass again on native WebGPU and WebGL2/Vulkan with actual replacement devices; all 137 package tests and all 9 runtime README examples pass. The tracer, core, stage and math sources match the successful r6 base/denoise GPU checks, which are retained without repetition. The changed compatibility preview ownership and browser teardown are covered by the fresh history and media lifecycle checks. Genuine paired entry/network records were generated from one clean package revision, API rows afterward, and the documentation corpus after final docs. The earlier 13,545-test verify is historical; no fresh full verify is claimed. Evidence: whitepaper/results/batch-99-history-landing-20261109.json. Jobs 1 and 2 remain open.
+
+### Preview attachment contract (2026-11-09)
+
+GPU-only optional packages refuse the small `webgl2` preview during setup with linked `unsupported`; the shared `requireWebGPU` helper runs before ownership and allocation. The full compatibility device uses the `webgpu` backend and passes this requirement. Existing preview routes stay available, including CPU mesh LOD; imposter registration refuses before mutation. XR preview refusal uses `unsupported`, while invalid attachment state remains `state`.
+
+Quality gate: `check:preview-contract` parses package sources, including shared helpers, and runs in verify and therefore check:merge. It catches backend-gated pass owners without an attach refusal; explicit real preview routes name their regression tests. Unit regressions exercise direct refusal, no retained plugins/passes, helper tier discrimination and CPU LOD. Browser evidence is `packages/webgl2-compat/test/package-tiers-browser.mjs`, with `test-results/preview-package-tiers.json`: direct refusals, loadCompat escalation, model and outline pixels, and procedural bake readback on native and full compatibility devices. The selection/glTF silent-blank premise did not reproduce; both already refused on main.
+
+Section 5 evidence limit: these checks prove attachment and the named fixture rendering, not new feature parity, speed, or support for devices below the full compatibility layer minimum. Core and stage source are unchanged.
+
+The same validation exposed a duplicate-detector defect: multiline import continuations counted as implementation.
+The detector now removes complete import/re-export declarations from the parsed syntax while preserving code and
+original line numbers (`tests/quality-gate.test.js`). The UI widgets README also awaited a dialog before initialization
+could finish; the example now requests the dialog from a button handler, with the exact snippet imported by
+`packages/ui/tests/readme-widgets.test.js`. Gate budgets and timeouts are unchanged.

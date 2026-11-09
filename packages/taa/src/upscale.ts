@@ -184,7 +184,10 @@ export class TAAUpscale implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'TAAUpscale is disposed; create a new TAAUpscale');
     if (!engine.gpu)
-      throw new MargoError('unsupported', 'TAAUpscale requires WebGPU; it does not run on the WebGL2 fallback');
+      throw new MargoError(
+        'unsupported',
+        'TAAUpscale requires WebGPU; it does not run on the WebGL2 fallback; see https://margoengine.com/errors#webgpu',
+      );
     if (engine.hasPlugin('taa')) throw new MargoError('unsupported', 'TAAUpscale replaces TAA; remove TAA first');
     this.engine = engine;
     const usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST;

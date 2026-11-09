@@ -78,7 +78,8 @@ export class TransparentDepth implements EnginePlugin, PBRTransparency {
     return value;
   }
   constructor({ order = 8.5, threshold = 0.1 }: TransparentDepthOptions = {}) {
-    if (!Number.isFinite(order) || order <= 0) throw new RangeError('Invalid TransparentDepth order; use a number above 0');
+    if (!Number.isFinite(order) || order <= 0)
+      throw new RangeError('Invalid TransparentDepth order; use a number above 0');
     if (!(threshold > 0 && threshold <= 1))
       throw new RangeError('Invalid TransparentDepth threshold; use a number above 0, at most 1');
     this.order = order;
@@ -113,7 +114,11 @@ export class TransparentDepth implements EnginePlugin, PBRTransparency {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'TransparentDepth is disposed; create a new TransparentDepth');
-    if (!engine.gpu) throw new MargoError('unsupported', 'TransparentDepth requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'TransparentDepth requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

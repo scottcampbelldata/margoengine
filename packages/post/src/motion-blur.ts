@@ -193,7 +193,8 @@ export class MotionBlur implements EnginePlugin {
         'state',
         'MotionBlur runs in a PostStack: use MotionBlur.attach(engine, options) or PostStack.attach(engine, [..., new MotionBlur(options)])',
       );
-    if (!engine.gpu) throw margoError('unsupported', 'MotionBlur requires WebGPU');
+    if (!engine.gpu)
+      throw margoError('unsupported', 'MotionBlur requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tilePipeline = compute(engine.gpu, tileShader);

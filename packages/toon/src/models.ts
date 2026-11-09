@@ -224,7 +224,7 @@ export class ModelOutlines implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'ModelOutlines requires WebGPU; attach a new ModelOutlines to a WebGPU engine',
+        'ModelOutlines requires WebGPU; attach a new ModelOutlines to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
   }

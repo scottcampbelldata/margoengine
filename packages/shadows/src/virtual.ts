@@ -392,7 +392,8 @@ export class VirtualShadows implements EnginePlugin {
         'unsupported',
         "VirtualShadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = virtualSampling(group, filter, this.effects as readonly ShadowEffect[], compatibilityLevel(this.device!)) + code;
+    const output =
+      virtualSampling(group, filter, this.effects as readonly ShadowEffect[], compatibilityLevel(this.device!)) + code;
     if (!cache) this.shaders.set(key, (cache = new Map()));
     cache.set(source, output);
     return output;
@@ -406,7 +407,12 @@ export class VirtualShadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: virtualSampling(group, filter, this.effects as readonly ShadowEffect[], compatibilityLevel(this.device!)),
+          declarations: virtualSampling(
+            group,
+            filter,
+            this.effects as readonly ShadowEffect[],
+            compatibilityLevel(this.device!),
+          ),
           direct: (d, n) => (n ? `shadowLit(${d},i.position,${n})` : `shadowLit(${d},i.position,s.n)`),
         }),
       );
@@ -417,7 +423,7 @@ export class VirtualShadows implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'VirtualShadows require WebGPU and a live effect; attach a new VirtualShadows to a WebGPU engine',
+        'VirtualShadows require WebGPU and a live effect; attach a new VirtualShadows to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const device = (this.device = engine.gpu),
@@ -471,7 +477,8 @@ export class VirtualShadows implements EnginePlugin {
     ];
     for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1 });
     this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
-    if ((o.filter ?? 'soft') === 'soft' && compatibilityLevel(device)) this.entries.push({ binding: 30, resource: poolView });
+    if ((o.filter ?? 'soft') === 'soft' && compatibilityLevel(device))
+      this.entries.push({ binding: 30, resource: poolView });
     const words = (levels * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32;
     this.requestBuffer = device.createBuffer({
       size: words * 4,
@@ -499,7 +506,10 @@ export class VirtualShadows implements EnginePlugin {
           // The scene's `section` plugin owns its binding: move the shadow declarations past the occupied slots.
           const base = Math.max(31, ...c.bindings.map((entry) => entry.binding)) + 1;
           const entries = this.bindings();
-          c.shader = moveEffects(this.shader(c.shader), (binding) => base + entries.findIndex((e) => e.binding === binding))
+          c.shader = moveEffects(
+            this.shader(c.shader),
+            (binding) => base + entries.findIndex((e) => e.binding === binding),
+          )
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
             .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
@@ -566,7 +576,8 @@ export class VirtualShadows implements EnginePlugin {
       record.meshPrimitive ??= [
         { node: source, vertex: buffers.vertex, index: buffers.index, count: geometry.indices.length, stride: 24 },
       ];
-      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count = geometry.indices.length;
+      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count =
+        geometry.indices.length;
       return record.meshPrimitive;
     }
     const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[
@@ -727,13 +738,13 @@ export class VirtualShadows implements EnginePlugin {
       key =
         (displacement?.key ?? '') +
         (p.stride +
-        (transform ? 1 : 0) +
-        (inst ? 2 : 0) +
-        (lines ? 4 : 0) +
-        (section ? 8 : 0) +
-        (displacement ? 16 : 0) +
-        (opacity ? 32 : 0) +
-        (solid ? 64 : 0));
+          (transform ? 1 : 0) +
+          (inst ? 2 : 0) +
+          (lines ? 4 : 0) +
+          (section ? 8 : 0) +
+          (displacement ? 16 : 0) +
+          (opacity ? 32 : 0) +
+          (solid ? 64 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);

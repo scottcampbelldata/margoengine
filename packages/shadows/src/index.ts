@@ -550,7 +550,12 @@ export class Shadows implements EnginePlugin {
     if ((o.colored ?? false) !== this.colored)
       throw new TypeError('Shadow colored is fixed at construction and a boolean; create a new Shadows instead');
     const filter = o.filter ?? 'soft';
-    if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard' && typeof (filter as ShadowFilterEffect).body !== 'string')
+    if (
+      filter !== 'soft' &&
+      filter !== 'pcf' &&
+      filter !== 'hard' &&
+      typeof (filter as ShadowFilterEffect).body !== 'string'
+    )
       throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf', 'hard' or a filter effect`);
     const resolution = o.resolution ?? 2048,
       square = typeof resolution === 'number';
@@ -743,7 +748,7 @@ export class Shadows implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Shadows require WebGPU and a live effect; attach a new Shadows to a WebGPU engine',
+        'Shadows require WebGPU and a live effect; attach a new Shadows to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;
@@ -1394,7 +1399,8 @@ export class Shadows implements EnginePlugin {
           stride: 24,
         },
       ];
-      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count = geometry.indices.length;
+      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count =
+        geometry.indices.length;
       return record.meshPrimitive;
     }
     const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[
@@ -1619,16 +1625,16 @@ export class Shadows implements EnginePlugin {
       key =
         (displacement?.key ?? '') +
         (p.stride +
-        (transform ? 1 : 0) +
-        (inst ? 2 : 0) +
-        (lines ? 4 : 0) +
-        (section ? 8 : 0) +
-        (displacement ? 16 : 0) +
-        (material ? 32 : 0) +
-        (opacity ? 64 : 0) +
-        (tinted ? 128 : 0) +
-        (solid ? 256 : 0) +
-        (hardware ? 512 : 0));
+          (transform ? 1 : 0) +
+          (inst ? 2 : 0) +
+          (lines ? 4 : 0) +
+          (section ? 8 : 0) +
+          (displacement ? 16 : 0) +
+          (material ? 32 : 0) +
+          (opacity ? 64 : 0) +
+          (tinted ? 128 : 0) +
+          (solid ? 256 : 0) +
+          (hardware ? 512 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);

@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { unprojectPoint } from '@margoengine/math';
@@ -290,7 +291,6 @@ interface PanelGpu {
 }
 
 const PANEL_FORMAT: GPUTextureFormat = 'rgba8unorm-srgb';
-let warned = false;
 
 /**
  * Engine plugin that draws {@link WorldPanel}s in the scene and routes rays to them. Each frame it steps every panel's
@@ -433,16 +433,10 @@ export class WorldPanels implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'WorldPanels');
     this.engine = engine;
     const canvas = (engine as unknown as { canvas?: HTMLElement }).canvas;
     if (this.input && canvas && !this.detach) this.detach = this.listen(canvas);
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) {
-        warned = true;
-        console.warn('@margoengine/ui/world: the WebGL2 backend is not supported, world panels will not be drawn.');
-      }
-      return;
-    }
     const device = (this.device = engine.gpu),
       both = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
     this.panelLayout = device.createBindGroupLayout({

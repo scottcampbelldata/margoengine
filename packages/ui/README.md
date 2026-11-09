@@ -150,7 +150,7 @@ ui.update(1 / 60); // wide enough now: one line
 message that fades. `AbortSignal` closes a dialog from code.
 
 ```ts
-import { Ui, HealthBar, Inventory } from '@margoengine/ui';
+import { Ui, HealthBar, Inventory, Button } from '@margoengine/ui';
 
 const ui = new Ui();
 const health = new HealthBar({ max: 100, width: 260, anchor: 'top-left', margin: 16 });
@@ -168,14 +168,18 @@ bag.on('use', (e) => {
 ui.add(health, bag);
 
 health.value = 40; // eases down; the old value lingers as a pale chip
-const controller = new AbortController();
-const answer = await ui.dialog({
-  title: 'Respawn?',
-  message: 'You fell off the map.',
-  buttons: [{ label: 'Respawn', value: 'respawn' }, { label: 'Quit', value: 'quit' }],
-  signal: controller.signal, // controller.abort() closes it and rejects
+const respawn = new Button({ text: 'Respawn options' });
+respawn.on('press', async () => {
+  const controller = new AbortController();
+  const answer = await ui.dialog({
+    title: 'Respawn?',
+    message: 'You fell off the map.',
+    buttons: [{ label: 'Respawn', value: 'respawn' }, { label: 'Quit', value: 'quit' }],
+    signal: controller.signal, // controller.abort() closes it and rejects
+  });
+  console.log(answer);
 });
-console.log(answer);
+ui.add(respawn);
 ```
 
 Status never relies on colour alone: bars write their value inside, toasts carry a symbol and a word for screen readers,
@@ -566,7 +570,7 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 
 ## Limits
 
-- World panels draw on WebGPU only: on WebGL2 they update and take rays, but nothing shows. The screen UI draws on both.
+- World panels require native WebGPU or the full compatibility layer and refuse the small preview during setup. Screen UI has a real preview route.
 - A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
@@ -577,3 +581,9 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 - A `VirtualList` has one row height; rows of different heights need a `List`.
 - Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
   never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+Screen `UiRenderer` keeps its real preview renderer. `WorldPanels` requires a complete tier.

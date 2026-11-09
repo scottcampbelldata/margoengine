@@ -1315,3 +1315,7 @@ console.log(debris.pieces[0].body!.position[1] < 5); // true: the beam fell onto
   an anchor that is not a defined block type, `MargoError` `disposed` from `update` after `dispose()`.
 - **Limits.** Pieces are whole cubes for both the collider and the picture (slabs and stairs too), drawn in flat
   colour without the world's textures or light; the search runs on this thread; see `docs/limits.md`.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

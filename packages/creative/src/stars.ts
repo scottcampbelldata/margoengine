@@ -38,7 +38,11 @@ export class Stars implements EnginePlugin {
 
   setup(engine: Engine): void {
     const device = engine.gpu;
-    if (!device) throw new MargoError('unsupported', 'The Earth starfield requires WebGPU; use a WebGPU engine');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'The Earth starfield requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.depthFormat = device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float';
     this.buffer = device.createBuffer({
       size: this.data.byteLength,

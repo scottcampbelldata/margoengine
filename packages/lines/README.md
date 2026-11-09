@@ -434,7 +434,7 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 
 ## Limits
 
-- WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
+- Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
 - By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). `engine.pick` finds lines through [`LinePicking`](#gpu-picking) only. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and `cap` applies to line ends only; `dashCap` shapes each dash. World-unit widths ignore the mesh scale.
 - Filled helper shapes are flat colour with no lighting, and do not pick; the lines around them do. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
@@ -466,7 +466,7 @@ Vertices at one position count as one (`tolerance`, default 1e-5), so hard-shade
 fog on lines against the analytic fog amount and draws a `SkeletonHelper` over a posed rig (lines present, following a
 new pose, gone when removed).
 
-`npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the single WebGL2 warning.
+`npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the linked WebGL2 preview refusal.
 
 `npm run test:browser` drives Chromium or Edge with a real engine and reads pixels back: summed edge coverage in a column equals the width for 10, 4, 2.5, 1 and 0.5 pixels, world-unit width matches the projection, antialiased and hard edges, per-vertex colors and opacity, a line behind a core mesh is hidden while one in front and an `onTop` one are visible, attached lines follow mesh transforms and visibility, dashes produce six dashes with gaps and move with `dashOffset`, depth-writing lines occlude each other in either order with gaps and cut parts writing nothing and a later plugin respecting them, same-size updates allocate no buffers, every join, cap and helper renders with zero validation and WGSL errors, `engine.rebootDevice()` keeps lines rendering, `removePlugin` removes the pass and releases the buffers, and a line passing behind the camera is clipped. It also saves `test-results/lines-gallery.png`. In a container run it with:
 
@@ -475,3 +475,9 @@ BROWSER_CHANNEL=bundled BROWSER_EXECUTABLE=/path/to/chrome BROWSER_ARGS='["--ena
 ```
 
 Apache-2.0 licensed.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.

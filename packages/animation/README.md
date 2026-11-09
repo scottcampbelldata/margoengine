@@ -719,3 +719,9 @@ state), into a target `KeyframeClip` with a rotation track per mapped bone and a
 characters' model spaces must face the same way; morph weight tracks are not carried over.
 `tests/retarget.test.js` checks analytic poses (bone directions, lengths, scaled hip motion, unmapped bones) across
 renamed rigs with different bone axes, and models driven by their `Animation`.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+This includes `VATCrowd` (and its crowd subclasses) and `MorphWeightPlayer`.

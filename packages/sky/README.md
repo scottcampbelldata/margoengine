@@ -815,3 +815,7 @@ at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground
 representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
 2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
 discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

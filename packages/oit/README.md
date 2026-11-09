@@ -419,3 +419,7 @@ The external depth-peeling install stays in engine-bench/batch-168 (setup and ve
 ray-sorted emission/coverage transport, with common sRGB encoding after readback. The measured picture
 MAE is 1.567519 versus the reference; weighted blending remains an approximation. The diagnostic busy-machine
 frame-plus-completion minimum is 2.000 ms. See [all results and caveats](../../docs/whitepaper/perf-vs-rivals.md).
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

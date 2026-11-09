@@ -612,3 +612,7 @@ engine.start();
 ```
 
 `evaluateNodes(graph, sample)` runs the same operators on the CPU. `node packages/vfx/test/features-check.mjs` (real GPU) holds one particle at velocity (1, 0, 0) under force (0, 2, 0) and drag 0.5, and checks position and velocity after four steps of 0.05 s. `node packages/vfx/test/shadows-nodes-webgl2.mjs` runs the same four steps on the WebGL2 compatibility layer: on an RTX A6000 the particle is at (0.18781, 0.04877, 0.00000) with velocity (0.90369, 0.38525, 0.00000).
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

@@ -236,7 +236,7 @@ export class Tonemap implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Tonemap requires WebGPU and a live effect; attach a new Tonemap to a WebGPU engine',
+        'Tonemap requires WebGPU and a live effect; attach a new Tonemap to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     if (
       !this.source &&

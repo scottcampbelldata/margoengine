@@ -722,3 +722,7 @@ against the curve through their points, triangles facing their normals, points w
 buffer core replaced, closed loops meeting, a drawn picture and a lost device.
 
 Apache-2.0 licensed.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

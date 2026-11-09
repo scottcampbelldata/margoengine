@@ -773,3 +773,9 @@ The extension GPU harness resolves FlightHelmet, EnvironmentTest, ScatteringSkul
 tower capture through the same external cache as verify. Every case validates its files and
 companions by hash. Missing files fail with the existing fetch-skip-assets recovery command; an
 unset MARGO_SPLAT_SAMPLES uses the normal shared cache. No case reports success without its input.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+`PBRModel` already refused the preview during setup. The tier regression loads an HTTP glTF fixture, checks direct refusal and automatic escalation, then verifies model and selection pixels on both complete tiers.

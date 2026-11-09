@@ -543,7 +543,7 @@ test('the bundler matrix does not take the GPU lock, and a render in a browser i
   );
 });
 
-test('verify runs the same checks as before plus the parity count and the XR device-run gate, hygiene and required assets first, then the build, the rest after the build', () => {
+test('verify keeps its checks and adds the preview contract after hygiene, assets and the build', () => {
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
   assert.deepEqual(SERIAL, [
     'node scripts/hygiene.js --verify',
@@ -558,6 +558,7 @@ test('verify runs the same checks as before plus the parity count and the XR dev
       'npm run quality',
       'npm run check:parity',
       'npm run check:xr-runs',
+      'npm run check:preview-contract',
       'npm run build --workspace examples/gameplay-sandbox',
       'npm run test --workspace examples/gameplay-sandbox',
       'npm run build --workspace examples/voxel-sandbox',

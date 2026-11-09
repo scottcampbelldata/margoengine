@@ -7,6 +7,7 @@
 //   3. resolve: colour = sum / weight, drawn over the scene.
 // This is the two-pass splatting of Botsch, Hornung, Zwicker and Kobbelt (High-quality surface splatting on today's GPUs,
 // 2005) with the depth weight added. Pushing the scene's own depth keeps meshes and points in one depth test.
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
@@ -176,8 +177,6 @@ interface Targets {
   sumsGroup: GPUBindGroup;
 }
 
-let warned = false;
-
 /**
  * Draws `PointCloud`s as blended surfels over the scene colour and depth (WebGPU), so a scan looks like a continuous
  * surface. A cloud goes to one plugin: add it here instead of to a `PointsPlugin`. `OctreeCloud` takes this plugin
@@ -234,7 +233,9 @@ export class SurfelPlugin implements EnginePlugin {
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
       throw new TypeError('SurfelPlugin needs a non-empty string name and a finite order; fix the options.');
     if (!(this.pointBudget >= 0) || !(this.overlap > 0) || !(this.blendDepth > 0))
-      throw new RangeError('Invalid SurfelPlugin option; pointBudget must be 0 or more, overlap and blendDepth above 0');
+      throw new RangeError(
+        'Invalid SurfelPlugin option; pointBudget must be 0 or more, overlap and blendDepth above 0',
+      );
   }
 
   /** Clouds drawn by this plugin. */
@@ -273,12 +274,8 @@ export class SurfelPlugin implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'SurfelPlugin');
     this.engine = engine;
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) console.warn('@margoengine/points: surfels need WebGPU; the WebGL2 backend draws nothing.');
-      warned = true;
-      return;
-    }
     const device = (this.device = engine.gpu),
       VF = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
       uniform = (size: number) =>

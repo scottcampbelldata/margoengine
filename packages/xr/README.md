@@ -216,3 +216,7 @@ const enter=document.createElement('button');enter.textContent='Enter VR';docume
 enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']}).catch(engine.onError);
 // ui.rays[i] tells where each ray points, for drawing a pointer; ui.dispose() lets go of everything.
 ```
+
+## Preview tier refusal
+
+`XR.create` and `XR.attach` reject the small WebGL2 preview with linked `MargoError` code `unsupported`, so an awaited call inside `autoEngine` setup can trigger `loadCompat`. After installing the full layer, WebXR also needs its `/xr` route and browser session support as documented above. An already attached or disposed engine remains a state error.

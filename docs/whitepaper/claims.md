@@ -1907,3 +1907,7 @@ noise-free camera moves, newly visible surfaces, a learned model or a /denoise
 entry. No speed result is published.
 
 Batch 99 history/artifact landing evidence: 448 current controlled history cases pass on native WebGPU and WebGL2/Vulkan, including actual replacement devices; all 137 package tests and 9 README examples pass. The same clean package revision produced both entry/network records, followed by API and documentation generation. Successful base/denoise checks with identical tracer/core/math sources are retained, with their exact scope in results/batch-99-history-landing-20261109.json. The previous full verify is historical. This does not establish reference-renderer equality, noise-free camera motion or a speed result.
+
+### Preview attachment refusal (2026-11-09)
+
+GPU-only optional renderers reject the small preview during setup with linked `unsupported`, so awaited `autoEngine` setup can load the full compatibility layer. Proof: `tests/preview-refusal.test.js`, `packages/lod/test/preview.test.js`, `packages/webgl2-compat/test/package-tiers-browser.mjs`; the latter verifies direct refusal, one compatibility load, two setup tiers, glTF/selection pixels and procedural bake readback. Selection and gltf-pro already refused on the baseline. Real CPU/GL preview routes stay available. No performance or additional hardware support claim.

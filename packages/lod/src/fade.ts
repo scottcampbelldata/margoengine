@@ -2,6 +2,7 @@
 // fixed noise threshold, so a level switch dissolves instead of popping. Core meshes read the threshold from a buffer
 // indexed by mesh id (a patch of core's shader; the id already travels in the instance data); gltf-pro models and
 // materials meshes read it from a lighting effect's uniform. Dither: interleaved gradient noise (Jimenez 2014).
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { Geometry, type EngineKernel, type Mesh } from '@margoengine/core';
 import { meshRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf-pro';
@@ -46,7 +47,10 @@ const BINDING = 95;
 export function coreFadeShader(code: string): string {
   if (!code.includes('@location(3) material:vec4f }')) return code;
   return code
-    .replace('@location(3) material:vec4f }', '@location(3) material:vec4f,@location(14) @interpolate(flat) lod_id:u32 }')
+    .replace(
+      '@location(3) material:vec4f }',
+      '@location(3) material:vec4f,@location(14) @interpolate(flat) lod_id:u32 }',
+    )
     .replace('o.color=i.color.rgb;', 'o.color=i.color.rgb;o.lod_id=u32(i.factors.w);')
     .replace(
       /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/,
@@ -101,6 +105,7 @@ export class LODFade implements EnginePlugin {
     this.name = 'lod-fade:' + system.name;
   }
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'LODFade');
     if (this.detach) throw new MargoError('state', 'LODFade is in use; make one per engine');
     this.engine = engine;
     this.detach = this.system.setTransition((lod, from, to) => this.begin(lod, from, to));
@@ -232,8 +237,7 @@ export class LODFade implements EnginePlugin {
     const anchor = lod.anchor,
       steps: Fader[] = [],
       leaving: (() => void)[] = [];
-    let outgoing: Fader | undefined,
-      incoming: Fader | undefined;
+    let outgoing: Fader | undefined, incoming: Fader | undefined;
     if (a instanceof Geometry) {
       // The anchor takes the new geometry or none; a ghost at the same place keeps drawing the old one.
       const ghost = this.ghosts.pop() ?? e.createMesh();

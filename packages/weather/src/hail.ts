@@ -332,7 +332,7 @@ export class Hail implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Hail requires WebGPU; attach a new Hail to a WebGPU engine',
+        'Hail requires WebGPU; attach a new Hail to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({

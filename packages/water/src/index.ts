@@ -663,7 +663,7 @@ export class Water implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Water requires WebGPU; attach a new Water to a WebGPU engine',
+        'Water requires WebGPU; attach a new Water to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.shared = this.options.depth ? undefined : acquireDepth(engine);

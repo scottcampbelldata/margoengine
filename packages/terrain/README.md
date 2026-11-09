@@ -916,3 +916,9 @@ at 4x and 1x MSAA. A terrain is reflected only on screen and, being a dielectric
 
 A hill can hide GPU-culled parts: `parts.addOccluder(terrain)` (`CulledParts` from `margoengine/culling/parts`, in
 `'occlusion'` mode) draws the terrain's depth through `terrain.drawOccluder`, with the rings and uniforms of its main pass.
+
+## Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.

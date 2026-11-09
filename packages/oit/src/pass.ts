@@ -68,7 +68,11 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'OIT is disposed; create a new OIT');
-    if (!engine.gpu) throw new MargoError('unsupported', 'OIT requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'OIT requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
   }

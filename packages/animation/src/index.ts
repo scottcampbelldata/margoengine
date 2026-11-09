@@ -546,7 +546,7 @@ export class Animation implements EnginePlugin {
     if (!device)
       throw new MargoError(
         'unsupported',
-        'Animation requires WebGPU; use a browser with WebGPU or leave skinning and morphing out',
+        'Animation requires WebGPU; use a browser with WebGPU or leave skinning and morphing out; see https://margoengine.com/errors#webgpu',
       );
     this.device = device;
     this.unsubscribe?.();

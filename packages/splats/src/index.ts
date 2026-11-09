@@ -175,7 +175,9 @@ export class Splats implements EnginePlugin {
   private range(first: number, n: number): void {
     if (this.disposed) throw new MargoError('disposed', 'The splats were disposed; write to a live cloud');
     if (!Number.isInteger(first) || !Number.isInteger(n) || first < 0 || n < 0 || first + n > this.count)
-      throw new RangeError(`Splats ${first} to ${first + n - 1} are outside this cloud of ${this.count}; keep first + count within the cloud`);
+      throw new RangeError(
+        `Splats ${first} to ${first + n - 1} are outside this cloud of ${this.count}; keep first + count within the cloud`,
+      );
   }
   private upload(first: number, n: number, all: boolean): this {
     this.writes++;
@@ -272,7 +274,7 @@ export class Splats implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Splats require WebGPU and a live cloud; attach a new Splats to a WebGPU engine',
+        'Splats require WebGPU and a live cloud; attach a new Splats to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;
@@ -572,7 +574,15 @@ export class Splats implements EnginePlugin {
     if (!this.projected || !this.evaluated || !this.keys.length)
       throw new MargoError('state', 'Splats are not attached; attach them to an engine first');
     const [positions, covariances, inputColors, sh] = this.inputs;
-    return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated, positions, covariances, inputColors, sh };
+    return {
+      sorted: this.keys[0],
+      ellipses: this.projected,
+      colors: this.evaluated,
+      positions,
+      covariances,
+      inputColors,
+      sh,
+    };
   }
   private release(): void {
     for (const b of this.buffers) b.destroy();

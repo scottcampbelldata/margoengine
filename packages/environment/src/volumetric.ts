@@ -395,7 +395,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'VolumetricFog requires WebGPU and a live effect; attach a new VolumetricFog to a WebGPU engine',
+        'VolumetricFog requires WebGPU and a live effect; attach a new VolumetricFog to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;

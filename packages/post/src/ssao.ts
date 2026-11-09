@@ -232,7 +232,8 @@ export class SSAO implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', `${this.label} is disposed; create a new ${this.label}`);
-    if (!engine.gpu) throw margoError('unsupported', `${this.label} requires WebGPU; use a WebGPU engine`);
+    if (!engine.gpu)
+      throw margoError('unsupported', `${this.label} requires WebGPU; see https://margoengine.com/errors#webgpu`);
     if (!this.host && (engine.hasPlugin('post-processing') || engine.hasPlugin('bloom')))
       throw margoError('state', 'SSAO owns the output target; remove the other post effect first');
     this.engine = engine;

@@ -416,7 +416,7 @@ export class DynamicInstances implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'DynamicInstances requires WebGPU; attach a new DynamicInstances to a WebGPU engine',
+        'DynamicInstances requires WebGPU; attach a new DynamicInstances to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     const d = engine.gpu;
     const storage = d.limits.maxStorageBufferBindingSize;
@@ -591,7 +591,13 @@ export class DynamicInstances implements EnginePlugin {
         (buffer, binding) => ({ binding, resource: { buffer } }),
       ),
     });
-    return { cull: pipeline('cull'), scan: pipeline('scan'), scatter: pipeline('scatter'), fill: pipeline('fill'), group };
+    return {
+      cull: pipeline('cull'),
+      scan: pipeline('scan'),
+      scatter: pipeline('scatter'),
+      fill: pipeline('fill'),
+      group,
+    };
   }
 
   /** Records `world` on `encoder`, once per cull. The compatibility route writes it on the CPU. */

@@ -105,7 +105,10 @@ export abstract class SkyLayer implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', `${this.label} is disposed; attach a new ${this.label}`);
     const gpu = engine.gpu;
     if (!gpu)
-      throw new MargoError('unsupported', `${this.label} draws with WebGPU; it does not run on the WebGL2 fallback`);
+      throw new MargoError(
+        'unsupported',
+        `${this.label} draws with WebGPU; it does not run on the WebGL2 fallback; see https://margoengine.com/errors#webgpu`,
+      );
     this.engine = engine;
     this.uniform = gpu.createBuffer({
       size: this.values.byteLength,

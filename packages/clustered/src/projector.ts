@@ -199,7 +199,11 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'ProjectorLights is disposed; create new ProjectorLights');
-    if (!engine.gpu) throw new MargoError('unsupported', 'ProjectorLights requires the WebGPU backend');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'ProjectorLights requires the WebGPU backend; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.dirty = true;

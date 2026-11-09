@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { EngineKernel } from '@margoengine/core';
 import { Geometry, type Mesh } from '@margoengine/core';
 import {
@@ -257,6 +258,7 @@ export class LODSystem implements EnginePlugin {
     const n = levels?.length,
       screen = levels?.[1]?.screen !== undefined;
     if (!Number.isInteger(n) || n < 1 || n > MAX_LEVELS) throw new RangeError('LOD needs 1-8 levels');
+    if (levels.some(({ object }) => isImposter(object))) requireWebGPU(e, 'LOD imposters');
     if (this.count === this.ids.length) this.grow(Math.max(16, this.count * 2));
     const i = this.count,
       b = i * MAX_LEVELS;
@@ -675,7 +677,8 @@ export class LODSystem implements EnginePlugin {
       const hooks = effect.pbr?.(1);
       if (!hooks) continue;
       declarations += hooks.declarations + '\n';
-      if (hooks.direct) direct += `direct=${hooks.direct('direct').replaceAll('i.position', 'world').replaceAll('s.n', 'nn')};`;
+      if (hooks.direct)
+        direct += `direct=${hooks.direct('direct').replaceAll('i.position', 'world').replaceAll('s.n', 'nn')};`;
     }
     return direct ? declarations + imposterShader.replace('/*lod:direct*/', direct) : imposterShader;
   }
@@ -776,7 +779,10 @@ export class LODSystem implements EnginePlugin {
   private marked(i: number, selected: (id: number) => boolean): boolean {
     if (selected(this.ids[i])) return true;
     for (const object of this.objects[i]) {
-      const mesh = (object as { model?: { root: Mesh } } | null)?.model?.root ?? (object as { root?: Mesh } | null)?.root ?? object,
+      const mesh =
+          (object as { model?: { root: Mesh } } | null)?.model?.root ??
+          (object as { root?: Mesh } | null)?.root ??
+          object,
         id = (mesh as { id?: number } | null)?.id;
       if (id !== undefined && selected(id)) return true;
     }

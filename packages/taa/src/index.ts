@@ -333,13 +333,19 @@ export class TAA implements EnginePlugin {
     if (o.locks !== undefined && typeof o.locks !== 'boolean')
       throw new TypeError('Invalid TAA locks; pass true or false.');
     if (o.present !== undefined && (typeof o.present?.code !== 'function' || typeof o.present.values !== 'function'))
-      throw new TypeError('Invalid TAA present; pass a present step such as new Sharpen() from @margoengine/taa/sharpen.');
+      throw new TypeError(
+        'Invalid TAA present; pass a present step such as new Sharpen() from @margoengine/taa/sharpen.',
+      );
     if (o.present && o.velocityOnly)
-      throw new TypeError('TAA velocityOnly presents nothing, so a present step has no effect; drop present or velocityOnly.');
+      throw new TypeError(
+        'TAA velocityOnly presents nothing, so a present step has no effect; drop present or velocityOnly.',
+      );
     // Checked here too, so a bad setting throws before this frame's first GPU command.
     o.present?.values();
     if (o.reactive && o.velocityOnly)
-      throw new TypeError('TAA velocityOnly resolves nothing, so a reactive mask has no effect; drop reactive or velocityOnly.');
+      throw new TypeError(
+        'TAA velocityOnly resolves nothing, so a reactive mask has no effect; drop reactive or velocityOnly.',
+      );
     if (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
       throw new TypeError('Invalid TAA stochastic; pass true or false.');
     if (o.velocityOnly !== undefined && typeof o.velocityOnly !== 'boolean')
@@ -360,11 +366,17 @@ export class TAA implements EnginePlugin {
       this.sources.add(drawer);
       this.reset();
       return () => {
-        if (this.sources.delete(drawer)) for (const view of [this, ...this.views.values()]) drawer.releaseVelocity?.(view);
+        if (this.sources.delete(drawer))
+          for (const view of [this, ...this.views.values()]) drawer.releaseVelocity?.(view);
         this.reset();
       };
     }
-    if (this.disposed || !source || (source as VelocitySource).disposed || !Array.isArray((source as VelocitySource).shadowPrimitives))
+    if (
+      this.disposed ||
+      !source ||
+      (source as VelocitySource).disposed ||
+      !Array.isArray((source as VelocitySource).shadowPrimitives)
+    )
       throw new TypeError(
         'Invalid TAA velocity source; pass a live object with a shadowPrimitives array to a TAA that is not disposed.',
       );
@@ -392,7 +404,7 @@ export class TAA implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'TAA requires WebGPU and a live effect; attach a new TAA to a WebGPU engine',
+        'TAA requires WebGPU and a live effect; attach a new TAA to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;
@@ -607,7 +619,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       const step = this.options.present;
       const module = c.device.createShaderModule({ code: step ? step.code(present) : present });
       if (step && !this.presentUniform)
-        this.presentUniform = c.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        this.presentUniform = c.device.createBuffer({
+          size: 16,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
       this.presentPipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
@@ -789,7 +804,11 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   private reactiveView(device: GPUDevice): GPUTextureView {
     if (this.reactiveSource) return this.reactiveSource.createView();
     if (!this.blackView) {
-      this.blackTexture = device.createTexture({ size: [1, 1], format: 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING });
+      this.blackTexture = device.createTexture({
+        size: [1, 1],
+        format: 'r8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      });
       this.blackView = this.blackTexture.createView();
     }
     return this.blackView;
@@ -838,7 +857,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       displacement = p.displacement,
       graph = displacement?.velocity,
       // A move that reads the graph's uniforms runs again on last frame's.
-      before = displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
+      before =
+        displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
     if ((opacity || displacement || clip) && p.stride !== 80)
       throw new TypeError('Invalid TAA opacity map, displacement or clip; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,

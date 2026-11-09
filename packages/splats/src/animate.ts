@@ -8,7 +8,13 @@
 // of a Gaussian under a linear map, as in Zwicker et al. 2001, "EWA Splatting"). Both run as one compute pass before
 // the cloud projects (order -7.5) and write the cloud's GPU inputs, so depth sorting, lighting and editing see the pose.
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { validateSplats, type SplatData } from './data.js';
 import type { Splats } from './index.js';
@@ -43,7 +49,10 @@ export const sequenceShader = `struct Mix {mix:vec4f,counts:vec4u}
 
 /** Packs a frame as the sequence pass reads it: 16 floats per splat. */
 function pack(data: SplatData, count: number): Float32Array {
-  if (validateSplats(data) !== count) throw new RangeError(`Every sequence frame needs ${count} splats, as the cloud has; pass frames of the same splats`);
+  if (validateSplats(data) !== count)
+    throw new RangeError(
+      `Every sequence frame needs ${count} splats, as the cloud has; pass frames of the same splats`,
+    );
   const out = new Float32Array(count * 16);
   for (let i = 0; i < count; i++) {
     out.set(data.positions.subarray(i * 3, i * 3 + 3), i * 16);
@@ -65,12 +74,16 @@ abstract class Player implements EnginePlugin {
   protected buffers: GPUBuffer[] = [];
   protected dead = false;
   constructor(cloud: Splats, what: string) {
-    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud)) throw new TypeError(`${what} needs a Splats cloud`);
+    if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud))
+      throw new TypeError(`${what} needs a Splats cloud`);
     this.cloud = cloud;
   }
   setup(engine: Engine): void {
     if (this.dead || !engine.gpu)
-      throw new MargoError(this.dead ? 'disposed' : 'unsupported', 'Splat animation needs WebGPU; attach a new player to a WebGPU engine');
+      throw new MargoError(
+        this.dead ? 'disposed' : 'unsupported',
+        'Splat animation needs WebGPU; attach a new player to a WebGPU engine; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.buffer(256, GPUBufferUsage.UNIFORM);
@@ -159,15 +172,22 @@ export class SplatSequence extends Player {
   private gpuFrames: GPUBuffer[] = [];
   constructor(cloud: Splats, frames: readonly SplatData[], options: SplatSequenceOptions = {}) {
     super(cloud, 'SplatSequence');
-    if (!Array.isArray(frames) || !frames.length) throw new RangeError('SplatSequence needs one frame or more; pass a list of clouds');
+    if (!Array.isArray(frames) || !frames.length)
+      throw new RangeError('SplatSequence needs one frame or more; pass a list of clouds');
     const fps = options.fps ?? 30;
-    if (!(fps > 0 && Number.isFinite(fps))) throw new RangeError('SplatSequence fps must be above 0; pass the capture rate');
+    if (!(fps > 0 && Number.isFinite(fps)))
+      throw new RangeError('SplatSequence fps must be above 0; pass the capture rate');
     this.fps = fps;
     this.loop = options.loop ?? true;
     this.frames = frames.map((f) => pack(f, cloud.count));
   }
   /** Same as `engine.use(new SplatSequence(cloud, frames, options))`; returns it. */
-  static attach(engine: EngineKernel, cloud: Splats, frames: readonly SplatData[], options: SplatSequenceOptions = {}): SplatSequence {
+  static attach(
+    engine: EngineKernel,
+    cloud: Splats,
+    frames: readonly SplatData[],
+    options: SplatSequenceOptions = {},
+  ): SplatSequence {
     const sequence = new SplatSequence(cloud, frames, options);
     engineRuntime(engine).use(sequence);
     return sequence;
@@ -206,9 +226,14 @@ export class SplatSequence extends Player {
       record = {
         group: this.device!.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
-          entries: [this.uniform!, this.gpuFrames[from], this.gpuFrames[to], state.positions, state.covariances, state.inputColors].map(
-            (buffer, binding) => ({ binding, resource: { buffer } }),
-          ),
+          entries: [
+            this.uniform!,
+            this.gpuFrames[from],
+            this.gpuFrames[to],
+            state.positions,
+            state.covariances,
+            state.inputColors,
+          ].map((buffer, binding) => ({ binding, resource: { buffer } })),
         }),
         positions: state.positions,
       };
@@ -282,11 +307,15 @@ export class SplatSkin extends Player {
     super(cloud, 'SplatSkin');
     const { joints, indices, weights } = options ?? ({} as SplatSkinOptions),
       n = cloud.count;
-    if (!Number.isInteger(joints) || joints < 1 || joints > 65536) throw new RangeError('SplatSkin needs 1 to 65,536 joints; pass the joint count');
+    if (!Number.isInteger(joints) || joints < 1 || joints > 65536)
+      throw new RangeError('SplatSkin needs 1 to 65,536 joints; pass the joint count');
     if (indices?.length !== n * 4 || weights?.length !== n * 4)
-      throw new RangeError(`SplatSkin needs 4 joint indices and 4 weights per splat (${n * 4} each); pass one set per splat`);
+      throw new RangeError(
+        `SplatSkin needs 4 joint indices and 4 weights per splat (${n * 4} each); pass one set per splat`,
+      );
     this.matrices = new Float32Array(joints * 16);
-    for (let k = 0; k < joints; k++) this.matrices[k * 16] = this.matrices[k * 16 + 5] = this.matrices[k * 16 + 10] = this.matrices[k * 16 + 15] = 1;
+    for (let k = 0; k < joints; k++)
+      this.matrices[k * 16] = this.matrices[k * 16 + 5] = this.matrices[k * 16 + 10] = this.matrices[k * 16 + 15] = 1;
     this.influence = new Float32Array(n * 8);
     const index = new Uint32Array(this.influence.buffer);
     for (let i = 0; i < n; i++) {
@@ -294,8 +323,10 @@ export class SplatSkin extends Player {
       for (let k = 0; k < 4; k++) {
         const j = indices[i * 4 + k],
           w = weights[i * 4 + k];
-        if (!Number.isInteger(j) || j < 0 || j >= joints) throw new RangeError(`SplatSkin joint index ${j} is outside 0 to ${joints - 1}; fix the indices`);
-        if (!(w >= 0 && Number.isFinite(w))) throw new RangeError('SplatSkin weights must be finite and 0 or more; fix the weights');
+        if (!Number.isInteger(j) || j < 0 || j >= joints)
+          throw new RangeError(`SplatSkin joint index ${j} is outside 0 to ${joints - 1}; fix the indices`);
+        if (!(w >= 0 && Number.isFinite(w)))
+          throw new RangeError('SplatSkin weights must be finite and 0 or more; fix the weights');
         index[i * 8 + k] = j;
         sum += w;
       }
@@ -331,9 +362,15 @@ export class SplatSkin extends Player {
       this.bound = {
         group: d.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
-          entries: [this.uniform!, this.matrixBuffer!, influence, this.restPositions!, this.restCovariances!, state.positions, state.covariances].map(
-            (buffer, binding) => ({ binding, resource: { buffer } }),
-          ),
+          entries: [
+            this.uniform!,
+            this.matrixBuffer!,
+            influence,
+            this.restPositions!,
+            this.restCovariances!,
+            state.positions,
+            state.covariances,
+          ].map((buffer, binding) => ({ binding, resource: { buffer } })),
         }),
         positions: state.positions,
       };

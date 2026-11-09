@@ -308,7 +308,7 @@ export class Picking implements EnginePlugin {
       if (!engine.hasPlugin('webgl-pick'))
         throw new MargoError(
           'unsupported',
-          'Picking requires WebGPU; on the WebGL2 preview attach webglPicking from @margoengine/webgl2-compat/pick first.',
+          'Picking requires WebGPU; on the WebGL2 preview attach webglPicking from @margoengine/webgl2-compat/pick first.; see https://margoengine.com/errors#webgpu',
         );
       // The preview has no WebGPU target to draw into: its engine.pick is the whole route, and it finds core meshes.
       this.engine = engine;

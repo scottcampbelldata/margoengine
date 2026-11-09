@@ -240,3 +240,7 @@ local.options.strength = 0.7; // a flatter, more "HDR photo" look
 `extensions` takes any `TonemapExtension`: `patch(shader, binding, extra)`, an optional `values()` for one uniform at
 `binding`, `resources()` for up to four more resources at `extra` on, and `encode(context)` for passes of its own before
 the presentation pass.
+
+## Preview tier contract
+
+GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

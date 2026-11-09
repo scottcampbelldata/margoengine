@@ -245,7 +245,7 @@ export class Bloom implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw margoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Bloom requires WebGPU and a live effect; attach a new Bloom to a WebGPU engine',
+        'Bloom requires WebGPU and a live effect; attach a new Bloom to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     if (
       !this.host &&

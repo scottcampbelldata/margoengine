@@ -149,7 +149,7 @@ export class ColorBackground {
     if (engine.backend === 'webgl2')
       throw new MargoError(
         'unsupported',
-        'ColorBackground requires the WebGPU backend; use an engine on the WebGPU backend',
+        'ColorBackground requires the WebGPU backend; use an engine on the WebGPU backend; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
   }

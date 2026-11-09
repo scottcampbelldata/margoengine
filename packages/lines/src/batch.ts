@@ -2,6 +2,7 @@
 // Massive line batches: every segment is one 32-byte instance of a 6-vertex quad in a vertex buffer, so a wire view of
 // millions of segments is one draw and no per-line work. It gives up joins, round caps, dashes and fog for that; the
 // fat lines of `Line` draw 78 vertices a segment.
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
@@ -136,7 +137,19 @@ export class LineBatch {
   private owner?: BatchOwner;
 
   constructor(options: LineBatchOptions = {}) {
-    const { positions, indices, colors, color, opacity, width, worldUnits, onTop, antialias, mesh = null, matrix } = options;
+    const {
+      positions,
+      indices,
+      colors,
+      color,
+      opacity,
+      width,
+      worldUnits,
+      onTop,
+      antialias,
+      mesh = null,
+      matrix,
+    } = options;
     if (color !== undefined) parseColor(color, this.color);
     if (opacity !== undefined) this.opacity = opacity;
     if (width !== undefined) this.width = width;
@@ -302,8 +315,6 @@ export interface LineBatchesOptions {
   order?: number;
 }
 
-let warned = false;
-
 /**
  * Engine plugin that draws `LineBatch` objects, one draw each (one per buffer past the device's `maxBufferSize`).
  * WebGPU only; on the WebGL2 backend it warns once and draws nothing.
@@ -361,14 +372,8 @@ export class LineBatches implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'LineBatches');
     this.engine = engine;
-    if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) {
-        warned = true;
-        console.warn('@margoengine/lines/batch: the WebGL2 backend is not supported, batches will not be drawn.');
-      }
-      return;
-    }
     const device = (this.device = engine.gpu),
       uniform = (size: number): GPUBindGroupLayoutEntry => ({
         binding: 0,

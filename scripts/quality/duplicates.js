@@ -31,6 +31,18 @@ const SKIP = /\/(vendor|generated)\//;
 
 /** Normalised code lines of a file: [{ text, line }] with 1-based original line numbers. */
 export function normalise(text) {
+  // Declarations are syntax, not implementation. Formatting an import across several lines must not create clones.
+  if (/^\s*(?:import\s|export\s+(?:type\s+)?[{*])/m.test(text)) {
+    const { program } = parseSync('duplicate-source.ts', text);
+    const declarations = program.body.filter(
+      (n) =>
+        n.type === 'ImportDeclaration' ||
+        n.type === 'ExportAllDeclaration' ||
+        (n.type === 'ExportNamedDeclaration' && !n.declaration),
+    );
+    for (const n of declarations.reverse())
+      text = text.slice(0, n.start) + text.slice(n.start, n.end).replace(/[^\r\n]/g, ' ') + text.slice(n.end);
+  }
   const out = [];
   let block = false;
   text.split(/\r?\n/).forEach((raw, i) => {

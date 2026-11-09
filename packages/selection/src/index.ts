@@ -282,7 +282,10 @@ export class Selection implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'Selection is disposed; create a new Selection to attach.');
     if (!engine.gpu)
-      throw new MargoError('unsupported', 'Selection requires WebGPU; use a browser with WebGPU enabled.');
+      throw new MargoError(
+        'unsupported',
+        'Selection requires WebGPU; use a browser with WebGPU enabled.; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.set(this.selected);

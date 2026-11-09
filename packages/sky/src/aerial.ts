@@ -172,7 +172,7 @@ export class AerialPerspective implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'AerialPerspective requires WebGPU; attach a new AerialPerspective to a WebGPU engine',
+        'AerialPerspective requires WebGPU; attach a new AerialPerspective to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu,

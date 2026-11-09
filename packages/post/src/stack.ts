@@ -23,9 +23,7 @@ const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
  * which cannot multisample them: there rg11b10ufloat, with less precision and no alpha.
  */
 const captureFormat = (d: GPUDevice, samples: number): GPUTextureFormat =>
-  samples > 1 && compatibilityLevel(d) && d.features.has('rg11b10ufloat-renderable')
-    ? 'rg11b10ufloat'
-    : 'rgba16float';
+  samples > 1 && compatibilityLevel(d) && d.features.has('rg11b10ufloat-renderable') ? 'rg11b10ufloat' : 'rgba16float';
 
 /** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom, Afterimage),
  * at most one display effect (Tonemap or creative PostProcessing), then LDR effects (SMAA or FXAA, Glitch). Without a
@@ -93,7 +91,7 @@ export class PostStack implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw margoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'PostStack requires WebGPU and a live stack; attach a new PostStack to a WebGPU engine',
+        'Attach a new PostStack on WebGPU; see https://margoengine.com/errors#webgpu',
       );
     for (const name of owners)
       if (engine.hasPlugin(name))

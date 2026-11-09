@@ -133,7 +133,7 @@ export abstract class SurfaceHook implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        `${this.label} requires WebGPU; attach a new ${this.label} to a WebGPU engine`,
+        `${this.label} requires WebGPU; attach a new ${this.label} to a WebGPU engine; see https://margoengine.com/errors#webgpu`,
       );
     this.engine = engine;
     this.device = engine.gpu;

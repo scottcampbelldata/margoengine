@@ -283,7 +283,7 @@ export class CulledModels implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'CulledModels requires WebGPU; attach a new CulledModels to a WebGPU engine',
+        'CulledModels requires WebGPU; attach a new CulledModels to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.device = engine.gpu;
@@ -455,7 +455,9 @@ export class CulledModels implements EnginePlugin {
     const pyramid = o.pyramid,
       [width, height] = viewSize(c);
     // Views of different sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
-    if (c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height)
+    if (
+      c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height
+    )
       pyramid.resize(Math.max(width, c.view ? pyramid.width : 0), Math.max(height, c.view ? pyramid.height : 0));
     pyramid.plan(width, height);
     const m = c.camera.matrix;

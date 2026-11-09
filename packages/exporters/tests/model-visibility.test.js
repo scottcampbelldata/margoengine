@@ -1,10 +1,11 @@
+import { materialEngine as headless } from './helpers.js';
 // exportModel retainedVisibility: a loaded model's KHR_node_visibility is copied only when asked.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseGLTFAsync } from '@margoengine/gltf-pro';
 import { exportGLB } from '../dist/index.js';
 import { exportModel } from '../dist/model.js';
-import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
 
 test('retainedVisibility copies source node visibility; the default leaves it out', () =>
   headlessModels(async () => {

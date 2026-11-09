@@ -460,7 +460,7 @@ export class HillaireSky implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'HillaireSky requires WebGPU; attach a new HillaireSky to a WebGPU engine',
+        'HillaireSky requires WebGPU; attach a new HillaireSky to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     const d = engine.gpu;

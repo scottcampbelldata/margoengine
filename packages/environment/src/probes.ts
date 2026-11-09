@@ -948,7 +948,7 @@ export class LightProbes extends ShaderEffect {
     if (!device)
       throw new MargoError(
         'unsupported',
-        'LightProbes require the WebGPU backend; use an engine on the WebGPU backend',
+        'LightProbes require the WebGPU backend; use an engine on the WebGPU backend; see https://margoengine.com/errors#webgpu',
       );
     this.allocate(device);
   }
