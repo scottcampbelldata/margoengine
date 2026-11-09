@@ -21,3 +21,18 @@ Docs: this audit and generated LLMS index only; existing scatter documentation, 
 Audit repair: a separate scatter fix validates GPU float conversion and sparse inputs, keeps a rejected update atomic,
 and prevents signed 32-bit camera-shift wrap. Three parent-failing unit regressions and the real-GPU teleport assertion
 cover the causes. Its docs are in scatter's README, limits, known-bugs, the operational playbook and claim LIM-604.
+
+## Job 4: grass chunks and LOD - SKIPPED
+
+The all-packages search found the full composition already present: procedural generateGrassMesh makes crossed
+tapered ribbon clumps (7/3/1 blades for three levels), and scatter/tiles streams those meshes as 8-byte records in
+page allocations, with distance-selected LOD, fades, heightmaps, wind and blade shading. No new creative/grass
+implementation is needed. radialPlacements also exists for clustered anchors, but is unnecessary for mesh clumps.
+
+Evidence: packages/procedural/src/foliage.ts, its foliage.test.js, scatter/src/tiles.ts, scatter/test/tiles.test.js
+and the existing lod.browser.mjs pixel/fade tests. A new grass-tiles.browser.mjs composition check on RTX A6000
+asserts every selected ring count, tile add/remove and device restoration, compiles all shaders and checks native
+WebGL2's coded refusal. Generated fixtures are stand-ins; no huge-area speed or artistic claim is made. Existing
+capacity and GPU binding limits apply. The audit found input/alignment defects, fixed in a separate scatter commit
+with two parent-failing regressions. Docs: scatter README, limits, known-bugs, operational playbook and this audit;
+existing scatter claims/clean-room records own the implementation, with no new public feature claim.
