@@ -1,8 +1,8 @@
 # Test-page bug review
 
-Implementation is preserved in separate local commits and rebased onto origin/main
-bd41f0279. Corrective verify passes. Three additional GPU/README gates are queued;
-push remains pending. No next-batch bug has been taken before this landing.
+Implementation is preserved in separate commits and rebased onto origin/main
+4238614df. Corrective verify and all remaining GPU/README gates pass. No
+next-batch bug has been taken before this landing.
 
 Source: the read-only, untracked test-page log in the main checkout. Reviewed on
 2026-11-09 against origin/main b9985bd07. Road entries 1, 2 and 6 are included by
@@ -118,28 +118,32 @@ types pass. Geometry's full package suite passes 291 tests; the box-only bundle
 measures 1,464 B, below its unchanged strict 1,550 B budget. These are packaging
 measurements, without a rendering-speed claim.
 
-Three additional gates remain queued under codex-testpage: geometry GPU after the
-private lattice-helper refactor, procedural GPU including main's new caves test,
-and geometry/margoengine README execution. Their wait and execution limits are
-hard bounded; they must pass before a fast-forward push. All 13 original package
-GPU scripts and the ten-package corrected README run already passed.
+The three remaining gates pass under codex-testpage: geometry GPU after the
+private lattice-helper refactor (3.6 s), procedural GPU including main's new caves
+test (12.7 s), and geometry/margoengine README execution (17/17 examples, 10.5 s).
+Results are in test-results/testpage-landing-exclusive-results.json and the
+corresponding logs. The old session's queued processes were gone; replacement
+shared requests were cancelled before execution and replaced by one bounded
+exclusive request so newer exclusive jobs could not indefinitely preempt them.
+All 13 original package GPU scripts and the ten-package corrected README run
+already passed. Completed gates were retained without duplicate execution.
 
 | Bug | Local commit (before any subsequent rebase) | Regression |
 | --- | --- | --- |
-| 1 FIXED locally | `dd24dd7b9` | `packages/road/test/testpage.test.js` |
-| 2 FIXED locally | `958cf2051` | `packages/road/test/testpage.test.js` |
-| 6 FIXED locally | `e3d323e41` | `packages/road/test/testpage.test.js` |
-| 7 FIXED locally | `19031dc39` | `packages/procedural/test/testpage-sdf.test.js` |
-| 8 FIXED locally | `45a78ee9e` | `packages/procedural/test/testpage-sdf.test.js` |
-| 9 FIXED locally | `bc184e952` | `packages/procedural/test/textures-browser.mjs` |
-| 10 FIXED locally | `05ad1813c` | `packages/procedural/test/testpage-assets.test.js` |
-| 11 FIXED locally | `255d4e0bb` | `packages/water/test/testpage.test.js` |
-| 12 FIXED locally | `4baf9599e` | `packages/core/tests/empty.test.js and empty.browser.mjs` |
-| 13 FIXED locally | `6ff991123` | `packages/wfc/test/testpage.test.js` |
-| 14 FIXED locally | `1d26ee091` | `packages/voxel-edit/tests/testpage-contracts.test.js` |
-| 16 FIXED locally | `5a1842265` | `packages/animator/test/testpage.test.js` |
-| 18 FIXED locally | `b5e2226f3` | `packages/animation/tests/testpage.test.js` |
-| 19 FIXED locally | `d4cc76819` | `packages/animation/tests/testpage.test.js` |
+| 1 FIXED | `6502c7f77` | `packages/road/test/testpage.test.js` |
+| 2 FIXED | `11e2a8fd5` | `packages/road/test/testpage.test.js` |
+| 6 FIXED | `2a7f37504` | `packages/road/test/testpage.test.js` |
+| 7 FIXED | `2aad90aea` | `packages/procedural/test/testpage-sdf.test.js` |
+| 8 FIXED | `824adfd10` | `packages/procedural/test/testpage-sdf.test.js` |
+| 9 FIXED | `b663cd24d` | `packages/procedural/test/textures-browser.mjs` |
+| 10 FIXED | `fe7b60ba9` | `packages/procedural/test/testpage-assets.test.js` |
+| 11 FIXED | `6b89cbd1e` | `packages/water/test/testpage.test.js` |
+| 12 FIXED | `5188c684b` | `packages/core/tests/empty.test.js and empty.browser.mjs` |
+| 13 FIXED | `cb6a1d506` | `packages/wfc/test/testpage.test.js` |
+| 14 FIXED | `489258925` | `packages/voxel-edit/tests/testpage-contracts.test.js` |
+| 16 FIXED | `472375fac` | `packages/animator/test/testpage.test.js` |
+| 18 FIXED | `aa3cc1ac9` | `packages/animation/tests/testpage.test.js` |
+| 19 FIXED | `3429283f6` | `packages/animation/tests/testpage.test.js` |
 
 Bugs 20, 23, 24 and 25 remain next, after this batch lands. The other latest
 Added entries belong to lane S. Physics remains on hold.
