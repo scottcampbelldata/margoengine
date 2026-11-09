@@ -105,7 +105,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 15, `./bot` 4, `./file-store` 1, `./entities` 14, `./shards` 12, `./webtransport` 6, `./chat` 16, `./rewind` 8, `./sql-store` 4 | 92 |  | 8,446 |
 | @margoengine/voxel-pathtracer | `.` 53, `./restir` 3, `./compose` 4, `./studio` 12, `./guiding` 3, `./sky` 2, `./media` 6, `./mesh` 6, `./spectral` 3 | 178 |  | 81,091 |
-| @margoengine/water | `.` 8, `./fft` 4, `./query` 2 | 12 |  | 19,856 |
+| @margoengine/water | `.` 8, `./fft` 4, `./query` 2 | 12 |  | 20,013 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
 | @margoengine/webgl2-compat | `.` 16, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2, `./tiers` 9 | 247 |  | 105,105 |
 | @margoengine/wfc | `.` 4, `./overlapping` 6, `./constraints` 6, `./sockets` 3, `./chunks` 4, `./worker` 3 | 11 |  | 1,898 |

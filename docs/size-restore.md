@@ -515,3 +515,11 @@ records measure f56e53077 with dirty=false. API/llms regeneration, 17 record
 tests, full API currentness, docs links and the size gate pass. Points remains
 24138 B; core/stage remains 23924 B. Main owns Save GPU/unit and LIC evidence;
 no second full verify or replay of successful points GPU/README tests.
+
+The final water-query rebase preserves all prior source evidence. Rebuilt only
+water and the umbrella for their newly changed entries. Genuine paired records
+now measure 8694e3a01 with dirty=false; full API (899 entries, 8702 exports),
+17 record tests, links and size gate pass. No metadata was relabeled. In this
+repository build, LAS/Potree and split LAS streams return to their original
+measurements; the initial standalone-build differences above are retained as
+such, rather than claimed as final growth. Root points remains 24138 B.
