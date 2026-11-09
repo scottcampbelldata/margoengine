@@ -638,14 +638,16 @@ test('tileset: a relative tileset URL resolves against the page, and so do its t
     configurable: true,
   });
   try {
-    const tileset = await Tileset.load('data/tileset.json', {
-      fetch: memory.fetch,
-      content: (content) => ({ bytes: content.byteLength, visible: false, dispose() {} }),
-    });
-    assert.equal(tileset.url, 'https://site.test/app/data/tileset.json');
-    assert.ok(tileset.root.contentUrls.length > 0);
-    assert.ok(tileset.root.contentUrls.every((url) => url.startsWith('https://site.test/app/data/')));
-    tileset.dispose();
+    for (const url of ['data/tileset.json', '/app/data/tileset.json']) {
+      const tileset = await Tileset.load(url, {
+        fetch: memory.fetch,
+        content: (content) => ({ bytes: content.byteLength, visible: false, dispose() {} }),
+      });
+      assert.equal(tileset.url, 'https://site.test/app/data/tileset.json');
+      assert.ok(tileset.root.contentUrls.length > 0);
+      assert.ok(tileset.root.contentUrls.every((url) => url.startsWith('https://site.test/app/data/')));
+      tileset.dispose();
+    }
   } finally {
     if (had) Object.defineProperty(globalThis, 'location', had);
     else delete globalThis.location;

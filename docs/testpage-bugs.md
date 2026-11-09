@@ -217,3 +217,18 @@ naming the collision and explaining reuse or an unused name. It never silently
 replaces the existing layout. labels/tests/testpage-attach.test.js fails on main's
 opaque Invalid plugin error and passes with the fix, preserving existing DOM and
 registration and allowing independent named annotations.
+
+Entries 35, 38 and 40 are NOT A BUG after a fresh npm run build:packages (57.1 s):
+preview, tilemap/iso, tilemap/hex and viewcube/axes resolve, and ViewCube has both
+setTheme and roll. The stale dist reports do not reproduce. New verify unit gate
+tests/package-exports.test.js checks every declared export target of every package,
+including types, nested conditions and wildcard targets, after the build. Its
+negative control detects missing runtime/declaration/conditional outputs; direct
+imports retain the specifically reported APIs. Existing API imports/hygiene
+checked many outputs but did not explicitly check every conditional target.
+
+Entry 39 was already FIXED on main in 1c2b04bcf: Tileset.load and Tileset.from
+resolve their input against location.href before resolving linked content. The
+existing tiles/tests/tiles.test.js regression passes; it now also keeps the
+reported root-relative variant beside the relative variant. The combined export
+and tiles run passes 22 tests. No production tile-loader change was needed.

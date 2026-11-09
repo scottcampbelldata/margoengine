@@ -2876,6 +2876,15 @@ and camera-move disocclusion denoising remain open. An independently restarted c
 zero-error image corpus remains missing. No core/stage source or physics source changed.
 
 
+### Test-page follow-up: built export evidence (2026-11-09)
+
+verify's post-build unit suite now checks every package.json export target,
+including declaration and nested conditional outputs, in package-exports.test.js.
+Missing-output negative controls exercise all three branches; direct imports
+cover native preview, tilemap iso/hex, viewcube axes and dynamic theme/roll APIs.
+Those test-page reports came from stale dist and do not reproduce after a fresh
+build. Tile relative/root-relative inputs also pass the existing loader fix.
+
 ### Test-page follow-up: transition composition evidence (2026-11-09)
 
 Optional mask/custom transitions own distinct plugin/pass names and nested capture
