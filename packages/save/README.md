@@ -165,6 +165,33 @@ console.log(weather.rain); // 0.5
 A plugin in the save and not in the scene needs `type` in its binding (`{ type: Sky }`), which attaches it with the
 saved options; without one the save is refused before anything changes.
 
+With `scene`, factories receive the real engine inside that scene's setup scope, so `use`, `createMesh`, lighting
+and passes belong to the target scene. State callbacks and rollback run in the same scope. A factory that throws
+after attaching plugins has those registrations removed in reverse order. Rollback checks instance identity and
+preserves a later replacement. Factories must dispose their own resources; binding callbacks must undo their own
+effects beyond the saved plugin state.
+
+```ts
+import { Engine, type EngineKernel } from 'margoengine/core';
+import { captureScene, restoreScene } from 'margoengine/save/engine';
+
+const engine = await Engine.create(document.createElement('canvas'));
+const scene = engine.createScene('restored');
+const type = {
+  attach(host: EngineKernel) {
+    const plugin = { name: 'score', points: 0, setup() {} };
+    host.use(plugin);
+    return plugin;
+  },
+};
+type.attach(engine).points = 12;
+const plugins = { score: { type, properties: ['points'] } };
+const saved = captureScene(engine, { plugins });
+await restoreScene(engine, saved, { scene, plugins });
+console.log(engine.sceneOf(scene.plugins.get('score')!) === scene); // true
+engine.dispose();
+```
+
 `restoreScene` is all or nothing. It checks the whole save, loads the models out of sight and builds every mesh, and
 only then applies plugin state, camera and lighting and removes what the scene held. A model that fails to load, a
 throw from `onEntity` or a plugin, or an abort leaves the running scene as it was, and `signal` stops it. `filter`

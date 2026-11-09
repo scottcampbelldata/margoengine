@@ -469,32 +469,53 @@ function applyPlugins(
   plugins: PluginBindings | undefined,
 ): void {
   const undo: (() => void)[] = [];
+  // A factory receives the real engine, whose public aliases are scene-local during setup.
+  // Choose an unused name: a saved or running plugin may use any string, including this prefix.
+  let name = 'save:restore';
+  while (scene.plugins.has(name) || wanted.some(([saved]) => saved === name)) name += ':';
+  const scope: EnginePlugin = { name, setup: apply };
   try {
-    for (const [name, saved] of wanted) {
-      const binding = bindingOf(plugins, name) ?? undefined;
-      let plugin = named.get(name);
-      if (plugin) {
-        const target = plugin,
-          was = readPlugin(target, binding);
-        if (was !== undefined) undo.push(() => writePlugin(target, binding, was));
-      } else {
-        const made = binding!.type!.attach(engine, (record(saved) ? saved.options : undefined) as never);
-        undo.push(() => scene.removePlugin(made.name));
-        plugin = made;
+    scene.use(scope);
+  } finally {
+    if (scene.plugins.get(name) === scope) scene.removePlugin(name);
+  }
+  function apply(): void {
+    try {
+      for (const [name, saved] of wanted) {
+        const binding = bindingOf(plugins, name) ?? undefined;
+        let plugin = named.get(name);
+        if (plugin) {
+          const target = plugin,
+            was = readPlugin(target, binding);
+          if (was !== undefined) undo.push(() => writePlugin(target, binding, was));
+        } else {
+          const before = new Set(scene.plugins.values());
+          try {
+            plugin = binding!.type!.attach(engine, (record(saved) ? saved.options : undefined) as never);
+          } finally {
+            // A factory can attach helpers or throw after registering. Undo all of its registrations,
+            // by identity, so a state loader's later replacement is never removed by an old undo step.
+            for (const made of scene.plugins.values())
+              if (!before.has(made))
+                undo.push(() => {
+                  if (scene.plugins.get(made.name) === made) scene.removePlugin(made.name);
+                });
+          }
+        }
+        writePlugin(plugin, binding, saved);
       }
-      writePlugin(plugin, binding, saved);
-    }
-  } catch (error) {
-    // Every step runs, whatever another does: the plugin that failed may refuse its old state too.
-    const undoErrors: unknown[] = [];
-    for (const step of undo.reverse()) {
-      try {
-        step();
-      } catch (problem) {
-        undoErrors.push(problem);
+    } catch (error) {
+      // Every step runs, whatever another does: the plugin that failed may refuse its old state too.
+      const undoErrors: unknown[] = [];
+      for (const step of undo.reverse()) {
+        try {
+          step();
+        } catch (problem) {
+          undoErrors.push(problem);
+        }
       }
+      throw undoErrors.length ? Object.assign(error as object, { undoErrors }) : error;
     }
-    throw undoErrors.length ? Object.assign(error as object, { undoErrors }) : error;
   }
 }
 

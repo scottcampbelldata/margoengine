@@ -3733,3 +3733,28 @@ for Smith/van der Walt 2015, Nunez/Anderton/Renslow 2018 and Kovesi 2015. No sou
 for this size change, and the 23,924 B core/stage measurement stays below 25,000 B. Old measurement sources
 a58dda187, 2518dd32e and 66e8a50cf remain historical audit checkpoints, not current figures.
 The strengthened main compute dispatch oracle and its subset/wait classifier are preserved unchanged.
+
+
+### Save factory scene scope and compensation (batch 56 owner continuation)
+
+Research compared Anindya Banerjee and David A. Naumann, *Ownership Confinement
+Ensures Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003, with Hector Garcia-Molina and Kenneth Salem,
+*Sagas* (1987), https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf,
+and Ecma International, *ECMAScript 2026 Language Specification* (2026),
+https://262.ecma-international.org/17.0/#sec-try-statement. Confinement motivates
+using the actual target scene's setup scope rather than an engine proxy;
+compensating transactions motivate reversing every new registration after a
+partial factory failure. ECMAScript finally semantics restore scope on success
+and failure. These are design inferences, not claims of a formal ownership proof
+or database isolation. No companion source or foreign implementation was read.
+
+Save invokes synchronous factories and state callbacks with the real engine in
+a temporary plugin's public scene setup. Its name avoids both live and saved
+plugin names. Removal of the scope preserves child pass ownership. Registrations
+are collected even if attach throws, reversed on rollback and removed only if
+the recorded instance still occupies that name. Replaced instances and other
+scenes are preserved. The owning package holds all code; core and stage do not
+change. The standard Save test command and check:merge run the 16-case real-engine
+owner suite, covering the original six failures plus default controls, partial
+attachment, helper cleanup, scope collisions and replacement identity.

@@ -3659,3 +3659,17 @@ The root cause was packaging quantization, not scientific data or GPU precision.
 Restore plain published decimal RGB rows and interpolate before documented
 float32 output conversion. All-row digests and precision regressions cover this
 class; sources and proof are in [size restoration](size-restore.md).
+
+
+### Fixed: Save factories registered into the default scene
+
+`restoreScene(engine, saved, { scene: secondary, plugins })` invoked a missing
+plugin's `type.attach(engine)` outside secondary setup. The real engine therefore
+attached it to the default scene while rollback removed from secondary. Default
+same-name plugins could also prevent attachment. Save now invokes factories and
+state callbacks inside the target setup scope and rolls back registrations by
+identity, including helpers attached before a factory throws. The 16 owner cases
+in `packages/save/tests/scene-owner.test.js` produce 13 failures on the parent and
+all pass after repair; the original nine-case fixture had six secondary failures
+and three passing default controls. Callback effects outside saved state remain
+the binding author's responsibility. The wider owner audit remains open.

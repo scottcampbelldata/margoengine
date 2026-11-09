@@ -1973,3 +1973,14 @@ leaf passes both backends with all four intermediate readbacks. Core plus stage
 remains 23,924 B gzip; runtime entries and size ceilings are unchanged by this
 fixture fix. Receipts: test-results/batch-273-features-{verify,rebase-*,final-size}.
 No whole-verify pass is claimed for the original failed invocation.
+
+
+### Save factory scene-owner regression
+
+Run `npm run test --workspace @margoengine/save` for all 112 units, including
+`tests/scene-owner.test.js`. Its 16 cases fail 13 times against parent
+0ba1d4f94; the original nine-case fixture fails six times. Run the package's
+`test:gpu` under one shared GPU lock (owner set, wait-max 60, bounded per-command
+max), then `npm run check:readme-run -- --packages=save`. The engine browser gate
+renders the secondary factory mesh and verifies target-only pass execution and
+failure cleanup alongside the existing real-model exact frame comparison.

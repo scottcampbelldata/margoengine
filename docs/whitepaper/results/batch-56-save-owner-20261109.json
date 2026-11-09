@@ -1,0 +1,67 @@
+{
+  "base": "0ba1d4f94",
+  "originalParent": {
+    "pass": 3,
+    "fail": 6
+  },
+  "expandedParent": {
+    "pass": 3,
+    "fail": 13
+  },
+  "packageUnits": {
+    "pass": 112,
+    "fail": 0
+  },
+  "gpu": {
+    "commands": [
+      "engine-check.mjs",
+      "slots-check.mjs",
+      "safe-check.mjs",
+      "remote-check.mjs"
+    ],
+    "allPassed": true,
+    "engineOriginal": {
+      "different": 0,
+      "moved": 0,
+      "plugins": 3
+    },
+    "owner": {
+      "red": 484,
+      "owned": true,
+      "passes": 1,
+      "failure": "reject state",
+      "errors": [],
+      "remaining": 0,
+      "meshes": 0,
+      "sentinel": true,
+      "aliases": true
+    }
+  },
+  "readme": {
+    "total": 12,
+    "node": 8,
+    "browser": 4,
+    "fail": 0
+  },
+  "sizes": {
+    "before": 8182,
+    "after": 8285,
+    "coreStage": {
+      "raw": 59077,
+      "gzip": 23924
+    }
+  },
+  "lint": {
+    "pass": true,
+    "existingWarnings": 120
+  },
+  "hygiene": {
+    "pass": true
+  },
+  "verify": "pending once-run bounded full verify",
+  "scope": "Save registration ownership; wider audit remains open; core light capture repair owned by separate hunter",
+  "retainedFailures": [
+    "initial GPU fixture lacked required viewport; original assertions passed; corrected fixture passed",
+    "initial expanded CPU graph fixture used unsupported observer; corrected fixture passed"
+  ]
+}

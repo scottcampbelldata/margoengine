@@ -2398,3 +2398,22 @@ rows are checked; interpolation and linear-light float32 output are covered.
 This removes the previous 8-bit packaging approximation. It does not claim
 new perceptual display accuracy or speed. Reproduction and sources:
 [size restoration](../size-restore.md), [limits](../limits.md).
+
+
+### Save secondary-scene factory ownership
+
+`restoreScene` invokes missing-plugin factories and state callbacks within the
+selected scene's public setup scope. Factories receive the actual engine;
+registration, setup-created meshes, lighting and passes use that scene. Failure
+compensates every newly registered instance in reverse order, including helpers
+from a throwing attach, without removing another scene's same-name plugin or a
+later replacement. Proof: `packages/save/tests/scene-owner.test.js`, 16 real-engine
+cases, parent 3 pass/13 fail and repaired all pass. The original nine cases give
+parent 3 pass/6 fail. Research and limitations: [clean-room record](../clean-room.md).
+This is a registration guarantee, not general isolation of arbitrary callbacks.
+
+Complete Save GPU acceptance passes all four browser commands, with exact saved/
+restored real-model frames, and the added owner case draws 484 red pixels. Its
+failed state leaves zero secondary plugins/meshes and preserves the default
+sentinel. All 12 runtime README examples pass. Core plus stage remains 23924 B;
+optional engine entry grows 8182 to 8285 B within its unchanged ceiling.

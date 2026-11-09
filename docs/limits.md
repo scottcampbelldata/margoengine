@@ -2851,3 +2851,21 @@ Before/after: 5ec86fe7c and that commit plus finding 8, identical bare-import
 external/minification/default-gzip method. Source hashes, research and numeric
 regression proof: [size restoration](size-restore.md). No new speed or display
 perceptual-accuracy claim is made.
+
+
+### Save factory ownership
+
+Save's optional engine entry scopes synchronous factory attachment, state loading
+and compensation to the selected scene. It uses the actual engine and public
+scene setup; core/stage are unchanged. Rollback removes newly attached plugins
+and helpers in reverse order only while their instance is still registered.
+Factories own their resources, and arbitrary binding side effects beyond saved
+state need their own compensation. No new asynchronous factory API or isolation
+from binding callbacks is claimed. The standard Save/check:merge unit suite
+includes 16 real-engine ownership cases, not a source-text classification.
+
+Canonical min+gzip with bare imports external: Save engine 8182 to 8285 B, within
+its unchanged 8438 B ceiling. Core plus stage stays 23924 B, below 25000 B. The
+complete four-command Save GPU suite passes, including 484 red secondary-scene
+factory pixels, one surviving owner pass and exact failure cleanup. All 12 README
+examples pass (eight Node, four browser); no benchmark or speed claim.

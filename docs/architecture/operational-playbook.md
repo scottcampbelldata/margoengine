@@ -4660,3 +4660,24 @@ regenerated entry/network records: LIC 23,461 B (previously 10,429), optional ce
 10,517). Keeping complete shared data avoids a loading contract solely for optional size. Root 50,303 B,
 flow 8,665 B, native driver 4,476 B and core/stage 23,924 B. No core/stage source or timing claim changes.
 Prior full verification and unaffected package checks are retained; closure records distinguish affected reruns.
+
+
+### Section 5 evidence: Save factory scene ownership
+
+Save's 16-case real-engine regression is part of its normal package tests and
+therefore check:merge/verify. The parent produces 13 failures (the original six
+secondary failures plus partial factory, helper, collision and identity cases);
+the repaired package passes all 112 units. Setup and rollback use a temporary
+public scene scope, never a proxy or private active-state mutation. Exact-instance
+compensation preserves replacements; nested factory passes keep their own graph
+owner when the temporary scope leaves. Core and stage are untouched. The Save
+browser engine gate additionally renders a factory-owned secondary-scene box,
+checks its pass survives scope removal and checks failed state removes both mesh
+and pass while retaining the default scene's sentinel. GPU acceptance is recorded
+separately from these CPU assertions; the wider owner audit remains open.
+
+Save GPU acceptance: all four package browser commands pass. The original real
+Knight/shoe/clone comparison remains exact (zero differing components); the added
+secondary factory proof yields 484 red pixels, one pass and zero leaked meshes
+or registrations after failure. Twelve runtime README examples pass; no GPU
+validation errors. Engine entry 8182 to 8285 B; core plus stage remains 23924 B.
