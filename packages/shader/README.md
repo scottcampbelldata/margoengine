@@ -1,5 +1,23 @@
 # @margoengine/shader
 
+`NodePass.dispose()` detaches the pass from its owning scene. A same-name pass in
+another scene is preserved; device restoration keeps the registration. For a
+secondary scene, attach the PostStack with `scene.use()`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {NodePass, inputColor} from 'margoengine/shader';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const pass = new NodePass(inputColor());
+const stack = new PostStack([pass]);
+product.use(stack);
+pass.dispose();
+stack.dispose();
+engine.dispose();
+```
+
 Import `margoengine/shader` from the `margoengine` package, or `@margoengine/shader` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.

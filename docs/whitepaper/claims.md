@@ -2194,3 +2194,10 @@ restoration preserves registration. Proof: packages/creative/tests/post-owner.te
 uses real engine registries with inert GPU resources for standalone/stacked effects,
 owner removal, same-name isolation and replacement; pre-repair disposal fails.
 Physical GPU/README acceptance remains pending.
+
+WideAngle, WideAngleCube and NodePass detach by owning-scene identity and preserve
+same-name effects in another scene. Proof: packages/cameras/test/scene-owner.test.js
+and packages/shader/test/post-owner.test.js use real engine registries with inert
+GPU resources, including restoration and replacement; preceding implementations
+fail their disposal assertions. Borrowed cube disposal is rejected by the camera
+fixture. Physical GPU/README acceptance remains pending.

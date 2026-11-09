@@ -5215,6 +5215,10 @@ Creative's PostProcessing and Painterly disposal removes their owning registrati
 restoration keeps it. No shaders, passes or entry ceilings change. Lifecycle
 claims currently have CPU evidence; physical GPU/README acceptance remains pending.
 
+WideAngle, WideAngleCube and NodePass explicitly detach their own registration;
+the cube effect preserves borrowed cubes. Device restoration keeps registration.
+No rendering work or entry ceilings change; physical GPU/README gates are pending.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5532,6 +5536,12 @@ helper. Its local repair separates resource release from explicit owner removal;
 Painterly now removes its own scene registration too. The creative post-owner
 regression reproduces the original failures and proves restoration, owner removal,
 same-name isolation and replacement. Physical GPU/README gates remain pending.
+
+The remaining PostStack peer scan reproduced the same active-scene removal in
+WideAngle and WideAngleCube, and missing detachment in NodePass (dispose dropped
+its engine reference but left registration). Their owning-package repairs have
+per-class inert-GPU regressions and a cross-package joinStack source guard.
+Physical GPU/README gates and the wider non-PostStack lifecycle audit remain open.
 
 ### Batch 56 review repair audit
 
@@ -9858,6 +9868,24 @@ The coat receives directional lighting and its shadow visibility. Clustered ligh
 
 # @margoengine/shader
 
+`NodePass.dispose()` detaches the pass from its owning scene. A same-name pass in
+another scene is preserved; device restoration keeps the registration. For a
+secondary scene, attach the PostStack with `scene.use()`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {NodePass, inputColor} from 'margoengine/shader';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const pass = new NodePass(inputColor());
+const stack = new PostStack([pass]);
+product.use(stack);
+pass.dispose();
+stack.dispose();
+engine.dispose();
+```
+
 Import `margoengine/shader` from the `margoengine` package, or `@margoengine/shader` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
@@ -9912,17 +9940,7 @@ const stage = await createStage('#viewport', {backend: 'webgpu'});
 const slice = uniform(1.5), leaf = await loadTexture('/leaf.png'), radii = new Float32Array(n).fill(0.2);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
-
-const counter = storage(1, 'u32', {atomic: true}), visible = storage(n, 'u32'), radius = storage(radii, 'f32');
-ComputePass.attach(stage.engine, n, i => {
-  const keep = radius.element(i).greaterThan(0.1);
-  const slot = counter.atomicAdd(0, select(keep, uint(1), uint(0)));   // previous value: this item's slot
-  return visible.store(select(keep, slot, uint(n - 1)), i);           // compacted list; counter.element(0) is the count
-});
-// counter.update() before a frame resets it to its CPU data (zeros).
 ```
-
-Statements: variables that change, branches that run one side only, loops that leave early:
 
 [README continues: https://margoengine.com/llms/packages/shader.md]
 
@@ -13350,6 +13368,27 @@ const stool = engine.createMesh().setGeometry(box()).setPosition([3, 0, 0]);
 
 # @margoengine/cameras
 
+`WideAngle` and `WideAngleCube` detach from their owning scene when disposed and
+preserve same-name effects in other scenes. Device restoration keeps them attached.
+Use `scene.use()` to attach their PostStack to a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {CubeCamera} from 'margoengine/environment/cube-camera';
+import {WideAngle} from 'margoengine/cameras/panini';
+import {WideAngleCube} from 'margoengine/cameras/wide-cube';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const cube = new CubeCamera({size:64});
+product.use(cube);
+const stack = new PostStack([new WideAngleCube({cube}), new WideAngle()]);
+product.use(stack);
+stack.dispose();
+cube.dispose();
+engine.dispose();
+```
+
 Import `margoengine/cameras` from the `margoengine` package, or `@margoengine/cameras` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps
@@ -13379,29 +13418,6 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
   `height` or `left`/`right`/`top`/`bottom`. Perspective: core's `fitToBoundingBox`. `aspect` defaults to the engine
   canvas, `duration` to 0.3 s; the engine advances the animation (after `attach(camera)` call `onPreUpdate(delta)`
   yourself). Throws `Bounds exceed far` when the box does not fit the default depth range (`camera.far` deep).
-
-- **Parameters**: `left`, `right`, `top`, `bottom` (all four replace `height` and
-  the canvas aspect, so update them on resize), `zoom` (divides the frustum about its centre), `near`, `far` (eye-space, may be negative).
-  Without `height` or bounds the visible height is `2 · distance · tan(fov / 2)`: the perspective framing at the target,
-  so `fitToBoundingBox`, the stage's `CADCameraControls` and `@margoengine/controls` dolly become ortho zoom and pan tracks
-  the cursor exactly. Without `near`/`far` the depth range is `camera.far` deep and centred on the target (Blender's
-  convention), so zooming in never clips a model at the eye.
-- **Fixed size.** With an explicit `height` or all four bounds, `projection.fixedOrthographic` (also readable on the
-  attached camera) is true: dolly changes only the distance, so `@margoengine/controls` zoom-to-cursor adds no pan.
-- **Depth** is reversed-Z on WebGPU (near 1, far 0) like core, and -1..1 on WebGL. Orthographic depth is linear.
-- **Vertical views**: core's `Camera.update` throws `Vertical camera` when the view is parallel to `camera.up`, which with the default +Y up means looking straight up or down. With the plugin,
-  such a view renders exactly vertical with screen up = `up` (default `[0, 0, -1]`, north up looking down; it needs a
-  horizontal component). While attached, `camera.up` reads as `up` for such views (horizontal part at most 1e-9 of the
-  distance) and as the world up (`[0, 1, 0]`) otherwise; assigning `camera.up` sets that world up. The position is
-  not moved, and passes that rebuild the view (shadows, SSAO, gltf-pro) read `camera.up` too. Orbit controls stay
-  1e-6 rad from the pole, so orbiting never snaps the roll.
-- **Culling** is exact and stays on: core derives the culling planes from the matrix the `project` hook builds. No
-  `culling: false` and no extra cost.
-- **Detecting it**: `camera.matrix` is orthographic when entries 3, 7 and 11 are zero.
-- `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core's
-  `project` (unset) and a plain `up` field. Attaching to a camera whose `project` is already set throws.
-
-Errors name their fix. Argument problems throw `RangeError` or `TypeError` (for example `Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite`). Branch on `error.code` for the rest: `attached` (a projection or camera already in use) and `state` (a `FloatingOrigin` used before `engine.use(origin)`).
 
 [README continues: https://margoengine.com/llms/packages/cameras.md]
 

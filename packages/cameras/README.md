@@ -1,5 +1,26 @@
 # @margoengine/cameras
 
+`WideAngle` and `WideAngleCube` detach from their owning scene when disposed and
+preserve same-name effects in other scenes. Device restoration keeps them attached.
+Use `scene.use()` to attach their PostStack to a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {CubeCamera} from 'margoengine/environment/cube-camera';
+import {WideAngle} from 'margoengine/cameras/panini';
+import {WideAngleCube} from 'margoengine/cameras/wide-cube';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const cube = new CubeCamera({size:64});
+product.use(cube);
+const stack = new PostStack([new WideAngleCube({cube}), new WideAngle()]);
+product.use(stack);
+stack.dispose();
+cube.dispose();
+engine.dispose();
+```
+
 Import `margoengine/cameras` from the `margoengine` package, or `@margoengine/cameras` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps

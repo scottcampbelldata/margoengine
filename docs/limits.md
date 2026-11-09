@@ -2624,3 +2624,7 @@ acceptance remains pending; these CPU lifecycle proofs make no speed claim.
 Creative's PostProcessing and Painterly disposal removes their owning registration;
 restoration keeps it. No shaders, passes or entry ceilings change. Lifecycle
 claims currently have CPU evidence; physical GPU/README acceptance remains pending.
+
+WideAngle, WideAngleCube and NodePass explicitly detach their own registration;
+the cube effect preserves borrowed cubes. Device restoration keeps registration.
+No rendering work or entry ceilings change; physical GPU/README gates are pending.

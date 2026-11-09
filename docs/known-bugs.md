@@ -314,6 +314,12 @@ Painterly now removes its own scene registration too. The creative post-owner
 regression reproduces the original failures and proves restoration, owner removal,
 same-name isolation and replacement. Physical GPU/README gates remain pending.
 
+The remaining PostStack peer scan reproduced the same active-scene removal in
+WideAngle and WideAngleCube, and missing detachment in NodePass (dispose dropped
+its engine reference but left registration). Their owning-package repairs have
+per-class inert-GPU regressions and a cross-package joinStack source guard.
+Physical GPU/README gates and the wider non-PostStack lifecycle audit remain open.
+
 ### Batch 56 review repair audit
 
 Reported causes: TAA's transient matrix entered the still controller/history key;

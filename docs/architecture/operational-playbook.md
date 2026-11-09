@@ -4310,3 +4310,9 @@ PostProcessing restoration calls resource release without removing the plugin;
 explicit disposal removes registration and passes before releasing resources.
 packages/creative/tests/post-owner.test.js covers restoration and secondary-scene
 disposal, owner removal and replacement. GPU/README acceptance remains pending.
+
+The PostStack peer audit includes WideAngle, WideAngleCube and NodePass. Their
+per-package ownership regressions prove default/secondary isolation, restoration,
+replacement and borrowed cube lifetime. tests/post-stack-owner-contract.test.js
+scans optional source files implementing joinStack and rejects direct active-scene
+plugin removal; verify/check:merge runs it. GPU/README acceptance remains pending.

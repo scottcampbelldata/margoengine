@@ -288,7 +288,9 @@ function stackHarness(samples = 4) {
     gpu: gpu.device,
     frameGraph: graph,
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
     use(plugin) {
+      plugins.set(plugin.name, plugin);
       graph.withOwner(plugin.name, () => {
         plugin.setup(engine);
         plugin.registerPasses?.(graph);

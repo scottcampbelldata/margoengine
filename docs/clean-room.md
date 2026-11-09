@@ -3008,3 +3008,11 @@ terminal registration cleanup, so device restoration retains its scene passes.
 This is lifecycle bookkeeping in the owning optional package; it adds no passes
 or shader changes. Real-engine inert-GPU tests cover both standalone and stacked
 PostProcessing, stacked Painterly, restoration and same-name scene isolation.
+
+The PostStack peer audit also applies those ownership papers' identity principle
+to WideAngle, WideAngleCube and NodePass. The camera effects previously removed
+the active scene's name; NodePass cleared its engine reference without removing
+its registration. Their per-package inert-GPU tests compare the default and
+secondary scene identities, restoration and replacements. A borrowed cube stays
+borrowed. Shader test hosts now implement the existing sceneOf contract and
+register before setup, like the real engine. No shader code or algorithm changes.

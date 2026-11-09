@@ -172,6 +172,7 @@ test('capture moves the cube to the camera and takes the faces asked for', () =>
       gpu: { createBuffer: () => ({ destroy() {} }), createSampler: () => ({}) },
       camera: { position: [1, 2, 3] },
       onFrame: (f) => (frames.push(f), () => frames.pop()),
+      sceneOf: () => undefined,
       removePlugin() {},
     };
   effect.joinStack({});

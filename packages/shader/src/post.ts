@@ -168,7 +168,9 @@ export class NodePass implements EnginePlugin {
   }
   dispose(): void {
     this.disposed = true;
+    const engine = this.engine;
     this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.onDeviceRestored();
   }
   declare [Symbol.dispose]: () => void;
