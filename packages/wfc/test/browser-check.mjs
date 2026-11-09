@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { fileURLToPath } from 'node:url';
 const server = await createServer({
+  root: fileURLToPath(new URL('../../..', import.meta.url)),
   configFile: false,
   // This suite serves only its middleware page, not the repository's unrelated HTML entries.
   optimizeDeps: { entries: [] },
