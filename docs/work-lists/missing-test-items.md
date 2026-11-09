@@ -1,5 +1,18 @@
 # Required test items audit
 
+## README five ownership (2026-11-09)
+
+Lane Q, branch `readme-five`, owns these five executable README exceptions under
+the private codex-readme-five brief. Lane C should leave these rows to lane Q:
+
+- `react/readme-first-scene-e7b2ea`: page harness React named exports.
+- `react/readme-pointer-events-and-picking-8b5eb7`: browser dependency isolation.
+- `stage/readme-feature-entries-a6844a`: static glTF fixture selection.
+- `text/readme-prebuilt-atlases-bitmapfont-5ec840`: missing licensed font atlas.
+- `worker/readme-margoengine-worker-b56e85`: page/worker companion setup.
+
+Claimed only; runtime fixes and evidence follow in separate pushes.
+
 Started 2026-11-09 from origin/main `c1646e3ec`. This is an active work list, not a completion claim.
 The scan covers package tests, root tests and scripts; limits, known bugs, claims, build-record,
 work-lists and busy-retests; the main checkout's private report/handoff files and ci-status.json.
