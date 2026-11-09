@@ -1405,6 +1405,107 @@
       },
       "qualityEntries": 977,
       "inheritedProofInputs": "Byte-identical to 826a6b2e9 in all repaired packages and GPU-lock. New main commit adds separate bvh/shadows entries and documentation. Existing passing GPU, unit, README and lock results are reused; only affected build/API/quality/docs gates rechecked."
+    },
+    "trsRebase": {
+      "base": "fc20cdca6",
+      "tip": "142eb2789",
+      "cpu": {
+        "landing-trs-build": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 12.904,
+          "log": "test-results/56fix/landing-trs-build.log"
+        },
+        "landing-trs-api": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 10.789,
+          "log": "test-results/56fix/landing-trs-api.log"
+        },
+        "landing-trs-quality": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 29.551,
+          "log": "test-results/56fix/landing-trs-quality.log"
+        },
+        "landing-trs-lint": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 2.072,
+          "log": "test-results/56fix/landing-trs-lint.log"
+        },
+        "landing-trs-hygiene": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 11.389,
+          "log": "test-results/56fix/landing-trs-hygiene.log"
+        },
+        "landing-trs-metadata": {
+          "code": 0,
+          "timedOut": false,
+          "seconds": 2.914,
+          "log": "test-results/56fix/landing-trs-metadata.log"
+        }
+      },
+      "gpu": [
+        {
+          "id": "pathtrace",
+          "words": [
+            "node",
+            "packages/staging/test/pathtrace-browser.mjs"
+          ],
+          "max": 2,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 179.01,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-pathtrace.log"
+        },
+        {
+          "id": "hdr-native",
+          "words": [
+            "node",
+            "packages/staging/test/hdr-shadow-browser.mjs"
+          ],
+          "max": 2,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 36.847,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-hdr-native.log"
+        },
+        {
+          "id": "hdr-compat",
+          "words": [
+            "node",
+            "packages/staging/test/hdr-shadow-browser.mjs",
+            "--compat"
+          ],
+          "max": 2,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 14.249,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-hdr-compat.log"
+        },
+        {
+          "id": "readmes",
+          "words": [
+            "node",
+            "scripts/run-readme-examples.mjs",
+            "--packages=staging,environment,margoengine"
+          ],
+          "max": 3,
+          "code": 0,
+          "timedOut": false,
+          "seconds": 38.408,
+          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-readmes.log"
+        }
+      ],
+      "readmeExamples": 27,
+      "api": {
+        "entries": 894,
+        "exports": 8673
+      },
+      "qualityEntries": 977,
+      "note": "Main advanced during the fast-forward push; no force or overwrite. Rebased again. Repair source and GPU lock unchanged; rebuilt all packages after upstream named TRS/caller migration, reran real-model pathtrace on both backends, HDR-shadow rotation on each backend and all 27 environment/staging/umbrella README examples. All pass. Red capture regression remains excluded."
     }
   }
 }
