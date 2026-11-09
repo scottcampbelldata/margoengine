@@ -92,6 +92,33 @@ lamp.x += 1;
 CPU helper functions `softShadowFactor(light, edges, x, y, options)`, `softInShadow(light, edges, x, y, options)` and
 `softLightAt(light, x, y, edges, normal, options)` evaluate soft shadows in Node for testing.
 
+## Light textures (cookies)
+
+`@margoengine/lighting2d/cookie` projects 2D textures (cookies / gobos) onto light footprints to shape lights with window patterns,
+slats, caustics or flashlights.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {CookieLighting2D, createSpotCookie} from 'margoengine/lighting2d/cookie';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const cookies = CookieLighting2D.attach(engine, {target: shade.target, camera: shade.camera, ambient: '#202030'});
+const cookie = createSpotCookie(32, 0.4, 0.9);
+const flashlight = cookies.addLight({x: 40, y: 30, radius: 80, color: '#ffd9a0', cookie, cookieScale: [60, 60]});
+cookies.setOccluders([{shape: 'box', width: 16, height: 16, offset: [80, 45]}]);
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+flashlight.x += 1;
+```
+
+A `CookieLight2D` takes `cookie: CookieTexture2D`, `cookieScale: [width, height]`, `cookieOffset: [x, y]`, `cookieRotation: radians`,
+`cookieWrap: 'zero' | 'clamp' | 'repeat' | 'mirror'`, and `cookieMode: 'multiply' | 'alpha' | 'color'`. Presets `createSpotCookie`
+and `createWindowCookie` construct standard patterns. CPU helper `cookieLightAt(light, x, y, normal)` evaluates the shaped light in Node.
+
 ## CPU forms
 
 `lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and

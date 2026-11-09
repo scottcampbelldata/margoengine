@@ -1473,3 +1473,7 @@ No engine/library source or external assets. Generated impulses are stand-ins.
 ## 2D soft shadows (batch 55)
 
 `@margoengine/lighting2d/soft` is written from published descriptions of 2D area light penumbra filtering: R. Fernando, "Percentage-Closer Soft Shadows", GPU Gems 2, ch. 8, 2005 (penumbra estimation from light source radius and distance between receiver and occluder), and T. Akenine-Moller and U. Assarsson, "Plausible Soft Shadows using Penumbra Wedges", 2002. Angular extent calculation and radial ray filtering across occluder edge lists are Margo-own clean room implementations derived from first principles geometry; no other engine source or library code was read.
+
+## 2D light textures and cookies (batch 55)
+
+`@margoengine/lighting2d/cookie` is written from published descriptions of projective texture masks: M. Segal, C. Korobkin, R. van Widenfelt, J. Foran, and P. Haeberli, "Fast Shadows and Lighting Effects Using Texture Masks", Computer Graphics (SIGGRAPH '92 Proceedings), vol. 26, no. 2, 1992, pp. 249-252. The 2D coordinate transformation, wrapping modes, blend modes and sampling math are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.

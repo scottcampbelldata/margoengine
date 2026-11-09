@@ -1334,6 +1334,10 @@
       "types": "./dist/lighting2d/soft.d.ts",
       "import": "./dist/lighting2d/soft.js"
     },
+    "./lighting2d/cookie": {
+      "types": "./dist/lighting2d/cookie.d.ts",
+      "import": "./dist/lighting2d/cookie.js"
+    },
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"

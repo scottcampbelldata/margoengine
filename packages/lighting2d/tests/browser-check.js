@@ -5,6 +5,7 @@ import { LayerCompositor } from '/packages/pixel/dist/index.js';
 import { SpriteLayer } from '/packages/sprites/dist/index.js';
 import { inShadow, lightAt, Lighting2D, occluderEdges } from '/packages/lighting2d/dist/index.js';
 import { SoftLighting2D, softLightAt } from '/packages/lighting2d/dist/soft.js';
+import { CookieLighting2D, cookieLightAt, createSpotCookie } from '/packages/lighting2d/dist/cookie.js';
 
 const WIDTH = 32,
   HEIGHT = 16,
@@ -386,6 +387,36 @@ window.check = {
       out.checks['soft shadows with penumbra'] = compare(bytes, wantSoft);
       softPass.dispose();
       softTarget.destroy();
+    }
+    {
+      const cookieTarget = texture(),
+        cookiePass = CookieLighting2D.attach(instance, { target: () => cookieTarget, ambient: '#000000' }),
+        cookie = createSpotCookie(16, 0.4, 0.9),
+        cookieLamp = cookiePass.addLight({
+          x: 16,
+          y: 8,
+          radius: 20,
+          height: 10,
+          color: '#ffffff',
+          intensity: 1,
+          cookie,
+          cookieScale: [20, 20],
+          cookieMode: 'multiply',
+        });
+      frame();
+      const bytes = await read(cookieTarget);
+      const wantCookie = new Float64Array(WIDTH * HEIGHT * 3);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = x + 0.5;
+          const wy = y + 0.5;
+          const add = cookieLightAt(cookieLamp, wx, wy, [0, 0, 1]);
+          for (let c = 0; c < 3; c++) wantCookie[(y * WIDTH + x) * 3 + c] = Math.min(1, add[c]) * 255;
+        }
+      }
+      out.checks['cookie texture light shaping'] = compare(bytes, wantCookie);
+      cookiePass.dispose();
+      cookieTarget.destroy();
     }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();

@@ -40,6 +40,10 @@
     "./soft": {
       "types": "./dist/soft.d.ts",
       "import": "./dist/soft.js"
+    },
+    "./cookie": {
+      "types": "./dist/cookie.d.ts",
+      "import": "./dist/cookie.js"
     }
   },
   "files": [

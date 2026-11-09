@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-592). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-593). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -876,3 +876,7 @@ The frame planner is linear in bodies, contacts and joints. General branching gr
 path work; accepted components still use local allocations and two banded factorizations each substep.
 No speed parity or allocation-free behavior is claimed. Browser speed must be remeasured on this accuracy
 baseline. CCD remains outside this correction.
+
+## 2D light textures and cookies (batch 55)
+
+Optional `@margoengine/lighting2d/cookie` projects 2D textures (cookies / gobos) onto light footprints to shape lights with window patterns and flashlights. Supports scale, offset, rotation, wrapping modes (zero, clamp, repeat, mirror) and blend modes (multiply, alpha, color). WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-593.
