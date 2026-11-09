@@ -223,6 +223,8 @@ except `id`, `color` and `type` are optional.
   (`color^(density * distance)`); `scatter` (addition) adds interior scattering per world unit, a random-walk subsurface
   look; `anisotropy` shapes that scattering. Adjacent voxels of the same glass index form one volume (no inner faces).
   A face of another model that coincides with a glass face (glass resting on a floor) is hit, not skipped.
+  Index-matched glass (`ior: 1`) also preserves energy around an enclosed diffuse voxel: inverse-refraction
+  light proposals that reproduce the same direction are offered once, including near-identity refraction.
 - Dispersion (addition): `abbe` (Abbe number V_d, 5-200; 0 or absent is none) makes the glass index depend on the
   wavelength by Cauchy's law through `ior` at 587.6 nm, so light splits into colours: about 64 for crown glass, 30-40
   for flint, 20 for a strong effect. A path takes one wavelength (380-780 nm) at its first dispersive glass and carries

@@ -47,9 +47,10 @@ retained for native termination. A deterministic asynchronous-session regression
 in `tests/browser-teardown.test.js` fails on the parent; all 56 scoped tests pass.
 All nine fresh voxel GPU suites and the README gate now pass, with the README
 gate retaining its existing five known failures and no new failure.
+
 ### Review 99 remaining tracer findings (2026-11-09)
 
-- Root glass: a white diffuse centre voxel in a 3x3x3 IOR-1 glass block under a constant unit environment returns 1.03826 at 1024 spp. The interior distant-light candidate/chain partition counts identical unrefracted directions more than once; fix and cover in the root GPU suite.
+- Fixed root glass: the interior inverse Snell candidates could offer the same unchanged direction through several face normals, adding their full light estimates while the path used one MIS share. A canonical box-exit face now offers that direction once, with the existing direction-equality predicate. The root glassfurnace GPU case rejects the old 1.03826 result and covers IOR 1, 1.000001, 1.0001 and 1.5 against analytic equilibrium.
 - Spectral: a white scene without dispersion has nonzero per-sample RGB spread because four identical traversals receive random spectral reconstruction weights. Delay wavelength-specific transport until a dispersive event; retain valid hero/companion sampling.
 - Composition: restir, guiding, media, mesh and spectral independently override tracingSource, so users cannot combine arbitrary entries. Shared transforms, validators and overlap regression coverage are required.
 - Full-scene meshes: missing UV textures, smooth normals, shared geometry instance transforms and emissive-triangle light sampling; zero-area triangles reject an entire scene and the BVH uses spatial medians. Real scene import needs each of these addressed, including SAH construction.

@@ -1,0 +1,49 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "date": "2026-11-09T19:51:27.795Z",
+  "command": "npm run test:gpu --workspace @margoengine/voxel-pathtracer",
+  "reference": "analytic equilibrium 1; existing glass-furnace absolute bound 0.02",
+  "results": {
+    "1": {
+      "pixels": 256,
+      "mean": 1.0006098730955273,
+      "sd": 0.005495078249750861,
+      "finite": true
+    },
+    "1.000001": {
+      "pixels": 256,
+      "mean": 1.0005833958275616,
+      "sd": 0.005938488766704222,
+      "finite": true
+    },
+    "1.0001": {
+      "pixels": 256,
+      "mean": 0.9996773223392665,
+      "sd": 0.004683553020905265,
+      "finite": true
+    },
+    "1.5": {
+      "pixels": 256,
+      "mean": 0.9997223445679992,
+      "sd": 0.007846457454102129,
+      "finite": true
+    }
+  }
+}

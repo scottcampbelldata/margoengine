@@ -76,7 +76,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu:restir": "cd ../.. && node packages/voxel-pathtracer/tests/restir-browser.mjs",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism convergence",
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal glassfurnace analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism convergence",
     "test:gpu:denoise": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise denoise-diffuse denoise-opaque denoisepeak denoisehistory",
     "test:gpu:denoise-materials": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-materials denoise-materials",
     "test:gpu:denoise-caustics": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-caustics denoise-caustics",

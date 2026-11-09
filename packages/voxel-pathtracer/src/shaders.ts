@@ -1249,6 +1249,9 @@ fn glassCandidates(kind:u32,m:Mat,n:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,l
     d0=-flipped(tin,u0,u1,u2,b);
     // Selection weight: in a box, the ray first reaches face k (no mirror) or a mirroring face.
     let first=boxExit(x,sz,o,d0);
+    // Equal-direction inverse Snell solutions are one proposal, even when
+    // several exit normals produce it. The box exit picks its representative.
+    if(b==0u&&same(d0,s)&&first!=(k>>1u)){continue;}
     if((b==0u&&first!=(k>>1u))||(b!=0u&&(b&(1u<<first))==0u)){weight=UNLIKELY;}
    } else if(g>0u){
     // The axes the walk should enter the instance's box through and, for glass, the first faces it should meet inside

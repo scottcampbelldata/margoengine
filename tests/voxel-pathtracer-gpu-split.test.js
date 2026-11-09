@@ -49,7 +49,7 @@ const checkScripts = () =>
     });
 
 test('the case list is read from the check itself and holds every known case', () => {
-  for (const name of ['agx', 'convergence', 'denoise-materials', 'denoise-caustics', 'denoisehistory', 'native4k'])
+  for (const name of ['agx', 'glassfurnace', 'convergence', 'denoise-materials', 'denoise-caustics', 'denoisehistory', 'native4k'])
     assert.ok(cases.includes(name), `${name} is a case`);
   assert.ok(cases.length >= 36, `${cases.length} cases`);
 });

@@ -2003,3 +2003,12 @@ exception, Wasm trap or hard timeout. Frozen new ETC controls were independently
 quality validated; existing strict controls were retained. Per-seed input,
 adapter and Wasm pins and unchanged source link the result to the ETC checkpoint.
 Missing encoders/public integration keep full job3 open.
+Review 99 root-glass correction: inverse Snell solutions that reproduce the same
+direction contribute one light estimate, paired with one path-side MIS weight.
+The root GPU suite's glassfurnace case checks an interior diffuse voxel at IOR
+1, 1.000001, 1.0001 and 1.5 against analytic equilibrium 1, with the existing
+0.02 glass-furnace bound. The previous shader fails at 1.038261 for IOR 1.
+Evidence: [root GPU values](results/review-99-root-glass-20261109.json);
+reproduce with the package test:gpu script or browser-check.mjs glassfurnace.
+This is a generated-scene energy regression, not a new spectral, nested-volume
+or performance claim.

@@ -478,6 +478,22 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Interior diffuse vertices exercise inverse Snell candidates, rather than
+ // the camera-only glass paths in the convex-cube analytic furnace.
+ async glassfurnace(){
+  const out={};look([0,0,4],[0,0,0],{project:ortho(3)});
+  for(const ior of [1,1.000001,1.0001,1.5]){
+   const scene={revision:1,models:[model('shell',[3,3,3],(x,y,z)=>x===1&&y===1&&z===1?2:1)],
+    instances:[{id:'shell',modelId:'shell',matrix:translate(-1.5,-1.5,-1.5)}],
+    materials:[{id:1,type:'glass',color:[1,1,1],ior,roughness:0},{id:2,type:'diffuse',color:[1,1,1]}],
+    environment:{ground:false,sunIntensity:0,skyIntensity:1,map:{width:4,height:2,data:new Float32Array(24).fill(1)}}};
+   out[ior]=await withTracer(scene,{denoise:false,maxBounces:64},async(t)=>{
+    const image=await t.renderImage({width:16,height:16,samples:1024,seed:12,jitter:false,signal:AbortSignal.timeout(120000)});
+    return {...stats(image,()=>true),finite:image.color.every(Number.isFinite)};
+   });
+  }
+  return out;
+ },
  // Analytic checks, each a mean over the pixels of one object.
  async analytic(){
   const out={},cubeMask=(image)=>(i)=>image.instance[i]===0;

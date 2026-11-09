@@ -3216,6 +3216,8 @@ Mixed-tracer creation builds the voxel snapshot once. Device setup checks the ge
 
 Review 99: the triangle sentinel is not a voxel instance. The mesh specialization excludes interior triangle glass from box-based inverse Snell candidates and marks new surface/scattering chains there as outside that sampler's support. Exterior straight-through walks remain paired with their path MIS share. Section 5 evidence adds a white diffuse voxel inside and behind a closed outward-wound glass cube at IOR 1 and 1.5 on both backends; mesh-browser.mjs keeps the root glass-furnace bound of 0.02. The prior kernel fails the new IOR-1 interior case at 0.979917. Core and stage are untouched.
 
+The independent root-glass correction removes repeated inverse Snell directions at interior diffuse vertices. The reservoir estimates a sum, so giving identical candidates small selection weights still counts their entire estimates repeatedly. The canonical box-exit face now offers an unchanged direction once; all distinct refraction and mirror candidates retain their previous weights. Section 5 evidence: the root test:gpu script includes glassfurnace (four IORs, including exact and near identity), with the existing 0.02 bound. The split-suite/check:merge invariant test requires this case explicitly, so it cannot live only in an optional entry suite. The old kernel returns 1.038261 at IOR 1 and fails this regression. No core or stage change and no speed claim.
+
 ### Complete Potree README folder: section 5 evidence (2026-11-09)
 
 The required outside manifest grows to 457 files, adding all 80 files of the

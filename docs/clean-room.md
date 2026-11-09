@@ -2334,6 +2334,15 @@ box-specific light sampler and assigns full path weight to interior triangle-gla
 it cannot construct. A triangle marker never enters voxel instance lookup. The furnace oracle
 is analytic equilibrium, not another tracer. No companion code or outside repository was read.
 
+The separate Review 99 root-glass repair uses Veach and Guibas (1995) above to
+keep the candidate sum and the path-side MIS partition consistent when inverse
+Snell solutions coincide. Walter et al. (2007) explains the index-matched limit:
+different interface normals can yield the same transmitted direction. Instead
+of adding an IOR-specific exception, Margo uses its existing direction-equality
+predicate and the already computed box-exit face as one canonical representative
+of the unchanged direction. The root GPU suite tests the analytic furnace at IOR
+1, 1.000001, 1.0001 and 1.5. No sampler PDF, tolerance or furnace bound changes.
+
 ## Batch 65 job 5: Lane markings
 
 A broad search of pavement markings and decal projection preceded implementation. FHWA [historical MUTCD 2009 chapter 3B](https://mutcd.fhwa.dot.gov/htm/2009/part3/part3b.htm) distinguishes line patterns and direction arrows. Sutherland and Hodgman, [Reentrant polygon clipping (1974)](https://doi.org/10.1145/360767.360802), describes successive clipping boundaries; projection and clipping are already implemented by Margo. Margo combines authored world-space line/arrow strokes with its existing box decal renderer. Glyphs are generated stand-ins, not copied standard artwork, and make no current traffic-rule compliance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.

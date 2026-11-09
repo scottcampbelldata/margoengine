@@ -262,6 +262,15 @@ try {
       assert.ok(t.maxRelativeDepth < 1e-4, `${name}: depth`);
     }
   }
+  if (wanted('glassfurnace')) {
+    const result = await run('glassfurnace');
+    for (const ior of [1, 1.000001, 1.0001, 1.5]) {
+      const row = result[ior];
+      assert.equal(row.finite, true);
+      assert.equal(row.pixels, 256);
+      near(row.mean, 1, 0.02, `diffuse inside voxel glass, IOR ${ior}`);
+    }
+  }
   if (wanted('analytic')) {
     const r = await run('analytic'),
       expect = {
