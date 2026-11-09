@@ -1521,3 +1521,13 @@ Optional road/terrain: 887 B min+gzip with bare package imports external; depend
 Optional road/repair: 605 B min+gzip with bare package imports external; dependencies are additional downloads. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes. A generated hairpin demonstrably folds and double-covers in the root sweep; repaired faces all have positive area and single coverage, with polygon/mesh area agreement. Closed courtyard, hostile inputs, grade rejection, ownership and aborts; real WebGPU/WebGL2 road pixels, exact reboot and disposal. No speed claim.
 
 Batch 65 job 4 also changes road/junctions to 1114 B min+gzip: the float32 boundary, rather than the pre-rounding boundary, defines triangulation and reported area.
+
+### Decoder README compressed-input evidence (2026-11-09)
+
+The examples' compressed bytes and metadata must agree. Their pinned CC0 inputs
+are Avocado view 0 (8,722 bytes, POSITION=3/NORMAL=1/TEXCOORD_0=0) and
+MeshoptCubeTest view 25 (97 bytes, 24 positions, stride 12, ATTRIBUTES/NONE).
+Extracting the views changes no encoded bytes. Replacing either with a whole
+multi-view buffer, another Draco format, or another view's IDs/counts is invalid.
+These runnable examples establish no new production quality or throughput result.
+No codec source, exports or entry-size budgets changed.

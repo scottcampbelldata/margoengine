@@ -16,6 +16,46 @@ import { parseIES } from '../packages/clustered/dist/ies.js';
 import { parseUSDZ } from '../packages/usdz/dist/index.js';
 import { createHash } from 'node:crypto';
 import { parsePly, parseSplat, parseSpz, parseSog, validateSplats } from '../packages/splats/dist/data.js';
+import { MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD } from '../packages/decoders/dist/meshopt-simd.js';
+
+test('the Draco README serves the exact published Avocado compressed view with matching attribute IDs', () => {
+  const fixture = readmeFixture('/mesh.drc');
+  assert.ok(fixture, 'Draco needs an explicit compressed mesh view, not another .drc format');
+  const bytes = readFileSync(fixture.path);
+  const doc = JSON.parse(readFileSync('packages/decoders/tests/fixtures/Avocado.gltf', 'utf8'));
+  const ext = doc.meshes[0].primitives[0].extensions.KHR_draco_mesh_compression;
+  const view = doc.bufferViews[ext.bufferView];
+  const buffer = readFileSync('packages/decoders/tests/fixtures/Avocado.bin');
+  assert.deepEqual(bytes, buffer.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
+  assert.equal(bytes.length, 8722);
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    '21dfb8f305c178834bc4d860388bfffe6bc26fc66847a476306e4127c38179f5',
+  );
+  assert.deepEqual(ext.attributes, { TEXCOORD_0: 0, NORMAL: 1, TANGENT: 2, POSITION: 3 });
+});
+
+test('the meshopt SIMD README serves a whole outside ATTRIBUTES view and matches the independent oracle', async () => {
+  const fixture = readmeFixture('/meshopt.bin');
+  assert.ok(fixture, 'Meshopt needs its own compressed bufferView, not a generic .bin');
+  const bytes = readFileSync(fixture.path);
+  const doc = JSON.parse(readFileSync('examples/assets/khronos/MeshoptCubeTest/MeshoptCubeTest.gltf', 'utf8'));
+  const ext = doc.bufferViews[25].extensions.KHR_meshopt_compression;
+  const buffer = readFileSync('examples/assets/khronos/MeshoptCubeTest/MeshoptCubeTest.bin');
+  assert.deepEqual(bytes, buffer.subarray(ext.byteOffset, ext.byteOffset + ext.byteLength));
+  assert.deepEqual([ext.count, ext.byteStride, ext.mode, ext.filter ?? 'NONE'], [24, 12, 'ATTRIBUTES', 'NONE']);
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    'a68a0aff67b80b4b3d554dfcb25c3672b88dd405fac553f467a41219663ad64e',
+  );
+  await MeshoptSIMDDecoder.ready;
+  const decoded = meshoptDecodeGltfBufferSIMD(bytes, ext.count, ext.byteStride, ext.mode, ext.filter);
+  const oracle = JSON.parse(readFileSync('packages/decoders/tests/fixtures/meshopt-views.json', 'utf8'))
+    .gltfs.find(({ path }) => path.includes('MeshoptCubeTest'))
+    .views.find(({ bufferView }) => bufferView === 25);
+  assert.equal(decoded.length, 288);
+  assert.equal(createHash('sha256').update(decoded).digest('hex'), oracle.result.sha256);
+});
 
 test('splat README aliases keep the real 8385-point capture excerpt in each documented format', async () => {
   const examples = [
@@ -43,8 +83,10 @@ test('the static USDZ introduction resolves the complete outside Blender box wit
   const fixture = readmeFixture('/model.usdz');
   assert.ok(fixture, 'The USDZ introduction needs its explicit outside static sample');
   const bytes = readFileSync(fixture.path);
-  assert.equal(createHash('sha256').update(bytes).digest('hex'),
-    'b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab');
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    'b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab',
+  );
   const asset = await parseUSDZ(bytes);
   assert.equal(asset.meshes.length, 1);
   assert.equal(asset.meshes[0].positions.length, 108);
@@ -76,7 +118,10 @@ test('explicit README formats never become another extension sample, HTML, or an
     assert.equal(readmeFixture('/texture.ktx2', base).path, path);
     assert.equal(readmeFixture('/unmapped.ktx2', base), undefined);
     assert.throws(() => readmeFixture('/sims/smoke.vdb', base, base), /fetch-readme-assets/);
-    assert.throws(() => readmeFixture('/model.usdz', base, base, base), /Missing Required test fixture.*BoxTextured.*fetch-skip-assets/);
+    assert.throws(
+      () => readmeFixture('/model.usdz', base, base, base),
+      /Missing Required test fixture.*BoxTextured.*fetch-skip-assets/,
+    );
     assert.ok(README_DOWNLOADS['/sims/smoke.vdb'].endsWith('.vdb'));
   } finally {
     rmSync(base, { recursive: true, force: true });

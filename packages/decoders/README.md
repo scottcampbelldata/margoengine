@@ -16,7 +16,7 @@ const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu!, workerLimit: 4});
 
 // A KHR_draco_mesh_compression bufferView, with the extension's attribute ids.
-const geometry = await draco.decode(bytes, {attributeIds: {POSITION: 0, NORMAL: 1, TEXCOORD_0: 2}});
+const geometry = await draco.decode(bytes, {attributeIds: {POSITION: 3, NORMAL: 1, TEXCOORD_0: 0}});
 geometry.positions; // Float32Array
 geometry.indices;   // Uint16Array or Uint32Array
 
@@ -26,6 +26,13 @@ const texture = await ktx2.createTexture(await (await fetch('/albedo.ktx2')).arr
 // On teardown:
 draco.dispose(); ktx2.dispose();
 ```
+
+Here `/mesh.drc` is the unmodified compressed bufferView of Khronos Avocado (Microsoft, CC0),
+whose extension assigns POSITION=3, NORMAL=1 and TEXCOORD_0=0. IDs belong to the file;
+read `KHR_draco_mesh_compression.attributes` for another asset. Run
+`node packages/decoders/scripts/make-readme-streams.mjs` from a clone to extract the
+two README streams into `packages/decoders/tests/fixtures/readme/`; serve `avocado.drc`
+as `/mesh.drc` and the matching 2D KTX2 texture as `/albedo.ktx2`.
 
 A standalone `.ktx2` goes on a material map through `@margoengine/materials`: `loadKTX2Texture(url, {decoder: ktx2})`,
 or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips on each device that draws it.
@@ -46,8 +53,13 @@ import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decod
 const bytes = new Uint8Array(await (await fetch('/meshopt.bin')).arrayBuffer());
 
 await MeshoptSIMDDecoder.ready;
-const positions = meshoptDecodeGltfBufferSIMD(bytes, 1000, 12, 'ATTRIBUTES');
+const positions = meshoptDecodeGltfBufferSIMD(bytes, 24, 12, 'ATTRIBUTES');
 ```
+
+This stream is `MeshoptCubeTest` bufferView 25 (Arseny Kapoulkine, CC0): 97 compressed
+bytes, 24 positions of 12 bytes each, mode ATTRIBUTES and filter NONE. Serve the extracted
+`cube-positions.bin` as `/meshopt.bin`. For another view use its extension's `count`,
+`byteStride`, `mode` and `filter`; a whole glTF buffer can contain several streams.
 
 `MeshoptSIMDDecoder` has the members of `MeshoptDecoder` (`supported`, `ready`, `decodeGltfBuffer`), so a loader written against
 that interface can take either. After changing the Rust source run `node scripts/meshopt-simd-build.mjs`; a test fails while the

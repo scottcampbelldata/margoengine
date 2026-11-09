@@ -877,6 +877,25 @@ test('a Wasm trap inside a decoder becomes the package error, with the trap as i
   assert.equal(isDecoderCrash(new Error('Draco: unknown geometry type')), false);
 });
 
+test('the README compressed view decodes with its documented Avocado attribute IDs', async () => {
+  const { module: draco } = await initDraco(
+    base + 'draco/draco_wasm_wrapper.js',
+    base + 'draco/draco_decoder.wasm',
+    async (url) => {
+      (0, eval)(await (await fetch(url)).text());
+    },
+  );
+  const result = decodeDraco(draco, await fixture('readme/avocado.drc'), {
+    attributeIds: { POSITION: 3, NORMAL: 1, TEXCOORD_0: 0 },
+  });
+  assert.equal(result.vertexCount, 406);
+  assert.equal(result.indices.length, 2046);
+  assert.equal(result.positions.length, 1218);
+  assert.equal(result.normals.length, 1218);
+  assert.equal(result.uvs.length, 812);
+  assert.ok(result.indices.every((index) => index < result.vertexCount));
+});
+
 test('real Draco Wasm decodes the Khronos Box and Avocado and does not grow its heap across repeated decodes', async () => {
   const { module: draco } = await initDraco(
     base + 'draco/draco_wasm_wrapper.js',

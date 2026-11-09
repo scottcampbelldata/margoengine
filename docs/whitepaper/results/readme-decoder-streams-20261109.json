@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-09",
+  "scope": "Runnable decoder examples on exact outside compressed views, not new arbitrary-model accuracy or speed evidence",
+  "source": {
+    "revision": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
+    "licence": "CC0-1.0",
+    "avocadoAuthor": "Microsoft",
+    "meshoptAuthor": "Arseny Kapoulkine",
+    "notice": "packages/decoders/tests/fixtures/NOTICE.md",
+    "generator": "node packages/decoders/scripts/make-readme-streams.mjs",
+    "freshSourceBuffersMatch": true
+  },
+  "draco": {
+    "bytes": 8722,
+    "sha256": "21dfb8f305c178834bc4d860388bfffe6bc26fc66847a476306e4127c38179f5",
+    "ids": {
+      "POSITION": 3,
+      "NORMAL": 1,
+      "TEXCOORD_0": 0
+    },
+    "vertices": 406,
+    "indices": 2046
+  },
+  "meshopt": {
+    "bytes": 97,
+    "sha256": "a68a0aff67b80b4b3d554dfcb25c3672b88dd405fac553f467a41219663ad64e",
+    "count": 24,
+    "stride": 12,
+    "mode": "ATTRIBUTES",
+    "filter": "NONE",
+    "decodedBytes": 288,
+    "independentDecodedSha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+  },
+  "regressions": "two alias tests fail before mappings; source view equality, independent SIMD hash and real Draco Wasm channel/count/index checks",
+  "removedKnownExceptions": [
+    "decoders/readme-margoengine-decoders-b7ae99",
+    "decoders/readme-meshopt-on-wasm-simd-margoengine-2685e0"
+  ],
+  "readmeResults": [
+    {
+      "id": "decoders/readme-margoengine-decoders-4ae9a8",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-meshopt-on-wasm-simd-margoengine-4fc59d",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-jpeg-xl-margoengine-decoders-jxl-2c0973",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-pvr-margoengine-decoders-pvr-44fd95",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-draco-point-clouds-margoengine-d-5f1327",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-webp-margoengine-decoders-webp-0035ab",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "decoders/readme-any-image-to-pixels-margoengine-91c6d3",
+      "result": "pass",
+      "place": "node"
+    },
+    {
+      "id": "decoders/readme-any-image-to-pixels-margoengine-86f34e",
+      "result": "fail",
+      "place": "page",
+      "reason": "TypeError: Failed to fetch"
+    },
+    {
+      "id": "decoders/readme-brotli-margoengine-decoders-brot-f9820a",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-bzip2-and-xz-margoengine-decoder-b38bfe",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-png-margoengine-decoders-png-5cf12b",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-tga-tiff-dds-and-ktx-1-margoengi-d480af",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-pcx-margoengine-decoders-pcx-150025",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-ktx2-cube-maps-and-arrays-margoe-d255e4",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-hdr-ktx2-margoengine-decoders-kt-cbfebd",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-streaming-ktx2-mips-margoengine-d0b4d7",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "decoders/readme-basis-on-the-gpu-margoengine-dec-8314b0",
+      "result": "pass",
+      "place": "page"
+    }
+  ],
+  "gpuChecks": [
+    "Draco Box and Avocado decode in classic workers with transferred, owned arrays",
+    "64 concurrent Draco decodes share a 2-worker pool",
+    "Abort, corrupt input and disposal",
+    "KTX2 transcodes to bc7 and uploads with writeTexture without validation errors",
+    "RGBA8 upload reads back byte-identical from the GPU",
+    "KTX2 cube map transcodes to bc7 in workers and each face reads back on the GPU",
+    "UASTC HDR cube transcodes to bc6h in workers and reads back on the GPU",
+    "KTX2 mips stream by Range reads from level 4 up and equal the whole file on the GPU",
+    "Basis on compute shaders equals the Wasm transcoder byte for byte on real UASTC and ETC1S files",
+    "JPEG XL decodes in a module worker to the bytes of the Node run, stops on abort, and reads back from the GPU",
+    "JPEG XL with no option: this browser went through wasm; the canvas read back passed on a stand-in",
+    "A real PVRTC file uploads as rgba8unorm-srgb, 10 levels, and reads back as decoded",
+    "Draco point clouds decode in a worker with indices, generic attributes and limits",
+    "Production Vite consumer emits the worker and decoders as assets and decodes from them"
+  ],
+  "browser": "157.0.4341.42"
+}

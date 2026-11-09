@@ -159,8 +159,8 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | decoders/readme-hdr-ktx2-margoengine-decoders-kt-cbfebd | /environment.ktx2 | sample: Error: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-jpeg-xl-margoengine-decoders-jxl-2c0973 | /texture.jxl | sample: MargoError: JPEG XL: neither a codestream nor a container signature is there; pass the complete bytes of a .jxl file | Passed with explicit licensed sample; exception removed |
 | decoders/readme-ktx2-cube-maps-and-arrays-margoe-d255e4 | /sky.ktx2, /terrain.ktx2 | sample: TypeError: KTX2: invalid file (not KTX 2.0); pass an unmodified .ktx2 file | Passed with explicit licensed sample; exception removed |
-| decoders/readme-margoengine-decoders-b7ae99 | /mesh.drc, /albedo.ktx2 | sample: Error: Draco: invalid header; pass an unmodified .drc buffer | Pending file selection, provenance and rerun |
-| decoders/readme-meshopt-on-wasm-simd-margoengine-2685e0 | /meshopt.bin | sample: MargoError: EXT_meshopt_compression: bad vertex stream header | Pending file selection, provenance and rerun |
+| decoders/readme-margoengine-decoders-b7ae99 | /mesh.drc, /albedo.ktx2 | sample: Error: Draco: invalid header; pass an unmodified .drc buffer | Passed after exact published Avocado view selection and documented file-specific IDs; exception removed |
+| decoders/readme-meshopt-on-wasm-simd-margoengine-2685e0 | /meshopt.bin | sample: MargoError: EXT_meshopt_compression: bad vertex stream header | Passed after exact published MeshoptCubeTest view selection and count/stride correction; exception removed |
 | decoders/readme-pcx-margoengine-decoders-pcx-150025 | /skin.pcx | sample: MargoError: PCX does not start with the manufacturer byte 10; pass the complete bytes of a valid PCX file | Passed with explicit licensed file/tool; exception removed |
 | decoders/readme-pvr-margoengine-decoders-pvr-44fd95 | /texture.pvr | sample: MargoError: PVR: this is not a PVR file; check the path | Passed with explicit licensed sample; exception removed |
 | decoders/readme-streaming-ktx2-mips-margoengine-d0b4d7 | /rock.ktx2 | sample: MargoError: KTX2: could not load /rock.ktx2 (404) | Passed with explicit licensed sample; exception removed |
@@ -564,3 +564,16 @@ The known README list now has 53 entries. Physics remains held.
 Splat input landing validation: full verify passes 13,368 tests with zero failures/skips (333.9 s); all 73 package tests, 32 root harness/asset tests, the GPU suite (20 shader modules, zero errors) and all 14 original README examples pass. Lint and hygiene pass. The alias regression fails before the mapping. No exports, codec source or runtime size budgets changed.
 `nLane C claims decoders introduction and meshopt SIMD README rows for exact compressed view inputs and metadata-aware examples. Physics remains held.
 `nLane C also claims the two points/Potree README rows for complete licensed PotreeConverter folder inputs. No generated folder will count as outside-file proof.
+
+## Decoder README stream inputs (2026-11-09)
+
+The two compressed-view rows now use exact CC0 published Avocado/MeshoptCubeTest
+bytes, with metadata corrected to those files. Fresh source downloads match both
+existing buffers. The extracts preserve all bytes and have a deterministic generator
+and source/extract hashes in the fixture notice and supply-chain registry. Root
+regressions fail without the aliases; real Wasm verifies Avocado channels/counts,
+and SIMD output matches the existing independent meshopt view oracle. No codec,
+core, stage or held physics source changed. Execution records are in
+`docs/whitepaper/results/readme-decoder-streams-20261109.json`.
+Decoder scoped validation: 291 tests pass with zero failures/skips; all 14 decoder GPU checks and both repaired browser snippets pass. README execution is 16/17, retaining only the unrelated Node/example.com sample. Known list now has 51 entries.
+Decoder landing validation: full verify passes 13,378 tests with zero failures/skips (329.1 s); lint and standalone hygiene pass. The 291 scoped tests, 14 GPU checks and 16/17 README execution result pass. No exports changed.

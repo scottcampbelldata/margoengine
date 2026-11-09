@@ -4000,3 +4000,20 @@ and every source position of the .splat. The derivative/generator are test-only.
 No rendering or codec source changed. This is example execution on a real excerpt,
 not independent encoder accuracy, complete-capture quality or speed evidence.
 Record: results/readme-splats-inputs-20261109.json.
+
+## Decoder README compressed inputs (2026-11-09)
+
+The Draco and meshopt SIMD examples now select exact, unmodified compressed views
+from Khronos Avocado and MeshoptCubeTest, respectively. Both source buffers match
+fresh downloads at glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
+The extraction script never decodes or re-encodes them. Avocado's IDs are 3/1/0
+for POSITION/NORMAL/TEXCOORD_0, not a portable 0/1/2 convention. The meshopt view
+contains 24 12-byte positions, not 1,000. README text now names these inputs and
+explains taking IDs/count/stride/mode/filter from each file's own extension.
+
+The two new alias regressions fail without the mappings. They compare every
+compressed byte with the original source view; SIMD output matches the existing
+independent 288-byte SHA-256 oracle. Real Draco Wasm verifies all output channel
+lengths, 406 vertices and 2,046 indices. No codec or runtime source changes.
+This is runnable-example evidence, not a new decoder accuracy or speed claim.
+Record: results/readme-decoder-streams-20261109.json.

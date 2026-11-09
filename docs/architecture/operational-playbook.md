@@ -2469,3 +2469,13 @@ A world-space snapshot of the road is projected into XZ. Existing bvh closest-po
 ### Batch 65 job 4: Self intersection repair
 
 The new optional repair entry samples the existing spline and lazily calls road/junctions. The owning road precision adapter now rounds polygon boundaries before triangulation, instead of rounding an already chosen float64 triangulation. This prevents two inverted ears in the local hairpin regression without filtering faces or weakening the output checks. Geometry's existing polygon union and triangulation do the heavy work. Core and stage are unchanged. Section 5 evidence: A generated hairpin demonstrably folds and double-covers in the root sweep; repaired faces all have positive area and single coverage, with polygon/mesh area agreement. Closed courtyard, hostile inputs, grade rejection, ownership and aborts; real WebGPU/WebGL2 road pixels, exact reboot and disposal. No speed claim. See packages/road/test/junction-bends.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.
+
+### Decoder README inputs: section 5 evidence (2026-11-09)
+
+Exact CC0 compressed views now accompany the Draco introduction and meshopt SIMD
+example; both snippets document file-specific metadata. Required alias reads refuse
+absence and LFS pointers. Root regressions compare every compressed byte to its
+outside source and SIMD output to an existing independent hash. The real Wasm
+regression checks Draco output channel/count/index bounds. No codec, backend,
+core or stage source changed. This is example execution, with no new performance
+or production-model quality claim. Sources/hashes live in the decoder fixture notice.

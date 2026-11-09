@@ -1464,3 +1464,16 @@ every locally serialized .splat position against the independent PLY. Run
 `npm run check:readme-run -- --packages=splats`. Evidence:
 results/readme-splats-inputs-20261109.json. The .splat was serialized here; this
 is not independent encoder accuracy, full-capture quality or speed evidence.
+
+### Decoder README compressed-input evidence (2026-11-09)
+
+The decoder introduction and SIMD example use exact outside compressed views of
+CC0 Khronos Avocado and MeshoptCubeTest, with their actual attribute IDs and vertex
+count documented. tests/readme-assets.test.js compares every compressed byte with
+the original bufferView and hashes the SIMD output against the existing independent
+reference record; packages/decoders/tests/decoders.test.js checks the real Draco
+output channels and counts. Reproduce extraction with
+`node packages/decoders/scripts/make-readme-streams.mjs`, then run
+`npm run check:readme-run -- --packages=decoders`.
+Evidence: results/readme-decoder-streams-20261109.json. Execution on these standard
+files supplies no new arbitrary-model accuracy, quality or performance claim.

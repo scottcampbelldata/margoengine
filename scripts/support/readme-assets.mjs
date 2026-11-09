@@ -7,6 +7,8 @@ import { externalAssetRoot, requireExternalAssets } from './external-test-assets
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/mesh.drc': decoder + 'readme/avocado.drc',
+  '/meshopt.bin': decoder + 'readme/cube-positions.bin',
   '/capture.splat': 'packages/splats/test/fixtures/raccoon-v2.splat',
   '/capture.ply': 'packages/splats/test/fixtures/raccoon-v2.ply',
   '/capture.spz': 'packages/splats/test/fixtures/raccoon-v2.spz',

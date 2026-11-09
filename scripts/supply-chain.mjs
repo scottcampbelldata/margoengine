@@ -329,7 +329,7 @@ const ASSETS = [
   ],
   [
     'packages/decoders/tests/fixtures/NOTICE.md',
-    'test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick)',
+    'test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick). README streams are exact unmodified bufferViews of Avocado (Microsoft CC0) and MeshoptCubeTest (Arseny Kapoulkine CC0), pinned to glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c70fb; extraction script, source/extract SHA-256 and metadata in the fixture notice. No external implementation files copied',
   ],
   [
     'packages/decoders/tests/fixtures/KTX2-README.md',

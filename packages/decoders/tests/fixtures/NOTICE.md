@@ -15,3 +15,29 @@ Fixtures are used only by the tests and are not part of the published package (`
 - `ktx2-hdr/`: see `ktx2-hdr/NOTICE.md`.
 - `NormalizedTriangle.gltf` and `NormalizedTriangle.bin` are Margo-made by `../generate-normalized-fixture.mjs` (one
   triangle encoded with the Draco 1.5.7 encoder); they contain no third-party data.
+
+## Exact README streams
+
+`readme/avocado.drc` and `readme/cube-positions.bin` contain unmodified compressed
+bufferViews, extracted without decoding or encoding by
+`node packages/decoders/scripts/make-readme-streams.mjs`.
+Fresh source downloads on 2026-11-09 match the existing source buffers byte for byte.
+Both come from Khronos glTF-Sample-Assets revision
+`8f492390ddc7a2ae221a1369ef560589cf8c70fb`:
+
+- [Avocado](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/Avocado/glTF-Draco):
+  Microsoft, CC0 1.0, grant in the model README. Avocado.bin SHA-256
+  `535123a66a19c0427298d0bbe81b0ba5efa6d8155b7c659e11c23d8c6d6fe2c6`.
+  BufferView 0: offset 0, length 8,722, POSITION=3, NORMAL=1, TEXCOORD_0=0 (TANGENT=2).
+  Extract SHA-256 `21dfb8f305c178834bc4d860388bfffe6bc26fc66847a476306e4127c38179f5`.
+- [MeshoptCubeTest](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/MeshoptCubeTest/glTF):
+  Arseny Kapoulkine, CC0 1.0, grant in the model README. MeshoptCubeTest.bin SHA-256
+  `6578c1d82c5cc2b228e9513e37f348ca89cdb24b5985aa0567efef8d3c014360`.
+  BufferView 25: compressed buffer 0, offset 3,500, length 97, count 24,
+  stride 12, ATTRIBUTES/NONE. Extract SHA-256
+  `a68a0aff67b80b4b3d554dfcb25c3672b88dd405fac553f467a41219663ad64e`.
+  Decoded 288-byte SHA-256 `4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021`,
+  independently recorded in meshopt-views.json by the existing outside reference decoder.
+
+These are standard test assets, never decoder implementation files or new encoder output.
+They prove the runnable examples with file-specific metadata, not arbitrary-model quality or speed.
