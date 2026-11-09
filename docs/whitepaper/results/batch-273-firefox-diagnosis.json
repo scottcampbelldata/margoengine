@@ -1,0 +1,53 @@
+{
+  "scope": "Read-only launch diagnosis; no installation or system setting change",
+  "nativeError": 14001,
+  "nativeMessage": "ERROR_SXS_CANT_GEN_ACTCTX: side-by-side configuration is incorrect",
+  "event": {
+    "TimeCreated": "/Date(1794265453853)/",
+    "Id": 33,
+    "Message": "Activation context generation failed for \"\\AppData\\Local\\ms-playwright\\firefox-1555\\firefox\\firefox.exe\". Dependent Assembly mozglue,language=\"&#x2a;\",type=\"win32\",version=\"1.0.0.0\" could not be found. Please use sxstrace.exe for detailed diagnosis."
+  },
+  "files": [
+    {
+      "name": "firefox.exe",
+      "machine": "8664",
+      "size": 1140736,
+      "manifests": [
+        {
+          "ids": [
+            24,
+            1,
+            1033
+          ],
+          "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n<assemblyIdentity\n        version=\"1.0.0.0\"\n        processorArchitecture=\"*\"\n        name=\"Firefox\"\n        type=\"win32\"\n/>\n<description>Firefox</description>\n<dependency>\n        <dependentAssembly>\n                <assemblyIdentity\n                        type=\"win32\"\n                        name=\"Microsoft.Windows.Common-Controls\"\n                        version=\"6.0.0.0\"\n                        processorArchitecture=\"*\"\n                        publicKeyToken=\"6595b64144ccf1df\"\n                        language=\"*\"\n                />\n        </dependentAssembly>\n</dependency>\n<dependency>\n        <dependentAssembly>\n                <assemblyIdentity\n                        type=\"win32\"\n                        name=\"mozglue\"\n                        version=\"1.0.0.0\"\n                        language=\"*\"\n                />\n        </dependentAssembly>\n</dependency>\n<ms_asmv3:trustInfo xmlns:ms_asmv3=\"urn:schemas-microsoft-com:asm.v3\">\n  <ms_asmv3:security>\n    <ms_asmv3:requestedPrivileges>\n      <ms_asmv3:requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\" />\n    </ms_asmv3:requestedPrivileges>\n  </ms_asmv3:security>\n</ms_asmv3:trustInfo>\n  <compatibility xmlns=\"urn:schemas-microsoft-com:compatibility.v1\">\n    <application>\n      <supportedOS Id=\"{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}\"/>\n      <supportedOS Id=\"{1f676c76-80e1-4239-95bb-83d0f6d0da78}\"/>\n      <supportedOS Id=\"{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}\"/>\n      <supportedOS Id=\"{35138b9a-5d96-4fbd-8e2d-a2440225f93a}\"/>\n    </application>\n  </compatibility>\n</assembly>\n"
+        }
+      ],
+      "sha256": "c949e57fba9a65ab6c434a76e32d2c72eb43f8b99a7c48ee7e927a4fad4b2a36"
+    },
+    {
+      "name": "mozglue.dll",
+      "machine": "8664",
+      "size": 656896,
+      "manifests": [
+        {
+          "ids": [
+            24,
+            2,
+            1033
+          ],
+          "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n<assemblyIdentity\n    version=\"1.0.0.0\"\n    name=\"mozglue\"\n    type=\"win32\"\n/>\n<file name=\"mozglue.dll\"/>\n</assembly>\n"
+        }
+      ],
+      "sha256": "552ebda93b13633e3382382ffebf4d37adbc0138df94ee85ac1dd6240b4fb470"
+    }
+  ],
+  "externalManifests": [
+    "firefox.VisualElementsManifest.xml",
+    "private_browsing.VisualElementsManifest.xml"
+  ],
+  "cause": "firefox.exe requires mozglue assembly 1.0.0.0. The installed mozglue.dll only embeds RT_MANIFEST ID 2; private assembly probing needs ID 1. No mozglue.manifest exists beside it.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-searching-sequence",
+    "https://learn.microsoft.com/en-us/windows/win32/sbscs/using-side-by-side-assemblies-as-a-resource"
+  ]
+}

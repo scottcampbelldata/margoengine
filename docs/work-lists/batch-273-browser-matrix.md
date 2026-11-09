@@ -100,3 +100,18 @@ Safari automation needs the Apple driver; iOS/iPadOS use a connected Mac.
 Microsoft / Playwright contributors, *Android* (2026),
 https://playwright.dev/docs/api/class-android: Android automation needs an
 authenticated ADB connection. Request that access with the physical devices.
+
+### Read-only Firefox spawn UNKNOWN diagnosis
+
+Direct hidden Process.Start of the installed Firefox with --version also fails
+before execution: Windows native error 14001, incorrect side-by-side configuration.
+Application/SideBySide event 33 names missing dependent assembly mozglue 1.0.0.0.
+Both executable and DLL are x64. The executable's RT_MANIFEST ID 1 requires
+mozglue; mozglue.dll embeds its assembly manifest only at ID 2, and no external
+mozglue.manifest is installed. Microsoft's [Assembly Searching Sequence](https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-searching-sequence)
+requires resource ID 1 for a private assembly DLL. Thus the installed browser's
+manifest packaging explains this loader refusal and Playwright's generic spawn
+UNKNOWN, before renderer/GPU startup. The [resource documentation](https://learn.microsoft.com/en-us/windows/win32/sbscs/using-side-by-side-assemblies-as-a-resource)
+distinguishes IDs 1 and 2. No installation, binary, registry or setting was changed;
+no Firefox pixel pass is claimed. Evidence with hashes, resource IDs, manifest
+text and event: docs/whitepaper/results/batch-273-firefox-diagnosis.json.
