@@ -3582,3 +3582,12 @@ Stats closing acceptance: the collected verify on the current-main stats rebase 
 Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). applyPlugins calls attach outside target scene setup, so the factory registers in default; rollback removes by name from secondary instead. A same-name default plugin makes the restore reject before state loads. Nine real-engine cases retain three passing default controls and six secondary failures, covering success, immediate load failure and a later binding failure. The lane retains save-owner-regression-red.log and the regression draft; a package repair is next.
 
 Capture root-cause update from the coordinator: the red capture regression is owned by core lighting's uniform-only light-direction normalization under GPU load. The core repair waits for Scott's approval. The red regression and its package wiring stay off main; the exact-zero assertions remain unchanged.
+
+### Fixed: subset enumeration misclassified as a fixed frame wait
+
+The post-rebase fixed-wait scan flagged compose.html's 32 distinct feature
+subsets because it recognized list indexing but not bitmask input selection.
+The checker now traces the filter's outer counter and callback bit index to an
+assigned input passed to render. Its new regression fails before the repair;
+all ten tests pass afterward, including five negative forms. The actual browser
+fixture, case count, assertions and fixed-wait baseline are unchanged.

@@ -74,7 +74,21 @@ function walks(body, counter) {
   const read = new RegExp(
     String.raw`\[\s*${counter}\s*\](?!\s*(?:[-+*/%&|^]|\*\*|<<|>>>?|\?\?|&&|\|\|)?=(?!=))|\.at\(\s*${counter}\s*\)`,
   );
-  return read.test(body);
+  if (read.test(body)) return true;
+  // A subset mask selects different input features each iteration, rather than drawing extra frames to get ready.
+  const selectors = /\.filter\(\s*\(([^)]*)\)\s*=>\s*(\w+)\s*&\s*\(\s*1\s*<<\s*(\w+)\s*\)\s*\)/g;
+  for (const selector of body.matchAll(selectors)) {
+    const parameters = selector[1].split(',').map((name) => name.trim()),
+      assignment = /\b(?:const|let)\s+(\w+)\s*=\s*[\w.]+\s*$/.exec(body.slice(0, selector.index));
+    if (
+      selector[2] === counter &&
+      !parameters.includes(counter) &&
+      parameters.includes(selector[3]) &&
+      assignment &&
+      new RegExp(`\\brender\\s*\\(\\s*${assignment[1]}\\s*[,)]`).test(body)
+    ) return true;
+  }
+  return false;
 }
 
 /**

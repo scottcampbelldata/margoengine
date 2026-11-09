@@ -46,6 +46,20 @@ test('a sleep of 50 ms or more is a fixed wait; a short poll interval is not', (
   assert.deepEqual(kinds('setTimeout(() => controller.abort(), 5000);'), []);
 });
 
+test('a bitmask filter enumerates distinct feature inputs, while recording a mask still waits', () => {
+  assert.deepEqual(
+    kinds('for(let mask=0;mask<32;mask++){ const selected=factories.filter((_,i)=>mask&(1<<i)); await render(selected); }'),
+    [],
+  );
+  for (const body of [
+    'log(mask & (1 << i)); await render();',
+    'const selected=factories.filter((mask,i)=>mask&(1<<i)); await render(selected);',
+    'const selected=factories.filter((_,i)=>other&(1<<i)); await render(selected);',
+    'const selected=factories.filter((_,i)=>mask&(1<<other)); await render(selected);',
+    'const ignored=factories.filter((_,i)=>mask&(1<<i)); await render();',
+  ]) assert.deepEqual(kinds(`for(let mask=0;mask<32;mask++){ ${body} }`), ['1:frames']);
+});
+
 // Regression (2026-10-31): these were invisible to the check, and each one failed under a loaded 8-way run.
 test("a unit test's sleep helper, and a promise raced against a time, are fixed waits", () => {
   assert.deepEqual(kinds('await sleep(500);\nassert.equal(alive(pid), false);'), ['1:ms']);

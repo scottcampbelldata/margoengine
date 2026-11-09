@@ -3468,3 +3468,25 @@ exists; all assertions and expected affected/full decisions remain unchanged.
 The existing failing real-plan regression is in tests/check-merge-affected.test.js. All failed gate files and compute
 units pass 244 checks after the wiring and ordering repairs. No foreign source
 or companion code was read, and no wait, retry or timeout was introduced.
+
+### Batch 56 fixed-wait subset classification
+
+Research compared Rothermel and Harrold, *A Safe, Efficient Regression Test
+Selection Technique* (1997), and Yoo and Harman, *Regression testing minimization,
+selection and prioritization: a survey* (2012), cited with links above, with
+Ecma International, *ECMAScript 2026 Language Specification* (2026), Array.filter
+and binary bitwise/shift semantics, https://262.ecma-international.org/17.0/.
+The research distinguishes retaining relevant cases from changing their order;
+the language contract explains how each mask filters a different feature set.
+Inference: the counted 32-subset composition loop is input enumeration, not a
+pipeline-readiness delay. No source or companion implementation was copied.
+
+The existing checker recognized counter-indexed lists but not this subset form.
+It now requires a bitmask filter using the outer counter, an unshadowed callback
+index for the bit shift, an assigned result and that result passed to render.
+Regression accepts the actual input-selection form and rejects recording a mask,
+shadowing the counter, unrelated masks or bit indices, and unused filtered data.
+The regression and actual repository scan fail before the repair; all ten checker
+tests pass afterward. Browser fixtures, all 32 cases, numerical assertions,
+wait baseline, timeouts and readiness contracts are unchanged. This is a test
+classification repair, with no runtime package or GPU implementation change.

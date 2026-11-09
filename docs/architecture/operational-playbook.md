@@ -4568,3 +4568,19 @@ this is corrected-step evidence, not a second full-green verify claim.
 ### Section 5 evidence: completed stats owner gates
 
 Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](../whitepaper/results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
+
+Stats integration onto main 1aa76ee38 preserves the upstream compute/test:gpu:owners
+registration from 39fb88cf9. The overlapping local manifest command is removed;
+its shared/rooted-command guard now pins the upstream command. Both regressions
+and the stronger intermediate dispatch assertions are retained. Intervening main
+changes do not alter stats or core source.
+
+### Section 5 evidence: subset-enumeration gate repair
+
+The latest-main affected run passes 339/340 checks, with only the newly inherited
+32-subset composition fixture misclassified by the fixed-wait heuristic. A
+regression reproduces the classifier error and rejects five actual/non-input
+wait forms. All ten fixed-wait tests and the complete repository scan pass after
+the correction. Browser fixtures, numerical checks, wait baseline and timeouts
+remain unchanged. This corrects the sole failed affected step; it is not a new
+full verify run or a GPU execution claim.
