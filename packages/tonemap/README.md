@@ -9,6 +9,20 @@ For exposure driven by aperture, shutter time and ISO, use
 Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
 sets Tonemap's exposure in stops.
 
+`Tonemap` detaches from its owning scene on disposal, preserving same-name
+effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const tonemap = new Tonemap();
+product.use(tonemap);
+tonemap.dispose();
+engine.dispose();
+```
+
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';

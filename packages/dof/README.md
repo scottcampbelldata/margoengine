@@ -4,6 +4,24 @@ Import `margoengine/dof` from the `margoengine` package, or `@margoengine/dof` f
 
 Optional WebGPU depth of field; core and stage are unchanged.
 
+`DOF` and `Autofocus` detach from their owning scene on disposal, preserving
+same-name effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {Autofocus} from 'margoengine/dof/autofocus';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const dof = new DOF();
+const focus = new Autofocus(dof);
+product.use(dof);
+product.use(focus);
+focus.dispose();
+dof.dispose();
+engine.dispose();
+```
+
 ```ts
 import {createStage} from 'margoengine';
 import {DOF} from 'margoengine/dof';

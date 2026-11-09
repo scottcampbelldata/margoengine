@@ -4298,3 +4298,9 @@ disposal and owner removal for all 22 classes; all 20 current GPU-recorder proof
 pass without changing stored call sequences or tolerances. Lint, hygiene, README
 type checks and size measurement pass. These recorder proofs use no physical GPU.
 Browser package gates remain pending under the coordinator's CPU-only restriction.
+
+PostStack peers DOF, Autofocus and Tonemap now resolve sceneOf for explicit
+disposal. Their package scene-owner regressions use real registries with inert
+GPU resources and check direct disposal, owner removal, same-name isolation and
+replacement. Per-package source guards run in verify/check:merge. Their physical
+GPU and new README-runtime acceptance are pending the browser teardown repair.

@@ -5207,6 +5207,10 @@ closure is claimed. Existing entry-size ceilings are unchanged.
 The audited FXAA entry is 4,642 bytes gzip and PostStack is 3,995 bytes gzip
 (bundleBytes, packages external); their ceilings remain 4,699 and 4,001 bytes.
 
+DOF, Autofocus and Tonemap's owner-disposal repairs change registry cleanup only;
+their GPU algorithms and existing entry ceilings are unchanged. Real-browser
+acceptance remains pending; these CPU lifecycle proofs make no speed claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5514,6 +5518,15 @@ Direct default-scene disposal call sites outside post still need
 per-plugin classification and regressions, followed by their package checks.
 Do not treat the batch 56 scene-ownership finding as fully accepted until that
 work and the required GPU proofs are complete.
+
+The PostStack peer audit also reproduced the same wrong-scene detachment in
+DOF, Autofocus and Tonemap; their local sceneOf repairs and per-package
+scene-owner.test.js regressions pass CPU checks, with GPU/README acceptance
+pending. Creative PostProcessing remains open: `const post = new PostProcessing();
+scene.use(post); post.dispose();` leaves its registration and passes installed.
+Cause: it stores only the device and releases resources without detaching its
+plugin; restoration calls dispose as its resource-release helper. Split that
+resource release from explicit owner removal in the creative package.
 
 ### Batch 56 review repair audit
 
@@ -11483,6 +11496,20 @@ For exposure driven by aperture, shutter time and ISO, use
 Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
 sets Tonemap's exposure in stops.
 
+`Tonemap` detaches from its owning scene on disposal, preserving same-name
+effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const tonemap = new Tonemap();
+product.use(tonemap);
+tonemap.dispose();
+engine.dispose();
+```
+
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
@@ -11547,6 +11574,24 @@ All are off by default and compiled in only when asked for: without them the sha
 Import `margoengine/dof` from the `margoengine` package, or `@margoengine/dof` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU depth of field; core and stage are unchanged.
+
+`DOF` and `Autofocus` detach from their owning scene on disposal, preserving
+same-name effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {Autofocus} from 'margoengine/dof/autofocus';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const dof = new DOF();
+const focus = new Autofocus(dof);
+product.use(dof);
+product.use(focus);
+focus.dispose();
+dof.dispose();
+engine.dispose();
+```
 
 ```ts
 import {createStage} from 'margoengine';

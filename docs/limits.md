@@ -2616,3 +2616,7 @@ Disposal sites outside post remain under audit in known-bugs.md; no cross-packag
 closure is claimed. Existing entry-size ceilings are unchanged.
 The audited FXAA entry is 4,642 bytes gzip and PostStack is 3,995 bytes gzip
 (bundleBytes, packages external); their ceilings remain 4,699 and 4,001 bytes.
+
+DOF, Autofocus and Tonemap's owner-disposal repairs change registry cleanup only;
+their GPU algorithms and existing entry ceilings are unchanged. Real-browser
+acceptance remains pending; these CPU lifecycle proofs make no speed claim.

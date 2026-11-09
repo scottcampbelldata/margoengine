@@ -2182,3 +2182,9 @@ The same owner-detachment claim has per-class real-engine regressions for 22
 additional post classes in effect-owners.test.js; a source guard prevents direct
 active-scene cleanup. DepthTexture's wrapper and capture have separate lifetimes.
 Package GPU/README acceptance remains pending.
+
+DOF, Autofocus and Tonemap explicitly detach their own scene registration and
+preserve another scene's same-name effect. Proof: the scene-owner.test.js files
+in packages/dof/tests and packages/tonemap/tests use real engine registries with
+inert GPU resources, and fail against the preceding implementations. Physical
+GPU/README acceptance is pending, with no rendering-quality or speed claim.

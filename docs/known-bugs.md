@@ -304,6 +304,15 @@ per-plugin classification and regressions, followed by their package checks.
 Do not treat the batch 56 scene-ownership finding as fully accepted until that
 work and the required GPU proofs are complete.
 
+The PostStack peer audit also reproduced the same wrong-scene detachment in
+DOF, Autofocus and Tonemap; their local sceneOf repairs and per-package
+scene-owner.test.js regressions pass CPU checks, with GPU/README acceptance
+pending. Creative PostProcessing remains open: `const post = new PostProcessing();
+scene.use(post); post.dispose();` leaves its registration and passes installed.
+Cause: it stores only the device and releases resources without detaching its
+plugin; restoration calls dispose as its resource-release helper. Split that
+resource release from explicit owner removal in the creative package.
+
 ### Batch 56 review repair audit
 
 Reported causes: TAA's transient matrix entered the still controller/history key;

@@ -2994,3 +2994,10 @@ of the unregistered SceneTargets helper it delegates GPU resources to. Shared
 proof hosts now model registration before setup and identity-based sceneOf;
 the quality-preset proof registers its effects through the real engine. The
 recorded GPU work and tolerances are unchanged. No timing measurement is added.
+
+The PostStack peer audit applies the same ownership research and object-identity
+rule to DOF, Autofocus and Tonemap. Explicit disposal resolves the existing
+`sceneOf` registration, while restoration keeps the existing release/setup path.
+Real-engine inert-GPU tests reproduce both the orphaned secondary registration
+and accidental removal of the default scene's same-name effect before repair.
+The fix changes no shaders, geometry, rendering work or core API.
