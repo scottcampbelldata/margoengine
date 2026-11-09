@@ -89,6 +89,7 @@ Scott's rule (2026-11-05): nothing lands undocumented. A change is not done unti
 
 ## Working rules
 
+- CPU-heavy tight loops (Scott, 2026-11-09), including codecs, geometry builds such as convex decomposition and navmesh, and solvers, are built or rebuilt in Rust compiled to Wasm with SIMD where measurement shows the gain. Use one crate and one .wasm per feature, loaded lazily by its optional entry with `new URL(..., import.meta.url)`, never imported by core or stage and never in a shared Wasm bundle. Keep the public API TypeScript, the same output, a gain proven by a work count or paired A/B, and the entry size checked.
 - Quiet: no progress messages. Run long commands in the background and report only when something lands, you are blocked or you need a decision, in one short paragraph.
 - Own files only: keep scripts and logs in your own worktree, never a shared scratch folder.
 - Timeouts: every test, check, benchmark and wait has a hard time limit. On a hang, kill the process tree and report it.
