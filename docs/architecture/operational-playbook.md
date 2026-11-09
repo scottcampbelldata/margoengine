@@ -2013,6 +2013,14 @@ itself, GPU output parity and a disposal-during-compilation regression.
 
 ### Batch 273: lower WebGL2 device tiers
 
+The materials vertex-input GPU leaf now explicitly opens native and full compatibility
+devices. Its instrumentation wraps the engine device's pipeline method, preserving
+the receiver; instrumenting native GPUDevice.prototype observed no compatibility
+calls. Both retain the original input-count, populated-frame and bit-exact image
+assertions. The package GPU suite used by check:merge runs this two-backend leaf.
+No renderer, shader or runtime API changed. Other indexed compatibility failures
+remain separate obligations.
+
 The optional tiers entry selects physical colour formats inside the existing
 device: half-float or UNORM8 for render/storage targets, with logical WebGPU
 formats and upload/copy layouts retained. Integer and depth/stencil targets and

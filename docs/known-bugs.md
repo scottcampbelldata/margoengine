@@ -223,10 +223,10 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline; the process tree was killed. Native evidence for the complete suite
   was 113 s. No new timeout or speed claim is justified; isolate the await and
   determine actual compatibility work before changing a limit.
-- `materials/test:gpu:vertex-inputs`: fails `inputs fetched` on the full layer.
-  `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
-  which it does not. The input-fetch divergence and feature expectation need
-  separate owning-package investigation, preserving native feature coverage.
+- `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
+  which it does not. The feature expectation needs owning-package investigation,
+  preserving native feature coverage. The separate vertex-inputs fixture was
+  repaired by observing the engine's actual device (see batch 273 evidence below).
 - `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
   compressed texture because its view-copy path requires a renderable format.
   The compressed view route needs investigation; no texture or colour work may
@@ -3519,3 +3519,11 @@ wall-clock loops were removed from this diagnostic before running; all pixel
 positions and CPU/GPU comparison work remain. Per-pick render/readback and CPU
 cost are not yet isolated. Receipt: test-results/batch-273-lod-picking-probe.log;
 its run is bounded at 3.5 minutes under the shared GPU lock. No repair claimed.
+
+Batch 273 resolved vertex-input fixture: the fixture instrumented native
+GPUDevice.prototype, which full compatibility does not inherit. It now observes
+the engine device itself, preserving the original method receiver. The canonical
+leaf explicitly runs both backends, and the existing exact regression retains
+all input counts and image assertions. Forced compatibility fails before the
+repair (`inputs fetched` is empty), while native and compatibility each pass
+with 47,234 lit pixels and zero differing pixels afterwards. No renderer change.

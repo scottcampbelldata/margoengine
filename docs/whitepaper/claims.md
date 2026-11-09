@@ -2161,6 +2161,13 @@ limits are in docs/size-restore.md and docs/limits.md.
 
 ### Batch 273: scoped lower-tier device evidence
 
+Full-tier vertex-input fixture evidence is separate: the original compatibility
+run failed with no recorded input fetches because it hooked the native device
+prototype. Observing the engine device repairs the fixture. The canonical GPU
+leaf now tests both backends with identical input-count and pixel assertions:
+47,234 lit pixels, zero differing pixels per backend. No runtime, speed or
+whole-package compatibility claim follows from this one regression.
+
 The lower-tier device probes cover seven requested float target formats, exact
 logical readback bytes, uploads, same-storage and cross-usage copies, sample-only float32 range and
 precision, mip/array views, four-sample resolve, additive blending and fragment/CPU

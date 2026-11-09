@@ -1694,6 +1694,15 @@ classification when invoking gpu-lock directly. No companion implementation is u
 
 ### Batch 273 tier device checkpoint
 
+For the full-tier materials vertex-input fixture regression, build packages and run
+`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/vertex-inputs-browser.mjs`.
+The leaf explicitly selects native then compatibility even when MARGO_COMPAT is
+set. It requires 2/3/5 fetched inputs, five when trimming is disabled, more than
+5,000 lit pixels and exact RGBA equality. Before repair, forced compatibility
+fails `inputs fetched`; after repair both report 47,234 lit pixels and no
+differences. Receipts: test-results/batch-273-vertex-inputs-before.log and
+batch-273-vertex-inputs-after.log. No timing assertion or benchmark was run.
+
 Build with npm run build --workspace @margoengine/webgl2-compat. Run the CPU tests
 with npm test --workspace @margoengine/webgl2-compat (hard limit 5 minutes). Run
 node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node

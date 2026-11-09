@@ -1388,6 +1388,16 @@ material unchanged. A white attenuation channel stays white at any attenuation d
 
 ## Preview tier contract
 
+The vertex-input regression runs on native WebGPU and the full WebGL2 layer. After building
+the repository packages, run it from the repository root:
+
+```sh
+npm run test:gpu:vertex-inputs --workspace packages/materials
+```
+
+It observes the engine's actual device and requires the original 2-, 3- and 5-input plans,
+all five inputs with trimming disabled, a populated frame and exact pixel equality.
+
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.

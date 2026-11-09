@@ -5140,6 +5140,12 @@ Research, migration and regression evidence: [size restoration](size-restore.md)
 
 ### Batch 273 lower compatibility tiers (device entry and proven packages)
 
+Scoped full-tier regression: materials vertex-inputs now observes the engine device
+on both native WebGPU and full compatibility. Both retain 47,234 lit pixels and
+zero differing pixels with input trimming disabled. This fixture-only repair
+changes no package runtime entry, precision limit or size ceiling, and closes
+only that indexed suite failure.
+
 The optional webgl2-compat/tiers entry permits half-float and LDR devices explicitly;
 root install keeps its full-tier default. Highp fragment floats/ints remain required.
 Only render/storage colour targets are substituted. Half-float uses R16F/RG16F/
@@ -5586,10 +5592,10 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline; the process tree was killed. Native evidence for the complete suite
   was 113 s. No new timeout or speed claim is justified; isolate the await and
   determine actual compatibility work before changing a limit.
-- `materials/test:gpu:vertex-inputs`: fails `inputs fetched` on the full layer.
-  `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
-  which it does not. The input-fetch divergence and feature expectation need
-  separate owning-package investigation, preserving native feature coverage.
+- `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
+  which it does not. The feature expectation needs owning-package investigation,
+  preserving native feature coverage. The separate vertex-inputs fixture was
+  repaired by observing the engine's actual device (see batch 273 evidence below).
 - `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
   compressed texture because its view-copy path requires a renderable format.
   The compressed view route needs investigation; no texture or colour work may
@@ -8882,6 +8888,14 @@ wall-clock loops were removed from this diagnostic before running; all pixel
 positions and CPU/GPU comparison work remain. Per-pick render/readback and CPU
 cost are not yet isolated. Receipt: test-results/batch-273-lod-picking-probe.log;
 its run is bounded at 3.5 minutes under the shared GPU lock. No repair claimed.
+
+Batch 273 resolved vertex-input fixture: the fixture instrumented native
+GPUDevice.prototype, which full compatibility does not inherit. It now observes
+the engine device itself, preserving the original method receiver. The canonical
+leaf explicitly runs both backends, and the existing exact regression retains
+all input counts and image assertions. Forced compatibility fails before the
+repair (`inputs fetched` is empty), while native and compatibility each pass
+with 47,234 lit pixels and zero differing pixels afterwards. No renderer change.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -6,9 +6,10 @@ import {Engine} from '/packages/core/dist/index.js';
 import {Material,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {boxGeometry} from '/packages/geometry/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[],fetched=[];
-const create=GPUDevice.prototype.createRenderPipeline;
-GPUDevice.prototype.createRenderPipeline=function(d){const n=d.vertex.buffers?.[0]?.attributes?.length;if(d.vertex.buffers?.[0]?.arrayStride===80)fetched.push(n);return create.call(this,d);};
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[4,3.5,7],target:[0,0,0],fov:50}});engine.stop();
+// Observe the device receiving these pipelines: the full compatibility device has its own prototype.
+const create=engine.gpu.createRenderPipeline;
+engine.gpu.createRenderPipeline=function(d){const n=d.vertex.buffers?.[0]?.attributes?.length;if(d.vertex.buffers?.[0]?.arrayStride===80)fetched.push(n);return create.call(this,d);};
 engine.gpu.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
 const turn=(x,y,z,a,s=1)=>{const c=Math.cos(a)*s,n=Math.sin(a)*s;return [c,0,-n,0,0,s,0,0,n,0,c,0,x,y,z,1];};
 const box=boxGeometry(0.7,0.7,0.7);

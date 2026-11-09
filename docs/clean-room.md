@@ -3346,3 +3346,26 @@ rows, so this is not evidence of a permanently stuck first pick. Its bounded
 run and log are test-results/batch-273-lod-picking-probe*. The owner and cause
 of the accumulated grid cost remain unresolved; no repair is claimed. Move
 to the next failure rather than consuming this continuation on it.
+
+### Batch 273 compatibility failure 5: vertex-input fixture instrumentation
+
+Before editing, compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (device pipeline operations); Ecma International,
+ECMAScript Language Specification (2026), https://tc39.es/ecma262/
+(ordinary property lookup and Function.prototype.call); and Steve Freeman,
+Nat Pryce, Tim Mackinnon and Joe Walnes, Mock Roles, not Objects (2004),
+https://jmock.org/oopsla2004.pdf (abstract and sections 1-2).
+The API role need not share the browser constructor's prototype. The fixture
+must observe the device that receives the actual descriptor, while preserving
+its method receiver. Real pipelines and exact pixel comparisons provide the
+regression; no library or companion implementation was read.
+
+Vertex-input regression result: the untouched forced-compatibility fixture fails
+with an empty fetched-input list. Wrapping the actual engine device's pipeline
+method repairs that instrumentation. The canonical leaf now explicitly selects
+native and full compatibility, so check:merge's package GPU selection covers
+both. Each passes every original assertion, with 47,234 lit pixels and exact
+trimmed/untrimmed RGBA equality. Materials unit tests: 402/402 pass. Package
+runtime entries are unchanged. Full landing gates are recorded separately.
+LOD's earlier bounded diagnostic reached row 15 before the lock killed its
+process tree at 3.5 minutes; it remains an unresolved failure, not a busy pass.

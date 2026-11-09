@@ -2550,6 +2550,12 @@ Research, migration and regression evidence: [size restoration](size-restore.md)
 
 ### Batch 273 lower compatibility tiers (device entry and proven packages)
 
+Scoped full-tier regression: materials vertex-inputs now observes the engine device
+on both native WebGPU and full compatibility. Both retain 47,234 lit pixels and
+zero differing pixels with input trimming disabled. This fixture-only repair
+changes no package runtime entry, precision limit or size ceiling, and closes
+only that indexed suite failure.
+
 The optional webgl2-compat/tiers entry permits half-float and LDR devices explicitly;
 root install keeps its full-tier default. Highp fragment floats/ints remain required.
 Only render/storage colour targets are substituted. Half-float uses R16F/RG16F/
