@@ -1675,3 +1675,16 @@ installed peers, invalid installed option types, array/object patterns, name
 collisions and idempotent packaging. The bundler matrix checks the packed React
 consumer with skipLibCheck false. Evidence: declarations-red.log and
 switch-bundlers-ready.log under test-results/webgl-merge.
+
+### Fixed: unused React camera controls emitted their peer chunks
+
+React camera wrappers called forwardRef at module scope without pure annotations.
+The bundler retained unused wrapper creation and its lazy loader, so an app importing
+only OrbitControls emitted the arcball renderer too. This exceeded the unchanged
+115,000 B emitted-JavaScript budget (115,873 B on the current matrix). Mark all four
+camera-control wrapper factories pure; requested controls and their loaders remain.
+The Vite regression in packages/react/tests/subpaths.test.js requires orbit-only and
+arcball-only builds to emit only the requested peer and keep it out of the static
+graph. The original test fails with both arcball modules present. No budget or scene
+was changed. Evidence: controls-red.log and bundle-reference-metrics.json under
+test-results/webgl-merge.

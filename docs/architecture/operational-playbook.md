@@ -2156,3 +2156,12 @@ fail strict library checking. The declaration fixture runs the real strict
 compiler without and with a peer, rejects wrong installed option types and checks
 idempotency/name collisions. The packed bundler proof retains skipLibCheck false.
 This changes declaration text only, without physics or renderer implementation.
+
+### React camera-control tree shaking: section 5 evidence
+
+All four camera-control forwardRef factories carry pure annotations. The Vite
+module-graph regression proves orbit-only and arcball-only apps emit only their
+requested lazy peer, while existing event/ref and real-browser checks exercise
+both controls. The full packed-consumer matrix keeps its 100,000 B initial and
+115,000 B emitted budgets and its original cube scene. This removes unused code
+without reducing scene work or changing rendering output.

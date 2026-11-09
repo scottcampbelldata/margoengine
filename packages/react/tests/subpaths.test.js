@@ -571,3 +571,35 @@ test('the root entry never names Rapier, so apps without physics build with webp
     false,
   );
 });
+
+test('control bindings emit only the requested camera control and keep it lazy', async () =>
+  temporary(async (directory) => {
+    for (const [binding, entry, unused] of [
+      ['OrbitControls', 'orbit', 'arcball'],
+      ['ArcballControls', 'arcball', 'orbit'],
+    ]) {
+      const outputs = await bundle(
+        directory,
+        'only-' + entry,
+        `import {${binding}} from '@margoengine/react/controls'; export const control = ${binding};`,
+      );
+      const modules = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
+      assert.ok(
+        modules.some((id) => id.includes('/controls/dist/' + entry)),
+        binding + ' emits its own peer',
+      );
+      assert.deepEqual(
+        modules.filter((id) => id.includes('/controls/dist/' + unused)),
+        [],
+        binding + ' emits no unused control',
+      );
+      const initial = staticChunks(outputs)
+        .flatMap((chunk) => Object.keys(chunk.modules))
+        .map((id) => id.replaceAll('\\', '/'));
+      assert.deepEqual(
+        initial.filter((id) => id.includes('/controls/dist/')),
+        [],
+        binding + ' loads its peer lazily',
+      );
+    }
+  }));

@@ -177,12 +177,12 @@ function useOrbit(
   }, [controls, keyEvents]);
 }
 /** Orbit the camera around a target: drag rotates, right-drag pans, the wheel zooms. The ref is the `OrbitControls`. */
-export const OrbitControls = forwardRef<OrbitInstance, OrbitControlsProps>(function OrbitControls(props, ref) {
+export const OrbitControls = /* @__PURE__ */ forwardRef<OrbitInstance, OrbitControlsProps>(function OrbitControls(props, ref) {
   useOrbit('OrbitControls', props, ref);
   return null;
 });
 /** Map-style navigation: drag pans across the ground, right-drag rotates. The ref is the `MapControls`. */
-export const MapControls = forwardRef<MapInstance, OrbitControlsProps>(function MapControls(props, ref) {
+export const MapControls = /* @__PURE__ */ forwardRef<MapInstance, OrbitControlsProps>(function MapControls(props, ref) {
   useOrbit('MapControls', props, ref as Ref<OrbitInstance>);
   return null;
 });
@@ -191,7 +191,7 @@ export const MapControls = forwardRef<MapInstance, OrbitControlsProps>(function 
  * `'margo'`; `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` and
  * `'rhino'` match those tools. Keys are on by default.
  */
-export const CadControls = forwardRef<OrbitInstance, OrbitControlsProps>(function CadControls(
+export const CadControls = /* @__PURE__ */ forwardRef<OrbitInstance, OrbitControlsProps>(function CadControls(
   { profile = 'margo', keyEvents = true, ...props },
   ref,
 ) {
@@ -219,7 +219,7 @@ export interface ArcballControlsProps extends ControlEventProps {
   projection?: ArcballProjection | null;
 }
 /** Rotate the view freely with a virtual trackball (no locked up direction); pan and zoom as with orbit. */
-export const ArcballControls = forwardRef<ArcballInstance, ArcballControlsProps>(function ArcballControls(props, ref) {
+export const ArcballControls = /* @__PURE__ */ forwardRef<ArcballInstance, ArcballControlsProps>(function ArcballControls(props, ref) {
   const scene = useScene(),
     { onChange, onStart, onEnd, onError, projection, ...options } = props;
   const controls = useControls<ArcballApi, ArcballInstance>(

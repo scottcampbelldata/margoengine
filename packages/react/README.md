@@ -844,3 +844,8 @@ export function App() {
 Strict consumers can use `skipLibCheck: false` with optional engine peers absent.
 Declaration packaging keeps parameter annotations while removing implementation
 binding patterns; installing a peer restores its full option checking.
+
+Camera-control bindings are tree-shakable independently: importing `OrbitControls`
+emits its lazy orbit entry without ArcballControls, and importing `ArcballControls`
+emits its lazy arcball entry without OrbitControls. Requested controls retain their
+normal props, refs and event behavior.
