@@ -57,17 +57,20 @@ default and custom collisions without replacing existing labels or DOM.
 ### Open: batch 134 scalar prototype fails source-quality acceptance
 
 The initial min/max BC4/BC5 prototype failed 40 of 98 pairs. Both-mode endpoint
-fitting and exterior-endpoint seeds now pass 86 pairs; 12 still fail across the
-same 46 primary and three supplementary files. All 1,296 old controls and frozen
-totals remain exact. Two proven search defects are covered by failing-before
-regressions. Every remaining loss has lower reconstructed-input error than the
-old output, yet loses one of the unchanged original-source bars. Reconstruction
-error alone therefore does not establish acceptance; no remaining case is waived
-or classified impossible. BC5 still must satisfy both conventional RG and mapped
-R/alpha checks. Reproduce with retained author-workspace identifier
-`measure/scalar-quality-report15b.mjs`. The private draft is not integrated into
-the public package and the prebuilt remains in use.
-[Current failures](whitepaper/results/batch-134-scalar-refinement.json) and
+fitting and exterior-endpoint seeds passed 86 pairs with 12 failures. Complete
+endpoint search and valid-rectangle fitting now pass 84 pairs with 14 failures
+across the same 46 primary and three supplementary files. The original 12 remain;
+the FlightHelmet MetalPartsMat BaseColor pair adds two losses. All 1,296 old
+controls and frozen totals remain exact. The complete search closes a proven
+1455-versus-903 reconstruction-score miss; the extent fix prevents outside-image
+padding competing with visible values. Both have failing-before tests, but
+neither establishes original-source acceptance. New losses remain failures;
+no case is waived or classified impossible. BC5 must satisfy both conventional
+RG and mapped R/alpha checks. Reproduce with retained author-workspace identifier
+`measure/scalar-quality-report16-final.mjs`. The private draft is not integrated
+into the public package and the prebuilt remains in use.
+[Current failures](whitepaper/results/batch-134-scalar-exact-edge.json),
+[previous refinement](whitepaper/results/batch-134-scalar-refinement.json) and
 [initial prototype](whitepaper/results/batch-134-scalar-prototype.json).
 
 ### Fixed 2026-11-09: owned Chromium process listing raced client close

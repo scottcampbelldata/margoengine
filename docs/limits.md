@@ -1,6 +1,16 @@
 # Design envelope
 
-Batch 134 scalar refinement remains unaccepted: 86/98 original-source quality
+Batch 134 complete scalar fitting and valid-extent checkpoint: the private
+draft is 169,084 B raw / 61,994 B gzip9, versus report 15's 168,906 / 60,673 B.
+The additional 1,321 gzip bytes provide complete endpoint candidate rejection
+and visible-rectangle fitting within the same optional Wasm. Core and stage
+are untouched; this is not final package entry, peak-memory or speed acceptance.
+All original-source/channel/mip/order/arithmetic bars remain unchanged and
+84/98 source-quality pairs pass and 14 fail, including two additional failures
+against report 15. See every image and remaining failure in
+the [current checkpoint](whitepaper/results/batch-134-scalar-exact-edge.json).
+
+Batch 134 report 15 scalar refinement remains unaccepted: 86/98 original-source quality
 pairs pass, 12 fail; both conventional and mapped R/alpha bars remain unchanged.
 Draft Wasm is 168,906 B raw / 60,673 B gzip9, compared with the initial scalar
 prototype's 158,873 / 57,653 B. The 3,020 gzip bytes provide both-mode endpoint

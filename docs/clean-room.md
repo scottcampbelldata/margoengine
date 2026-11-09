@@ -1,5 +1,37 @@
 # Clean room
 
+## Batch 134 finite scalar fitting and image extents (2026-11-09)
+
+Before implementation, wide searches compared scalar endpoint fitting,
+cascaded quantization and indirect source estimation. Reread Khronos Group,
+[Data Format Specification 1.4 (2025)](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.inline.html),
+chapter 19 introduction, 19.1/Table 121 and 19.3; Shin Fujieda and Takahiro Harada,
+[Neural Texture Block Compression (2024)](https://arxiv.org/html/2407.09543v1),
+2.3 and section 3 through the 3.1 opening; and Per Wennersten and Jacob Strom,
+[Table-based Alpha Compression (2009)](https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf),
+retained text sections 4.1-4.3, with the section 3 early-rejection paragraph
+also exposed. No full-paper or figure review is claimed. Microsoft,
+[Block compression](https://learn.microsoft.com/en-us/windows/uwp/graphics-concepts/block-compression),
+Using block compression / Virtual size versus physical size, independently
+confirms that sampling ignores padding outside the declared image extent.
+
+Also read Ariel Doubchak, Tal Philosof, Uri Erez and Amit Berman,
+[Design of Threshold-Constrained Indirect Quantizers (2024)](https://arxiv.org/html/2409.06839v1),
+abstract and introduction through I-C.2; the web opening additionally exposed
+I-D. Its indirect-source distinction explains why optimizing reconstruction
+error alone cannot establish the required original-source quality. No source
+estimator is claimed from that reading.
+
+The independent implementation inverts integer interpolation intervals to
+enumerate every endpoint pair that can strictly improve the current rounded
+palette score. Nonnegative weighted errors justify the rejection bounds;
+an independent complete 65,536-pair reader checks 4,096 deterministic blocks.
+Image fitting uses only the valid local rectangle; complete physical blocks
+and R/alpha mapping are retained. Both defects have failing-before tests.
+No foreign implementation, companion code, old endpoint rule or optimizer was
+opened, inferred or used. Original-source references and both bars are unchanged.
+[Unaccepted search and extent evidence](whitepaper/results/batch-134-scalar-exact-edge.json).
+
 ## Batch 134 independent scalar endpoint refinement (2026-11-09)
 
 Before refinement, wide searches compared BC4/BC5 endpoint fitting, S3TC cluster

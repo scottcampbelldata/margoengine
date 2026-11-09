@@ -22,6 +22,19 @@ reductions or artificial diagnostic entry split. Numeric and container fixtures,
 retained node:zlib parity tests and sciviz policy tests are described and sourced
 in `docs/size-restore.md`.
 
+### Section 5 evidence: batch 134 complete scalar search and valid extents
+
+The private scalar draft now checks every potentially improving legal endpoint
+pair using integer interval rejection and fits partial image blocks only to
+their visible texels. A complete independent byte-pair oracle and a padding
+invariance regression expose both previous defects. Native 56 and scalar Node
+4 tests pass. Complete endpoint fitting is a reconstruction-objective result,
+not original-source quality acceptance. Both original-source bars still apply
+to all 98 pairs and 1,296 images; their full results and source/Wasm pins are in
+the [checkpoint](../whitepaper/results/batch-134-scalar-exact-edge.json).
+Remaining encoders, public integration, full fuzz, peak-memory/final-entry
+acceptance and job 4 timing remain open. No prebuilt removal or completed job 2.
+
 ### Section 5 evidence: batch 134 scalar refinement
 
 Private BC4/BC5 both-mode endpoint fitting and extrema-slot seeds pass the new
@@ -2505,7 +2518,7 @@ error, public-array mutation, signed-zero comparisons and the three monotone acc
 Evidence: 20,384,784 scene, 2,400,000 randomized and 58,560 added boundary/mutation comparisons, zero differences;
 unchanged scalar/SIMD/native/Wasm pins; Edge WebGPU/WebGL2 and Firefox WebGL2 bits. In 40 timed-window frames,
 102,862 certificates avoid at least 3,030,990 squared-distance candidates after accounting for all attempted
-upper bounds. A/B minima 3.0449→2.9581 ms, 11/24 wins, do not establish a stable speed gain. Firefox WebGPU and
+upper bounds. A/B minima 3.0449â†’2.9581 ms, 11/24 wins, do not establish a stable speed gain. Firefox WebGPU and
 quiet-machine timing remain missing. [Entry 101](../whitepaper/perf-history.md) includes browser losses and raw data.
 
 The block solver remains unchanged. [Solver study](physics2d-solver-study.md) records failed setup and per-point

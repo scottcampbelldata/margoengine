@@ -1,5 +1,18 @@
 # Reproducing Margo's numbers
 
+The [complete scalar search and extent checkpoint](results/batch-134-scalar-exact-edge.json)
+records every image, original reference, old control and source/adapter/Wasm pin.
+Retained author-workspace identifiers are `transcoder/tests/scalar_exact.rs`,
+`transcoder/tests/scalar_edges.rs`, `measure/report16-final.mjs` and
+`measure/scalar-quality-report16-final.mjs`. The controller pins all Rust sources
+before/after building the one Wasm and running the unchanged quality policy.
+The quality command intentionally exits nonzero: 84 pairs pass and 14 fail,
+including two new MetalPartsMat BaseColor losses. Native 56 and scalar Node 4
+tests pass. Earlier copy-based oracle attempts reused newer Cargo artifacts;
+only the fresh-compilation red/green evidence is used for the regression claim.
+These identifiers refer to a separately retained development workspace, not
+shipped clone commands or a completed public decoder. No timing A/B was run.
+
 The [scalar refinement](results/batch-134-scalar-refinement.json) lists retained
 author-workspace file identifiers and exact input, source, adapter and Wasm pins.
 Its native crate tests include `scalar_refinement.rs`; build that crate for

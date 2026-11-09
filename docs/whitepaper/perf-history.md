@@ -1,5 +1,17 @@
 # Performance history: losses, causes and fixes
 
+### Batch 134 complete scalar search and valid extents
+
+The [private checkpoint](results/batch-134-scalar-exact-edge.json) scores all
+potentially improving legal endpoint pairs after integer interval rejection;
+partial image blocks fit only their visible texels. This does additional search
+work to close a proven fitting miss and retains complete physical outputs.
+There is no wall-clock A/B, benchmark or speed claim. The one lazy private Wasm
+is 169,084 B raw / 61,994 B gzip9, versus report 15's 168,906 / 60,673 B;
+the 1,321 additional gzip bytes buy complete fitting and extent correctness.
+Original-source losses remain real failures, regardless of reconstruction SSE.
+Final entry, peak memory and all deferred timing targets remain unaccepted.
+
 ### Sciviz CPU extraction foundation (2026-11-10, batch 181 job 1)
 
 The new optional `/fallback` entry puts marching-cubes classification and generation in one feature-local
