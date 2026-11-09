@@ -24,7 +24,7 @@ export class VoxelHistory {
     get label(): string | undefined;
     get depth(): number;
     get bytes(): number;
-    push(grid: VoxelGrid, label?: string): HistoryEntry;
+    push(grid: VoxelGrid, label?: string): VoxelGrid;
     undo(): VoxelGrid;
     redo(): VoxelGrid;
     go(index: number): VoxelGrid;

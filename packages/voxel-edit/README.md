@@ -22,6 +22,22 @@ node.dispose();
 engine.dispose();
 ```
 
+`VoxelHistory.push(grid, label?)`, `undo()`, `redo()`, `go(index)` and `current`
+all return an owned `VoxelGrid` directly; read
+`history.label` for the current operation's name. Every returned grid is an owned
+copy. Navigation at either endpoint returns the current grid.
+
+```ts
+import { VoxelHistory } from '@margoengine/voxel-edit/history';
+const grid = { size: [1, 1, 1] as const, voxels: new Uint8Array(1) };
+const history = new VoxelHistory(grid);
+grid.voxels[0] = 2;
+const pushed = history.push(grid, 'Paint');
+const previous = history.undo();
+const restored = history.redo();
+console.log(pushed.voxels[0], previous.voxels[0], restored.voxels[0], history.label);
+```
+
 ```ts
 import { combineGrids, mergePalettes, rotateGrid, type VoxelGrid } from 'margoengine/voxel-edit';
 import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';

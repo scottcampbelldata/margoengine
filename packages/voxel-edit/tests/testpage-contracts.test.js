@@ -33,3 +33,23 @@ test('empty voxel mesh clears and restores an existing core mesh with an empty G
   assert.equal(node.id, id);
 });
 
+test('history push and navigation consistently return owned grids and expose the current label', () => {
+  const grid = { size: [1, 1, 1], voxels: new Uint8Array(1) },
+    history = new VoxelHistory(grid);
+  grid.voxels[0] = 3;
+  const entry = history.push(grid, 'Paint');
+  assert.equal(entry.voxels[0], 3);
+  assert.equal('grid' in entry, false);
+  assert.equal(history.label, 'Paint');
+  const undo = history.undo();
+  assert.deepEqual(undo.size, [1, 1, 1]);
+  assert.equal(undo.voxels[0], 0);
+  assert.equal('grid' in undo, false);
+  assert.equal(history.label, 'initial');
+  const redo = history.redo();
+  assert.equal(redo.voxels[0], 3);
+  assert.equal(history.label, 'Paint');
+  redo.voxels[0] = 10;
+  entry.voxels[0] = 11;
+  assert.equal(history.current.voxels[0], 3);
+});

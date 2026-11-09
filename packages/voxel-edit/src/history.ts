@@ -78,11 +78,11 @@ export class VoxelHistory {
   }
 
   /**
-   * Record a copy of `grid`. Discards any redo branch. Returns a copy of the stored entry.
+   * Record a copy of `grid`. Discards any redo branch. Returns an owned grid copy, like undo/redo/go/current.
    * @throws RangeError when the grid fails the cell budget or the retained copies would pass `maxBytes`; nothing is
    * recorded then.
    */
-  push(grid: VoxelGrid, label?: string): HistoryEntry {
+  push(grid: VoxelGrid, label?: string): VoxelGrid {
     checkGrid(grid, this.#maxCells, 'History grid');
     const stored = copyGrid(grid);
     const next = this.#entries.slice(0, this.#index + 1);
@@ -97,7 +97,7 @@ export class VoxelHistory {
     this.#entries = next;
     this.#index = next.length - 1;
     this.#bytes = bytes;
-    return { grid: copyGrid(stored), label };
+    return copyGrid(stored);
   }
 
   /** Move to the previous step and return a copy of its grid, or the current copy if at the start. */
