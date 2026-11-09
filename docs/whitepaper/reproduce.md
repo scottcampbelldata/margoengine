@@ -1546,3 +1546,19 @@ decoder sources and aggregate Wasm/adapter hashes against the BC7 checkpoint.
 decode calls, with no uncoded error, trap or hard timeout. Per-seed input and
 adapter hashes are logged; the Wasm hash is aggregate. The same caveats about
 mixed call counts, implemented subsets and end-instance memory still apply.
+
+For the [private UASTC ETC checkpoint](results/batch-134-uastc-etc.json), use
+the same pinned private crate and Node gzip9 baseline. Research extent and
+pre-use SOLID-ETC-1 convention are recorded in `docs/clean-room.md` and
+`private/batch-134/planner/etc-research-report13.md`. With the bounded CPU
+runner, execute `measure/etc-solid-contract.mjs`, native crate tests, release
+Wasm build, `measure/etc.test.mjs` and the retained adapter/packed/BC7 tests.
+`measure/etc-compare.mjs` is a strict byte-identity diagnostic: it reports498
+differences among690 images for these permitted selector choices; its result
+must not be presented as a passing strict identity check. The actual
+quality gate `measure/etc-quality.mjs` rechecks old payload hashes and old
+source SSE/sample/per-channel metrics, then requires no worse aggregate
+source SSE for each of52 file/target pairs, with no tolerance. All52 improve.
+The same original pixels and direct exact-area mip references are preserved.
+`measure/report13-etc-evidence.mjs` freezes source/tests and records the work
+count, selected checks and draft size. This does not complete jobs2/3.

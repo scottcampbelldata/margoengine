@@ -2223,3 +2223,17 @@ specification-defined RGB9E5. Source/compiled Wasm stayed unchanged; the result
 records aggregate Wasm and adapter hashes, plus per-seed input/adapter hashes.
 Counts mix whole-file and image/target calls; end-instance pages are not a
 per-pair peak-memory bar. Full job 3 remains open until every encoder exists.
+
+The private [UASTC ETC1/ETC2 checkpoint](whitepaper/results/batch-134-uastc-etc.json)
+implements targets0/1 across26 primary files/52 pairs/690 images, all served
+mips/layers/faces. Mandatory hint/packing rules are retained. Full RGB squared
+error is an independently chosen selector metric:192 payloads are old-exact,
+498 differ; every file/target pair has lower source SSE under the unchanged
+stored-channel/exact-area reference policy. This is quality acceptance of
+permitted encoder choices, not a waived identity bar for prescribed output.
+The old source metrics and payload hashes are rechecked. Native43 and selected
+Node18 tests pass, including corruption and independent palette-optimality
+checks. Draft Wasm155605raw/56363gzip bytes uses the baseline Node gzip9
+compressor. It is not final entry/peak-memory/speed acceptance. ETC1S ETC2,
+other encoders and public lazy TS/worker/API integration remain incomplete;
+no prebuilt was removed, no GPU request or new timing proof was made.

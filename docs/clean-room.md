@@ -2603,3 +2603,36 @@ post-failure recovery checks. This is a deterministic correctness campaign,
 not symbolic execution, coverage-guided fuzzing, a fuzzer-speed comparison or
 a statistical claim that all parser defects have been excluded. No timing-only
 assertion or wall-clock A/B is introduced.
+## Batch 134 report13, ETC hint convention and independent selector search
+
+The published UASTC solid ETC1S selector field does not spell out its numbering.
+Authorized opaque experiment SOLID-ETC-1 crafted 64 blocks across two color
+modes, eight intensity tables and all four hint indices, in both transfer
+modes (128 cases). The pinned old binary emits bit-plane indices 3/2/0/1 for
+hint0/1/2/3, meaning -b/-a/+a/+b. Record:
+`private/batch-134/measure/etc-solid-contract.json`. This is a field convention,
+not an inferred encoder algorithm. No implementation source or glue was read.
+
+Research before implementation compared Jacob Strom and Tomas Akenine-Moller,
+[*iPACKMAN: High-Quality, Low-Complexity Texture Compression for Mobile Phones*](https://fileadmin.cs.lth.se/graphics/research/papers/ipackman2005/ipackman2005.pdf)
+(2005, sections3 and4.1-4.3.1 reviewed), and Jacob Strom and Martin Pettersson,
+[*ETC2: Texture Compression using Invalid Combinations*](https://www.jacobstrom.com/publications/StromPetterssonGH07.pdf)
+(2007, section3 and section4 through overflow/payload discussion reviewed).
+Per Wennersten and Jacob Strom, [*Table-based Alpha Compression*](https://doi.org/10.1111/j.1467-8659.2009.01409.x)
+(2009) was abstract-only; the full PDF fetch failed and supplied no integer rules.
+No companion implementations were opened. These are not full-paper certifications.
+
+The normative [Khronos Data Format1.4](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html)
+section25.8.3 was read fully, with chapter21 endpoint/selector text and
+tables139-140, and full22.3 alpha text/tables145-146 rechecked before code.
+Published UASTC per-mode bit allocations locate the hints. Rounded subblock
+means, bias, differential clamping, solid hints, alpha centers and table
+mapping follow these rules. Selector error metrics and ties are permitted
+choices. Initial clamped/unclipped luma projections differed from the old
+outputs; final independent search uses the paper's full RGB squared error on
+the clamped palette, smallest bit index on ties. No optimizer was inferred
+from oracle outputs. Alpha chooses a nearest scalar index after the specified
+center/hints. [Evidence](whitepaper/results/batch-134-uastc-etc.json) records
+690 images/52 pairs/26 files, with lower original-source SSE in every pair;
+192 images are old-byte-exact and498 have permitted selector differences.
+All old payload hashes and old source metrics are independently rechecked.

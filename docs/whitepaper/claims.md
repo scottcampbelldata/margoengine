@@ -1963,3 +1963,15 @@ to the implemented UASTC paths over all 51 primary seeds and 2,856 deterministic
 mutations. Its 14,974 decode calls produced no uncoded exception, Wasm trap or
 hard-limit failure. This extends implemented-subset evidence; it does not close
 job 3 while target encoders remain missing or claim statistical fuzz coverage.
+
+The private [UASTC ETC checkpoint](results/batch-134-uastc-etc.json) follows the
+published ETC hint/alpha mapping and independently chooses RGB selectors by
+minimum squared error on the decoded clamped palette. Across26 files/52 pairs
+and690 images, every file/target pair has lower original-source SSE than the
+old build, using the unchanged stored-channel/exact-area reference policy;
+192 payloads are byte-exact and498 differ in permitted selector choices.
+Old payload/source controls are reverified, and an independent format reader
+checks selector optimality over all crafted modes/partitions/CSELs. Fixed
+block-local scratch avoids full-image RGBA staging and per-block heap
+allocation. This is subset quality/work evidence, not full jobs2/3 completion,
+peak-memory, GPU or timing acceptance.

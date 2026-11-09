@@ -3861,3 +3861,18 @@ adapter hashes. Controls retain strict RGB9E5 specification output; other
 implemented outputs retain frozen prebuilt hashes. Counts mix ABI image/target
 and whole-file/target jobs. Remaining encoders, full job 3 and isolated peak
 memory acceptance remain open.
+
+### Section 5 evidence: batch 134 private UASTC ETC
+
+The private [ETC1/ETC2 target0/1 checkpoint](../whitepaper/results/batch-134-uastc-etc.json)
+covers26 primary files/52 pairs/690 mip/layer/face outputs. Published hint,
+packing and alpha-center rules are retained; the independently chosen full
+RGB selector metric improves every pair's unchanged original-source SSE.
+192 images are old-byte-exact;498 permitted selector differences are quality
+checked, with old payload/source controls revalidated. Native43 and selected
+Node18 tests pass. The crafted queued-adapter test uses an independent
+specification-derived ETC reader to verify palette-optimal RGB indices over
+every mode/partition/CSEL; native vectors verify solid fields and alpha
+center/index orientation. Wasm155605raw/56363gzip bytes is an incomplete
+private build. Public integration, remaining encoders, peak memory, final
+size, GPU and deferred speed proofs stay open. No new GPU request was made.
