@@ -2782,3 +2782,17 @@ packages/road/test/review65.test.js uses all four exact review inputs, checks al
 The new check:road-invariants is an unconditional CPU step of check:merge after verify. It executes the three regression files against the built packages, so footprint, undersampled-planarity and periodic-frame classes remain checked even when an affected-package plan would narrow later GPU work. Generated stand-ins only; no surveyed-data, civil-design, speed or other-hardware claim. Updated LIM-634/635/636 evidence replaces the original unsupported no-defect assertions.
 
 Final validation caught terrain-entry growth past its existing 1143 B quality budget. Reusing the existing BVH ray containment primitive removed the duplicate predicate implementation and reduced the corrected entry to 1000 B without changing any size budget or regression assertion. An additional custom-sweep probe with up parallel to the seam tangent exposed a separate history-dependent fallback; the terminal row now uses the initial up frame, and periodic-sweep.test.js covers that case too.
+
+### Section 5 evidence: batch 68 cellular automata
+
+Optional procedural/caves loads one feature-local Rust/Wasm instance with no
+core/stage imports or renderer dependency. 2D/3D synchronous Moore updates use
+exact separable box sums, choosing a direct stencil on grids where it costs
+fewer reads. Native tests compare every threshold against the direct algorithm;
+JS tests use independent scalar loops, hostile values, all volume/work bounds,
+owned data and lifecycle checks. Real Natural Earth Madagascar data is a pinned
+public-domain fixture with root checkout-byte protection. The browser test checks
+every output cell on actual WebGPU and native WebGL2, before and after genuine
+loss and with a replacement generator. No shader is introduced. Seeded/3D
+controls are stand-ins, and geological realism, connectivity, renderer pixels,
+wall-clock/SIMD gains and other hardware remain unmeasured. Bounds: LIM-643.

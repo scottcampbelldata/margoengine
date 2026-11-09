@@ -39,3 +39,5 @@ python/margoengine/nbextension/
 packages/voxel-pathtracer/mesh-kernel/target/
 
 /packages/procedural/buildings-kernel/target/
+
+/packages/procedural/caves-kernel/target/

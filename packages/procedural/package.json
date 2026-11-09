@@ -69,6 +69,10 @@
     "./buildings": {
       "types": "./dist/buildings.d.ts",
       "import": "./dist/buildings.js"
+    },
+    "./caves": {
+      "types": "./dist/caves.d.ts",
+      "import": "./dist/caves.js"
     }
   },
   "files": [
@@ -87,11 +91,11 @@
     "@margoengine/core": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs && node scripts/copy-sdf.mjs && node scripts/copy-buildings.mjs",
+    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs && node scripts/copy-sdf.mjs && node scripts/copy-buildings.mjs && node scripts/copy-caves.mjs",
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
-    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs",
+    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
     "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",
@@ -100,6 +104,8 @@
     "build:sdf": "node scripts/build-sdf.mjs",
     "test:sdf-kernel": "node scripts/build-sdf.mjs --test",
     "build:buildings": "node scripts/build-buildings.mjs",
-    "test:buildings-kernel": "node scripts/build-buildings.mjs --test"
+    "test:buildings-kernel": "node scripts/build-buildings.mjs --test",
+    "build:caves": "node scripts/build-caves.mjs",
+    "test:caves-kernel": "node scripts/build-caves.mjs --test"
   }
 }

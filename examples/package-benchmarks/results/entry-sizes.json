@@ -1,5 +1,5 @@
 {
-  "commit": "42831ffb4",
+  "commit": "086b4bcb8",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1122,8 +1122,8 @@
         "gzip": 3587
       },
       "dist/workers/fbx.js": {
-        "raw": 249450,
-        "gzip": 82005
+        "raw": 249567,
+        "gzip": 82049
       }
     },
     "@margoengine/fsm": {
@@ -1146,12 +1146,12 @@
     },
     "@margoengine/geometry": {
       ".": {
-        "raw": 65075,
-        "gzip": 23971
+        "raw": 65187,
+        "gzip": 24023
       },
       "./shapes": {
-        "raw": 9992,
-        "gzip": 3585
+        "raw": 10104,
+        "gzip": 3632
       },
       "./triangulate": {
         "raw": 17012,
@@ -1174,8 +1174,8 @@
         "gzip": 5570
       },
       "./nurbs": {
-        "raw": 13176,
-        "gzip": 5006
+        "raw": 13288,
+        "gzip": 5047
       },
       "./sample": {
         "raw": 4009,
@@ -1194,12 +1194,12 @@
         "gzip": 3148
       },
       "./polygon": {
-        "raw": 17796,
-        "gzip": 6558
+        "raw": 17908,
+        "gzip": 6603
       },
       "./sweep": {
-        "raw": 15623,
-        "gzip": 6615
+        "raw": 15703,
+        "gzip": 6657
       },
       "./tessellate": {
         "raw": 2823,
@@ -2290,6 +2290,10 @@
       "./buildings": {
         "raw": 2987,
         "gzip": 1502
+      },
+      "./caves": {
+        "raw": 2660,
+        "gzip": 1421
       }
     },
     "@margoengine/quality": {
@@ -2490,24 +2494,24 @@
     },
     "@margoengine/road": {
       ".": {
-        "raw": 1977,
-        "gzip": 1027
+        "raw": 2094,
+        "gzip": 1089
       },
       "./junctions": {
         "raw": 2448,
         "gzip": 1114
       },
       "./banking": {
-        "raw": 2029,
-        "gzip": 1041
+        "raw": 2379,
+        "gzip": 1226
       },
       "./terrain": {
-        "raw": 1624,
-        "gzip": 887
+        "raw": 1878,
+        "gzip": 1000
       },
       "./repair": {
-        "raw": 959,
-        "gzip": 605
+        "raw": 1268,
+        "gzip": 685
       },
       "./markings": {
         "raw": 1643,
@@ -2612,12 +2616,12 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 106617,
-        "gzip": 35812
+        "raw": 107576,
+        "gzip": 36057
       },
       "./bricks": {
-        "raw": 37500,
-        "gzip": 13849
+        "raw": 37708,
+        "gzip": 13905
       },
       "./colormaps": {
         "raw": 10516,
@@ -2860,28 +2864,28 @@
     },
     "@margoengine/splines": {
       ".": {
-        "raw": 3807,
-        "gzip": 1597
+        "raw": 3899,
+        "gzip": 1630
       },
       "./closest": {
         "raw": 1365,
         "gzip": 727
       },
       "./frames": {
-        "raw": 3941,
-        "gzip": 1783
+        "raw": 3966,
+        "gzip": 1799
       },
       "./knots": {
-        "raw": 8996,
-        "gzip": 3222
+        "raw": 9088,
+        "gzip": 3259
       },
       "./mesh": {
-        "raw": 7124,
-        "gzip": 2987
+        "raw": 7149,
+        "gzip": 3002
       },
       "./fit": {
-        "raw": 7115,
-        "gzip": 2994
+        "raw": 7207,
+        "gzip": 3025
       }
     },
     "@margoengine/sprites": {
@@ -2962,12 +2966,16 @@
     },
     "@margoengine/staging": {
       ".": {
-        "raw": 22307,
-        "gzip": 8129
+        "raw": 23223,
+        "gzip": 8520
       },
       "./accumulate": {
-        "raw": 26471,
-        "gzip": 9314
+        "raw": 27433,
+        "gzip": 9655
+      },
+      "./pathtrace": {
+        "raw": 2783,
+        "gzip": 1213
       }
     },
     "@margoengine/stats": {
@@ -3805,6 +3813,11 @@
       "gzip": 9596,
       "brotli": 8153
     },
+    "packages/procedural/dist/caves.wasm": {
+      "raw": 27405,
+      "gzip": 11564,
+      "brotli": 9737
+    },
     "packages/procedural/dist/buildings.wasm": {
       "raw": 31252,
       "gzip": 12794,
@@ -3871,9 +3884,9 @@
       "brotli": 469989
     },
     "packages/staging/dist/index.js": {
-      "raw": 22307,
-      "gzip": 8129,
-      "brotli": 7342
+      "raw": 23223,
+      "gzip": 8520,
+      "brotli": 7701
     },
     "packages/tonemap/dist/index.js": {
       "raw": 35619,
@@ -3981,9 +3994,9 @@
       "brotli": 14147
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 247293,
-      "gzip": 81846,
-      "brotli": 70795
+      "raw": 247410,
+      "gzip": 81888,
+      "brotli": 70798
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 332501,

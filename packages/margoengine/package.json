@@ -2170,6 +2170,10 @@
       "types": "./dist/procedural/buildings.d.ts",
       "import": "./dist/procedural/buildings.js"
     },
+    "./procedural/caves": {
+      "types": "./dist/procedural/caves.d.ts",
+      "import": "./dist/procedural/caves.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

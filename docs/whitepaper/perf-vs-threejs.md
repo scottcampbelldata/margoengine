@@ -401,3 +401,11 @@ The WFC worker entry has no rival rendering-speed comparison. Its real WebGPU/We
 ### Batch 99 mixed geometry scope
 
 No rival triangle/voxel path tracer was run for this entry. The recorded CPU preparation A/B compares two Margo implementations with byte-identical geometry and hierarchy output, not an engine-to-engine speed ratio. GPU transport performance and quiet release timings remain unmeasured; this entry makes no competitive speed claim.
+
+### Batch 68 caves
+
+No rival cave generator was run and no engine-speed comparison is claimed.
+The comparison is our own direct Moore stencil versus our own separable integer
+sums, with identical grid output. Counts include all stencil/intermediate/centre
+reads but exclude allocation, copies, initialization and Wasm startup. This work
+reduction is not a release timing or SIMD result.

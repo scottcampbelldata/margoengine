@@ -49,7 +49,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-642). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-643). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1745,3 +1745,21 @@ integrator and Wasm retain their separate budgets. Staging root 8131 B, accumula
 This supersedes the Y-up receiver restriction in earlier batch-56 entries. ContactShadows and AccumulatedShadows accept any finite nonzero up direction and normalize it before GPU upload. Width is projected X unless abs(normal.x) >= 0.9, when projected Z is used; depth is width cross normal. This fixed frame switches at the threshold. fit uses conservative world AABB supports, not an oriented mesh fit. Accumulation's default light is world 8 * normalized up; custom world light positions must clear the caster height along that normal. Existing dimensions, sample and raster precision bounds remain. The HDR ground backdrop stays Y-up.
 
 Both receivers draw on WebGPU and the installed WebGL2 compatibility layer. The older native preview throws linked unsupported. The analytic geometry oracle covers eight orientations, all 4096 texels per effect per orientation, display pixels and actual device replacement; the real FlightHelmet additionally proves a Z-up fit/contact composition. No speed, cross-hardware subpixel identity or photographic quality claim. Root staging is 8520 B gzip (ceiling 8776), accumulate 9655 (ceiling 9945), pathtrace unchanged 1213; core plus stage unchanged 23797 < 25000.
+
+### LIM-643: bounded cellular automata caves and islands
+
+Optional procedural/caves: 2D eight-neighbour or 3D 26-neighbour synchronous
+binary threshold automata. Width/height 3..1024; depth 1 or 3..256; at most
+1,048,576 cells, steps 0..64, cells*steps <= 16,777,216. Fixed one-cell rock
+(caves) or water (islands) boundary. Same seed/options, same owned X-fastest grid;
+zero is a distinct uint32 seed. No connectivity, route, nonempty component,
+minimum playable area, mesh or infinite/chunk-continuity guarantee. Arbitrary
+thresholds can remove either state. Synchronous AbortSignal precheck; workers
+are needed for mid-call interruption. No retained GPU resources; tests use actual
+WebGPU/WebGL2 contexts and loss plus disposal/recreation. Real Natural Earth
+Madagascar input has exact scalar parity. Synthetic random/3D grids are stand-ins.
+Separable sums reduce stencil input reads with exact output; tiny grids use the
+cheaper direct rule. Counts exclude initialization, copies and allocation. No
+elapsed-time, SIMD, geological realism, rival-speed or cross-device rendering claim.
+
+Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23797 B gzip, strictly below 25000 B.

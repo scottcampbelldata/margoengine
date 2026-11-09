@@ -565,3 +565,55 @@ generated bounds agree within1.89 source pixels against the fixed2-pixel bar.
 Source hashes, licence (publisher CC BY-SA, no version stated), measurements and
 method are in test/fixtures/buildings/facade-reference.json. This limited calibrated
 layout test does not recover the whole facade, its ornamentation or material.
+
+## Cellular automata caves and islands
+
+The optional `@margoengine/procedural/caves` entry generates seeded binary 2D or
+3D grids. A synchronous Moore rule counts the 8 or 26 neighbours, excluding the
+centre: state 0 becomes 1 at `birth` occupied neighbours, state 1 survives at
+`survival` occupied neighbours. The defaults retain the previous state on a tie.
+Interpret 1 as rock/land and 0 as floor/water. Caves have a fixed rock boundary;
+islands have a fixed water boundary, including Z faces in 3D.
+
+```ts
+import { createCaveGenerator } from '@margoengine/procedural/caves';
+
+using caves = await createCaveGenerator();
+const cave = caves.generate({ width: 64, height: 48, seed: 7 });
+const islands = caves.generate({ width: 64, height: 48, mode: 'islands', seed: 9 });
+const volume = caves.generate({ width: 32, height: 32, depth: 32, seed: 7 });
+console.log(cave.cells.length, islands.cells.length, volume.cells.length);
+```
+
+| Option | Default | Bounds and meaning |
+| --- | --- | --- |
+| width, height | 64, 48 | Integer 3..1024 cells each |
+| depth | 1 | 1 for 2D, otherwise integer 3..256; total cells <= 1,048,576 |
+| seed | 1 | Unsigned 32-bit, zero has its own stream |
+| steps | 5 | Integer 0..64; total cells times steps <= 16,777,216 |
+| fill | 0.45 | Probability of state 1, finite 0..1; validated but unused with initial |
+| mode | caves | caves or islands; controls the fixed outermost cell layer |
+| birth, survival | 5, 4 (2D); 14, 13 (3D) | Integer 0..8 or 0..26, inclusive thresholds |
+| initial | absent | Optional owned Uint8Array, exact grid length, binary 0/1; copied and boundary replaced |
+| signal | absent | Abort checked before synchronous generation; use a worker to interrupt in flight |
+
+Owned `cells` index X fastest, then Y, then Z: `(z * height + y) * width + x`.
+Zero steps returns initialization with the fixed boundary. The LCG advances once
+per grid cell, including boundary cells: unsigned `1664525 * state + 1013904223`,
+occupied when state / 2^32 < fill. There is no automatic component pruning, route
+carving, connectivity, navigability, minimum land/floor area, chunk continuity,
+meshing or guarantee that either state survives a selected rule. 3D controls are
+stand-ins; no measured geological realism is claimed (LIM-643).
+
+One lazy caves.wasm, no import-time work, no GPU required. Identical values on
+actual WebGPU/WebGL2 before and after device/context loss. Dispose is idempotent;
+owned maps survive disposal. Loading accepts AbortSignal; errors have codes and
+help links. Real public-domain Natural Earth land polygons provide a Madagascar
+mask tested against a separate scalar automaton, without claiming geographic
+reconstruction. Its original bytes, source, hash and licence are test fixtures.
+Separable integer sums reduce stencil input reads against a direct Moore stencil
+with identical output; tiny grids select the direct stencil when cheaper. Counts
+include intermediate and centre reads, exclude initialization, copies, allocation
+and compilation. No elapsed-time, SIMD gain or rival-speed claim is made.
+
+Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23797 B gzip, strictly below 25000 B.

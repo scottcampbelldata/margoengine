@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/procedural/test/fixtures/caves/reference.json',
+    'Natural Earth v5.1.2 1:110m land GeoJSON, public domain, Nathaniel Vaughn Kelso and Tom Patterson; https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_110m_land.geojson; SHA-256 9e0729ee253ca7d7a5c4ae9395fb1902264c5377c52e224d13dd85010e2835d9. Original 138160-byte standard geographic test fixture, never shipped in npm. Terms: https://www.naturalearthdata.com/about/terms-of-use/. Own Madagascar rasterization and scalar automaton; no implementation copied.',
+  ],
+  [
     'packages/procedural/test/fixtures/buildings/facade-reference.json',
     'Own numeric observations of four annotated windows in CMP Facade Database base/cmp_b0001, Radim Tylecek and Radim Sara (2013), https://cmp.felk.cvut.cz/~tylecr1/facade/. Publisher CC BY-SA, no version stated. Original archive, photo and XML downloaded but never redistributed; all SHA-256, observation ordinals and calibration method recorded in the fixture. No external code.',
   ],

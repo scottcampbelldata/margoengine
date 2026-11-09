@@ -2795,3 +2795,15 @@ Optional worker solving keeps the heap algorithm and seed stream. Bounded TS/hos
 ### Batch 99 triangle preparation
 
 The optional mesh path uses a feature-local Rust/Wasm build rather than new JavaScript geometry loops. The CPU paired driver alternates an independent scalar spatial-median builder and Rust, requiring every output word to agree for 16,384 triangles. SIMD validation replaces 147,456 scalar coordinate predicates with 36,864 four-lane groups, with identical validity decisions. Loaded SCOTT-DEV per-round minima are retained in results/batch-99-mesh-build-ab-20261109.json as diagnostics. No quiet release number or GPU throughput improvement is published; first-call Wasm fetch/compilation is outside the kernel-only comparison.
+
+### Batch 68 caves: deterministic work counts
+
+Feature-local Rust/Wasm separates Moore box sums along grid axes, subtracts the
+centre and applies identical birth/survival thresholds. Per generation, I is the
+interior cell count: direct reads are 9I (2D) or 27I (3D). Separable reads are
+3(w-2)h + 4I in 2D, or 3(w-2)hd + 3(w-2)(h-2)d + 4I in 3D. The smaller method
+is selected, including boundary-support work. Exact scalar parity and counts
+are checked on real geographic input and stand-in random/3D grids. These are
+stencil reads including intermediate/centre reads, not total execution work;
+initialization, allocation, copies and compilation are excluded. No speed ratio,
+elapsed-time or SIMD gain is claimed.

@@ -2155,3 +2155,19 @@ existing licensed Khronos FlightHelmet as a neutral material study.
 ### Batch 56 job 6: oriented receivers
 
 Research survey: Duff et al., [Building an Orthonormal Basis, Revisited](https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf) (2017), abstract and section 1 on perpendicular vectors and cross products; Thorsten Thormaehlen's [planar shadows lecture](https://www.mathematik.uni-marburg.de/~thormae/lectures/graphics1/graphics_11_1_eng_web.html), equations deriving Blinn's point-light projection; and the W3C [WebGPU coordinate systems](https://www.w3.org/TR/webgpu/#coordinate-systems). We independently project a safely selected world axis into the plane, normalize and cross it with the normal. The existing Margo local shadow projection is composed with that world frame. Scale-before-normalize handles all finite nonzero direction magnitudes. No paper listing or external implementation was copied, and no engine source was read. This constant-size frame calculation needs no new CPU geometry loop or Wasm.
+
+### Batch 68 caves: bounded binary cellular automata
+
+Read public papers only: Johnson, Yannakakis and Togelius (2010),
+https://pcgworkshop.com/archive/johnson2010cellular.pdf, section 3 (seeded binary
+Moore-neighbour caves); Gartner and Zehmakan (2017),
+https://arxiv.org/html/1711.10920, sections 1 and 3 (synchronous majority, ties and
+boundary/topology distinctions). The implementation combines the cave stencil
+with explicit tie retention and an optional 3D Moore extension; it does not
+implement the first paper's infinite connected multi-grid game. Own Rust loops
+compute exact separable integer box sums or a direct stencil for small grids.
+No foreign implementation or linked code was read. Natural Earth v5.1.2 1:110m
+land GeoJSON is public-domain standard geographic data, downloaded unmodified,
+hash-pinned and credited in test/fixtures/caves/reference.json and notices.
+Our test-only ray crossing rasterizer samples the Madagascar region at cell
+centres. Scalar CA parity on that real mask proves rules, not coastal realism.

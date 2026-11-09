@@ -4227,3 +4227,87 @@ All four exact inputs now have regressions in packages/road/test/review65.test.j
 The new check:road-invariants runs all three class-regression files unconditionally after verify in check:merge. The package suites pass 335 tests with zero failures/skips; road native WebGPU and real WebGL2 compatibility and the geometry GPU checks pass. README examples execute for road, splines and geometry. This remains generated stand-in evidence, without a speed or civil-design claim. Reproduce using the review-correction commands in reproduce.md.
 
 Current optional road entry min+gzip bytes: root 1089, banking 1226, terrain 1000, repair 685. Bare package imports are external and dependencies are additional downloads. The earlier entry sizes are historical measurements, superseded for these entries. Core plus stage stays 23797 B, below 25000 B.
+
+## Batch 68: procedural generation
+
+Eight requested jobs were checked across all packages before implementation.
+The reservation/React Native decision landed in ad59b13cb966701eeae90625a72339812e7d28a0
+(LIM-615). Physics remains on hold; this lane changed no core or stage source.
+
+| Job | Status | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Poisson disk sampling | DONE (STAND-IN) | 2c59521434b6d9a168b6c9769b4292c42bf1ddc7 | procedural/poisson; minimum spacing on 2D/surface controls |
+| 2. Heightfield erosion | SKIPPED | existing | biomes/erosion already supplies thermal and hydraulic erode |
+| 3. Dungeon layouts | DONE (STAND-IN) | 52036468d16adbcb6e30c5d4b7c4bb702ede44c4 | procedural/dungeon; connected BSP rooms/corridors |
+| 4. Space colonisation trees | DONE (STAND-IN) | d1166649b8c8e8a6dc60a0feca51d7a38635e5c1 | procedural/trees; seeded attraction-driven skeletons |
+| 5. Sharp SDF modelling | DONE | 61db2517114b8175abe1794a41dfdad2baa591b9 | procedural/sdf; real standard Box plus stand-in sharp shapes, LIM-632 |
+| 6. Tileable textures | DONE | 978a86423, 1d303bc21, 06e58f18c | procedural/textures; calibrated paper figure plus stand-in pixel controls, LIM-639 |
+| 7. Building grammar | DONE | 252df10cc4bdd2628e4fa7fef597a6e6be864d4e | procedural/buildings; real municipal envelopes and four calibrated facade windows, LIM-642 |
+| 8. Cellular automata caves | DONE | this commit | procedural/caves; real Natural Earth mask plus stand-in seeded/3D controls, LIM-643 |
+
+Every implemented entry is optional and tree-shakable, with its own Rust/Wasm
+CPU feature except the GPU texture baker. No other engine implementation was
+read or copied. Public papers, real standard data provenance and licences are
+in clean-room.md, fixture records and THIRD-PARTY-NOTICES.md. Stand-in status is
+retained where the proof is synthetic; none establishes natural or architectural
+realism. No quiet release timing, rival-speed or SIMD gain is claimed.
+
+Job 8 tests all native threshold values for direct/separable equality, independent
+JS scalar rules on asymmetric 2D/3D grids, zero steps, tiny/full-volume/work bounds,
+nonfinite/huge/empty input, exact abort reasons, ownership and double disposal.
+The real public-domain 138160-byte Natural Earth land GeoJSON is downloaded
+unmodified and hash-pinned, rasterized over Madagascar at cell centres. Its
+automaton output must agree byte for byte with independent scalar rules.
+caves-browser.mjs makes 100068 cell comparisons on actual WebGPU and native
+WebGL2 before/after real loss and after recreation, plus lazy-fetch/lifecycle
+assertions and clean process exit. Results and work counts: results/batch-68-caves.json.
+
+Prelanding fixes: dimension validation precedes grid-volume arithmetic, so BigInt
+and Symbol dimensions produce coded errors with help links instead of native
+coercion errors. caves.test.js covers both types in every numeric option. The
+original hostile-value repro failed before the validation-order change.
+The first closing verify passed 13441 of 13445 tests: the new hostile-input
+regression and three claim-table/count checks correctly failed. The new claim
+was moved directly after LIM-642 in its design-envelope table and the limits
+counter was advanced to 643. All 28 focused cave/claim regressions then passed;
+the complete gates are rerun on the corrected build before landing.
+Cave rejection headers preserve the exact allocation length,
+with native and Wasm regression tests; the cave browser harness passes owned
+resources to bounded closeAll so assertion success also exits. Earlier texture
+fixes observe pending queue/compiler promises before cancellation/loss can throw
+and reject malformed WGSL literals with source-line errors. The downloaded
+CityJSON and Natural Earth standard fixtures use -text and root hash/attribute
+regressions, preventing Git line-ending corruption of publisher bytes. Earlier
+verify correctly caught the CityJSON hash mismatch; original bytes were restored.
+Initial cave setup also exposed a missing new Cargo.lock, a Windows .cmd spawn
+mistake, and a line-ending-sensitive metadata insertion; these were corrected.
+The resulting stale size record was regenerated without loosening its check.
+An API preflight started during a rebuild observed an already replaced generated
+chunk; waiting for the build to finish resolved that setup error, and all seven
+preflight tests, parity and quality API passed on the completed build.
+
+JS entry min+gzip bytes: poisson 1335, dungeon 1277, trees 1540, sdf 1559,
+textures 2874, buildings 1502, caves 1421. Caves Wasm 27405 B raw / 11564 B gzip;
+JS ceiling 1680 B. Building Wasm 31252 B raw / 12794 B gzip. Core plus stage
+23797 B gzip, strictly below 25000 B. Limits/options and accepted differences
+remain explicit in the README and limits.md. Caves offer no route carving,
+connectivity, nonempty/playable-area guarantee, mesh or chunk continuity.
+
+Closing validation is gated on lint, hygiene, full verify, procedural unit/native
+tests, actual GPU tests, executable README examples, API reports, quality and
+parity. Every check has a hard process-tree deadline. Nothing failed is pushed;
+final rebase changes regenerate metadata and rerun affected scope checks.
+
+Complete gates at dd1d4f5a7 passed: 13445/13445 full verification tests,
+103/103 procedural tests, actual WebGPU/WebGL2 GPU checks and 16/16 executable
+README examples (13 Node, 3 page). Native cave tests and the focused 28 cave/claim
+regressions passed. That earlier rebase preserved exact feature/loader/dependency
+bytes and repeated affected tests, GPU values, README execution, API and quality.
+The subsequent geometry changes on main require a new complete push-gate run.
+
+Docs per implemented job: procedural README/example, clean-room research,
+operational playbook section 5, claims, limits and reproduction notes. Work-count
+results and unmeasured timing are in perf-history.md and perf-vs-threejs.md.
+Job 2 adds no duplicate feature or new API documentation because the existing
+biomes/erosion README already describes it. Open-defect status is in known-bugs.md;
+this batch leaves no known cave defect.

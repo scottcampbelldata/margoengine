@@ -2113,3 +2113,20 @@ The contact receiver's native preview refusal lacked its help link; the new regr
 ### Closed: GPU mutex reuse collided with pending Windows deletion (2026-11-09)
 
 The combined biome/loader runtime gate failed at mkdir(gpu.lock/mutex) with EPERM while other runs released the same reusable directory. Deleting the live mutex name left it unavailable while a Windows handle retained a pending deletion. Mutex release, stale reclamation and tidying now rename that directory to a unique retired name before deletion. Permission and cleanup errors still throw; no retry or suppressed error was added. tests/gpu-lock-mutex.test.js reproduces the original EPERM using a real Win32 delete-pending directory handle, then creates a new mutex while the retired one is still pending. Existing locking, legacy compatibility and limit tests remain required.
+
+### Fixed before landing: batch 68 cave rejection ownership and proof teardown
+
+Dimension validation also precedes grid-volume arithmetic. BigInt/Symbol dimensions
+previously threw native coercion errors before the validator could issue its coded
+error/help link. The hostile numeric test now covers both types for every option.
+
+The new cave Wasm invalid-request header initially omitted its 16-byte allocation
+length. A wrapper releasing that header would otherwise use the wrong layout.
+Both valid and rejected results now report the exact size; caves.test.js and the
+native kernel invalid-dimensions test assert it and release using the header.
+The first cave browser diagnostic passed all values but used the shared teardown
+helper with an array instead of its resource object, leaving the browser/server
+open. Its owned process tree was ended. caves-browser.mjs now calls bounded
+closeAll with browser and servers, then removes its temporary fixture directory.
+The GPU gate must finish with exit zero, not merely print passing assertions.
+No test, tolerance, size bar or time budget was loosened.

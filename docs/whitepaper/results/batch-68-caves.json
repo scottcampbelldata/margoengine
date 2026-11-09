@@ -1,0 +1,64 @@
+{
+  "entryGzip": 1421,
+  "entryCeiling": 1680,
+  "wasmRaw": 27405,
+  "wasmGzip": 11564,
+  "wasmSha256": "679e4867d7d12819125c0f3d9931fddfad01d44600fd787fbc8412536ca4da34",
+  "cases": [
+    {
+      "options": {
+        "width": 31,
+        "height": 27,
+        "seed": 0,
+        "steps": 7
+      },
+      "stencilReads": 36743,
+      "directReads": 45675
+    },
+    {
+      "options": {
+        "width": 19,
+        "height": 17,
+        "depth": 11,
+        "seed": 4294967295,
+        "mode": "islands",
+        "steps": 7
+      },
+      "stencilReads": 189924,
+      "directReads": 433755
+    },
+    {
+      "options": {
+        "width": 96,
+        "height": 128,
+        "mode": "islands",
+        "steps": 5
+      },
+      "stencilReads": 417360,
+      "directReads": 532980
+    }
+  ],
+  "proof": {
+    "native": "all threshold values direct/separable equality on asymmetric 2D/3D grids; invalid result release size",
+    "js": "independent scalar parity, full bounds, hostile input, ownership, abort and disposal; BigInt/Symbol dimensions reject before arithmetic with coded help links",
+    "browser": "100068 cell comparisons: WebGPU/native WebGL2, actual loss, fresh instance, no page errors",
+    "reference": {
+      "source": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_110m_land.geojson",
+      "licence": "Public domain",
+      "licenceUrl": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "author": "Natural Earth, Nathaniel Vaughn Kelso and Tom Patterson",
+      "bytes": 138160,
+      "sha256": "9e0729ee253ca7d7a5c4ae9395fb1902264c5377c52e224d13dd85010e2835d9",
+      "extent": [
+        43,
+        -27,
+        52,
+        -10
+      ],
+      "width": 96,
+      "height": 128,
+      "description": "Real Natural Earth 1:110m land polygons, Madagascar region rasterized at cell centres. CA output is compared with independent synchronous scalar rules; no realism/reconstruction claim."
+    }
+  },
+  "limits": "Seeded/3D controls are stand-ins. Geographic input proves rule parity only, no geological realism, connectivity, mesh, timing or SIMD claim. Stencil reads exclude initialization/copies/allocation/compilation."
+}

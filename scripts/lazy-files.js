@@ -36,6 +36,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/caves.wasm',
+    label: 'caves.wasm',
+    kind: 'Rust Wasm cellular automata',
+    measure: 'file',
+    when: '`createCaveGenerator()`, only from the optional /caves entry',
+  },
+  {
+    package: '@margoengine/procedural',
     file: 'packages/procedural/dist/buildings.wasm',
     label: 'buildings.wasm',
     kind: 'Rust Wasm building split grammar',

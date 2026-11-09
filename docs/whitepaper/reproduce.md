@@ -1238,3 +1238,18 @@ npm run verify
 ```
 
 The review and corrective logs are local worktree evidence under test-results/review65 and test-results/fixes65. The committed result record is results/batch-65-review-fixes-20261109.json. The original repair implementation succeeds with area 80 and all Y values zero for the hill input; the regression now requires coded unsupported. All six new regression tests fail on the original implementation (the repair baseline was also probed directly). No performance measurement is claimed.
+
+### Batch 68 caves
+
+Build: npm run build:caves --workspace @margoengine/procedural (Rust wasm32 target).
+Run npm run test:caves-kernel --workspace @margoengine/procedural, then npm test
+--workspace @margoengine/procedural. GPU values/loss: use the required GPU lock
+around npm run test:gpu --workspace @margoengine/procedural. The caves browser
+test checks a seeded 2D cave, a seeded 3D island volume and real Natural Earth
+Madagascar land. reference.json pins the source URL, public-domain terms, original
+length/hash, extent and cell-centre resolution. caves-reference.js independently
+parses/rasterizes that data and applies scalar synchronous rules. Every output
+cell must match, including before/after loss and fresh instances on both APIs.
+Native tests compare every threshold on asymmetric grids and prove the exact
+read-count formulas in perf-history.md; tiny grids choose direct reads. No fixed
+runtime/speed threshold, connectivity or real 3D geology is claimed.
