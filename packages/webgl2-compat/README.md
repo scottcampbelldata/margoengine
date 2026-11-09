@@ -122,6 +122,10 @@ What it does:
   shaders.
 - In the repository, not in the package: the WGSL corpus, every shader module the packages create in their real-GPU
   checks (`npm run record:wgsl-corpus`), which the translator is tested against.
+  Additive recordings of an identical source retain all creating packages, labels,
+  pages and distinct pipelines; a later package label resolves an initially bundled
+  page's owner. Source bytes are still stored once. The corpus regression test checks
+  this across a write/read/add cycle.
 
 ### Native WebGPU on older GPUs (`margoengine/webgl2-compat/adapter`)
 

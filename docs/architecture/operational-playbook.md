@@ -2560,3 +2560,18 @@ lost-device waits and a fresh adapter/device are exercised. Partial allocations 
 queue failures have stand-in regressions. Compilation diagnostics include the WGSL
 source line. A downloaded published brick raster supplies a calibrated structural
 row offset only; other proofs are stand-ins, not material realism (LIM-639).
+
+### Additive shader corpus provenance repair (batch 68)
+
+The corpus writer previously kept only the first record for a source hash. Adding
+an already recorded bundled shader after giving it a package label lost the new
+owner and pipelines, so the existing source-coverage gate still refused the package.
+writeCorpus now unions creating packages, labels, pages and distinct renamed
+pipelines, and resolves bundled ownership when a real package label arrives. It
+keeps one source body per hash. corpus.test.js reproduces the initial unlabelled
+record followed by two labeled/package recordings, shared and distinct pipelines,
+and checks exact metadata after a write/read/add cycle. The existing root corpus
+coverage test remains unchanged and guards every package that gains shaders.
+Runtime renderer, core and stage code are unchanged. The procedural compute shader
+was recorded from the actual GPU run; original published-reference images are not
+included in the corpus. This is quality-gate metadata, not a new renderer claim.

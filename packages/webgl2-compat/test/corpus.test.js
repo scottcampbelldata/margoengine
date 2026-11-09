@@ -34,7 +34,15 @@ test('the corpus covers every package whose source holds WGSL', () => {
   // the system's regex library and macOS has no \b there: it matched nothing and git exited 1.
   const files = execFileSync(
     'git',
-    ['grep', '-l', '-E', '@(vertex|fragment|compute)([^[:alnum:]_]|$)', '--', 'packages/*/src/**', 'packages/shared/*.js'],
+    [
+      'grep',
+      '-l',
+      '-E',
+      '@(vertex|fragment|compute)([^[:alnum:]_]|$)',
+      '--',
+      'packages/*/src/**',
+      'packages/shared/*.js',
+    ],
     {
       cwd: root,
       encoding: 'utf8',
@@ -55,6 +63,47 @@ test('the corpus covers every package whose source holds WGSL', () => {
   );
 });
 
+test('repeated sources merge owners, labels, pages and distinct pipelines without growing sources', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wgsl-corpus-provenance-'));
+  try {
+    const code = '@compute @workgroup_size(1) fn shared() {} @compute @workgroup_size(1) fn alternate() {}';
+    const record = (key, packages, labels, pages, entry) => ({
+      key,
+      code,
+      errors: 0,
+      packages,
+      labels,
+      pages,
+      pipelines: [{ compute: { module: key, entryPoint: entry }, layout: 'auto' }],
+    });
+    writeCorpus([record('a', [], [], ['/old'], 'shared')], { dir });
+    const previous = readCorpus(dir);
+    writeCorpus(
+      [
+        ...recordsOf(previous),
+        record('b', ['procedural'], ['/packages/procedural/textures'], ['/new'], 'shared'),
+        record('c', ['other'], ['second label'], ['/other'], 'alternate'),
+      ],
+      { dir },
+    );
+    const current = readCorpus(dir);
+    assert.equal(current.modules.length, 1);
+    const module = current.modules[0];
+    assert.equal(module.package, 'procedural');
+    assert.deepEqual(module.packages, ['procedural', 'other']);
+    assert.deepEqual(module.labels, ['/packages/procedural/textures', 'second label']);
+    assert.deepEqual(module.pages, ['/old', '/new', '/other']);
+    assert.equal(module.pipelines.length, 2);
+    assert.ok(module.pipelines.every((p) => p.compute.module === module.key));
+    assert.deepEqual(
+      module.pipelines.map((p) => p.compute.entryPoint),
+      ['shared', 'alternate'],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a recording added to the corpus keeps every module, its pipelines and its owner', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wgsl-corpus-add-'));
   try {
@@ -64,10 +113,7 @@ test('a recording added to the corpus keeps every module, its pipelines and its 
       strip = ({ key, package: owner, packages, pipelines }) => ({ key, owner, packages, pipelines: pipelines.length });
     assert.equal(again.length, modules.length + 1);
     assert.equal(again.find((m) => m.code === code).package, 'biomes');
-    assert.deepEqual(
-      again.filter((m) => m.code !== code).map(strip),
-      modules.map(strip),
-    );
+    assert.deepEqual(again.filter((m) => m.code !== code).map(strip), modules.map(strip));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

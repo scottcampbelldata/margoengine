@@ -100,7 +100,24 @@ export function writeCorpus(records, { date = new Date().toISOString().slice(0, 
     const key = sha(record.code).slice(0, 16),
       who = owner(record),
       known = byKey.get(key);
-    if (known) continue;
+    if (known) {
+      // The same source can be created by more than one package or acquire a
+      // useful label on a later recording. Keep all provenance and pipelines.
+      const union = (a, b) => [...new Set([...a, ...b])];
+      known.packages = union(known.packages, who.packages);
+      if (who.package !== '(bundled page)') {
+        if (known.package === '(bundled page)') known.package = who.package;
+        else if (known.package !== who.package) known.packages = union(known.packages, [who.package]);
+      }
+      known.labels = union(
+        known.labels,
+        (record.labels ?? []).map((l) => l.replace(/^check-wgsl:/, 'check:wgsl ')),
+      );
+      known.pages = union(known.pages, record.pages ?? []);
+      const pipelines = [...known.pipelines, ...(record.pipelines ?? []).map((p) => renameModules(p, keys))];
+      known.pipelines = [...new Map(pipelines.map((p) => [JSON.stringify(p), p])).values()];
+      continue;
+    }
     byKey.set(key, {
       key,
       bytes: Buffer.byteLength(record.code),
