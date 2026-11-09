@@ -351,3 +351,14 @@ Entry 32 gates: labels units passed (2.3 s), lint passed (2.1 s), hygiene
 passed (12.6 s), and full verify passed in 405.2 s with zero failures/skips.
 The labels GPU and executable README checks are queued under codex-testpage;
 the separate local commit is not pushed until those actual checks pass.
+
+### Entry 42: NOT A BUG on current main
+
+The report's two-index input already throws RangeError from triangleIndices,
+before winding conversion, in STL, OBJ and PLY. normalizeGeometry uses that
+validator for plain geometry and core geometry, and per-primitive overrides also
+use it. The README already documents complete triangles. Persistent coverage in
+exporters/tests/testpage-triangles.test.js passes unchanged implementation:
+72 rejections across three writers, ordinary/Uint16/Uint32 arrays, lengths
+1/2/4/5 and ordinary/mirrored scales. Inputs remain identical; complete triangles
+still export. No exporter behaviour or public entry was changed for this finding.
