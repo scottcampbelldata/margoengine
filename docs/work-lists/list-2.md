@@ -27,7 +27,7 @@ For the second account. Start now.
 | F | voxels, then 2D | 96 | voxel | 1 | done |
 | F | voxels, then 2D | 97 | voxel-edit | 5 | done |
 | F | voxels, then 2D | 98 | voxel-net | 7 | todo |
-| F | voxels, then 2D | 99 | voxel-pathtracer | 8 | todo |
+| F | voxels, then 2D | 99 | voxel-pathtracer | 8 | list 1 (dev PC) |
 | F | voxels, then 2D | 100 | sprites | 6 | done |
 | F | voxels, then 2D | 101 | tilemap | 4 | done |
 | F | voxels, then 2D | 102 | pixel | 4 | done |
