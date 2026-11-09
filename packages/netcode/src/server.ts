@@ -241,7 +241,7 @@ export class GameServer<State, Input> {
         if (peer.player) return this.drop(peer, CloseCode.protocol, 'hello twice');
         if (message.version !== ENVELOPE_VERSION || message.schema !== game.schema.hash)
           return this.drop(peer, CloseCode.mismatch, 'protocol or schema differs; update the client');
-        if (this.players.length + this.joins.length >= this.maxPlayers)
+        if (this.players.length >= this.maxPlayers)
           return this.drop(peer, CloseCode.full, 'server full');
         peer.player = this.nextPlayer++;
         peer.playing = true;

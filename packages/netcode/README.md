@@ -850,7 +850,9 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
   Inputs more than `maxInputAhead` ticks ahead (default 2 seconds) are dropped, so a client cannot queue a burst, and
   the server consumes at most one input per player per tick, so a client cannot speed up time.
 - **Join checks.** The hello names the envelope version and the schema hash; a mismatch closes with
-  `CloseCode.mismatch`. `maxPlayers` (default 64) closes the next one with `CloseCode.full`. Silent clients close with
+  `CloseCode.mismatch`. `maxPlayers` (default 64) counts every accepted player once,
+  including a hello received before the next simulation tick, and closes the next
+  one with `CloseCode.full`. A disconnect frees its slot immediately. Silent clients close with
   `CloseCode.timeout` after `timeout` ms (default 10,000).
 - **Not covered here**: authentication (pass only connections you accepted, after your own login check), encryption
   (use `wss://` or WebRTC's DTLS), and denial of service at the network level (put the server behind a proxy).

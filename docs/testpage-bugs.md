@@ -193,3 +193,12 @@ transitions/test/mask.test.js fails on main and passes with the fix; it uses rea
 Engine registration, both attachment orders, independent progress, device restore,
 capture restoration and independent disposal. The existing viewport GPU oracle
 now also covers all three kinds together; its gate remains required before push.
+
+Entry 34 reproduces on main: 50 simultaneous hello messages admit only 32 players
+with maxPlayers 64. The players getter already includes accepted joins, so the
+additional joins.length double-counted them. Capacity now checks players once.
+netcode/tests/testpage-burst.test.js verifies 50 accepted before the first tick,
+64 accepted from a 65-client burst with exactly one full refusal, authoritative
+state after stepping, and immediate slot reuse after a disconnect. Its initial
+state checks include the arena fixture's four pre-existing crates. No timer or
+wall-clock tolerance is used.
