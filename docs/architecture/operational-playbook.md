@@ -3755,13 +3755,24 @@ attachment still refuses without the explicit fallback. This is source-gate
 integration for the existing route, not a new renderer feature or relaxed test.
 
 
-The final source-gate integration passes 326 focused tests with zero failures or
+The final source-gate integration passes 380 focused tests with zero failures or
 skips, including all compatibility, DOF and LOD unit tests, native sciviz route
 checks, paired size/network records and the unchanged clone-path regression.
 The actual sciviz native-WebGPU/native-WebGL2 pixel and recovery command passes
 with its original all-pixel bounds. Fresh preview-contract runs pass in both
 outer modes, and the additional compatibility README gate passes all 12 examples.
-Lint, hygiene, quality, API (889 entries/8,643 exports), documentation, README types,
+Lint, hygiene, quality, API (890 entries/8,648 exports), documentation, README types,
 preview source contract and size gates pass. The full verify's earlier one-doc
 failure and its precise repair remain recorded above. Durable summary:
 whitepaper/results/preview-contract-landing-20261109.json (relative to docs).
+
+Final documentation rebase onto 44f75880e preserves both additive limits notes
+and regenerates the documentation corpus. All 19 affected creative, pixel and
+tonemap README programs pass. Reconciled coverage is 545 current examples:
+534 pass, 11 known failures, zero new failures or missing examples. The focused
+README, corpus, encoding, preview, size and private-path regressions pass 93 tests
+with zero failures or skips; API, links, README types, preview and size checks pass.
+The completed integration validation belongs to base 17e876ee3/head 30e16454f;
+the evidence no longer attributes it to the mutable origin/main ref. Paired
+entry/network measurements are retained from c3f5f4d18. Full verify and completed
+GPU/parity suites were not repeated for this documentation rebase.

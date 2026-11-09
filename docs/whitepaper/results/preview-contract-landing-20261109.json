@@ -40,11 +40,12 @@
   "readmes": {
     "expected": 545,
     "covered": 545,
-    "pass": 533,
-    "knownFailures": 12,
+    "pass": 534,
+    "knownFailures": 11,
     "newFailures": 0,
     "freshDofLodCompatibility": "30/30 pass",
-    "freshCompatibilityAfterRebase": "12/12 pass"
+    "freshCompatibilityAfterRebase": "12/12 pass",
+    "freshFinalRebase": "19/19 creative, pixel and tonemap examples pass; current IDs and known list reconciled"
   },
   "compatibilityContinuation": {
     "selected": 115,
@@ -60,5 +61,22 @@
     "pairedSizeNetwork": 8,
     "includes": "current voxel/sciviz/Rust and GPU admission/activity regressions"
   },
-  "landingBase": "44f75880e00ff741be783cf9565f6f1169db77c1"
+  "validatedBase": "17e876ee3",
+  "validatedHead": "30e16454f",
+  "validationProvenance": "The completed landing-integration checks validated this base/head; the earlier landingBase field incorrectly read the mutable shared origin/main ref.",
+  "finalDocumentationRebase": {
+    "base": "44f75880e",
+    "focused": {
+      "passed": 93,
+      "failed": 0,
+      "skipped": 0
+    },
+    "metadata": "API, documentation links, README types, preview contract and size pass",
+    "readmeExamples": {
+      "passed": 19,
+      "failed": 0
+    },
+    "retainedMeasurements": "Paired entry/network records and API surface preserved from c3f5f4d18; no new timing claim",
+    "fullVerifyRepeated": false
+  }
 }
