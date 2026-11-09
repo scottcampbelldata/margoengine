@@ -57,7 +57,7 @@ validity repair, so it is omitted here. Cap cycles and strip winding follow sour
 half edges, avoiding the failed global-centroid orientation guess. Regression
 evidence, not the papers alone, establishes the twelve tested output guarantees.
 
-## Disposal investigation: entry 45 remains unverified
+## Disposal investigation: entry 45
 
 - Khronos WebGL Working Group, *WEBGL_lose_context*, revision 15, 2020,
   [specification](https://registry.khronos.org/webgl/extensions/WEBGL_lose_context/).
@@ -86,3 +86,25 @@ completion queries, and the paper motivates checking the full shader pipeline.
 Record page errors, readiness, render, tracer disposal and context-loss entry/exit
 separately. Browser-process teardown is a different owned investigation, not proof
 that the engine's synchronous dispose call hung. No companion code was read.
+
+### Active-compilation disposal isolation
+
+- Khronos WebGL Working Group, Kelsey Gilbert (editor), *WebGL Specification*,
+  editor's draft, 2026,
+  [program and shader objects](https://registry.khronos.org/webgl/specs/latest/1.0/).
+  Explicit object deletion and context loss are distinct operations. The draft
+  informs the deletion experiment; it is not evidence that a driver cancels an
+  active compiler job when an object is deleted.
+- Samuli Laine, Tero Karras and Timo Aila, *Megakernels Considered Harmful:
+  Wavefront Path Tracing on GPUs*, HPG 2013,
+  [paper](https://research.nvidia.com/sites/default/files/pubs/2013-07_Megakernels-Considered-Harmful/laine2013hpg_paper.pdf).
+  Specialized kernels exchange path state through queues instead of enclosing
+  all transport in one kernel. This is a candidate decomposition for the existing
+  D3D11 compilation defect, not proof of compile success or speed in Margo.
+
+Comparison: the context-loss and parallel-compile specifications distinguish
+resource shutdown from pending link work; DarthShader distinguishes translation
+and driver compilation; Laine et al. describe splitting transport work while
+preserving its state. None permits removing materials, traversal or precise
+maths. A future staged route must keep the same work, random sequence and output
+and prove correctness before any performance claim. No companion code was read.

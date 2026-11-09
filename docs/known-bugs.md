@@ -221,28 +221,35 @@ process creation time before waiting, so recycled PIDs cannot spend the shutdown
 budget on an unrelated replacement. Both cases have regression coverage in
 `tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
 
-### Unverified: test-page 45 compatibility path-tracer disposal hang
+### Open: test-page 45 context loss during D3D11 trace compilation
 
-The live test-page log reports a Chromium/Edge ANGLE Direct3D11 hang after
-installCompat({force:true}), Engine.create(canvas), VoxelPathTracer.attach(engine,
-{scene}), tracer.dispose(), engine.dispose(). The reported stopping point is
-CompatDevice.destroy's WEBGL_lose_context.loseContext call; the claimed cause is
-unreleased float-target/compute state from the path tracer compatibility route.
-That attribution still needs independent reproduction and root-cause proof.
-The coordinator requires the existing local test-page follow-ups to land first;
-entry 45 is retained for subsequent owning-package triage, alongside 42-44 in
-testpage-bugs.md. No core change is implied by this report.
+Repro on an RTX A6000 with ANGLE Direct3D11: force-install compatibility,
+create an engine, attach the test-page voxel scene and render the raster view.
+After the trace render pipeline has submitted compilation, wait one second,
+dispose the tracer, then dispose the engine. Tracer disposal returns, but engine
+disposal enters WEBGL_lose_context.loseContext and never returns before the
+unchanged 180 s hard limit kills its process tree. Immediate attach/dispose
+returns; awaiting tracer.ready instead encounters the existing D3D11 compilation
+defect below before disposal. These are distinct lifecycle boundaries.
 
-Independent bounded D3D11 evidence: immediate attach/dispose returns from both
-tracer.dispose and engine.dispose, including loseContext entry/exit. A separate
-ready/render case stalls before render, at tracer.ready, and its whole process
-tree is killed at the unchanged 180 s limit. The disposal cause remains
-unverified. An isolated pipeline-boundary probe distinguishes pending compiler
-promises from engine disposal; browser teardown remains with its dedicated owner.
-That isolated probe resolves every requested pipeline except trace before the
-same three-minute hold limit terminates its process tree. GL completion queries
-and JavaScript heartbeats return while trace remains pending. The cause of this
-readiness failure still needs attribution; it is not proof of a loseContext hang.
+Deleting all 15 tracked programs and 30 shaders after unbinding the current
+program returns normally, but does not resolve the context-loss hang. A raw
+OffscreenCanvas WebGL2 context reproduces it with only the captured trace vertex
+and fragment programs (366 and 134,593 bytes), compile/link, a one-second delay,
+a false COMPLETION_STATUS_KHR query and loseContext. No Margo module, buffer,
+texture, framebuffer, compute binding or draw is involved in that raw repro.
+A simple-program control links successfully and returns from context loss.
+All three failing probes end at the same three-minute GPU-lock limit.
+
+The active shader compilation/context-loss interaction is therefore sufficient;
+the reported float-target/compute-state leak is not required. The precise
+internal ANGLE/driver lock is not identified. This intersects the already
+documented monolithic D3D11 trace compilation defect below. A complete repair
+must preserve transport, materials, random sequences and precision while making
+the route compile and dispose correctly; staged transport is a candidate, not a
+completed fix. No runtime change or weakened test is claimed. Evidence and
+research comparisons are in testpage-bugs.md and testpage-research.md. Browser
+process teardown remains with its dedicated owner; no core change is implied.
 
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 

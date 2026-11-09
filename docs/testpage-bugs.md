@@ -477,3 +477,37 @@ ANGLE Direct3D11 monolithic trace compilation defect in known-bugs.md. A new
 bounded probe will dispose while trace compilation is active, rather than wait
 for that known pending readiness promise. No runtime change or disposal-cause
 claim is made before that probe runs.
+
+### Entry 45: confirmed active-compilation context-loss hang, still open
+
+After the entry 44 landing, a new D3D11 probe renders the original raster stand-in
+and disposes one second after the trace render pipeline submits compilation.
+It reaches 61 raster frames; tracer.dispose returns, engine.dispose enters
+loseContext, and that call never returns before the unchanged three-minute lock
+limit terminates the entire process tree. The outer supervisor records 181.3 s
+and failure; its own 64-minute queue-plus-run deadline did not fire. This is an
+actual disposal repro, unlike the earlier ready-only probe.
+
+A second diagnostic unbinds the current program and explicitly deletes all 15
+tracked programs and 30 shaders first. Deletion returns; engine context loss
+still hangs until the same limit (181.3 s including termination). This does not
+justify adding a deletion workaround to the runtime.
+
+The raw-context isolation creates no Margo device or texture/compute objects.
+A simple shader pair links and loses context successfully. A second context
+compiles and links the exact captured trace shader pair, returns false from
+COMPLETION_STATUS_KHR, then hangs in loseContext until the same limit (180.9 s
+including termination). The emitted vertex is 366 bytes, SHA-256
+9bf388d1a190efbc6471d472e441c211eb26d34e9ae3796786a05aadc35a2b9d;
+the fragment is 134,593 bytes, SHA-256
+d1c6b1991b9e86d9af892eb298d53bd29a9f48ca55530d31c6a05500a609fd0c.
+The compiler/context-loss interaction is sufficient without the alleged float
+target leak. The driver's internal locking cause is still unproved.
+
+Local reproducibility files are test-results/testpage-45-delayed-dispose.mjs
+(ordinary and --delete-programs modes) and testpage-45-raw-context.mjs, their
+supervisors, .log/.json results and captured .glsl pair. Each actual GPU command
+takes one shared codex-testpage slot, wait-max 60 and max 3; nothing else holds
+the lock. Research and the candidate staged transport repair are documented in
+testpage-research.md. No runtime change, completed fix or performance claim is
+made. Browser teardown stays with its dedicated owner. BUGS.md still ends at 45.

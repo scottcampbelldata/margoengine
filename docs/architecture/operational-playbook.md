@@ -1828,6 +1828,20 @@ timing clocks. Its regression executes the actual fixture and checks every
 render; the old fixture fails when it reads the forbidden clock. The optional
 measurement path is explicitly deferred in `docs/work-lists/speed-phase.md`.
 
+### Context loss during active D3D11 compilation (test-page 45)
+
+The bounded test-page reproduction now reaches the actual synchronous hang:
+tracer disposal returns, then engine disposal enters loseContext while the trace
+render program is still compiling. Explicit shader/program deletion does not
+resolve it. A raw WebGL2 OffscreenCanvas, using just the exact captured shader
+pair and compile/link/context-loss calls, also hangs; its simple-shader control
+links and loses context successfully. No texture, framebuffer, compute state or
+Margo module is needed for the raw failure. All failing process trees are killed
+at the unchanged 180 s limit, one shared slot at a time. The known monolithic
+D3D11 compilation defect and this context-loss interaction remain open. There is
+no runtime repair, native WebGPU failure claim or new speed measurement. A staged
+route must retain identical tracing work and output; its correctness is unproved.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for
