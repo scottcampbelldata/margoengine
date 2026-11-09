@@ -1,5 +1,13 @@
 # Clean room
 
+## Creative texture targets (batch 77)
+
+Cube/array texture views, mip extents and 3D render attachment depthSlice follow the
+[W3C WebGPU specification, texture views](https://www.w3.org/TR/webgpu/#texture-views) and
+[color attachments](https://www.w3.org/TR/webgpu/#render-pass-color-attachments), Candidate Recommendation
+Draft dated 15 September 2026. Implementation and generated color/triangle fixtures are independently written.
+No other engine or library source was read. This is a color subresource API, not scene or camera capture.
+
 Margo is written clean room. This page says what that means, how the 2026-10-24 rewrites were done, and where every
 lighting and post-processing formula in the engine comes from.
 

@@ -1,6 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget, sceneSamples } from '../../shared/msaa.js';
 import type { PassContext } from '@margoengine/core/extension';
+export { TextureRenderTarget } from './texture-target.js';
+export type { TextureRenderTargetOptions, TargetSurface } from './texture-target.js';
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
   TEXTURE_BINDING: number;

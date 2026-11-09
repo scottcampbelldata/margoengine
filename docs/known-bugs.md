@@ -21,6 +21,14 @@ Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
 
+### Fixed 2026-11-08: meadow phone quality label and stale DPR fixture
+
+`applyQualityTier` intentionally renders phones at DPR 1. The meadow treated every single-sample tier as
+mobile, then its nonzero margoLow made the label say Desktop light. Its older GPU fixture and the creative
+README still expected a phone DPR cap of 2. The demo now uses the returned tier for the phone label and
+documents DPR 1. `scripts/modern-grass-tests.js` asserts the exact phone label and exact DPR 1 on an actual
+mobile browser context; the existing pixel, interaction, device restoration and teardown checks remain.
+
 ### Two identical runs of GlassVaseFlowers can differ on a few pixels
 
 - **What:** the same model, camera and sorted path, built twice in one page, differed on fewer than 8 of 147,456 pixels
@@ -1360,3 +1368,10 @@ The reference has residual noise/silhouette sampling differences (exact oracle v
 No known open defect in tested selection, variation, cooldown and pool-lifecycle paths. Existing AudioVoicePool owns voice stealing and sources. Invalid positions/draws are validated before pool playback so failure does not cut an existing voice or consume container history. Node regression coverage is in events.test.js; real browser PCM uses generated stand-ins. Model and resource limits are in limits.md.
 
 Event review found that Array.every skips sparse-array holes, accepting missing range endpoints and missing coordinates. Explicit finite endpoint/coordinate checks now reject them. AudioVoicePool.play also stopped a sounding voice before validating new coordinates, volume or rate. The owning pool now validates all play inputs before any voice mutation. Regression tests in packages/audio/tests/events.test.js and packages/audio/tests/audio.test.js fail against the previous implementation and pass with both fixes, including preserving the previous source, pose, level, rate and smoothing. No tests or tolerances were loosened.
+
+### Creative texture targets (batch 77)
+
+No open defect found in the tested color-only subresource scope. The generated fixtures and real WebGPU
+readback cover faces/layers/slices/mips, load, HDR and explicit device replacement; native WebGL2 rejects with
+a coded help link. Scene capture, depth, MSAA, automatic mip generation and other devices are design limits
+or unmeasured coverage, recorded in limits.md, not proven capabilities.

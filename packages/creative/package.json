@@ -27,6 +27,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:gpu:targets": "node scripts/test-targets.js",
     "dev": "vite --config vite.config.js",
     "prepack": "npm run build"
   },

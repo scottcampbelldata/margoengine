@@ -31,7 +31,14 @@ const cases = [
     allowed: ['particles'],
     packs: ['vfx'],
   },
-  { key: 'targets', pack: 'creative', entry: 'targets', exports: ['HDRRenderTarget'], allowed: ['targets'] },
+  {
+    key: 'targets',
+    pack: 'creative',
+    entry: 'targets',
+    exports: ['HDRRenderTarget'],
+    narrowOnly: ['TextureRenderTarget'],
+    allowed: ['targets'],
+  },
   { key: 'toon', pack: 'creative', entry: 'toon', exports: ['ToonShading'], allowed: ['toon'] },
   { key: 'post', pack: 'creative', entry: 'post', exports: ['PostProcessing'], allowed: ['post', 'targets'] },
   { key: 'grass', pack: 'creative', entry: 'grass', exports: ['GrassField'], allowed: ['grass'] },
@@ -257,7 +264,7 @@ test('actual root/subpath imports share identities and facade helpers preserve r
     const narrow = await import('@margoengine/' + feature.pack + '/' + feature.entry);
     assert.deepEqual(
       Object.keys(narrow).sort(),
-      [...feature.exports].sort(),
+      [...feature.exports, ...(feature.narrowOnly ?? [])].sort(),
       'Unexpected narrow runtime exports: ' + feature.key,
     );
     for (const name of feature.exports) {
@@ -272,6 +279,10 @@ test('actual root/subpath imports share identities and facade helpers preserve r
         roots[feature.pack][name],
         'Root/subpath identity changed: ' + feature.key + '.' + name,
       );
+    }
+    for (const name of feature.narrowOnly ?? []) {
+      assert.equal(typeof narrow[name], 'function', 'Missing optional-only export: ' + name);
+      assert.equal(roots[feature.pack][name], undefined, 'Optional-only feature leaked into root: ' + name);
     }
   }
   void gltf;

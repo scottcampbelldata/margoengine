@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-605). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-606). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3589,6 +3589,19 @@ predicate calls from static compiler counts and loaded-machine timing. The profi
 clock, optimizer/layout and post-timer cache effects prevent an exact production-phase deconvolution.
 All original accuracy predicates and three corrected pins remain; no Box2D parity or owned-2D CCD claim.
 
+## Creative texture targets (batch 77)
+
+LIM-606. Optional /targets entry: 4021 B gzip, 11373 B minified with bare dependencies external.
+The optional entry's prior 2821 B size budget covered only the 2D HDR target. Adding subresource rendering
+sets its measured budget to 4277 B (4021 B plus the existing 256 B headroom); the feature stays in size class S.
+Cube/array/3D color only, rgba8unorm or rgba16float, one sample, explicit mip rendering. Positive integer
+dimensions within device limits; total logical texture bytes including mips at most 256 MiB. Cubes are square
+with six faces. Volume depth shrinks at mips; array layers do not. No core scene capture, depth attachment,
+automatic cameras, mip generation or resizing. Call restore(newDevice), rebuild bind groups and redraw after
+device loss; disposed targets cannot be reused. Native WebGL2 returns unsupported with a help link.
+Generated color/triangle fixtures on real WebGPU check 78 subresources, HDR, load and replacement-device redraw.
+Other devices, browsers, camera correctness, frame rate and speed are unmeasured. Core plus stage stays 23,626 B gzip.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -3613,6 +3626,14 @@ Its constitutive bending limit is documented in [limits](limits.md#own-2d-sustai
 Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
+
+### Fixed 2026-11-08: meadow phone quality label and stale DPR fixture
+
+`applyQualityTier` intentionally renders phones at DPR 1. The meadow treated every single-sample tier as
+mobile, then its nonzero margoLow made the label say Desktop light. Its older GPU fixture and the creative
+README still expected a phone DPR cap of 2. The demo now uses the returned tier for the phone label and
+documents DPR 1. `scripts/modern-grass-tests.js` asserts the exact phone label and exact DPR 1 on an actual
+mobile browser context; the existing pixel, interaction, device restoration and teardown checks remain.
 
 ### Two identical runs of GlassVaseFlowers can differ on a few pixels
 
@@ -4953,6 +4974,13 @@ The reference has residual noise/silhouette sampling differences (exact oracle v
 No known open defect in tested selection, variation, cooldown and pool-lifecycle paths. Existing AudioVoicePool owns voice stealing and sources. Invalid positions/draws are validated before pool playback so failure does not cut an existing voice or consume container history. Node regression coverage is in events.test.js; real browser PCM uses generated stand-ins. Model and resource limits are in limits.md.
 
 Event review found that Array.every skips sparse-array holes, accepting missing range endpoints and missing coordinates. Explicit finite endpoint/coordinate checks now reject them. AudioVoicePool.play also stopped a sounding voice before validating new coordinates, volume or rate. The owning pool now validates all play inputs before any voice mutation. Regression tests in packages/audio/tests/events.test.js and packages/audio/tests/audio.test.js fail against the previous implementation and pass with both fixes, including preserving the previous source, pose, level, rate and smoothing. No tests or tolerances were loosened.
+
+### Creative texture targets (batch 77)
+
+No open defect found in the tested color-only subresource scope. The generated fixtures and real WebGPU
+readback cover faces/layers/slices/mips, load, HDR and explicit device replacement; native WebGL2 rejects with
+a coded help link. Scene capture, depth, MSAA, automatic mip generation and other devices are design limits
+or unmeasured coverage, recorded in limits.md, not proven capabilities.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -8892,7 +8920,7 @@ Use a feature subpath for a static import or an on-demand `import()`:
 | Subpath | Feature |
 | --- | --- |
 | `@margoengine/creative/particles` | `GPUParticles` (a `@margoengine/vfx` preset) and particle option types |
-| `@margoengine/creative/targets` | `HDRRenderTarget` |
+| `@margoengine/creative/targets` | `HDRRenderTarget`, `TextureRenderTarget` |
 | `@margoengine/creative/toon` | `ToonShading` and toon option types |
 | `@margoengine/creative/post` | `PostProcessing` (fog, god rays, focus blur, grading, grain) and its option types |
 | `@margoengine/creative/grass` | `GrassField` and grass option types |

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-605). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-606). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1001,3 +1001,16 @@ The [proof](architecture/physics2d-frame-preparation.md) and perf history entry 
 predicate calls from static compiler counts and loaded-machine timing. The profile's adjacent setup,
 clock, optimizer/layout and post-timer cache effects prevent an exact production-phase deconvolution.
 All original accuracy predicates and three corrected pins remain; no Box2D parity or owned-2D CCD claim.
+
+## Creative texture targets (batch 77)
+
+LIM-606. Optional /targets entry: 4021 B gzip, 11373 B minified with bare dependencies external.
+The optional entry's prior 2821 B size budget covered only the 2D HDR target. Adding subresource rendering
+sets its measured budget to 4277 B (4021 B plus the existing 256 B headroom); the feature stays in size class S.
+Cube/array/3D color only, rgba8unorm or rgba16float, one sample, explicit mip rendering. Positive integer
+dimensions within device limits; total logical texture bytes including mips at most 256 MiB. Cubes are square
+with six faces. Volume depth shrinks at mips; array layers do not. No core scene capture, depth attachment,
+automatic cameras, mip generation or resizing. Call restore(newDevice), rebuild bind groups and redraw after
+device loss; disposed targets cannot be reused. Native WebGL2 returns unsupported with a help link.
+Generated color/triangle fixtures on real WebGPU check 78 subresources, HDR, load and replacement-device redraw.
+Other devices, browsers, camera correctness, frame rate and speed are unmeasured. Core plus stage stays 23,626 B gzip.

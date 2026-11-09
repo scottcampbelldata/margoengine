@@ -596,11 +596,13 @@ try {
       dpr: document.querySelector('canvas').width / innerWidth,
       overflow: document.documentElement.scrollWidth > innerWidth,
       panel: document.querySelector('aside').getBoundingClientRect().height,
+      label: document.querySelector('#quality').textContent,
     }));
     assert.equal(quality.blades, 35000);
     assert(!quality.open && !quality.overflow && quality.panel < 844 / 2);
     assert(!quality.textures.includes(4) && !quality.samples.includes(4));
-    assert.equal(quality.dpr, 2);
+    assert.equal(quality.dpr, 1, 'The phone quality tier renders at DPR 1');
+    assert.equal(quality.label, 'Mobile · 1× MSAA · DPR capped at 1', 'Phone label matches the rendered quality');
     await mobile.getByText('Shape the meadow', { exact: true }).click();
     await mobile.locator('#density').selectOption('100000');
     assert.equal(await mobile.evaluate(() => meadowAudit.grass[61]), 100000);

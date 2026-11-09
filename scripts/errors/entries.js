@@ -8,6 +8,14 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'creative-target',
+    title: '@margoengine/creative: texture render targets',
+    kind: 'family',
+    messages: [],
+    cause: 'A texture target dimension, mip, layer, format, load operation or clear color is outside its supported range.',
+    fix: 'Use cube, array or 3d with positive integer dimensions within device limits and a total allocation at most 256 MiB. Cubes have six square faces. Render one mip and layer at a time. Use rgba8unorm or rgba16float, and finite four-component clear colors. See the creative package README for every default and range.',
+  },
+  {
     id: 'disposed',
     title: 'disposed: used after dispose()',
     kind: 'code',

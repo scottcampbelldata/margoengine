@@ -30,4 +30,32 @@ export class HDRRenderTarget {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export interface TargetSurface {
+    readonly mip?: number;
+    readonly layer?: number;
+    readonly loadOp?: 'clear' | 'load';
+    readonly clearColor?: readonly [number, number, number, number];
+}
+
+export class TextureRenderTarget {
+    readonly options: Readonly<Required<TextureRenderTargetOptions>>;
+    constructor(device: GPUDevice | null | undefined, options: TextureRenderTargetOptions);
+    get texture(): GPUTexture;
+    get view(): GPUTextureView;
+    mipSize(mip?: number): readonly [number, number, number];
+    begin(encoder: GPUCommandEncoder, surface?: TargetSurface): GPURenderPassEncoder;
+    restore(device: GPUDevice | null | undefined): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface TextureRenderTargetOptions {
+    readonly kind: 'cube' | 'array' | '3d';
+    readonly width: number;
+    readonly height?: number;
+    readonly depthOrLayers?: number;
+    readonly mipLevelCount?: number;
+    readonly format?: 'rgba8unorm' | 'rgba16float';
+}
 ```

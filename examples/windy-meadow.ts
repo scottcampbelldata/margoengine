@@ -10,7 +10,7 @@ import { clouds } from '@margoengine/sky/clouds';
 import { lighting } from '@margoengine/sky/lighting';
 import { sceneSamples } from '../packages/shared/quality.js';
 import { applyQualityTier, paceEngine, redrawAfterRestore, watchQuality } from '@margoengine/quality';
-applyQualityTier();
+const qualityTier = applyQualityTier();
 
 const error = document.querySelector<HTMLElement>('#error')!,
   status = document.querySelector<HTMLElement>('#status')!;
@@ -76,11 +76,14 @@ try {
   watchQuality();
   if (mobile) density.value = '35000';
   document.querySelector<HTMLDetailsElement>('#settings')!.open = !matchMedia('(max-width:600px)').matches;
-  document.querySelector<HTMLElement>('#quality')!.textContent = !mobile
-    ? 'Desktop · 4× MSAA · DPR capped at 1'
-    : light
-      ? `Desktop light · 1× MSAA · DPR capped at ${light}`
-      : 'Mobile · 1× MSAA · DPR capped at 2';
+  document.querySelector<HTMLElement>('#quality')!.textContent =
+    qualityTier === 'phone'
+      ? 'Mobile · 1× MSAA · DPR capped at 1'
+      : !mobile
+        ? 'Desktop · 4× MSAA · DPR capped at 1'
+        : light
+          ? `Desktop light · 1× MSAA · DPR capped at ${light}`
+          : 'Desktop light · 1× MSAA · DPR capped at 1';
   let meadow: GrassField;
   const render = () => stage.engine.render({ delta: 0 });
   const populate = () => {

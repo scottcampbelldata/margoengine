@@ -53,6 +53,11 @@
       <p><strong>Fix.</strong> Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With <code>backend: "auto"</code> and <code>fallback: webglRenderer</code> from <code>@margoengine/webgl</code> the page draws on WebGL2 instead. Raise <code>startupTimeout</code> for a slow first compile; pass <code>signal</code> to cancel creation yourself. Branch on <code>error.code === "timeout"</code>.</p>
     </section>
     <h2>Messages</h2>
+    <section id="creative-target">
+      <h2><a href="#creative-target">@margoengine/creative: texture render targets</a></h2>
+      <p><strong>Cause.</strong> A texture target dimension, mip, layer, format, load operation or clear color is outside its supported range.</p>
+      <p><strong>Fix.</strong> Use cube, array or 3d with positive integer dimensions within device limits and a total allocation at most 256 MiB. Cubes have six square faces. Render one mip and layer at a time. Use rgba8unorm or rgba16float, and finite four-component clear colors. See the creative package README for every default and range.</p>
+    </section>
     <section id="worker">
       <h2><a href="#worker">Moving a canvas to a worker</a></h2>
       <p class="messages"><code>transferCanvas needs a canvas element in a browser with OffscreenCanvas</code> <code>transferCanvas: expected a Worker</code> <code>transferCanvas: timeout above 0</code> <code>This canvas has a context or already moved to a worker</code> <code>Worker failed before it took the canvas</code> <code>The worker never called receiveCanvas</code> <code>The page never called transferCanvas</code> <code>receiveCanvas: timeout above 0</code></p>

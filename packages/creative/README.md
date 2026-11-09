@@ -29,7 +29,7 @@ Use a feature subpath for a static import or an on-demand `import()`:
 | Subpath | Feature |
 | --- | --- |
 | `@margoengine/creative/particles` | `GPUParticles` (a `@margoengine/vfx` preset) and particle option types |
-| `@margoengine/creative/targets` | `HDRRenderTarget` |
+| `@margoengine/creative/targets` | `HDRRenderTarget`, `TextureRenderTarget` |
 | `@margoengine/creative/toon` | `ToonShading` and toon option types |
 | `@margoengine/creative/post` | `PostProcessing` (fog, god rays, focus blur, grading, grain) and its option types |
 | `@margoengine/creative/grass` | `GrassField` and grass option types |
@@ -88,7 +88,7 @@ The compute pass culls conservative blade bounds against all six camera planes a
 
 Instance data, uniforms, bind groups and pass descriptors are allocated at creation. The initial pipeline variant is built during setup; additional supported target variants are cached on first use. Stable frames reuse these resources. There is no production CPU visibility readback. Frame rate depends on hardware, resolution and visible density; 60 FPS is a target, not a guarantee. Grass is not a core mesh and does not participate in mesh picking, Stage fitting, section clipping or shadows.
 
-Run `npx vite --host 127.0.0.1` from the repository root and open `/examples/windy-meadow.html` for wind, density and seed controls, the optional Sky package's daylight/moonlight and moving clouds, and Bloom's HDR/AgX presentation. The demo uses the shared 4× MSAA desktop default; mobile uses 1× MSAA, a DPR cap of 2 and 35,000 blades, with collapsible settings. Orbit, pinch, keyboard navigation and reset remain available while motion is paused; reduced motion pauses the grass, seeds and clouds. Run `node --test tests/modern-grass.test.js` and `node scripts/modern-grass-tests.js` after building the creative, sky and post packages for the unit and GPU checks.
+Run `npx vite --host 127.0.0.1` from the repository root and open `/examples/windy-meadow.html` for wind, density and seed controls, the optional Sky package's daylight/moonlight and moving clouds, and Bloom's HDR/AgX presentation. The demo uses the shared 4× MSAA desktop default; mobile uses 1× MSAA, a DPR cap of 1 and 35,000 blades, with collapsible settings. Orbit, pinch, keyboard navigation and reset remain available while motion is paused; reduced motion pauses the grass, seeds and clouds. Run `node --test tests/modern-grass.test.js` and `node scripts/modern-grass-tests.js` after building the creative, sky and post packages for the unit and GPU checks.
 
 ## Planet
 
@@ -139,10 +139,66 @@ npm run test --workspace @margoengine/creative
 npm run test:browser --workspace @margoengine/creative
 ```
 
-The demo combines Planet's linear HDR surface/cloud/rim output with optional Bloom and AgX tone mapping. It presents a complete local 1k Earth map set first, then atomically upgrades all five maps to 2k on desktop while keeping that preview visible. Mobile keeps the complete 1k set. It includes damped OrbitControls with exterior zoom limits, a switchable procedural starfield, sun direction, independent rotation/cloud speeds, bloom and exposure controls. Desktop uses the shared 4× MSAA default; mobile uses 1× MSAA, a DPR cap of 2 and collapsible settings. Reduced-motion preferences pause rotation and cloud drift and disable navigation damping; keyboard and pinch navigation remain available. [Texture attribution and licenses](examples/earth/assets/ATTRIBUTION.md) travel with the example.
+The demo combines Planet's linear HDR surface/cloud/rim output with optional Bloom and AgX tone mapping. It presents a complete local 1k Earth map set first, then atomically upgrades all five maps to 2k on desktop while keeping that preview visible. Mobile keeps the complete 1k set. It includes damped OrbitControls with exterior zoom limits, a switchable procedural starfield, sun direction, independent rotation/cloud speeds, bloom and exposure controls. Desktop uses the shared 4× MSAA default; mobile uses 1× MSAA, a DPR cap of 1 and collapsible settings. Reduced-motion preferences pause rotation and cloud drift and disable navigation damping; keyboard and pinch navigation remain available. [Texture attribution and licenses](examples/earth/assets/ATTRIBUTION.md) travel with the example.
 
 The build and prepack commands write only this package's `dist` and license copy. Checks and screenshots write to this package's `test-results`; they use existing core artifacts without rebuilding the base. The browser check uses Edge by default (or installed Playwright Chromium as a fallback); set `BROWSER_CHANNEL` to choose another installed Chromium channel. The unit checks cover loading, lifecycle, validation, resource retention and bundle isolation. The WebGPU checks cover shaders, rendered pixels, depth, HDR and device restoration.
 
 This ESM package includes TypeScript declarations, requires `@margoengine/core` 1.0.0 and depends on `@margoengine/vfx` for particles. See the effect options and limitations.
 
 Apache-2.0 licensed.
+
+## Texture targets
+
+`TextureRenderTarget` adds color-only cube faces, array layers, mip levels and 3D depth slices to the optional
+`/targets` entry. It works on native WebGPU. Passing a WebGL2 engine's `gpu` (null) throws a `MargoError` with
+`code: 'unsupported'` and a help link. It does not capture the core scene; the caller records draws into its pass.
+
+```ts
+import {TextureRenderTarget} from 'margoengine/creative/targets';
+
+const adapter = await navigator.gpu.requestAdapter();
+if (!adapter) throw new Error('WebGPU adapter required');
+const device = await adapter.requestDevice();
+const cube = new TextureRenderTarget(device, {kind: 'cube', width: 32, mipLevelCount: 2});
+const encoder = device.createCommandEncoder();
+for (let mip = 0; mip < 2; mip++) {
+  for (let layer = 0; layer < 6; layer++) {
+    const pass = cube.begin(encoder, {mip, layer, clearColor: [layer / 5, mip, 0, 1]});
+    // Set a single-sample rgba8unorm pipeline and draw here, if needed.
+    pass.end();
+  }
+}
+device.queue.submit([encoder.finish()]);
+await device.queue.onSubmittedWorkDone();
+// cube.view is a cube sampling view; cube.texture supports copyTextureToBuffer.
+cube.dispose();
+device.destroy();
+```
+
+| Option | Default | Range |
+| --- | --- | --- |
+| `kind` | required | `cube`, `array`, `3d` |
+| `width` | required | Positive integer, device maxTextureDimension2D or maxTextureDimension3D |
+| `height` | width | Same limits as width; cube must be square |
+| `depthOrLayers` | 6 for cube, otherwise 1 | Cube fixed at 6; array bounded by maxTextureArrayLayers; 3D by maxTextureDimension3D |
+| `mipLevelCount` | 1 | 1 through the complete mip chain; array layers never shrink, 3D depth does |
+| `format` | `rgba8unorm` | `rgba8unorm` or `rgba16float` |
+
+Total logical allocation including mips is capped at 256 MiB. Cube layer order is +X, -X, +Y, -Y, +Z, -Z.
+`mipSize(mip = 0)` returns logical [width, height, depth/layers]. `begin(encoder, surface = {})` selects `mip = 0`
+and `layer = 0` by default. `layer` means face, layer or slice at that mip. `loadOp` defaults to `clear`; `load`
+preserves earlier pixels. `clearColor` defaults to [0, 0, 0, 0], with four finite components in 0..1 for rgba8unorm
+or -65504..65504 for rgba16float. The pass stores its output. Views are cached per surface (per mip for 3D).
+There is no depth attachment, MSAA, automatic camera setup or mip filtering/generation. Sample with the whole
+resource `view` (cube, 2d-array or 3d) after ending its render pass. Texture contents are initially zero.
+
+The target owns its texture; `dispose()` and `[Symbol.dispose]()` are idempotent and terminal. After device loss,
+call `restore(newDevice)`, fetch fresh `texture`/`view` handles, rebuild dependent bind groups and redraw every
+surface. Options survive; pixels do not. Restoration validates the new device limits before replacing resources.
+Do not retain surface views or use handles from a lost device. Invalid options and subresources fail before any
+pass is begun. GPU allocation/validation errors still follow WebGPU error scopes.
+
+Proof: `node --test --test-timeout=30000 packages/creative/tests/targets.test.js` and
+`node scripts/gpu-lock.mjs run --owner=creative-targets --max=5 -- node packages/creative/scripts/test-targets.js`.
+The generated color fixture checks 78 subresources with full pixel readback, HDR, partial draws with load,
+WebGL2 rejection and replacement-device restoration. Other browser/GPU implementations and speed are unmeasured.

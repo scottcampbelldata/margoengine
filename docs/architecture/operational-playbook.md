@@ -1809,3 +1809,13 @@ per-step state/work fingerprints, 39-clock calibration/residuals, original harne
 source-only reproducer. At 99.29% aggregate CPU busy its phase shares guide investigation; absolute times
 are not substituted for the separate rival benchmark. Entry 112 records the combined bounded paired/browser
 session; neither constituent receives an independently measured timing claim. No core/stage change or CCD.
+
+### Creative texture targets (batch 77): section 5 evidence
+
+The optional targets entry records color-only passes into cube faces, array layers, mips and volume slices.
+It uses single-mip 2D attachment views for cube/array and a 3D view with depthSlice for volumes, per W3C WebGPU.
+No core or stage changes. Unit checks reject invalid dimensions, memory, mips, layers and colors before recording.
+Real WebGPU full texel readback covers 78 generated subresources across rgba8unorm/rgba16float, partial draws
+with load, shrinking volume mips, explicit device loss and redraw on a replacement device. A real native WebGL2
+engine gets unsupported with help link. Reproduce with packages/creative/scripts/test-targets.js under gpu-lock.
+No scene capture, depth, MSAA, automatic mip generation, other-device or speed proof. Entry 4021 B gzip.
