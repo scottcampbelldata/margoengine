@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
+import { packedTolerance } from './support/raster-snap.mjs';
 
 // In parallel worktrees, set MARGO_GPU_LOCK to the shared adapter lock before running.
 // Browser/channel/adapter choices are supplied through scripts/browser.js environment options.
@@ -86,9 +87,12 @@ function numeric(label, image, options, variant = {}, region) {
     const local = region?.(point, index) ?? {},
       reference = expected(point, { ...options, ...local.options }, variant, local.z),
       name = `${label} at ${point}`;
-    // Analytic rays and fixed-point raster interpolation differ slightly for mirrored perspective triangles.
-    if (reference.packing === 'rgba') close(name + ' independently unpacked', unpack(rgba), reference.value, 3e-6);
-    else {
+    if (reference.packing === 'rgba') {
+      const at = (dx, dy) =>
+          expected([point[0] + dx, point[1] + dy], { ...options, ...local.options }, variant, local.z),
+        slope = Math.abs(at(0.5, 0).value - at(-0.5, 0).value) + Math.abs(at(0, 0.5).value - at(0, -0.5).value);
+      close(name + ' independently unpacked', unpack(rgba), reference.value, packedTolerance(slope));
+    } else {
       for (let channel = 0; channel < 3; channel++)
         close(name + ' ' + 'RGB'[channel], rgba[channel] / 255, reference.value, 0.5 / 255 + 2e-6);
       close(name + ' alpha', rgba[3] / 255, options.transparent ? (options.opacity ?? 1) : 1, 0.5 / 255 + 1e-6);

@@ -13,13 +13,17 @@
 // Each suite runs as it does in check:merge, with NODE_OPTIONS=--import=scripts/support/wgsl-corpus-hook.mjs and
 // MARGO_WGSL_CORPUS=test-results/wgsl-corpus, so every browser it launches records into a shard; the suites take the
 // GPU lock themselves. A suite that fails is reported and the run exits 1 after writing what was recorded, so a broken
-// check cannot silently shrink the corpus. Every suite has a hard time limit (30 minutes; MARGO_CORPUS_SUITE_MIN).
+// check cannot silently shrink the corpus. Every suite has a hard time limit (30 minutes; MARGO_CORPUS_SUITE_MIN), except
+// check:gpu-packages, which ends each of its tests at that test's own limit: its limit is the sum of those (runMinutes in
+// scripts/gpu-package-tests.mjs), as one 30-minute cap over all of them stopped a full run on a slow GPU with nothing
+// hung (Radeon 680M, 2026-11-08: tests 1 to 111 of 193 had run and reported, 16 s each on average, when it fired).
 // Kept in the corpus: modules that compiled without errors on the recording browser and declare an entry point.
 // Fragments that check:wgsl compiles on purpose (they fail alone) and anything with an error are counted, not kept.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runMinutes } from './gpu-package-tests.mjs';
 import { runLimited } from './support/run-limited.mjs';
 import { mergeShards } from './support/wgsl-corpus.mjs';
 import { readCorpus, recordsOf, writeCorpus } from '../packages/webgl2-compat/test/corpus/store.mjs';
@@ -59,7 +63,8 @@ if (!process.argv.includes('--merge-only')) {
     limitMs = Number(process.env.MARGO_CORPUS_SUITE_MIN ?? 30) * 60_000;
   for (const suite of suites) {
     console.log(`record-wgsl-corpus: npm run ${suite}`);
-    const result = await runLimited(`npm run ${suite}`, { cwd: root, env, limitMs, label: suite });
+    const ms = /^check:gpu-packages(\s|$)/.test(suite) ? Math.max(limitMs, runMinutes(suite) * 60_000) : limitMs,
+      result = await runLimited(`npm run ${suite}`, { cwd: root, env, limitMs: ms, label: suite });
     if (!result.ok) failed.push(`${suite}: ${result.message ?? 'failed'}`);
   }
 }

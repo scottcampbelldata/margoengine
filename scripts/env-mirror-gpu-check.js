@@ -9,6 +9,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { encodePNG } from '../packages/exporters/dist/capture.js';
+import { compareFlat } from './support/mirror-compare.mjs';
 
 const release = await acquire({ owner: 'env-mirror-gpu-check' });
 const W = 320,
@@ -82,6 +83,35 @@ try {
     const value = compare(a, b, mask ?? new Uint8Array(W * H).fill(1));
     record(name, value, value.max === 0);
   };
+  // The mirror against the scene reflected in its plane. At 1x every pixel must match. At 4x edges cannot (the capture
+  // camera's samples are the main pattern flipped left to right, and the capture resolves in linear HDR while a main
+  // pass without post-processing resolves after encoding; see scripts/support/mirror-compare.mjs), so flat pixels must
+  // match it to rounding, and every pixel must match the mirror view (the scene from the reflected camera, flipped
+  // back) with post-processing on, which takes both causes away.
+  const mirrorMatches = async (name, state, image, dark) => {
+    const reference = await render({ ...state, scene: 'reference' }),
+      region = erode(differs(image, dark), 2);
+    if (samples === 1) return matches(name, image, reference, region);
+    const flat = compareFlat(image, reference, region, W, H);
+    record(`${name}, flat pixels`, flat, flat.pixels >= 2000 && flat.max <= 1);
+    const linear = await render({ ...state, scene: 'mirror', tonemap: true }),
+      linearDark = await render({ ...state, scene: 'mirror', tonemap: true, tint: [0, 0, 0] }),
+      view = await render({ ...state, scene: 'mirror-view', tonemap: true });
+    matches(
+      `${name}, every pixel equals the mirror view, both resolved in linear HDR`,
+      linear,
+      flip(view),
+      erode(differs(linear, linearDark), 2),
+    );
+  };
+  // The picture flipped left to right.
+  const flip = (image) => {
+    const pixels = new Array(W * H * 4);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
+        for (let c = 0; c < 4; c++) pixels[(y * W + x) * 4 + c] = image.pixels[(y * W + W - 1 - x) * 4 + c];
+    return { ...image, pixels };
+  };
   const texelDifference = (a, b) => {
     let max = 0;
     for (let i = 0; i < a.data.length; i++) max = Math.max(max, Math.abs(a.data[i] - b.data[i]));
@@ -113,12 +143,11 @@ try {
     // Mirror against the reflected scene.
     const mirror = await render({ scene: 'mirror' }),
       dark = await render({ scene: 'mirror', tint: [0, 0, 0] }),
-      reference = await render({ scene: 'reference' }),
       region = erode(differs(mirror, dark), 2);
     await save('mirror', mirror);
-    await save('mirror-reference', reference);
+    await save('mirror-reference', await render({ scene: 'reference' }));
     record('mirror captured', { captured: mirror.captured }, mirror.captured === 1);
-    matches('mirror pixels equal the scene reflected in the mirror plane', mirror, reference, region);
+    await mirrorMatches('mirror pixels equal the scene reflected in the mirror plane', {}, mirror, dark);
 
     // Nothing behind the mirror (the green box) reaches the capture; a clip plane moved behind it lets it through.
     const withBox = await capture('mirror', { scene: 'mirror', green: true }),
@@ -132,15 +161,9 @@ try {
 
     // Orthographic main camera.
     const ortho = await render({ scene: 'mirror', ortho: true }),
-      orthoDark = await render({ scene: 'mirror', ortho: true, tint: [0, 0, 0] }),
-      orthoReference = await render({ scene: 'reference', ortho: true });
+      orthoDark = await render({ scene: 'mirror', ortho: true, tint: [0, 0, 0] });
     await save('mirror-ortho', ortho);
-    matches(
-      'orthographic mirror equals the reflected scene',
-      ortho,
-      orthoReference,
-      erode(differs(ortho, orthoDark), 2),
-    );
+    await mirrorMatches('orthographic mirror equals the reflected scene', { ortho: true }, ortho, orthoDark);
 
     // TAA: captures leave TAA's history alone. The converged mirror matches the converged reflected scene except at
     // edges inside the reflection (TAA supersamples real geometry; the mirror samples one unjittered capture), and a

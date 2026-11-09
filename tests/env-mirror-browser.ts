@@ -9,6 +9,7 @@ import { Environment } from '../packages/environment/dist/index.js';
 import { ALL_LAYERS, setCameraLayers, setRenderLayers } from '../packages/cameras/dist/layers.js';
 import { CameraProjection } from '../packages/cameras/dist/index.js';
 import { TAA } from '../packages/taa/dist/index.js';
+import { Tonemap } from '../packages/tonemap/dist/index.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
@@ -18,7 +19,8 @@ declare global {
 
 type Vec = [number, number, number];
 type State = {
-  scene: 'baseline' | 'mirror' | 'reference' | 'glass' | 'glass-reference';
+  scene: 'baseline' | 'mirror' | 'reference' | 'mirror-view' | 'glass' | 'glass-reference';
+  tonemap?: boolean;
   tint?: Vec;
   clipBias?: number;
   green?: boolean;
@@ -61,7 +63,9 @@ const part = (color: string | Vec, position: Vec, size: Vec, rotation = 0): Mesh
     .setRotation([0, 0, rotation]);
 const mirrored = (p: Vec): Vec => [p[0], p[1], -p[2]];
 // Mirror scene: everything in front of the mirror (z > 0), a box behind it (z < 0), a wall behind the camera that only
-// the reflection shows. The reference scene is the mirror scene reflected in z = 0, light included.
+// the reflection shows. The reference scene is the mirror scene reflected in z = 0, light included. The mirror view is
+// the mirror scene (without the box behind the mirror) from the main camera reflected in z = 0, up kept: a proper
+// camera, so its picture is the reference picture flipped left to right, drawn with the samples the capture uses.
 const RED: Vec = [-0.6, 0.2, 1.2],
   BLUE: Vec = [0.7, -0.4, 0.8],
   WALL: Vec = [0, 0, 9],
@@ -104,6 +108,7 @@ const RED: Vec = [-0.6, 0.2, 1.2],
     cube: cubeParts,
   },
   all = Object.values(groups).flat();
+let tonemap: Tonemap | undefined;
 let taa: TAA | undefined, projection: CameraProjection | undefined;
 // Attached on first use, so the first baseline frame is drawn without them (feature-off reference).
 let mirror: Reflector | undefined, glass: Refractor | undefined;
@@ -130,7 +135,7 @@ function apply(state: State, attach = true) {
   const scene = state.scene,
     glassScene = scene === 'glass' || scene === 'glass-reference';
   const shown =
-    scene === 'baseline' || scene === 'mirror'
+    scene === 'baseline' || scene === 'mirror' || scene === 'mirror-view'
       ? groups.mirror
       : scene === 'reference'
         ? groups.reference
@@ -153,7 +158,13 @@ function apply(state: State, attach = true) {
     mirror.distortion = 0.03;
     mirror.layers = (state.layers ?? 'none') === 'both' ? 1 : ALL_LAYERS;
   }
-  engine.camera.position = glassScene ? [0.5, 0.3, 5] : [1.2, 0.8, 5];
+  engine.camera.position = glassScene ? [0.5, 0.3, 5] : scene === 'mirror-view' ? [1.2, 0.8, -5] : [1.2, 0.8, 5];
+  // Any post-processing makes the main pass resolve its samples in linear HDR, as the capture does.
+  if (state.tonemap && !tonemap) tonemap = Tonemap.attach(engine);
+  if (!state.tonemap && tonemap) {
+    engine.removePlugin(tonemap.name);
+    tonemap = undefined;
+  }
   engine.camera.target = [0, 0, 0];
   engine.lighting.direction.set([0.4, 0.7, scene === 'reference' ? -0.6 : 0.6, 2.5]);
   engine.lighting.radiance.set([1, 1, 1, 0.25]);

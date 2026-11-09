@@ -705,6 +705,21 @@ export const holdMinutes = (step) =>
   Math.ceil((2 * testLimitMs(step.minutes)) / 60_000) + (PREPARE[step.name] ? 25 : 5);
 
 /**
+ * The longest a run of this script with `args` (its --only and --select) can take without anything hung, in minutes:
+ * the sum of its steps' hold limits, since every step is ended at its own. A caller that wraps a whole run in one
+ * limit (scripts/record-wgsl-corpus.mjs) takes this, not a fixed cap that a slow GPU outgrows with nothing hung.
+ */
+export function runMinutes(args, tests = plan(), profile = machineProfile()) {
+  const only = /--only=(\S+)/.exec(args)?.[1],
+    select = /--select=(\S+)/.exec(args)?.[1],
+    chosen = select && new Set(select.split(',').filter(Boolean)),
+    picked = tests.filter((t) => (!only || t.label.includes(only)) && (!chosen || chosen.has(testId(t))));
+  return planSteps(picked, profile)
+    .filter((step) => !step.excluded)
+    .reduce((sum, step) => sum + holdMinutes(step), 0);
+}
+
+/**
  * The suites side by side: each in its own slot of the GPU lock with its own log. The first failure stops the run, unless
  * `keepGoing`: then every suite runs and every failure is reported.
  */
