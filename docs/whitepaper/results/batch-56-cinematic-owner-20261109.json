@@ -158,5 +158,13 @@
     "inherited": "batch-56-save-owner-20261109.json",
     "fullRunRepeated": false,
     "reason": "Scott requested affected checks only"
+  },
+  "rebasedFix": "02fd42e4c",
+  "landingBase": "136c5fd60",
+  "rebase": {
+    "cinematicSourceAndTestsIdentical": true,
+    "upstreamChanges": "materials acceptance documentation and browser probes",
+    "gpuRepeated": false,
+    "fullVerifyRepeated": false
   }
 }
