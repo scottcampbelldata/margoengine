@@ -53,3 +53,18 @@ console.log(surface.geometry.indices.length);
 ```
 
 `bankedRoad` accepts all root road options and `bank` (default 0): radians about the forward tangent, bounded to +/-pi/4. Positive bank raises the positive lateral edge. A list of 2..4097 angles interpolates linearly at equal arc distances. The entire cross section, including curbs, rotates; normals are rebuilt with the existing geometry utility after deformation. `signal` (default none) checks before and after lazy normal-kernel loading. Data is snapshotted before the first await and caller-owned, with no CPU resource to dispose. Dispose rendered meshes and engines. Input and output positions must stay within +/-1,000,000 m; float32 collapsed triangles and UV overflow reject. Nonvertical tangents and the root road limits apply. Banking does not repair tight bends or design civil-engineering transitions. Both native WebGPU and real WebGL2 compatibility render the banked mesh, including exact device reboot and double disposal tests.
+
+## Terrain fit
+
+```ts
+import {road} from 'margoengine/road';
+import {Spline} from 'margoengine/splines';
+import {fitTerrain} from 'margoengine/road/terrain';
+import {heightfieldGeometry} from 'margoengine/terrain';
+const surface = road(new Spline([[0,2,-10],[0,4,10]]));
+const height = await fitTerrain(surface.geometry, {base:()=>1, shoulder:3, depth:0.1});
+const ground = heightfieldGeometry(height, {size:[30,30], resolution:64});
+console.log(ground.indices.length);
+```
+
+`fitTerrain` returns a height function compatible with terrain heightfields and biome field sources. It cuts ground above the road and fills ground below it. Pass world-space geometry; root curbs, banked grades and junction surfaces work. `base` defaults to flat zero, `shoulder` to 2 m and `depth` below the road to 0 m. The bed follows barycentric road triangle heights; outside the footprint it fades to base with cubic smoothstep over the shoulder. Vertical curb walls have no heightfield footprint and are omitted. Input positions and sampled base/query coordinates stay within +/-1,000,000 m, up to one million vertices/faces. No bridge/tunnel or overlapping-layer classification; use one at-grade surface. The input mesh snapshots before lazy BVH loading. `signal` (default none) checks around loading; synchronous queries/builds finish without interruption. Returned CPU data is garbage collected; dispose rendered meshes and engines. WebGPU and WebGL2 compatibility both have fitted-heightfield pixel, value, reboot and disposal proof. Sampling resolution controls the final terrain mesh fidelity.

@@ -1882,3 +1882,7 @@ then verifies four exact hashes, 8,385 points per file and every locally seriali
 .splat position against the independent PLY. The stale skip-when-absent fixture
 notice now documents the existing strict shared downloader. No codec/render defect
 is hidden by a generic fallback, and no full-capture or encoder-accuracy claim follows.
+
+### Batch 65 job 3: Terrain fit audit
+
+No open defect found within the documented contract. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim.

@@ -2362,6 +2362,10 @@
       "types": "./dist/road/banking.d.ts",
       "import": "./dist/road/banking.js"
     },
+    "./road/terrain": {
+      "types": "./dist/road/terrain.d.ts",
+      "import": "./dist/road/terrain.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

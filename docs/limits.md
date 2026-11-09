@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-634). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-635). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1511,3 +1511,7 @@ reuse the independent fixtures; .splat is serialized here with Margo from that P
 preserving positions, quantizing colour/quaternion and omitting SH as its format
 requires. Four example-input failures close. Independent .splat encoder accuracy,
 complete-capture quality and throughput are separate; no codec/render or size budget changed.
+
+### Batch 65 job 3: Terrain fit (LIM-635)
+
+Optional road/terrain: 887 B min+gzip with bare package imports external; dependencies are additional downloads. Heightfield only, no bridge/tunnel separation or overlapping elevation layers. Inputs within +/-1,000,000 m; up to one million vertices and one million faces; vertical curb walls omitted from the heightfield projection. Zero-area projected faces ignored, at least one remaining face required. Shoulder 0..1000 m (default 2), bed depth 0..100 m (default 0). Existing terrain sampling resolution determines mesh accuracy. No excavation-volume or engineering-design claim. Analytic cut/fill, shoulder/end distance, banked grades, curbs, ownership, hostile inputs and aborts; actual fitted heightfield pixels and value oracles, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.

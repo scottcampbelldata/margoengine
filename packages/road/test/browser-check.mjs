@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'banking']) {
+  for (const feature of ['junctions', 'banking', 'terrain']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -61,7 +61,19 @@ try {
         throw e;
       };
       let data;
-      if (feature === 'banking') {
+      if (feature === 'terrain') {
+        const {road} = await import('/packages/road/dist/index.js');
+        const {fitTerrain} = await import('/packages/road/dist/terrain.js');
+        const {Spline} = await import('/packages/splines/dist/index.js');
+        const {heightfieldGeometry} = await import('/packages/terrain/dist/index.js');
+        const {Geometry} = await import('/packages/core/dist/index.js');
+        const surface=road(new Spline([[0,2,-10],[0,2,10]]),{crossSection:[[-3,0],[3,0]]});
+        const cut=await fitTerrain(surface.geometry,{base:()=>5});
+        const fill=await fitTerrain(surface.geometry,{base:()=>-5});
+        if(cut(0,0)!==2 || fill(0,0)!==2 || cut(10,0)!==5 || fill(10,0)!==-5) throw new Error('Cut/fill value oracle');
+        const ground=heightfieldGeometry(fill,{size:[20,20],resolution:20});
+        data={geometry:new Geometry(ground.positions,ground.normals,ground.indices)};
+      } else if (feature === 'banking') {
         const {bankedRoad} = await import('/packages/road/dist/banking.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
         data = await bankedRoad(new Spline([[0,0,-10],[0,0,10]]), {bank:Math.PI/6, crossSection:[[-3,0],[3,0]]});
@@ -130,7 +142,8 @@ try {
       const [r, g, b] = rgb(first, x, y);
       assert.ok(r > g + 30 && r > b + 30, `${mode}: road covers ${x},${y}: ${r},${g},${b}`);
     }
-    assert.ok(rgb(first, 100, 100)[0] < 40, `${mode}: corner outside road stays clear`);
+    const exterior = feature === 'terrain' ? [5,5] : [100,100];
+    assert.ok(rgb(first, ...exterior)[0] < 40, `${mode}: corner outside road stays clear`);
     await page.evaluate(() => window.check.reboot());
     assert.deepEqual((await pixels()).data, first.data, `${mode}: retained geometry survives device reboot`);
     await page.evaluate(() => window.check.remove());

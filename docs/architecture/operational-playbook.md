@@ -2461,3 +2461,7 @@ splats each and compares every locally serialized .splat position with independe
 PLY. No codec/render, core or stage source changed. This is example-execution
 evidence; independent encoder accuracy, full-capture quality and throughput remain
 separate. Full SPZ tests keep their required shared fixtures.
+
+### Batch 65 job 3: Terrain fit
+
+A world-space snapshot of the road is projected into XZ. Existing bvh closest-point queries supply footprint distance and barycentric weights for the original road Y; a cubic smoothstep shoulder blends that bed with the original ground. BVH loads on invocation. Biomes carvePaths already shapes a ground-following bed but cannot take authored road triangle elevations, so it is not duplicated. Core and stage are unchanged. Section 5 evidence: Analytic cut/fill, shoulder/end distance, banked grades, curbs, ownership, hostile inputs and aborts; actual fitted heightfield pixels and value oracles, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim. See packages/road/test/terrain.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.
