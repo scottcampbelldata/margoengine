@@ -723,6 +723,8 @@ loaded sessions cannot prove before/after speed. The Box2D goal remains open and
 
 The raw Rust kernel under `packages/physics2d/kernel` exposes checked `Result<_, PhysicsError>` body/shape/chain
 creation, world stepping and handle operations, bounds queries, scalar/coherent/four-pair and smooth-chain collision.
+The public Rust `solver::solve` entry also checks current inputs and derived outputs; its direct-call substep
+must be positive and representable. `World::step` retains its validated nonpositive-step no-op policy.
 Use `?` to propagate a refusal, or read `PhysicsError::code()` and `help()`; the latter points to this section.
 The Rapier-backed TypeScript facade is a separate API. Pure math and mass-property utilities are not all checked
 entry points; in particular, `mass::mass_of` retains its direct `MassData` return.

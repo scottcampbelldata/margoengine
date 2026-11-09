@@ -19,6 +19,21 @@ The required centered 1:1000 contact stack now uses the unchanged sag, drift, cr
 Its constitutive bending limit is documented in [limits](limits.md#own-2d-sustained-contact-support).
 Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
+### Fixed 2026-11-08: direct Rust solver call bypassed input validation
+
+- **Repro:** on `bf40cdace`, step two touching boxes once, set
+  `world.contacts[0].manifold.count = 3`, then call the public
+  `margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 60.0)` directly.
+  It panics at `solver.rs:371` indexing point 2 of a two-point array.
+- **Cause:** current-data ownership, handle, count and numeric preflight lives only in `World::step`;
+  the public solver entry assumes that preflight already ran. Direct callers can bypass it.
+- **Fix:** both public entries share the original input and derived-output checks. `World::step` uses a
+  private already-checked entry, retaining its single preflight and separate post-sleep check.
+  `tests/solver_input.rs` covers malformed direct inputs, finite-input overflow and error recovery;
+  a private scalar/SIMD oracle compares complete valid body/contact/cache/joint bits against the old
+  algorithm. The existing Wasm `check(i)` also exercises count/handle/nonfinite refusals, recovery and
+  derived overflow. The frozen expected-red reproduction remains in lane P's `direct-solver-input-v1`.
+
 ## Rendering
 
 ### Fixed 2026-11-08: creative targets workspace GPU launch

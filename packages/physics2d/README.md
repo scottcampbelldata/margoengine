@@ -142,6 +142,10 @@ Genuine zero density or zero area retains its documented zero-mass behavior; pos
 to zero is refused. Before stepping, the world checks current public data and handles, including edits made
 after creation. A reported arithmetic error during simulation does not promise rollback of the whole step.
 
+Direct Rust `solver::solve` calls check the same current inputs and derived solver outputs. `World::step`
+uses the private already-checked solver entry after its preflight, so a normal step checks each boundary once.
+Unlike the world's nonpositive-step no-op, the direct solver requires a positive representable substep.
+
 Collision calls (`collide`, `collide_coherent`, `collide_four` and `collide_smooth`) refuse nonfinite poses or
 cutoffs and invalid current core data instead of indexing a missing face or returning an invented contact.
 The existing [four-pair Rust doctest](kernel/src/manifold/four.rs) demonstrates the checked collision call.

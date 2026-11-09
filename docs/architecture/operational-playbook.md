@@ -1640,6 +1640,12 @@ also checks absent face/distance candidates before indexing. This matters on bot
 the reproduced `47f81f909` panic used a NaN pose together with a NaN cutoff; the literal finite-cutoff review
 call returned empty here. It is now a coded refusal rather than a sentinel index or invented manifold.
 
+The public Rust `solver::solve` entry shares the current-data preflight and final solver-output check.
+The bf40 baseline let direct callers bypass `World::step` and panic by setting a manifold count to three;
+`tests/solver_input.rs` covers that boundary and related handles, ownership, numeric domains and recovery.
+`World::step` calls a private already-checked solver entry, preserving its single preflight, post-solve
+check and separate post-sleep check. No physical equation, result pin or hot-step scan is changed.
+
 Regression coverage is in `kernel/tests/input.rs`, `manifold_exact.rs`, `manifold.rs`, native unit checks and the
 existing Wasm `check(i)` invalid-input checks. Two creation assertions copied unchanged into an isolated
 `47f81f909` tree fail as expected (`.lane/p/input-baseline.log`); the current checked versions exercise rollback

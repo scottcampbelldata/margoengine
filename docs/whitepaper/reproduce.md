@@ -274,6 +274,12 @@ The 1:1000 contact extension is a new failing baseline diagnostic, not a passed 
 
 ## Own 2D input validation
 
+The public direct solver boundary is covered by
+`cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test solver_input`.
+On bf40, the count-three direct-call regression panics at `solver.rs:371`; current callers receive the
+coded parameter error. Related tests cover handles, ownership, finite inputs, derived overflow, recovery
+and valid direct-call results. `World::step` retains one preflight and its original output/sleep scans.
+
 From the repository root, with cargo on PATH, run the checked raw Rust API regressions, complete retained-reference
 collision comparisons, valid native hashes and the existing collision doctest:
 

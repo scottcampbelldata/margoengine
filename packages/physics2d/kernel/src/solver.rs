@@ -250,6 +250,13 @@ fn inverse(q: Rot) -> Rot {
 
 /// One step of `dt` over the world's awake bodies and the contacts that touch one.
 pub fn solve(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
+    world.validate_step_inputs(dt)?;
+    solve_validated(world, dt)?;
+    world.validate_solver_outputs()
+}
+
+// World::step has already checked the same input boundary and checks outputs before sleep.
+pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
     let settings = world.settings;
     if !settings.contact_max_push.is_finite() || settings.contact_max_push < 0.0 {
         return Err(PhysicsError::InvalidParameter);
@@ -1005,6 +1012,66 @@ fn sequential_normal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(dead_code)]
+    mod scenes {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/support/bits_scenes.rs"));
+    }
+
+    fn output_bits(world: &World) -> Vec<u64> {
+        let mut bits = Vec::new();
+        for b in &world.bodies {
+            bits.extend([
+                b.xf.p.x, b.xf.p.y, b.xf.q.c, b.xf.q.s, b.center.x, b.center.y,
+                b.local_center.x, b.local_center.y, b.linear_velocity.x, b.linear_velocity.y,
+                b.angular_velocity, b.mass, b.inv_mass, b.inertia, b.inv_inertia, b.extent,
+                b.linear_damping, b.angular_damping, b.gravity_scale, b.sleep_time,
+            ].map(|v| v.to_bits() as u64));
+            bits.extend(b.exact_center.map(f64::to_bits));
+            bits.extend([b.kind as u64, b.can_sleep as u64, b.fixed_rotation as u64, b.awake as u64]);
+            bits.extend(b.shapes.iter().map(|&s| s as u64));
+        }
+        for c in &world.contacts {
+            bits.extend([c.a as u64, c.b as u64, c.manifold.count as u64]);
+            bits.extend([c.manifold.normal.x, c.manifold.normal.y].map(|v| v.to_bits() as u64));
+            for p in c.manifold.points {
+                bits.push(p.id as u64);
+                bits.extend([p.point.x, p.point.y, p.separation].map(|v| v.to_bits() as u64));
+            }
+            bits.extend(c.normal_impulse.into_iter().chain(c.tangent_impulse).map(|v| v.to_bits() as u64));
+        }
+        for j in &world.joints {
+            bits.extend(j.lock.into_iter().chain([j.lower, j.upper, j.motor]).map(|v| v.to_bits() as u64));
+        }
+        let c = world.counts;
+        bits.extend([c.compared, c.pairs, c.manifolds, c.cold_points, c.constraints, c.block,
+            c.sequential, c.colours, c.overflow, c.islands, c.awake_bodies, world.steps]);
+        bits
+    }
+
+    #[test]
+    fn checked_public_solve_keeps_prevalidated_body_contact_and_joint_bits() {
+        let fixtures: [fn() -> World; 3] = [|| scenes::pyramid(8), scenes::joint_grid, scenes::mixed];
+        for lanes in [false, true] {
+            for fixture in fixtures {
+                let mut checked = fixture();
+                let mut validated = fixture();
+                checked.settings.contact_lanes = lanes;
+                validated.settings.contact_lanes = lanes;
+                for _ in 0..12 {
+                    checked.step(scenes::DT).unwrap();
+                    validated.step(scenes::DT).unwrap();
+                }
+                assert_eq!(output_bits(&checked), output_bits(&validated));
+                for _ in 0..4 {
+                    solve(&mut checked, scenes::DT).unwrap();
+                    solve_validated(&mut validated, scenes::DT).unwrap();
+                    validated.validate_solver_outputs().unwrap();
+                    assert_eq!(output_bits(&checked), output_bits(&validated), "lanes={lanes}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_visit_reads_two_32_byte_bodies_and_a_128_byte_contact() {

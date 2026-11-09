@@ -71,6 +71,20 @@ fn invalid_input_checks() -> bool {
         if world.create_shape(body, core, &ShapeDef { friction: f32::MAX, ..ShapeDef::default() }).is_err() { return false; }
     }
     if world.step(1.0 / 240.0).is_err() { return false; }
+    let Some(contact) = world.contacts.first_mut() else { return false; };
+    let count = contact.manifold.count;
+    contact.manifold.count = 3;
+    if margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 240.0) != Err(PhysicsError::InvalidParameter) { return false; }
+    world.contacts[0].manifold.count = count;
+    let shape = world.contacts[0].a;
+    world.contacts[0].a = u32::MAX;
+    if margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 240.0) != Err(PhysicsError::InvalidHandle) { return false; }
+    world.contacts[0].a = shape;
+    let velocity = world.bodies[0].linear_velocity;
+    world.bodies[0].linear_velocity.x = f32::NAN;
+    if margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 240.0) != Err(PhysicsError::NotFinite) { return false; }
+    world.bodies[0].linear_velocity = velocity;
+    if margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 240.0).is_err() { return false; }
     for (c, s) in [(1.0e30, 1.0e30), (0.0, f32::from_bits(1)), (1.0e-30, -1.0e-30)] {
         let q = Rot::from_pair(c, s);
         if !q.c.is_finite() || !q.s.is_finite() || (q.c * q.c + q.s * q.s - 1.0).abs() >= 4.0e-7 { return false; }
@@ -105,6 +119,10 @@ fn invalid_input_checks() -> bool {
     let Ok(circle) = Core::circle(V2::ZERO, 1.0e9) else { return false; };
     if world.create_shape(body, circle, &ShapeDef { density: 1.0e-40, friction: 0.0, restitution: 0.0 }).is_err() { return false; }
     if world.step(1.0 / 60.0) != Err(PhysicsError::ArithmeticOverflow) { return false; }
+    let mut world = World::default();
+    world.settings.gravity = v2(f32::MAX, 0.0);
+    if world.create_body(&BodyDef { gravity_scale: f32::MAX, ..BodyDef::default() }).is_err() { return false; }
+    if margoengine_physics2d_kernel::solver::solve(&mut world, 1.0 / 60.0) != Err(PhysicsError::ArithmeticOverflow) { return false; }
     true
 }
 

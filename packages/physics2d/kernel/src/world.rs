@@ -589,7 +589,8 @@ impl World {
         ba != bb && (self.bodies[ba as usize].is_dynamic() || self.bodies[bb as usize].is_dynamic())
     }
 
-    pub fn step(&mut self, dt: f32) -> Result<(), PhysicsError> {
+    /// Checks the shared World::step and public solver entry boundary before either mutates physics state.
+    pub(crate) fn validate_step_inputs(&mut self, dt: f32) -> Result<(), PhysicsError> {
         let settings = &self.settings;
         if [dt, settings.gravity.x, settings.gravity.y, settings.contact_hertz, settings.contact_damping, settings.contact_max_push, settings.restitution_threshold, settings.sleep_threshold, settings.sleep_time, settings.joint_hertz, settings.joint_damping, settings.joint_max_push].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if settings.contact_max_push < 0.0 || settings.joint_max_push < 0.0 { return Err(PhysicsError::InvalidParameter); }
@@ -625,6 +626,17 @@ impl World {
             validate_joint_def(&joint.def)?;
             if joint.lock.into_iter().chain([joint.lower, joint.upper, joint.motor]).any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         }
+        Ok(())
+    }
+
+    /// Checks derived body and solver-cache results before either checked entry returns success.
+    pub(crate) fn validate_solver_outputs(&self) -> Result<(), PhysicsError> {
+        if self.bodies.iter().any(|body| !finite_body(body) || !nonzero_rotation(body.xf.q)) || !finite_solver_caches(self) { return Err(PhysicsError::ArithmeticOverflow); }
+        Ok(())
+    }
+
+    pub fn step(&mut self, dt: f32) -> Result<(), PhysicsError> {
+        self.validate_step_inputs(dt)?;
         if !(dt > 0.0) {
             return Ok(());
         }
@@ -633,8 +645,8 @@ impl World {
         self.broad_phase()?;
         self.narrow_phase()?;
         self.wake_and_join();
-        solver::solve(self, dt)?;
-        if self.bodies.iter().any(|body| !finite_body(body) || !nonzero_rotation(body.xf.q)) || !finite_solver_caches(self) { return Err(PhysicsError::ArithmeticOverflow); }
+        solver::solve_validated(self, dt)?;
+        self.validate_solver_outputs()?;
         self.sleep(dt);
         if self.bodies.iter().any(|body| !finite_body(body) || !nonzero_rotation(body.xf.q)) { return Err(PhysicsError::ArithmeticOverflow); }
         Ok(())
