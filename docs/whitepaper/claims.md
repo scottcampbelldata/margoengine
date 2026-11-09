@@ -1,5 +1,12 @@
 # Claims and evidence
 
+Shared compression errors distinguish corrupt data, unsupported preset
+dictionaries and caller byte limits. GLB argument errors name each header field
+and chunk constraint. Synthetic DEFLATE/GLB fixtures and valid compressed
+NIfTI/DICOM policy regressions prove these specific diagnostics; retained
+node:zlib parity cases prove unchanged valid inflation outputs. Sources and
+scope: `docs/size-restore.md`. No speed claim or broader format-support claim.
+
 The [private scalar refinement](results/batch-134-scalar-refinement.json) passes
 86 of 98 original-source quality pairs with all 1,296 old controls exact.
 Twelve still fail; lower reconstructed-input SSE in those cases is diagnostic,

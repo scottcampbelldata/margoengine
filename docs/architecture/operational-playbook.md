@@ -10,6 +10,18 @@ Observers preserve real calls, returns and exceptions, including idempotent
 re-entry during plugin disposal. No package or renderer changed. CPU regression
 and the real WebGPU README run are described in `docs/readme-live.md`.
 
+## Shared codec diagnostic restoration (section 5 evidence, 2026-11-10)
+
+Shared inflate and GLB validation retain complete, linked failure details in
+their owning optional entries. Caller byte limits are policy failures with
+counts and repair hints, not proof of damage. The RFC fixed distance alphabet
+includes the two reserved symbols solely to diagnose their rejection correctly.
+Core plus stage stays 23924 B; optional ceiling increases, measurements and their
+tradeoff are recorded together in `docs/limits.md`. No timing runs, quality
+reductions or artificial diagnostic entry split. Numeric and container fixtures,
+retained node:zlib parity tests and sciviz policy tests are described and sourced
+in `docs/size-restore.md`.
+
 ### Section 5 evidence: batch 134 scalar refinement
 
 Private BC4/BC5 both-mode endpoint fitting and extrema-slot seeds pass the new

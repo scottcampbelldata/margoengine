@@ -2155,6 +2155,73 @@ The sky README bakes its environment, then starts the progressive viewport indep
 
 History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
 
+
+## Optional codec diagnostic restoration (2026-11-10)
+
+Complete inflate and GLB diagnostics remain in each owning entry. A synchronous
+codec failure must not require a lazy diagnostic loader. These bytes restore
+field names, failure causes, links, counts and real repair options. No output,
+quality or format support is reduced. Core plus stage: 23924 -> 23924 B gzip,
+below the unchanged 25000 B cap. Optional ceilings preserve existing headroom
+and at least max(3%, 256 B). Method and sources: `docs/size-restore.md`.
+
+| Entry/worker | Before gzip B | After gzip B | Before ceiling B | After ceiling B |
+|---|---:|---:|---:|---:|
+| @margoengine/blender/components | 15050 | 15051 | 15198 | 15503 |
+| @margoengine/blender/pbr-ext | 12192 | 12193 | 12254 | 12559 |
+| @margoengine/decoders/png | 3798 | 4316 | 3813 | 4572 |
+| @margoengine/decoders/brotli | 66947 | 67415 | 68932 | 69438 |
+| @margoengine/decoders/image | 764152 | 764655 | 786471 | 787595 |
+| @margoengine/decoders/tiff | 3894 | 4401 | 4129 | 4657 |
+| @margoengine/decoders/ktx2-layers | 374640 | 375071 | 385718 | 386324 |
+| @margoengine/decoders/ktx2-gpu | 13917 | 14364 | 14314 | 14795 |
+| @margoengine/decoders/ktx2-stream | 378624 | 379142 | 389637 | 390517 |
+| @margoengine/environment | 30545 | 30987 | 31320 | 31917 |
+| @margoengine/exporters | 36017 | 36211 | 36135 | 37298 |
+| @margoengine/exporters/usdz | 17060 | 17257 | 17538 | 17775 |
+| @margoengine/exporters/usdz-anim | 20163 | 20356 | 20310 | 20967 |
+| @margoengine/exporters/threemf | 15924 | 16113 | 16202 | 16597 |
+| @margoengine/exporters/roblox-chunks | 9419 | 9623 | 9679 | 9912 |
+| @margoengine/exporters/godot | 10004 | 10168 | 10258 | 10474 |
+| @margoengine/exporters/unity | 40768 | 40965 | 41842 | 42194 |
+| @margoengine/exporters/unity-precision | 24454 | 24636 | 25154 | 25376 |
+| @margoengine/exporters/unreal-precision | 27770 | 27948 | 28243 | 28787 |
+| @margoengine/exporters/draco | 180868 | 181081 | 185946 | 186514 |
+| @margoengine/exporters/ktx2 | 984536 | 984752 | 1013431 | 1014295 |
+| @margoengine/exporters/meshopt | 8143 | 8343 | 8399 | 8599 |
+| @margoengine/exporters/optimize | 9262 | 9448 | 9540 | 9732 |
+| @margoengine/fbx dist/workers/fbx.js | 82049 | 83143 | 83143 | 85638 |
+| @margoengine/gltf | 6698 | 6913 | 6831 | 7169 |
+| @margoengine/gltf/auto | 14082 | 14288 | 14481 | 14717 |
+| @margoengine/gltf-pro | 67092 | 67364 | 68350 | 69385 |
+| @margoengine/gltf-pro/model | 55723 | 55884 | 56493 | 57561 |
+| @margoengine/gltf-pro/prepare | 22494 | 22731 | 23169 | 23413 |
+| @margoengine/gltf-pro/progressive | 75985 | 76178 | 77537 | 78464 |
+| @margoengine/gltf-pro/worker | 67622 | 67805 | 68901 | 69840 |
+| @margoengine/gltf-pro dist/workers/gltf.js | 26227 | 26449 | 27014 | 27243 |
+| @margoengine/rigging/vrm | 10232 | 10427 | 10526 | 10740 |
+| @margoengine/sciviz/formats | 13312 | 13846 | 13712 | 14262 |
+| @margoengine/tiles | 15586 | 15813 | 15927 | 16288 |
+| @margoengine/tiles/metadata | 4690 | 4919 | 4946 | 5175 |
+| @margoengine/tiles/ion | 2543 | 2752 | 2785 | 3008 |
+| @margoengine/usdz dist/workers/usdz.js | 113636 | 113871 | 116081 | 117288 |
+
+Separate lazy-file records use their declared file/bundle method in
+`scripts/lazy-files.js`, not the external-import entry method above. They have no
+independent ceiling increase here; their owning entry/worker budgets are raised
+above, and all recorded split-entry budgets are unchanged.
+
+| Lazy file | Before gzip B | After gzip B |
+|---|---:|---:|
+| packages/gltf/dist/index.js | 6698 | 6913 |
+| packages/environment/dist/index.js | 30545 | 30987 |
+| packages/gltf-pro/dist/index.js | 576577 | 576872 |
+| packages/exporters/dist/encoder.worker.js | 9085 | 9542 |
+| packages/environment/dist/loaders.js | 9926 | 10404 |
+| packages/gltf-pro/dist/workers/gltf.js | 26182 | 26400 |
+| packages/fbx/dist/workers/fbx.js | 81888 | 82988 |
+| packages/usdz/dist/workers/usdz.js | 113339 | 113570 |
+
 Skip-audit item 5 supplies a complete 2x2x2 identity Cube in the tonemap README;
 it is an example using the existing 2..65 parser bound, not a new LUT limit.
 Smooth PixelCamera and the physical-camera and terrain-grass pointers expose

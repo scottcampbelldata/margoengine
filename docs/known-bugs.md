@@ -11,6 +11,17 @@ tests/readme-live.test.js proves lifecycle ordering and refusal of missing work
 or cleanup, and fails against the old runner. Sources and repro:
 `docs/readme-live.md`.
 
+### Fixed 2026-11-10: shared codec diagnostics obscured causes and caller limits
+
+Size-driven generic inflate errors called valid files damaged when they exceeded
+the caller's byte limit. GLB errors did not identify header fields or chunk rules.
+The shared helpers now report the exact failure and help link; stream policy
+errors include minimum required and limit bytes with the caller's real repair
+hint. Preset dictionaries report unsupported. Sciviz names maxSamples for
+NIfTI/DICOM policy and metadata for paired images and Zarr chunks. Regressions:
+`tests/shared-inflate-diagnostics.test.js`, `tests/shared-glb.test.js`, and
+`packages/sciviz/tests/formats.test.js`; method and sources: `docs/size-restore.md`.
+
 ### Fixed 2026-11-09: owned termination waited before releasing its pipes
 
 The close path awaited native termination work before destroying its owned

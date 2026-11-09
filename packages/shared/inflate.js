@@ -4,12 +4,9 @@
 // up to that limit. inflateRaw serves containers that must know where a raw stream ends (gzip members and deflated
 // DICOM data sets in @margoengine/sciviz/formats). Every input read, output write and back reference is bounds checked, and damaged data throws
 // MargoError 'failed'.
-import { margoError } from './errors.js';
+import { fault } from './errors.js';
 
-const damaged = (problem) => margoError('failed', `Compressed data ${problem}; the file is damaged, export it again`);
-const BAD = 'is malformed',
-  EARLY = 'ends early',
-  SIZE = 'does not inflate to its expected size';
+const damaged = (problem) => fault('failed', `Compressed data ${problem}; the file is damaged, export it again`);
 
 // Every `groupShift`-sized group of symbols adds one extra bit (after the first two groups, which have none), and each
 // base is the previous base plus the span the previous symbol's extra bits cover. That rule rebuilds both RFC 1951
@@ -54,7 +51,7 @@ function huffmanTable(lengths) {
   // accepted (RFC 1951 allows a lone distance code); its unused patterns stay 0 and throw only if the data uses them.
   for (let length = 1, room = 1; length <= MAX_BITS; length++) {
     room = room * 2 - perLength[length];
-    if (room < 0) throw damaged(BAD);
+    if (room < 0) throw damaged('has an over-subscribed Huffman code');
   }
   const nextCode = new Uint16Array(MAX_BITS + 1);
   for (let length = 1, code = 0; length <= MAX_BITS; length++) {
@@ -82,6 +79,7 @@ let fixedTables;
 class Inflater {
   #input;
   #limit;
+  #limitHint;
   #output;
   #position;
   #held = 0;
@@ -91,6 +89,7 @@ class Inflater {
     this.#input = input;
     this.#position = start;
     this.#limit = size.limit;
+    this.#limitHint = size.limitHint ?? 'raise limit to allow more decompressed bytes';
     // A growable buffer starts no larger than its limit, so a limit under 1 KiB holds as well as a larger one.
     this.#output = new Uint8Array(this.#limit === undefined ? size : Math.min(1024, this.#limit));
   }
@@ -105,7 +104,7 @@ class Inflater {
   #bits(n) {
     if (this.#count < n) {
       this.#refill();
-      if (this.#count < n) throw damaged(EARLY);
+      if (this.#count < n) throw damaged('ends early while reading DEFLATE bits');
     }
     const value = this.#held & ((1 << n) - 1);
     this.#held >>>= n;
@@ -117,8 +116,8 @@ class Inflater {
     if (this.#count < table[1]) this.#refill();
     const entry = table[0][this.#held & (table[0].length - 1)],
       length = entry & 15;
-    if (entry === 0) throw damaged(BAD);
-    if (length > this.#count) throw damaged(EARLY);
+    if (entry === 0) throw damaged('uses a Huffman code its block does not define');
+    if (length > this.#count) throw damaged('ends early while reading a DEFLATE Huffman code');
     this.#held >>>= length;
     this.#count -= length;
     return entry >> 4;
@@ -134,7 +133,13 @@ class Inflater {
     const output = this.#output,
       limit = this.#limit;
     if (need <= output.length) return output;
-    if (limit === undefined || need > limit) throw damaged(SIZE);
+    if (limit === undefined)
+      throw damaged(`inflates to at least ${need} bytes, above the expected ${output.length} bytes`);
+    if (need > limit)
+      throw fault(
+        'failed',
+        `Compressed data needs at least ${need} bytes, above the limit ${limit} bytes; ${this.#limitHint}`,
+      );
     const bigger = new Uint8Array(Math.min(limit, Math.max(output.length * 2, need)));
     bigger.set(output);
     return (this.#output = bigger);
@@ -152,12 +157,13 @@ class Inflater {
       }
       if (next === END_OF_BLOCK) return (this.#written = written);
       const lengthSymbol = next - 257;
-      if (lengthSymbol > LENGTH_258) throw damaged(BAD);
+      if (lengthSymbol > LENGTH_258) throw damaged(`uses the reserved length symbol ${next}`);
       const length = LENGTHS[0][lengthSymbol] + this.#bits(LENGTHS[1][lengthSymbol]),
         distanceSymbol = this.#symbol(distances);
-      if (distanceSymbol >= 30) throw damaged(BAD);
+      if (distanceSymbol >= 30) throw damaged(`uses the reserved distance symbol ${distanceSymbol}`);
       const distance = DISTANCES[0][distanceSymbol] + this.#bits(DISTANCES[1][distanceSymbol]);
-      if (distance > written) throw damaged(BAD);
+      if (distance > written)
+        throw damaged(`refers back ${distance} bytes with only ${written} bytes written, before the start of its data`);
       if (written + length > output.length) output = this.#room(written + length);
       // Front to back, one byte at a time: a distance shorter than the length repeats the bytes just written.
       for (let from = written - distance, stop = written + length; written < stop; ) output[written++] = output[from++];
@@ -168,7 +174,7 @@ class Inflater {
     const literalCount = this.#bits(5) + 257,
       distanceCount = this.#bits(5) + 1,
       codeLengthCount = this.#bits(4) + 4;
-    if (literalCount > 286) throw damaged(BAD);
+    if (literalCount > 286) throw damaged(`declares ${literalCount} literal/length codes (at most 286)`);
     const codeLengthLengths = new Uint8Array(19);
     for (let i = 0; i < codeLengthCount; i++) codeLengthLengths[CODE_LENGTH_ORDER[i]] = this.#bits(3);
     const codeLengthCode = huffmanTable(codeLengthLengths);
@@ -183,15 +189,15 @@ class Inflater {
       let value = 0,
         repeat;
       if (next === 16) {
-        if (filled === 0) throw damaged(BAD);
+        if (filled === 0) throw damaged('repeats a code length before the first one');
         value = lengths[filled - 1];
         repeat = 3 + this.#bits(2);
       } else repeat = next === 17 ? 3 + this.#bits(3) : 11 + this.#bits(7);
-      if (repeat > lengths.length - filled) throw damaged(BAD);
+      if (repeat > lengths.length - filled) throw damaged('repeats code lengths past the declared count');
       lengths.fill(value, filled, filled + repeat);
       filled += repeat;
     }
-    if (!lengths[END_OF_BLOCK]) throw damaged(BAD);
+    if (!lengths[END_OF_BLOCK]) throw damaged('has a block without an end-of-block code');
     this.#block(huffmanTable(lengths.subarray(0, literalCount)), huffmanTable(lengths.subarray(literalCount)));
   }
   /**
@@ -201,12 +207,18 @@ class Inflater {
   run(size, checkAdler, raw) {
     const input = this.#input;
     if (!raw) {
-      if (input.length < 2) throw damaged(EARLY);
+      if (input.length < 2) throw damaged('is too short for a zlib header');
       const method = input[0],
         flags = input[1];
       // RFC 1950: compression method 8 (deflate), window of at most 32 KiB, header check, no preset dictionary.
-      if ((method & 15) !== 8 || method >> 4 > 7 || ((method << 8) | flags) % 31 !== 0 || flags & 0x20)
-        throw damaged(BAD);
+      if ((method & 15) !== 8) throw damaged(`declares zlib compression method ${method & 15}, not DEFLATE (8)`);
+      if (method >> 4 > 7) throw damaged(`declares zlib window size ${method >> 4}, above the maximum 7`);
+      if (((method << 8) | flags) % 31 !== 0) throw damaged('fails its zlib header check');
+      if (flags & 0x20)
+        throw fault(
+          'unsupported',
+          'Compressed data needs a preset dictionary; recompress it without a preset dictionary',
+        );
     }
     let final = 0;
     do {
@@ -215,30 +227,31 @@ class Inflater {
       if (type === 0) {
         // Stored block: byte aligned LEN, NLEN (its one's complement), then LEN raw bytes.
         let at = this.#align();
-        if (input.length - at < 4) throw damaged(EARLY);
+        if (input.length - at < 4) throw damaged('ends early in its stored block length header');
         const length = input[at] | (input[at + 1] << 8),
           check = input[at + 2] | (input[at + 3] << 8);
-        if ((length ^ 0xffff) !== check) throw damaged(BAD);
+        if ((length ^ 0xffff) !== check) throw damaged('has a stored block whose length check fails');
         at += 4;
-        if (length > input.length - at) throw damaged(EARLY);
+        if (length > input.length - at) throw damaged('ends early in its stored block data');
         this.#room(this.#written + length).set(input.subarray(at, at + length), this.#written);
         this.#written += length;
         this.#position = at + length;
       } else if (type === 1) {
         fixedTables ??= [
           huffmanTable(new Uint8Array(288).fill(8, 0, 144).fill(9, 144, 256).fill(7, 256, 280).fill(8, 280, 288)),
-          huffmanTable(new Uint8Array(30).fill(5)),
+          huffmanTable(new Uint8Array(32).fill(5)),
         ];
         this.#block(fixedTables[0], fixedTables[1]);
       } else if (type === 2) this.#dynamic();
-      else throw damaged(BAD);
+      else throw damaged('uses the reserved block type 3');
     } while (!final);
-    if (this.#limit === undefined && this.#written !== size) throw damaged(SIZE);
+    if (this.#limit === undefined && this.#written !== size)
+      throw damaged(`inflates to ${this.#written} bytes, not the expected ${size} bytes`);
     const output = this.#output.subarray(0, this.#written);
     const at = this.#align();
     if (raw) return { output, end: at };
     // RFC 1950 trailer: the Adler-32 of the decompressed bytes, big-endian, after the last block's final byte.
-    if (input.length - at < 4) throw damaged(EARLY);
+    if (input.length - at < 4) throw damaged('ends before its Adler-32 checksum');
     const stored = ((input[at] << 24) | (input[at + 1] << 16) | (input[at + 2] << 8) | input[at + 3]) >>> 0;
     if (checkAdler && adler32(output) !== stored) throw damaged('fails its Adler-32 checksum');
     return output;

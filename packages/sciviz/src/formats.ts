@@ -54,6 +54,8 @@ export interface FormatVolume extends VolumeGrid {
 }
 
 const DEFAULT_MAX = 2 ** 29;
+const MAX_SAMPLES_HINT = 'increase maxSamples to raise the decompressed-byte limit';
+const ZARR_LIMIT_HINT = 'check the Zarr chunk shape and dtype; regenerate the chunk to match its metadata';
 
 // ------------------------------------------------------------------------------------------------------------ inflate
 
@@ -62,7 +64,7 @@ const damaged = (what: string, detail: string) => rangeError(`damaged ${what} da
 const u32le = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
 /** Every member of a gzip file (RFC 1952 2.2: members follow each other with nothing before, between or after). */
-function gunzip(input: Uint8Array, max: number): Uint8Array {
+function gunzip(input: Uint8Array, max: number, limitHint: string): Uint8Array {
   const members: Uint8Array[] = [];
   let at = 0,
     total = 0;
@@ -87,7 +89,7 @@ function gunzip(input: Uint8Array, max: number): Uint8Array {
       p += 2;
     }
     if (p >= input.length) throw damaged('gzip', 'the stream ends early');
-    const { output, end } = inflateRaw(input, p, { limit: max - total });
+    const { output, end } = inflateRaw(input, p, { limit: max - total, limitHint });
     if (end + 8 > input.length) throw damaged('gzip', 'the stream ends early');
     if (crc32(output) !== u32le(input, end)) throw damaged('gzip', 'a member fails its CRC-32 check');
     if (output.length % 2 ** 32 !== u32le(input, end + 4))
@@ -103,12 +105,12 @@ function gunzip(input: Uint8Array, max: number): Uint8Array {
 }
 
 /** A zlib stream (RFC 1950): header, DEFLATE data, Adler-32 of the output, and nothing after. */
-function unzlib(input: Uint8Array, max: number): Uint8Array {
+function unzlib(input: Uint8Array, max: number, limitHint: string): Uint8Array {
   const method = input[0],
     flags = input[1];
   if (input.length < 6 || (method & 15) !== 8 || method >> 4 > 7 || ((method << 8) | flags) % 31 || flags & 0x20)
     throw damaged('zlib', 'the header is not deflate without a preset dictionary');
-  const { output: bytes, end: p } = inflateRaw(input, 2, { limit: max });
+  const { output: bytes, end: p } = inflateRaw(input, 2, { limit: max, limitHint });
   if (p + 4 !== input.length) throw damaged('zlib', 'the stream does not end at its Adler-32');
   let a = 1,
     b = 0;
@@ -317,7 +319,7 @@ export async function parseNIfTI(
   options.signal?.throwIfAborted();
   const max = options.maxSamples ?? DEFAULT_MAX;
   let bytes = bytesOf(input, 'parseNIfTI');
-  if (isGzip(bytes)) bytes = gunzip(bytes, max * 8 + (1 << 20));
+  if (isGzip(bytes)) bytes = gunzip(bytes, max * 8 + (1 << 20), MAX_SAMPLES_HINT);
   if (bytes.byteLength < 348) throw rangeError('NIfTI: shorter than a header', 'sciviz');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let little = true,
@@ -383,7 +385,12 @@ export async function parseNIfTI(
     body = await options.resolve(name);
     offset = Math.max(0, offset);
     // The .img holds `offset` bytes before the image, so the inflated size is the two together.
-    if (isGzip(body)) body = gunzip(body, offset + count * SIZE[kind]);
+    if (isGzip(body))
+      body = gunzip(
+        body,
+        offset + count * SIZE[kind],
+        'check the NIfTI image dimensions, datatype and voxel offset against its header',
+      );
   } else offset = Math.max(offset, size + 4); // nifti1.h: a vox_offset below 352 (544 for NIfTI-2) means 352 (544)
   options.signal?.throwIfAborted();
   const raw = samples(body, offset, count, kind, little);
@@ -848,7 +855,7 @@ export async function parseDICOM(
   }
   if (syntax === SYNTAX.deflated) {
     const start = c.at,
-      { output, end } = inflateRaw(bytes, start, { limit: max * 8 + (1 << 20) }),
+      { output, end } = inflateRaw(bytes, start, { limit: max * 8 + (1 << 20), limitHint: MAX_SAMPLES_HINT }),
       rest = bytes.byteLength - end;
     // PS3.5 A.5: a deflate stream of odd length is followed by one NUL byte; nothing else may follow it.
     if (rest && !(rest === 1 && bytes[end] === 0 && (end - start) % 2 === 1))
@@ -1529,7 +1536,9 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
       });
       encoded += 4;
     } else {
-      steps.unshift(name === 'zlib' ? (b) => unzlib(b, decoded) : (b) => gunzip(b, decoded));
+      steps.unshift(
+        name === 'zlib' ? (b) => unzlib(b, decoded, ZARR_LIMIT_HINT) : (b) => gunzip(b, decoded, ZARR_LIMIT_HINT),
+      );
       encoded += 5 * Math.ceil(encoded / 65535 + 1) + 65536;
     }
   }

@@ -33,13 +33,13 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 4, `./brotli` 2, `./bzip2` 2, `./xz` 3, `./image` 6, `./bc` 5, `./webp` 3, `./webp-lossless` 4, `./tga` 3, `./pcx` 3, `./dds` 5, `./ktx` 5, `./tiff` 3, `./ktx2-layers` 7, `./ktx2-hdr` 10, `./ktx2-gpu` 3, `./ktx2-stream` 8, `./meshopt-simd` 2, `./jxl` 9, `./pvr` 7, `./draco-points` 6 | 37 |  | 478,250 |
 | @margoengine/dof | `.` 2, `./lens` 4, `./autofocus` 2 | 10 |  | 9,215 |
 | @margoengine/ecs | `.` 17, `./changes` 1, `./engine` 3, `./growable` 2, `./query` 2, `./relations` 2, `./schedule` 5 | 35 |  | 4,379 |
-| @margoengine/environment | `.` 62, `./probes` 9, `./volumetric` 6, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4, `./blend` 3, `./ground` 2, `./gi` 2, `./fog-volumes` 6, `./studio` 4 | 50 |  | 30,545 |
-| @margoengine/exporters | `.` 62, `./usdz` 5, `./usdz-anim` 5, `./threemf` 3, `./model` 6, `./collect` 15, `./dae` 3, `./capture` 29, `./gltf` 8, `./jpeg-read` 3, `./apng` 2, `./webp` 3, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1, `./atlas` 8, `./godot-2d` 7, `./unity-2d` 5, `./unreal-import` 6, `./unity-uv` 4, `./roblox-uv` 3, `./draco` 4, `./ktx2` 9, `./meshopt` 6, `./optimize` 6 | 248 |  | 36,017 |
+| @margoengine/environment | `.` 62, `./probes` 9, `./volumetric` 6, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4, `./blend` 3, `./ground` 2, `./gi` 2, `./fog-volumes` 6, `./studio` 4 | 50 |  | 30,987 |
+| @margoengine/exporters | `.` 62, `./usdz` 5, `./usdz-anim` 5, `./threemf` 3, `./model` 6, `./collect` 15, `./dae` 3, `./capture` 29, `./gltf` 8, `./jpeg-read` 3, `./apng` 2, `./webp` 3, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1, `./atlas` 8, `./godot-2d` 7, `./unity-2d` 5, `./unreal-import` 6, `./unity-uv` 4, `./roblox-uv` 3, `./draco` 4, `./ktx2` 9, `./meshopt` 6, `./optimize` 6 | 248 |  | 36,211 |
 | @margoengine/fbx | `.` 5, `./worker` 2, `./export` 3, `./scene-extras` 1, `./layers` 2, `./deformers` 2, `./curves` 4, `./pbr` 2 | 7 |  | 21,505 |
 | @margoengine/fsm | `.` 3, `./parallel` 3, `./document` 9, `./trace` 7 | 18 |  | 1,637 |
 | @margoengine/geometry | `.` 76, `./shapes` 20, `./triangulate` 5, `./extrude` 6, `./primitives` 17, `./utils` 36, `./extras` 6, `./nurbs` 8, `./sample` 4, `./optimize` 9, `./flow` 7, `./delaunay` 5, `./polygon` 16, `./sweep` 9, `./tessellate` 4, `./gpu` 15 | 52 |  | 24,021 |
-| @margoengine/gltf | `.` 8, `./auto` 3, `./instancing` 1, `./meshopt` 1, `./quantized` 1, `./scene-data` 6, `./textured` 4 | 186 |  | 6,698 |
-| @margoengine/gltf-pro | `.` 50, `./model` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 808 | 3 | 67,092 |
+| @margoengine/gltf | `.` 8, `./auto` 3, `./instancing` 1, `./meshopt` 1, `./quantized` 1, `./scene-data` 6, `./textured` 4 | 186 |  | 6,913 |
+| @margoengine/gltf-pro | `.` 50, `./model` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 808 | 3 | 67,364 |
 | @margoengine/headless | `.` 11, `./video` 12, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,615 |
 | @margoengine/html | `.` 8, `./texture` 5 |  |  | 7,235 |
 | @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
@@ -91,7 +91,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/terrain | `.` 13, `./query` 6, `./layers-pbr` 4, `./stream` 4, `./sculpt` 7, `./holes` 2, `./rvt` 5, `./displace` 3, `./deform` 4, `./blend` 2, `./planet` 8 | 65 |  | 12,858 |
 | @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4, `./animate` 8, `./extrude` 12 | 45 |  | 16,395 |
 | @margoengine/tilemap | `.` 42, `./autotile` 13, `./ldtk` 8, `./tiled` 6, `./iso` 13, `./hex` 17, `./path` 9, `./fov` 11 | 88 |  | 7,303 |
-| @margoengine/tiles | `.` 80, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11 | 84 |  | 15,586 |
+| @margoengine/tiles | `.` 80, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11 | 84 |  | 15,813 |
 | @margoengine/tonemap | `.` 9, `./grade` 5, `./custom` 2, `./local` 2 | 6 |  | 12,482 |
 | @margoengine/toon | `.` 2, `./models` 4, `./hatch` 3 | 2 |  | 1,430 |
 | @margoengine/transitions | `./mask` 2, `./custom` 2, `.` 2, `./live` 3 | 4 |  | 4,496 |
@@ -104,7 +104,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 15, `./bot` 4, `./file-store` 1, `./entities` 14, `./shards` 12, `./webtransport` 6, `./chat` 16, `./rewind` 8, `./sql-store` 4 | 92 |  | 8,446 |
-| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 81,092 |
+| @margoengine/voxel-pathtracer | `.` 53, `./restir` 2, `./studio` 12, `./guiding` 2, `./sky` 2, `./media` 5, `./mesh` 5, `./spectral` 2 | 142 |  | 81,091 |
 | @margoengine/water | `.` 8 |  |  | 19,846 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
 | @margoengine/webgl2-compat | `.` 15, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2 | 145 |  | 102,804 |

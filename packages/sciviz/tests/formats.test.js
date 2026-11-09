@@ -265,6 +265,46 @@ test('a deflated file and a skipped undefined-length sequence read like the plai
   assert.deepEqual(deflated.pixelSpacing, [0.5, 0.25]);
 });
 
+test('NIfTI gzip and deflated DICOM limits name maxSamples instead of blaming a valid file', async () => {
+  const samples = new Uint16Array(600_000);
+  const niftiBytes = gzipSync(nifti({ dims: [1000, 600, 1], datatype: 512, data: samples }));
+  const dicomBytes = dicom({
+    syntax: '1.2.840.10008.1.2.1.99',
+    rows: 1000,
+    columns: 600,
+    pixels: samples,
+    deflate: true,
+  });
+  for (const [parse, bytes] of [
+    [parseNIfTI, niftiBytes],
+    [parseDICOM, dicomBytes],
+  ]) {
+    await assert.rejects(parse(bytes, { maxSamples: 1 }), (error) => {
+      assert.equal(error.name, 'MargoError');
+      assert.equal(error.code, 'failed');
+      assert.match(error.message, /at least \d+ bytes.*limit 1048584 bytes/);
+      assert.match(error.message, /increase maxSamples/);
+      assert.match(error.message, /https:\/\/margoengine.com\/errors#failed/);
+      assert.doesNotMatch(error.message, /damaged|export it again/);
+      return true;
+    });
+    const image = await parse(bytes, { maxSamples: samples.length });
+    assert.equal(image.data.length, samples.length);
+    assert.deepEqual(image.data, samples);
+  }
+});
+
+test('a paired NIfTI image limit names the header fields that determine its exact bytes', async () => {
+  const header = nifti({ dims: [2, 1, 1], datatype: 512, magic: 'ni1', data: new Uint16Array(2) });
+  await assert.rejects(parseNIfTI(header, { resolve: async () => gzipSync(new Uint8Array(357)) }), (error) => {
+    assert.equal(error.code, 'failed');
+    assert.match(error.message, /limit 356 bytes/);
+    assert.match(error.message, /NIfTI image dimensions, datatype and voxel offset/);
+    assert.doesNotMatch(error.message, /maxSamples/);
+    return true;
+  });
+});
+
 test('dicomSeries orders slices by position along the normal, spaces them and builds the patient matrix', async () => {
   // Shuffled slices of a sagittal-free axial stack 2 mm apart; the normal of the default orientation is +z.
   const slices = await Promise.all(
@@ -289,6 +329,37 @@ test('dicomSeries orders slices by position along the normal, spaces them and bu
 // Zarr stores written key by key from the v2 and v3 specifications (stand-ins).
 const json = (value) => JSON.stringify(value);
 const f32 = (values) => new Uint8Array(new Float32Array(values).buffer);
+
+test('Zarr codec limits name chunk metadata rather than the unrelated maxSamples option', async () => {
+  for (const [id, compress] of [
+    ['zlib', deflateSync],
+    ['gzip', gzipSync],
+  ]) {
+    const array = await openZarr(
+      {
+        'a/.zarray': json({
+          zarr_format: 2,
+          shape: [4],
+          chunks: [4],
+          dtype: '|u1',
+          compressor: { id },
+          fill_value: 0,
+          order: 'C',
+          filters: null,
+        }),
+        'a/0': compress(Uint8Array.of(1, 2, 3, 4, 5)),
+      },
+      'a',
+    );
+    await assert.rejects(array.read(), (error) => {
+      assert.equal(error.code, 'failed');
+      assert.match(error.message, /limit 4 bytes/);
+      assert.match(error.message, /Zarr chunk shape and dtype/);
+      assert.doesNotMatch(error.message, /maxSamples/);
+      return true;
+    });
+  }
+});
 
 test('a chunked Zarr v2 array with zlib reads whole, as a box, and with a missing chunk as its fill value', async () => {
   // shape [3, 4], chunks [2, 3]: four chunks, chunk (1, 1) missing.

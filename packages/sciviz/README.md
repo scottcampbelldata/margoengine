@@ -550,6 +550,15 @@ dependency: gzip (every member of the file), zlib and deflate are inflated in th
 stream ends. Every reader returns `data`, `dims`, `bounds` (the true proportions, from 0) and `range` (the smallest and
 largest finite sample), and `volumeFromGrid(fig, grid, options)` draws any of them.
 
+Compressed single-file NIfTI and deflated DICOM data that exceed the decompressed-byte limit report a
+linked `MargoError` with code `failed`, the minimum required byte count, the byte
+limit, and instructions to increase `maxSamples` (default `536_870_912`). The byte
+allowance is `8 * maxSamples + 1_048_576`. These policy failures do not call the
+file damaged or ask you to re-export it. For a gzip member after the first, the
+byte count and limit refer to that member and the remaining allowance. A paired
+NIfTI `.img` instead uses its header's exact image size and names those fields.
+Zarr chunk byte limits come from shape and dtype metadata; their errors name that metadata.
+
 - **NIfTI** (`parseNIfTI(bytes)`, `loadNIfTI(url)`): NIfTI-1 and NIfTI-2, `.nii`, `.nii.gz`, and a `.hdr` with its
   `.img` (through `resolve`), in either byte order. Scaled data (`scl_slope`, `scl_inter`) comes back as
   `Float32Array`; RGB24 and RGBA32 are never scaled. `matrix` is the sform when set, else the qform (with `qfac`), else
@@ -578,8 +587,8 @@ largest finite sample), and `volumeFromGrid(fig, grid, options)` draws any of th
   zstd, sharding, storage transformers, other chunk key encodings and metadata fields this reader does not know (unless
   marked `must_understand: false`) are refused with code `unsupported`, naming them. Metadata the specification does
   not allow (a codec chain without one bytes codec, a fill value outside its data type, a `.` or `..` path segment,
-  `dimension_names` of the wrong length) and a chunk that decodes to more or fewer bytes than its shape needs are
-  refused with a `RangeError`.
+  `dimension_names` of the wrong length) and a chunk that ends with fewer bytes than its shape needs are refused
+  with a `RangeError`. A compressor that exceeds the chunk byte allowance reports linked `MargoError` code `failed`.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

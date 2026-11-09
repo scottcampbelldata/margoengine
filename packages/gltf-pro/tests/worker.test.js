@@ -59,7 +59,11 @@ test('worker errors keep their type; without Worker the entry falls back to the 
         url: 'https://example.test/',
         input: new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0, 9, 0, 0, 0]).buffer,
       }),
-      { name: 'TypeError', message: /^GLB is shorter than its header/ },
+      {
+        name: 'TypeError',
+        message:
+          'GLB needs at least 20 bytes for its 12-byte file header and 8-byte JSON chunk header; received 12; pass a whole glTF 2.0 GLB file; see https://margoengine.com/errors#failed',
+      },
     );
     assert.equal(typeof Worker, 'undefined');
     const model = await parseGLTFInWorker(await headless(), bigGLB({ segments: 2, meshes: 1 }));
