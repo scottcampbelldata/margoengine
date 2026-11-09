@@ -283,13 +283,20 @@ export function withBoundedClose(
                   // the process table through WMI and PowerShell needs a console, both of which stall or fail on
                   // this PC under load and around GPU driver resets. A helper that could not run reported nothing
                   // killed, the browser kept running, and the close waited the whole budget. See `stopOwned`.
-                  if (running) await stop(child, browser, { end, pids });
                   // ChildProcess 'exit' does not close its stdio. Playwright's kill API is safe only
                   // after 'close', which marks the driver process closed. Release every owned pipe,
                   // including Chromium's two CDP pipes, then wait for 'close' (the process handle signalled).
                   const pipes = child.stdio ?? [child.stdin, child.stdout, child.stderr];
                   const openPipes = pipes.some((pipe) => pipe && !pipe.closed);
-                  for (const pipe of pipes) pipe?.destroy();
+                  let stopped;
+                  try {
+                    // Termination completion can depend on canceling pending pipe I/O. Request it,
+                    // release the pipes, then await it; waiting before release creates a circular wait.
+                    stopped = running ? stop(child, browser, { end, pids }) : undefined;
+                  } finally {
+                    for (const pipe of pipes) pipe?.destroy();
+                  }
+                  await stopped;
                   if (tracked || running || openPipes) await closed;
                 } finally {
                   if (onClose) child.removeListener('close', onClose);

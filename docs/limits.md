@@ -1,5 +1,11 @@
 # Design envelope
 
+Owned Chromium teardown requests native termination before releasing its owned
+stdio/CDP pipes, and releases those pipes before awaiting termination completion.
+Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
+5,000 ms process-list bound are unchanged. The controlled regression proves
+pipe-dependent completion, not a measured browser shutdown speed guarantee.
+
 GPU `run` and `enqueue` accept GPU leaves only; known CPU aggregators cannot be
 overridden, and unclassified GPU leaves require a logged `--gpu` reason. New
 clients hold one slot per canonical worktree or owner lane prefix. Admission is

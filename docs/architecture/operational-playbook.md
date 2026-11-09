@@ -1,5 +1,18 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: owned termination and pipe release
+
+The browser owner now releases stdio/CDP pipes after requesting termination and
+before awaiting completion, removing a circular dependency on pending I/O.
+`tests/browser-teardown.test.js` includes a controlled stop promise that cannot
+complete until those pipes are released; it fails before the repair. All 42
+teardown, shutdown and page-ready tests pass afterward. The initial full verify
+passed 13,665 tests and failed only page-ready cleanup. Successful checks are
+retained; the failed test is revalidated after the repair. Its original native
+phase was not observed, so the controlled wait defect is the precise claim.
+Process listing still precedes client disconnect and driver cleanup still waits
+for process close. Every existing shutdown bound remains unchanged.
+
 ## Optional labels diagnostic restoration (section 5 evidence, 2026-11-10)
 
 The duplicate-attachment state diagnostic keeps full repair guidance and MargoError

@@ -1,5 +1,17 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: owned termination waited before releasing its pipes
+
+The close path awaited native termination work before destroying its owned
+stdio/CDP pipes. Termination completion can itself depend on pending I/O being
+released, creating a circular wait. It now requests termination, releases the
+pipes even if the request throws, then awaits completion and process close.
+The deterministic pipe-dependent regression fails on the parent and passes
+after the repair; all 42 teardown, shutdown and page-ready tests pass. The full
+verify had 13,665 successes and one page-ready cleanup timeout; those successful
+results are retained and the failed page-ready test passes after this repair.
+The original loaded timeout's native phase was not captured. No deadline changed.
+
 ### Fixed 2026-11-10: labels duplicate attachment lost its error contract
 
 Calling `LabelRenderer.attach(engine)` twice reported a shortened TypeError

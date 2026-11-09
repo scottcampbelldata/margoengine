@@ -1,5 +1,12 @@
 # Claims and evidence
 
+Owned browser cleanup releases its pipes before awaiting termination completion,
+while retaining process-list-before-disconnect and process-close-before-driver
+ordering. The pipe-dependent regression in `tests/browser-teardown.test.js`
+fails before the repair; all 42 teardown, shutdown and page-ready tests pass
+after it. This proves the controlled wait dependency, without a shutdown speed
+claim or conclusive native attribution of the earlier loaded timeout.
+
 Labels duplicate attachment preserves the existing renderer and reports a linked
 state MargoError with the collision and both repair choices. Evidence:
 `packages/labels/tests/testpage-attach.test.js`, including default and custom

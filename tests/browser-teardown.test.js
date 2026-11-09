@@ -252,6 +252,45 @@ test('owned Chromium releases stdout, stderr and CDP pipes and observes close be
   }
 });
 
+test('owned process termination can await pipe release without blocking that release', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  const released = Promise.withResolvers();
+  let requested = false, closed = false, kills = 0;
+  const pipes = Array.from({ length: 4 }, () => ({
+    closed: false,
+    destroy() {
+      assert.equal(requested, true, 'request native termination before closing its pipes');
+      this.closed = true;
+      if (pipes.every((pipe) => pipe.closed) && !closed) {
+        closed = true;
+        child.emit('close', null, 'SIGKILL');
+        released.resolve();
+      }
+    },
+  }));
+  child.stdio = [null, ...pipes];
+  const browser = withBoundedClose({ close: async () => {} }, {
+    platform: 'win32',
+    server: {
+      process: () => child,
+      kill: async () => { assert.equal(closed, true); kills++; },
+    },
+    stop: () => {
+      requested = true;
+      child.signalCode = 'SIGKILL';
+      return released.promise;
+    },
+  });
+  const closing = browser.close();
+  try {
+    await closeAll({ browser: { close: () => closing }, budgetMs: 200 });
+    assert.equal(kills, 1);
+  } finally {
+    for (const pipe of pipes) pipe.destroy();
+    await closing;
+  }
+});
+
 // The SHUTDOWN_TIMEOUT that blocked five lanes on 2026-11-09 ("still open: browser" after every check passed): the owned
 // browser was ended by helper programs started at close time (taskkill.exe, which reads the process table through WMI,
 // then a PowerShell handle wait). On this PC those failed or stalled under load and around GPU driver resets; a helper

@@ -2587,6 +2587,12 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Owned Chromium teardown requests native termination before releasing its owned
+stdio/CDP pipes, and releases those pipes before awaiting termination completion.
+Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
+5,000 ms process-list bound are unchanged. The controlled regression proves
+pipe-dependent completion, not a measured browser shutdown speed guarantee.
+
 GPU `run` and `enqueue` accept GPU leaves only; known CPU aggregators cannot be
 overridden, and unclassified GPU leaves require a logged `--gpu` reason. New
 clients hold one slot per canonical worktree or owner lane prefix. Admission is
@@ -4844,6 +4850,18 @@ subset evidence, not completed fuzz acceptance or a peak-memory/speed claim.
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: owned termination waited before releasing its pipes
+
+The close path awaited native termination work before destroying its owned
+stdio/CDP pipes. Termination completion can itself depend on pending I/O being
+released, creating a circular wait. It now requests termination, releases the
+pipes even if the request throws, then awaits completion and process close.
+The deterministic pipe-dependent regression fails on the parent and passes
+after the repair; all 42 teardown, shutdown and page-ready tests pass. The full
+verify had 13,665 successes and one page-ready cleanup timeout; those successful
+results are retained and the failed page-ready test passes after this repair.
+The original loaded timeout's native phase was not captured. No deadline changed.
+
 ### Fixed 2026-11-10: labels duplicate attachment lost its error contract
 
 Calling `LabelRenderer.attach(engine)` twice reported a shortened TypeError
@@ -5022,7 +5040,6 @@ fragment-stage storage buffers and recommends weighted OIT. The base OIT check
 passes first. Review the advertised storage capabilities, the existing documented
 ExactOIT limit, and its refusal/help contract before changing either test or route.
 
-### Voxel browser gate revalidation pending after the Chromium repair (2026-11-09)
 
 ### Fixed 2026-11-09: voxel memory admission and browser revalidation
 

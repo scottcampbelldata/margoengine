@@ -1,5 +1,11 @@
 # Reproducing Margo's numbers
 
+Owned browser I/O regression: run
+`node --test --test-timeout=90000 tests/browser-teardown.test.js tests/shutdown.test.js tests/page-ready.test.js`.
+The pipe-dependent completion test fails before the ordering repair. Existing
+deadlines and refusal tests remain intact. The page-ready test checks a held
+module and browser cleanup; it is not a GPU rendering or speed benchmark.
+
 The [unaccepted scalar prototype](results/batch-134-scalar-prototype.json)
 retains its source/tests and corpus in the author research workspace, outside
 clone contents. There, run native crate tests, the release Wasm build and

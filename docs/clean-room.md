@@ -1,5 +1,23 @@
 # Clean room
 
+## Owned Chromium termination and pipe release (2026-11-09)
+
+Research before the change compared Edward G. Coffman Jr., Michael J. Elphick
+and Arie Shoshani, [System Deadlocks (1971)](https://doi.org/10.1145/356586.356588),
+introduction and section 2 through the circular-wait conditions, with Bas van
+den Heuvel and Jorge A. Perez,
+[Deadlock Freedom for Asynchronous and Cyclic Process Networks (2021)](https://arxiv.org/abs/2110.00146),
+abstract only, and Microsoft's
+[TerminateProcess remarks](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess)
+and [process termination lifecycle](https://learn.microsoft.com/en-us/windows/win32/procthread/terminating-a-process)
+(retrieved 2026-11-09). Termination completion may await pending I/O cancellation.
+The independent repair requests native termination, releases the owned pipes,
+then awaits completion and process close before driver cleanup. A controlled
+stop promise dependent on pipe release fails before the repair and passes after.
+The CDP listing still precedes disconnect. No companion implementation was read.
+The loaded page-ready timeout lacked native phase attribution; this controlled
+dependency is proven, without claiming its original kernel state was observed.
+
 ## Batch 134 scalar prototype and strict quality control (2026-11-09)
 
 Before the private BC4/BC5 prototype, wide searches compared scalar texture
