@@ -2581,3 +2581,5 @@ entries remain uncovered until included. The landed scope is the device entry
 plus ten scenes (17 accepted lower-tier images and three measured LDR refusals),
 not complete package parity. Physical lower-tier hardware and cross-browser
 measurements remain separate outstanding evidence.
+Untested features of the scoped core, shadows, materials and culling packages
+also remain in T273-COVERAGE; a passing scene does not certify a whole package.

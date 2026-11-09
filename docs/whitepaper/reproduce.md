@@ -1727,3 +1727,18 @@ in results/batch-273-tier-package-summary.json. PostStack, Bloom and SSAO CPU
 regressions check allocation/refusal/restore ownership and supported tiers.
 The native post GPU suite and all 25 post README examples pass. Full optional
 package/tier coverage remains outstanding; no package-wide completion is claimed.
+
+Landing scope (coordinator direction): ship the device entry and these ten scenes;
+T273-COVERAGE in the package README and limits tracks the remaining package work.
+On current-main integration, all three device tiers and all 20 scoped package rows
+pass again, as does the upstream preview/auto package browser proof. All eleven
+post GPU commands also pass with MARGO_COMPAT=1 in a single shared slot. CPU
+validation passes 283/284 initially; the only failure was the explicit isolation
+alias list missing the now-tracked tiers umbrella file. Adding that registered
+alias passes all six isolation checks, including exact generated alias contents.
+Lint, hygiene and all five quality gates pass. The initial full verify invocation
+failed at stale generated API; its resumed unit run had two failures repaired by
+targeted runs. API, llms, size-page and lazy-boundary checks pass afterward. This
+is composed step evidence, not a claim that an unconditional full verify passed.
+The retained README evidence is 16 compat/umbrella and 25 post examples, unchanged.
+No passed step was rerun without an affected input; no tolerance or workload changed.

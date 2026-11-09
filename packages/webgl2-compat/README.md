@@ -206,7 +206,8 @@ selection, shader, sky, splats, sprites, staging, stats, terrain, tilemap, toon,
 VFX, video, voxel, voxel-pathtracer, water, weather, XR, UI, biomes, scenery,
 stage, controls, LOD and OIT still need feature-by-feature half-float/LDR images and measured
 attach-time refusals. Other optional rendering entries are uncovered until added
-to that matrix. Full-tier compat failures are tracked separately in known-bugs.md
+to that matrix, as are untested features of core, shadows, materials and culling.
+Full-tier compat failures are tracked separately in known-bugs.md
 and are repaired before this follow-up. Physical lower-tier hardware and the
 cross-browser matrix remain unmeasured.
 The device probes cover all seven float targets, exact logical readback bytes,
