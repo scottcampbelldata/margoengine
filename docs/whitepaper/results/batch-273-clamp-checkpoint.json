@@ -165,5 +165,16 @@
       "clamp-rebase-final-size"
     ],
     "coreStageGzip": 23924
+  },
+  "finalIntegration": {
+    "mainBase": "d15e46fd2",
+    "publishedClamp": "17359bda8",
+    "publishedAPI": "95e5c2691",
+    "upstreamViewcubeFixture": "d15e46fd2 supplies the identical sceneOf method plus an identity/disposal regression; retained both",
+    "build": "complete repository rebuild passed",
+    "units": "29/29 ViewCube, guide and sciviz site tests pass; 41/41 Animator/guide checks and 187/187 root Animator checks passed on earlier integration",
+    "api": "899 entries/8702 exports match",
+    "corePlusStageGzip": 23924,
+    "notes": "Generated guides retain upstream Animator and sciviz changes. No second full verification on unchanged clamp runtime."
   }
 }
