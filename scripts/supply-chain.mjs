@@ -361,6 +361,10 @@ const ASSETS = [
     'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
   ],
   [
+    'packages/decoders/tests/fixtures/basis134/NOTICE.md',
+    'test-only licensed replacements for AGI HQ atlas, alpha3, Kodak03 and the Memorial HDR cube after their original image-use grants could not be proved. Three .basis fixtures derive from the pinned FlightHelmet GlassPlasticMat BaseColor PNG (CC0-1.0, copyright 2018 Public, conversion Gary Hsu); the six-face HDR cube and its source arrays are Margo analytic data dedicated CC0-1.0. Same dimensions, mip counts and input/alpha/cube features; hashes, source arrays, generator and 45-pair/250-image old-prebuilt quality baseline in the fixture folder. Encoder executed opaquely outside the repository; no implementation source read or copied',
+  ],
+  [
     'packages/decoders/tests/fixtures/ktx2-layers/NOTICE.md',
     'test-only KTX2 cube/array standard files and independent ktx-extract image hashes, Apache-2.0, Khronos Group and RasterGrid. The unmodified arraytex_7_mipmap_reference_u.ktx2 is verified against KhronosGroup/KTX-Software-CTS 1815a621e92186114042aa38798b5162b7ed2520, clitests/input/ktx2_sample, SHA-256 fce87d983f3dfa995faf3df1d3dd60b1c8ba12cd52c1a6baccff20e905357fdb, 9928 bytes; root LICENSE. Its seven five-level solid-colour chains prove materials/mips upload conformance, not production image quality. Other cube/array fixtures were made here by KTX-Software from the published suite images as documented in NOTICE.md; they are not outside-authored chains. No implementation code was read or copied',
   ],

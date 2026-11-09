@@ -130,6 +130,18 @@ source-quality coverage, replacement identity/quality, old/new speed, hostile
 input and GPU proof remain open. No replacement code has been written; the
 prebuilt stays until all gates pass.
 
+### Licensed baseline substitution (2026-11-09)
+
+The manager accepts 685/699 historical quality pairs to start implementation
+and directs openly licensed replacement of unproven image grants. The active
+corpus now has source metrics for all 699 pairs and 9,491 images. Three .basis
+files derive from pinned CC0 FlightHelmet pixels; six synthetic CC0 HDR faces
+replace Memorial Church at the same size/mip count. All previous served formats
+and features remain covered. The official encoder ran opaquely outside this
+repository solely to generate standard fixture assets. No encoder code was read
+or copied and no codec algorithm was inferred. The owning fixture notice records
+sources, grants, hashes, generation and limitations; the historical snapshot stays.
+
 ## Creative texture targets (batch 77)
 
 Cube/array texture views, mip extents and 3D render attachment depthSlice follow the

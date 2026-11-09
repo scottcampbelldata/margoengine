@@ -1,0 +1,99 @@
+{
+  "encoder": {
+    "wasmSha256": "dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a"
+  },
+  "files": [
+    {
+      "replaces": "Binomial150-webgl_gltf_assets_textureAtlasImage.basis",
+      "file": "cc0-flighthelmet-atlas-etc1s.basis",
+      "width": 1024,
+      "height": 1024,
+      "uastc": false,
+      "alpha": false,
+      "levels": 1,
+      "sha256": "4f5c6d8bcd021592be4bc0c1eac9c97bc3c170d721c63d89c5ffa1fe4245625b",
+      "sourceSha256": "4b0ae1f404dfa78a443ce0f38f9be9cb01e65397c9a8cda08ea596a1fff1442c",
+      "license": "CC0-1.0",
+      "source": "KhronosGroup-Models_FlightHelmet_glTF_FlightHelmet_Materials_GlassPlasticMat_BaseColor.png",
+      "originalSourceSha256": "0914544aabe161046f417274051e34ecc85163cfce6698581b3e1e18c96fe4f1",
+      "sourceTransform": "Nearest source-pixel resampling; alpha variant adds a deterministic 128-pixel product ramp. Full source RGBA8 retained.",
+      "reason": "Original source/derivative image grant unproven; manager ordered replacement without waiting."
+    },
+    {
+      "replaces": "Binomial150-webgl_texture_test_assets_alpha3.basis",
+      "file": "cc0-flighthelmet-alpha-etc1s.basis",
+      "width": 768,
+      "height": 512,
+      "uastc": false,
+      "alpha": true,
+      "levels": 1,
+      "sha256": "f0877cd7952b0b676e38378e9a2bebcbd31f15f584da671a32c41dcda37807b1",
+      "sourceSha256": "91b56af484a4752d76a1caa80097b1a0e490eccedf80cc95566e45bc843d4d14",
+      "license": "CC0-1.0",
+      "source": "KhronosGroup-Models_FlightHelmet_glTF_FlightHelmet_Materials_GlassPlasticMat_BaseColor.png",
+      "originalSourceSha256": "0914544aabe161046f417274051e34ecc85163cfce6698581b3e1e18c96fe4f1",
+      "sourceTransform": "Nearest source-pixel resampling; alpha variant adds a deterministic 128-pixel product ramp. Full source RGBA8 retained.",
+      "reason": "Original source/derivative image grant unproven; manager ordered replacement without waiting."
+    },
+    {
+      "replaces": "Binomial150-webgl_texture_test_assets_kodim03_uastc.basis",
+      "file": "cc0-flighthelmet-uastc.basis",
+      "width": 768,
+      "height": 512,
+      "uastc": true,
+      "alpha": false,
+      "levels": 1,
+      "sha256": "7d0d0ce2d4b39fd540e9bfdde7767dfbcff9873322910016c7f6f6df4f581d35",
+      "sourceSha256": "ab4509162183be4b7524a45ff2fd39a4321b380f209d2e9947e27c8f15e02bcf",
+      "license": "CC0-1.0",
+      "source": "KhronosGroup-Models_FlightHelmet_glTF_FlightHelmet_Materials_GlassPlasticMat_BaseColor.png",
+      "originalSourceSha256": "0914544aabe161046f417274051e34ecc85163cfce6698581b3e1e18c96fe4f1",
+      "sourceTransform": "Nearest source-pixel resampling; alpha variant adds a deterministic 128-pixel product ramp. Full source RGBA8 retained.",
+      "reason": "Original source/derivative image grant unproven; manager ordered replacement without waiting."
+    },
+    {
+      "replaces": "Margo-ktx2-hdr-cube-uastc-hdr.ktx2",
+      "file": "cc0-cube-uastc-hdr.ktx2",
+      "sha256": "1e63760a51b2e1ad2e4410ec190a80901400acc9282c644faa4513cfed3149cd",
+      "width": 96,
+      "height": 96,
+      "faces": [
+        {
+          "face": 0,
+          "sha256": "f5f9b140e8192b2677135e96f29d2639635ea60cc95150f3c6a01abd71652402"
+        },
+        {
+          "face": 1,
+          "sha256": "1778cfb26ecf3ab36fda0d1875ed56e017084f5aa44a6d906d1d3352dcf0ed87"
+        },
+        {
+          "face": 2,
+          "sha256": "09e3b5e101167d98fdf719eba294bc3925c48fe7b9982eab534a21844cfecadb"
+        },
+        {
+          "face": 3,
+          "sha256": "67a5023913e86982690944445b5898e876a214ebe1ad6c553d12895eac0f46ea"
+        },
+        {
+          "face": 4,
+          "sha256": "19f03401b3b478b22c5a9d044699a880d2db1b61a710d7856e16b6b61bec2c5a"
+        },
+        {
+          "face": 5,
+          "sha256": "86dd976b05acc153365fa7a55bb32053909bb1bcd66719451c252217aca6fec7"
+        }
+      ],
+      "levels": 7,
+      "license": "CC0-1.0",
+      "source": "Margo analytic light-field generator in replacements.mjs",
+      "reason": "Memorial Church image-use grant unproven; replace with six distinct analytic HDR faces at the same size and mip count."
+    }
+  ],
+  "source": {
+    "file": "flighthelmet-cc0.png",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/FlightHelmet/glTF/FlightHelmet_Materials_GlassPlasticMat_BaseColor.png",
+    "license": "CC0-1.0",
+    "grant": "FlightHelmet-NOTICE.md: Legal; copyright 2018 Public; conversion Gary Hsu",
+    "sha256": "0914544aabe161046f417274051e34ecc85163cfce6698581b3e1e18c96fe4f1"
+  }
+}

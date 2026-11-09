@@ -63,6 +63,16 @@ exercising the same formats and features, without waiting for grants. Preserve
 this historical snapshot and record each replacement and its coverage. Missing
 or provisional source metrics are not passing replacement evidence.
 
+The [active licensed corpus](whitepaper/results/batch-134-active-corpus.json)
+replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
+same dimensions, input formats, alpha/cube features and mip counts. All 699
+served pairs and 9,491 images now have source metrics, with zero provisional
+pairs. The four replacements account for 45 pairs and 250 images. Three .basis
+files use real FlightHelmet image content; the HDR cube uses an analytic light
+field. The historical baseline is retained, and its timings are not transplanted
+onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
+
+
 ### Fixed 2026-11-09: batch 76 transition review
 
 Built-in/custom composites used viewport-local UVs to address full-target captures, reading uncaptured pixels in offset views. They now derive capture UVs from absolute fragment positions. viewport-browser.js compares spatial colors against baseline at idle/0/0.5/1 across all built-in kinds, custom and mask, at 1x/4x, including preservation outside a stacked scissor. Live target validation omitted the fragment output's format domain, so integer/depth targets could advance source scenes before invalid GPU work. A shared float-color/resolve check now rejects those formats before live allocation or updates and also guards frozen-frame capture. live.test.js, live-browser.js and transitions.test.js cover this class, including non-resolvable 32-bit float 4x outputs. README and limits document custom WGSL's trusted-author requirement and fixed resource interface; real-compiler regressions accept costly code without dispatch, reject reachable extra resources and distinguish unused declarations. No core/stage change.

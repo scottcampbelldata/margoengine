@@ -1,5 +1,15 @@
 # Performance history: losses, causes and fixes
 
+The [active licensed corpus](results/batch-134-active-corpus.json)
+replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
+same dimensions, input formats, alpha/cube features and mip counts. All 699
+served pairs and 9,491 images now have source metrics, with zero provisional
+pairs. The four replacements account for 45 pairs and 250 images. Three .basis
+files use real FlightHelmet image content; the HDR cube uses an analytic light
+field. The historical baseline is retained, and its timings are not transplanted
+onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
+
+
 This page lists every performance loss and every significant bug that Margo's checks caught and that was then fixed.
 Each entry gives:
 
