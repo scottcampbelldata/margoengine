@@ -36,13 +36,14 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
+  for (const feature of ['junctions', 'banking']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
     page.on('pageerror', (e) => failures.push(e.message));
     await page.addInitScript(trackPipelines);
     await page.goto(server.resolvedUrls.local[0] + 'road-check');
-    const result = await page.evaluate(async (mode) => {
+    const result = await page.evaluate(async ({mode, feature}) => {
       const { Engine, PbrMaterial } = await import('/packages/core/dist/index.js');
       const { junctions } = await import('/packages/road/dist/junctions.js');
       const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
@@ -59,7 +60,13 @@ try {
       engine.onError = (e) => {
         throw e;
       };
-      const data = await junctions([
+      let data;
+      if (feature === 'banking') {
+        const {bankedRoad} = await import('/packages/road/dist/banking.js');
+        const {Spline} = await import('/packages/splines/dist/index.js');
+        data = await bankedRoad(new Spline([[0,0,-10],[0,0,10]]), {bank:Math.PI/6, crossSection:[[-3,0],[3,0]]});
+        if (Math.abs(data.geometry.vertices[1]+1.5)>1e-6) throw new Error('Bank height oracle');
+      } else data = await junctions([
         {
           points: [
             [-10, 0],
@@ -106,20 +113,20 @@ try {
       };
       await draw();
       return { area: data.area, backend: engine.backend, vendor: engine.gpu.adapterInfo?.vendor };
-    }, mode);
-    assert.equal(result.area, 144);
+    }, {mode, feature});
+    if (feature === 'junctions') assert.equal(result.area, 144);
     assert.equal(result.backend, 'webgpu');
     assert.equal(result.vendor === 'margo-webgl2', mode === 'compat');
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of [
+    for (const [x, y] of (feature === 'banking' ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],
       [64, 24],
       [64, 104],
-    ]) {
+    ])) {
       const [r, g, b] = rgb(first, x, y);
       assert.ok(r > g + 30 && r > b + 30, `${mode}: road covers ${x},${y}: ${r},${g},${b}`);
     }
@@ -131,9 +138,10 @@ try {
     assert.ok(rgb(removed, 64, 64)[0] < 40, `${mode}: disposed mesh leaves no road`);
     assert.equal(await page.evaluate(() => window.check.dispose()), true);
     console.log(
-      `PASS junctions ${mode}: five road pixels, clear outside, exact reboot pixels, disposal; area ${result.area}`,
+      `PASS ${feature} ${mode}: road pixels, clear outside, exact reboot pixels, disposal`,
     );
     await page.close();
+  }
   }
   assert.deepEqual(failures, []);
 } finally {

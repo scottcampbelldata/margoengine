@@ -1867,3 +1867,9 @@ external manifest, now 353 inputs. tests/readme-assets.test.js fails before the
 alias and asserts its exact bytes, topology, UVs and archived PNG. The original
 browser example passes. The composition example remains open; no unsupported
 input was accepted and no parser boundary changed.
+
+### Batch 65 job 2 audit
+
+No open defect found in bounded authored banking. Tight-bend overlap remains outside this entry, as limits.md records. Analytic, hostile-input, abort, ownership and real backend lifecycle checks cover the contract.
+
+Banking audit regression: input bounds alone missed a section rotated beyond the output coordinate limit. banking.test.js reproduced the missing rejection before the fix. banking.ts now validates transformed float32 positions too; the regression passes.

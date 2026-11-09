@@ -2610,7 +2610,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-633). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-634). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -4086,6 +4086,10 @@ BoxTextured USDZ (USDC plus PNG), with one mesh, 36 expanded vertices and 12 tri
 This proves the static introduction loads that complete standard sample. It does
 not establish arbitrary production USDZ, visual quality, reset-stack evidence or
 physical Apple Quick Look behaviour. The composition example remains open.
+
+### Batch 65 job 2: banking (LIM-634)
+
+Optional road/banking: 1041 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5958,6 +5962,12 @@ external manifest, now 353 inputs. tests/readme-assets.test.js fails before the
 alias and asserts its exact bytes, topology, UVs and archived PNG. The original
 browser example passes. The composition example remains open; no unsupported
 input was accepted and no parser boundary changed.
+
+### Batch 65 job 2 audit
+
+No open defect found in bounded authored banking. Tight-bend overlap remains outside this entry, as limits.md records. Analytic, hostile-input, abort, ownership and real backend lifecycle checks cover the contract.
+
+Banking audit regression: input bounds alone missed a section rotated beyond the output coordinate limit. banking.test.js reproduced the missing rejection before the fix. banking.ts now validates transformed float32 positions too; the regression passes.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -9744,7 +9754,7 @@ const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15,
 engine.createMesh().setGeometry(geometry);
 ```
 
-Custom crossSection entries are [lateralOffset, height]. UV V follows distance / uvMeters and U follows cross-section distance. The core is frozen and has no UV channel: uvs is separate data for a textured optional renderer/exporter. Sweeps are Y-up and reject vertical or zero tangents; banking and self-intersection repair are not included in the root sweep.
+Custom crossSection entries are [lateralOffset, height]. UV V follows distance / uvMeters and U follows cross-section distance. The core is frozen and has no UV channel: uvs is separate data for a textured optional renderer/exporter. Sweeps are Y-up and reject vertical or zero tangents; banking is available in the optional entry below; self-intersection repair is not included in the root sweep.
 
 ## Junctions
 
@@ -9771,6 +9781,18 @@ GPU tests from the repository root: `node scripts/gpu-lock.mjs run --owner=road-
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/road
+
+
+## Banking
+
+```ts
+import {bankedRoad} from "margoengine/road/banking";
+import {Spline} from "margoengine/splines";
+const surface = await bankedRoad(new Spline([[0,0,0],[20,2,20],[50,0,25]]), {bank:[0,0.12,0]});
+console.log(surface.geometry.indices.length);
+```
+
+`bankedRoad` accepts all root road options and `bank` (default 0): radians about the forward tangent, bounded to +/-pi/4. Positive bank raises the positive lateral edge. A list of 2..4097 angles interpolates linearly at equal arc distances. The entire cross section, including curbs, rotates; normals are rebuilt with the existing geometry utility after deformation. `signal` (default none) checks before and after lazy normal-kernel loading. Data is snapshotted before the first await and caller-owned, with no CPU resource to dispose. Dispose rendered meshes and engines. Input and output positions must stay within +/-1,000,000 m; float32 collapsed triangles and UV overflow reject. Nonvertical tangents and the root road limits apply. Banking does not repair tight bends or design civil-engineering transitions. Both native WebGPU and real WebGL2 compatibility render the banked mesh, including exact device reboot and double disposal tests.
 
 === @margoengine/tilemap (packages/tilemap/README.md) ===
 

@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-633). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-634). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1499,3 +1499,7 @@ BoxTextured USDZ (USDC plus PNG), with one mesh, 36 expanded vertices and 12 tri
 This proves the static introduction loads that complete standard sample. It does
 not establish arbitrary production USDZ, visual quality, reset-stack evidence or
 physical Apple Quick Look behaviour. The composition example remains open.
+
+### Batch 65 job 2: banking (LIM-634)
+
+Optional road/banking: 1041 B min+gzip with bare package imports external, plus lazy geometry normal and root road dependencies. Bank defaults to zero, finite +/-pi/4 radians or 2..4097 equally spaced angles; all root sweep limits apply. Positions bounded to +/-1,000,000 m, rejects float32 collapsed triangles and nonfinite UVs. Tangent-axis rotation retains cross-section distances; normals follow deformed triangles. No automatic civil transition design, speed-based superelevation, tight-bend repair, surveyed-road or performance claim. Generated geometry only; native WebGPU and real WebGL2 compatibility pixels, exact reboot and disposal proved. Core and stage unchanged.

@@ -2358,6 +2358,10 @@
       "types": "./dist/road/junctions.d.ts",
       "import": "./dist/road/junctions.js"
     },
+    "./road/banking": {
+      "types": "./dist/road/banking.d.ts",
+      "import": "./dist/road/banking.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

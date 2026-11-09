@@ -29,6 +29,10 @@
     "./junctions": {
       "types": "./dist/junctions.d.ts",
       "import": "./dist/junctions.js"
+    },
+    "./banking": {
+      "types": "./dist/banking.d.ts",
+      "import": "./dist/banking.js"
     }
   },
   "files": [

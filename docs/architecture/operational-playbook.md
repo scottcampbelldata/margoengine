@@ -2448,3 +2448,7 @@ checks one mesh, 36 expanded vertices, 12 triangles, UVs, texture and zero issue
 No parser, rendering, core or stage code changed. This closes the introduction's
 missing-file execution gap only; composition, reset-stack data, physical Quick
 Look and production image quality remain separate gaps.
+
+### Batch 65 job 2: banking
+
+Optional road/banking rotates the existing road sweep about its forward tangent and lazily reuses geometry/utils normals after deformation. Core and stage stay unchanged. Section 5 evidence: banking.test.js proves analytic signed tilt, width, normal direction, equal-distance transitions, grades, curved and closed inputs, finite normals, hostile bounds, float32 collapse, ownership and abort boundaries. browser-check.mjs proves road/clear pixels, exact device reboot and double mesh/engine disposal on native WebGPU and real WebGL2 compatibility. Generated geometry is stand-in proof; no survey, civil design, other-hardware or speed claim.
