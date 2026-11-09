@@ -127,6 +127,10 @@
       "types": "./dist/pvr.d.ts",
       "import": "./dist/pvr.js"
     },
+    "./draco-native": {
+      "types": "./dist/draco-native.d.ts",
+      "import": "./dist/draco-native.js"
+    },
     "./draco-points": {
       "types": "./dist/draco-points.d.ts",
       "import": "./dist/draco-points.js"

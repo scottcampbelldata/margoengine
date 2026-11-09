@@ -22,6 +22,8 @@ await build({
 const emitted = await readdir(resolve(consumerOut, 'assets'));
 for (const pattern of [
   /^decoder\.worker-.*\.js$/,
+  /^draco-native\.worker-.*\.js$/,
+  /^draco-native-.*\.wasm$/,
   /^draco_decoder-.*\.wasm$/,
   /^draco_wasm_wrapper-.*\.js$/,
   /^basis_transcoder-.*\.wasm$/,
@@ -72,7 +74,14 @@ try {
   await page.goto(productionServer.resolvedUrls.local[0]);
   await page.waitForFunction(() => typeof window.runConsumer === 'function');
   report.consumer = await page.evaluate(() => window.runConsumer());
-  assert.deepEqual(report.consumer, { vertices: 24, indices: 36, width: 2048, format: 'rgba8unorm', jxlWidth: 200, points: 24 });
+  assert.deepEqual(report.consumer, {
+    vertices: 24,
+    indices: 36,
+    width: 2048,
+    format: 'rgba8unorm',
+    jxlWidth: 200,
+    points: 24,
+  });
   report.consumer.emitted = emitted;
   report.checks.push('Production Vite consumer emits the worker and decoders as assets and decodes from them');
   report.browser = browser.version();

@@ -1,0 +1,974 @@
+{
+  "scope": "Unshipped job 2 context checkpoint. Job 2 incomplete; no completion, paired-speed, feature-parity or final-entry-size claim.",
+  "job1Commit": "da393371370fa6e0b25932e7649fca5d5475c209",
+  "originalCorpus": {
+    "scope": "Development diagnostic; error codes are pending decoder features, not approved release limits",
+    "streams": 454,
+    "exactNative": 454,
+    "exactFloat": 454,
+    "errors": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0
+    },
+    "peakWasmLinearBytes": 18874368,
+    "exposedMetadataExact": 2
+  },
+  "fixtures": [
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/connectivity.bin",
+      "bytes": 8464366,
+      "sha256": "70f042c705f89965d28f1469b65bc7ecf38aa506561494eb2ecae790838170fb"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/established.bin",
+      "bytes": 191506,
+      "sha256": "4ab4a2f9a5de272e1d7d6e39469e9892e631e69d40d335aa8dab627e08a8dc36"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/kd.bin",
+      "bytes": 10420782,
+      "sha256": "96d61d1feabee7e4b90fd2a9167007195d0a800ddbf8574b8a99661609895568"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/memory.json",
+      "bytes": 3667,
+      "sha256": "a7df1a47398cf35d489fb3b1a46dc47fa4e8acc81bf615c1d767ddb1eb2bd7fa"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/beautiful-game-first.drc",
+      "bytes": 99609,
+      "sha256": "3efdb3f177a09345c8a0fbea33ae13d76bb5d69592a4d14df955d3e344ae83d5"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/beautiful-game-largest.drc",
+      "bytes": 139154,
+      "sha256": "3faa13c5daa20ce91cd11e485d7b3f816df7d50c66ef2573f3560aec3477f939"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/multi.bin",
+      "bytes": 166906,
+      "sha256": "80a6d1e001ee9a78fc450de52dd27423d1fb77ed9e28ebe6c305fdc79c46c14f"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/metadata.bin",
+      "bytes": 426956,
+      "sha256": "8f02f8e722eca40d828c79b439a7be8c25dc11dcfb12f4ea38488669cfdefd68"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/metadata-long.drc",
+      "bytes": 1072,
+      "sha256": "a817da4ec999fe0e59cafa1b538e605e33cc6740c9b032efaaa769e7540eb0d1"
+    },
+    {
+      "file": "packages/decoders/native/draco/tests/fixtures/flavor.bin",
+      "bytes": 190579,
+      "sha256": "9812a91ef6493e6dd1b6af98b580acbf72a5d31d26118d9b876a1e66f95f62c6"
+    }
+  ],
+  "wasm": {
+    "bytes": 121653,
+    "gzipBytes": 47137,
+    "sha256": "fa0d5915e90ef22f41ea8d4a81d55fcbaf6569f7b0100dbf44c6a0b137ee491c",
+    "compression": "Node gzipSync level 9, same compressor as paired prebuilt size"
+  },
+  "exactCases": {
+    "attributes": 281,
+    "KD": 369,
+    "connectivity": 730,
+    "multiAndTraversal": 289,
+    "metadata": 41,
+    "flavor": 214
+  },
+  "memory": {
+    "metric": "Committed Wasm linear memory; process RSS separate and pending",
+    "prebuiltTarget": 20185088,
+    "preFix": 23789568,
+    "current": 18874368,
+    "sameOriginalInputs": true,
+    "preFixRegressionFails": true
+  },
+  "newKDChecks": {
+    "strictPrefixes": 49779,
+    "mutations": 4096,
+    "repeatedDecodeFree": 2000
+  },
+  "openGates": [
+    "Predictive EdgeBreaker, historical predictor 3, remaining predictor transform combinations and exhaustive version/type/quantization inventory",
+    "Public metadata names, including invalid-UTF8 binding behavior; raw bytes and nesting now retained in private native/Wasm ABI",
+    "Requested typed conversions and all resource-budget behavior",
+    "Loader, workers, lifecycle, cancellation and concurrency integration",
+    "Original corpus plus all new fixtures paired cold/warm per-file timing, true cold-process compile/startup and process peak RSS, interleaved old/new in one session",
+    "Full lint/hygiene/verify, affected decoders/glTF/glTF-pro unit/GPU and README gates before each job push",
+    "Jobs 3-5, final distribution sizes and removal of both prebuilts"
+  ],
+  "checks": [
+    {
+      "name": "feature-native-final",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-clippy",
+      "command": "cargo",
+      "args": [
+        "clippy",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "metadata-wasm-build",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-attributes",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-topology",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-topology-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-kd",
+      "command": "node",
+      "args": [
+        "packages/decoders/native/draco/tests/wasm-kd.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-prediction",
+      "command": "node",
+      "args": [
+        "packages/decoders/native/draco/tests/wasm-prediction.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-metadata",
+      "command": "node",
+      "args": [
+        "packages/decoders/native/draco/tests/wasm-metadata.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-corpus",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-external-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-wasm-memory",
+      "command": "node",
+      "args": [
+        "packages/decoders/native/draco/tests/wasm-memory.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-merge-regression-direct",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=300000",
+        "packages/decoders/tests/draco-native.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-lint",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "lint"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-rebase-build",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "build:packages"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-hygiene-built",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "hygiene"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-doc-links",
+      "command": "node",
+      "args": [
+        "scripts/docs-links.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-notices-check",
+      "command": "node",
+      "args": [
+        "scripts/supply-chain.mjs",
+        "--check"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-decoder-units",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=300000",
+        "packages/decoders/tests/*.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-gltf-units",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test",
+        "--workspace",
+        "@margoengine/gltf"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "feature-gltf-pro-units",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test",
+        "--workspace",
+        "@margoengine/gltf-pro"
+      ],
+      "code": 0,
+      "timedOut": false
+    }
+  ],
+  "safetyCommit": "4699cbfc0",
+  "rebaseBase": "4238614df2f9db0d5e3d9aaebd6f325870d74607",
+  "newFeatureChecks": {
+    "prediction": {
+      "exact": 289,
+      "strictPrefixes": 48405,
+      "mutations": 16384,
+      "decodeFree": 2000
+    },
+    "metadata": {
+      "exact": 41,
+      "selectedStrictPrefixes": 9360,
+      "mutations": 4096,
+      "decodeFree": 2000
+    },
+    "metadataDepthHeldOut": 129,
+    "largestMetadataValueHeldOut": 32769,
+    "rawMetadataPreserved": true,
+    "publicMetadataStringConversionIntegrated": false,
+    "flavor": {
+      "exact": 214,
+      "expandedFull": 1937,
+      "expandedGLTF": 1003,
+      "fullVsGLTFDivergencesPreserved": 128,
+      "publicEntryIntegrated": false
+    }
+  },
+  "checkpointCommit": "89793c61444c28245ff3d8b357da5ad6a4bc11b6",
+  "expandedCorrectness": [
+    {
+      "variant": "draco-full",
+      "inputs": 1937,
+      "accepted": 1937,
+      "exact": 1937,
+      "failures": 0
+    },
+    {
+      "variant": "draco",
+      "inputs": 1937,
+      "accepted": 1003,
+      "exact": 1003,
+      "failures": 0
+    }
+  ],
+  "bitReader": {
+    "proof": "Each width-bit read loads ceil((offset mod 8 + width)/8) source bytes, at most 5, rather than width; width 0 loads none. Independent alignment/length/width/cursor-position regression; same complete-stream outputs.",
+    "pairedClaim": false
+  },
+  "continuationChecks": [
+    {
+      "name": "resume7-bit-ab.json",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-speed.mjs",
+        "rust-before"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bit-build.json",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bit-native.json",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bits-attribute.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bits-clippy.json",
+      "command": "cargo",
+      "args": [
+        "clippy",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bits-corpus.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-external-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bits-topology.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/wasm-topology-check.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-bits-wasm-gate.json",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=300000",
+        "packages/decoders/tests/draco-native.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-decoder-gpu.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--max=10",
+        "--wait-max=4",
+        "--",
+        "cmd.exe",
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test:browser",
+        "--workspace",
+        "@margoengine/decoders"
+      ],
+      "code": 2,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-doc-regressions.json",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=60000",
+        "tests/no-private-paths.test.js",
+        "tests/llms.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-expanded-exact-conversions.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-validate.mjs"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-expanded-exact-diagnostic.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-validate.mjs"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-expanded-exact-flavor.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-validate.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-expanded-exact.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-validate.mjs"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-decoder-browser.json",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:browser",
+        "--workspace",
+        "@margoengine/decoders"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-decoder-node-gltf.json",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:gpu:node-gltf",
+        "--workspace",
+        "@margoengine/decoders"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-doc-regressions.json",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=60000",
+        "tests/no-private-paths.test.js",
+        "tests/llms.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-gltf-browser.json",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:gpu",
+        "--workspace",
+        "@margoengine/gltf"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-gltf-pro-materials.json",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:gpu:materials",
+        "--workspace",
+        "@margoengine/gltf-pro"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-gltf-pro-units.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test",
+        "--workspace",
+        "@margoengine/gltf-pro"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-gltf-units.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test",
+        "--workspace",
+        "@margoengine/gltf"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-gpu-gates.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--exclusive",
+        "--max=35",
+        "--wait-max=29",
+        "--",
+        "node",
+        "<maintainer-cache>/batch-133/run-gpu-gates.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-hygiene.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "hygiene"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-lint.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "lint"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-readme.json",
+      "command": "npm",
+      "args": [
+        "run",
+        "check:readme-run",
+        "--",
+        "--packages=decoders"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-final-verify.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "verify"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-flavor-build.json",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-flavor-clippy.json",
+      "command": "cargo",
+      "args": [
+        "clippy",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "packages/decoders/native/draco/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-flavor-fixture.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/make-flavor-fixture.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-flavor-gate.json",
+      "command": "node",
+      "args": [
+        "--test",
+        "--test-timeout=300000",
+        "packages/decoders/tests/draco-native.test.js"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-gltf-fallback-probe.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/gltf-fallback-probe.mjs"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-gltf-gpu.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--max=10",
+        "--wait-max=4",
+        "--",
+        "cmd.exe",
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test:gpu",
+        "--workspace",
+        "@margoengine/gltf"
+      ],
+      "code": 2,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-gltf-pro-gpu.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--max=10",
+        "--wait-max=4",
+        "--",
+        "cmd.exe",
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "test:gpu:materials",
+        "--workspace",
+        "@margoengine/gltf-pro"
+      ],
+      "code": 2,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-hygiene-after-build.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "hygiene"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-hygiene.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "hygiene"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-lint.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "lint"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-pair-gates.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--exclusive",
+        "--max=40",
+        "--wait-max=20",
+        "--",
+        "node",
+        "<maintainer-cache>/batch-133/run-pairs.mjs"
+      ],
+      "code": 1,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-paired-draco-full.json",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-speed.mjs",
+        "draco-full"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-paired-draco.json",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-speed.mjs",
+        "draco"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-paired-smoke.json",
+      "command": "node",
+      "args": [
+        "<maintainer-cache>/batch-133/paired-speed.mjs",
+        "draco-full",
+        "3efdb3f177a09345c8a0fbea33ae13d76bb5d69592a4d14df955d3e344ae83d5"
+      ],
+      "code": 0,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-readme.json",
+      "command": "node",
+      "args": [
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-133",
+        "--max=20",
+        "--wait-max=9",
+        "--",
+        "cmd.exe",
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "check:readme-run",
+        "--",
+        "--packages=decoders"
+      ],
+      "code": 2,
+      "timedOut": false
+    },
+    {
+      "name": "resume7-verify.json",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm",
+        "run",
+        "verify"
+      ],
+      "code": 1,
+      "timedOut": false
+    }
+  ],
+  "paired-rust-before": {
+    "summary": {
+      "inputs": 1937,
+      "supported": 1937,
+      "decodeLosses": 19,
+      "totalLosses": 11
+    },
+    "scope": "Loaded-machine development diagnostic. Original 454 targets preserved and expanded. Same native/float output and ordered indices; decoding, output extraction and disposal in totalMs. Rust decodeMs includes private ABI serialization; prebuilt decodeMs ends at decoded geometry. Metadata text/lifecycle integration remain separate. First is first call in this process; true cold processes and RSS are measured separately. No quiet speed claim.",
+    "environment": {
+      "host": "SCOTT-DEV",
+      "node": "v26.12.0",
+      "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "threads": 32,
+      "busy": 0.615440623115896
+    }
+  },
+  "paired-draco-full": {
+    "summary": {
+      "inputs": 1937,
+      "supported": 1937,
+      "decodeLosses": 499,
+      "totalLosses": 365
+    },
+    "scope": "Loaded-machine development diagnostic. Original 454 targets preserved and expanded. Same native/float output and ordered indices; decoding, output extraction and disposal in totalMs. Rust decodeMs includes private ABI serialization; prebuilt decodeMs ends at decoded geometry. Metadata text/lifecycle integration remain separate. First is first call in this process; true cold processes and RSS are measured separately. No quiet speed claim.",
+    "environment": {
+      "host": "SCOTT-DEV",
+      "node": "v26.12.0",
+      "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "threads": 32,
+      "busy": 0.5094239022347831
+    }
+  },
+  "paired-draco": {
+    "summary": {
+      "inputs": 1937,
+      "supported": 1003,
+      "decodeLosses": 365,
+      "totalLosses": 288
+    },
+    "scope": "Loaded-machine development diagnostic. Original 454 targets preserved and expanded. Same native/float output and ordered indices; decoding, output extraction and disposal in totalMs. Rust decodeMs includes private ABI serialization; prebuilt decodeMs ends at decoded geometry. Metadata text/lifecycle integration remain separate. First is first call in this process; true cold processes and RSS are measured separately. No quiet speed claim.",
+    "environment": {
+      "host": "SCOTT-DEV",
+      "node": "v26.12.0",
+      "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "threads": 32,
+      "busy": 0.5402570584769295
+    }
+  }
+}

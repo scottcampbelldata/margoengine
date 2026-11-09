@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -6,6 +6,7 @@ import { build } from 'vite';
 import { staticEmbind } from '../../../scripts/static-embind.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { endTree } from '../../../scripts/support/shutdown.mjs';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the worker and the Wasm decoders as its own assets.
@@ -21,6 +22,59 @@ execFileSync(
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
+// Build the optional clean-room asset from our crate, never from a registry codec.
+const native = spawn(
+  'cargo',
+  [
+    'build',
+    '--offline',
+    '--locked',
+    '--release',
+    '--target',
+    'wasm32-unknown-unknown',
+    '--manifest-path',
+    resolve(root, 'native/draco/Cargo.toml'),
+  ],
+  { windowsHide: true, stdio: 'inherit' },
+);
+let nativeTimeout = false,
+  nativeEnded = Promise.resolve([]);
+const nativeTimer = setTimeout(() => {
+  nativeTimeout = true;
+  if (native.pid) nativeEnded = endTree(native.pid);
+}, 120_000);
+try {
+  const code = await new Promise((done, reject) => {
+    native.once('error', reject);
+    native.once('close', done);
+  });
+  const survivors = await nativeEnded;
+  if (nativeTimeout || code !== 0 || survivors.length)
+    throw new Error('Clean-room Draco build failed or exceeded 120 s');
+} finally {
+  clearTimeout(nativeTimer);
+}
+await copyFile(
+  resolve(root, 'native/draco/target/wasm32-unknown-unknown/release/margoengine_draco.wasm'),
+  resolve(dist, 'draco-native.wasm'),
+);
+await build({
+  configFile: false,
+  publicDir: false,
+  logLevel: 'warn',
+  build: {
+    outDir: dist,
+    emptyOutDir: false,
+    minify: true,
+    target: 'es2022',
+    lib: {
+      entry: resolve(root, 'src/draco-native.worker.ts'),
+      name: 'MargoNativeDracoWorker',
+      formats: ['iife'],
+      fileName: () => 'draco-native.worker.js',
+    },
+  },
+});
 // The worker replaces tsc's module emit with one self-contained classic script, so it can importScripts the wrappers.
 await build({
   configFile: false,

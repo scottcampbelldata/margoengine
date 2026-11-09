@@ -372,3 +372,5 @@ plus the old submit-to-done p90 diagnostic on the same frames. Wall-clock
 instrumentation and the 7 ms assertion run only in the active speed phase.
 Real timestamps, tier storage/next-load selection and wrapper cleanup remain
 live correctness. No speed run occurred during this continuation.
+
+- Deferred core one-pass item: lane-K measurement d1c55001c and docs a5877f3f1 remain on the branch in margoengine-lane-K; A6000 gain beyond spread, AMD within spread; core change waits for the speed phase and Scott's OK.

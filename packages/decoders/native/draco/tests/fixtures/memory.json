@@ -1,0 +1,96 @@
+[
+  {
+    "file": "beautiful-game-first.drc",
+    "inputSha256": "3efdb3f177a09345c8a0fbea33ae13d76bb5d69592a4d14df955d3e344ae83d5",
+    "outputSha256": "c60a211b976c02f4681efd7526617330dbc1de965ddfa0a17d395b0c76ea02ee",
+    "source": {
+      "name": "KhronosGroup/glTF-Sample-Assets/Models/ABeautifulGame/glTF-Binary-KTX-ETC1S-Draco/ABeautifulGame.glb:1/0",
+      "sha256": "3efdb3f177a09345c8a0fbea33ae13d76bb5d69592a4d14df955d3e344ae83d5",
+      "bytes": 99609,
+      "source": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/ABeautifulGame/glTF-Binary-KTX-ETC1S-Draco/ABeautifulGame.glb",
+      "sourceSha256": "d950162d41e0064be9dfac0c09d80c7a23719a37af37f08cd79385b8af0af0c1",
+      "bufferView": 33,
+      "attributes": {
+        "POSITION": 0,
+        "NORMAL": 1,
+        "TEXCOORD_0": 2
+      },
+      "accessors": {
+        "POSITION": {
+          "type": "VEC3",
+          "componentType": 5126,
+          "count": 29162,
+          "max": [
+            0.028035586699843407,
+            0.15154190361499786,
+            0.02803558111190796
+          ],
+          "min": [
+            -0.028035584837198257,
+            -3.725290298461914e-09,
+            -0.02803558111190796
+          ]
+        },
+        "NORMAL": {
+          "type": "VEC3",
+          "componentType": 5126,
+          "count": 29162
+        },
+        "TEXCOORD_0": {
+          "type": "VEC2",
+          "componentType": 5126,
+          "count": 29162
+        }
+      },
+      "licenseSource": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/ABeautifulGame/README.md",
+      "licenseSha256": "35b650cc930a9c86de184f28e973e5122e26a0c20b88175e7c362e1faf97596b"
+    }
+  },
+  {
+    "file": "beautiful-game-largest.drc",
+    "inputSha256": "3faa13c5daa20ce91cd11e485d7b3f816df7d50c66ef2573f3560aec3477f939",
+    "outputSha256": "89ba5147deed4b7da203b01116088909f4331cdd5ff8c83b3ce83c1e48b41a5b",
+    "source": {
+      "name": "KhronosGroup/glTF-Sample-Assets/Models/ABeautifulGame/glTF-Binary-KTX-ETC1S-Draco/ABeautifulGame.glb:4/0",
+      "sha256": "3faa13c5daa20ce91cd11e485d7b3f816df7d50c66ef2573f3560aec3477f939",
+      "bytes": 139154,
+      "source": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/ABeautifulGame/glTF-Binary-KTX-ETC1S-Draco/ABeautifulGame.glb",
+      "sourceSha256": "d950162d41e0064be9dfac0c09d80c7a23719a37af37f08cd79385b8af0af0c1",
+      "bufferView": 35,
+      "attributes": {
+        "POSITION": 0,
+        "NORMAL": 1,
+        "TEXCOORD_0": 2
+      },
+      "accessors": {
+        "POSITION": {
+          "type": "VEC3",
+          "componentType": 5126,
+          "count": 115634,
+          "max": [
+            0.3527080714702606,
+            0.01851509138941765,
+            0.3527080714702606
+          ],
+          "min": [
+            -0.3527080714702606,
+            -5.566945304735782e-08,
+            -0.3527080714702606
+          ]
+        },
+        "NORMAL": {
+          "type": "VEC3",
+          "componentType": 5126,
+          "count": 115634
+        },
+        "TEXCOORD_0": {
+          "type": "VEC2",
+          "componentType": 5126,
+          "count": 115634
+        }
+      },
+      "licenseSource": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/ABeautifulGame/README.md",
+      "licenseSha256": "35b650cc930a9c86de184f28e973e5122e26a0c20b88175e7c362e1faf97596b"
+    }
+  }
+]

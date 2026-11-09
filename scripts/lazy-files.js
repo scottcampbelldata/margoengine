@@ -210,6 +210,22 @@ export const LAZY_FILES = [
   // Draco and KTX2/Basis: a pool of classic workers, each loading the decoder it is asked for once.
   {
     package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/draco-native.worker.js',
+    label: 'draco-native.worker.js',
+    kind: 'Classic clean-room decode worker',
+    measure: 'file',
+    when: 'First decode on each worker, only from the optional @margoengine/decoders/draco-native entry',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/draco-native.wasm',
+    label: 'draco-native.wasm',
+    kind: 'Rust clean-room Draco decoder',
+    measure: 'file',
+    when: 'First mesh or point decode in each optional Draco worker; one module contains both flavors',
+  },
+  {
+    package: '@margoengine/decoders',
     file: 'packages/decoders/dist/decoder.worker.js',
     label: 'decoder.worker.js',
     kind: 'Worker',

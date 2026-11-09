@@ -1,0 +1,899 @@
+{
+  "scope": "Coordinator note 2: optional decoder only. Defaults and both prebuilts retained. No new feature or speed work.",
+  "priorCheckpoints": [
+    "32cb23ec6",
+    "98661d637",
+    "db66bb2ed"
+  ],
+  "sizes": {
+    "draco-native.js": {
+      "raw": 3471,
+      "gzip": 1164,
+      "sha256": "70397e794aff52ab6cac852403556f50e65127cbeb49f85c5e29f6771c86a409"
+    },
+    "draco-native.worker.js": {
+      "raw": 7517,
+      "gzip": 3060,
+      "sha256": "b84b2161de13138c94fca271737835cf58763c11038bf60bf5cb270aac98bb79"
+    },
+    "draco-native.wasm": {
+      "raw": 122685,
+      "gzip": 47360,
+      "sha256": "398c85b66ee4949c28f5bfb542794dd0141f367772432fde9999a142faa4043b"
+    }
+  },
+  "exactNative": {
+    "full": 3881,
+    "gltfAccepted": 1003,
+    "predictiveHeld": 2160
+  },
+  "openWarmLosses": {
+    "campaignInputs": 1937,
+    "fullDecode": 499,
+    "fullTotal": 365,
+    "gltfAccepted": 1003,
+    "gltfDecode": 365,
+    "gltfTotal": 288
+  },
+  "replacementGates": "Historical feature inventory, invalid UTF8 metadata equivalence, complete current cold/RSS/startup and warm parity remain open.",
+  "checks": {
+    "entryTests": "4/4 passed; frozen point records, normalized accessors, output budget, prefix recovery, memory stability and SSR",
+    "lint": "passed",
+    "landingGates": "BLOCKED before GPU test startup; nothing pushed.",
+    "verify": "Initial full run stopped after 217.6 s: new optional entry lacked its size-ratchet registration; completed chains passed. API and unit chains were interrupted by fail-fast. Register only this new budget, then resume quality/API/units.",
+    "sizeRegression": "Fails before registration, passes after; no default optional reference and native raw/gzip below smaller prebuilt target.",
+    "api": {
+      "entries": 888,
+      "exports": 8646
+    },
+    "fullUnitRun": {
+      "tests": 13540,
+      "pass": 13539,
+      "fail": 1,
+      "skips": 0,
+      "durationMs": 558501.9999,
+      "cause": "The new optional worker/Wasm were missing from LAZY_FILES. Both are now registered and entry sizes regenerated. Matching basic-scene GPU network record and focused sizes-page rerun remain pending."
+    },
+    "commands": {
+      "lint-final": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "lint"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 16937,
+        "logSha256": "d9497769c19ffbada0d441de0c5e42b3b245f4bb3bf892b74b90a4a8f34c057b"
+      },
+      "quality-corrected": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "quality"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 405,
+        "logSha256": "b986b0e74da3146f1cfdb6c5c1a8ed6473ad8b7c0b58e200f473142cbd2f6dfd"
+      },
+      "api-corrected": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "api:check"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 107,
+        "logSha256": "f068b673542452c0405634f6a0b9c0a61b85c45159b30cca5e7cd9d62a715391"
+      },
+      "size-regression-after": {
+        "command": "node",
+        "args": [
+          "--test",
+          "packages/decoders/tests/draco-native-entry.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 675,
+        "logSha256": "0ab99e9668d4cfcd948992dca00c0ebbd697babdb293e9c07a9c45984c0cc567"
+      },
+      "consumer-preflight": {
+        "command": "node",
+        "args": [
+          "test-results/batch-133/consumer-preflight.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 65,
+        "logSha256": "5159fb1fb9cd4ba8f14d934c7f2d737b654c86a783c2e3d47ba17a7454ed9ad5"
+      },
+      "entry-sizes": {
+        "command": "node",
+        "args": [
+          "examples/package-benchmarks/entry-sizes.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 18146,
+        "logSha256": "6a27e248f3e4d7fbda2afd77044e21732dfc0b3f30590d6fb5b8a1e62a51e644"
+      },
+      "hygiene": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "hygiene"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 15020,
+        "logSha256": "c02c3fd6ab8f866e427a29099a5286da0dd5d18e46484d7a446dfaf2b9bebca6"
+      },
+      "decoders-unit": {
+        "command": "node",
+        "args": [
+          "--test",
+          "packages/decoders/tests/*.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 21733,
+        "logSha256": "fc3cdb612a6d51bd0bf3246d96ff318646e36d683472785e7c2d4e0f1d453510"
+      },
+      "gltf-unit": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "test",
+          "--workspace",
+          "@margoengine/gltf"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 5590,
+        "logSha256": "a7bb34f7cb0cc19fbbece2cbb18c52924b5230729b51a1c7e7f7284ed3eb1a92"
+      },
+      "gltf-pro-unit": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "test",
+          "--workspace",
+          "@margoengine/gltf-pro"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 39885,
+        "logSha256": "582cc3aff9cc1f3a3297b53416209ff326508a863d88e6870869efe21a4ed597"
+      },
+      "gpu-acquisition": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--exclusive",
+          "--wait-max=20",
+          "--max=20",
+          "--",
+          "node",
+          "test-results/batch-133/resume9-gpu-bundle.mjs"
+        ],
+        "code": 2,
+        "timedOut": false,
+        "logBytes": 1371,
+        "logSha256": "a2dae2cf4ccdf3819c662de9e66887e7a2d7d93e53e35eb5c35d522ffb680ae1"
+      }
+    }
+  },
+  "sizeGate": {
+    "measuredMinGzip": 65504,
+    "registeredBudget": 67470,
+    "method": "Existing Vite library bundleBytes gzip measurement, including bundled asset URLs; separate asset raw/gzip sizes are above.",
+    "existingLimits": "unchanged"
+  },
+  "blocker": null,
+  "validationBase": "Landing validation and historical failures are recorded in landOnly; the earlier validation and blocked attempts remain historical.",
+  "historicalBlocker": {
+    "cause": "Exclusive GPU acquisition expired after its 20-minute wait, exit 2. No test started and no timeout assertion was changed.",
+    "holder": "preview-skip-repair",
+    "waiting": "codex-99",
+    "pending": [
+      "basic-scene network record at the size-measurement commit",
+      "tests/sizes-page.test.js after matching network record",
+      "decoder browser/production consumer",
+      "decoder Node glTF GPU",
+      "glTF GPU",
+      "glTF-pro materials GPU",
+      "README runtime decoders,margoengine"
+    ],
+    "retry": "No blind retry, lock bypass or passing GPU claim. Resume after GPU ownership changes."
+  },
+  "landOnly": {
+    "date": "2026-11-09T23:50:06.092Z",
+    "originalCommit": "64e375e2d3f6af1884cdd0108d05994c655b4174",
+    "validationHead": "4983505ec9a50ad2c8334691a5e6a964adaa10ec",
+    "validationMain": "a105c063f8a165d2564daab32bd81479ef5a3120",
+    "scope": "Landing plus necessary gate repairs only. No speed work, new decoder feature, default replacement, core/stage or physics source change.",
+    "results": {
+      "lint": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "lint"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 6.838,
+        "completed": "2026-11-09T23:24:11.254Z",
+        "logBytes": 16933,
+        "logSha256": "174476f0ae50c5f44dc8878b91f49798fc2f5a3ecc50e859754ee42fc2f2c317"
+      },
+      "hygiene": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "hygiene"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 12.846,
+        "completed": "2026-11-09T23:24:24.104Z",
+        "logBytes": 15020,
+        "logSha256": "a0ff3442ddd5968c6dce0a760fa81808f188877ff2a190839361440a61d9c575"
+      },
+      "verify": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "verify"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "seconds": 87.332,
+        "completed": "2026-11-09T23:25:51.440Z",
+        "logBytes": 6812,
+        "logSha256": "31979aa7e64408731219c27d9039f4a998051542dbd93e05e11d7ae75f3be3b2"
+      },
+      "decoders-unit": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=300000",
+          "packages/decoders/tests/*.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 29.481,
+        "completed": "2026-11-09T23:29:45.941Z",
+        "logBytes": 21760,
+        "logSha256": "b8caad662e3424a33f3d53a7f2741e8fac33c7a4f97163f1c35c8bb835d47440"
+      },
+      "gltf-unit": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "test",
+          "--workspace",
+          "@margoengine/gltf"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 2.589,
+        "completed": "2026-11-09T23:29:48.535Z",
+        "logBytes": 5597,
+        "logSha256": "b35239772e83bea849a803db738753cb7303cc1af27aa6a75da2be717b9db87b"
+      },
+      "gltf-pro-unit": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "test",
+          "--workspace",
+          "@margoengine/gltf-pro"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 10.388,
+        "completed": "2026-11-09T23:29:58.926Z",
+        "logBytes": 40477,
+        "logSha256": "fcce51ab96e8e4f6df56d99d93279ec16b602e0f3024a6ed3c6659102933c377"
+      },
+      "syntax-before": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=20000",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "logBytes": 1820,
+        "logSha256": "051d2c67daa123502b09eb0db37e276b57d9fa69ac1aa89ea96aa1e431fbcdb2"
+      },
+      "syntax-after": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=20000",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 760,
+        "logSha256": "c5b95d93df021cbee0fa19c68903b64c772271a7d432a9aad0c413cbeb46ddcd"
+      },
+      "assets-before": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=20000",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "logBytes": 2963,
+        "logSha256": "2d4d6a5a1ba56eb6c4260255c158c8bb2c508ab23c747df06de12202108669d1"
+      },
+      "fixtures-after": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=20000",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 1462,
+        "logSha256": "cfa76f7c7a11e04826417acf98f8baa7dbbc0c3f3baaf9c0bbf54807d3cd9c5d"
+      },
+      "gpu-decoders-initial": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--wait-max=60",
+          "--max=5",
+          "--",
+          "node",
+          "packages/decoders/scripts/test-browser.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "seconds": 44.218,
+        "completed": "2026-11-09T23:30:00.614Z",
+        "logBytes": 771,
+        "logSha256": "622bb28cf0d6f233561c1a1fd6f3c161343d776d480340f148003a7c12cead71"
+      },
+      "gpu-decoders-input-failure": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--wait-max=60",
+          "--max=5",
+          "--",
+          "node",
+          "packages/decoders/scripts/test-browser.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "seconds": 8.558,
+        "completed": "2026-11-09T23:32:17.878Z",
+        "logBytes": 446,
+        "logSha256": "875fa2196db4dafe0584ecc3444fc22f0e715c6894e2bd8c995a443c818c61e6"
+      },
+      "gpu-decoders-contract-failure": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--wait-max=60",
+          "--max=5",
+          "--",
+          "node",
+          "packages/decoders/scripts/test-browser.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "seconds": 6.47,
+        "completed": "2026-11-09T23:35:57.221Z",
+        "logBytes": 424,
+        "logSha256": "c25cdbac056644cf0876f244a0cb61f27eb8b6acb05dd0698e175b4fb6c45255"
+      },
+      "gpu-decoders": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--wait-max=60",
+          "--max=5",
+          "--",
+          "node",
+          "packages/decoders/scripts/test-browser.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.434,
+        "completed": "2026-11-09T23:37:32.420Z",
+        "logBytes": 5444,
+        "logSha256": "c3cdfb31d0d7cf0c0d9580bddc1f0f8143b52fef238a2e4c60a7f8f22b48fb0f"
+      },
+      "gpu-node-gltf": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=2",
+          "--",
+          "node",
+          "packages/decoders/scripts/test-node-gltf.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 5.82,
+        "completed": "2026-11-09T23:38:55.676Z",
+        "logBytes": 295,
+        "logSha256": "631bd1e03daf66ce3a869ba950aeb27f00e4bf7f4ae441f7655b5b2136898de5"
+      },
+      "gpu-gltf": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=1",
+          "--",
+          "node",
+          "scripts/test-gltf-browser.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 4.677,
+        "completed": "2026-11-09T23:39:00.356Z",
+        "logBytes": 744,
+        "logSha256": "f96035c4fbf20290d1f98e19fd9418aad8960191beaa851cc6e024ec1709c8c0"
+      },
+      "gpu-gltf-pro": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=3",
+          "--",
+          "node",
+          "scripts/gltf-pro-materials-gpu-check.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 9.597,
+        "completed": "2026-11-09T23:39:09.958Z",
+        "logBytes": 3894,
+        "logSha256": "c845cd941abdeb4546c10b78c7b8bc579e3c471c907d6087309114628d59f3dc"
+      },
+      "readmes": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=3",
+          "--",
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=decoders,margoengine"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 23.281,
+        "completed": "2026-11-09T23:39:33.241Z",
+        "logBytes": 191,
+        "logSha256": "268b40bb0c8ad520e77d9930eb37a676271a7c499e11ea4c18baf74a2c44ff68"
+      },
+      "readmes-final": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=1",
+          "--",
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=decoders,margoengine"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 27.206,
+        "completed": "2026-11-09T23:43:00.164Z",
+        "logBytes": 565,
+        "logSha256": "3b2e6e1a6a2d8d49e520ad568e37beda993860335cf8fe91730a78849ea7dca4"
+      },
+      "lazy-groups-before": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=30000",
+          "--test-name-pattern=lazy file package groups",
+          "tests/sizes-page.test.js"
+        ],
+        "code": 1,
+        "timedOut": false,
+        "logBytes": 1022,
+        "logSha256": "5041d5f3c38129068dc5c243a56a7b62df606717eb8b0684e3ea769420b3e720"
+      },
+      "lazy-groups-corrected": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=30000",
+          "tests/sizes-page.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 984,
+        "logSha256": "da975204e28d94cabd86095e4a72103d9d2b78516470f4f1c51a44ce0c1523ae"
+      },
+      "final-viewcube-and-browser-source": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=60000",
+          "packages/viewcube/test/viewcube.test.js",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 3429,
+        "logSha256": "a7be0a814f14a9b377ef23ca66e82541f0ab92f1d9455c2644ca14551c46dc3e"
+      },
+      "build": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "build:packages"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 26.6,
+        "completed": "2026-11-09T23:45:25.010Z",
+        "logBytes": 3393,
+        "logSha256": "714375b99138bb8d437597fa590aa41cbb36d60c71455854f867314f2236e68b"
+      },
+      "entries": {
+        "command": "node",
+        "args": [
+          "examples/package-benchmarks/entry-sizes.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 46.922,
+        "completed": "2026-11-09T23:46:11.935Z",
+        "logBytes": 18472,
+        "logSha256": "c09a1f5e77324c1f53a4a501a757fe23e17831cbbd4bede52b28be0aaf4f3956"
+      },
+      "network": {
+        "command": "node",
+        "args": [
+          "scripts/basic-scene-network.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 20.146,
+        "completed": "2026-11-09T23:46:32.084Z",
+        "logBytes": 2135,
+        "logSha256": "78483ecea8d741aa4f8f934554a624678ff62798538c1b9de6235441fc7c3050"
+      },
+      "api-update": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "api:update"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 8.218,
+        "completed": "2026-11-09T23:46:40.304Z",
+        "logBytes": 151,
+        "logSha256": "77b10b4d1445e717e435374cbfdfa768460eda863b7bf1d99080147997ca7262"
+      },
+      "llms": {
+        "command": "node",
+        "args": [
+          "scripts/build-llms.mjs"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 0.628,
+        "completed": "2026-11-09T23:46:40.934Z",
+        "logBytes": 71,
+        "logSha256": "22ed4d3a37e85cbc1157a8dfb7d514d509b6563cf6315f24be68a0042a2d5cd4"
+      },
+      "latest-core-viewcube": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=60000",
+          "packages/core/tests/unit-light.test.js",
+          "packages/viewcube/test/viewcube.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 2370,
+        "logSha256": "b347b0fce03150b9a5ba08b388b2e2f741836a62a6cc6a0c5566aac96a6f990c"
+      },
+      "latest-gltf-pro-unit": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "test",
+          "--workspace",
+          "@margoengine/gltf-pro"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 40430,
+        "logSha256": "093a18b1a3c4f3c9e706c00057e1e9ad2129b402fc5367017ba31cae5dbba8b8"
+      },
+      "latest-quality-sizes": {
+        "command": "node",
+        "args": [
+          "scripts/quality-gate.mjs",
+          "--gate=sizes"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 67,
+        "logSha256": "e0ba2e6b122a84a7b37e2ce5b4057eea7d1ce376577a93e4f5cae8d64b77044e"
+      },
+      "latest-docs": {
+        "command": "node",
+        "args": [
+          "--test",
+          "--test-timeout=120000",
+          "tests/llms.test.js",
+          "tests/claims-file.test.js",
+          "tests/no-private-paths.test.js",
+          "tests/sizes-page.test.js",
+          "tests/umbrella-readme-size.test.js",
+          "packages/decoders/tests/browser-source.test.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 5505,
+        "logSha256": "85e946fd7670de5e56ee39062a79a30c46219baf065bafadbeb25d1dc8207a42"
+      },
+      "latest-proofs": {
+        "command": "cmd.exe",
+        "args": [
+          "/d",
+          "/c",
+          "npm",
+          "run",
+          "proofs",
+          "--",
+          "--current"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "logBytes": 2199,
+        "logSha256": "2394eedaec7c0ebeda98b61df86ad4825a82ece028bf2e277aa00c97f8d086d6"
+      },
+      "gpu-gltf-pro-latest": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=1",
+          "--",
+          "node",
+          "scripts/gltf-pro-materials-gpu-check.js"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 140.494,
+        "completed": "2026-11-09T23:48:44.873Z",
+        "logBytes": 4687,
+        "logSha256": "67ef6be2feb8f9b974caa93f034dbd874dc338ac016ae894aa60aead46caf460"
+      },
+      "readmes-latest": {
+        "command": "node",
+        "args": [
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-133",
+          "--gpu=Native WebGPU model rendering and texture readback",
+          "--wait-max=60",
+          "--max=1",
+          "--",
+          "node",
+          "scripts/run-readme-examples.mjs",
+          "--packages=decoders,margoengine"
+        ],
+        "code": 0,
+        "timedOut": false,
+        "seconds": 47.966,
+        "completed": "2026-11-09T23:49:32.842Z",
+        "logBytes": 981,
+        "logSha256": "e56789d36fb9a7dcabdd9b98212d3ee93ae835b225c53ae0c7b5320fcd0a6b7f"
+      }
+    },
+    "resumedChains": {
+      "reason": "Single full verify stopped at upstream missing animator receipt; failed and interrupted chains resumed after main fix. The three completed parallel stages are retained.",
+      "results": [
+        {
+          "name": "land-resume-6-0",
+          "command": "npm run docs:links",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 1.556
+        },
+        {
+          "name": "land-resume-3-0",
+          "command": "npm run build --workspace examples/gameplay-sandbox",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 2.182
+        },
+        {
+          "name": "land-resume-4-0",
+          "command": "npm run build --workspace examples/voxel-sandbox",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 2.244
+        },
+        {
+          "name": "land-resume-3-1",
+          "command": "npm run test --workspace examples/gameplay-sandbox",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 4.283
+        },
+        {
+          "name": "land-resume-7-0",
+          "command": "npm run check:readmes",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 6.676
+        },
+        {
+          "name": "land-resume-2-0",
+          "command": "npm run check:preview-contract",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 8.484
+        },
+        {
+          "name": "land-resume-8-0",
+          "command": "npm run proofs -- --current",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 18.334
+        },
+        {
+          "name": "land-resume-0-0",
+          "command": "npm run api:check",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 29.351
+        },
+        {
+          "name": "land-resume-4-1",
+          "command": "npm run test --workspace examples/voxel-sandbox",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 40.984
+        },
+        {
+          "name": "land-resume-1-0",
+          "command": "npm run quality",
+          "code": 0,
+          "timedOut": false,
+          "seconds": 49.922
+        },
+        {
+          "name": "land-resume-5-0",
+          "command": "node --experimental-test-module-mocks --test --test-concurrency=8 --test-timeout=300000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js",
+          "code": 1,
+          "timedOut": false,
+          "seconds": 291.813
+        }
+      ]
+    },
+    "fullUnitResult": {
+      "tests": 14140,
+      "passed": 14136,
+      "failed": 4,
+      "skipped": 0,
+      "failures": [
+        "Three viewcube stand-in sceneOf failures fixed upstream by d15e46fd2; current-base focused tests pass.",
+        "Lazy file table row order fixed by grouping both new decoder records; all nine size-page tests pass."
+      ]
+    },
+    "policy": {
+      "gpu": "One shared slot per lane; real GPU leaves only; wait-max=60; no exclusive acquisition.",
+      "speed": "deferred"
+    },
+    "gateRepairs": [
+      "Distinct nativeDraco browser lexical binding with before/after parser regression.",
+      "Fixture-root URLs preserve nested and existing top-level fixture inputs; before/after asset-source regression.",
+      "Contiguous decoder lazy asset records with before/after registration regression."
+    ],
+    "remaining": "Warm losses, full feature/default replacement and removal jobs stay open. Core one-pass lane-K evidence is deferred in speed-phase.md.",
+    "previousValidation": {
+      "head": "9a8a10220eec59110099d7d25c543d7b79e5fa6e",
+      "main": "d5fa888479bc3abd07c7d7b7b255db68b41509ac"
+    },
+    "finalState": {
+      "outcome": "All required gates accounted for: one full verify attempt, interrupted chains resumed, recorded failures repaired with regression tests and focused passing checks; no second full verify.",
+      "measuredCommit": "4983505ec",
+      "packagesDirty": false,
+      "coreStageGzip": 23950,
+      "nativeWasmSha256": "398c85b66ee4949c28f5bfb542794dd0141f367772432fde9999a142faa4043b",
+      "latestFocusedTests": 55,
+      "latestCoreViewcubeTests": 22,
+      "gltfProTests": 403,
+      "readmeExamples": 21,
+      "proofs": 20,
+      "remainingBlockers": [],
+      "inheritedMainRepair": "da12bd07e normalizes light uniforms; this lane changes no core/stage source."
+    }
+  }
+}

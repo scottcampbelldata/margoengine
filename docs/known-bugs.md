@@ -1,5 +1,29 @@
 # Known bugs and unverified features
 
+### Fixed: batch 133 lazy asset package grouping
+
+The new decoder records were separated from its existing records, so grouping
+the table changed row enumeration relative to the catalog. Both native records
+now sit with the decoder group. The new contiguous-group regression and the
+unchanged exact table identity assertion fail before repair and pass afterward;
+all nine size-page tests pass. No asset, measured byte or existing assertion is
+removed. Research is recorded in clean-room.md.
+
+### Fixed: batch 133 browser fixture duplicate declaration
+
+The optional Draco fixture reused the HDR fixture's native lexical binding in
+runDecoderTests, preventing module parsing. A Draco-only binding rename fixes
+it. browser-source.test.js fails before and passes after, parsing every non-test
+fixture/support module through Node --check. The real GPU gate retains its
+unchanged assertions and deadlines. Research is recorded in clean-room.md.
+
+The subsequent empty-input failure came from Vite's dynamic URL table omitting
+nested fixture directories, producing tests/undefined (404), not from the Wasm
+allocator. An explicit fixture-root URL fixes all new and existing callers. The same CPU regression
+rejects dynamic asset paths before browser execution; it fails before repair
+and passes after. No decoder, worker, or allocation implementation changed.
+
+
 ### Fixed: normalized fixed-step streamlines stalled near critical points
 
 fields.ts now refines normalized RK4 by step doubling and stage/endpoint direction checks before publishing
@@ -757,7 +781,7 @@ family for exact cache/hash failure checks and a full Node GPU integration proof
 this is one exception closure, leaving 48 overall. See
 whitepaper/results/readme-node-basis-20261109.json.
 
-### Open: batch 133 clean-room Draco replacement is not implemented
+### Open: batch 133 default replacement remains incomplete
 
 This is a replacement prerequisite, not a newly observed failure of the shipped decoder.
 Reproduce the source gap by following the published specification's connectivity
@@ -770,6 +794,29 @@ experiments to infer the missing rules, with each rule and experiment recorded i
 the source ledger and private plan. No implementation source may be read or used.
 The remedy is the full Rust/Wasm decoder followed by all comparison and quality
 gates. The existing prebuilt files remain and batch 133 stays open.
+
+### Fixed 2026-11-09: batch 133 prediction-degree seed coverage
+
+Unshipped crate only. The traversal incorrectly shared depth-first's early
+visited-face check. The specification's prediction-degree entry visits all three
+seed vertices before checking the face. A capped fan could therefore leave a
+vertex unmapped and reject an accepted stream. Removing that early return fixes
+the cause. The retained 247 predictor cases include the 12 historical/current
+failures, and 42 raw canaries independently cover fan sizes and disconnected
+components. Native and Wasm regressions pass without changing expected output.
+
+### Fixed 2026-11-09: batch 133 metadata length and retention
+
+Unshipped crate only. The specification prints a UI8 metadata value length,
+whereas crafted black-box canaries establish varUI32. The prototype misread long
+values, discarded all metadata and imposed a recursive 64-level ceiling. It now
+retains file/attribute roots, keys, binary values and child references in a flat
+arena, with iterative parsing and destruction. The 1,024-byte regression fails
+before repair; 41 exact native/Wasm cases include 32,769-byte values and depth
+129. Public name conversion remains part of the uncompleted integration gate.
+`packages/decoders/tests/draco-native.test.js` runs these and the traversal,
+prediction, KD and memory regressions through `verify` and `check:merge`, with
+hard process-tree limits and no skip when Cargo is unavailable.
 
 ### Open: batch 134 Basis replacement remains unverified
 
@@ -811,6 +858,35 @@ files use real FlightHelmet image content; the HDR cube uses an analytic light
 field. The historical baseline is retained, and its timings are not transplanted
 onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
 
+
+### Fixed 2026-11-09: batch 133 crafted capped-fan point mapping
+
+Unshipped development crate only. The retained 548-case connectivity fixture
+exposed 31 capped-fan point/index mismatches. A non-triangular interior cap can
+make an opposite walk leave a vertex's fan. The old boundary update then moved
+that vertex's representative onto another vertex, changing seam deduplication.
+Boundary representatives now stay on their own vertex; corners not visited by
+deduplication keep the oracle's initial point zero. Closed walks retain their
+original representative as the published algorithm requires. All 548 retained
+cases and 182 newly accepted held-out caps match exact native/Wasm point counts
+and ordered indices. No expected result or assertion was weakened. Reproduce
+with `cargo test --offline --locked --manifest-path
+packages/decoders/native/draco/Cargo.toml --lib` and the 730-case Wasm topology
+check. Probe/output hashes are in
+[the inference checkpoint](whitepaper/results/batch-133-inference-checkpoint.json).
+
+### Fixed 2026-11-09: batch 133 prototype peak allocation lifetime
+
+Unshipped development crate only. Prediction retained connectivity, mappings and
+portable parent positions while allocating final attribute arrays and point
+ordering. On the original corpus its Wasm linear memory grew to 23,789,568 bytes,
+exceeding the prebuilt's 20,185,088-byte target. Releasing those owners immediately
+after reconstruction lowers the same corpus peak to 18,874,368 bytes, with all
+454 native/float payloads exact. `packages/decoders/native/draco/tests/wasm-memory.mjs`
+checks two pinned ABeautifulGame streams, full oracle-derived output hashes and
+three decode/free rounds against the unchanged ceiling. It fails on the saved
+pre-fix build at 23,789,568 bytes and passes on the repaired build. Process RSS,
+other performance targets and exhaustive feature coverage remain separate gates.
 
 ### Fixed 2026-11-09: batch 76 transition review
 
@@ -3798,3 +3874,58 @@ synchronously before the next coordinate query. The full original browser
 assertions pass afterward. No ViewCube or Controls runtime bytes changed.
 Receipts: test-results/batch-273-clamp-resume-units.log,
 batch-273-clamp-viewcube-{diagnose,owner-after,compat,compat-after}.log.
+### Historical: batch 133 GPU startup contention (resolved on main)
+
+Bounded decoder/glTF/glTF-pro and README wrapper attempts on 2026-11-09 did not
+run their tests: shared acquisition reached its four-minute wait limit behind
+other sessions' exclusive work; glTF and README also reported Windows EPERM
+creating the shared GPU mutex. The latter occurs before ownership/test startup,
+not in Draco. The current main retirement fix is already present. A remaining
+mixed-client or parent-directory deletion race is suspected but not yet proven;
+retain the exact logs in the maintainer's batch 133 gate evidence and reproduce
+with concurrent main-checkout lock clients before changing the owning script.
+No retries, bypasses, skipped gates or passing GPU claims were used.
+
+### Fixed by batch 160: batch 133 verify browser pipe teardown
+
+The final verify at checkpoint 89793c614 runs 13,477 tests: 13,476 pass, none
+are skipped, and tests/page-ready.test.js fails its real-browser readiness
+regression during teardown. All page assertions pass, but browser.close exceeds
+the unchanged 30,000 ms shutdown budget. The failure is localized to the owned
+Chromium teardown in scripts/lib/browser.mjs withBoundedClose, under the outer
+closeAll in scripts/browser.js; process termination, child exit, server.kill and
+driver close share that budget. Which inner phase stalled is not yet isolated.
+The already-landed retirement/owned-server fixes are present on current main.
+No matching lane-owned browser was found alive afterward. The coordinator assigns
+the pipe-lifecycle root repair to batch 160, not this lane. Commit 6ebbd1aa4
+closes owned Chromium pipes before driver cleanup. After rebasing onto that
+repair, this lane reran tests/page-ready.test.js: all four tests pass, including
+real-browser teardown, in 9.03 seconds at the unchanged budget. The page is plain
+HTML and needs no GPU; an unnecessary GPU-lock wrapper first expired in its
+queue before test startup. Its failure is retained separately. No competing
+teardown fix or busy-machine exemption was applied in this lane.
+
+### Open: batch 133 optional decoder replacement gaps
+
+The optional clean-room decoder retains the warm losses measured in
+whitepaper/results/batch-133-paired-checkpoint.json: full 365 and glTF 288 total
+losses on the 1,937/1,003 accepted-input sets. Profiling Margo's own named Wasm
+localizes remaining cost to mapping, reconstruction and traversal; the proven
+mapping work reduction did not establish overall speed parity. Reproduce with
+the pinned paired manifest and private batch 133 driver. Cold/RSS/startup coverage
+is partial. Historical predictor 3 and full historical KD/type/transform coverage,
+and invalid UTF8 public metadata conversion are not established; the published
+spec omits rules and no new inference is authorized in this landing run. Both
+prebuilts stay default while these gaps remain; no replacement pass is claimed.
+
+### Historical: batch 133 optional landing GPU acquisition (resume 9)
+
+The 20-minute exclusive request by codex-133 expired before starting a test,
+while preview-skip-repair held the GPU. No hang, decoder fault, timing exemption
+or GPU pass is inferred. CPU gates pass except the sizes-page catalog check:
+its missing optional worker/Wasm registrations are repaired and entry sizes
+regenerated, but the required matching basic-scene network record and focused
+rerun need the GPU. Decoder/glTF/glTF-pro GPU and README runtime gates remain
+unrun. Reproduce/resume with the bounded resume9 GPU bundle after ownership
+changes; no lock bypass or blind retry was used. Nothing was pushed. The command
+results and log hashes are in whitepaper/results/batch-133-landing.json.

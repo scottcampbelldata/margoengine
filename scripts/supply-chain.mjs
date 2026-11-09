@@ -151,6 +151,10 @@ const ASSETS = [
     'Own envelope measurements from the real Ville de Montreal two-building CityJSON tutorial sample: https://www.cityjson.org/tutorials/files/twobuildings.city.json, SHA-256 a713f41252f1a1430698160f697123e70db81476a83b5ec1921c61cc6a9bd51c. CC-BY-4.0 (Quebec); licence and provenance links in the fixture. The byte-identical 48488-byte standard tutorial sample and our numeric measurements are committed as test-only fixtures, never shipped in npm. No implementation or image redistributed.',
   ],
   [
+    'packages/decoders/native/draco/tests/fixtures/NOTICE.md',
+    'unshipped batch-133 development fixtures: 305 Draco connectivity extracts, seven full Google standard Draco inputs and two ABeautifulGame compressed bufferViews from pinned Khronos glTF-Sample-Assets, independent Cesium standard glTF assets and Google Draco standard test data, plus Margo-made syntax/seam specimens, 2160 predictive EdgeBreaker cases and public-API oracle output. Per-file source/grant URLs and SHA-256 in docs/whitepaper/results/batch-133-corpus-manifest.json. CC0, CC-BY-4.0, Apache-2.0 and named per-model grants in the notice; BrainStem and VirtualCity retain restricted/test-only grants and are not generally redistributable models. Never runtime assets; no codec implementation copied or read',
+  ],
+  [
     'packages/procedural/test/fixtures/textures/structural-reference.json',
     'Our numerical joint-centre measurements from Lefebvre and Poulin, Analysis and Synthesis of Structural Textures, Graphics Interface 2000, Fig.1(d), https://graphicsinterface.org/wp-content/uploads/gi2000-12.pdf. Source PDF SHA-256, method and uncertainty in the fixture. Original paper/JPEG remain outside shipped files; no image or implementation redistributed. Factual measurements only, with author/title attribution.',
   ],

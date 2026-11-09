@@ -1,0 +1,437 @@
+{
+  "edge": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-probes.json",
+      "sha256": "d1f98b76627381f930c82fee0623ce0ff7f2b1e9cebcf2d499658aabae8cbc90",
+      "bytes": 7184
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-results.json",
+      "sha256": "b6fc0d4bd218d7d5d6a4268c836597168f167c0c17f866eb7b116ab0d643365f",
+      "bytes": 10530
+    }
+  },
+  "edge-held": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-held-probes.json",
+      "sha256": "8c0a9c3d3570ff40b0ecb2992a1a8266c86b619d51808381a3e369aff6e5f641",
+      "bytes": 5908
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-held-results.json",
+      "sha256": "cd87c16eaaf150f8038a6330e642749908481066440f65f9f6a986a6f672ce37",
+      "bytes": 4402
+    }
+  },
+  "edge-compaction": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-compaction-probes.json",
+      "sha256": "45640053249b6c7aa5bed67ef6c9efd77777923a7f418377bd15b04962965358",
+      "bytes": 1348
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-compaction-results.json",
+      "sha256": "9895f5621ec37c3db87b3ec6f568d04fcf810d792c6bfee6f8cfbde1543d63aa",
+      "bytes": 3560
+    }
+  },
+  "edge-attribute": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-attribute-probes.json",
+      "sha256": "53bb94eaa74fcc794333cd62890061b100346dede673338ecfee52e24a268719",
+      "bytes": 5804
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-attribute-results.json",
+      "sha256": "1b37af67501c31bb811054bcdad217dbff76d4bab10997695c0b703db5bea982",
+      "bytes": 11216
+    }
+  },
+  "parallelogram": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/parallelogram-probes.json",
+      "sha256": "b588ad651962e1ff4243cbb57eea6086102b103344285e4ab1f97f1c64a20a26",
+      "bytes": 1824
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/parallelogram-results.json",
+      "sha256": "a0133f2fdf7407c1b90d3df2c98d82b865ef223ca00d8450fa10098dbc7c166c",
+      "bytes": 6482
+    }
+  },
+  "edge-boundary-held": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-boundary-held-probes.json",
+      "sha256": "8f9650abcf596d7a5eefc2384234a4e46836c29e7a6fdaa88404b7837e6e327d",
+      "bytes": 2954
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/edge-boundary-held-results.json",
+      "sha256": "46a371ea0f56f1b22a6e1177253927f0bd0ca11f0395373e4d757229d299c378",
+      "bytes": 6837
+    }
+  },
+  "connectivity": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/connectivity-probes.json",
+      "sha256": "862aa5c8ba7464a1f374f89f633e685f8eb6f2091ac74d680cfb7ac41f11c03d",
+      "bytes": 924833
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/connectivity-results.json",
+      "sha256": "4a6ae9eeb64ba337a5ddd1d9c7b3b1edac0eabb2357d2558dcfa824155c1647a",
+      "bytes": 28795914
+    }
+  },
+  "constrained": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/constrained-probes.json",
+      "sha256": "1c0fdf882a78a8ae8e423d6beb98cc3d335057b850045218765d60c3e287dbb6",
+      "bytes": 27831
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/constrained-results.json",
+      "sha256": "8c138457ff2ccb21ec9f7ad1195baf70f894839fcc4a97c75b80dbd0142ce902",
+      "bytes": 80556
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "portable": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/portable-probes.json",
+      "sha256": "36ae73cb6bc9d74410d1569e6e0a2ec9caaa4db4c71fac60cfda96b83a2558a7",
+      "bytes": 89300
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/portable-results.json",
+      "sha256": "9f7188e97e344d6ddf680b12ace31e8798c639ddf4d5d1228429873103247c15",
+      "bytes": 103284
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "uv-arithmetic": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/uv-arithmetic-probes.json",
+      "sha256": "1b3dc6f2e84f4fff4774bd92b74517b04da4c60fb6d75af10ef7a6268ec5607a",
+      "bytes": 6558
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/uv-arithmetic-results.json",
+      "sha256": "87abbafd943fc10ca13b63dbd1657f75e4eb2e07b10143fb1ecb5c03e9c63597",
+      "bytes": 22430
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-probes.json",
+      "sha256": "87a03ebaffe2b12ce08a3f12344c32a405a27228932d270737b806fe8ebdb4c2",
+      "bytes": 47292
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-results.json",
+      "sha256": "36850ca1358abf4c82f8bebe1894e4a1388e2ef85937e3aada72bb963e57f424",
+      "bytes": 51986
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version-entropy": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-entropy-probes.json",
+      "sha256": "b10a5310851f179eb8c4f751974f44d019e8067a28c8e1470fdd5384336f63f3",
+      "bytes": 19296
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-entropy-results.json",
+      "sha256": "29e553457aa8fce4baf2498779f16c449eaaba86570887db32fc103fa538d876",
+      "bytes": 24869
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version-edge": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-edge-probes.json",
+      "sha256": "4dd0d547cc5f0d1a4e3c4f409c91d95d28c880628cb65958794e1c31d309e6ac",
+      "bytes": 105780
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-edge-results.json",
+      "sha256": "f563736137cbb88d7650ce2ef7f430c44ead548d17ce24e50e54e16f4f089561",
+      "bytes": 94564
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version-edge-fields": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-edge-fields-probes.json",
+      "sha256": "219448209ae3328a36a48fa8982231958651511cb8afd6d5516fbc2500c86b63",
+      "bytes": 584388
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-edge-fields-results.json",
+      "sha256": "3c98e6618d05e67bdb26cdf4706017279ea866b9936302ccf6798c04cebc6235",
+      "bytes": 2194369
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version-normal": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-normal-probes.json",
+      "sha256": "b8f944b27256acd4403facd18f66f2bae0b8c658bd76958771b64dd8e1ef3d66",
+      "bytes": 13272
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-normal-results.json",
+      "sha256": "0c0421d25a0f30d47430bb41e7c98bda49408cf781cf90e4b3f868bf3ea1d894",
+      "bytes": 22340
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "version-seam": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-seam-probes.json",
+      "sha256": "e0e1d7c6c154e95219c28ea599bebbc40e7fa93e762183a7f5cb7c0dd5e7b913",
+      "bytes": 26996
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/version-seam-results.json",
+      "sha256": "b6c7f12141febc259ba524af6e8a0c4450486c6f429bea0c0cd01bd74db06330",
+      "bytes": 38835
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "legacy-normal-grid": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/legacy-normal-grid-probes.json",
+      "sha256": "0241e0a1310bf572ff31417c9642699efdad9d67a585a95f8a8658da256b857b",
+      "bytes": 20823
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/legacy-normal-grid-results.json",
+      "sha256": "fa6bc5bfca2500c9a1944f59dc2c224108eb957584a4986f68be3bc8c6d7b490",
+      "bytes": 136484
+    },
+    "scope": "Black-box observations; acceptance alone does not establish valid framing or manifold connectivity. Preserve canaries and descriptors."
+  },
+  "cap-held": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/cap-held-probes.json",
+      "bytes": 68975,
+      "sha256": "cb62d172ba7bd67a034e2462bbe572a85f2d6e696a7556ab211b742c92787ee7"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/cap-held-results.json",
+      "bytes": 94974,
+      "sha256": "ce50473e0abbff7432926386a7c2167da9e5404ff8dd9e164ccd1d8172e63624"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-frame": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-frame-probes.json",
+      "bytes": 353664,
+      "sha256": "235c14f7668a2afa7b4f45df24fa3153322dde76f95b4f6de81dddc3a6e3c935"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-frame-results.json",
+      "bytes": 79352,
+      "sha256": "9a6f210f304e4c101faa98eb3590c0db944a64e4567fa30536760dff16713fd9"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-buffers": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-buffers-probes.json",
+      "bytes": 5796630,
+      "sha256": "36ced18ba58b378f7381d03c85d7d0f80c41f2cec8afc37bc7d440a5583d4344"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-buffers-results.json",
+      "bytes": 61076,
+      "sha256": "469de6ead72ab9b5021156ae4ee7790b930895edaa7dede489efad8923a9810d"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-bitorder": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-bitorder-probes.json",
+      "bytes": 937916,
+      "sha256": "b6aebbfbcaa4a3ade212d35aa9d3215fa3851443bcfa56ddb5a45bacde66fad3"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-bitorder-results.json",
+      "bytes": 82746,
+      "sha256": "5c9576c11099f7dd490f060fc5f9209188075d560105d9a940aa20e217ca65a7"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-axis": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-axis-probes.json",
+      "bytes": 50225124,
+      "sha256": "101ec56e06ee7e48df51b3f15b1f1ca32d3764e9890c96d8e69f3b6045a87ce8"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-axis-results.json",
+      "bytes": 1298780,
+      "sha256": "9bc546f69a0eff3887b912fa5229c450b47c95f05daf44b9a4253c3dbb6f9d94"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-types": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-types-probes.json",
+      "bytes": 328982,
+      "sha256": "cb9ba56d7ab174acb053c268cba15b5df608239d9cf20c0915d8a4ab75cb2d63"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-types-results.json",
+      "bytes": 15358,
+      "sha256": "5e48e6ade03e759b654c58b1b65815bac20d4935cdac8732c19c1287d5951475"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-transform": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-transform-probes.json",
+      "bytes": 66957,
+      "sha256": "b29eecff126b3b970f76d35b61eaf46286303584e70c54e13111b87bda6c9095"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-transform-results.json",
+      "bytes": 3839,
+      "sha256": "a04578d447d1881d507e6559793caf7b04b5989b05b6fddf6211bc91a03ffecd"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "kd-regression": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-regression-probes.json",
+      "bytes": 49681580,
+      "sha256": "a55a0f572f637b22ee758612b96f74eded48f2600bf7c9c56d230bbcbfe0ee68"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/kd-regression-results.json",
+      "bytes": 3663359,
+      "sha256": "94b8b4cf9bd4155f4b614c5daa4ee829f048724be488ebc235f8907d141384e3"
+    },
+    "scope": "Crafted black-box public API observations. No codec implementation or wrapper source accessed."
+  },
+  "multi": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-probes.json",
+      "bytes": 53021,
+      "sha256": "efaa9a77cab784535c82cb711428ad16af046f3a6747af0d9e03b8d345bb3595"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-results.json",
+      "bytes": 244098,
+      "sha256": "626dd95f997a8942a525dfaeac0be5b0d9fb369ae3d16730f3e86ee2555aa63a"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "multi-debug": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-debug-probes.json",
+      "bytes": 4452,
+      "sha256": "56e3c694eae0814738f5204c4e177428938dda28adcff4fc61d7e3ae3d6a48fe"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-debug-results.json",
+      "bytes": 12868,
+      "sha256": "37898bf9f7f4322355d3f2419946b826f059169c7cb2c44176d89db9dc58139b"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "multi-control": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-control-probes.json",
+      "bytes": 3011,
+      "sha256": "5b55f805999f5cf4e2f93a43dba4753ecab517ca1af73edf62f5bf788327d761"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-control-results.json",
+      "bytes": 12528,
+      "sha256": "cedba8385f49c12df1239b5d0ba18f3a3de765230c68605610fa48f4e7a75838"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "multi-held": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-held-probes.json",
+      "bytes": 119910,
+      "sha256": "f2db9fadca67ed3548cbb7edfa93e5361dc64c77fb54ee31b4c703b823be2c82"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/multi-held-results.json",
+      "bytes": 369442,
+      "sha256": "b81b04bdba9da5d73aaaa3080c15825f4a87745c9b1dea928ad3f84bccb6c9ae"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "traversal": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/traversal-probes.json",
+      "bytes": 35352,
+      "sha256": "683e907f59c864fe61ec14b438f02d62e3be8ac935f652ef9ca2d711cf15b3a2"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/traversal-results.json",
+      "bytes": 153978,
+      "sha256": "ad1a76b212c0372a8765d7d106ce1018aacd9bbfccfff7f6bbbf10f1021b3f3f"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "metadata": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/metadata-probes.json",
+      "bytes": 299689,
+      "sha256": "3b55abe5193edeae97e1e4014ef9421fb48153943aa479c35eb1573c1182cf36"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/metadata-results.json",
+      "bytes": 28481,
+      "sha256": "51a7599e3ebeb613aae4b6d34e0ee15a6fa271fa046e229319c10b16dce0ab10"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "metadata-held": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/metadata-held-probes.json",
+      "bytes": 704580,
+      "sha256": "0bcf818fe6eacde3d1d4d037581f43b967dde0c9c9bacdbfd7f47076a47d8d2f"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/metadata-held-results.json",
+      "bytes": 161601,
+      "sha256": "d82f8c0e9a8a76bf00ba968c076c21b70795788dd64d8e71e8d68eaeef3fab28"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "corpus-metadata": {
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/corpus-metadata-probes.json",
+      "bytes": 1762,
+      "sha256": "d4a027fa2401020e04d50efe363a416373706c564c5a406ea3dc1f33846c4d46"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/corpus-metadata-results.json",
+      "bytes": 3832,
+      "sha256": "a8a93d301758e9dcb5698d60b83f0560bde59574b8bbeb0d7dea2c5b2dbcd595"
+    },
+    "scope": "Margo-crafted inputs, except the two unchanged original-corpus metadata seeds. Opaque prebuilt public APIs only; no implementation or wrapper source inspected."
+  },
+  "gltf-fallback": {
+    "scope": "E20, Margo-crafted public-API experiment only. No codec or wrapper source read.",
+    "probes": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/gltf-fallback-probes.json",
+      "bytes": 104228,
+      "sha256": "cf0e2b3a6be1d31b150566372728889391fbbdd4f661aa2ac804c3fe7038bd90"
+    },
+    "results": {
+      "maintainerCacheKey": "<maintainer-cache>/batch-133/gltf-fallback-results.json",
+      "bytes": 433992,
+      "sha256": "1cec421afc703b70bf2ab0f27a8bf12a6b1d4242f5413f8d6ac522bfb19d19d5"
+    }
+  }
+}

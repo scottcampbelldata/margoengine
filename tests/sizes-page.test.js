@@ -14,6 +14,17 @@ const inputs = readSizesInputs(),
 const { document } = new JSDOM(sizesPage(inputs)).window;
 const number = (cell) => Number(cell.textContent.replaceAll(',', ''));
 
+test('lazy file package groups stay contiguous in table order', () => {
+  const groups = new Set();
+  let previous;
+  for (const { package: name } of LAZY_FILES) {
+    if (name === previous) continue;
+    assert.ok(!groups.has(name), `${name}: keep all lazy files together in the package row group`);
+    groups.add(name);
+    previous = name;
+  }
+});
+
 test('every lazy file names what it leaves out as patterns, or entry-sizes.mjs cannot measure it', () => {
   for (const { file, measure, external } of LAZY_FILES)
     if (measure === 'bundle') assert.ok(external.every((pattern) => pattern instanceof RegExp), file);

@@ -2207,3 +2207,68 @@ cases with exactly 512 red pixels and zero outside changes. Retained earlier
 fixture diagnostics are not used as the final parent proof. All six APIs match.
 [Receipt](results/batch-56-video-owner-20261109.json). The optional root size
 2144 -> 2211 B and ceiling 2199 -> 2467 B are documented with the split cost.
+
+## Batch 133 development regressions
+
+This is unshipped decoder evidence, not a release performance result. From the
+repository root, with Rust's `wasm32-unknown-unknown` target installed:
+
+```sh
+cargo test --offline --locked --manifest-path packages/decoders/native/draco/Cargo.toml
+cargo build --offline --locked --release --target wasm32-unknown-unknown --manifest-path packages/decoders/native/draco/Cargo.toml
+node packages/decoders/native/draco/tests/wasm-kd.mjs
+node packages/decoders/native/draco/tests/wasm-memory.mjs
+node packages/decoders/native/draco/tests/wasm-prediction.mjs
+node packages/decoders/native/draco/tests/wasm-metadata.mjs
+node --test --test-timeout=300000 packages/decoders/tests/draco-native.test.js
+```
+
+Use a 120-second hard process-tree limit for native/build/memory commands and
+180 seconds for the KD campaign. The KD fixture retains 369 public-API oracle
+outputs; selected full-file prefix, mutation and free-cycle checks are included.
+Memory checks use the two pinned full ABeautifulGame streams credited in the
+fixture notice, compare every output byte's oracle-derived hash, and enforce the
+unchanged 20,185,088-byte prebuilt ceiling. The saved pre-fix artifact fails at
+23,789,568 bytes; current output remains exact at an 18,874,368-byte peak.
+
+The original 454-payload corpus additionally requires the private pinned input
+and grant cache and the maintainer-only `wasm-external-check.mjs`; its manifest and
+proof hashes are public in [the checkpoint](results/batch-133-resume.json).
+True cold-process start-up, paired per-file cold/warm timing, process RSS, the
+full feature inventory and final entry/transfer sizes remain required before
+removing either prebuilt. No speed or SIMD gain is claimed here.
+
+### Batch 133 dual-output and bit-cursor regressions
+
+Run the native cargo test/build commands above, then
+`node packages/decoders/native/draco/tests/wasm-flavor.mjs`. The native suite
+includes the independent bit reference and both full/glTF outputs on 214 pinned
+inputs. The Wasm suite also covers selected strict prefixes, invalid flavor
+errors, deterministic mutations and repeated free. The existing package gate
+runs it automatically, with the same hard child/outer limits. Whole-corpus
+paired drivers and the licensed input/grant cache are maintainer-only at this
+development checkpoint; the public record contains hashes and scope rather
+than clone-inaccessible filesystem pointers. No final speed claim is made.
+
+### Batch 133 predictive traversal and redundant fan search
+
+The native Cargo tests above include the 2,160-case predictive fixture and the
+independent tetrahedron work regression. After the Wasm build, run
+`node packages/decoders/native/draco/tests/wasm-predictive.mjs`. It compares every
+complete output in both Rust flavors, checks strict prefixes, mutates inputs and
+repeats decode/free. The package's required native gate invokes it automatically.
+The public fixture contains all expected bytes and needs no opaque runtime to
+rerun. Maintainer-only probe/profile/paired inputs are hash-pinned in
+[the continuation evidence](results/batch-133-resume8.json), with the exact
+seven-round paired method and open loss scope. No quiet speed result is claimed.
+
+## Batch 133 optional entry integration
+
+Build with `npm run build --workspace @margoengine/decoders` (Cargo and its
+wasm32-unknown-unknown target required for source builds). Run
+`node --test packages/decoders/tests/draco-native-entry.test.js` for the optional
+bridge's frozen point records, normalized accessor, subset/output budget and
+corrupt-input recovery checks. The regular decoder browser gate now also covers
+its dedicated worker, concurrent jobs, transfer, abort, disposal and production
+Vite-emitted worker/Wasm assets. Run it through the shared GPU lock with owner
+codex-133. Neither default entry nor either prebuilt is replaced.

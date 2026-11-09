@@ -57,6 +57,58 @@ prior reader and pass the new reader. The private replacement, 25 RSS losses
 and remaining formats are still subject to their separate acceptance gates.
 
 
+### Batch 133 lazy asset row groups
+
+Compared WHATWG, [HTML table processing model](https://html.spec.whatwg.org/multipage/tables.html#table-model)
+(2026); Ecma International, [Map iteration](https://tc39.es/ecma262/#sec-map.prototype.foreach)
+(2026); and Nurzhan Bakibayev, Tomas Kocisky, Dan Olteanu and Jakub Zavodny,
+[Aggregation and Ordering in Factorised Databases](https://arxiv.org/abs/1307.0441)
+(2013; abstract reviewed). Grouping and enumeration order are distinct concerns;
+the standards specify ordered row groups and insertion-order iteration. Our
+inference is to preserve the existing catalog order and keep each package's
+records contiguous, rather than changing the table builder or its assertions.
+No implementation or companion code was read.
+
+The new native worker/Wasm records interrupted another package's group while
+the decoder's other records appeared later. Moving both records together into
+the decoder group preserves all files and measurements. The new contiguous-
+group regression and existing exact table identity test fail before repair;
+all nine size-page tests pass afterward. verify includes this regression, hence
+check:merge catches the same registration error in future.
+
+### Batch 133 browser gate lexical declarations
+
+Compared Ecma International, *ECMAScript Language Specification*, function-body
+[early errors](https://tc39.es/ecma262/#sec-function-definitions-static-semantics-early-errors)
+(2026); Toufique Ahmed, Noah Rose Ledesma and Premkumar Devanbu,
+[SYNFIX: Automatically Fixing Syntax Errors using Compiler Diagnostics](https://arxiv.org/abs/2104.14671)
+(2021, revised 2022; abstract reviewed); and Thodoris Sotiropoulos and Benjamin
+Livshits, [Static Analysis for Asynchronous JavaScript Programs](https://arxiv.org/abs/1901.03575)
+(2019; abstract reviewed). The standard prohibits duplicate lexical declarations;
+compiler diagnostics identify this static failure before asynchronous browser work.
+Broader asynchronous analysis is unnecessary for this syntax-only defect.
+Node.js, [Command-line API](https://nodejs.org/api/cli.html#-c---check), documents
+parse-only checking. No implementation or companion code was read.
+
+The optional Draco browser fixture reused the HDR fixture's native binding in
+one function scope, preventing module parsing. A distinct nativeDraco binding
+fixes the cause. browser-source.test.js parses every non-test JavaScript fixture
+and support module without executing browser APIs; it fails before the rename
+and passes afterward. verify includes the package test, so check:merge covers
+this class. No engine code, speed work, assertion or deadline changes.
+
+The next browser failure was a fixture URL, not the decoder: Vite transformed
+the dynamic asset name into a table that omitted nested directories, requesting
+tests/undefined and receiving an empty 404 body. Vite contributors, *Static
+Asset Handling* (2026), [new URL and nested-directory limitation](https://vite.dev/guide/assets.html#new-url-url-import-meta-url),
+documents this restriction. Compared with the ECMAScript and static-diagnostic
+sources above, the suite's existing /tests/fixtures hosting convention preserves
+the helper's name-based contract for nested and top-level files. The parser regression now
+checks all fixture/support asset URL sites; it fails on the original dynamic
+path and passes after the helper uses that explicit fixture root. A GPU-disabled
+browser diagnostic retained the 404 URL and sixteen zero-length worker posts;
+the own-worker CPU diagnostic decoded all sixteen real inputs correctly.
+
 ## Batch 134 corpus, uploads and memory continuation
 
 Research before instrumentation compared the retained fuzz papers: Patrice
@@ -880,6 +932,158 @@ Version-byte mutations do not establish historical syntax. Other point-cloud
 methods, predictive EdgeBreaker and the remaining planned experiments are still
 unproven. A private sequential Rust prototype exercises these rules; no shipped
 decoder or public entry changes in the specification-review job.
+
+### Batch 133 development checkpoint: connectivity and measurements
+
+The unshipped Rust crate now compares standard and valence connectivity, seams
+and exact point/index order on 352 cases: 304 connectivity extracts from real
+external version 2.2 meshes and 48 crafted cases. This is connectivity evidence,
+not complete attribute decoding or a replacement claim. The prebuilt was measured
+before this extension. Its targets and the remaining performance gates are in
+[perf-history.md](whitepaper/perf-history.md#batch-133-prebuilt-decoder-targets-development).
+
+| Experiment | Distinguishing observation and rule | Confirmation |
+| --- | --- | --- |
+| E8 | A valence E triangle accepts start-face data followed directly by six context counts. Adding the standard symbol buffer makes it reject. Thus valence omits that buffer, contrary to its figure. Initial E and reverse-pop context symbols follow the pseudocode. | Seven E/L/R/C and mixed-fan cases distinguish context 0 from context 1 and preserve exact index order. All 304 external connectivity extracts also agree. |
+| E9 | Unconditionally replacing a vertex representative as the printed `MapCornerToVertex` does changes seam point order. Preserve the left boundary representative when a fan closes. For interior closure, walk previous/opposite from previous(a) to b, then the same walk from previous(b) to c. Asymmetric fans distinguish the printed second walk. | All 304 external extracts agree; 16 further closed fans with one/two independently patterned seam streams agree without changing the algorithm. |
+| E9 compaction | Four multi-split fans run with zero and one all-false attribute-connectivity stream return different point numbering. With zero streams, fill isolated IDs in split-discovery order from the highest remaining live vertex, skipping isolated tails. With streams, recompute seam points in vertex order. | All eight paired files agree. This also resolves the independent nonmanifold `test_nm.obj.edgebreaker.cl4.2.2.drc` extract. |
+| E10 | Two independent attribute groups accept all routing triples before all descriptors; interleaving a triple with its descriptors rejects. Base data ID is 255; a corner group's data ID indexes attribute connectivity. Connectivity streams still expand seam points when the group count is zero. | Eight two-group canary files cover depth-first and prediction-degree traversal; all 304 zero-group connectivity extracts retain the oracle's point/index order. |
+| E12 integer extension | A valid wrap range [-1e9,1e9], first entry values [1e9,1e9,-1e9] and a zero fourth parallelogram correction produce -1e9. Widening the predictor before clamping predicts +1e9. Predictor addition/subtraction therefore wraps to int32 before clamping. | An opposite-sign case and three distinct further arithmetic cases preserve the following float canary and match all returned integer values. |
+
+The original input/output artifacts and SHA-256 pairs are indexed in
+[the inference checkpoint](whitepaper/results/batch-133-inference-checkpoint.json).
+They are retained privately, together with the specification and original fixture
+emitters. No implementation source was read, recalled or disassembled. Public
+decoder API calls against the opaque outside build supply every observation.
+The native test `standard_and_valence_connectivity_match_black_box` checks all
+352 point/index sequences without sorting or tolerances. The complete-attribute
+development fixture had 131 cases at that checkpoint. The continuation below
+records expanded coverage and a newly exposed failure.
+
+### Batch 133 continuation: portable prediction and historical streams
+
+The original 454-payload corpus now has 454 exact native and float results,
+including `google/draco/testdata/pc_kd_color.drc` (see the E15 continuation below).
+Every descriptor and index is compared in order, without sorting or tolerances.
+This is unshipped development work. The public loader, workers and both prebuilt
+assets remain unchanged. The 281-case complete-attribute fixture includes six
+unmodified Google standard inputs. Native attribute tests and Wasm pass, with
+75,482 strict prefixes rejected, 4,096 deterministic mutations and 2,000
+decode/free cycles without growth. The published constrained multi-parallelogram,
+portable UV and geometric normal algorithms match 50 accepted constrained
+canaries, 32 portable-parent canaries and the original external streams using
+these paths. Portable integers are retained until parents are reconstructed.
+This does not establish exhaustive feature or requested-conversion coverage.
+
+The [inference checkpoint](whitepaper/results/batch-133-inference-checkpoint.json)
+adds SHA-256 pairs for all discovery and output artifacts below. Only the opaque
+outside prebuilt's public API supplied observations. No codec or wrapper source
+was read, recalled or disassembled.
+
+| Experiment | Observation and inferred rule | Confirmation |
+| --- | --- | --- |
+| E12 UV arithmetic | Form the uint64 square-root argument modulo 2^64. Right triangles at scales 2048/65535/1048575/1000000 distinguish this from widened multiplication, with both orientations and an adjacent canary. | Held-out scales 310003/1000033 match, as does the unmodified q20 cube that previously overflowed. |
+| E17 scalar framing | Before 2.2 mesh counts are LE u32. Before 2.0 attribute counts are LE u32, IDs LE u16, entropy tables use u32 counts/u64 payload lengths, and quantization/normal parameters follow the prediction header. Later parameters follow group payloads. 2.3 sequential points retain 2.2 framing. Actual older files contain duplicate zero IDs. | Version/entropy probes discriminate with unequal IDs 300/8191 and float canaries; original historical sequential and 2.3 point files agree. Accidentally accepted alternatives with wrong descriptors/canaries are not positive framing evidence. |
+| E17 topology framing | Before 2.2 an extra count and a sized traversal block precede split events; symbol and direct start-face-bit blobs have u64 lengths. Before 1.2 split records use target u32/source u32/edge byte; later use deltas and two edge bits before 2.2, using the low bit. Routing degree appears in 1.2. | Extra count sweeps 0/1/2/3/97 preserve zero-attribute output only; no broader semantic claim. Three historical flag sweeps distinguish both used bits and ignored partners. Original historical files agree. |
+| E17 holes/seams | Removing/changing pre-2.1 hole lists preserves outputs in three historical seeds. Before 2.1 seam bits visit both interior half-edges and union their markings; 2.1 visits each undirected edge once. | Asymmetric two-triangle seam patterns discriminate the rules; larger open fans and the historical cube confirm them. The capped-fan failure below is fixed by the E9 continuation. |
+| E17 normal transform 2 | Use published fold/modulus/unfold without canonical quadrant rotation, with unsigned corrections. Transform 2 consumes two words before 2.2, then only max in 2.2; recompute center. | Twelve version probes and eighteen 33-normal grids agree. q4/q7 discovery and q10 held-out; serialized center sweeps 0/17 preserve older outputs. |
+
+The connectivity fixture now retains all 548 former cases and adds 182 accepted
+held-out capped boundaries, for 730 exact native/Wasm comparisons. The 31 prior
+failures are fixed without changing any expected point or index. Opposite walks
+from malformed caps may cross vertex identities; preserve each representative on
+its own vertex and initialize unvisited point mappings to the observed zero. See
+[the fixed defect](known-bugs.md#fixed-2026-11-09-batch-133-crafted-capped-fan-point-mapping).
+
+### Batch 133: E9 capped boundaries and E15 KD-tree observations (2026-11-09 continuation)
+
+The 31 retained capped-fan regressions and 182 newly accepted held-out specimens
+across versions 1.1/1.2/2.0/2.1/2.2 match after preserving a boundary
+representative on its own vertex and giving corners not reached by point
+deduplication the observed initial point zero. Malformed caps may join fans
+with different vertex identities; acceptance is not a manifold-validity claim.
+No old case was removed or relaxed; the connectivity fixture now has 730 cases.
+
+E15 uses only crafted inputs to the opaque decoder public API, plus the
+previously pinned standard `pc_kd_color.drc` input. Experiments `kd-frame`,
+`kd-buffers`, `kd-bitorder` and `kd-axis` are indexed with input/output SHA-256
+in [the inference checkpoint](whitepaper/results/batch-133-inference-checkpoint.json).
+An independent Margo Python model matches every coordinate in 345 accepted
+crafted cases, and every color byte and quantized/dequantized position byte
+in the 7,733-point external seed. These are observations, not a completed
+feature or performance claim. The native Rust/Wasm KD implementation now matches
+369 retained complete-file cases, including the unmodified external seed.
+
+Observed framing: group descriptors are followed by one compression-level byte,
+LEu32 coordinate width and LEu32 point count. Levels 0/1 use raw number bits,
+2/3 use one binary ANS decoder, and 4/5/6 use 32 binary ANS bit planes plus
+one spare binary decoder. Three LEu32-length raw buffers carry residuals,
+axis choices and uneven-half directions, followed by attribute transforms.
+Raw words are little endian, read from their most significant bit; number
+planes are visited in most-significant-first order starting at plane zero.
+Counts above two subdivide the selected axis. The number width is
+floor(log2(count)); the stored difference subtracts from floor(count/2).
+Direction one assigns that smaller half to the lower box; otherwise to the
+upper box. Output visits the upper box first. Counts one/two emit residual
+coordinates in cyclic axis order. Levels 0-5 advance the prior axis cyclically
+(initial prior axis zero). Level 6 reads four explicit axis bits at counts
+at least 64; smaller nodes choose the largest remaining coordinate width,
+breaking ties by first dimension. Width exhaustion emits repeated box origins.
+The 33rd ANS stream has no observed use yet; do not infer its semantics.
+The `kd-types` and `kd-transform` experiments additionally establish signed
+i8/i16/i32 minima as per-component unsigned LEB128 zigzag values. Distinct mixed
+signed/float canaries show all floating transforms precede all signed minima,
+regardless of descriptor order. The decoder preserves integer low bits when
+writing the declared scalar width. Unsigned u8/u16/u32 and float32 also match.
+The 369 `kd-regression` inputs trim only unused trailing probe bytes and were
+independently re-run through the opaque decoder before becoming positive tests.
+Native/Wasm compare every exposed native byte and descriptor, reject 49,779
+selected complete-file strict prefixes, pass 4,096 KD mutations and 2,000
+decode/free cycles without growth. Historical KD, predictor and full feature
+coverage remain to establish; mutated version headers do not establish support.
+
+### Batch 133 E18: multi-parallelogram and seed traversal
+
+The opaque decoder accepts 112 crafted predictor-2 discovery cases and 135
+held-out cases with explicit historical framing across 1.1, 1.2, 2.0, 2.1 and
+2.2, depth-first/degree routing, one/two/three components and large corrections.
+Predictor 2 has no crease side flags. It averages the available parallelograms
+along SwingRight from the entry corner, stopping at boundary or closure, with
+the observed signed int32 wrapping and truncating division. The open split-fan
+canary distinguishes the incorrect two-direction walk. Both walk candidates
+and all oracle outputs remain retained; no expected result was replaced.
+
+The held-out degree cases exposed a separate prototype error: it skipped seed
+vertices when the face was already visited. The published
+`EdgebreakerGenerateSequence` and `PredictionDegree_TraverseFromCorner` visit all
+three seed vertices before checking the face, unlike depth-first traversal.
+The repair follows those sections directly. Another 42 raw-attribute canaries
+vary fan size and disconnected component count independently of prediction.
+All 289 complete files match ordered indices, descriptors and native bytes.
+
+### Batch 133 E19: metadata framing and preservation
+
+The published metadata table prints UI8 for the value size. Crafted paired
+UI8/varUI32 layouts at 127, 128, 255, 256, 1,024 and 16,384 bytes discriminate
+that field: only the varint framing remains accepted above 127. Held-out values
+129, 257, 4,097 and 32,769 bytes confirm it with unrelated following float
+canaries. Metadata IDs associate with attribute unique IDs, not array positions.
+File and attribute roots, raw key/value bytes, child names and references are
+now retained in an iterative flat arena. Accepted 65/129-level nested cases
+prove the prototype's recursive 64-level ceiling was not a supported limit.
+The private Wasm ABI retains this arena in its optional META trailer.
+
+The public string query stops at NUL. Valid UTF8 names agree with their crafted
+bytes. The prebuilt's invalid-UTF8 binding result is retained as an observation;
+matching that text conversion is still a public-integration target. The 41
+accepted metadata fixtures preserve every declared raw byte and exact geometry.
+Both unchanged original-corpus metadata streams also match their exposed file
+and attribute entries. This establishes no full feature or integration claim.
+Input/output hashes for multi, held-out multi, traversal, metadata, held-out
+metadata and original metadata are in
+[the inference checkpoint](whitepaper/results/batch-133-inference-checkpoint.json).
+Only the prebuilt's public API was executed; no implementation, wrapper text,
+disassembly or remembered internals supplied these rules.
 
 ## Basis replacement specification gate (batch 134, 2026-11-09)
 
@@ -4316,3 +4520,48 @@ The design inference is to preserve registration identity in the test stand-in
 and explicitly publish a camera change before reading CSS coordinates, rather
 than depending on an intervening animation frame. These repair fixture contracts;
 no engine implementation or camera/pixel tolerance changes. No companion code read.
+### Batch 133 E20: distinct glTF predictor behavior
+
+Only Margo-crafted inputs and the two opaque shipped public APIs were used. Sixty
+complete controls vary components 1/2/3/7, three correction patterns and five
+open/split/closed shapes. Separate NONE, difference, parallelogram and multi
+payloads distinguish four candidates. Every glTF method-2 output equals full
+difference prediction, and none equals the other candidates. The existing
+expanded fixtures supply 128 independent divergent cases; all now match the
+proper entry flavor. A 214-case native/Wasm fixture retains both opaque outputs.
+Probe/output hashes are in [the gate record](whitepaper/results/batch-133-gates.json).
+No implementation source, wrapper text, disassembly or remembered internals were
+used. The private ABI uses one Wasm and an explicit full/glTF flavor, not per-file
+special cases. Public TypeScript integration remains open.
+
+The tagged-bit optimization is direct arithmetic equivalence of the published
+LSB-first payload rule: assemble at most five consecutive bytes in a u64, shift
+by the cursor alignment, mask to width and advance once. Independent per-bit
+reference checks cover input lengths, all alignments, widths 0..33, errors and
+the next bit after success/failure. It introduces no new inferred format rule.
+
+### Batch 133 E16: predictive EdgeBreaker traversal
+
+Only Margo-crafted inputs and the opaque full public API supplied the omitted
+rules. A 630-candidate framing sweep isolates the standard symbol stream, start
+faces and seams followed by a little-endian u32 word and a binary prediction
+stream. The word is consumed; its broader semantic role remains unproved.
+Symbol/fallback controls establish prediction eligibility after C and R only;
+E, L and S clear it. On a successful prediction bit, the new active corner's
+next vertex degree at least six selects C, otherwise R. A failed bit consumes
+the next standard symbol. Across 1,176 independently reconstructed controls,
+this vertex and threshold have zero disagreements; the other tested vertices
+and thresholds disagree. The degree model follows the published connectivity
+rules and Margo's existing E8/E9 corrections.
+
+The held-out campaign emits 2,160 complete files across six explicitly framed
+versions, 60 shapes, successful and failed predictions, split merges, separate
+components and raw vertex/corner canaries. All match the full prebuilt in
+ordered indices, descriptors and every exposed scalar byte. The glTF prebuilt
+rejects all 2,160, so no glTF predictive-output match is claimed. Native and
+Wasm fixtures, strict prefixes, mutations and repeated frees retain the rule.
+Hashes and exact scope are in [the continuation evidence](whitepaper/results/batch-133-resume8.json).
+No implementation, wrapper listing, disassembly or remembered internals supplied
+any rule. Seam-free fan search removal is an arithmetic/work equivalence of
+Margo's existing mapping, with an independent closed-tetrahedron step count;
+it adds no format inference or claimed overall speed gain.

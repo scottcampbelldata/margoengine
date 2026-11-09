@@ -3166,3 +3166,65 @@ Size restoration finding 10, headless/stage: onError must be a function or
 undefined (default). Invalid types reject with linked TypeError before GPU
 installation or engine creation. Entry growth: @margoengine/headless/stage: 3106->3140 B gzip; ceiling 3306->3396.
 Core plus stage remains 23924 B. No new rendering or speed claim.
+
+### Batch 133 development decoder evidence
+
+The unshipped Draco crate matches the 454 unique original corpus payloads in
+ordered native and float bytes. Its same-input committed Wasm peak is
+18,874,368 bytes against the prebuilt target 20,185,088. This is a measured corpus
+maximum, not an approved input-size or feature limit. Process RSS, all supported
+features, typed conversions, lifecycle and paired per-file cold/warm targets
+remain open. Both shipped prebuilts and the public TypeScript entry are unchanged.
+See [the development record](whitepaper/results/batch-133-resume.json).
+
+The next development checkpoint adds 289 exact prediction/traversal cases and
+41 metadata cases, retaining all previous fixtures. Its private Wasm is 121,619
+bytes raw and 47,532 gzip; these are not final entry or transfer sizes. Metadata
+values through 32,769 bytes and nesting through 129 children are observed, not
+new release limits. Parsing/destruction have no recursion or fixed depth ceiling.
+Raw metadata survives the private native/Wasm ABI; public text/name conversion
+and remaining prediction/feature/integration/performance gates are still open.
+
+### Batch 133 expanded diagnostic scope
+
+The 1,937-input diagnostic includes every original target plus retained crafted
+fixtures. Full matches 1,937; glTF accepts/matches 1,003. The two opaque builds
+differ on method 2: glTF uses difference prediction, while full uses multi. The
+private ABI retains explicit flavors in one Wasm; public entries are unchanged.
+The development artifact is 121,653 bytes raw / 47,137 gzip using Node gzip level
+9, before public integration and final transfer-size gates. Other feature,
+requested-output budget, typed conversion, lifecycle, speed, startup/RSS and
+GPU/README gates remain open. These are not approved feature limits.
+
+### Batch 133 predictive traversal development checkpoint
+
+The optional entry is still unshipped and both public prebuilts remain. The
+expanded exact diagnostic preserves all original inputs and now has 3,881 unique
+streams. A separate 2,160-case fixture establishes predictive EdgeBreaker across
+six versions; all full-build outputs match, while the glTF prebuilt rejects this
+traversal. The development Wasm is 122,685 raw / 47,360 gzip bytes (Node level 9),
+before public integration. These counts are evidence, not feature or input limits.
+Historical predictor 3, the remaining feature inventory, public conversion,
+requested-output limits, workers/lifecycle and complete cold/RSS targets remain
+open. The coordinator permits an optional entry after non-warm gates pass, with
+warm losses recorded; default replacement still requires speed parity.
+
+### Batch 133 optional decoder landing
+
+Coordinator note 2 limits this landing to the decoder. The optional
+`@margoengine/decoders/draco-native` entry exposes mesh and point decoder classes;
+default entries and automatic loaders retain both prebuilts. It uses one lazy
+122,685-byte Wasm (47,360 bytes gzip, Node level 9). Input and internal workspace
+are each bounded at 256 MiB; requested output uses the existing decoder limits.
+Native corpus peak linear memory is 18,874,368 bytes versus the prebuilt's
+20,185,088. JS result copies and process RSS are separate from linear memory.
+
+Open warm-speed loss: the retained 1,937-input campaign has 499/365 full decode/
+total losses and 365/288 glTF losses over 1,003 accepted inputs. Original-target
+total losses are 153/454 full and 168/399 glTF. These are unresolved losses, not
+accepted performance differences. Current-artifact cold/RSS/startup campaigns,
+historical predictor 3, historical KD/full feature inventory and malformed UTF8
+metadata equivalence are incomplete. The optional landing does not close these
+replacement gates or remove either prebuilt. No new speed work is included.
+See [retained speed evidence](whitepaper/results/batch-133-paired-checkpoint.json)
+and [current native evidence](whitepaper/results/batch-133-resume8.json).

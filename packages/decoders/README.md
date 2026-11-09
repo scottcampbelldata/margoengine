@@ -502,6 +502,36 @@ fails with the exact file path; run `git lfs pull` from the repository root to f
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
 
+## Optional clean-room Draco (`@margoengine/decoders/draco-native`)
+
+This entry exports `DracoDecoder` and `DracoPointsDecoder` with the existing decode
+contracts, pooling, AbortSignal, transfer, timeout and disposal. It lazily loads
+one clean-room Rust Wasm per worker through `new URL(..., import.meta.url)`.
+The default entries and loaders continue to use the bundled prebuilts.
+
+```ts
+import {DracoDecoder} from '@margoengine/decoders/draco-native';
+using decoder = new DracoDecoder({workerLimit: 2});
+const geometry = await decoder.decode(await (await fetch('/mesh.drc')).arrayBuffer(), {
+  attributeIds: {POSITION: 3, NORMAL: 1, TEXCOORD_0: 0},
+});
+geometry.positions;
+```
+
+Use the same Avocado `/mesh.drc` described above. `decoderPath`, when set, is a
+folder containing `draco-native.wasm`; unset uses the bundled asset. Other
+constructor defaults are four workers capped by hardware threads and the existing
+10 s plus 4 s/MiB timeout. Output limits retain their existing defaults; native
+workspace and input each have a separate 256 MiB ceiling. Source builds require
+Cargo and the `wasm32-unknown-unknown` target; installed tarballs contain the asset.
+
+Warm performance parity remains open: the prior 1,937-input campaign has 365
+full-flavor and 288 glTF-flavor total-output losses. Cold/RSS and the full historical
+feature inventory remain incomplete; neither prebuilt is replaced. See
+[the evidence and limits](../../docs/limits.md#batch-133-optional-decoder-landing)
+and [native regression instructions](native/draco/README.md). `npm test` retains
+all native/Wasm cases, including 2,160 predictive cases and hostile input tests.
+
 Apache-2.0 licensed.
 
 ## Content Security Policy

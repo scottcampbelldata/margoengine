@@ -2974,3 +2974,149 @@ The incomplete Wasm is 107,169 raw and 43,720 gzip bytes using the baseline
 Node gzip9 compressor. Public integration, other target encoders, full hostile-input,
 GPU, memory and final acceptance remain open. No new timing A/B or timing-only
 assertion was run; timing proof stays in [speed-phase.md](../work-lists/speed-phase.md).
+
+### Batch 133 prebuilt decoder targets (development)
+
+The opaque prebuilt was measured before extending the clean-room Rust prototype.
+The [corpus manifest](results/batch-133-corpus-manifest.json) contains 535 entries:
+404 external mesh/point streams, with 323 unique payloads, and 131 crafted
+attribute/quantization specimens. The combined corpus has 454 unique payloads.
+The external glTF sources include 18 Khronos models and independent Cesium assets;
+Draco test assets cover mesh/point methods and historical versions. Every download
+is pinned, hashed and accompanied by its source grant. No implementation is part
+of this corpus. The separate 352-case connectivity experiment is not full-file
+attribute compatibility evidence.
+
+| Opaque shipped build | Accepted unique payloads | Wasm raw bytes | Wasm gzip bytes | Largest committed Wasm memory |
+| --- | ---: | ---: | ---: | ---: |
+| Full | 454 / 454 | 285,747 | 88,507 | 20,185,088 |
+| glTF | 399 / 454 | 192,420 | 63,395 | 20,185,088 |
+
+Complete per-file targets are in [the full report](results/batch-133-prebuilt-draco-full.json)
+and [the glTF report](results/batch-133-prebuilt-draco.json): first decode in a
+fresh instance, compile/instantiate/start-up samples, seven warm rounds of three
+trials with per-round minima, peak committed linear memory, wrapper transfer size,
+exact native/float output hashes and supported attribute descriptors. The full
+build covers point clouds, all five semantics and the observed i8/u8/i16/u16/i32/
+u32/f32/f64/bool types. Historical versions are actual seed files, not header-byte
+mutations. A full prediction/quantization coverage inventory remains required;
+these observations do not claim exhaustive feature coverage.
+
+System CPU busy fractions were 99.90% and 99.96%. These are retained development
+targets, not release speed claims. Fresh instance does not mean cold OS/compiler
+cache; true cold-process measurements and paired cold/warm old/new rounds remain
+required. Peak linear memory and process peak RSS are explicitly separate metrics.
+The new decoder must meet or beat every supported per-file and feature target
+with bit-identical output. A miss is a loss to fix, never an accepted difference.
+The current unshipped Rust diagnostic matches all 454 native and float outputs,
+including the KD-tree point cloud. The 31 capped-fan mismatches are fixed, with
+all 548 former cases plus 182 accepted held-out caps retained and exact.
+
+Prediction previously retained connectivity, mappings and portable parent values
+through final array construction, reaching 23,789,568 committed Wasm bytes.
+Releasing those owners after reconstruction lowers the identical corpus peak to
+18,874,368 bytes, below the unchanged prebuilt ceiling of 20,185,088. The new
+`tests/wasm-memory.mjs` regression under `packages/decoders/native/draco` uses two
+pinned ABeautifulGame streams and every output byte's oracle-derived hash; it
+fails on the saved pre-fix artifact and passes after the lifetime repair.
+[The continuation record](results/batch-133-resume.json) contains Wasm raw/gzip
+size, hashes, corpus scope and targeted checks. This is not final entry/transfer
+size or process RSS. No speed or SIMD gain is claimed. New inference specimens
+have output records; they have not yet entered the original timing targets.
+
+Original measurement driver: the maintainer-only `measure-prebuilt.mjs`, executed
+through the bounded batch runner with the opaque builds outside this worktree.
+Reproduction requires the pinned manifest and the private input/grant cache.
+The eventual committed paired driver must reproduce both sides in one session
+before the prebuilt decoder files are removed.
+
+The additional predictor/metadata checkpoint retains the original timing corpus
+unchanged. Its unshipped private Wasm measures 121,619 bytes raw / 47,532 gzip,
+with the same 18,874,368-byte original-corpus peak and bit-exact outputs. This
+includes the metadata arena trailer; public entry/worker/loader integration is
+still pending. The new 289 prediction/traversal and 41 metadata fixtures have
+prebuilt correctness observations, not completed timing/RSS/start-up targets.
+All must enter the expanded prebuilt-first targets before completion. No paired
+speed, cold-process, SIMD or final distribution claim is made here.
+
+### Batch 133 paired-gate preparation
+
+All 454 original timing inputs remain. The new same-session driver expands to
+1,937 unique inputs, measures prebuilt first, then alternates old/new order in
+seven warm rounds with three trials and per-round minimums/spread. It records
+decode and decode-plus-native/float-output/disposal separately: Rust's decode
+includes private-ABI serialization, an explicit extra cost. Cold measurements
+use fresh OS processes per file/side/trial, three interleaved rounds, eight
+startup-only rounds and process lifetime peak RSS, separately from Wasm memory.
+OS file-cache eviction is not claimed. All matching outputs are checked.
+
+The unguarded preliminary single-file smoke observed a loss on the first
+ABeautifulGame stream and is not release performance evidence. The subsequent
+bit-reader repair reduces source reads from width to ceil((alignment+width)/8),
+at most five bytes, without reducing decoded work. The guarded whole-corpus
+paired campaign and every missed target remain mandatory before completion.
+
+### Batch 133 warm results and interrupted cold checkpoint
+
+[The complete per-file warm evidence and cold checkpoint](results/batch-133-paired-checkpoint.json)
+retain every original target and all 1,937 expanded inputs. Full has 499
+decode-only and 365 total-output warm losses beyond the round spread; glTF
+has 365 and 288 across its 1,003 accepted inputs. Among the original targets,
+full total loses on 153/454 and glTF total on 168/399. Measured CPU busy fractions
+were 0.5094 and 0.5403. These are losses to fix, not accepted release differences.
+The separate before/after bit-reader comparison shows no overall speed gain;
+its proven benefit is fewer source-byte reads with identical decoded output.
+
+The cold campaign was intentionally ended at the requested context handoff,
+with no surviving owned measurement processes: 715 full-build inputs, including
+all 454 original inputs, completed three paired cold-process rounds and exact
+output checks. This partial set has 171 decode-only, 74 total and 143 RSS losses
+beyond the measured spread. Eight full-build startup-only pairs also completed.
+The remaining full inputs and the glTF cold campaign are incomplete; no full
+RSS/startup or performance-gate pass is claimed. The raw result rows include
+process high-water RSS and Wasm memory separately. Measurement exit zero means
+completed measurement, never replacement acceptance. A separate verdict checker
+requires every target and zero losses; it must run after a complete campaign.
+
+### Batch 133 mapping profile and work reduction
+
+The development profile of Margo's own named Wasm samples mapping most heavily,
+followed by integer reconstruction and attribute traversal. No opaque source or
+disassembly is inspected. Seam-free attribute fans had already been validated
+and assigned one value, then were searched again for a point-ordering seam.
+The new path omits that redundant search. An independent closed tetrahedron
+uses 28/52/148 steps for 1/4/16 attribute streams versus 36/84/276 before;
+restoring the old search fails the unchanged regression.
+
+The same-process seven-round, three-trial before/after run retains every one of
+the 1,937 inputs and exact output. Summed total-output minima are 376.3523 ms
+before and 373.9718 ms after; the original 454 subset is 307.9473 / 312.7792 ms.
+This is no overall speed-gain claim. Two per-file total losses exceed their old
+round spread: VirtualCity bufferView 118/0, 0.0089 / 0.0091 ms, and the long nested
+metadata canary, 0.0178 / 0.0184 ms. Both are retained as diagnostic losses; no
+target is waived. Full per-file rounds and sample hashes are retained in
+[the continuation evidence](results/batch-133-resume8.json).
+
+Predictive traversal adds 2,160 full-build exact cases and expands the unique
+manifest to 3,881 without removing an original target. The previous warm and
+715-row cold evidence remains a historical checkpoint; it does not measure the
+new artifact or complete expanded corpus. The artifact is 122,685 raw / 47,360
+gzip bytes with the same compressor as the prebuilt measurements. No new cold,
+RSS, startup or default-replacement pass is claimed. The newest coordinator note
+allows an optional entry once output, size, memory and its other gates pass,
+with open warm losses recorded here. The prebuilt remains default until parity.
+
+### Batch 133 optional entry landing, coordinator note 2
+
+The decoder lands only behind `@margoengine/decoders/draco-native`. Both prebuilt
+defaults remain. The open warm loss is retained without waiver: 499/365 full
+and 365/288 glTF decode/total losses in the historical 1,937/1,003-input campaign;
+original-target total losses are 153/454 and 168/399. The retained per-round minima
+are [here](results/batch-133-paired-checkpoint.json). These are losses to fix before
+changing defaults; no new speed experiment or speed claim is made in this landing.
+The single bundled Wasm is 122,685 raw / 47,360 gzip bytes (Node level 9), smaller
+than either prebuilt target. The measured native corpus linear-memory peak remains
+18,874,368 bytes against 20,185,088; this excludes JS copies and process RSS.
+The partial cold/RSS evidence above remains incomplete, not a passing replacement
+gate. Optional entry transfer sizes and landing checks are retained separately in
+results/batch-133-landing.json once measured.

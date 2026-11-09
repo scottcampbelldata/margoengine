@@ -1,5 +1,32 @@
 # Engine architecture and quality reference
 
+### Batch 133 land-only validation
+
+The optional native decoder retains the default prebuilts and its existing
+Rust/Wasm output. Lint and hygiene pass. One full verify stopped at a missing
+upstream animator receipt; the mainline receipt repair unblocks documentation.
+Its interrupted parallel chains were resumed, with all non-unit chains passing.
+The unit run completed 14,140 tests: 14,136 pass, four fail, zero skips. Three
+viewcube stand-in ownership failures are repaired by main d15e46fd2; the fourth
+is the lazy table registration order repaired here. Current-base focused checks
+pass 33 viewcube/browser-source cases and all nine size-page cases.
+
+Decoder, glTF and glTF-pro CPU checks pass. The decoder browser/production
+consumer, actual Node glTF rendering, glTF browser and glTF-pro material GPU
+checks pass. All 21 decoder/umbrella runtime README examples pass, including
+the final rebased build. Every GPU step uses one shared slot and wait-max 60;
+no speed campaign or exclusive hold runs. Genuine entry/network records share
+the same clean package revision; core plus stage is 23,950 B after the inherited
+mainline unit-light repair. The native
+Wasm remains 122,685 raw / 47,360 gzip bytes. Full/default replacement, warm
+losses and remaining feature inventory remain open. Evidence and log hashes:
+[landing receipt](../whitepaper/results/batch-133-landing.json).
+
+The final rebase inherits main's uniform-only light normalization repair, with
+no owned core/stage edits. Its 22 core/viewcube cases and the complete glTF-pro
+CPU suite pass. The glTF-pro material GPU and README checks are refreshed for
+that shader change; the native decoder source and artifact remain unchanged.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four
@@ -35,6 +62,26 @@ The original173 retained-output memory pairs have been remeasured;2 RSS
 losses remain. Further storage changes need the same proof before closing
 those losses. GPU ETC2/EAC proof remains absent on RTX A6000.
 
+
+### Section 5 evidence: batch 133 lazy catalog ordering
+
+The native worker and Wasm registrations now remain in the decoder row group.
+The new contiguity regression and unchanged exact table identities fail before
+repair; all nine size-page tests pass. verify and check:merge include the guard.
+No runtime asset, table behavior, measurement or tolerance changes.
+
+### Section 5 evidence: batch 133 browser source parsing
+
+The package CPU gate parses every non-test JavaScript fixture/support module
+before GPU execution. Its regression rejects the duplicate optional Draco/HDR
+lexical binding and passes after a Draco-only rename. verify includes it, so
+check:merge covers this class without a GPU hold. No engine source, rendering
+math, deadline or tolerance changes. Research is recorded in clean-room.md.
+
+The same parser gate enforces literal fixture asset URLs for Vite. It rejects
+the nested dynamic path that produced tests/undefined and sixteen empty jobs;
+the explicit fixture root preserves the real inputs. Both regression bars fail before
+their respective repairs. Production decoder and worker sources are unchanged.
 
 ### Section 5 evidence: batch 134 current-Wasm bounded campaigns
 
@@ -2406,8 +2453,26 @@ the existing TypeScript API, one lazy decoder asset, hostile-input bounds, full
 external-corpus bit comparisons and paired A/B gates. Scott's 2026-11-10 ruling
 allows crafted-input black-box inference for omitted rules, with experiments in
 the source ledger and private plan; codec and wrapper source remain unread.
-No replacement was built or benchmarked. The prebuilt decoders remain pending
-all five jobs; existing tests do not prove a clean-room replacement.
+The development Rust crate matches all 454 original native and float payloads,
+including all 323 unique external streams, with exact descriptors and ordered
+indices. Separate native/Wasm fixtures cover 281 existing attribute cases,
+369 KD cases and 730 topology cases, including all 31 former capped-fan failures
+and 182 new held-out caps. Existing attribute strict-prefix/mutation/lifecycle
+checks remain; KD adds 49,779 strict prefixes, 4,096 mutations and 2,000 frees.
+The topology Wasm suite reaches its unchanged 16,384-mutation campaign again.
+The [prebuilt targets](../whitepaper/perf-history.md#batch-133-prebuilt-decoder-targets-development)
+were measured first on the whole corpus. Releasing prediction-only owners before
+final attribute construction lowers the same-input Wasm linear-memory peak from
+23,789,568 to 18,874,368 bytes, below the old 20,185,088-byte target. Two pinned
+ABeautifulGame full streams and oracle output hashes make this a regression test
+that fails on the prior artifact. Core and stage are untouched.
+
+These are unshipped development proofs. Full predictor/version/point-cloud and
+metadata/typed-conversion coverage, budget and loader/worker/lifecycle integration,
+process RSS, cold-process start-up and paired cold/warm per-file timing remain
+open. Both prebuilts remain until all five jobs pass; no speed, SIMD or shipped
+replacement claim is made. The original-corpus measurement manifest is unchanged;
+new discovery cases have not yet entered its timing targets.
 
 ### Basis clean-room replacement (batch 134, 2026-11-09)
 
@@ -3793,6 +3858,25 @@ with WFC and additionally assert every affected tracer/staging/stage suite, life
 exact full plan for combined voxel/tracer changes above the unchanged 12-package safety threshold.
 No GPU scope, test tolerance or safety threshold was reduced.
 
+### Batch 133 predictor and metadata continuation: section 5 evidence
+
+The unshipped decoder adds 289 exact prediction/traversal cases and 41 metadata
+cases. Prediction-degree seed vertices are visited before the face-visited check,
+as specified; long metadata lengths use observed varUI32 framing. A flat arena
+preserves roots, raw bytes and children without recursive parsing/destruction or
+a fixed depth limit. Native and private Wasm regressions pass, including strict
+prefixes, corruption and repeated frees. Both exposed original metadata streams
+and all 454 original native/float payloads remain exact at an 18,874,368-byte peak.
+
+`packages/decoders/tests/draco-native.test.js` makes these regressions part of
+`verify`, hence `check:merge`, including native tests, Wasm build, KD, memory,
+prediction and metadata checks. Each subprocess has a hard process-tree limit,
+and missing Cargo is a failure. The CPU gate changes no GPU footprint. Full
+predictive EdgeBreaker/predictor/type/version coverage, public text conversion,
+worker/loader/lifecycle, requested-byte budgets and per-file paired timing,
+start-up and RSS remain required; public entry, prebuilts, core and stage stay
+unchanged. The scoped evidence is `whitepaper/results/batch-133-resume.json`.
+
 ### Oriented staging receivers: section 5 evidence (batch 56, job 6)
 
 The orientation oracle completes accumulated coverage by observing `samples` against the configured
@@ -4984,3 +5068,72 @@ synchronously before the next coordinate query. The full original browser
 assertions pass afterward. No ViewCube or Controls runtime bytes changed.
 Receipts: test-results/batch-273-clamp-resume-units.log,
 batch-273-clamp-viewcube-{diagnose,owner-after,compat,compat-after}.log.
+### Batch 133 expanded decoder evidence: section 5
+
+The unshipped single Rust/Wasm decoder now preserves both opaque entry flavors.
+All 1,937 expanded unique inputs match full output; all 1,003 accepted by glTF
+match that build's output, including its method-2 difference fallback. The
+214-case dual-output regression, strict prefixes, mutations and decode/free
+checks run in the existing decoder package gate. The bit reader loads each
+source byte once per value, with an independent alignment/cursor test. Neither
+change touches core/stage, the public entry or either shipped prebuilt.
+
+The first full verify reached 13,475 tests: 13,473 passed, two failed on stale
+generated site text and inaccessible cache pointers in public records. Both
+causes were repaired and the unchanged focused regressions pass. GPU attempts
+failed before executing tests: bounded queue expiry and Windows mutex mkdir
+EPERM under cross-session contention. Those are unresolved gates, not passing
+GPU evidence. Full final verify, GPU/README, paired per-file performance, true
+cold-process startup/RSS and all feature/lifecycle integration remain required.
+
+The final full verify closes the two documentation defects: 13,476 of 13,477
+tests pass, zero skipped. A separate real-browser teardown exceeds its unchanged
+30-second hard budget and blocks full verify; its cause is localized to the
+owned Chromium close sequence but its stalled phase is not yet isolated.
+Hygiene passes after the package build; a concurrent hygiene attempt had read a
+dist directory during rebuild, so that attempt is retained as a harness-order
+failure. The complete warm campaign retains full/glTF losses, and the 715-input
+cold checkpoint retains RSS losses. Neither is accepted away or release proof.
+
+### Batch 133 predictive traversal: section 5 evidence
+
+The unshipped crate adds traversal 1 from recorded black-box rules, retaining
+2,160 complete full-build exact cases across six versions, split merges,
+components and vertex/corner canaries. Wasm also checks 362,250 strict prefixes,
+8,192 mutations and 2,000 decode/free operations. The glTF prebuilt rejects this
+path; no unsupported-output comparison is claimed. The required native package
+gate runs these tests, so verify and check:merge hold them. All original inputs
+remain in the expanded 3,881-input manifest.
+
+An independent work regression proves fewer seam-free mapping walks and fails
+with the old scan. The paired diagnostic has no overall speed gain and retains
+two small timing losses. The coordinator assigns browser pipe teardown to batch
+160 and permits the optional decoder entry after non-warm gates pass, keeping
+the prebuilt default while warm losses remain. Public integration, historical
+predictor 3, other feature/conversion/lifecycle checks and complete cold/RSS
+targets are still open. No shipping or full performance gate is closed here.
+
+The final owned exclusive GPU session passes decoder browser and Node/glTF checks, glTF browser, glTF-pro materials, and all 17 decoder README examples (3 Node, 14 page). These still exercise the unchanged public prebuilt paths; they do not prove pending Rust public integration. The prior queued/EPERM attempts remain diagnostic evidence. The paired cold process tree was intentionally ended at the context handoff, with no surviving owned measurement processes; its code 1 records interruption, not a completed gate.
+
+### Batch 133 optional landing evidence: section 5
+
+Coordinator note 2 authorizes only the optional decoder landing. One Rust crate
+builds one lazy Wasm for `@margoengine/decoders/draco-native`; dedicated workers
+reuse the existing pool's cancellation, timeout, transfer and disposal behavior.
+No core or stage change is involved. Defaults and both prebuilts remain. Native
+and Wasm hostile-input regressions stay in verify; the public bridge adds frozen
+point records, accessor conversion and budget checks, plus worker/production
+consumer coverage in the decoder browser gate. Warm losses remain open; current
+cold/RSS/startup and full historical feature inventory are not claimed complete.
+
+The landing gate caught two omitted registrations: the new entry's transfer
+budget and its two lazy runtime assets. The existing ratchet now registers only
+the new 65,504 B measured entry at 67,470 B; all old limits stay unchanged. A
+new regression fails before registration and passes after, also checking the
+smaller Wasm and absence from the default entry. The full unit run is 13,539
+passes / one missing-lazy-catalog failure / zero skips. Both assets are now
+registered and sizes regenerated; its matching network record and focused rerun
+remain blocked on GPU acquisition. The 20-minute exclusive queue expired before
+test startup. Lint, hygiene, quality, 888 API entries / 8,646 exports and explicit
+decoders/glTF/glTF-pro CPU suites pass. No GPU, README runtime or push is claimed.
+Evidence: whitepaper/results/batch-133-landing.json.

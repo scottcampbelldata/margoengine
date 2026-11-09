@@ -1,0 +1,59 @@
+{
+  "cleanRoom": "Only published spec sections and opaque public-API observations supplied these rules. No implementation source read.",
+  "multiCandidates": [
+    {
+      "walk": "start entry; SwingLeft then reset and SwingRight",
+      "result": "wrong ordered bytes in open split fan",
+      "log": "multi-candidate"
+    },
+    {
+      "walk": "start entry; SwingRight only, stop boundary or closure",
+      "result": "all 112 discovery cases exact, then all 135 held cases after separate degree-seed root fix",
+      "log": "multi-right-walk"
+    }
+  ],
+  "degreeRoot": "EdgebreakerGenerateSequence invokes PredictionDegree_TraverseFromCorner for every face; the latter visits three seed vertices before checking face visitation. Prototype early visited-face return was erroneous.",
+  "metadataRoot": "Published UI8 value size is contradicted by accepted varUI32 long-value probes. Preserve raw metadata in a flat arena and iterate all children without a fixed depth ceiling.",
+  "logs": [
+    {
+      "path": "test-results/batch-133/multi-candidate.log",
+      "bytes": 1192,
+      "sha256": "fbd71e72faba4877a504163e7e93e664eec9112fe3af3b63d2ec12d1ee8de85a"
+    },
+    {
+      "path": "test-results/batch-133/multi-right-walk.log",
+      "bytes": 483,
+      "sha256": "7c84729eba6998e6aff3fe16a60446e1f5b521997b59e6e4622c86d3f18cea3b"
+    },
+    {
+      "path": "test-results/batch-133/multi-held-native.log",
+      "bytes": 1027,
+      "sha256": "c9cfbf21a21be5fcc81f903b1b862da5856e93368e302f9cc3855de922ce66fa"
+    },
+    {
+      "path": "test-results/batch-133/multi-held-native-fixed.log",
+      "bytes": 483,
+      "sha256": "01e8c7b53b2d34170034f6921da85845e04fff8c1a700c69f784171256cfc746"
+    },
+    {
+      "path": "test-results/batch-133/metadata-before.log",
+      "bytes": 927,
+      "sha256": "23b56a281a6197059ed50478209b68995bcaa340f429966131be32c2a31a73f4"
+    },
+    {
+      "path": "test-results/batch-133/metadata-native.log",
+      "bytes": 476,
+      "sha256": "f1911f9e653a2b4cfd4142c51935d06850035026cf2f2b62b95128c4c47a3e90"
+    },
+    {
+      "path": "test-results/batch-133/feature-merge-regression.log",
+      "bytes": 1175,
+      "sha256": "97dbcd58a3f1b51bdb7c5223206c83c5be8d05ba05e9250e7006d9513ee2b5fc"
+    },
+    {
+      "path": "test-results/batch-133/feature-merge-regression-direct.log",
+      "bytes": 223,
+      "sha256": "9384f34099fb8cada3927a7501e67bb71c58f813386eddfe36c1b084beec4464"
+    }
+  ]
+}

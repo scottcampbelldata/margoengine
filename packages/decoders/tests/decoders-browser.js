@@ -8,9 +8,9 @@ import { decodePNG } from '../dist/png.js';
 import jxlRecords from './fixtures/jxl/records.json';
 import { parsePVR } from '../dist/pvr.js';
 import { DracoPointsDecoder } from '../dist/draco-points.js';
+import { DracoDecoder as NativeDraco, DracoPointsDecoder as NativePoints } from '../dist/draco-native.js';
 
-const fixture = async (name) =>
-  new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
+const fixture = async (name) => new Uint8Array(await (await fetch(`/tests/fixtures/${name}`)).arrayBuffer());
 const check = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -82,7 +82,10 @@ async function readLevels(device, texture) {
     const width = Math.max(1, texture.width >> level),
       height = Math.max(1, texture.height >> level),
       rowBytes = Math.ceil((width * 4) / 256) * 256,
-      read = device.createBuffer({ size: rowBytes * height * layers, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+      read = device.createBuffer({
+        size: rowBytes * height * layers,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      }),
       encoder = device.createCommandEncoder();
     encoder.copyTextureToBuffer(
       { texture, mipLevel: level },
@@ -102,6 +105,49 @@ async function readLevels(device, texture) {
 }
 
 window.runDecoderTests = async () => {
+  // The optional clean-room worker must preserve public output and pool lifecycle.
+  const nativeDraco = new NativeDraco({ workerLimit: 2 }),
+    nativePoints = new NativePoints({ workerLimit: 1 });
+  try {
+    const bytes = await fixture('readme/avocado.drc');
+    const results = await Promise.all(
+      Array.from({ length: 16 }, () =>
+        nativeDraco.decode(bytes, {
+          attributeIds: { POSITION: 3, NORMAL: 1, TEXCOORD_0: 0 },
+        }),
+      ),
+    );
+    check(
+      results.every((r) => r.vertexCount === 406 && r.indices.length === 2046),
+      'optional native concurrency',
+    );
+    check(
+      results.every((r) => r.positions.every((v, i) => Object.is(v, results[0].positions[i]))),
+      'optional native owned outputs',
+    );
+    const cloud = await nativePoints.decode(await fixture('draco-points/survey.drc'));
+    check(
+      cloud.pointCount === 1000 && cloud.attributes.some((a) => a.name === 'intensity'),
+      'optional native point metadata',
+    );
+    const transferred = (await fixture('readme/avocado.drc')).buffer;
+    const pending = nativeDraco.decode(transferred, { transfer: true });
+    check(transferred.byteLength === 0, 'optional native input transfer');
+    await pending;
+    const aborted = new AbortController();
+    aborted.abort();
+    await nativeDraco.decode(bytes, { signal: aborted.signal }).then(
+      () => {
+        throw new Error('optional native abort accepted');
+      },
+      (e) => check(e.name === 'AbortError', 'optional native abort'),
+    );
+    nativeDraco.dispose();
+    check((await nativeDraco.decode(bytes)).vertexCount === 406, 'optional native restart after disposal');
+  } finally {
+    nativeDraco.dispose();
+    nativePoints.dispose();
+  }
   const checks = [],
     report = { checks };
   const spawned = [];
@@ -294,7 +340,10 @@ window.runDecoderTests = async () => {
   const streamCube = await streamer.open('/tests/fixtures/ktx2-layers/cube-uastc-zstd.ktx2'),
     hdrStream = await streamer.open('/tests/fixtures/ktx2-hdr/cube-uastc-hdr.ktx2'),
     firstLevel = streamCube.residentLevel;
-  check(statuses.every((status) => status === 206), `Range reads answered ${statuses}`);
+  check(
+    statuses.every((status) => status === 206),
+    `Range reads answered ${statuses}`,
+  );
   check(firstLevel > 0 && streamCube.texture.width < 64, `a stream starts small, at level ${firstLevel}`);
   check(streamCube.format === packedCube.format, `${streamCube.format} stream of a ${packedCube.format} cube`);
   await toFull(streamCube);
@@ -343,7 +392,9 @@ window.runDecoderTests = async () => {
       wasmMs = performance.now() - wasmStart;
     device.pushErrorScope('validation');
     const gpuStart = performance.now(),
-      texture = await gpuDecoder.createTexture(bytes, { usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC });
+      texture = await gpuDecoder.createTexture(bytes, {
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      });
     await device.queue.onSubmittedWorkDone();
     const gpuMs = performance.now() - gpuStart,
       gpuError = await device.popErrorScope();
@@ -361,7 +412,15 @@ window.runDecoderTests = async () => {
           worst = Math.max(worst, Math.abs(level[at] - wanted[at]));
         }
     });
-    report.gpuTranscode.push({ name, levels: levels.length, layers: texture.depthOrArrayLayers, differ, worst, wasmMs, gpuMs });
+    report.gpuTranscode.push({
+      name,
+      levels: levels.length,
+      layers: texture.depthOrArrayLayers,
+      differ,
+      worst,
+      wasmMs,
+      gpuMs,
+    });
     check(differ === 0, `${name}: ${differ} bytes differ from the Wasm transcoder, worst ${worst}`);
     texture.destroy();
     // A small storage buffer limit splits a level into bands; the bytes must not change.
@@ -378,7 +437,10 @@ window.runDecoderTests = async () => {
         cut = await banded.createTexture(bytes, { usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC }),
         cutLevels = await readLevels(device, cut);
       cutLevels.forEach((level, i) => {
-        check(level.every((value, at) => value === levels[i][at]), `${name} level ${i} changes when it is cut into bands`);
+        check(
+          level.every((value, at) => value === levels[i][at]),
+          `${name} level ${i} changes when it is cut into bands`,
+        );
       });
       cut.destroy();
       banded.dispose();
@@ -392,13 +454,18 @@ window.runDecoderTests = async () => {
   const jxlFile = async (name) => new Uint8Array(await (await fetch(`/tests/fixtures/jxl/${name}`)).arrayBuffer()),
     jxl = new JXLDecoder({ browser: false, workerLimit: 1 }),
     sha = async (data) =>
-      [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))].map((v) => v.toString(16).padStart(2, '0')).join('');
+      [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))]
+        .map((v) => v.toString(16).padStart(2, '0'))
+        .join('');
   for (const [name, record] of Object.entries(jxlRecords)) {
     const image = await jxl.decode(await jxlFile(`${name}.jxl`));
     check(image.decoder === 'wasm', `${name} went through ${image.decoder}`);
     check((await sha(image.data)) === record.sha256, `${name} decodes to other bytes in the worker`);
   }
-  check(spawned.some(({ url, type }) => url.includes('jxl.worker') && type === 'module'), 'JPEG XL ran in a module worker');
+  check(
+    spawned.some(({ url, type }) => url.includes('jxl.worker') && type === 'module'),
+    'JPEG XL ran in a module worker',
+  );
   const jxlBytes = await jxlFile('bicycles.jxl');
   let jxlCut;
   await jxl.decode(jxlBytes.subarray(0, jxlBytes.length - 1)).catch((error) => (jxlCut = error));
@@ -414,10 +481,15 @@ window.runDecoderTests = async () => {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
     }),
     [jxlTexels] = await readLevels(device, jxlTexture);
-  check(jxlTexels.every((value, at) => value === jxlImage.data[at]), 'JPEG XL texels read back differ');
+  check(
+    jxlTexels.every((value, at) => value === jxlImage.data[at]),
+    'JPEG XL texels read back differ',
+  );
   jxlTexture.destroy();
   jxl.dispose();
-  checks.push('JPEG XL decodes in a module worker to the bytes of the Node run, stops on abort, and reads back from the GPU');
+  checks.push(
+    'JPEG XL decodes in a module worker to the bytes of the Node run, stops on abort, and reads back from the GPU',
+  );
   // The browser path. A real browser with JPEG XL is reported when there is one; on this Chromium a PNG stands in for it, so the
   // read back through the canvas is tested and the browser's own decoder is not.
   const jxlPNG = await jxlFile('blendmodes-reference.png'),
@@ -436,7 +508,9 @@ window.runDecoderTests = async () => {
   report.jxlBrowser = (await jxlNative.decode(jxlBytes)).decoder;
   check((await jxlNative.decode(jxlBytes)).decoder === report.jxlBrowser, 'the second decode took another path');
   jxlNative.dispose();
-  checks.push(`JPEG XL with no option: this browser went through ${report.jxlBrowser}; the canvas read back passed on a stand-in`);
+  checks.push(
+    `JPEG XL with no option: this browser went through ${report.jxlBrowser}; the canvas read back passed on a stand-in`,
+  );
   // PVR: every level of a real file, decoded on the CPU, reads back from the GPU as it was written.
   const pvr = parsePVR(new Uint8Array(await (await fetch('/tests/fixtures/pvr/fern.pvr')).arrayBuffer())),
     pvrTexture = uploadTexture(device, pvr, {
@@ -445,7 +519,10 @@ window.runDecoderTests = async () => {
     pvrLevels = await readLevels(device, pvrTexture);
   check(pvrLevels.length === pvr.mipmaps.length, `PVR uploaded ${pvrLevels.length} of ${pvr.mipmaps.length} levels`);
   pvrLevels.forEach((level, i) => {
-    check(level.every((value, at) => value === pvr.mipmaps[i].data[at]), `PVR level ${i} reads back differently`);
+    check(
+      level.every((value, at) => value === pvr.mipmaps[i].data[at]),
+      `PVR level ${i} reads back differently`,
+    );
   });
   pvrTexture.destroy();
   checks.push(`A real PVRTC file uploads as ${pvr.format}, ${pvr.mipmaps.length} levels, and reads back as decoded`);
@@ -453,11 +530,19 @@ window.runDecoderTests = async () => {
   const points = new DracoPointsDecoder({ workerLimit: 1 }),
     survey = await points.decode(await (await fetch('/tests/fixtures/draco-points/survey.drc')).arrayBuffer()),
     intensity = survey.attributes.find(({ name }) => name === 'intensity');
-  check(survey.pointCount === 1000 && survey.indices.length === 1000 && survey.indices[999] === 999, 'survey cloud size');
-  check(intensity?.array instanceof Float32Array && intensity.array[999] === 999 / 4, 'generic attribute through the worker');
+  check(
+    survey.pointCount === 1000 && survey.indices.length === 1000 && survey.indices[999] === 999,
+    'survey cloud size',
+  );
+  check(
+    intensity?.array instanceof Float32Array && intensity.array[999] === 999 / 4,
+    'generic attribute through the worker',
+  );
   let pointsRefused;
   await points
-    .decode(await (await fetch('/tests/fixtures/draco-points/survey.drc')).arrayBuffer(), { limits: { maxVertices: 10 } })
+    .decode(await (await fetch('/tests/fixtures/draco-points/survey.drc')).arrayBuffer(), {
+      limits: { maxVertices: 10 },
+    })
     .catch((error) => (pointsRefused = error));
   check(/raise maxVertices/.test(pointsRefused?.message), `limit gave ${pointsRefused}`);
   points.dispose();

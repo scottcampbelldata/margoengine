@@ -798,6 +798,10 @@
       "types": "./dist/decoders/pvr.d.ts",
       "import": "./dist/decoders/pvr.js"
     },
+    "./decoders/draco-native": {
+      "types": "./dist/decoders/draco-native.d.ts",
+      "import": "./dist/decoders/draco-native.js"
+    },
     "./decoders/draco-points": {
       "types": "./dist/decoders/draco-points.d.ts",
       "import": "./dist/decoders/draco-points.js"

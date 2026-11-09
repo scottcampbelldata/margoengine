@@ -2670,3 +2670,60 @@ claim or whole-audit completion is made.
 createHeadlessStage names onError's function/undefined contract in its linked
 TypeError before GPU installation or engine creation. Proof and reproduction:
 packages/headless/tests/stage.test.js and [size restoration](../size-restore.md).
+
+## Batch 133 development checkpoint (not a release claim)
+
+The unshipped Draco Rust/Wasm prototype matches all 454 original payloads in
+ordered native and float bytes. The retained topology suite has 730 exact cases,
+including all 31 former capped-fan failures, and the KD suite has 369 exact cases.
+Releasing prediction-only owners before final array construction reduces the
+same-corpus committed Wasm peak from 23,789,568 to 18,874,368 bytes against the
+prebuilt target 20,185,088. Oracle-derived output hashes and the unchanged ceiling
+make the memory regression fail on the saved old artifact and pass on the new.
+Evidence and scope are in [the checkpoint](results/batch-133-resume.json).
+Full feature/lifecycle parity, paired speed, process RSS and final distribution
+gates remain open; neither shipped prebuilt has been replaced.
+
+The continuation adds 289 exact multi-parallelogram/traversal cases and 41
+metadata cases without removing any earlier fixture. Native and Wasm tests
+cover long values, raw names/binary bytes, file and attribute roots and 129 child
+levels. The original 454 payloads and both exposed metadata seeds remain exact;
+the peak remains 18,874,368 bytes. The package's native/Wasm regression test is
+now reached by `verify` and `check:merge`. Evidence is the same scoped checkpoint.
+Public text conversion and the remaining feature/integration gates remain open.
+
+### Batch 133 expanded entry-flavor diagnostic
+
+[Development evidence](results/batch-133-gates.json) preserves all 454 original
+targets and expands to 1,937 unique complete files. Full output matches all
+1,937; glTF output matches all 1,003 accepted files. Ordered native and supported
+float extractions and descriptors are exact. Native FLOAT64/BOOL extraction is
+not exposed by the prebuilt API; its supported FLOAT32 output is compared. The
+214 dual-output cases preserve the builds' distinct method-2 behavior. This is
+not a public loader/lifecycle, complete feature inventory, speed or completion
+claim. The source-read reduction in the bit cursor preserves output, with no
+elapsed-time gain claimed until the paired run finishes.
+
+### Batch 133 predictive traversal and mapping work
+
+[The continuation evidence](results/batch-133-resume8.json) records 2,160 exact
+full-build predictive EdgeBreaker cases, six versions, split/component cases and
+raw attribute canaries. The glTF build rejects these inputs; no match against an
+unsupported path is claimed. Native and Wasm tests retain both Rust flavors,
+362,250 strict nonempty prefixes, 8,192 mutations and repeated frees. The mapping
+test proves fewer seam-free fan steps with unchanged ordered output, and fails
+when the old redundant search is restored. Its paired run shows no overall
+decoder speed gain and retains two small timing losses. No complete decoder,
+public integration, speed parity or prebuilt-removal claim is made.
+
+## Batch 133 optional entry boundary
+
+`@margoengine/decoders/draco-native` loads a single clean-room Rust Wasm only on
+first decode in its dedicated worker pool. Default decoder entries and loaders
+retain the two prebuilts. Native evidence remains 3,881/3,881 exact full streams
+and 1,003/1,003 accepted glTF streams; the additional predictive fixture has 2,160
+full exact cases. The optional bridge checks frozen real point-cloud output,
+normalized accessor conversion, subset/output budgets, corrupt-input recovery,
+concurrent workers and a production consumer. This is an opt-in integration claim,
+not complete feature or speed parity. Open warm losses and incomplete cold/RSS/
+historical inventory remain in limits and perf-history.
