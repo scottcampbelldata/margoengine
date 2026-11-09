@@ -1,5 +1,5 @@
 {
-  "commit": "15f6cbca5",
+  "commit": "f2a093294",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1846,6 +1846,10 @@
       "./sidechain": {
         "raw": 3460,
         "gzip": 1559
+      },
+      "./snapshots": {
+        "raw": 4299,
+        "gzip": 1700
       }
     },
     "@margoengine/navmesh": {
@@ -2948,6 +2952,10 @@
       "./animate": {
         "raw": 30704,
         "gzip": 11439
+      },
+      "./extrude": {
+        "raw": 16652,
+        "gzip": 6159
       }
     },
     "@margoengine/tilemap": {
@@ -3236,8 +3244,12 @@
     },
     "@margoengine/viewcube": {
       ".": {
-        "raw": 12793,
-        "gzip": 5065
+        "raw": 12982,
+        "gzip": 5130
+      },
+      "./axes": {
+        "raw": 14843,
+        "gzip": 5773
       }
     },
     "@margoengine/voxel": {

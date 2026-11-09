@@ -115,6 +115,17 @@ try {
   await page.emulateMedia({ colorScheme: 'light' });
   assert.deepEqual(await page.evaluate(() => window.check.theme('auto')), light, 'auto in a light scheme');
   console.log('ok themes');
+  // The axis triad (viewcube/axes) in the bottom-left corner, on the same camera, with the real mouse.
+  await page.evaluate(() => window.check.front());
+  await page.evaluate(() => window.check.settle());
+  const ballX = await page.evaluate(() => window.check.ball('1,0,0')),
+    ballY = await page.evaluate(() => window.check.ball('0,1,0'));
+  assert.ok(ballX.hit && ballY.hit, 'the X and Y balls hit-test');
+  near([ballX.dx, ballX.dy], [23, 0], 'X ball right of the centre', 0.5);
+  near([ballY.dx, ballY.dy], [0, -23], 'Y ball above the centre', 0.5);
+  await page.mouse.click(ballX.x, ballX.y);
+  near((await page.evaluate(() => window.check.settle())).direction, [1, 0, 0], 'X ball click', 1e-6);
+  console.log('ok axis triad');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {

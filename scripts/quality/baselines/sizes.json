@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11402555,
+  "total": 11408584,
   "history": [
     {
       "date": "2026-10-24",
@@ -4718,6 +4718,12 @@
       "commit": "87d8e4dd2",
       "reason": "feat(text): add extruded 3D text entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "f2a093294",
+      "reason": "viewcube axis triad: new entry viewcube/axes 1127 B gzip over the root; root 5065 to 5130 B measured",
+      "grew": 1
     }
   ],
   "items": {
@@ -5488,6 +5494,7 @@
     "@margoengine/video/material": 1407,
     "@margoengine/video/record": 1396,
     "@margoengine/viewcube": 5321,
+    "@margoengine/viewcube/axes": 6029,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,

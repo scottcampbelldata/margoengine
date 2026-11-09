@@ -7,6 +7,7 @@ import { OrbitControls, AUTOCAD, BLENDER, SOLIDWORKS } from '../../controls/dist
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { compactOutput } from '../../../scripts/measure-size.js';
 import { THEMES, ViewCube } from '../dist/index.js';
+import { AxisTriad } from '../dist/axes.js';
 
 /** Inline style: plain fields, plus the custom-property methods. */
 class FakeStyle {
@@ -753,7 +754,75 @@ test('a view option turns that view camera and places the cube in the corner of 
   left.dispose();
 });
 
-test('size budget', async (t) => {
+test('axis triad: X, Y and Z balls turn with the camera and act like the cube', () => {
+  const { engine, plugins } = setup(),
+    c = engine.camera,
+    triad = AxisTriad.attach(engine, { duration: 0, home: true, roll: true }),
+    of = (name) => triad.element.all().filter((e) => e.className === name),
+    balls = of('mvc-ball'),
+    sticks = of('mvc-stick'),
+    at = (e) => /translate\(([-\d.]+)px,([-\d.]+)px\)/.exec(e.style.transform).slice(1).map(Number);
+  assert.ok(triad instanceof ViewCube);
+  assert.equal(triad.element.style.width, '64px', 'smaller than the cube by default');
+  assert.deepEqual(of('mvc-face'), [], 'no cube faces');
+  assert.deepEqual(
+    balls.map((b) => [b.tagName, b.dataset.view, b.getAttribute('aria-label'), b.style.width]),
+    [
+      ['BUTTON', '1,0,0', 'Right view (X)', '18px'],
+      ['DIV', '-1,0,0', null, '12px'],
+      ['BUTTON', '0,1,0', 'Top view (Y)', '18px'],
+      ['DIV', '0,-1,0', null, '12px'],
+      ['BUTTON', '0,0,1', 'Front view (Z)', '18px'],
+      ['DIV', '0,0,-1', null, '12px'],
+    ],
+  );
+  assert.equal(balls[0].style['--c'], 'var(--mvc-x,#c62828)');
+  for (const b of balls.filter((e) => e.tagName === 'BUTTON')) {
+    const color = rgba(/#\w+/.exec(b.style['--c'])[0]);
+    assert.ok(contrast([255, 255, 255], color) >= 4.5, `white letter on ${b.style['--c']}`);
+  }
+  // Front view: centre 32 px, axis length 23 px. +X right of the centre, +Y above it, +Z on the centre in front.
+  assert.deepEqual(at(balls[0]), [46, 23]);
+  assert.deepEqual(at(balls[1]), [3, 26]);
+  assert.deepEqual(at(balls[2]), [23, 0]);
+  assert.deepEqual(at(balls[4]), [23, 23]);
+  assert.deepEqual(
+    balls.map((b) => b.style.zIndex),
+    ['200', '200', '200', '200', '300', '100'],
+  );
+  assert.equal(sticks[0].style.width, '23px');
+  assert.equal(sticks[0].style.transform, 'translate(32px,31px) rotate(0rad)');
+  assert.equal(sticks[4].style.width, '0px');
+  // A click on a ball is that axis view: from the right, -Z is screen right, so the Z ball moves to the left.
+  balls[0].dispatch('click');
+  engine.frame();
+  assert.ok(close(direction(c), [1, 0, 0], 1e-12));
+  assert.deepEqual(at(balls[0]), [23, 23]);
+  assert.deepEqual(at(balls[4]), [0, 23]);
+  assert.equal(balls[0].style.zIndex, '300');
+  // Dragging a ball orbits (two radians per triad width); the click ending the drag starts no view.
+  triad.view('front', 0);
+  balls[4].dispatch('pointerdown', { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  balls[4].dispatch('pointermove', { pointerId: 1, clientX: 32, clientY: 0 });
+  balls[4].dispatch('pointerup', { pointerId: 1, clientX: 32, clientY: 0 });
+  balls[4].dispatch('click');
+  assert.ok(close(direction(c), [Math.sin(-1), 0, Math.cos(-1)], 1e-12), `${direction(c)}`);
+  // Home, roll and themes come with it.
+  assert.equal(triad.element.all().filter((e) => e.dataset.home !== undefined).length, 1);
+  assert.equal(triad.element.all().filter((e) => e.dataset.roll !== undefined).length, 2);
+  triad.roll(1, 0);
+  assert.equal(triad.turns, 1);
+  triad.home(0);
+  assert.ok(close(direction(c), [0, 0, 1], 1e-12));
+  triad.setTheme('dark');
+  assert.equal(triad.element.style['--mvc-background'], THEMES.dark.background);
+  triad.dispose();
+  assert.equal(triad.element.parentElement, null);
+  assert.ok(![...plugins.keys()].some((k) => k.startsWith('margoengine-viewcube')));
+});
+
+/** Minified and gzipped size of a dist entry; `alone` also leaves out the package's own root entry it imports. */
+async function gzipOf(t, file, alone = false) {
   const { build } = await import('vite'),
     { gzipSync } = await import('node:zlib'),
     { mkdtemp, writeFile, rm } = await import('node:fs/promises'),
@@ -764,7 +833,7 @@ test('size budget', async (t) => {
   const entry = join(folder, 'entry.js');
   await writeFile(
     entry,
-    `export * from ${JSON.stringify(fileURLToPath(new URL('../dist/index.js', import.meta.url)).replaceAll('\\', '/'))};`,
+    `export * from ${JSON.stringify(fileURLToPath(new URL(`../dist/${file}`, import.meta.url)).replaceAll('\\', '/'))};`,
   );
   const out = await build({
     root: folder,
@@ -775,11 +844,26 @@ test('size budget', async (t) => {
       minify: true,
       target: 'es2022',
       lib: { entry, formats: ['es'], fileName: 'entry' },
-      rollupOptions: { external: (id) => id.startsWith('@margoengine/'), output: compactOutput },
+      rollupOptions: {
+        external: (id) => id.startsWith('@margoengine/') || (alone && id === './index.js'),
+        output: compactOutput,
+      },
     },
   });
-  const gzip = gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
+  return gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
+}
+
+test('size budget', async (t) => {
+  const gzip = await gzipOf(t, 'index.js');
   console.log(`viewcube gzip: ${gzip} B`);
-  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B, themes 5,065 B (2026-11-08).
+  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B, themes 5,065 B, the build
+  // and draw hooks for the axis triad 5,130 B (2026-11-08).
   assert.ok(gzip < 5150, `${gzip} B`);
+});
+
+test('axis triad size budget: the axes entry over the cube it imports', async (t) => {
+  const gzip = await gzipOf(t, 'axes.js', true);
+  console.log(`viewcube/axes gzip, without the root entry: ${gzip} B`);
+  // Measured 1,127 B (2026-11-08).
+  assert.ok(gzip < 1200, `${gzip} B`);
 });

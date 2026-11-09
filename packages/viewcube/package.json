@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./axes": {
+      "types": "./dist/axes.d.ts",
+      "import": "./dist/axes.js"
     }
   },
   "files": [

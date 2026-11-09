@@ -30,6 +30,8 @@ export class ViewCube {
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
     constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, roll, theme, view }?: ViewCubeOptions);
+    protected build(cube: HTMLDivElement, names: Record<Face, string>, size: number): void;
+    protected draw(_right: readonly number[], _up: readonly number[], back: readonly number[], matrix: string): void;
     view(view: View, duration?: number): void;
     setHome(home?: HomeView): void;
     getHome(): HomeView | undefined;

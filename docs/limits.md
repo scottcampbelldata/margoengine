@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-587). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-588). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -431,6 +431,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | View cube home view (`home` and `setHome` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-580). Enforced: a home is a position and a target, three finite numbers each and apart. | The target and distance move with the eased view angles in one animation; any other camera move during it cancels it. | Only position and target are kept: the field of view, the projection and any zoom of an orthographic camera stay as they are. | Set the projection and field of view yourself after `cube.home()`, or call `camera.fitToBoundingBox` to frame a model. |
 | View cube roll (`roll` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-584). Enforced: `turns` is a finite number. | The cube writes `camera.up` every frame while rolled, so a control that sets `camera.up` itself takes over and ends the roll. | Rest positions are whole quarter turns; a fractional `roll` lands on the nearest. Any view change from the cube is upright. | Set `camera.up` yourself for a free roll angle. |
 | View cube themes (`theme` and `setTheme` on `ViewCube`, 2026-11-08) | Proved by computed WCAG 2 contrast of every built-in pair over a black and a white page, and computed styles in Chromium on a Radeon 680M (LIM-585). Enforced: a theme is a built-in name, `'auto'` or tokens that are strings. | Tokens are plain CSS colour strings and are not parsed; a bad colour falls back as CSS does. | The contrast of your own tokens is not checked; `'auto'` follows the browser's settings only, not the page's. | Start from a `THEMES` set and change single tokens, and check your colours with a WCAG contrast checker. |
+| Axis triad (`AxisTriad` in `@margoengine/viewcube/axes`, 2026-11-08) | Proved with real mouse events in Chromium on a Radeon 680M (LIM-588). By method: each ball is placed by the camera's view rotation in 2D, ordered by depth with `z-index`. | Only the six axis views are clickable (no edges or corners); the cube's arrow keys and Home still work. | A ball straight toward the viewer covers its stick and the centre; balls of axes seen end-on overlap. | Use `ViewCube` for edge and corner views; drag or roll to separate overlapping balls. |
 
 ## Copies of a model
 

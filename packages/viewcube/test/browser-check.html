@@ -4,12 +4,14 @@ import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {CameraProjection} from '/packages/cameras/dist/index.js';
 import {OrbitControls} from '/packages/controls/dist/index.js';
 import {ViewCube} from '/packages/viewcube/dist/index.js';
+import {AxisTriad} from '/packages/viewcube/dist/axes.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,10],target:[0,0,0],near:0.1,far:100}}),errors=[];
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 // Red at +X, blue at -Z, green at the origin: top view puts red right of centre and blue above it.
 for(const [color,position] of [['#ff0000',[2,0,0]],['#0000ff',[0,0,-2]],['#00ff00',[0,0,0]]])engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
 const projection=new CameraProjection({mode:'perspective'});engine.use(projection);
 const orbit=new OrbitControls(engine),cube=new ViewCube(engine,{projection,duration:0.25,home:true,roll:true});
+const triad=new AxisTriad(engine,{corner:'bottom-left',duration:0.25});
 engine.start();
 const direction=()=>{const c=engine.camera,d=c.position.map((v,i)=>v-c.target[i]),l=Math.hypot(...d);return d.map(v=>v/l);};
 window.check={
@@ -23,6 +25,7 @@ window.check={
   front(){cube.view('front',0);},
   button(name){const r=cube.element.querySelector(`[data-${name}]`).getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return document.elementFromPoint(x,y)?.dataset[name]!==undefined?{x,y}:null;},
   theme(name){cube.setTheme(name);const s=getComputedStyle(cube.element.querySelector('.mvc-face'));return {background:s.backgroundColor,color:s.color};},
+  ball(view){const e=triad.element.querySelector(`[data-view="${view}"]`),r=e.getBoundingClientRect(),o=triad.element.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,dx:x-(o.left+o.width/2),dy:y-(o.top+o.height/2),hit:document.elementFromPoint(x,y)===e};},
   home(){const r=cube.element.querySelector('[data-home]').getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return document.elementFromPoint(x,y)?.dataset.home===''?{x,y}:null;},
   toggle(){const r=cube.element.querySelector('[data-projection]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},
 };

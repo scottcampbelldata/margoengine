@@ -31,6 +31,19 @@ cube.roll(1);                                          // a quarter turn counter
 cube.dispose();                                        // engine.dispose() also disposes it
 ```
 
+For less than a cube, `margoengine/viewcube/axes` (`@margoengine/viewcube/axes`) has an axis triad: X, Y and Z
+balls on sticks and a smaller ball at each negative end, turning with the camera.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {AxisTriad} from 'margoengine/viewcube/axes';
+const canvas = document.querySelector('canvas')!;
+
+const engine = await Engine.create(canvas);
+const triad = AxisTriad.attach(engine, {corner: 'bottom-left', home: true}); // every ViewCube option works
+triad.view('right');                                   // a ViewCube in every other way
+```
+
 Options: `container` (default: the canvas's parent; made `position: relative` if it is static), `corner`
 (`'top-right'` default, `'top-left'`, `'bottom-right'`, `'bottom-left'`), `size` (cube edge in CSS pixels, 80),
 `duration` (seconds, 0.4), `projection` (a CameraProjection, or anything with `mode`), `labels` (face names, for
@@ -79,6 +92,14 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   The package tests check every built-in pair against WCAG 2 contrast over both a black and a white page behind the
   translucent fill: text and hovered text at least 4.5:1 (high contrast 7:1), edges and the focus ring at least 3:1.
   The light theme's edges and focus ring are darker than before themes (`#6b7280`, `#0b3d91`) for that reason.
+- **Axis triad.** `AxisTriad` (entry `viewcube/axes`) is a `ViewCube` subclass that builds balls in place of the
+  faces: +X, +Y and +Z are buttons labelled X, Y and Z ("Right view (X)", "Top view (Y)", "Front view (Z)"), the
+  negative ends smaller rings. Each ball sits where its axis points on screen, nearer balls drawn in front, so the
+  view is read the way a CAD axis gizmo reads. Clicking a ball animates to that axis view, dragging orbits (two
+  radians per triad width), and the home view, roll buttons, projection toggle, themes, flip and keyboard behave as
+  on the cube. Default `size` is 64. The axis colours are `--mvc-x`, `--mvc-y` and `--mvc-z` (default `#c62828`,
+  `#2e7d32`, `#1565c0`, white letters at 4.5:1 or more). The cube's `build` and `draw` are the protected hooks it
+  overrides.
 - **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
 - **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and the stage's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
@@ -100,6 +121,6 @@ whole quarter turn), the home view keeps the camera's field of view and
 projection (only position and target), and a custom theme's contrast is yours to check (only the built-in ones are
 tested).
 
-Size: 5,065 B min + gzip (the test enforces under 5,150 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
+Size: 5,130 B min + gzip (the test enforces under 5,150 B); `viewcube/axes` adds 1,127 B on top (under 1,200 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
 
 Unit tests: `npm test --workspace @margoengine/viewcube`. Browser check with real clicks: `node packages/viewcube/test/browser-check.mjs`.

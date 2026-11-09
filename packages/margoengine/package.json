@@ -3050,6 +3050,10 @@
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"
     },
+    "./viewcube/axes": {
+      "types": "./dist/viewcube/axes.d.ts",
+      "import": "./dist/viewcube/axes.js"
+    },
     "./voxel": {
       "types": "./dist/voxel.d.ts",
       "import": "./dist/voxel.js"

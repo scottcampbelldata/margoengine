@@ -310,29 +310,7 @@ export class ViewCube {
     el('style', root).textContent = CSS;
     if (theme) this.setTheme(theme);
     this.cube = el('div', root, 'mvc-cube');
-    for (const face of Object.keys(FACES) as Face[]) {
-      const [n, u, w] = FACES[face],
-        f = el('div', this.cube, 'mvc-face'),
-        k = size / 2;
-      // Element x to the face's right, element y (down) to its down, z outward, pushed out by half the cube.
-      f.style.transform = css([...u, 0, ...w.map((x) => -x), 0, ...n, 0, ...n.map((x) => x * k), 1]);
-      for (let i = 0; i < 9; i++) {
-        const row = 1 - Math.floor(i / 3),
-          col = (i % 3) - 1,
-          d = n.map((x, a) => x + col * u[a] + row * w[a]) as V3,
-          label = describe(d, names),
-          center = i === 4;
-        const cell = el(center ? 'button' : 'div', f);
-        cell.dataset.view = d.join();
-        cell.title = label;
-        if (center) {
-          (cell as HTMLButtonElement).type = 'button';
-          this.buttons.push([cell, n]);
-          cell.textContent = names[face];
-          cell.setAttribute('aria-label', label + ' view');
-        } else cell.setAttribute('aria-hidden', 'true');
-      }
-    }
+    this.build(this.cube, names, size);
     if (projection) {
       const t = (this.toggle = el('button', root, 'mvc-projection'));
       t.type = 'button';
@@ -377,6 +355,61 @@ export class ViewCube {
     this.sync();
   }
 
+  /**
+   * Builds the widget's hot spots in `cube`, the element {@link draw} turns: each element with a `data-view` of three
+   * numbers is clicked and dragged like a face. The cube's six faces of nine cells here; AxisTriad builds balls.
+   */
+  protected build(cube: HTMLDivElement, names: Record<Face, string>, size: number): void {
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, parent: HTMLElement, className?: string) => {
+      const e = cube.ownerDocument.createElement(tag);
+      if (className) e.className = className;
+      parent.appendChild(e);
+      return e;
+    };
+    for (const face of Object.keys(FACES) as Face[]) {
+      const [n, u, w] = FACES[face],
+        f = el('div', cube, 'mvc-face'),
+        k = size / 2;
+
+      // Element x to the face's right, element y (down) to its down, z outward, pushed out by half the cube.
+
+      f.style.transform = css([...u, 0, ...w.map((x) => -x), 0, ...n, 0, ...n.map((x) => x * k), 1]);
+
+      for (let i = 0; i < 9; i++) {
+        const row = 1 - Math.floor(i / 3),
+          col = (i % 3) - 1,
+          d = n.map((x, a) => x + col * u[a] + row * w[a]) as V3,
+          label = describe(d, names),
+          center = i === 4;
+
+        const cell = el(center ? 'button' : 'div', f);
+
+        cell.dataset.view = d.join();
+
+        cell.title = label;
+
+        if (center) {
+          (cell as HTMLButtonElement).type = 'button';
+
+          this.buttons.push([cell, n]);
+
+          cell.textContent = names[face];
+
+          cell.setAttribute('aria-label', label + ' view');
+        } else cell.setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+  /**
+   * Shows the camera's orientation: the rows of its view rotation (screen right, up and back in world space) and the
+   * same as a CSS matrix3d. Called by {@link sync} only when the orientation changed.
+   */
+  protected draw(_right: readonly number[], _up: readonly number[], back: readonly number[], matrix: string): void {
+    this.cube.style.transform = matrix;
+    // Only faces turned toward the viewer take keyboard focus (screen readers still reach all six).
+    for (const [button, n] of this.buttons)
+      button.tabIndex = n[0] * back[0] + n[1] * back[1] + n[2] * back[2] > 0.05 ? 0 : -1;
+  }
   /** Animates to a view (`duration` 0 jumps). The target and distance stay; vertical views keep -Z (top) or +Z (bottom) up. */
   view(view: View, duration = this.duration): void {
     const d = typeof view === 'string' ? (view === 'iso' ? [1, 1, 1] : FACES[view]?.[0]) : view;
@@ -505,9 +538,7 @@ export class ViewCube {
     // Rows (right, up, back) with y flipped for CSS: the columns are the images of world X, Y and Z.
     const m = css([xx, -yx, zx, 0, xy, -yy, zy, 0, xz, -yz, zz, 0, 0, 0, 0, 1]);
     if (m === this.last) return;
-    this.cube.style.transform = this.last = m;
-    // Only faces turned toward the viewer take keyboard focus (screen readers still reach all six).
-    for (const [button, n] of this.buttons) button.tabIndex = n[0] * zx + n[1] * zy + n[2] * zz > 0.05 ? 0 : -1;
+    this.draw([xx, xy, xz], [yx, yy, yz], [zx, zy, zz], (this.last = m));
   }
   dispose(): void {
     if (this.disposed) return;

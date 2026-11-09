@@ -3348,6 +3348,11 @@ Five optional video entries, built clean room on the dev PC (RTX A6000, Edge). E
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
+| 1 | Drag to orbit on the cube | DONE | fa07cbcf0 | `drag` option and field | LIM-579 |
+| 2 | Your own home view | DONE | 333940364 | `home`, `setHome`, `getHome`, `home()` | LIM-580 |
+| 3 | Roll buttons | DONE | c57cd2ce4 | `roll` option, `roll(turns)`, `turns` | LIM-581 |
+| 4 | Themes | DONE | 70522dc8c | `theme`, `setTheme`, `THEMES` | LIM-585 |
+| 5 | Axis triad gizmo | DONE | this commit | `@margoengine/viewcube/axes` (`AxisTriad`) | LIM-588 |
 | 1 | External video on mesh materials | DONE (stand-in evidence) | 52620833b | `@margoengine/video/material` | LIM-566 |
 | 2 | Canvas recording with audio | DONE (stand-in evidence) | 4b83eee8a | `@margoengine/video/record` | LIM-571 |
 | 3 | 360 and stereo video | DONE (stand-in screen/XR evidence) | 687f4b330 | `@margoengine/video/360` | LIM-573 |
@@ -3384,3 +3389,26 @@ motion, and clean-room extruded 3D vector text meshes from OpenType font files.
 - **Sources:** `docs/clean-room.md` rows TX1 to TX3: ISO/IEC 14496-22 / OpenType specification for TrueType (`glyf`/`loca`) and PostScript (`CFF ` / Type 2 charstrings); Adobe Technical Notes #5176 and #5177; Held (2001) and Eberly (2002) for ear clipping triangulation with hole bridging seams.
 - **Limits:** rows in `docs/limits.md` for text atlas eviction (LIM-572), per-glyph animation (LIM-577), and extruded 3D text (LIM-587).
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=text`, API surface check, quality size baseline, LLMS check, and text browser GPU test suite.
+
+- **Built from:** the `docs/clean-room.md` section "View cube: `@margoengine/viewcube` (batch 109)": spherical
+  coordinates, W3C Pointer Events, Rodrigues' rotation formula, WCAG 2.2 contrast, CSS Custom Properties, Media
+  Queries Level 5, CSS Transforms. No other engine's or CAD application's view cube or gizmo source was read.
+- **Proved (real GPU, this Beelink):** `node packages/viewcube/test/browser-check.mjs` in Chromium with real mouse
+  events: a 40 px drag turns one radian, the home button returns to the attach view, the roll button puts +X up the
+  screen, the computed face colours follow the dark, high contrast and `'auto'` themes under an emulated dark and
+  light scheme, and the triad's X and Y balls sit 23 px from its centre and a click on X turns to the right view.
+  Node tests: `packages/viewcube/test/viewcube.test.js` (18 tests, including WCAG 2 contrast of every built-in
+  colour pair over a black and a white page).
+- **Sizes (gzip, B):** root entry 3,394 before the batch, then 3,709, 4,101, 4,619, 5,065 and 5,130 (the test
+  budget is now 5,150, each raise with its measured reason in its commit); `viewcube/axes` 1,127 over the root.
+- **Slips and bugs:** job 1's clean-room row landed in the VFX table with the section's paragraph above its
+  heading (fixed in job 2). Job 2's home button covered the cube's top-left corner cell in the front view (fixed in
+  job 3 with a browser regression check that all nine front cells hit-test). The light theme's old edge and focus
+  colours failed 3:1 (now darker, test-checked). Batch 108's README example `engine.pick` slip (fixed on main in
+  e165bfedf) is covered by this batch's closing verify.
+- **Limits and unmeasured:** rows in `docs/limits.md`. One browser (Chromium); touch drags, other browsers and
+  `prefers-contrast` in a real browser are not run.
+Five jobs for `@margoengine/viewcube` on the Beelink (Radeon 680M), one commit each. Jobs 1 to 4 extend the
+`ViewCube` in the package's root entry; job 5 adds the entry `@margoengine/viewcube/axes`. Core and stage are
+untouched (23,626 B gzip together after the batch).
+## Lane H batch 109: viewcube
