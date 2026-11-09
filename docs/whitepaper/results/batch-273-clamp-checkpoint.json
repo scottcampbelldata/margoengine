@@ -32,5 +32,123 @@
   "units": "13/13 device tests; 2 added regressions fail on parent",
   "remaining": "High-bit stencil reference masking before GL",
   "sizeCeilings": "unchanged",
-  "cleanRoom": "docs/clean-room.md"
+  "cleanRoom": "docs/clean-room.md",
+  "gates": {
+    "invokedVerify": {
+      "result": "failed API snapshots; retained original result",
+      "receipt": "test-results/batch-273-clamp-verify-result.json"
+    },
+    "api": "Updated 3 exposed extension-type reports; 899 entries/8702 exports match",
+    "completedChains": [
+      {
+        "label": "api",
+        "command": "npm run api:check",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 17.4
+      },
+      {
+        "label": "quality",
+        "command": "npm run quality",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 43.6
+      },
+      {
+        "label": "units",
+        "command": "node --experimental-test-module-mocks --test --test-concurrency=8 --test-timeout=300000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js",
+        "ok": false,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 332
+      },
+      {
+        "label": "voxel-sandbox",
+        "command": "npm run test --workspace examples/voxel-sandbox",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 34.5
+      }
+    ],
+    "repositoryUnits": {
+      "tests": 14099,
+      "passed": 14095,
+      "failed": 4,
+      "skipped": 0,
+      "repairs": "ViewCube sceneOf stand-in (18/18 pass) and generated llms guide (complete llms test file passes)"
+    },
+    "compatibilityUnits": 159,
+    "gpu": [
+      {
+        "label": "features",
+        "command": "node packages/webgl2-compat/test/features-browser.mjs",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19.1
+      },
+      {
+        "label": "device",
+        "command": "node packages/webgl2-compat/test/compat-browser-check.mjs",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 31.5
+      },
+      {
+        "label": "materials-native",
+        "command": "node packages/materials/test/browser-check.mjs",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 38.5
+      },
+      {
+        "label": "materials-compat",
+        "command": "node packages/materials/test/browser-check.mjs --compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 62.2
+      },
+      {
+        "label": "render-native",
+        "command": "node scripts/material-render-state-gpu-check.js",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 20.4
+      },
+      {
+        "label": "readme",
+        "command": "npm run check:readme-run -- --packages=webgl2-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 20.1
+      }
+    ],
+    "lint": "pass",
+    "hygiene": "pass",
+    "failedFilesRerun": {
+      "tests": 27,
+      "passed": 27,
+      "failed": 0,
+      "receipt": "test-results/batch-273-clamp-final-fixed-units.log"
+    },
+    "viewcubeBrowser": {
+      "native": "pass after fixture edit",
+      "compat": "pass after frame publication repair",
+      "readme": "all examples pass",
+      "receipts": [
+        "batch-273-clamp-viewcube-native-after-result.json",
+        "batch-273-clamp-viewcube-compat-after-result.json",
+        "batch-273-clamp-viewcube-readme-result.json"
+      ]
+    },
+    "verificationPlan": "All chains completed; original API failure and four unit failures retained, repaired and checked in their owning files. No second full verification on unchanged runtime."
+  }
 }

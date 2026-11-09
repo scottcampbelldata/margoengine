@@ -116,6 +116,7 @@ function setup(camera = { position: [0, 0, 10], target: [0, 0, 0] }) {
       return engine;
     },
     hasPlugin: (name) => plugins.has(name),
+    // Controls dispose through the scene that owns the exact registered wrapper.
     sceneOf: (plugin) => plugins.get(plugin.name) === plugin ? engine : undefined,
     removePlugin(name) {
       const p = plugins.get(name);

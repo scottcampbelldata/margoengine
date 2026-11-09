@@ -4286,3 +4286,16 @@ pixels in each of four default/secondary direct/owner cases. No capture source
 was changed. Root size 2144 -> 2211 B; ceiling 2199 -> 2467 B under Scott's
 optional-size exception. Splitting would add bootstrap complexity for correctness
 that all overlays require.
+
+### Batch 273 fixture ownership and frame publication
+
+Compared Anindya Banerjee and David A. Naumann, Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs (2002),
+https://arxiv.org/abs/cs/0212003; Ecma International, ECMAScript 2026 Language
+Specification (2026), https://262.ecma-international.org/17.0/#sec-map.prototype.get;
+and WHATWG contributors, HTML Living Standard, Event loops and Update the
+rendering (2026), https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering.
+The design inference is to preserve registration identity in the test stand-in
+and explicitly publish a camera change before reading CSS coordinates, rather
+than depending on an intervening animation frame. These repair fixture contracts;
+no engine implementation or camera/pixel tolerance changes. No companion code read.

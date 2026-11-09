@@ -4955,3 +4955,20 @@ and client close at the unchanged hard limit. Deterministic parent failures and
 repair class. The old generic timeout cannot establish which substep stalled
 in that original run; retain that evidence limit. See size-restore.md and
 known-bugs.md. No full verification replay or speed measurement is claimed.
+
+### Section 5 evidence: batch 273 checkpoint fixture acceptance
+
+The full repository units completed 14,099 tests: 14,095 passed and four failed.
+Three ViewCube integration tests failed because their single-scene EngineKernel
+stand-in lacked sceneOf after Controls began resolving exact wrapper ownership.
+The fixture now implements that required identity-based method, matching the
+real engine; all 18 ViewCube tests pass without altered camera assertions.
+The fourth failure was stale generated site/llms-full.txt after the README edit;
+regeneration and tests/llms.test.js resolve it. No failed result is discarded.
+ViewCube's full compat browser check also clicked a corner instead of an edge:
+front() changed the camera but read CSS hit coordinates before the frame graph
+published the new orientation. The fixture now renders that requested frame
+synchronously before the next coordinate query. The full original browser
+assertions pass afterward. No ViewCube or Controls runtime bytes changed.
+Receipts: test-results/batch-273-clamp-resume-units.log,
+batch-273-clamp-viewcube-{diagnose,owner-after,compat,compat-after}.log.

@@ -22,7 +22,8 @@ window.check={
   },
   async settle(){await new Promise(r=>setTimeout(r,400));await engine.gpu.queue.onSubmittedWorkDone();return {direction:direction(),animating:cube.animating,errors:errors.splice(0),mode:projection.mode,turns:cube.turns,up:[...engine.camera.up],ortho:!engine.camera.matrix[11]};},
   focus(){const tabbable=[...cube.element.querySelectorAll('button[tabindex="0"]:not([data-projection])')].map(b=>b.getAttribute('aria-label'));cube.element.querySelector('[aria-label="Top view"]').focus();return {tabbable,active:document.activeElement.getAttribute('aria-label')};},
-  front(){cube.view('front',0);},
+  // Publish the camera's new matrix to the CSS hit targets before the next mouse coordinate is read.
+  front(){cube.view('front',0);engine.render();},
   button(name){const r=cube.element.querySelector(`[data-${name}]`).getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return document.elementFromPoint(x,y)?.dataset[name]!==undefined?{x,y}:null;},
   theme(name){cube.setTheme(name);const s=getComputedStyle(cube.element.querySelector('.mvc-face'));return {background:s.backgroundColor,color:s.color};},
   ball(view){const e=triad.element.querySelector(`[data-view="${view}"]`),r=e.getBoundingClientRect(),o=triad.element.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,dx:x-(o.left+o.width/2),dy:y-(o.top+o.height/2),hit:document.elementFromPoint(x,y)===e};},
