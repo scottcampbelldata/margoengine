@@ -2806,6 +2806,10 @@
       "types": "./dist/staging/accumulate.d.ts",
       "import": "./dist/staging/accumulate.js"
     },
+    "./staging/pathtrace": {
+      "types": "./dist/staging/pathtrace.d.ts",
+      "import": "./dist/staging/pathtrace.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

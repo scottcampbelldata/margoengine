@@ -2077,3 +2077,14 @@ The count oracle advanced four bytes per float vertex property and ignored color
 ### Open: biome whole-world I/O README does not finish within the page budget (2026-11-09)
 
 Repro: npm run check:readme-run -- --packages=biomes. The docs-files-files-in-and-out-7b879b example creates the default 4 km world, exports complete height/weights/masks/temperature data, then saves/loads and compares digests. The corrected runner reports failure after 20 s while waiting for module completion and closes the owning browser. No missing file or network fixture is involved in those exports. The repeated whole-world generation/serialization workload is the path to profile; the individual expensive or stalled operation has not yet been isolated. This is still open, without a claimed root-cause repair, accepted slowdown, shrunk example or raised deadline. The aborted wider audit supplies no result for later examples.
+
+### Batch 56 idle-still audit
+
+No new open defect found. ProgressiveStill reuses the triangle integrator and its documented flat
+static scene limits. Its Windows compatibility test uses ANGLE Vulkan; the inherited Direct3D
+compiler problem is already tracked by the owning package. No new renderer or external source
+was copied, and no general photographic-material fidelity is claimed.
+
+The pre-attachment array lifetime across lazy loading was repaired before landing, with an
+independent mutation regression including non-cloneable content-key identity. Planner fixture
+assumptions were updated for the new real dependency, with stronger downstream/full-plan assertions.

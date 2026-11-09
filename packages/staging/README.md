@@ -205,3 +205,69 @@ Bounds are fitted once, so call the camera's fitToBoundingBox after changing pro
 A glTF with no drawable bounds rejects; a failed setup restores camera state. Native WebGL2 is
 unsupported; WebGL2 compatibility passes the same real-model pixel and radius assertions.
 The FlightHelmet test fixture is a licensed real product model; no photographic quality or speed claim.
+## An idle path-traced still
+
+`@margoengine/staging/pathtrace` adds an idle controller to the existing optional
+`@margoengine/voxel-pathtracer/mesh` integrator. Camera motion shows the ordinary raster frame;
+after 0.25 unchanged-camera seconds, the viewport accumulates a still. Changing the camera or
+canvas size clears the history. This entry loads the integrator and its feature-local Rust/Wasm
+BVH only when `ProgressiveStill.attach` is called. Install the optional voxel-pathtracer peer
+when using staging on its own.
+
+This example makes a neutral plastic surface study of an existing model, explicitly replacing
+its authored materials. `worldTriangles` snapshots world-space geometry; it does not transfer
+textures, material extensions or a changing animation pose:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {worldTriangles} from 'margoengine/bvh';
+import {ProgressiveStill} from 'margoengine/staging/pathtrace';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0.3, 0.85], target: [0, 0.25, 0]},
+});
+const model = await loadGLTF(engine, '/shoe.glb', {signal: AbortSignal.timeout(30_000)});
+const geometry = worldTriangles(engine, [model]);
+const still = await ProgressiveStill.attach(engine, {
+  scene: {
+    revision: 1, models: [], instances: [],
+    materials: [{id: 1, type: 'plastic', color: [0.55, 0.25, 0.08], roughness: 0.3}],
+    meshes: [{id: 'product', positions: geometry.vertices, indices: geometry.indices, material: 1}],
+    environment: {skyIntensity: 0.3, sunIntensity: 3, groundColor: [0.7, 0.7, 0.7]},
+  },
+  idleDelay: 0.25, maxSamples: 1024, denoise: true,
+  signal: AbortSignal.timeout(30_000),
+});
+await still.ready;
+engine.start();
+// Explicit capture is available even while the viewport is moving.
+const png = await still.capture({width: 128, height: 128, samples: 64,
+  signal: AbortSignal.timeout(120_000)});
+console.log(png.type); // image/png
+// Later: engine.dispose() owns both the controller and integrator.
+```
+
+`idleDelay` is finite seconds in 0..60 (default 0.25). Zero begins immediately. All other options
+and their defaults are the [mesh integrator's](../voxel-pathtracer/README.md#triangle-meshes-beside-voxels),
+except the drawing order is fixed at 20 (the idle controller runs at 19). `active`, `stats`, `status`
+and `ready` report the owned renderer. `invalidate()` restarts the idle interval and accumulation
+after another interaction. `setScene(scene, {signal?})` builds a replacement static snapshot,
+then restarts idle; failed or cancelled replacements preserve the current one. Rebuild the snapshot
+after geometry or pose changes. `renderImage` returns linear floats; `capture` returns a PNG.
+Attachment snapshots caller arrays before loading the integrator; source arrays may then be reused.
+`dispose()` / `using` removes both owned plugins. Only one rendered view per engine is supported;
+multiple views throw linked `unsupported`.
+
+The integrator supplies multibounce transport, area lights, importance-sampled HDR environments,
+plastic, metal, glass, emission and a denoiser. Its triangle input is flat-shaded and has no UV
+textures, interpolated normals, cutouts, deformation or mesh material-extension conversion. A still
+can be much cleaner than the raster approximation; arbitrary photographic material fidelity and
+outside-renderer equality are not established. The finite bounce and scene limits of that entry apply.
+
+Native WebGPU and the WebGL2 compatibility layer pass `test/pathtrace-browser.mjs`: the licensed
+20,734-triangle FlightHelmet, a neutral material study, decreasing image error at 8 versus 64 samples
+against 512 samples, analytic emission at every hit, exact raster restoration during motion and
+disposal, identical repeated stills and actual device replacement. The layer's Windows path uses
+ANGLE Vulkan. ANGLE Direct3D cannot finish compiling the inherited integrator and keeps raster;
+see its documented backend limit. Plain WebGL2 gives linked `unsupported`. No speed or general
+photographic-quality claim.

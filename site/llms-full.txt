@@ -4285,6 +4285,22 @@ and missing-file failures apply in Node too. Record: whitepaper/results/readme-n
 
 P20 scope (2026-11-09): the complete VTK horse is independently checked as big-endian PLY, with white RGB and an ignored confidence field. It has no authored normals or UVs, and it proves no varying-color, surveyed-accuracy, visual-quality or speed claim. The original input and both licence texts stay outside Margo with pinned digests. Record: whitepaper/results/ply-big-endian-horse-20261109.json.
 
+### Idle triangle stills (batch 56, job 5)
+
+ProgressiveStill is an optional idle controller; geometry is a static MeshTraceScene snapshot,
+separate from the raster model. worldTriangles captures bind-pose world-space positions, not
+textures, smooth normals, deformation or material extensions. Supply deliberate palette materials
+and rebuild the snapshot after geometry edits. MeshPathTracer's one-million-triangle, 128 MiB input,
+Float32, flat-shading, glass-shell, material and lighting limitations apply unchanged. One rendered
+view per engine; multiple views throw linked unsupported. Idle seconds are finite in 0..60.
+
+Native WebGPU and compatibility ANGLE Vulkan have real-model pixel/value/device coverage. Native
+WebGL2 gives linked unsupported; compatibility ANGLE Direct3D retains the inherited compiler limit
+and raster frame. No arbitrary photographic fidelity, outside-renderer equality or speed claim.
+The controller entry is 1213 B gzip (ceiling 1469); its dynamically loaded existing
+integrator and Wasm retain their separate budgets. Staging root 8131 B, accumulate
+9306 B; core plus stage 23797 B, strictly below 25,000 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6366,6 +6382,17 @@ The count oracle advanced four bytes per float vertex property and ignored color
 ### Open: biome whole-world I/O README does not finish within the page budget (2026-11-09)
 
 Repro: npm run check:readme-run -- --packages=biomes. The docs-files-files-in-and-out-7b879b example creates the default 4 km world, exports complete height/weights/masks/temperature data, then saves/loads and compares digests. The corrected runner reports failure after 20 s while waiting for module completion and closes the owning browser. No missing file or network fixture is involved in those exports. The repeated whole-world generation/serialization workload is the path to profile; the individual expensive or stalled operation has not yet been isolated. This is still open, without a claimed root-cause repair, accepted slowdown, shrunk example or raised deadline. The aborted wider audit supplies no result for later examples.
+
+### Batch 56 idle-still audit
+
+No new open defect found. ProgressiveStill reuses the triangle integrator and its documented flat
+static scene limits. Its Windows compatibility test uses ANGLE Vulkan; the inherited Direct3D
+compiler problem is already tracked by the owning package. No new renderer or external source
+was copied, and no general photographic-material fidelity is claimed.
+
+The pre-attachment array lifetime across lazy loading was repaired before landing, with an
+independent mutation regression including non-cloneable content-key identity. Planner fixture
+assumptions were updated for the new real dependency, with stronger downstream/full-plan assertions.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

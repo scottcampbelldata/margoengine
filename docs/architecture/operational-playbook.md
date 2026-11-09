@@ -2684,3 +2684,27 @@ The required external manifest adds the complete VTK big-endian horse and both o
 
 
 README lifecycle gate (2026-11-09): the same 20-second page deadline now covers creation, navigation, module completion, settling, error queries and page closure. A hung lifecycle fails, closes the owned browser tree, stops later scheduling and preserves completed partial results. Three deterministic non-answering-call regressions run in verify. An extra full audit was killed after a genuine lifecycle hang; its focused biome files-in/out example now reports an unfinished module. No full-audit pass or accepted slowdown is claimed.
+
+### Idle product stills: section 5 evidence (batch 56, job 5)
+
+Optional staging/pathtrace supplies ProgressiveStill, a camera-idle controller around the existing
+voxel-pathtracer/mesh integrator. The renderer, Rust/Wasm BVH and transport stay in that package;
+attach dynamically loads them. Core and stage are unchanged. Camera and image-size changes reset
+progress and restore raster before the still pass. Device replacement resets the idle timer.
+
+The real 20,734-triangle licensed FlightHelmet neutral material study passes on native WebGPU and
+WebGL2 compatibility with ANGLE Vulkan. Tests assert every restored raster/traced pixel, convergence
+at 8 and 64 samples against 512, per-hit analytic emission, empty geometry, cancellation, PNG capture,
+invalid replacement, owning-plugin disposal and actual device replacement. CPU tests cover hostile
+idle/delta values, zero, huge finite delta, all camera-key parts and registration rollback. Browser
+canvas assertions use compositor screenshots: 2D copies of a WebGPU canvas are cleared or stale
+around presentation and cannot establish the displayed frame. Raw evidence: whitepaper/results/
+batch-56-pathtrace.json. Flat-shaded triangle/material and inherited backend limits remain explicit.
+No new CPU-heavy loop, outside-renderer equality, general photo-quality or speed claim.
+
+The lazy attach boundary snapshots caller arrays before its first await, retaining content-key
+identity; the regression fails before repair (9 rather than 1). The optional peer legitimately
+adds staging/stage downstream GPU coverage. Planner tests retain standalone/runner narrowing
+with WFC and additionally assert every affected tracer/staging/stage suite, lifecycle, and the
+exact full plan for combined voxel/tracer changes above the unchanged 12-package safety threshold.
+No GPU scope, test tolerance or safety threshold was reduced.

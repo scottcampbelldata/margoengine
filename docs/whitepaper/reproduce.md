@@ -1150,3 +1150,14 @@ Build packages; fetch with node scripts/reference-rendering/fetch-skip-assets.mj
 The independent oracle uses Python 3.13, python-plyfile 1.1.3 and NumPy 2.3.4 installed in an outside environment. Run python packages/loaders/scripts/ply-reference.py <external-cache>/ply-horse/horse.ply <output.json>, then compare it with packages/loaders/tests/fixtures/horse-oracle.json. It reads the original file without re-encoding it and records every position/color/index hash. Python is needed to regenerate that oracle, not to run the required Node regression.
 
 For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it through the shared GPU lock. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.
+
+### Batch 56 job 5: idle triangle product still
+
+Build packages, then run staging's package tests. Under the codex-56 GPU lock run
+node packages/staging/test/pathtrace-browser.mjs. It runs native and compatibility (ANGLE Vulkan
+on Windows), the existing licensed examples/assets/flight-helmet-mobile.glb, 20,734 triangles.
+Palette material intentionally replaces the authored material. It measures 8/64-sample image error
+against a 512-sample reference and asserts each emission hit against [2,1,0.5], plus camera/idle
+pixel identity, empty/invalid/cancelled updates, capture, disposal and a real replacement device.
+Compositor screenshots establish displayed pixels. Raw report: test-results/staging-pathtrace.json;
+committed scope/device/value evidence: results/batch-56-pathtrace.json. No speed result.

@@ -1,0 +1,64 @@
+<!doctype html><html><meta charset="utf-8"><title>Idle product still</title><style>body{margin:0}canvas{width:96px;height:96px}</style><canvas width="96" height="96"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {worldTriangles} from '/packages/bvh/dist/index.js';
+import {ProgressiveStill} from '/packages/staging/dist/pathtrace.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+let engine,scene,still,triangles;const errors=[];
+const watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const frame=async(delta=0.125)=>{engine.render({delta});await engine.gpu.queue.onSubmittedWorkDone();};
+const converge=async()=>{
+ const end=performance.now()+120000;
+ while(!still.stats.converged){if(performance.now()>end)throw Error('still viewport deadline');await frame();}
+ await frame(0);return {active:still.active,samples:still.stats.samples};
+};
+window.check={
+ async init(compat){
+  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+  engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0.3,0.85],target:[0,0.25,0]},clearColor:'#303840'});
+  engine.onError=e=>errors.push(e.message);watch();
+  const model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb',{signal:AbortSignal.timeout(30000)});
+  triangles=worldTriangles(engine,[model]);
+  scene={revision:1,models:[],instances:[],materials:[{id:1,type:'plastic',color:[0.55,0.25,0.08],roughness:0.3}],
+   meshes:[{id:'real helmet neutral surface study',material:1,positions:triangles.vertices,indices:triangles.indices}],
+   environment:{skyColor:[1,1,1],skyIntensity:0.3,sunIntensity:3,sunDirection:[-1,2,2],sunAngularSize:0.15,groundColor:[0.7,0.7,0.7]}};
+  await frame(0);return triangles.indices.length/3;
+ },
+ async attach(){still=await ProgressiveStill.attach(engine,{scene,idleDelay:0.25,maxSamples:4,samplesPerFrame:1,denoise:false,seed:37});await still.ready;await frame();return still.active;},
+ async waiting(){await frame();return still.active;},
+ converge,
+ async noProduct(){await still.setScene({...scene,revision:4,meshes:[]});return converge();},
+ async resetProduct(){await still.setScene(scene);return converge();},
+ async move(x){engine.camera.position=[x,0.3,0.85];await frame();return still.active;},
+ async images(){
+  const render=async samples=>still.renderImage({width:32,height:32,samples,seed:13,aovs:true,signal:AbortSignal.timeout(120000)});
+  const reference=await render(512),low=await render(8),high=await render(64);
+  const mse=im=>im.color.reduce((s,v,i)=>s+(v-reference.color[i])**2,0)/im.color.length;
+  const convergence={low:mse(low),high:mse(high),finite:reference.color.every(Number.isFinite),hitPixels:reference.instance.filter(v=>v<=-4).length};
+  const emission={...scene,revision:2,materials:[{id:1,type:'emit',color:[0,0,0],emissionColor:[1,0.5,0.25],emission:2}],environment:{skyIntensity:0,sunIntensity:0}};
+  await still.setScene(emission);const replacedInactive=!still.active;
+  const emitted=await still.renderImage({width:32,height:32,samples:1,seed:2,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+  let maximumEmissionError=0,emissionHits=0;
+  for(let p=0;p<emitted.instance.length;p++)if(emitted.instance[p]<=-4){emissionHits++;for(let c=0;c<3;c++)maximumEmissionError=Math.max(maximumEmissionError,Math.abs(emitted.color[p*3+c]-[2,1,0.5][c]));}
+  await still.setScene(scene);await converge();return {convergence,replacedInactive,maximumEmissionError,emissionHits};
+ },
+ async restore(){const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await still.ready;await frame();return {newDevice:engine.gpu!==old,idle:!still.active};},
+ async empty(){
+  await still.setScene({...scene,revision:3,meshes:[],environment:{skyIntensity:0,sunIntensity:0}});
+  const image=await still.renderImage({width:16,height:16,samples:1,signal:AbortSignal.timeout(120000)});
+  let cancelled=false;try{await still.capture({width:16,height:16,samples:1,signal:AbortSignal.abort()});}catch(e){cancelled=e.name==='AbortError';}
+  const png=await still.capture({width:16,height:16,samples:1,signal:AbortSignal.timeout(120000)});
+  let invalid=false;try{await still.setScene({...scene,meshes:[{...scene.meshes[0],positions:new Float32Array([NaN,0,0])}]});}catch{invalid=true;}
+  return {black:image.color.every(v=>v===0),cancelled,pngType:png.type,pngBytes:png.size,invalid};
+ },
+ async finish(){
+  still.dispose();still.dispose();await frame(0);
+  const detached=!engine.scene.plugins.has('progressive-still')&&!engine.scene.plugins.has('voxel-pathtracer');
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});let refusal;
+  try{await ProgressiveStill.attach(native,{scene:{...scene,meshes:[]}});}catch(e){refusal={code:e.code,message:e.message};}finally{native.dispose();}
+  return {detached,refusal,errors};
+ },
+ dispose(){still?.dispose();engine?.dispose();},
+};window.ready=true;
+</script></html>

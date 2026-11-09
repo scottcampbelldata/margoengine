@@ -1570,3 +1570,14 @@ required bytes fail. Evidence: results/readme-node-basis-20261109.json.
 ### P20: independent complete big-endian PLY input (2026-11-09)
 
 The complete VTK horse.ply (BSD-3-Clause data / Apache-2.0 collection) has 48,485 vertices and 96,966 triangles. Every position, white RGB component, index and bound matches python-plyfile 1.1.3 / NumPy 2.3.4 output exactly. Required file/hash checks run in verify and direct package tests. This closes the valid outside-file big-endian proof; it does not establish varying-color, authored normal/UV, survey, visual-quality or speed accuracy. Record: results/ply-big-endian-horse-20261109.json.
+
+## Batch 56 job 5: progressive idle still controller
+
+DONE via the optional staging/pathtrace entry, reusing the mesh path tracer that landed at
+f48effca1 during the all-package audit. [Real FlightHelmet evidence](results/batch-56-pathtrace.json)
+proves raster while moving, refinement while idle, lower image error with more samples, analytic
+emission, empty geometry, cancellation, PNG capture, exact restoration on disposal and replacement
+devices. Both native WebGPU and ANGLE Vulkan compatibility pass. The model is a neutral material
+study with explicit replacement palette material, not its authored textured appearance. No general
+photographic-quality, outside-renderer equality or speed claim. The flat static triangle limits and
+ANGLE Direct3D compilation limit remain the existing integrator's.

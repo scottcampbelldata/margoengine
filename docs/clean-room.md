@@ -2085,3 +2085,15 @@ pitch/width and per-row window heights determine floor splits with a common wind
 ratio. No external image or XML is redistributed. Numeric observations, archive,
 photo and XML hashes, licence and reproduction method are recorded in the fixture.
 The publisher says CC BY-SA without a version. No parsing implementation was read.
+
+### Batch 56 job 5: idle still integration
+
+An initial broad research survey read Kajiya's rendering-equation descriptions, PBRT fourth edition
+[Path Tracing](https://pbr-book.org/4ed/Light_Transport_I_Surface_Reflection/Path_Tracing), Heitz's
+[GGX visible-normal paper](https://jcgt.org/published/0007/04/01/paper.pdf) (2018), and Veach's
+[MIS chapter](https://graphics.stanford.edu/courses/cs348b-03/papers/veach-chapter9.pdf) (1997).
+No source implementation in the textbook or another engine was used. A refreshed all-package
+search then found newly landed Margo voxel-pathtracer/mesh (f48effca1). The unused independent
+draft was removed; only a camera-idle controller was built, reusing that owned integrator and
+its Rust/Wasm BVH. No new BSDF, traversal, packing loop or Wasm is needed here. Tests use the
+existing licensed Khronos FlightHelmet as a neutral material study.

@@ -545,7 +545,11 @@ test('the bundler matrix does not take the GPU lock, and a render in a browser i
 
 test('verify runs the same checks as before plus the parity count and the XR device-run gate, hygiene and required assets first, then the build, the rest after the build', () => {
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
-  assert.deepEqual(SERIAL, ['node scripts/hygiene.js --verify', 'node scripts/support/external-test-assets.mjs', 'npm run build:packages']);
+  assert.deepEqual(SERIAL, [
+    'node scripts/hygiene.js --verify',
+    'node scripts/support/external-test-assets.mjs',
+    'npm run build:packages',
+  ]);
   assert.deepEqual(
     PARALLEL.flat().sort(),
     [
@@ -787,15 +791,15 @@ test('cases 2 and 4: a standalone repro check, or a proof and its claim, run the
 
 test('case 3: a package.json of one package runs that package and its dependents, not every GPU test', () => {
   const { decision, planned } = planFor([
-    'packages/voxel-pathtracer/package.json',
+    'packages/wfc/package.json',
     'tests/voxel-pathtracer-gpu-split.test.js',
     'docs/known-bugs.md',
     'site/index.html',
   ]);
   assert.equal(decision.mode, 'affected');
-  assert.deepEqual(decision.changed, ['@margoengine/voxel-pathtracer']);
+  assert.deepEqual(decision.changed, ['@margoengine/wfc']);
   const ids = selected(planned);
-  assert.ok(ids.includes('voxel-pathtracer/test:gpu'));
+  assert.ok(ids.includes('wfc/test:gpu'));
   for (const id of ['shader/test:gpu', 'water/test:gpu', 'voxel/test:gpu', 'root/test:lifecycle:browser'])
     assert.ok(!ids.includes(id), id);
   // The landing page is a site page the no-WebGPU check opens.
@@ -810,18 +814,42 @@ test('case 5: runner files run the smoke list plus the tests of the packages tha
     'scripts/support/heat.mjs',
     'scripts/support/machine-profile.mjs',
     'scripts/support/machine-profiles.json',
-    'packages/voxel/package.json',
-    'packages/voxel-pathtracer/package.json',
+    'packages/wfc/package.json',
     'tests/heat-containment.test.js',
     'tests/voxel-pathtracer-gpu-split.test.js',
   ]);
   assert.equal(decision.mode, 'affected');
   const ids = selected(planned);
   for (const id of RUNNER_SMOKE) assert.ok(ids.includes(id), id);
-  for (const t of tests.filter((x) => x.dir === 'voxel' || x.dir === 'voxel-pathtracer'))
-    assert.ok(ids.includes(testId(t)), testId(t));
+  for (const t of tests.filter((x) => x.dir === 'wfc')) assert.ok(ids.includes(testId(t)), testId(t));
   for (const id of ['water/test:gpu', 'materials/test:gpu', 'root/test:catalog:browser'])
     assert.ok(!ids.includes(id), id);
   assert.ok(!runs(planned, 'check:views'));
   assert.ok(!runs(planned, 'check:depth'));
+});
+
+test('an optional staging integrator peer selects its real downstream GPU coverage', () => {
+  const { decision, planned } = planFor(['packages/voxel-pathtracer/package.json']);
+  assert.equal(decision.mode, 'affected');
+  for (const name of ['@margoengine/voxel-pathtracer', '@margoengine/staging', '@margoengine/stage'])
+    assert.ok(decision.affected.includes(name), name);
+  const ids = selected(planned);
+  for (const t of tests.filter((x) => ['voxel-pathtracer', 'staging', 'stage'].includes(x.dir)))
+    assert.ok(ids.includes(testId(t)), testId(t));
+  assert.ok(ids.includes('root/test:lifecycle:browser'), 'lifecycle imports stage, which depends on staging');
+  assert.ok(!ids.includes('water/test:gpu'));
+});
+
+test('combined voxel and triangle-integrator changes retain the unchanged full-run safety threshold', () => {
+  const { decision, planned } = planFor([
+    'scripts/gpu-package-tests.mjs',
+    'packages/voxel/package.json',
+    'packages/voxel-pathtracer/package.json',
+  ]);
+  assert.equal(decision.mode, 'full');
+  assert.match(decision.reason, /packages affected, more than 12/);
+  assert.deepEqual(
+    planned,
+    steps.map((command) => ({ command })),
+  );
 });

@@ -1,0 +1,154 @@
+{
+  "batch": 56,
+  "job": 5,
+  "status": "DONE",
+  "entry": "@margoengine/staging/pathtrace",
+  "reuse": "MeshPathTracer from f48effca1, not a new integrator",
+  "sizes": {
+    "index": {
+      "raw": 22303,
+      "gzip": 8131
+    },
+    "accumulate": {
+      "raw": 26467,
+      "gzip": 9306
+    },
+    "pathtrace": {
+      "raw": 2783,
+      "gzip": 1213
+    },
+    "coreStage": {
+      "raw": 58792,
+      "gzip": 23797
+    }
+  },
+  "cap": 1469,
+  "runs": [
+    {
+      "compat": false,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "triangles": 20734,
+      "tracedDifference": 27635,
+      "viewportSurface": {
+        "product": [
+          138,
+          83,
+          21
+        ],
+        "empty": [
+          205,
+          205,
+          205
+        ]
+      },
+      "images": {
+        "convergence": {
+          "low": 0.00085863858366928,
+          "high": 0.00011911807771520216,
+          "finite": true,
+          "hitPixels": 196
+        },
+        "replacedInactive": true,
+        "maximumEmissionError": 0,
+        "emissionHits": 196
+      },
+      "restored": {
+        "newDevice": true,
+        "idle": true
+      },
+      "empty": {
+        "black": true,
+        "cancelled": true,
+        "pngType": "image/png",
+        "pngBytes": 73,
+        "invalid": true
+      },
+      "detached": true,
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": []
+    },
+    {
+      "compat": true,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "webgpu": null,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [
+          "--use-angle=vulkan"
+        ],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "triangles": 20734,
+      "tracedDifference": 27635,
+      "viewportSurface": {
+        "product": [
+          138,
+          83,
+          21
+        ],
+        "empty": [
+          205,
+          205,
+          205
+        ]
+      },
+      "images": {
+        "convergence": {
+          "low": 0.0008586386499187989,
+          "high": 0.00011911788001852916,
+          "finite": true,
+          "hitPixels": 196
+        },
+        "replacedInactive": true,
+        "maximumEmissionError": 0,
+        "emissionHits": 196
+      },
+      "restored": {
+        "newDevice": true,
+        "idle": true
+      },
+      "empty": {
+        "black": true,
+        "cancelled": true,
+        "pngType": "image/png",
+        "pngBytes": 73,
+        "invalid": true
+      },
+      "detached": true,
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": []
+    }
+  ],
+  "limits": "Static flat-shaded triangle snapshots, no UV textures/normal interpolation or glTF material conversion. One view per engine. Compatibility layer tested on ANGLE Vulkan; inherited ANGLE Direct3D compiler limit. No outside-renderer equality, speed or general photographic-fidelity claim.",
+  "inputSnapshot": "Before-repair regression observed mutated 9 instead of captured 1 across lazy import. New CPU regression preserves caller arrays and non-cloneable content-key identity.",
+  "planRegression": "Leaf/runner selection assertions retained with WFC; added every downstream staging/stage/tracer GPU suite and exact full plan above the unchanged 12-package safety threshold.",
+  "hostileArguments": "Undefined, null, array and empty options reject with linked TypeError; before-repair regression rejected the unlinked native destructuring error."
+}

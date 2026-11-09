@@ -1697,3 +1697,19 @@ and missing-file failures apply in Node too. Record: whitepaper/results/readme-n
 
 
 P20 scope (2026-11-09): the complete VTK horse is independently checked as big-endian PLY, with white RGB and an ignored confidence field. It has no authored normals or UVs, and it proves no varying-color, surveyed-accuracy, visual-quality or speed claim. The original input and both licence texts stay outside Margo with pinned digests. Record: whitepaper/results/ply-big-endian-horse-20261109.json.
+
+### Idle triangle stills (batch 56, job 5)
+
+ProgressiveStill is an optional idle controller; geometry is a static MeshTraceScene snapshot,
+separate from the raster model. worldTriangles captures bind-pose world-space positions, not
+textures, smooth normals, deformation or material extensions. Supply deliberate palette materials
+and rebuild the snapshot after geometry edits. MeshPathTracer's one-million-triangle, 128 MiB input,
+Float32, flat-shading, glass-shell, material and lighting limitations apply unchanged. One rendered
+view per engine; multiple views throw linked unsupported. Idle seconds are finite in 0..60.
+
+Native WebGPU and compatibility ANGLE Vulkan have real-model pixel/value/device coverage. Native
+WebGL2 gives linked unsupported; compatibility ANGLE Direct3D retains the inherited compiler limit
+and raster frame. No arbitrary photographic fidelity, outside-renderer equality or speed claim.
+The controller entry is 1213 B gzip (ceiling 1469); its dynamically loaded existing
+integrator and Wasm retain their separate budgets. Staging root 8131 B, accumulate
+9306 B; core plus stage 23797 B, strictly below 25,000 B.

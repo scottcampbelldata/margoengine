@@ -29,6 +29,10 @@
     "./accumulate": {
       "types": "./dist/accumulate.d.ts",
       "import": "./dist/accumulate.js"
+    },
+    "./pathtrace": {
+      "types": "./dist/pathtrace.d.ts",
+      "import": "./dist/pathtrace.js"
     }
   },
   "files": [
@@ -40,7 +44,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/voxel-pathtracer": "^1.0.0"
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
@@ -49,6 +54,11 @@
     "build": "node ../../scripts/build-optional.js staging",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/staging/test/browser-check.mjs --no-record && node packages/staging/test/ground-browser.mjs && node packages/staging/test/ground-browser.mjs --studio && node packages/staging/test/ground-browser.mjs --studio --compat && node packages/staging/test/accumulate-browser.mjs && node packages/staging/test/accumulate-browser.mjs --compat"
+    "test:gpu": "cd ../.. && node packages/staging/test/browser-check.mjs --no-record && node packages/staging/test/ground-browser.mjs && node packages/staging/test/ground-browser.mjs --studio && node packages/staging/test/ground-browser.mjs --studio --compat && node packages/staging/test/accumulate-browser.mjs && node packages/staging/test/accumulate-browser.mjs --compat && node packages/staging/test/pathtrace-browser.mjs"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/voxel-pathtracer": {
+      "optional": true
+    }
   }
 }
