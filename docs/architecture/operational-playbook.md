@@ -1,5 +1,15 @@
 # Engine architecture and quality reference
 
+## Optional labels diagnostic restoration (section 5 evidence, 2026-11-10)
+
+The duplicate-attachment state diagnostic keeps full repair guidance and MargoError
+identity. The optional root measured 5450 to 5550 B gzip; its ceiling increases
+5546 to 5806 B with the normal 256 B headroom. No split of the synchronous attach
+path is needed. Core plus stage remains 23924 B below 25000 B. Evidence: the
+default/custom-name regression in `packages/labels/tests/testpage-attach.test.js`,
+all 49 package tests, both browser backends and six runnable README examples.
+Sources and rationale: `docs/size-restore.md`. No speed claim or changed quality bar.
+
 ## Owned Chromium process-list ordering (section 5 supplement, 2026-11-09)
 
 Client close must follow the owned browser's bounded CDP process-list read.

@@ -1,5 +1,10 @@
 # Claims and evidence
 
+Labels duplicate attachment preserves the existing renderer and reports a linked
+state MargoError with the collision and both repair choices. Evidence:
+`packages/labels/tests/testpage-attach.test.js`, including default and custom
+names; clean-room rationale and measured optional-entry cost: `docs/size-restore.md`.
+
 Owned Windows Chromium teardown reads its process list before client disconnect
 can invalidate that read. The asynchronous-session regression in
 `tests/browser-teardown.test.js` fails on the prior ordering; all 56 scoped

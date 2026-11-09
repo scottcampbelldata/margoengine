@@ -45,7 +45,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
 | @margoengine/inspector | `.` 12, `./frame` 17, `./history` 2, `./snapshot` 6, `./resources` 2, `./packages` 10 | 4 |  | 9,071 |
 | @margoengine/kinematics-constraints | `.` 21, `./swept` 5, `./sdf` 5 | 10 |  | 11,567 |
-| @margoengine/labels | `.` 22, `./declutter` 5, `./callouts` 2 | 34 |  | 5,450 |
+| @margoengine/labels | `.` 22, `./declutter` 5, `./callouts` 2 | 34 |  | 5,550 |
 | @margoengine/lighting2d | `.` 13, `./soft` 9, `./cookie` 13, `./gi` 8, `./height` 10, `./emissive` 7 | 26 |  | 5,394 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50, `./edges` 6, `./pick` 4, `./trail` 2, `./batch` 5, `./hidden` 2 | 39 |  | 19,632 |

@@ -2056,9 +2056,13 @@ without exceptions. Evidence: whitepaper/results/missing-items-landing-20261109.
 The separate 7.4 ms slow-send outlier remains open with its unchanged 3.5 ms
 gate; no performance ratio, busy exemption or new accepted difference.
 
-The test-page 41 duplicate-label diagnostic fits the existing labels root entry
-budget at 5,546 B min+gzip. It reports TypeError with code state and a help link
-before setup creates DOM; duplicate registration never replaces existing labels.
+The test-page 41 duplicate-label diagnostic reports MargoError with code state,
+the colliding plugin name, reuse guidance, a complete alternate-name call and a
+help link before construction or setup; existing labels are preserved. Restoring
+this guidance changes the labels root from 5,450 to 5,550 B min+gzip. Its optional
+ceiling rises from 5,546 to 5,806 B (256 B headroom). A separate diagnostic entry
+would complicate a synchronous attach call for no API benefit. Core plus stage
+remains 23,924 B, below the unchanged 25,000 B limit.
 
 Whole-mesh bevel uses centroid fractions and requires consistently wound closed
 faces with one connected face fan per vertex. Generated warped strips and caps

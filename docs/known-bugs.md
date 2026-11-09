@@ -1,5 +1,14 @@
 # Known bugs and unverified features
 
+### Fixed 2026-11-10: labels duplicate attachment lost its error contract
+
+Calling `LabelRenderer.attach(engine)` twice reported a shortened TypeError
+(`reuse/rename`) because its diagnostic was squeezed into the optional entry's
+size ceiling. It now reports a linked state MargoError with the colliding name,
+reuse guidance and a complete alternate-name example, before construction.
+`packages/labels/tests/testpage-attach.test.js` rejects the old error and covers
+default and custom collisions without replacing existing labels or DOM.
+
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 
 After the helper-program repair, voxel GI passed its rendering assertions but

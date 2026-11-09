@@ -1414,8 +1414,8 @@
     },
     "@margoengine/labels": {
       ".": {
-        "raw": 14024,
-        "gzip": 5450
+        "raw": 14191,
+        "gzip": 5550
       },
       "./declutter": {
         "raw": 2817,
