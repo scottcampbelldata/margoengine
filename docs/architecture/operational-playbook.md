@@ -4794,14 +4794,17 @@ rollback. The old viewer and missing-peer diagnostics fail the strengthened
 checks. Sources and measured optional ceilings: [size restoration](../size-restore.md).
 
 
-### Section 5 pending evidence: Cinematic ownership
+### Section 5 evidence: Cinematic ownership
 
 Two optional camera plugins now resolve their actual scene during disposal.
 The real-engine suite covers default/secondary scenes, direct/plugin/scene/engine
 disposal, same-name replacement and reattachment. Four parent failures become
 green; all 108 package units and a class guard pass. The guard scans all sources
-implementing EnginePlugin and runs in the check:merge unit inventory. GPU and
-runtime README acceptance remain pending.
+implementing EnginePlugin and runs in the check:merge unit inventory. The
+complete GPU browser proof passes, with eight actual owner cases each drawing
+484 red pixels and no validation errors. All ten runtime README examples pass,
+as do lint, hygiene, API, README types, docs links and quality/size gates. Only
+affected checks were rerun; the inherited single full verify is retained.
 
 ### Section 5 evidence: Controls wrappers
 

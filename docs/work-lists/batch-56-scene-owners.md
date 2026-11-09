@@ -138,3 +138,12 @@ proved CAD replacement; counts remain syntax, not exhaustive lifetime proof.
 No second full verify. [Controls receipt](../whitepaper/results/batch-56-controls-owner-20261109.json).
 
 Cinematic and CameraBrain now have four reproduced direct/reattached owner failures in sixteen real-engine cases. The optional two-line identity repair passes 108 package units and a source-wide class guard. GPU/README acceptance remains open. No core/stage or capture work is included.
+
+Cinematic acceptance is complete: all 108 package units, a class guard, the
+complete browser (eight owner cases, 484 red pixels each, no GPU errors), and
+ten runtime README examples pass. All eight APIs and entry ceilings remain
+unchanged. The fresh inventory is 183 calls: 77 identity, two stored Save calls,
+three core routers and 101 active/delegated candidates, including the proved
+CAD replacement. Explicit EnginePlugin classes: 174, identity disposal 63,
+active-shaped disposal 82. These remain syntax counts, not exhaustive proof.
+The wider audit remains OPEN. [Cinematic receipt](../whitepaper/results/batch-56-cinematic-owner-20261109.json).

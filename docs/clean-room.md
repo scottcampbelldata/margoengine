@@ -3964,8 +3964,10 @@ Cinematic and CameraBrain retained the engine but removed through its active
 scene. Direct secondary disposal and disposal after reattachment could remove
 a default same-name plugin and retain the actual registration. Both optional
 classes now resolve sceneOf(this). Four of sixteen real-engine cases fail on
-the parent; all 108 package units and a class guard pass after repair. GPU and
-runtime README acceptance remain pending; no core or stage source changed.
+the parent; all 108 package units and a class guard pass after repair. The
+complete GPU browser check passes, including eight owner pixel cases each
+reading 484 red pixels without validation errors. All ten runtime README
+examples pass. No core or stage source changed.
 
 ### Controls wrapper ownership (batch 56 continuation)
 

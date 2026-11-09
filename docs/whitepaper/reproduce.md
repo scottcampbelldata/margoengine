@@ -2080,6 +2080,9 @@ sixteen scene-owner cases fail on parent a1831da68. Run the complete package
 browser leaf through one shared GPU slot with wait-max60 and measured hold plus
 margin; it now includes eight actual owner/pixel cases. Run the runtime README
 examples separately through that same slot. Builds stay outside the GPU lock.
+All 108 units, the class guard, complete browser and ten runtime examples pass.
+The eight GPU owner cases each draw 484 red pixels. The [receipt](results/batch-56-cinematic-owner-20261109.json)
+records affected gates. No second full verify or speed suite was run.
 
 ### Controls wrapper owner reproduction
 

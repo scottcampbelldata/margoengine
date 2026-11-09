@@ -2530,11 +2530,13 @@ code and help link. Proof: stage viewer/scene/missing-package regressions and
 tests/modern-wrapper.test.js; research and reproduction: [size restoration](../size-restore.md).
 
 
-### Cinematic registration CPU proof
+### Cinematic registration CPU and GPU proof
 
 The local Cinematic/CameraBrain identity repair passes sixteen real-engine
 lifecycle cases (parent twelve pass, four fail), all 108 package units and a
-source-wide EnginePlugin guard. No GPU, README acceptance or speed claim yet.
+source-wide EnginePlugin guard. The complete GPU browser proof passes, with
+eight actual owner cases each drawing 484 red pixels and no validation errors.
+All ten runtime README examples pass. No speed claim is added.
 Research: [clean-room record](../clean-room.md).
 
 ### Controls wrapper owner CPU and GPU proof

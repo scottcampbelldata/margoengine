@@ -2982,8 +2982,21 @@ and install help, with their npm command and restart advice. Entry growth:
 
 Cinematic and CameraBrain dispose by actual plugin identity, including after
 reattachment. Four of sixteen real-engine parent cases fail; the repair passes
-108 package units and a source guard. GPU/README acceptance remains pending.
-No exports, core/stage source, speed budget or optional ceiling changed.
+108 package units and a source guard. The complete GPU browser and all ten
+runtime README examples pass. Eight GPU owner cases each render 484 red pixels,
+with no validation errors. No exports, core/stage source, speed budget or
+optional ceiling changed.
+
+| Cinematic entry | min+gzip bytes | Unchanged ceiling |
+| --- | ---: | ---: |
+| @margoengine/cinematic | 1956 | 2076 |
+| @margoengine/cinematic/brain | 3015 | 3262 |
+| @margoengine/cinematic/composer | 1917 | 2173 |
+| @margoengine/cinematic/dolly | 1312 | 1568 |
+| @margoengine/cinematic/group | 1845 | 2101 |
+| @margoengine/cinematic/noise | 1356 | 1612 |
+| @margoengine/cinematic/confine | 1358 | 1614 |
+| @margoengine/cinematic/lens | 1013 | 1269 |
 
 ### Controls wrapper ownership continuation
 

@@ -1,10 +1,162 @@
 {
-  "status": "LOCAL_REPAIR_ACCEPTANCE_PENDING",
+  "status": "ACCEPTED_AFFECTED_CHECKS",
   "base": "a1831da68",
-  "parent": { "pass": 12, "fail": 4 },
-  "packageUnits": { "pass": 108, "fail": 0 },
-  "guard": { "pass": 1, "fail": 0 },
+  "parent": {
+    "pass": 12,
+    "fail": 4
+  },
+  "packageUnits": {
+    "pass": 108,
+    "fail": 0
+  },
+  "guard": {
+    "pass": 1,
+    "fail": 0
+  },
   "coreStageSourceChanged": false,
   "hunterCaptureChanged": false,
-  "pending": ["GPU browser owner/pixel proof", "runtime README", "affected gates", "push"]
+  "pending": [],
+  "fix": "22511eaa5",
+  "gpu": [
+    {
+      "name": "browser",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 6.1
+    },
+    {
+      "name": "readme",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 13.3
+    }
+  ],
+  "checks": [
+    {
+      "name": "lint",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4
+    },
+    {
+      "name": "hygiene",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 13.5
+    },
+    {
+      "name": "links",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.8
+    },
+    {
+      "name": "readme-types",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3
+    },
+    {
+      "name": "api",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.6
+    },
+    {
+      "name": "quality",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 35.7
+    },
+    {
+      "name": "sizes",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.6
+    },
+    {
+      "name": "inventory",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3
+    }
+  ],
+  "sizes": [
+    {
+      "name": "@margoengine/cinematic",
+      "gzip": 1956,
+      "ceiling": 2076
+    },
+    {
+      "name": "@margoengine/cinematic/brain",
+      "gzip": 3015,
+      "ceiling": 3262
+    },
+    {
+      "name": "@margoengine/cinematic/composer",
+      "gzip": 1917,
+      "ceiling": 2173
+    },
+    {
+      "name": "@margoengine/cinematic/dolly",
+      "gzip": 1312,
+      "ceiling": 1568
+    },
+    {
+      "name": "@margoengine/cinematic/group",
+      "gzip": 1845,
+      "ceiling": 2101
+    },
+    {
+      "name": "@margoengine/cinematic/noise",
+      "gzip": 1356,
+      "ceiling": 1612
+    },
+    {
+      "name": "@margoengine/cinematic/confine",
+      "gzip": 1358,
+      "ceiling": 1614
+    },
+    {
+      "name": "@margoengine/cinematic/lens",
+      "gzip": 1013,
+      "ceiling": 1269
+    }
+  ],
+  "api": "8 unchanged selected entries",
+  "readme": {
+    "pass": 10,
+    "node": 4,
+    "browser": 6
+  },
+  "ownerGpu": {
+    "cases": 8,
+    "redPixelsEach": 484,
+    "errors": 0
+  },
+  "inventory": {
+    "calls": 183,
+    "identity": 77,
+    "stored": 2,
+    "core": 3,
+    "activeCandidates": 101,
+    "explicitClasses": 174,
+    "identityClasses": 63,
+    "activeClasses": 82
+  },
+  "verify": {
+    "inherited": "batch-56-save-owner-20261109.json",
+    "fullRunRepeated": false,
+    "reason": "Scott requested affected checks only"
+  }
 }
