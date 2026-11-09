@@ -96,3 +96,49 @@ on a quiet machine. See `docs/work-lists/speed-phase.md` for the retained budget
 
 Written clean room from public papers: Volder 1959 (CORDIC), Jarzynski and Olano 2020 (PCG hashes for GPUs), Perlin
 2002 (quintic fade), Wendland 1995 (compactly supported kernels). Details in `docs/clean-room.md`.
+## Larger erosion grids in Rust/Wasm
+
+The optional `@margoengine/biomes/erosion-wasm` entry supports up to 4,194,304
+cells (2048 x 2048). It preserves the ordered integer thermal, hydraulic, lake
+and drainage passes of `biomes/erosion`, with a zero-byte output difference.
+It runs on the CPU without a graphics device, including WebGL2 applications.
+The existing synchronous JS entry keeps its 2,097,152-cell cap. This is a Wasm
+route, not a WebGPU erosion compute pass.
+
+```js
+import { createErosionKernel } from '@margoengine/biomes/erosion-wasm';
+
+using kernel = await createErosionKernel();
+const height = Int32Array.from({ length: 64 * 64 }, (_, i) => (i % 64) * 1000);
+const result = kernel.erode({ height, nx: 64, nz: 64, step: 16000 });
+console.log(result.height[0], result.outflow, result.memoryBytes);
+```
+
+`createErosionKernel({signal})` loads only `erosion.wasm`, beside the installed
+entry. Serve that asset and allow Wasm SIMD in the browser's CSP. The loader
+rejects with a coded error and help link if it cannot load. `erode` accepts all
+the existing erosion options and defaults (32 rounds), plus `signal`, checked
+before synchronous work. Run in your own worker to interrupt a call in flight.
+Dispose the kernel to release its memory; every returned array is a fresh owned
+copy and stays valid after another call or disposal. Input heights are unchanged.
+
+The full real-DEM correctness command is
+`node packages/biomes/tests/erosion-dem.mjs`, after the package build, under a
+20-minute process limit. It recreates 64 pinned Mapzen Terrarium tiles from
+USGS data without resampling and checks the default 32-round output against
+the independent ordered JS reference hashes. Fixture URLs, attribution, hashes
+and the small real-data unit-test crop are in `tests/fixtures/erosion-dem*.json`.
+Kernel array reuse removes 10 bytes per cell, but Wasm input and output copies
+cost 21 extra bytes per cell. `memoryBytes` reports actual linear-memory high
+water; it excludes the caller's 4-byte-per-cell input and 17-byte-per-cell output.
+`vectorBlocks` counts four-cell SIMD difference blocks. These are work and memory
+figures; elapsed speed proof is deferred to the quiet speed phase. Build the
+committed module with `npm run build:erosion --workspace @margoengine/biomes`.
+
+Production-browser proof (from the repository root): build the package, then run
+`node --test --test-timeout=120000 packages/biomes/tests/erosion-bundle.test.js`
+to prepare and validate a real Vite consumer outside the GPU lease. Run
+`node packages/biomes/tests/erosion-browser.mjs` in one shared GPU slot afterward.
+The same preparation runs with the package CPU tests. The browser proof checks
+lazy asset loading, exact served Wasm bytes and every real-crop field on WebGPU
+and WebGL2 pages; it makes no GPU erosion or elapsed-speed claim.

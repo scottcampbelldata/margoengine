@@ -302,6 +302,10 @@
       "types": "./dist/biomes/ecosystem.d.ts",
       "import": "./dist/biomes/ecosystem.js"
     },
+    "./biomes/erosion-wasm": {
+      "types": "./dist/biomes/erosion-wasm.d.ts",
+      "import": "./dist/biomes/erosion-wasm.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

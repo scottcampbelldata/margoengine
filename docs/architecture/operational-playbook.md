@@ -4047,3 +4047,32 @@ and before/after measurements are in size-restore.md and limits.md. The real GPU
 suite passes 236 pixel checks with zero wrong pixels or validation errors, and
 11 shader modules compile. All nine README examples run as written. Execution
 uses one shared GPU slot per worktree and wait-max 60.
+
+### Section 5 evidence: optional ordered erosion
+
+The feature-local Rust SIMD Wasm keeps Margo's ordered erosion and shared option
+quantization, outside core/stage. Earlier native tests (2), 258 JS parity cases
+and the pinned unresampled 2048x2048 DEM at 32 rounds match every independent JS
+hash and outflow. Fresh linear memory is 156,827,648 B; caller input and owned
+output bring backing storage to 244,908,032 B, excluding objects. Array reuse
+saves 10n bytes while copies cost 21n; no total-memory or elapsed-speed win.
+A new production-consumer regression failed because the saved manifest omitted
+the optional export and Wasm copy build step. Both registrations are restored.
+Vite emits erosion-YNFeqg0-.wasm; the browser confirms exact served bytes, lazy
+loading and every real-crop field on WebGPU and WebGL2 pages. All eight existing
+biomes GPU suites pass, plus that production browser proof, all 36 biomes
+README examples and all three umbrella examples.
+
+Item 1 final proof: 477 package CPU tests, lint, hygiene and focused metadata
+checks pass. All eight existing biomes GPU suites, the new production erosion
+browser proof, all 36 biomes README examples and all three umbrella examples
+pass. A combined five-minute lease interrupted flythrough after three completed
+suites; the orchestration was split, completed suites preserved, and only the
+interrupted/pending steps ran. Flythrough passes in 243.2 s; no assertion or
+package deadline was changed. This is gate duration, not a speed claim.
+Earlier complete verify passed 13,585 tests with zero failures/skips
+(repair-api-fullverify.log). No extra full verify ran in this continuation.
+Final main rebase inherits unrelated diagnostics and documentation; erosion
+source/Wasm and proof inputs stay unchanged. Packages are rebuilt, with genuine
+paired entry/network records from 604f09866, dirty=false, then generated API.
+Logs: test-results/skip-gaps/item1-*.log; no benchmark or timing-only run.

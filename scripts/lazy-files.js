@@ -401,6 +401,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/erosion.wasm',
+    label: 'erosion.wasm',
+    kind: 'Rust SIMD ordered erosion',
+    measure: 'file',
+    when: 'createErosionKernel(), only from biomes/erosion-wasm; no renderer or worker required',
+  },
+  {
+    package: '@margoengine/biomes',
     file: 'packages/biomes/dist/workers/biomes-splines.js',
     label: 'workers/biomes-splines.js',
     kind: 'Worker part',

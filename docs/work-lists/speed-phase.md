@@ -289,3 +289,15 @@ shared locks. Retain historical timing records, without treating them as fresh a
 
 Raw/gzip entry and Wasm size, peak memory, exact output, source-quality, hostile-input and GPU correctness bars
 remain required. The deferred timing work does not mark Batch 134 jobs 2-5 complete or authorize prebuilt removal.
+## Skip-audit work counts and pending timing evidence
+
+| Item | Evidence available | Quiet speed-phase work still owed |
+| --- | --- | --- |
+| Batch 108 job 2, selection pickMany | Same 100 answers/copies; captured matrix reads 1600 to 16, submissions 100 to 1; rejected micro matrix reads 6400 to 3200 | Reproduce the unchanged 100-pick workload against the parent and like-for-like rival routes; attribute or fix the historical 83 ms versus 67 ms loss. No new timing run during build phase. |
+| Batch 61 job 6, erosion Wasm | Exact 32-round 2048x2048 real-DEM hashes; 10n fewer kernel array bytes, n/4 SIMD difference blocks; input/readback adds 21n bytes | Paired CPU/Wasm elapsed comparison at identical output and full copy cost after Scott ends the build phase. No elapsed win or total memory win is claimed. |
+
+Selection's model browser suite runs all correctness comparisons by default.
+Its optional latency loop requires `--time` and an exclusive outer GPU lock;
+it is not run during this build phase. Reproduction in the later speed phase:
+`node scripts/gpu-lock.mjs run --exclusive --owner=codex-skipgaps --wait-max=60 -- node packages/selection/test/models.browser.mjs --time`.
+

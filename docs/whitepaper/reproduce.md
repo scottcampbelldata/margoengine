@@ -1612,3 +1612,23 @@ payloads. `measure/report13-fuzz-evidence.mjs` verifies every source manifest pi
 and aggregate/per-seed Wasm/adapter pins. [Result](results/batch-134-etc-fuzz.json):
 51 seeds/2856 mutations/17908 calls, no uncoded error/trap/hard timeout. Do not
 sum mixed call/refusal axes or treat end-instance pages as peak memory.
+
+## Ordered erosion CPU proof
+
+Build `@margoengine/biomes`, then run
+`node --test --test-timeout=120000 packages/biomes/tests/erosion-wasm.test.js`
+and `node packages/biomes/tests/erosion-dem.mjs` under a 20-minute process-tree
+timeout. The latter downloads only missing pinned standard terrain tiles, checks
+every source hash, joins without resampling, converts Terrarium metres to rounded
+integer millimetres, and checks every output hash at the default 32 iterations.
+The SHA-256 references came from Margo's original ordered JS algorithm with only
+its cell/key stride raised to 2^22, verified byte-for-byte against the draft and
+now against the integrated entry. No foreign erosion code is used. The linear
+memory report counts Wasm pages, input and owned output separately. No timings
+or GPU work are run. Source manifest: packages/biomes/tests/fixtures/erosion-dem.json.
+
+For the production browser proof, first run the package CPU bundle regression:
+`node --test --test-timeout=120000 packages/biomes/tests/erosion-bundle.test.js`.
+Then run `node packages/biomes/tests/erosion-browser.mjs` in one shared GPU slot
+with wait-max 60 and a one-minute hold. It validates separate emission, lazy
+fetch, exact served Wasm and all real-crop fields on WebGPU/WebGL2 pages.

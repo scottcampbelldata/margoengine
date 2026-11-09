@@ -2408,3 +2408,21 @@ enum choices and the help link. Splitting diagnostics would add indirection to
 synchronous construction and per-frame mutable-value checks. No lighting work,
 quality or features are removed. Core plus stage remains 23924 B. Research and
 regression evidence: [size restoration](size-restore.md).
+
+## Optional Wasm erosion grid
+
+`biomes/erosion-wasm` accepts at most 4,194,304 cells with heights within
++/-33,554,432 mm and spacing 1..1,048,576 mm. It preserves all JS erosion
+defaults and exact output. The old JS entry remains capped at 2,097,152 cells.
+The Rust module uses Wasm SIMD and no GPU, so WebGL2 uses the same CPU route.
+On the pinned unresampled 2048x2048 real DEM, 32 rounds match all five JS output
+array SHA-256 hashes and outflow exactly. A fresh integrated instance reports
+156,827,648 B linear-memory high water. Including caller input and owned output
+requires 244,908,032 B of backing storage, excluding JS object/allocator overhead.
+Kernel array reuse eliminates 41,943,040 B of allocations, while input/readback
+add 88,080,384 B relative to running directly in JS. This is not a whole-process
+memory or elapsed-speed win. Final differences use 1,048,576 four-lane SIMD blocks.
+Entry gzip: 2,393 B, below the unchanged 2,652 B ceiling; Wasm is a separate
+31,905 B raw / 13,036 B gzip lazy asset. Existing erosion entry:
+3,014 B, below its unchanged 3,202 B ceiling; biome root 16,516 / 16,819 B.
+Production-browser, all biomes GPU and all biomes/umbrella README gates pass.

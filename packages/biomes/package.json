@@ -137,6 +137,10 @@
     "./ecosystem": {
       "types": "./dist/ecosystem.d.ts",
       "import": "./dist/ecosystem.js"
+    },
+    "./erosion-wasm": {
+      "types": "./dist/erosion-wasm.d.ts",
+      "import": "./dist/erosion-wasm.js"
     }
   },
   "files": [
@@ -180,7 +184,7 @@
     }
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js biomes",
+    "build": "node ../../scripts/build-optional.js biomes && node scripts/copy-erosion.mjs",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs",
@@ -192,6 +196,8 @@
     "test:gpu:backend-placement": "cd ../.. && node packages/biomes/tests/gpu-backend-placement-check.mjs",
     "test:gpu:prefetch": "cd ../.. && node packages/biomes/tests/prefetch-check.mjs",
     "test:gpu:flythrough:speed": "cd ../.. && node packages/biomes/tests/flythrough-speed.mjs",
-    "test:gpu:objects-frame:speed": "cd ../.. && node packages/biomes/tests/objects-frame-speed.mjs"
+    "test:gpu:objects-frame:speed": "cd ../.. && node packages/biomes/tests/objects-frame-speed.mjs",
+    "build:erosion": "node scripts/build-erosion.mjs",
+    "test:browser:erosion": "cd ../.. && node packages/biomes/tests/erosion-browser.mjs"
   }
 }

@@ -1,6 +1,6 @@
 {
-  "commit": "b5822d106",
-  "dirty": true,
+  "commit": "604f09866",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59077,
@@ -198,8 +198,8 @@
         "gzip": 3258
       },
       "./erosion": {
-        "raw": 6018,
-        "gzip": 2946
+        "raw": 6212,
+        "gzip": 3014
       },
       "./relief": {
         "raw": 9706,
@@ -281,9 +281,13 @@
         "raw": 6926,
         "gzip": 3210
       },
+      "./erosion-wasm": {
+        "raw": 4935,
+        "gzip": 2393
+      },
       "dist/workers/biomes-erosion.js": {
-        "raw": 5158,
-        "gzip": 2598
+        "raw": 5351,
+        "gzip": 2669
       },
       "dist/workers/biomes-graph.js": {
         "raw": 7127,
@@ -4044,15 +4048,20 @@
       "gzip": 39482,
       "brotli": 34985
     },
+    "packages/biomes/dist/erosion.wasm": {
+      "raw": 31905,
+      "gzip": 13036,
+      "brotli": 11092
+    },
     "packages/biomes/dist/workers/biomes-splines.js": {
       "raw": 9683,
       "gzip": 4272,
       "brotli": 3865
     },
     "packages/biomes/dist/workers/biomes-erosion.js": {
-      "raw": 5170,
-      "gzip": 2595,
-      "brotli": 2338
+      "raw": 5363,
+      "gzip": 2666,
+      "brotli": 2396
     },
     "packages/biomes/dist/workers/biomes-graph.js": {
       "raw": 7057,

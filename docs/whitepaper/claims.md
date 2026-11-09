@@ -2048,3 +2048,14 @@ were exercised. interact.browser.mjs has unchanged 1e-5 numeric bars, extended
 to a sloped heightfield, explicit/implicit rectangles and airborne explosions;
 Real-GPU execution passes. The README's terrain chunks example demonstrates
 16 held chunks and 7/3/1-blade LOD meshes without a huge-area or speed claim.
+## Optional ordered erosion CPU evidence
+
+The `biomes/erosion-wasm` route supports a 2048x2048 height grid with zero-byte
+differences from the ordered integer JS algorithm. CPU tests cover 258 option
+and boundary cases and a pinned real-DEM crop; the full real DEM's default
+32-round result matches independent JS reference hashes and outflow. Reproduce
+with `packages/biomes/tests/erosion-dem.mjs` (see reproduce.md). Work counts prove
+10 fewer kernel array bytes per cell and four-lane final differences, not faster
+elapsed execution. Total backing memory including copies is 244,908,032 B in a
+fresh instance. Production-browser, package GPU and README proofs pass. Research and
+the clean-room comparison are in docs/work-lists/skip-gaps-research.md.

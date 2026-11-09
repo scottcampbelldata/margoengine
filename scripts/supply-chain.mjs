@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/biomes/tests/fixtures/erosion-dem.json',
+    'Test-only 2048x2048 Mount Rainier elevation from 64 unmodified Mapzen Terrain Tiles Terrarium PNGs, zoom 13, x 1320..1327 and y 2880..2887, https://s3.amazonaws.com/elevation-tiles-prod/terrarium/13/{x}/{y}.png (8,162,734 source bytes, downloaded 2026-11-09). United States 3DEP and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey, public domain; Mapzen attribution https://raw.githubusercontent.com/tilezen/joerd/master/docs/attribution.md. The manifest pins each URL, byte count and SHA-256; erosion-dem-crop.json contains an owned 16x16 integer-millimetre crop. Tiles are joined without resampling and rounded to millimetres by Margo code, not a USGS-endorsed modification. Original tiles stay in ignored development inputs, no data ships in package tarballs, and no terrain service implementation or paper code is copied.',
+  ],
+  [
     'docs/whitepaper/results/batch-99-parity-gamma-20261109.json',
     'Own numerical observations of external MagicaVoxel 0.99.7.2 win64, by ephtracy, https://ephtracy.github.io/mv_main.html. Free use; distribution in other packages prohibited. Official release archive SHA-256 58320b90be00742cac2984ac6ddcc2cdd773d0b18a4212a1560b52b082e4d873, executable 7657e4c00de35f5272eec5b8d513b36b4e0767bb941668aa37677f3f9a3d4162. Only a black-box tool; executable, shaders and rendered PNGs stay outside Margo. No implementation read or copied. Calibration .vox files are Margo-authored stand-ins.',
   ],

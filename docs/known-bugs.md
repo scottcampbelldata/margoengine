@@ -3036,3 +3036,26 @@ Scatter sources and passing proof inputs are unchanged. Its changed package was
 rebuilt and the paired entry/network records regenerated from 21ff80d28,
 dirty=false; scatter/interact stays 3345 B and core + stage 23924 B.
 The pre-rebase GPU/README proof above remains the scatter execution evidence.
+
+### Closed: ordered erosion production packaging
+
+Repro: build a Vite app importing biomes/erosion-wasm from the saved chain. The
+manifest omitted its export and copy-erosion build step, so resolution failed
+before loading the module. Restored both registrations; the new
+packages/biomes/tests/erosion-bundle.test.js fails before and passes afterward,
+checking separate emission and exact asset bytes. The real production browser
+checks lazy loading and all crop fields on WebGPU/WebGL2 pages; both pass.
+
+Item 1 final proof: 477 package CPU tests, lint, hygiene and focused metadata
+checks pass. All eight existing biomes GPU suites, the new production erosion
+browser proof, all 36 biomes README examples and all three umbrella examples
+pass. A combined five-minute lease interrupted flythrough after three completed
+suites; the orchestration was split, completed suites preserved, and only the
+interrupted/pending steps ran. Flythrough passes in 243.2 s; no assertion or
+package deadline was changed. This is gate duration, not a speed claim.
+Earlier complete verify passed 13,585 tests with zero failures/skips
+(repair-api-fullverify.log). No extra full verify ran in this continuation.
+Final main rebase inherits unrelated diagnostics and documentation; erosion
+source/Wasm and proof inputs stay unchanged. Packages are rebuilt, with genuine
+paired entry/network records from 604f09866, dirty=false, then generated API.
+Logs: test-results/skip-gaps/item1-*.log; no benchmark or timing-only run.

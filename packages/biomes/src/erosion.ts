@@ -10,7 +10,8 @@
 // Journal of Geophysical Research, 2009; drainage over the filled surface in Priority-Flood order, Barnes, Lehman and
 // Mulla, Computers and Geosciences, 2014. Our own integer layout from those descriptions.
 import { rangeError, typeError } from '../../shared/errors.js';
-import { bilinear, degreesToAngle, divFloor, ONE, sincos } from './fixed.js';
+import { bilinear, divFloor, ONE } from './fixed.js';
+import { erosionSettings } from './erosion-settings.js';
 import { erosionHook } from './erosion-hook.js';
 import type { HeightGrid } from './hydrology.js';
 import type { Relief } from './relief.js';
@@ -264,14 +265,6 @@ function flowPass(w: Work, step: number, rates: readonly number[], load: Float64
   return out;
 }
 
-/** A rate option quantised to Q16 after a range check. */
-function rate(value: number | undefined, fallback: number, max: number, name: string): number {
-  const v = value ?? fallback;
-  if (typeof v !== 'number' || !(v >= 0 && v <= max))
-    throw rangeError(`Erosion ${name} must be a number from 0 to ${max}`, 'biomes');
-  return Math.round(v * ONE);
-}
-
 /**
  * Erodes a height grid: `iterations` rounds of thermal then hydraulic erosion, then the drainage of the result. Same
  * grid and options, same bytes on every machine. The grid's border and cells below `sea` are outlets.
@@ -283,39 +276,8 @@ function rate(value: number | undefined, fallback: number, max: number, name: st
  * console.log(e.height[128 * 257 + 128] - height[128 * 257 + 128], e.flow[128 * 257 + 128]);
  */
 export function erode(grid: HeightGrid, options: ErosionOptions = {}): Erosion {
-  const { height, nx, nz, step } = grid;
-  if (!(height instanceof Int32Array)) throw typeError('erode needs height as an Int32Array of millimetres', 'biomes');
-  if (typeof options !== 'object' || options === null)
-    throw typeError('Erosion options must be an object; pass {} for the defaults', 'biomes');
-  if (
-    !Number.isInteger(nx) ||
-    !Number.isInteger(nz) ||
-    !(nx >= 2 && nz >= 2 && nx * nz <= CELLS) ||
-    height.length !== nx * nz ||
-    !Number.isInteger(step) ||
-    !(step >= 1 && step <= 1048576) ||
-    height.some((v) => v > LIMIT || v < -LIMIT)
-  )
-    throw rangeError(
-      'erode needs nx and nz of 2 or more (at most 2,097,152 cells), nx x nz heights within +-33,554,432 mm and a step of 1..1,048,576 mm',
-      'biomes',
-    );
-  const iterations = options.iterations ?? 32,
-    talus = options.talus ?? 35,
-    sea = options.sea === undefined ? undefined : Math.round(options.sea);
-  if (!Number.isInteger(iterations) || iterations < 0 || iterations > 1024)
-    throw rangeError('Erosion iterations must be an integer from 0 to 1,024', 'biomes');
-  if (typeof talus !== 'number' || !(talus >= 0 && talus <= 89))
-    throw rangeError('Erosion talus must be an angle of 0 to 89 degrees', 'biomes');
-  if (sea !== undefined && !Number.isFinite(sea)) throw rangeError('Erosion sea must be a height in mm', 'biomes');
-  const thermal = rate(options.thermal, 0.25, 0.5, 'thermal'),
-    rates = [
-      rate(options.capacity, 0.01, 1, 'capacity'),
-      rate(options.incision, 0.25, 1, 'incision'),
-      rate(options.deposition, 0.5, 1, 'deposition'),
-    ],
-    cs = sincos(degreesToAngle(talus), [0, 0]),
-    tan = divFloor(cs[1] * ONE, cs[0]),
+  const { height, nx, nz, step } = grid,
+    { iterations, thermal, rates, sea, straight, diagonal } = erosionSettings(grid, options, CELLS),
     n = nx * nz,
     w: Work = {
       nx,
@@ -329,8 +291,6 @@ export function erode(grid: HeightGrid, options: ErosionOptions = {}): Erosion {
       heap: new Float64Array(n),
       seen: new Uint8Array(n),
     },
-    straight = Math.floor((tan * step) / ONE),
-    diagonal = Math.floor((tan * Math.floor((step * ROOT2) / ONE)) / ONE),
     ex = new Int32Array(8),
     load = new Float64Array(n);
   let outflow = 0;
