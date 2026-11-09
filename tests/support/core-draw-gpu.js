@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { GPURenderer } from '../../packages/core/dist/renderer.js';
 import { GLRenderer } from '../../packages/webgl2-compat/dist/preview.js';
 import { Camera } from '../../packages/core/dist/camera.js';
@@ -126,12 +127,13 @@ export function glDrawHarness(t) {
     clears = [],
     enabled = new Set(),
     canvas = { width: 160, height: 120 },
-    state = { viewport: [0, 0, 160, 120], scissor: [0, 0, 160, 120] },
+    state = { viewport: [0, 0, 160, 120], scissor: [0, 0, 160, 120], program: null },
     gl = {
       VERTEX_SHADER: 35633,
       FRAGMENT_SHADER: 35632,
       COMPILE_STATUS: 35713,
       LINK_STATUS: 35714,
+      CURRENT_PROGRAM: 0x8b8d,
       ARRAY_BUFFER: 34962,
       ELEMENT_ARRAY_BUFFER: 34963,
       STATIC_DRAW: 35044,
@@ -155,6 +157,10 @@ export function glDrawHarness(t) {
       attachShader() {},
       linkProgram() {},
       getProgramParameter: () => true,
+      getParameter(parameter) {
+        assert.equal(parameter, gl.CURRENT_PROGRAM);
+        return state.program;
+      },
       deleteProgram() {},
       deleteShader() {},
       getUniformLocation: (_program, name) => name,
@@ -191,7 +197,9 @@ export function glDrawHarness(t) {
         clears.push({ mask, scissorEnabled: enabled.has(gl.SCISSOR_TEST) });
         trace.push(['clear', mask]);
       },
-      useProgram() {},
+      useProgram(program) {
+        state.program = program;
+      },
       uniformMatrix4fv() {},
       uniform3f() {},
       uniform3fv() {},

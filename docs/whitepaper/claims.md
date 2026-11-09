@@ -7,6 +7,13 @@ snapshot/restore and ref identity through store growth. Core + stage: 23,837 to
 23,924 B gzip (+87 B); core alone 21,553 B, below its unchanged 21,587 B cap.
 No throughput or cross-hardware claim.
 
+Native GL reboot ownership repair (batch 181): the preview renderer releases its current program before
+deletion on live restoration and disposal, so another plugin does not retain a binding that becomes invalid
+when switched away. Foreign current programs are preserved. `preview-webgl.test.js` is the failing-before,
+passing-after CPU regression for owned, foreign and null bindings; sciviz's existing strict real-context reboot
+checkpoints are deferred pending the browser teardown repair on origin/main. This is a
+resource-lifetime claim only; no new hardware, pixel-equivalence or speed claim follows.
+
 Batch 181 native drawing piece (2026-11-10): `sciviz/webgl2` implements CPU-backed height surfaces and
 instanced rectangles on an engine whose actual backend is WebGL2, without a WebGPU shim. The root and the CPU
 extractor do not load that optional implementation. `packages/sciviz/tests/webgl2.test.js` checks delegation,

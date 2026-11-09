@@ -33,6 +33,26 @@ record, omit a lazy asset or change a size ceiling. Existing sizes-page tests
 are the regression gate and already participate in verify/check:merge. No code
 or file from another repository was read or copied; no speed measurement ran.
 
+## Batch 181 native GL reboot: current program lifetime (2026-11-10)
+
+Research-first search compared Alper Sarikaya and Michael Gleicher,
+[Using WebGL as an Interactive Visualization Medium: Our Experience Developing SplatterJs](https://graphics.cs.wisc.edu/Papers/2015/SG15/splatterjs-dsia-final.pdf)
+(2015), abstract and porting discussion, and Will Usher and Valerio Pascucci,
+[Interactive Visualization of Terascale Data in the Browser: Fact or Fiction?](https://arxiv.org/abs/2009.03254)
+(2020), abstract. Both motivate explicit browser GPU resource ownership; neither specifies object deletion.
+The deciding rules are Khronos WebGL Working Group, [WebGL 2.0 Specification](https://registry.khronos.org/webgl/specs/latest/2.0/)
+(2026 working draft), Conventions (inherited WebGL 1 rules and GLES 3.0), its
+[WebGL program-object API](https://registry.khronos.org/webgl/specs/latest/1.0/#5.14.9),
+and Jon Leech and Benj Lipchak (editors), [OpenGL ES 3.0.6](https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf)
+(2019), section 2.12.3: deleting a current program flags it for deferred deletion and leaves its binding;
+WebGL rejects using the marked object again. A plugin cannot restore it. The preview renderer now unbinds its own
+current program before deletion on live restore and disposal, preserving foreign programs. No source
+implementation, companion code or paper listing was read. This is a resource-lifetime repair, with no
+new CPU loop, Wasm or timing claim. The unit regression fails on the prior renderer; sciviz's reboot
+checkpoint supplies the real-context repro. The CPU regression models marking, retained current bindings and
+INVALID_OPERATION on rebinding, then exercises a plugin save/switch/restore after both live rebuild and disposal,
+with owned, foreign and null initial bindings. The ordinary unit-test chain in `check:merge` runs this regression.
+
 ## Batch 181 job 1: native sciviz surface and rectangle drawing (2026-11-10)
 
 Research-first survey, before implementation, compared these primary papers and standards:

@@ -98,9 +98,14 @@ axes:false and unsupported Figure calls reject before publishing, so it cannot s
 First native drawing run: all eight WebGPU cases passed; the native WebGL2 bar produced/restored the same
 pixels and passed hostile-state image/identity comparisons, but its final `gl.getError() === NO_ERROR` assertion
 failed. Reproduce with the shared lock around `node packages/sciviz/tests/webgl2-browser.mjs` after building.
-The invalid operation is in the creation/reboot/draw/state-cleanup path; the exact GL call and root cause are
-not isolated yet. New strict checks at each phase and console warnings are queued, not waived or loosened.
-Evidence: `test-results/sciviz-fixes/webgl-gpu.log/json`; next run: `webgl-gl-diagnostic.*`. This piece stays local.
+The strict diagnostic isolated `useProgram` at bar reboot: the preview renderer deleted its still-current
+program during live restore. Deletion leaves it bound; a later plugin's state scope saves the flagged object,
+switches programs and cannot rebind the now-deleted object. The owning preview renderer now releases only its
+own current binding before deletion, on restore and disposal. The unit regression fails before the repair and
+passes afterwards; the unchanged native GL browser checkpoints are deferred under the coordinator's CPU-only
+instruction until the remaining browser teardown repair lands on origin/main. No GPU lock is requested. Evidence:
+`test-results/sciviz-fixes/webgl-gl-diagnostic.*`, `program-lifetime-before.log`, `program-lifetime-after.log`.
+No native surface parity or full-job completion is claimed until the browser gate passes. This piece stays local.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 

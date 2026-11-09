@@ -87,6 +87,8 @@ fetches, retaining every grid cell, central-difference normals, contours, grid s
 `MAX_TEXTURE_SIZE`. Rectangles use one instanced draw with packed colours. The optional driver preserves
 the caller's GL state, uses the engine view's viewport/scissor and shares its depth buffer with core meshes.
 `webglRestore()` rebuilds layer resources from retained data, including the latest height update.
+The preview renderer releases its own current program before live rebuild/disposal, allowing a layer's
+GL state scope to restore a valid binding. CPU regression tests cover this; native reboot validation is pending.
 Root `Figure.create` continues to select WebGPU. Importing the root or CPU extractor never loads this driver.
 
 `npm run test:webgl2 --workspace @margoengine/sciviz` checks the two real engine backends, restoration,

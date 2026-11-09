@@ -1,5 +1,10 @@
 # @margoengine/webgl2-compat
 
+Live `/restore` rebuilds and renderer disposal release the renderer's current shader program before
+deleting it. Other plugins can save and restore GL state during reconstruction without retaining a
+deleted program; a current program owned by another plugin is preserved. The existing restore example
+below needs no additional setup. CPU lifetime tests cover owned, foreign and null bindings; the sciviz
+native reboot pixel/error gate remains pending the browser teardown repair.
 
 This is the single WebGL2 package. Use the root `install()` entry to run the real
 renderer without WebGPU. The optional `/preview`, `/pick`, `/restore` and `/auto`

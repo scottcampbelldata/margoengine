@@ -62,6 +62,10 @@ An independent one-second refresh preserves the old reader/writer client's
 ten-second freshness convention during synchronous work. Holder/waiter formats
 remain compatible. This is CPU-only scheduling evidence, not a GPU speed claim.
 
+Native WebGL2 live rebuild and disposal release the preview renderer's current program before deleting it.
+A foreign current program is preserved. The lifetime regression covers both operations and catches a deleted
+binding escaping into another plugin's state scope; it adds no rendering feature or timing claim.
+
 Half-float voxel encoding uses one reusable four-byte bit-cast buffer, with no typed-array allocations per voxel.
 It retains IEEE binary16 rounding, subnormals and special values. This changes neither brick selection nor the
 atlas budget; `tests/f16-allocation.test.js` checks all 65,536 half words, rounding ties and allocation counts.

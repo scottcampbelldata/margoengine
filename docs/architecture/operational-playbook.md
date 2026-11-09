@@ -50,6 +50,17 @@ or new speed claim is part of this change. The queue uses the common process
 limiter, so affected-step closure now selects views/depth when that limiter changes;
 the regression checks both the dependency and the selected checks.
 
+## Native WebGL2 current-program lifetime (batch 181, section 5 supplement)
+
+The native sciviz reboot diagnostic found a preview renderer ownership defect: deleting the current program
+kept a flagged binding alive until a plugin switched programs, at which point its saved binding became invalid.
+Preview restore and disposal now unbind their own current program before deletion, preserving foreign programs.
+`packages/webgl2-compat/test/preview-webgl.test.js` fails before the repair and checks both paths and foreign
+state preservation. `packages/sciviz/tests/webgl2-browser.js` checks NO_ERROR immediately after every reboot,
+upload and draw; that real-context gate is deferred until the browser shutdown repair lands on origin/main.
+The CPU test models the specification's marked-object rebinding error and checks owned, foreign and null
+bindings after both operations. No core or stage implementation changes are needed.
+
 ## Browser shutdown evidence (batch 160, section 5 supplement)
 
 The Windows browser owner distinguishes native process exit from ChildProcess

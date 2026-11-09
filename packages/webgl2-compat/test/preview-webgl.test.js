@@ -88,3 +88,63 @@ test('add on a held geometry makes the new buffers first, so a failure keeps the
   renderer.remove(geometry);
   assert.equal(live.size, 0);
 });
+
+test('live restore and disposal leave a program binding a plugin can save and restore', () => {
+  // WebGL 2 inherits WebGL 1 program-object rules and GLES 3.0 section 2.12.3:
+  // deleting the current program retains its binding, but useProgram rejects a marked object.
+  let current = null,
+    error = 0;
+  const deleted = new Set(),
+    programs = [];
+  const gl = new Proxy(
+    {
+      CURRENT_PROGRAM: 0x8b8d,
+      NO_ERROR: 0,
+      INVALID_OPERATION: 0x502,
+      getParameter(p) {
+        assert.equal(p, this.CURRENT_PROGRAM);
+        return current;
+      },
+      useProgram(p) {
+        if (deleted.has(p)) {
+          error = this.INVALID_OPERATION;
+          return;
+        }
+        current = p;
+      },
+      getError() {
+        const result = error;
+        error = 0;
+        return result;
+      },
+      createProgram() {
+        const p = {};
+        programs.push(p);
+        return p;
+      },
+      getShaderParameter: () => true,
+      getProgramParameter: () => true,
+      deleteProgram(p) {
+        deleted.add(p);
+      },
+    },
+    { get: (target, key) => (key in target ? target[key] : () => ({})) },
+  );
+  for (const operation of ['restore', 'dispose']) {
+    for (const binding of ['own', 'foreign', 'none']) {
+      const renderer = new GLRenderer({ getContext: () => gl }),
+        own = programs.at(-1),
+        foreign = gl.createProgram();
+      gl.useProgram(binding === 'own' ? own : binding === 'foreign' ? foreign : null);
+      renderer[operation]();
+      assert.ok(deleted.has(own), `${operation} releases its old program`);
+      const saved = gl.getParameter(gl.CURRENT_PROGRAM);
+      // The sciviz upload/draw scope, after renderer.restore and before another preview frame.
+      gl.useProgram(foreign);
+      gl.useProgram(saved);
+      assert.equal(gl.getError(), gl.NO_ERROR, `${operation}/${binding}: a plugin can restore the binding`);
+      assert.equal(current, binding === 'foreign' ? foreign : null, `${operation}/${binding}: owner isolation`);
+      renderer.dispose();
+    }
+  }
+});

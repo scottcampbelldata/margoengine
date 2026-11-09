@@ -141,7 +141,7 @@ export class GLRenderer implements Renderer {
       gl.getError();
     } else {
       for (const [geometry] of kept) this.remove(geometry);
-      gl.deleteProgram(this.program);
+      this.releaseProgram();
     }
     this.link();
     for (const [geometry, { capacity }] of kept) this.add(geometry, capacity);
@@ -297,7 +297,14 @@ export class GLRenderer implements Renderer {
   }
   dispose(): void {
     for (const geometry of this.resources.keys()) this.remove(geometry);
-    this.gl.deleteProgram(this.program);
+    this.releaseProgram();
+  }
+  private releaseProgram(): void {
+    // Deletion alone leaves a current program flagged but bound. A plugin saving that binding
+    // cannot restore it after switching programs (WebGL INVALID_OPERATION). Release our binding first.
+    const { gl } = this;
+    if (gl.getParameter(gl.CURRENT_PROGRAM) === this.program) gl.useProgram(null);
+    gl.deleteProgram(this.program);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
