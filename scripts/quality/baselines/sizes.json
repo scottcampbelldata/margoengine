@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11508256,
+  "total": 11511585,
   "history": [
     {
       "date": "2026-10-24",
@@ -4898,6 +4898,12 @@
       "commit": "a64611ae7",
       "reason": "voxel-net/sql-store: new entry (98.6)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "75406d386",
+      "reason": "Batch 77 new optional creative/paint, 3073 B gzip, size class S. New budget 3329 B includes standard 256 B headroom; all existing budgets unchanged. No core/stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5842,6 +5848,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/creative/paint": 3329
   }
 }

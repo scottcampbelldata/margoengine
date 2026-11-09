@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-618). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-619). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1168,3 +1168,18 @@ Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics en
 | Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
 
 Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,797 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
+
+## Painterly post effects (batch 77, LIM-619)
+
+Optional creative/paint: 7504 B minified / 3073 B gzip with bare imports external, size class S.
+PostStack is a separately imported optional peer; core/stage do not import paint. WebGPU only; native WebGL2 gives
+unsupported with help link. Display-encoded RGB, centre alpha unchanged, no alpha-weighted neighbourhoods. Radius
+is an integer 1..8 pixels, default 3; strength 0..1, default 1; enabled true; mode kuwahara. Maximum classic
+Kuwahara work is four 9x9 regions (324 reads) plus centre; watercolour adds eight gradient reads, sketch uses eight
+plus centre. All neighbourhoods clamp to the viewport, not the optional scissor. One small uniform per retained
+view; inactive view resources are pruned on advancing frames. No CPU image filtering or extra image history.
+Classic Kuwahara has square artifacts and unstable noisy ties; watercolour is an eight-level wash with fixed paper
+and dark edges; sketch uses Sobel outlines and six-pixel hatches. No anisotropic filtering, fluid/pigment simulation,
+temporal stabilization, aesthetic, throughput, mobile or cross-browser proof. Generated noise, flat, hard-edge,
+tiny and split-view images on RTX A6000 match independent CPU references; real Engine/PostStack resize and device
+replacement are read back. RGB tolerance is one UNORM code for f32/store rounding, alpha and bypass exact.

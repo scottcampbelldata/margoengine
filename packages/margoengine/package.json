@@ -606,6 +606,10 @@
       "types": "./dist/core/extension.d.ts",
       "import": "./dist/core/extension.js"
     },
+    "./creative/paint": {
+      "types": "./dist/creative/paint.d.ts",
+      "import": "./dist/creative/paint.js"
+    },
     "./creative": {
       "types": "./dist/creative.d.ts",
       "import": "./dist/creative.js"

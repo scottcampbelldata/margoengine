@@ -36,3 +36,12 @@ WebGL2's coded refusal. Generated fixtures are stand-ins; no huge-area speed or 
 capacity and GPU binding limits apply. The audit found input/alignment defects, fixed in a separate scatter commit
 with two parent-failing regressions. Docs: scatter README, limits, known-bugs, operational playbook and this audit;
 existing scatter claims/clean-room records own the implementation, with no new public feature claim.
+
+## Job 5: painterly post effects - DONE
+
+An all-packages search for Kuwahara, watercolour/watercolor, painterly, pencil and sketch found no implementation
+before coding (6,230 files searched). New optional creative/paint exports Painterly and option/mode types, absent
+from the creative root; the generated umbrella aliases it. Classic minimum-variance quadrants, a quantized wash
+and Sobel/hatching sketch work in an LDR PostStack. Papers and scope distinctions are recorded in clean-room.md.
+Docs: creative README, clean-room, limits, known-bugs, operational section 5, claims LIM-619, reproduce and build-record.
+No speed claim, so perf-history and rival-speed files need no change. Physics remains on hold.

@@ -3684,3 +3684,47 @@ formulation choices distinguished from its unisolated full cause. No package/cor
 Job 3 checks: lint, hygiene, full verify (13155 pass, zero failures/skips), 402 materials
 unit tests, its 96-module GPU suite, seven reference-contract tests, and both frozen
 sheen picture budgets. No package README or public API changed.
+
+## Batch 77: creative
+
+Render target subresources, existing terrain grass composition and optional painterly post effects. Physics and
+physics2d remain on hold and were not changed by this batch.
+
+| Job | Status | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Cube, array, mip and 3D slice targets | DONE | 0fd6733f5 | creative/targets: 11,373 B minified / 4,021 B gzip; colour-only explicit subresources, 78 generated GPU readbacks, HDR/load and restore; native WebGL2 coded refusal |
+| 2. Grass on terrain | SKIPPED | af1249532 | Existing scatter heightmap/densityMap/blades/wind; all-packages audit in batch-77-audit.md |
+| 3. Grass interaction | SKIPPED | a609bda24 | Existing scatter/interact radial player/vehicle/one-frame explosion pushes; no second field |
+| 4. Grass clumps, chunks and LOD | SKIPPED | 75406d386 | Existing procedural 7/3/1-blade clumps plus scatter/tiles, terrain/wind/fades and page streaming; generated GPU composition proof |
+| 5. Kuwahara, watercolour and sketch | DONE | this commit | creative/paint: 7504 B minified / 3073 B gzip; classic Kuwahara and stylized wash/sketch, independent CPU pixel proof, real Engine/PostStack lifecycle |
+
+Separate audit repairs: 91d24a636 fixes scatter interaction hostile floats, atomic validation and camera shifts
+(parent-failing interact.test.js and real-GPU extreme-value/pixel checks); 5b705a199 fixes tile sparse/nonrepresentable
+rectangles, arithmetic overflow and unaligned byte views (both tiles-inputs.test.js tests fail on the parent;
+grass-tiles.browser.mjs checks real GPU counts/add/remove/restore and native WebGL2 refusal). Scatter interact is
+7,463 B minified / 3,318 B gzip; tiles is 7,975 B / 3,295 B. Harness repairs f960d9619 and f83f20472 keep GPU scripts
+workspace-launchable and teardown bounded, with root-launch regressions. Main's WFC constraints checks were retained.
+
+Job 5 first rejected WebGL2 through an unlinked stack message; the entry now preflights it and supplies the coded
+help link, covered by Node and native browser checks. No core/stage or physics changes. Painterly includes hostile
+construction/live options, separate view uniforms, inactive-view cleanup, alpha/bypass, tiny images, radii 1/3/8,
+hard edges, BGRA/4x MSAA, resize and actual device replacement. All shaders compile, with no uncaptured GPU errors.
+Generated fixtures are stand-ins, not artwork quality evidence. Kuwahara's square/noisy-tie limits and stylized
+watercolour/sketch scope are explicit; no anisotropic/fluid/pigment simulation, huge-area grass throughput,
+cross-device, aesthetic or speed claim. PostStack is a separate optional peer, absent from creative's root.
+
+Earlier jobs passed lint, hygiene, full verify, creative/scatter/WFC units and the relevant GPU/README checks.
+Job 4's final full verify passed on current main after upstream core/CSP updates. One earlier real-browser-close
+timing miss at 30,771.6487 ms under 99.32-100% CPU remains recorded in busy-retests.md for the quiet release rerun;
+no budget, assertion or test was relaxed. Closing job gates are lint, hygiene, full verify, creative/post units,
+creative GPU (Planet/grass/targets/paint), README execution, API reports, parity, lock sync and claim consistency.
+The final push carries row 77 done, this build record, exports/API/size records and documentation together.
+
+Closing batch 77 validation on 0dd9417d7: lint, hygiene and full verify passed (13162 passed,
+0 failed, 14 pre-existing optional fixture/conformance skips in the full suite; no new skip).
+Creative's 52 and post's unit tests passed; Planet, grass, targets and paint GPU suites passed under codex-77's lock.
+Painterly checked 20,528 channel values, with all shader modules compiling and no GPU validation errors; creative
+README examples ran 6/6. Export/API records, parity, size gates, claim uniqueness and lock sync passed. The early
+API-quality failure was missing argument help anchors; documented arguments/state anchors and linked WebGL2
+preflight errors are now asserted by regression tests. No failed check remains. The older busy browser-close
+release retest stays recorded honestly; this batch did not change its budget or remove its test.

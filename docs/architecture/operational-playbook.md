@@ -2026,3 +2026,16 @@ The optional `voxel-pathtracer/restir` subclass replaces only the emissive direc
 ### Umbrella size drift check: section 5 evidence
 
 The umbrella README now records the current core plus stage figure, 23,797 B gzip. `tests/umbrella-readme-size.test.js` compares its duplicate figure with the root README, so a future measurement update cannot leave the umbrella text stale. The existing `measure:size` gate supplies the actual measurement; this regression runs with the root tests in verify and check:merge. No runtime or size budget changes.
+
+### Painterly post effects (batch 77): section 5 evidence
+
+creative/paint is an optional LDR PostStack stage; no core/stage change. Single-pass WGSL implements classic
+four-quadrant minimum RGB variance, a stylized quantized watercolour wash and a Sobel/hatching sketch. Neighbour
+reads clamp to each viewport. Per-view uniforms prevent queue writes from overwriting earlier encoded views;
+ViewStates prunes inactive resources. Pipeline keys include format and sample count; input changes rebuild bindings.
+Real RTX A6000 WebGPU readbacks compare generated stand-in images to an independent double-precision CPU reference
+using squared deviations, including radius endpoints, one-pixel images, hard edges, uneven split views, exact centre
+alpha and bypass, BGRA and 4x MSAA. Real Engine/PostStack readbacks cover resize and replacement devices. Native
+WebGL2 rejects with a code/help link. Shader compilation and uncaptured validation errors are checked. Node tests
+cover hostile live edits before GPU writes, lifecycle, pruning and terminal restoration. No artistic quality,
+temporal stability, speed, mobile or other-browser evidence. Entry 3073 B gzip, size class S.

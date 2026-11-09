@@ -30,6 +30,7 @@ await build({
     lib: { entry, formats: ['es'], fileName: (_, name) => name + '.js' },
     rollupOptions: {
       external: [
+        '@margoengine/post/stack',
         '@margoengine/core',
         '@margoengine/core/extension',
         '@margoengine/vfx/base',

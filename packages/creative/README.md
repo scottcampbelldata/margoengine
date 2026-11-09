@@ -31,6 +31,7 @@ Use a feature subpath for a static import or an on-demand `import()`:
 | `@margoengine/creative/particles` | `GPUParticles` (a `@margoengine/vfx` preset) and particle option types |
 | `@margoengine/creative/targets` | `HDRRenderTarget`, `TextureRenderTarget` |
 | `@margoengine/creative/toon` | `ToonShading` and toon option types |
+| `@margoengine/creative/paint` | `Painterly`: Kuwahara, watercolour wash and sketch, in an LDR PostStack |
 | `@margoengine/creative/post` | `PostProcessing` (fog, god rays, focus blur, grading, grain) and its option types |
 | `@margoengine/creative/grass` | `GrassField` and grass option types |
 | `@margoengine/creative/planet` | `Planet` and planet option types |
@@ -202,3 +203,50 @@ Proof: `node --test --test-timeout=30000 packages/creative/tests/targets.test.js
 `node scripts/gpu-lock.mjs run --owner=creative-targets --max=5 -- node packages/creative/scripts/test-targets.js`.
 The generated color fixture checks 78 subresources with full pixel readback, HDR, partial draws with load,
 WebGL2 rejection and replacement-device restoration. Other browser/GPU implementations and speed are unmeasured.
+
+## Painterly post effects
+
+Import only `@margoengine/creative/paint` (or `margoengine/creative/paint`). It stays out of the creative root.
+Install the optional `@margoengine/post` peer alongside creative for this entry. Painterly works in display space
+after tonemapping, with no texture or scene input to provide. All options are live and validated each frame.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Painterly } from 'margoengine/creative/paint';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+engine.scene.background = '#406080';
+const paint = Painterly.attach(engine, { mode: 'watercolour', radius: 3, strength: 1 });
+engine.start();
+// Live changes: paint.options.mode = 'sketch'; paint.enabled = false;
+// On teardown: paint.dispose(); engine.dispose();
+```
+
+For an existing stack, add `new Painterly(options)` after its display effect using
+`PostStack.attach(engine, [/* HDR/display effects, then */ new Painterly()])` from `@margoengine/post/stack`.
+The stack owns its effects. `Painterly.attach` creates and owns a stack by itself; disposing the returned effect
+releases both. Disposal is terminal, idempotent and supports `using` / `Symbol.dispose`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `mode` | `'kuwahara'` | `'kuwahara'`, `'watercolour'` or `'sketch'` |
+| `radius` | `3` | Integer 1..8 pixels; sketch uses this for gradient spacing |
+| `strength` | `1` | Finite 0..1 blend; zero is an exact input copy |
+| `enabled` | `true` | False is an exact input copy |
+
+Kuwahara chooses the mean of the lowest summed RGB-variance quadrant among four overlapping squares, with the
+first quadrant winning equal computed variances. This classic filter can produce square artifacts and flicker on
+noisy near-ties; it is not the anisotropic tensor filter. Watercolour adds eight-level colour quantization, a pale
+wash, Sobel edge darkening and a fixed 17-value paper pattern. Sketch draws Sobel outlines and two diagonal hatch
+families at six-pixel spacing, selected by source luminance. These are single-frame stylizations, not fluid,
+pigment or pencil simulations. Each preserves the centre alpha, clamps neighbours to its viewport and keeps
+uniforms separate per view. RGB is filtered as supplied by the LDR stack, without alpha-weighted filtering.
+
+WebGPU only; native WebGL2 throws coded `unsupported` with a help link. Invalid options throw linked RangeError;
+attachment/state/disposal errors are coded. Device restoration rebuilds GPU resources automatically through the
+stack. A maximum-radius Kuwahara or watercolour pixel reads 324 neighbourhood samples plus the centre (watercolour
+also reads eight Sobel neighbours); sketch reads eight neighbours plus the centre. Entry: 7504 B minified,
+3073 B gzip with bare dependencies external. No speed, aesthetic quality or other-device claim. Tests use
+generated images as stand-ins on a real RTX A6000, against an independent CPU pixel reference. Run
+`npm run test:gpu:paint --workspace @margoengine/creative` through the repository GPU lock.

@@ -1545,3 +1545,11 @@ WFC omitted shared bounded teardown and served package-relative files under a re
 ### Fixed: batch 160 material GPU teardown and masked check errors
 
 The job 4 blocker used the pre-c1646e3ec Chromium launch path. Ending its native process tree could leave the Playwright launch-client cleanup promise pending past 30,000 ms. Current main owns the process and driver through launchServer and server.kill; the batch adds a pending-client regression and uses runSuite in the actual material GPU script, with an injected double-failure regression. No timeout was raised. Instrumented BRDF runs completed all readbacks and WGSL reports and exited after process cleanup; this does not establish a leaked page device as the original cause. Job 4 must still pass its frozen picture budgets before landing.
+
+### Painterly post effects (batch 77)
+
+No open defect found in the tested scope. The first GPU run exposed an unlinked WebGL2 rejection from the underlying
+stack; Painterly now preflights its backend and gives its own coded, linked refusal. Construction/live validation,
+terminal disposal and independent view uniforms are covered by paint.test.js; paint-browser.js checks independent
+CPU pixels, hard edges, alpha/bypass, MSAA/BGRA, resize, real replacement devices and native WebGL2. Classic
+Kuwahara square artifacts and noisy variance ties are documented algorithm limits, not a tensor-filter claim.

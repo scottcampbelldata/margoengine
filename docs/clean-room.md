@@ -1677,3 +1677,18 @@ The optional voxel-pathtracer/restir entry was written from these papers only:
 - Lin et al., [Generalized Resampled Importance Sampling](https://dqlin.xyz/data/paper/GRIS.pdf), 2022, sections 3.3 and 4.2-4.4: contribution weights and the restrictions needed for unbiased reuse. This entry does not reuse reservoirs across frames or pixels.
 
 The initial light-only reservoir left the BSDF emitter contribution outside resampling and retained its original MIS partition. The implemented mixture instead integrates emissive direct illumination with a common solid-angle measure and complementary balance weights, including visibility in its target. The continued path's directly sampled emitter contribution is excluded only when covered by this integral; camera and delta paths retain emission. Media are ignored only while locating a directional candidate, then evaluated by the same transmittance walk as light candidates. No other renderer's source or paper-linked implementation was read or copied.
+
+## Batch 77: painterly post effects
+
+Creative's optional paint entry was authored from descriptions and papers, with no external source code read or
+copied. Kyprianidis, Kang and Dollner, *Image and Video Abstraction by Anisotropic Kuwahara Filtering*, Computer
+Graphics Forum 28(7), 2009, [section 2](https://www.kyprianidis.com/p/pg2009/jkyprian-pg2009.pdf), describes classic
+minimum-variance rectangular regions; this entry implements that classic four-quadrant method, not the paper's
+anisotropic tensor filter. Curtis, Anderson, Seims, Fleischer and Salesin, *Computer-Generated Watercolor*, SIGGRAPH
+1997, [sections 1 and 2](https://grail.cs.washington.edu/wp-content/uploads/2015/08/curtis-1997-cgw.pdf), supplies
+appearance goals (granulation and edge darkening). Margo uses its own quantization, fixed integer paper pattern
+and Sobel modulation, without their fluid, pigment or Kubelka-Munk simulation. Sketch is Margo's direct 3x3 Sobel
+luminance convolution and diagonal tone hatching. GPU bindings, viewport/scissor and textureLoad follow the
+[W3C WebGPU specification](https://www.w3.org/TR/webgpu/) and [WGSL specification](https://www.w3.org/TR/WGSL/).
+Only the papers/specifications were consulted, never their linked implementations. Test images are generated
+stand-ins; no third-party artwork or code is included.

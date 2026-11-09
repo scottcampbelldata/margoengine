@@ -668,3 +668,11 @@ The driver also checks baseline identity at one candidate, finite values at 64, 
 absorbing half-block media, camera and delta emission, empty scenes, native WebGL2 refusal, compatibility rendering,
 disposal and real device restoration. Output: `test-results/voxel-pathtracer-restir.json`.
 The accuracy result is from generated geometry on one RTX A6000 and Edge 157. No quiet-machine speed result is claimed.
+
+### Batch 77 painterly pixels
+
+Build packages, then run `npm test --workspace @margoengine/creative` and
+`node scripts/gpu-lock.mjs run --owner=codex-77 -- npm run test:gpu:paint --workspace @margoengine/creative`.
+The GPU script reads every tested pixel against the independent CPU reference (double-precision squared
+deviations), asserts exact alpha/bypass and one-code RGB error, tests BGRA/MSAA, separate views, real device
+replacement and real Engine/PostStack integration. Generated stand-ins only; no timing or aesthetic judgement.

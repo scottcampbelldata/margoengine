@@ -28,11 +28,16 @@
     "test": "npm run build && node --test tests/*.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:gpu:targets": "node scripts/test-targets.js",
+    "test:gpu:paint": "node scripts/test-paint.js",
     "dev": "vite --config vite.config.js",
     "prepack": "npm run build"
   },
   "sideEffects": false,
   "exports": {
+    "./paint": {
+      "types": "./dist/paint.d.ts",
+      "import": "./dist/paint.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
@@ -71,7 +76,13 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/post": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/post": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/vfx": "^1.0.0"
