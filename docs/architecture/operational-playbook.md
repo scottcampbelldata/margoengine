@@ -1362,6 +1362,16 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Bevel polygon validity (test-page 44)
+
+The mesh-edit whole-mesh bevel now uses its existing ear clipper for
+nonplanar generated strips/caps, keeping UV corners and every face-map descendant.
+Winding comes from input half edges and cap connectivity, rather than a centroid
+normal estimate that inverted a twice-extruded cylinder strip. Twelve before/after
+regressions prove planar faces, two opposite incidences per edge, unique IDs,
+source ownership, face provenance and successful further editing. This is CPU
+polygon modeling in its optional package; no core, GPU math, backend or speed claim.
+
 ### Retained core transform references (test-page 36)
 
 Core Mesh defines non-configurable accessors for its position, rotation and scale

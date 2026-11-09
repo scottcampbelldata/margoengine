@@ -1360,3 +1360,9 @@ and `npm run measure:size`. The parent fails replacement rejection; the repaired
 build preserves mutation and inspector restoration. Package GPU and README checks
 use `npm run test:gpu --workspace=@margoengine/core` and
 `npm run check:readme-run -- --packages=core` under the shared GPU lock.
+
+For test-page 44, build packages then run
+`node --test --test-timeout=120000 packages/mesh-edit/tests/testpage-bevel.test.js`.
+The parent fails eight planar-face cases; the fix passes all twelve including
+closed winding, provenance and subsequent edits. The package browser script and
+`npm run check:readme-run -- --packages=mesh-edit` exercise its rendering and docs.

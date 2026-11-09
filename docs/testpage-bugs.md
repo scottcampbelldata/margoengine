@@ -372,3 +372,34 @@ root. exporters/tests/testpage-usdz-entry.test.js imports the actual documented
 package subpath, writes a ZIP/USDZ header and pins the README's explicit optional
 entry contract. The unchanged implementation passes. Adding a root reexport
 would reverse this documented choice; no export or behaviour change is needed.
+
+### Entry 44: generated bevel surfaces must satisfy the polygon contract
+
+On current main, cube extrusion alone succeeds, but extrude/inset and double
+extrusion reproduce the planar-face failure; wedge and cylinder extrusions also
+reproduce it. The persistent twelve-case regression fails eight cases before the
+fix. The existing ear clipper now splits generated invalid strips/caps into planar
+triangles, preserving corner UVs and mapping every piece to every source face.
+Splitting alone revealed an inverted strip/cap on a twice-extruded cylinder
+(11/12 passed). Winding now follows source half edges and cap connectivity,
+instead of guessing outward from a global centroid. All twelve now pass planar,
+closed/opposite edge incidence, UV ownership, provenance, compile and subsequent
+extrude/inset assertions. No tests or tolerances were changed to obtain the pass.
+No core/stage or separate private modeling implementation was changed.
+
+Entry 44's initial full verify stopped at the unchanged entry size budget:
+30,471 > 30,203 B. The repair now keeps valid planar convex loops and directly
+ear-clips invalid generated loops, without the optional convex-merging step.
+All twelve regressions still pass, and the entry measures 30,180 B. The budget
+was not changed. Mesh-edit and exporters suites passed 421 and 502 tests before
+this size refinement; the changed mesh-edit suite and full verify run again.
+Research/standards comparison for entries 32, 36 and 42-45 is recorded in
+[testpage-research.md](testpage-research.md). The newest live rulings also defer
+all new speed measurements and require shared correctness locks with >=60-minute
+queue bounds. No benchmark or paired wall-clock speed experiment was run here.
+
+Final local entry 44 pre-gates after the size refinement: mesh-edit units pass
+421/421 (8.4 s), scoped API refresh passes, lint passes (3 s), hygiene passes
+(13.9 s). Full verify is queued shared with wait-max 60 and a 40-minute hold;
+actual GPU/browser/README work is separately queued and waits for that result.
+The earlier 36/32 ten-minute queues expired without running tests. No push yet.

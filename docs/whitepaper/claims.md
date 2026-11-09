@@ -1753,3 +1753,10 @@ keeps its getter-only public type. labels/tests/testpage-position.test.js fails
 before and passes after; supported setPosition behaviour is retained. The labels
 entry shares the declared math/mat4 module instead of embedding its implementation:
 5,546 to 5,450 B gzip, within the unchanged 5,546 B budget. No speed claim.
+
+Test-page 44: whole-mesh bevel returns editable planar convex pieces after the
+twelve cube/wedge/cylinder edit sequences in mesh-edit/tests/testpage-bevel.test.js.
+Eight cases fail on the parent; the split-only intermediate fails opposite edge
+incidence on the twice-extruded cylinder. Connectivity-based winding plus planar
+splitting passes every case with retained source UVs and full face provenance.
+No speed, equal-width bevel or arbitrary self-intersection support claim.

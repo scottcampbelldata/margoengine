@@ -4494,6 +4494,14 @@ The test-page 41 duplicate-label diagnostic fits the existing labels root entry
 budget at 5,546 B min+gzip. It reports TypeError with code state and a help link
 before setup creates DOM; duplicate registration never replaces existing labels.
 
+Whole-mesh bevel uses centroid fractions and requires consistently wound closed
+faces with one connected face fan per vertex. Generated warped strips and caps
+are split into convex planar pieces with per-corner UVs and full face provenance.
+Open/nonmanifold edges still return owned unchanged geometry with a diagnostic;
+inconsistent winding or disconnected vertex fans throw a linked TypeError.
+The twelve test-page 44 regressions cover cube/wedge/cylinder edits, not arbitrary
+self-intersecting outlines or a new equal-width bevel guarantee.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6825,6 +6833,18 @@ complete for this landing group. Earlier queued/blocker notes above are history.
 The separate 7.4 ms flythrough attribution remains open and is next per the
 coordinator; it is not a busy exemption. Durable results:
 whitepaper/results/missing-items-landing-20261109.json.
+
+### Open on main: test-page 44 bevel output validity, local repair awaiting gates
+
+Repro: createPrimitiveMesh('cube', 'box'), extrude its last face by 0.3,
+inset its first face by 0.25, then bevelPolygonMesh(mesh, 0.12). The generated
+edge strips/caps can be nonplanar, so bevel's own final assertion fails.
+A twice-extruded cylinder also exposes the centroid-based winding guess.
+The local repair triangulates invalid generated loops and follows half edges
+for cap cycles/winding. Twelve persistent regressions pass; the first full gate
+found an entry size overrun, now reduced to 30,180 B against unchanged 30,203 B.
+Full verification, browser and runnable README checks still must finish before
+landing; this entry closes only after those checks and the push.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -13155,9 +13175,16 @@ Inset a face (default `amount` 0.24, a centroid fraction from 0.001 to 0.95), th
 import { createPrimitiveMesh, insetMeshFace, bevelPolygonMesh } from 'margoengine/mesh-edit';
 const cube = createPrimitiveMesh('cube', 'box');
 const inset = insetMeshFace(cube, 'box-face-0', 0.3);
-const beveled = bevelPolygonMesh(cube, 0.1);
+const beveled = bevelPolygonMesh(inset.mesh, 0.1);
 console.log(inset.mesh.faces.length, beveled.mesh.faces.length);
 ```
+
+Bevel keeps the inset source faces and splits generated strips/caps into convex
+planar pieces when their corners are not coplanar. Corner UVs and every generated
+piece's source-face mapping survive the split. Strips and caps follow the input
+half-edge winding, so further extrude/inset operations remain valid. Closed
+inputs must have consistently wound faces and one connected face fan at each
+vertex; invalid winding/fans throw TypeError with the arguments help link.
 
 Callers own selection intent, locks, visibility, motion/opacity policy, IDs, undo and texture storage. Margo owns component transform geometry and the UV/paint algorithms below. No engine instance, DOM or GPU is needed. Supply `createId` for deterministic face IDs; otherwise commands call `crypto.randomUUID()` only when creating faces. Empty and duplicate generated IDs reject before exposing output.
 
@@ -13168,14 +13195,6 @@ The original parity commands retain existing behavior: extrusion acts along the 
 `traceMeshQuadRing(mesh, {faceId, corner})` traverses opposite edges of connected quads with transported edge orientation. `cutMeshQuadRing(mesh, seed, fraction)` accepts `0 < fraction < 1`, splits each geometric edge once, independently interpolates each incident face's UVs and returns the new ring's ordered vertices and edges. Open strips end at geometric boundaries. Nonquad continuation, nonmanifold or inconsistent winding and ambiguous/self-crossing paths reject. This API performs a coherent adjustable ring split; callers own preview, confirm/cancel and selection remapping.
 
 `vertexMap[oldIndex]` lists output descendants, including retained identities where present. `faceMap[oldId]` lists retained and descendant faces. Created vertices are new identities even when they are mapped descendants; removed vertices name discarded input indices, including welded duplicates that still map to a retained output vertex. Bevel replaces all vertex identities and maps each old vertex to its incident face corners. UV seams never weld merely because positions coincide.
-
-Tests import the built public package. Run `npm test --workspace @margoengine/mesh-edit` from the engine repository.
-
-## Modeling: edge bevel, loop slide, dissolve, weld and bridge
-
-Bevel selected edges, cut a loop and slide it, dissolve, merge by distance and bridge two open loops, from the
-`margoengine/mesh-edit/modeling` entry (`@margoengine/mesh-edit/modeling`), so apps that only paint or move components
-never load it. Edge IDs are `"low:high"` vertex pairs (see `polygonMeshEdges`):
 
 [README continues: https://margoengine.com/llms/packages/mesh-edit.md]
 

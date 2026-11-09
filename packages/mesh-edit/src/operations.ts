@@ -1,8 +1,10 @@
 import type { MutableVec2, MutableVec3 } from '@margoengine/math';
-import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
-import { assertPolygonMesh, centroid, edgeId, newellNormal } from './polygon.js';
+import { add, scale } from '@margoengine/math/vec3';
+import { assertPolygonMesh, centroid, edgeId, newellNormal, faceGeometryError } from './polygon.js';
 import { meshTileUV } from './primitives.js';
 import { clonePolygonMesh, createMeshEditResult, faceIdFactory, identityFaceMap, identityVertexMap } from './result.js';
+import { triangulateLoop } from './polygon-split.js';
+import { typeError } from '../../shared/errors.js';
 import type { PolygonFace, PolygonMesh, MeshEditOptions, MeshEditResult } from './types.js';
 
 const amountInRange = (amount: number, min: number, max: number) => {
@@ -157,7 +159,7 @@ export function cutMeshFace(mesh: PolygonMesh, faceId: string, options: MeshEdit
   });
 }
 
-/** Chamfer all faces of a closed mesh by centroid fractions. Open/nonmanifold meshes return owned unchanged geometry with a diagnostic. */
+/** Chamfer closed consistently wound faces by centroid fractions, splitting generated strips/caps into convex planar pieces. Open/nonmanifold edges return owned unchanged geometry with a diagnostic. */
 export function bevelPolygonMesh(mesh: PolygonMesh, amount = 0.12, options: MeshEditOptions = {}): MeshEditResult {
   assertPolygonMesh(mesh);
   amountInRange(amount, 0.001, 0.45);
@@ -200,40 +202,46 @@ export function bevelPolygonMesh(mesh: PolygonMesh, amount = 0.12, options: Mesh
     });
     return { id: face.id, vertices, uv: face.uv.map((point) => [...point] as MutableVec2) };
   });
-  const middle = centroid(mesh.vertices);
-  const addSurface = (vertices: number[], outward: MutableVec3, sources: string[]) => {
-    if (dot(newellNormal(vertices.map((i) => next.vertices[i])), outward) < 0) vertices.reverse();
-    const id = createId();
-    next.faces.push({ id, vertices, uv: meshTileUV(0, vertices.length) });
-    for (const source of new Set(sources)) faceMap[source].push(id);
+  const follows = new Map<number, number>();
+  const addSurface = (vertices: number[], sources: string[]) => {
+    const uv = meshTileUV(0, vertices.length),
+      pieces = faceGeometryError(next.vertices, vertices)
+        ? triangulateLoop(vertices.map((i) => next.vertices[i]))
+        : [vertices.map((_, i) => i)];
+    if (!pieces) throw typeError('Bevel outline crosses itself or has no area', 'arguments');
+    for (const piece of pieces) {
+      const id = createId();
+      next.faces.push({ id, vertices: piece.map((i) => vertices[i]), uv: piece.map((i) => [...uv[i]]) });
+      for (const source of new Set(sources)) faceMap[source].push(id);
+    }
   };
   for (const [first, second] of edgeMap.values()) {
     const { a, b } = first;
+    const fa = corners.get(`${first.face}:${a}`)!,
+      fb = corners.get(`${first.face}:${b}`)!,
+      sa = corners.get(`${second.face}:${a}`)!,
+      sb = corners.get(`${second.face}:${b}`)!;
+    // The strip opposes both inset face edges. Its end edges determine each vertex cap's winding.
+    follows.set(sa, fa);
+    follows.set(fb, sb);
     addSurface(
-      [
-        corners.get(`${first.face}:${a}`)!,
-        corners.get(`${first.face}:${b}`)!,
-        corners.get(`${second.face}:${b}`)!,
-        corners.get(`${second.face}:${a}`)!,
-      ],
-      sub(scale(add(mesh.vertices[a], mesh.vertices[b]), 0.5), middle),
+      [fb, fa, sa, sb],
       [mesh.faces[first.face].id, mesh.faces[second.face].id],
     );
   }
   for (const [vi, indices] of atVertex) {
     if (indices.length < 3) continue;
-    const outward = normalize(sub(mesh.vertices[vi], middle)),
-      axis = normalize(cross(outward, Math.abs(outward[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])),
-      other = cross(outward, axis),
-      hub = centroid(indices.map((i) => next.vertices[i]));
-    indices.sort((a, b) => {
-      const da = sub(next.vertices[a], hub),
-        db = sub(next.vertices[b], hub);
-      return Math.atan2(dot(da, other), dot(da, axis)) - Math.atan2(dot(db, other), dot(db, axis));
-    });
+    const ring: number[] = [];
+    let corner: number | undefined = indices[0];
+    for (let i = 0; i < indices.length; i++) {
+      if (corner === undefined) throw typeError('Bevel needs consistently wound faces', 'arguments');
+      ring.push(corner);
+      corner = follows.get(corner);
+    }
+    if (corner !== ring[0] || new Set(ring).size !== indices.length)
+      throw typeError('Bevel vertex needs one closed face fan', 'arguments');
     addSurface(
-      indices,
-      outward,
+      ring,
       mesh.faces.filter((face) => face.vertices.includes(vi)).map((face) => face.id),
     );
   }

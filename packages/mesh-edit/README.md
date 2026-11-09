@@ -17,9 +17,16 @@ Inset a face (default `amount` 0.24, a centroid fraction from 0.001 to 0.95), th
 import { createPrimitiveMesh, insetMeshFace, bevelPolygonMesh } from 'margoengine/mesh-edit';
 const cube = createPrimitiveMesh('cube', 'box');
 const inset = insetMeshFace(cube, 'box-face-0', 0.3);
-const beveled = bevelPolygonMesh(cube, 0.1);
+const beveled = bevelPolygonMesh(inset.mesh, 0.1);
 console.log(inset.mesh.faces.length, beveled.mesh.faces.length);
 ```
+
+Bevel keeps the inset source faces and splits generated strips/caps into convex
+planar pieces when their corners are not coplanar. Corner UVs and every generated
+piece's source-face mapping survive the split. Strips and caps follow the input
+half-edge winding, so further extrude/inset operations remain valid. Closed
+inputs must have consistently wound faces and one connected face fan at each
+vertex; invalid winding/fans throw TypeError with the arguments help link.
 
 Callers own selection intent, locks, visibility, motion/opacity policy, IDs, undo and texture storage. Margo owns component transform geometry and the UV/paint algorithms below. No engine instance, DOM or GPU is needed. Supply `createId` for deterministic face IDs; otherwise commands call `crypto.randomUUID()` only when creating faces. Empty and duplicate generated IDs reject before exposing output.
 

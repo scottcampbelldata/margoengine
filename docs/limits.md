@@ -1906,3 +1906,11 @@ gate; no performance ratio, busy exemption or new accepted difference.
 The test-page 41 duplicate-label diagnostic fits the existing labels root entry
 budget at 5,546 B min+gzip. It reports TypeError with code state and a help link
 before setup creates DOM; duplicate registration never replaces existing labels.
+
+Whole-mesh bevel uses centroid fractions and requires consistently wound closed
+faces with one connected face fan per vertex. Generated warped strips and caps
+are split into convex planar pieces with per-corner UVs and full face provenance.
+Open/nonmanifold edges still return owned unchanged geometry with a diagnostic;
+inconsistent winding or disconnected vertex fans throw a linked TypeError.
+The twelve test-page 44 regressions cover cube/wedge/cylinder edits, not arbitrary
+self-intersecting outlines or a new equal-width bevel guarantee.

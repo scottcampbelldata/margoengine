@@ -2327,3 +2327,15 @@ complete for this landing group. Earlier queued/blocker notes above are history.
 The separate 7.4 ms flythrough attribution remains open and is next per the
 coordinator; it is not a busy exemption. Durable results:
 whitepaper/results/missing-items-landing-20261109.json.
+
+### Open on main: test-page 44 bevel output validity, local repair awaiting gates
+
+Repro: createPrimitiveMesh('cube', 'box'), extrude its last face by 0.3,
+inset its first face by 0.25, then bevelPolygonMesh(mesh, 0.12). The generated
+edge strips/caps can be nonplanar, so bevel's own final assertion fails.
+A twice-extruded cylinder also exposes the centroid-based winding guess.
+The local repair triangulates invalid generated loops and follows half edges
+for cap cycles/winding. Twelve persistent regressions pass; the first full gate
+found an entry size overrun, now reduced to 30,180 B against unchanged 30,203 B.
+Full verification, browser and runnable README checks still must finish before
+landing; this entry closes only after those checks and the push.
