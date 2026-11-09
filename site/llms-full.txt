@@ -2605,7 +2605,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-627). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-628). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3813,7 +3813,7 @@ Quiet-world zero-resend resume evidence assumes stationary clients with a fully 
 
 ## Poisson disk placement (LIM-621)
 
-Optional procedural/poisson: 1,269 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
+Optional procedural/poisson: 1,290 B min+gzip JavaScript plus a lazy 29,914 B Wasm file (13,192 B gzip).
 CPU-only on WebGPU and WebGL2. Rectangle or area-weighted triangle-soup darts, ambient Euclidean separation,
 not geodesic spacing. Finite coordinates within +/-1,000,000; radius 0.000001..1,000,000; maximum 65,536 triangles,
 65,536 returned points and 2,000,000 candidates. Defaults: seed 1, 4,096 points, 100,000 candidates.
@@ -3922,6 +3922,17 @@ other scatter entries are unchanged. No speed or new rendering-quality claim.
 ## Texture mask wipes (LIM-627)
 
 Optional transitions/mask uses encoded red values as reveal thresholds, alpha ignored. 8-bit ImageData is snapshotted; ImageBitmap is borrowed and must stay open through restoration, and is never closed by the transition. Mask dimensions 1..min(4096, device limit), capture dimensions <=65535 and within the device limit. Integer centre addressing is overflow-free within those bounds, including odd-size exact ties. Nearest full-capture stretch, top-left origin, no tiling or aspect fitting. Softness default 0.02, zero or finite 0.000001..1. Exact endpoints bypass thresholding; built-in kind/displacement are ignored. ImageData bytes have no conversion; bitmap upload uses WebGPU default sRGB destination encoding. Resize retains history/progress; replacement cancels scene history and reuploads the mask. Closed borrowed images cause linked state errors. Native WebGL2 is linked unsupported. Generated 2x2 fixtures at 1x/4x on RTX A6000 only; no throughput or artistic-quality claim. Root 4300 B and custom 5038 B remain in existing budgets; mask 5266 B min+gzip, new budget 5522, umbrella mask 65 B, new budget 321. Core plus stage remains 23797 B.
+
+## BSP dungeon layouts (LIM-628)
+
+Optional procedural/dungeon: width and height 6..1024 integer cells, each at least minRoomSize + 4;
+minRoomSize 2..64, maxRooms 1..256 (upper bound), uint32 seed. One-cell orthogonal corridors may cross
+rooms and other corridors. Rooms do not overlap and retain partition margins. The outer border is wall;
+all floor cells are four-neighbour connected by construction. No 3D rooms, doors, stairs, gameplay
+furnishing or agent-clearance guarantee. Abort before synchronous generation; use a worker to stop work
+in flight. Identical seeded integer output and cell-work counts are tested; no timing/SIMD acceleration,
+visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
+and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The new JS ceiling is 1,479 B, the measured entry plus the standard 256 B allowance. The shared internal loader makes Poisson JS 1,290 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5661,6 +5672,14 @@ not a repair of the pre-existing raster model. Regression: sky-environment.test.
 ### Fixed while building batch 76 job 2: mask addressing and bitmap usage
 
 The new draft mask shader used interpolated UVs, whose rounding selected the adjacent texel at an exact boundary after an odd-size resize. The unchanged per-pixel oracle failed at pixel 0,1 in a 7x3 capture. It now uses integer centre mapping within explicit overflow-safe dimensions. The bitmap draft also lacked the RENDER_ATTACHMENT usage required by WebGPU external-image copies; both that usage and COPY_DST are now required by a unit regression and actual bitmap pixel proof. A reserved WGSL identifier found by the compile guard was corrected before delivery. packages/transitions/test/mask.test.js and test/gpu-browser.js retain these checks; no new open defect remains from these failures.
+
+### Batch 68 BSP layouts
+
+No open dungeon-generator defect is known after bounded-input, connectivity and ownership tests.
+Generated grid proofs do not establish gameplay quality, 3D geometry or navigation clearance (LIM-628).
+During rebase, prepending the dungeon asset ahead of another package split the procedural asset group.
+The size page groups each package once, so registry order and rendered order differed. Dungeon and Poisson
+records now stay adjacent; the unchanged lazy-row assertions in `tests/sizes-page.test.js` catch this class.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

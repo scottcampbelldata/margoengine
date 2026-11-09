@@ -1734,3 +1734,11 @@ not a repair of the pre-existing raster model. Regression: sky-environment.test.
 ### Fixed while building batch 76 job 2: mask addressing and bitmap usage
 
 The new draft mask shader used interpolated UVs, whose rounding selected the adjacent texel at an exact boundary after an odd-size resize. The unchanged per-pixel oracle failed at pixel 0,1 in a 7x3 capture. It now uses integer centre mapping within explicit overflow-safe dimensions. The bitmap draft also lacked the RENDER_ATTACHMENT usage required by WebGPU external-image copies; both that usage and COPY_DST are now required by a unit regression and actual bitmap pixel proof. A reserved WGSL identifier found by the compile guard was corrected before delivery. packages/transitions/test/mask.test.js and test/gpu-browser.js retain these checks; no new open defect remains from these failures.
+
+### Batch 68 BSP layouts
+
+No open dungeon-generator defect is known after bounded-input, connectivity and ownership tests.
+Generated grid proofs do not establish gameplay quality, 3D geometry or navigation clearance (LIM-628).
+During rebase, prepending the dungeon asset ahead of another package split the procedural asset group.
+The size page groups each package once, so registry order and rendered order differed. Dungeon and Poisson
+records now stay adjacent; the unchanged lazy-row assertions in `tests/sizes-page.test.js` catch this class.

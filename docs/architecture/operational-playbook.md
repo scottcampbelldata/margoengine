@@ -1351,6 +1351,18 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Procedural BSP layouts (batch 68, job 3)
+
+The optional dungeon entry owns one dungeon-kernel crate and one lazily loaded dungeon.wasm. Partitioning,
+room generation and rasterization run in Rust compiled with SIMD enabled; no SIMD speed gain is claimed.
+The shared internal byte loader preserves independent per-feature URLs and the existing Poisson entry's
+abort/error behaviour. No core or stage source changes. Native Rust and TypeScript tests check bounded
+inputs, owned outputs, seeded repeatability, wall borders, room margins, tree links, flood-fill connectivity
+and an independent whole-grid raster oracle. Direct written-cell work excludes common grid initialization.
+The production browser test covers both feature assets under a non-root base, no Wasm request on import,
+WebGPU/WebGL2 exact values, real device/context loss, and idempotent disposal. All grids are STAND-IN;
+gameplay, navigation clearance, 3D meshes, cross-device coverage and timing remain unmeasured (LIM-628).
+
 ### Procedural Poisson placement (batch 68, job 1)
 
 `procedural/poisson` keeps rejection and area loops in one lazy feature-local Rust/Wasm module; core and stage

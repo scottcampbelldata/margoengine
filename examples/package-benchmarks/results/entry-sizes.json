@@ -1,6 +1,6 @@
 {
-  "commit": "dda49e33e",
-  "dirty": false,
+  "commit": "0a1ba3e95",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -1440,12 +1440,12 @@
         "gzip": 7350
       },
       "./gi": {
-        "raw": 22174,
-        "gzip": 8589
+        "raw": 22192,
+        "gzip": 8598
       },
       "./height": {
-        "raw": 18844,
-        "gzip": 6832
+        "raw": 18898,
+        "gzip": 6855
       },
       "./emissive": {
         "raw": 10968,
@@ -2248,8 +2248,8 @@
         "gzip": 12594
       },
       "./poisson": {
-        "raw": 2382,
-        "gzip": 1269
+        "raw": 2408,
+        "gzip": 1290
       },
       "./standin": {
         "raw": 711,
@@ -2270,6 +2270,10 @@
       "./expression": {
         "raw": 11133,
         "gzip": 4462
+      },
+      "./dungeon": {
+        "raw": 2227,
+        "gzip": 1223
       }
     },
     "@margoengine/quality": {
@@ -2502,8 +2506,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 63395,
-        "gzip": 19062
+        "raw": 63484,
+        "gzip": 19094
       },
       "./tiles": {
         "raw": 8234,
@@ -2756,8 +2760,8 @@
         "gzip": 6611
       },
       "./hillaire": {
-        "raw": 18890,
-        "gzip": 6735
+        "raw": 29965,
+        "gzip": 10822
       },
       "./shafts": {
         "raw": 17828,
@@ -3127,13 +3131,17 @@
       }
     },
     "@margoengine/transitions": {
+      "./mask": {
+        "raw": 15569,
+        "gzip": 5266
+      },
       "./custom": {
-        "raw": 14828,
-        "gzip": 5019
+        "raw": 14866,
+        "gzip": 5038
       },
       ".": {
-        "raw": 12489,
-        "gzip": 4280
+        "raw": 12523,
+        "gzip": 4300
       }
     },
     "@margoengine/tween": {
@@ -3562,6 +3570,10 @@
       "./guiding": {
         "raw": 5736,
         "gzip": 2535
+      },
+      "./sky": {
+        "raw": 313,
+        "gzip": 212
       }
     },
     "@margoengine/water": {
@@ -3652,32 +3664,32 @@
     },
     "@margoengine/wfc": {
       ".": {
-        "raw": 4269,
-        "gzip": 1824
+        "raw": 4372,
+        "gzip": 1868
       },
       "./overlapping": {
-        "raw": 5233,
-        "gzip": 2451
+        "raw": 5254,
+        "gzip": 2457
       },
       "./constraints": {
-        "raw": 5741,
-        "gzip": 2460
+        "raw": 5924,
+        "gzip": 2484
       },
       "./sockets": {
-        "raw": 1183,
-        "gzip": 676
+        "raw": 1462,
+        "gzip": 776
       },
       "./chunks": {
-        "raw": 8935,
-        "gzip": 3589
+        "raw": 9279,
+        "gzip": 3647
       },
       "./worker": {
         "raw": 2726,
         "gzip": 1331
       },
       "dist/workers/wfc.js": {
-        "raw": 7999,
-        "gzip": 3345
+        "raw": 8331,
+        "gzip": 3399
       }
     },
     "@margoengine/worker": {
@@ -3719,14 +3731,19 @@
   },
   "lazyFiles": {
     "packages/wfc/dist/workers/wfc.js": {
-      "raw": 7967,
-      "gzip": 3326,
-      "brotli": 3015
+      "raw": 8299,
+      "gzip": 3380,
+      "brotli": 3062
     },
     "packages/wfc/dist/wfc.wasm": {
       "raw": 24282,
       "gzip": 9596,
       "brotli": 8153
+    },
+    "packages/procedural/dist/dungeon.wasm": {
+      "raw": 23281,
+      "gzip": 10028,
+      "brotli": 8634
     },
     "packages/procedural/dist/poisson.wasm": {
       "raw": 29914,

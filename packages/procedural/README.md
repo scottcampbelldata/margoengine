@@ -253,7 +253,7 @@ Build and unit tests: npm test --workspace @margoengine/procedural
 
 ## Poisson disk placement
 
-Optional `@margoengine/procedural/poisson`: 1,269 B min+gzip JavaScript and one lazy Rust/Wasm file,
+Optional `@margoengine/procedural/poisson`: 1,290 B min+gzip JavaScript and one lazy Rust/Wasm file,
 29,914 B raw / 13,192 B gzip. Importing the entry fetches nothing. The factory loads the shipped artifact;
 applications need no Rust toolchain. WebGPU and WebGL2 use the same CPU sampler.
 
@@ -291,3 +291,42 @@ versus 3,445,553 distance tests. This proves less rejection work, not a language
 no SIMD speed claim). Browser proof: `npm run test:gpu --workspace @margoengine/procedural`, including a production
 consumer below a non-root base, lazy Wasm requests and values on WebGPU/WebGL2 after device/context loss.
 
+## Dungeon layouts
+
+The optional `@margoengine/procedural/dungeon` entry makes seeded BSP rooms and corridors with no input assets.
+Use `margoengine/procedural/dungeon` through the umbrella package. Each room is inside its own partition;
+one centre-to-centre corridor joins the two child layouts at each split. This constructs a connected layout
+without retries or a repair pass. Coordinates and dimensions are integer grid cells, with X fastest.
+
+```ts
+import { createDungeonGenerator } from '@margoengine/procedural/dungeon';
+using generator = await createDungeonGenerator();
+const layout = generator.generate({ width: 64, height: 48, seed: 19 });
+console.log(layout.rooms.length, layout.corridors.length);
+console.log(layout.cells[20 * layout.width + 30]); // 0 wall, 1 walkable
+```
+
+| Option | Default | Limits |
+| --- | --- | --- |
+| width | 64 | Integer 6..1024; at least minRoomSize + 4 |
+| height | 48 | Integer 6..1024; at least minRoomSize + 4 |
+| seed | 1 | uint32; zero uses seed one's stream |
+| minRoomSize | 4 | Integer 2..64, in cells |
+| maxRooms | 32 | Integer 1..256; an upper bound, small grids can fit fewer |
+| signal | absent | Factory load is abortable; generation checks before synchronous work |
+
+`rooms` hold x/y/width/height, `corridors` hold from/to room indices and an orthogonal bend. Each corridor
+is one cell wide. Crossings with rooms or other corridors are allowed. The link graph is a tree; crossings
+can introduce loops in the raster. The outer border is always wall. Every floor cell is reachable using
+four-neighbour movement. `cells` is an owned Uint8Array; layouts survive later calls and disposal.
+`rasterVisits` counts written room/corridor cells including repeated writes, excluding zero initialization.
+The independent test oracle checks every cell against every room and corridor segment with identical output.
+This is a work-count proof, not a timing or Wasm/SIMD speed claim.
+
+The factory loads one feature-local Rust/Wasm asset lazily; importing downloads no Wasm. WebGPU and WebGL2
+use the same CPU generator, which remains usable after device/context loss. `dispose()` and `Symbol.dispose`
+release the instance and are idempotent. Bad settings and use after disposal throw coded errors with help links.
+Use a worker for interruption of work in flight. Build the checked-in artifact with `npm run build:dungeon`
+in this package; `npm run test:dungeon-kernel` runs the native Rust tests. SIMD compilation is enabled;
+its benefit has not been measured. Layouts are blockouts, without rendering, doors, stairs, gameplay
+furnishing, 3D meshes or navigation clearance guarantees (LIM-628). All proof maps are generated stand-ins.

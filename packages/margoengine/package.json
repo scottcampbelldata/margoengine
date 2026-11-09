@@ -2150,6 +2150,10 @@
       "types": "./dist/procedural/expression.d.ts",
       "import": "./dist/procedural/expression.js"
     },
+    "./procedural/dungeon": {
+      "types": "./dist/procedural/dungeon.d.ts",
+      "import": "./dist/procedural/dungeon.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

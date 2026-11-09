@@ -793,3 +793,15 @@ The ordered compaction, per-ring caps and conservative tile-distance arithmetic 
 ### Batch 76 mask wipes
 
 Run the same transitions unit, GPU-lock and README commands as job 1. The GPU suite also creates a 2x2 four-grey ImageData and ImageBitmap, checks 1344 pixels across hard/soft thresholds at 1x/4x, resizes through odd 5x7 and 7x3 captures and replaces a real device. A double-precision threshold oracle is independent of the integer WGSL addressing. Endpoints are byte-exact; blended channels allow one UNORM code. The fixtures are stand-ins. Native WebGL2 must refuse with linked unsupported. No performance comparison was made.
+
+### BSP dungeon layouts (batch 68 job 3)
+
+Run `npm run test:dungeon-kernel --workspace @margoengine/procedural` for native Rust tests,
+`npm run build:dungeon --workspace @margoengine/procedural` to reproduce the checked-in Wasm,
+then `npm test --workspace @margoengine/procedural`. The dungeon tests independently flood-fill generated
+grids, verify rooms and tree links, cover 256 seeded thin/small layouts plus the maximum grid, and compare
+direct raster writes against a full-grid membership oracle with exactly matching cells. The emitted
+`dungeonWork` counts are diagnostic work counts, not wall-time speed results.
+Run `node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+for a production consumer under /sampling/: both independent lazy Wasm assets, no asset fetch on import,
+native WebGPU and WebGL2 values, real loss events and disposal. Generated maps only (STAND-IN, LIM-628).

@@ -28,6 +28,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/dungeon.wasm',
+    label: 'dungeon.wasm',
+    kind: 'Rust Wasm BSP layouts',
+    measure: 'file',
+    when: '`createDungeonGenerator()`, only from the optional /dungeon entry',
+  },
+  {
+    package: '@margoengine/procedural',
     file: 'packages/procedural/dist/poisson.wasm',
     label: 'poisson.wasm',
     kind: 'Rust Wasm sampler',

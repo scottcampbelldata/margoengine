@@ -1754,3 +1754,16 @@ copied or downloaded into the repository. GPU cases are generated stand-ins, doc
 ## Greyscale texture wipes (batch 76, job 2)
 
 Wide reference search combined [W3C CSS Masking](https://www.w3.org/TR/css-masking-1/#MaskValues) on image masks, the previously cited Porter/Duff paper on separate image contributions, and [WGSL smoothstep and textureLoad](https://www.w3.org/TR/WGSL/). This wipe uses a threshold of encoded greyscale red, not CSS's full luminance/alpha model. Integer centre mapping derives from floor((pixel+1/2)*sourceSize/outputSize), evaluated as (pixel*sourceSize+floor(sourceSize/2))/outputSize; the stated dimension bounds keep all u32 numerators below overflow. [WebGPU copyExternalImageToTexture](https://www.w3.org/TR/webgpu/#dom-gpuqueue-copyexternalimagetotexture) requires COPY_DST and RENDER_ATTACHMENT. Uploads/snapshots are platform operations; there is no new CPU-heavy loop or Wasm kernel. No external code read or adapted.
+
+## Batch 68 job 3: BSP dungeon layouts
+
+Written clean room from published descriptions only:
+- Shaker, Liapis, Togelius, Lopes and Bidarra, [Constructive Generation Methods for Dungeons and Levels](https://www.antoniosliapis.com/articles/pcgbook_dungeons.php), PCG book chapter 3, space partitioning: one inset room per leaf, links between sibling subtrees.
+- Van der Linden, Lopes and Bidarra, [Procedural Generation of Dungeons](https://research.tudelft.nl/en/publications/procedural-generation-of-dungeons/), 2014, DOI 10.1109/TCIAIG.2013.2290371: survey framing for layout versus gameplay control and geometric modelling limits.
+- Green et al., [Two-step Constructive Approaches for Dungeon Generation](https://arxiv.org/abs/1906.04660), 2019: architectural layout and gameplay furnishing are separate stages. This entry implements only the former.
+
+Margo chooses bounded largest-leaf splitting, seeded inset rectangles, sibling representative links and
+direct row/segment rasterization. The connectivity argument is induction over the partition tree: each
+leaf is connected; an orthogonal path between child room centres joins two connected child layouts.
+No implementation or source repository linked by these papers was opened. Tests generate stand-in maps;
+the independent oracle checks whole-grid geometric membership, not the production rasterization loops.

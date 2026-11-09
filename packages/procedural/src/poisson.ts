@@ -1,4 +1,5 @@
-import { fault, wasmError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
+import { loadKernel } from './wasm.js';
 
 /** Bounded dart-throwing settings; coordinates and spacing use the same units. */
 export interface PoissonOptions {
@@ -136,32 +137,6 @@ class Sampler implements PoissonSampler {
 
 /** Load one feature-local Wasm module only when requested. No rendering context is required. */
 export async function createPoissonSampler(options: { signal?: AbortSignal } = {}): Promise<PoissonSampler> {
-  options.signal?.throwIfAborted();
   const url = new URL(/* @vite-ignore */ './poisson.wasm?no-inline', import.meta.url);
-  let bytes: ArrayBuffer;
-  if (url.protocol === 'file:') {
-    url.search = '';
-    const nodeModule = 'node:fs/promises';
-    const { readFile }: { readFile(path: URL, options: { signal?: AbortSignal }): Promise<Uint8Array<ArrayBuffer>> } =
-      await import(/* @vite-ignore */ /* webpackIgnore: true */ nodeModule);
-    const file = await readFile(url, { signal: options.signal });
-    bytes = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
-  } else {
-    const response = await fetch(url, { signal: options.signal });
-    if (!response.ok)
-      throw fault(
-        'failed',
-        `Poisson Wasm fetch returned HTTP ${response.status}; serve the package assets`,
-        'procedural',
-      );
-    bytes = await response.arrayBuffer();
-  }
-  let result: WebAssembly.WebAssemblyInstantiatedSource;
-  try {
-    result = await WebAssembly.instantiate(bytes);
-  } catch (error) {
-    throw wasmError(error);
-  }
-  options.signal?.throwIfAborted();
-  return new Sampler(result.instance.exports as unknown as Kernel);
+  return new Sampler(await loadKernel<Kernel>(url, 'Poisson', options.signal));
 }
