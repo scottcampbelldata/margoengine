@@ -113,6 +113,16 @@ interface VFXMeshParticles {
     ambient?: number;
 }
 
+interface VFXNode {
+    op: 'const' | 'attribute' | 'add' | 'mul' | 'sub' | 'mix' | 'min' | 'max' | 'scale' | 'normalize' | 'length' | 'force' | 'drag';
+    inputs?: readonly number[];
+    value?: number | readonly [number, number, number] | 'position' | 'velocity' | 'size' | 'color' | 'life' | 'age';
+}
+
+interface VFXNodes {
+    graph: readonly VFXNode[];
+}
+
 type VFXObstacle = {
     kind: 'sphere';
     center: Vec3;
@@ -159,6 +169,7 @@ interface VFXOptions {
     skinned?: VFXSkinned;
     flipbook?: VFXFlipbook;
     shadows?: VFXShadows;
+    nodes?: VFXNodes;
 }
 
 interface VFXParticleLight {

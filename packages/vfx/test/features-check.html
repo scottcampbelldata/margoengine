@@ -438,5 +438,35 @@ window.checkShadows=async()=>{
  const samples=[[32,32],[47,32],[0,0]];
  return {error:error??depthRun.error??depthError?.message??null,errors:errors.splice(0),header,lights:[0,1,2].map(lightAt),published:seen.at(-1)??null,depthGot:samples.map(([px,py])=>depth[py*depthN+px]),depthWant:samples.map(([px,py])=>expectDepth(px,py))};
 };
+// Update nodes. One particle, velocity (1, 0, 0), a constant force (0, 2, 0) and drag 0.5. The loop here is
+// independent of evaluateNodes: velocity += (force - drag * velocity) * dt, then position += velocity * dt.
+window.checkNodes=async()=>{
+ const dt=0.05,frames=3,steps=frames+1;
+ const graph=[
+  {op:'const',value:[0,2,0]},
+  {op:'force',inputs:[0]},
+  {op:'const',value:0.5},
+  {op:'drag',inputs:[2]},
+ ];
+ const effect=new VFX({...still,capacity:1,lifetime:[100,100],nodes:{graph}});
+ const {buffers:[p],error}=await run(effect,{
+  frames,dt,
+  setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[0,0,0],velocity:[1,0,0],size:0.01,color:[1,1,1],life:100}],1)),
+  read:()=>[effect.gpuState.particles],
+ });
+ effect.dispose();
+ let at=[0,0,0],v=[1,0,0];
+ for(let s=0;s<steps;s++){
+  const a=[-0.5*v[0],2-0.5*v[1],-0.5*v[2]];
+  v=v.map((x,i)=>x+a[i]*dt);
+  at=at.map((x,i)=>x+v[i]*dt);
+ }
+ const got={at:[...p.subarray(0,3)],v:[...p.subarray(4,7)]};
+ const near=(a,b)=>a.every((x,i)=>Math.abs(x-b[i])<=1e-4+1e-4*Math.abs(b[i]));
+ const mismatches=[];
+ if(!near(got.at,at))mismatches.push({what:'position',got:got.at,want:at});
+ if(!near(got.v,v))mismatches.push({what:'velocity',got:got.v,want:v});
+ return {error,errors:errors.splice(0),mismatches,got,want:{at,v}};
+};
 window.ready=true;
 </script></body></html>

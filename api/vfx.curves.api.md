@@ -137,6 +137,7 @@ interface VFXFeatures {
     skinned?: VFXExtension<VFXSkinned>;
     flipbook?: VFXExtension<VFXFlipbook>;
     shadows?: VFXExtension<VFXShadows>;
+    nodes?: VFXExtension<VFXNodes>;
 }
 
 interface VFXFields {
@@ -169,6 +170,16 @@ interface VFXMeshParticles {
     light?: readonly [number, number, number];
     lightColor?: readonly [number, number, number];
     ambient?: number;
+}
+
+interface VFXNode {
+    op: 'const' | 'attribute' | 'add' | 'mul' | 'sub' | 'mix' | 'min' | 'max' | 'scale' | 'normalize' | 'length' | 'force' | 'drag';
+    inputs?: readonly number[];
+    value?: number | readonly [number, number, number] | 'position' | 'velocity' | 'size' | 'color' | 'life' | 'age';
+}
+
+interface VFXNodes {
+    graph: readonly VFXNode[];
 }
 
 type VFXObstacle = {
@@ -217,6 +228,7 @@ interface VFXOptions {
     skinned?: VFXSkinned;
     flipbook?: VFXFlipbook;
     shadows?: VFXShadows;
+    nodes?: VFXNodes;
 }
 
 interface VFXParticleLight {

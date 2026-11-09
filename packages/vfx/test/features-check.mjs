@@ -25,6 +25,8 @@
 // solid cells times the life fade, within 2 of 255. Removing the mix fails this.
 // Shadows: the first two live slots of four (a dead slot between them) pack as point lights, and one sphere at the
 // origin writes the orthographic sphere depth into a 64 x 64 map. The WebGL2 route is not part of this check.
+// Nodes: one particle with velocity (1, 0, 0), force (0, 2, 0) and drag 0.5 matches four steps of 0.05 s of
+// velocity += (force - drag * velocity) * dt, then position += velocity * dt. The WebGL2 route is not part of this check.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -187,6 +189,16 @@ try {
         `${name} sample ${i}: got ${r.depthGot[i]} want ${r.depthWant[i]}`,
       );
     console.log(`ok ${name}: lights ${r.header.join(',')} depth ${r.depthGot.map((v) => v.toFixed(5)).join(' ')}`);
+  }
+  {
+    const name = 'nodes',
+      r = await page.evaluate(() => window.checkNodes());
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(
+      `ok ${name}: at ${r.got.at.map((v) => v.toFixed(5)).join(',')} v ${r.got.v.map((v) => v.toFixed(5)).join(',')}`,
+    );
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

@@ -116,6 +116,8 @@ export interface VFXOptions {
   flipbook?: VFXFlipbook;
   /** Particles cast sphere shadows and the first live slots emit point lights. Needs `shadows` from `@margoengine/vfx/shadows`. */
   shadows?: VFXShadows;
+  /** A graph of operators added to each particle's acceleration. Needs `nodes` from `@margoengine/vfx/nodes`. */
+  nodes?: VFXNodes;
 }
 /**
  * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf-pro`, with a
@@ -177,6 +179,40 @@ export interface VFXShadows {
   into?: { setLights(lights: readonly VFXParticleLight[]): void };
   /** The light list on the GPU (a header, then up to 64 lights). Set by the feature at attach. */
   buffer?: GPUBuffer;
+}
+/** One operator in a particle update graph. `force` and `drag` add acceleration and have no output. */
+export interface VFXNode {
+  op:
+    | 'const'
+    | 'attribute'
+    | 'add'
+    | 'mul'
+    | 'sub'
+    | 'mix'
+    | 'min'
+    | 'max'
+    | 'scale'
+    | 'normalize'
+    | 'length'
+    | 'force'
+    | 'drag';
+  /** Indices of other operators. A cycle, a self input or an unknown index is a TypeError. */
+  inputs?: readonly number[];
+  /** `const`: a finite number or three. `attribute`: the name. `scale`: a finite number. */
+  value?: number | readonly [number, number, number] | 'position' | 'velocity' | 'size' | 'color' | 'life' | 'age';
+}
+/** Operators compiled into the simulation. The wires are fixed at attach; const and scale numbers are read every frame. */
+export interface VFXNodes {
+  graph: readonly VFXNode[];
+}
+/** The particle values a graph reads. Age is the life already lived. */
+export interface VFXNodeSample {
+  position: readonly [number, number, number];
+  velocity: readonly [number, number, number];
+  size: number;
+  color: readonly [number, number, number];
+  life: number;
+  age: number;
 }
 /** A point that pulls particles towards it (or pushes them away with a negative strength). */
 export interface VFXAttractor {
@@ -458,6 +494,7 @@ const extensions = [
   'skinned',
   'flipbook',
   'shadows',
+  'nodes',
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
@@ -525,6 +562,7 @@ export interface VFXFeatures {
   skinned?: VFXExtension<VFXSkinned>;
   flipbook?: VFXExtension<VFXFlipbook>;
   shadows?: VFXExtension<VFXShadows>;
+  nodes?: VFXExtension<VFXNodes>;
 }
 let nextId = 0;
 /**

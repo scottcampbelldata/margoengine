@@ -213,12 +213,12 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (29,209 B min+gzip) carries every feature. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
+`VFX` from `@margoengine/vfx` (31,135 B min+gzip) carries every feature. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (11,188 B min+gzip); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same), `/skinned` (2.1 kB, the same), `/flipbook` (0.9 kB, 911 B min+gzip, the quality gate's figure) and `/shadows` (2.8 kB, 2,805 B min+gzip, the quality gate's figure). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same), `/skinned` (2.1 kB, the same), `/flipbook` (0.9 kB, 911 B min+gzip, the quality gate's figure), `/shadows` (2.8 kB, 2,805 B min+gzip, the quality gate's figure) and `/nodes` (3.1 kB, 3,093 B min+gzip, the quality gate's figure). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 29,209 B. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 31,135 B. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
@@ -585,3 +585,28 @@ engine.start();
 ```
 
 The light list is packed with a workgroup prefix sum, so the same slots give the same lights and nothing is chosen with an atomic. The sphere draw is a depth-only pass, one per cascade, and it does not add a storage buffer to the simulation. `node packages/vfx/test/features-check.mjs` (real GPU) reads the light buffer of four slots (live, dead, live, live) with `count` 2 and checks a sphere at the origin against the orthographic depth. The WebGL2 route was not run.
+
+### Particle update nodes
+
+`nodes` compiles a graph into the simulation. Each operator is `const`, `attribute` (`position`, `velocity`, `size`, `color`, `life`, `age`), `add`, `mul`, `sub`, `mix`, `min`, `max`, `scale`, `normalize`, `length`, `force` or `drag`. `force` adds a vector to the acceleration. `drag` subtracts a number times the velocity. An operator runs after the ones it reads. A cycle, a self input, an unknown operator or a bad width is a `TypeError`. At most 32 operators, and at most 16 numeric literals. Const and scale numbers are read every frame. The operators and the wires are fixed at attach. The acceleration is added after gravity, curl and fields. Velocity moves by that acceleration times the step, then position moves by the new velocity times the step.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {nodes} from 'margoengine/vfx/nodes';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// A constant push upward, with drag on the velocity.
+const graph = [
+  {op: 'const', value: [0, 2, 0]},
+  {op: 'force', inputs: [0]},
+  {op: 'const', value: 0.5},
+  {op: 'drag', inputs: [2]},
+] as const;
+VFX.attach(engine, {
+  capacity: 1024, rate: 40, size: 0.15, lifetime: [1, 2], color: [1, 0.6, 0.2, 1],
+  nodes: {graph},
+}, {nodes});
+engine.start();
+```
+
+`evaluateNodes(graph, sample)` runs the same operators on the CPU. `node packages/vfx/test/features-check.mjs` (real GPU) holds one particle at velocity (1, 0, 0) under force (0, 2, 0) and drag 0.5, and checks position and velocity after four steps of 0.05 s. The WebGL2 route was not run.

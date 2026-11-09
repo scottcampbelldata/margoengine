@@ -3026,6 +3026,10 @@
       "types": "./dist/vfx/shadows.d.ts",
       "import": "./dist/vfx/shadows.js"
     },
+    "./vfx/nodes": {
+      "types": "./dist/vfx/nodes.d.ts",
+      "import": "./dist/vfx/nodes.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

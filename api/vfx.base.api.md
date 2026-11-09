@@ -162,6 +162,7 @@ export interface VFXFeatures {
     skinned?: VFXExtension<VFXSkinned>;
     flipbook?: VFXExtension<VFXFlipbook>;
     shadows?: VFXExtension<VFXShadows>;
+    nodes?: VFXExtension<VFXNodes>;
 }
 
 export interface VFXFields {
@@ -194,6 +195,25 @@ export interface VFXMeshParticles {
     light?: readonly [number, number, number];
     lightColor?: readonly [number, number, number];
     ambient?: number;
+}
+
+export interface VFXNode {
+    op: 'const' | 'attribute' | 'add' | 'mul' | 'sub' | 'mix' | 'min' | 'max' | 'scale' | 'normalize' | 'length' | 'force' | 'drag';
+    inputs?: readonly number[];
+    value?: number | readonly [number, number, number] | 'position' | 'velocity' | 'size' | 'color' | 'life' | 'age';
+}
+
+export interface VFXNodeSample {
+    position: readonly [number, number, number];
+    velocity: readonly [number, number, number];
+    size: number;
+    color: readonly [number, number, number];
+    life: number;
+    age: number;
+}
+
+export interface VFXNodes {
+    graph: readonly VFXNode[];
 }
 
 export type VFXObstacle = {
@@ -242,6 +262,7 @@ export interface VFXOptions {
     skinned?: VFXSkinned;
     flipbook?: VFXFlipbook;
     shadows?: VFXShadows;
+    nodes?: VFXNodes;
 }
 
 export interface VFXParticleLight {

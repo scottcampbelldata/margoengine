@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11411409,
+  "total": 11416742,
   "history": [
     {
       "date": "2026-10-24",
@@ -4730,6 +4730,12 @@
       "commit": "batch-111",
       "reason": "New optional @margoengine/mixer/worklet, isolated from mixer root, core and stage",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "160f13807",
+      "reason": "vfx/nodes: a node graph adds particle acceleration after gravity, curl and fields",
+      "grew": 2
     }
   ],
   "items": {
@@ -5475,7 +5481,7 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13771,
-    "@margoengine/vfx": 30086,
+    "@margoengine/vfx": 32070,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/depth-collide": 2262,
@@ -5485,6 +5491,7 @@
     "@margoengine/vfx/flipbook": 1167,
     "@margoengine/vfx/lit": 1960,
     "@margoengine/vfx/mesh": 3449,
+    "@margoengine/vfx/nodes": 3349,
     "@margoengine/vfx/obstacles": 1364,
     "@margoengine/vfx/ribbons": 2854,
     "@margoengine/vfx/shadows": 3061,
