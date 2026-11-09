@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { applyView } from '../../shared/view-rect.js';
 // Solid or vertical-gradient background color.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
@@ -236,6 +237,7 @@ export class ColorBackground {
     if (depthFormat.includes('stencil')) this.depthAttachment.stencilReadOnly = true;
     else delete this.depthAttachment.stencilReadOnly;
     const pass = context.encoder.beginRenderPass(this.passDescriptor);
+    applyView(pass, context);
     pass.setPipeline(entry.pipeline);
     pass.setBindGroup(0, entry.group);
     pass.draw(3);

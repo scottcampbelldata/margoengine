@@ -659,6 +659,7 @@ export class ContactShadows implements EnginePlugin {
     const device = c.device,
       views = this.targets!.views,
       projection = this.projection(s);
+    // view-state: offscreen caster projection, receiver-local texture.
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: views[0], clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' }],
     });
@@ -738,6 +739,7 @@ export class ContactShadows implements EnginePlugin {
     gaussianKernel((s.blur / s.depth) * s.resolution, [0, texel], this.kernelValues[1]);
     for (let axis = 0; axis < 2; axis++) {
       device.queue.writeBuffer(this.kernels![axis], 0, this.kernelValues[axis]);
+      // view-state: offscreen receiver blur, full local target.
       const blur = c.encoder.beginRenderPass({
         colorAttachments: [{ view: views[1 - axis], loadOp: 'clear', clearValue: [0, 0, 0, 0], storeOp: 'store' }],
       });

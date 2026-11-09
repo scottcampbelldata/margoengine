@@ -475,6 +475,7 @@ async function build(
       device.queue.writeBuffer(settingsBuffer, 0, data);
       for (let mip = 0; mip < specularMips; mip++)
         for (let face = 0; face < 6; face++) {
+          // view-state: offscreen BRDF integration LUT, no scene camera.
           const pass = encoder.beginRenderPass({
             label: 'environment prefilter',
             colorAttachments: [

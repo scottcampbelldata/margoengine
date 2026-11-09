@@ -153,6 +153,7 @@ export class AccumulatedShadows extends ContactShadows {
     this.state[0] = this.count;
     c.device.queue.writeBuffer(this.uniform!, 0, this.state);
     const index = this.count & 1;
+    // view-state: offscreen receiver history sum, full local target.
     const pass = c.encoder.beginRenderPass({colorAttachments: [{view: this.history.views[index],loadOp:'clear',storeOp:'store'}]});
     pass.setPipeline(this.sums);
     pass.setBindGroup(0, this.bindings[index]);

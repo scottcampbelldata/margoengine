@@ -26,7 +26,7 @@ import {
   type CapturePassContext,
   type CapturePassFilter,
 } from './capture.js';
-import { checkLayers } from '../../shared/view-rect.js';
+import { applyView, checkLayers } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -553,6 +553,7 @@ export abstract class PlanarSurface {
         ...(stencil ? { stencilLoadOp: 'load' as const, stencilStoreOp: 'store' as const } : {}),
       },
     });
+    applyView(pass, c);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, state.group.value);
     pass.draw(6);
@@ -660,9 +661,7 @@ export abstract class PlanarSurface {
         groups: levels.slice(0, -1).map((view) =>
           device.createBindGroup({
             layout: state.reduce!.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: view },
-            ],
+            entries: [{ binding: 0, resource: view }],
           }),
         ),
         key,
@@ -670,6 +669,7 @@ export abstract class PlanarSurface {
     }
     c.encoder.copyTextureToTexture({ texture: color }, { texture: blur.texture }, [color.width, color.height]);
     for (let level = 1; level < blur.levels.length; level++) {
+      // view-state: offscreen planar mip, full reduced target.
       const pass = c.encoder.beginRenderPass({
         label: 'planar blur',
         colorAttachments: [{ view: blur.levels[level], loadOp: 'clear', storeOp: 'store' }],

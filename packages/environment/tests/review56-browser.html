@@ -1,0 +1,21 @@
+<!doctype html><html><meta charset="utf-8"><title>Environment view isolation</title><style>body{margin:0}canvas{width:128px;height:64px}</style><canvas></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {Reflector} from '/packages/environment/dist/reflector.js';
+import {ColorBackground,ImageBackground} from '/packages/environment/dist/index.js';
+let engine,effect;const errors=[];
+window.check={
+ async init(){
+  engine?.dispose();engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1,3],target:[0,0,0]}});
+  engine.scene.background='#cccccc';engine.onError=e=>errors.push(e.message);engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  engine.render();await engine.gpu.queue.onSubmittedWorkDone();
+ },
+ async draw(kind,scissor){
+  if(kind==='floor'){effect=Reflector.attach(engine,{width:8,height:8,color:[1,0,0],autoUpdate:false,roughness:.4});effect.node.setRotation([-Math.PI/2,0,0]);effect.update();}
+  if(kind==='color')effect=ColorBackground.attach(engine,{color:'#ff0000'});
+  if(kind==='image')effect=ImageBackground.attach(engine,{shape:'sphere',images:[{width:1,height:1,data:new Uint8ClampedArray([255,0,0,255])}]});
+  engine.render({views:[{camera:engine.camera,viewport:[0,0,64,64],pixels:true,clear:'#cccccc',...(scissor?{scissor:[0,0,32,64]}:{})}]});
+  await engine.gpu.queue.onSubmittedWorkDone();return errors;
+ },
+ dispose(){effect?.dispose();engine?.dispose();return errors;}
+};window.ready=true;
+</script></html>

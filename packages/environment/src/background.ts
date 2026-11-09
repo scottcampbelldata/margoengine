@@ -595,6 +595,7 @@ export class ImageBackground {
     if (depthFormat.includes('stencil')) this.depthAttachment.stencilReadOnly = true;
     else delete this.depthAttachment.stencilReadOnly;
     const pass = context.encoder.beginRenderPass(this.passDescriptor);
+    applyView(pass, context);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, state.group!);
     pass.draw(3);
