@@ -4,6 +4,14 @@ import { engine } from '../../../tests/support/review56-engine.js';
 import { PostStack } from '../../post/dist/stack.js';
 import { NodePass, inputColor } from '../dist/index.js';
 
+test('NodePass setup errors retain an actionable attachment or backend remedy', () => {
+  const pass = new NodePass(inputColor());
+  assert.throws(() => pass.setup({}), { code: 'state', message: /PostStack.attach\(engine, \[pass\]\)/ });
+  new PostStack([pass]);
+  assert.throws(() => pass.setup({}), { code: 'unsupported', message: /use a WebGPU engine/ });
+  pass.dispose();
+});
+
 for (const remove of [false, true])
   test(`NodePass ${remove ? 'owner removal' : 'disposal'} preserves other scenes`, async (t) => {
     const e = await engine(t),

@@ -2606,7 +2606,7 @@ preserve finite extreme and subnormal directions by scaling before normalization
 
 TAA and TAAUpscale explicit disposal uses the owning scene; another scene's effect with the same name is preserved (batch 56 ownership audit).
 
-Batch 56 repair tree entry gzip bytes (bundleBytes, packages external): staging 8,520; ground 9,103; accumulate 9,655; pathtrace 1,316; reflector 11,140; refractor 11,101; cube-camera 5,688; TAA 14,233; upscale 7,088. Core plus stage is 23,837 bytes. Existing entry ceilings are unchanged; the new ground entry ceiling is 9,363 bytes.
+Batch 56 repair tree entry gzip bytes (bundleBytes, packages external): staging 8,520; ground 9,103; accumulate 9,655; pathtrace 1,316; reflector 11,140; refractor 11,101; cube-camera 5,688; TAA 14,233; upscale 7,088. After rebasing onto main's approved reference fix, core plus stage is 23,924 bytes. Existing entry ceilings are unchanged; the new ground entry ceiling is 9,363 bytes.
 
 Batch 56 post audit: FXAA and PostStack disposal and stack-child liveness resolve
 registered object identity through sceneOf. This covers secondary scenes and

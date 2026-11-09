@@ -4316,3 +4316,14 @@ per-package ownership regressions prove default/secondary isolation, restoration
 replacement and borrowed cube lifetime. tests/post-stack-owner-contract.test.js
 scans optional source files implementing joinStack and rejects direct active-scene
 plugin removal; verify/check:merge runs it. GPU/README acceptance remains pending.
+
+Post-audit CPU evidence after rebasing onto origin/main 99b7dafec: 784 scoped
+tests pass, zero failures/skips, including every post/dof/tonemap/creative/cameras/
+shader package test and the original repair regressions. All 20 current recorder
+proofs pass. Lint/hygiene, 888 API reports (8,641 exports), 1,125 README type
+examples and all quality gates pass; 971 size ceilings stay unchanged. NodePass's
+backend and kind diagnostics retain their remedies within the effects entry's
+existing ceiling. Core plus stage is 23,924 B from main's approved reference fix;
+this lane changes neither core nor stage. Fresh full verify and physical GPU/
+README runs remain pending: current verify includes timed environment A/B work
+and browser tests, which conflict with the active no-speed/CPU-only restrictions.

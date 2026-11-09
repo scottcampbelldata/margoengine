@@ -1771,6 +1771,23 @@ licensed FlightHelmet model, plus a raised-box geometry control. No foreign
 implementation is required. Full package GPU suites and README runtime examples
 remain required, along with lint, hygiene, verify and the unchanged size ceilings.
 
+### Batch 56 PostStack ownership audit (CPU)
+
+After `npm run build:packages`, run these inert-GPU regressions; they create real
+engine registries without requesting a physical adapter or GPU lock:
+
+```sh
+node --test --test-timeout=120000 packages/post/test/scene-owner.test.js packages/post/test/effect-owners.test.js packages/dof/tests/scene-owner.test.js packages/tonemap/tests/scene-owner.test.js packages/creative/tests/post-owner.test.js packages/cameras/test/scene-owner.test.js packages/shader/test/post-owner.test.js tests/post-stack-owner-contract.test.js
+```
+
+They check owner removal, direct disposal, other-scene identity, replacement and
+restoration. The shader test additionally checks actionable setup diagnostics.
+Run `npm run proofs -- --current` for all 20 CPU recorder proofs; it compares
+stored GPU call sequences without rendering on hardware. These are CPU evidence,
+not substitutes for the package GPU and README-runtime gates. Do not run physical
+GPU gates before the coordinator's browser-teardown restriction is lifted, or
+timing tests while the speed phase is deferred.
+
 Batch 56 continuation: review56-browser.mjs also reads the linear capture texture
 for Reflector, Refractor and CubeCamera attached to a secondary scene: the red
 owner background and green owner mesh must appear, and no blue default-scene
