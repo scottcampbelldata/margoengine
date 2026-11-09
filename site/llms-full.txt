@@ -4761,6 +4761,15 @@ Final rebased selection measures 20,833 B gzip versus upstream 20,772 B (+61 B),
 below its unchanged 21,142 B entry ceiling. Core + stage is 23,924 B. Genuine
 paired entry/network records use 375b56d0b with dirty=false.
 
+### Batch 134 packed LDR draft scope
+
+The private decoder draft's RGB565/BGR565/RGBA4444 outputs match 1,845 primary
+and 99 supplementary image hashes across every served mip/layer/face in this
+subset. [Evidence](whitepaper/results/batch-134-packed-ldr.json) includes the
+1,024-block, two-transfer-mode conversion probe and direct block emission checks.
+Draft Wasm: 107,169 raw / 43,720 gzip bytes, not a completed replacement size.
+No public decoder entry changes or prebuilt removal; jobs 2-5 remain incomplete.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

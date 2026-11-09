@@ -2886,3 +2886,22 @@ still open. Neither the timing budget nor a rival comparison row changes.
   passes on the real NVIDIA adapter. No scene, result, tolerance or sample count is reduced.
 - Reproduce CPU counts: build selection, then `node --test --test-timeout=120000
   packages/selection/test/picking.test.js`. Benchmark and release rerun: entry 60.
+
+## Batch 134 packed LDR build evidence (2026-11-09)
+
+The private Rust draft now emits RGB565, BGR565 and RGBA4444 directly from
+block-local reconstruction. [Frozen-payload evidence](results/batch-134-packed-ldr.json)
+records 46 primary files, 138 file/target pairs and 1,845 image hashes, plus
+three independently authored CC0 .basis files, nine pairs and 99 hashes.
+Every packed payload equals the prebuilt; therefore the same fixed source references
+and target readers give identical source error for these pairs. This adds no new
+source-image assumptions. The 51-file primary corpus remains unchanged.
+
+Packed emission allocates its two-byte-per-texel output and uses block-local RGBA
+scratch. It avoids a four-byte-per-texel full-image reconstruction staging buffer;
+a native odd-edge test verifies one visit per source block. This is structural work
+evidence against a reconstruct-then-pack design, not an old/new speed claim.
+The incomplete Wasm is 107,169 raw and 43,720 gzip bytes using the baseline
+Node gzip9 compressor. Public integration, other target encoders, full hostile-input,
+GPU, memory and final acceptance remain open. No new timing A/B or timing-only
+assertion was run; timing proof stays in [speed-phase.md](../work-lists/speed-phase.md).

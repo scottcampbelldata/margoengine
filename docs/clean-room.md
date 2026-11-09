@@ -2516,3 +2516,25 @@ is edited by hand, and no speed result is inferred from these byte counts.
 The WebGL2 README startup repair applies the same research comparison recorded above under nonblocking guiding initialization: WebGPU (Ninomiya, Jones and Blandy, editors, 2026), The Lightspeed Automatic Interactive Lighting Preview System (Ragan-Kelley, 2007), Shader Metaprogramming (McCool, Qin and Popa, 2002), and Specializing Shaders (Guenter, Knoblock and Ruf, 1995), with the same linked sources and reading limits. The example used unbounded full-pipeline readiness before starting its loop. Progressive initialization and pagehide disposal fix that dependency without shader specialization or a compilation-time promise. A deterministic unresolved-promise regression checks the same ordering class for this separate example. No companion code, transport or deadline change.
 
 The sky README startup repair uses the same four-source progressive-initialization research comparison recorded for guiding and compatibility above. The isolated cold diagnostic separates the atmosphere bake from full tracer readiness; it completes and is not described as a reproduced deadline failure. A controlled unresolved-trace promise independently proves the initialization dependency. The existing atmosphere bake, its options, shaders and returned floats are unchanged. The example starts the progressive viewport after baking and disposes both owners on pagehide; no full-compilation or runtime speed guarantee.
+
+## Batch 134 packed LDR research and PACK16-1 (2026-11-09)
+
+Before implementing packed outputs, searched scientific literature on scalar/UNORM quantization
+and compared Stuart P. Lloyd, [Least Squares Quantization in PCM (1982)](https://web.stanford.edu/class/ee398a/handouts/papers/Lloyd%20-%20Least%20Squares%20Q%20in%20PCM.pdf),
+sections II-V (read those sections, not the full paper), with Robert M. Gray and David L. Neuhoff,
+[Quantization (1998)](https://www.math.ucdavis.edu/~saito/data/quantization/44it06-gray.pdf),
+section I and Figures 1-2 (read that section, not the full survey).
+Fixed reconstruction levels use nearest-level assignment; adaptation of reconstruction levels is
+inappropriate because the destination bit fields are fixed. The normative packing authority remains
+Khronos Data Format 1.4 and [OpenGL ES 3.2 (2022), Jon Leech ed.](https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf),
+sections 2.3.5.1-2 (read those sections, not the full specification).
+These define UNORM normalization but do not uniquely prescribe the Basis conversion convention.
+
+PACK16-1 was recorded in the private plan before implementation: 1,024 specification-authored
+solid UASTC blocks vary each RGBA channel through all 256 byte values, in linear and sRGB files.
+Outside opaque prebuilt targets 14/15/16 match nearest UNORM rounding of v*(2^b-1)/255,
+little-endian RGB565/BGR565/RGBA4444. Truncation differs on 13,120/13,120/3,584 pixels per
+transfer mode; nearest rounding differs on zero. Target 13 matches the authored colors.
+The experiment selects the omitted conversion convention only, never a codec algorithm.
+Evidence: private/batch-134/measure/packed-ldr-probe.json and eight frozen payloads.
+No implementation source, companion code, foreign glue, disassembly or remembered internals used.

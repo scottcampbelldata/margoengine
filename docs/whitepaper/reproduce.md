@@ -1490,3 +1490,15 @@ GPU equivalence and command counts: `node scripts/gpu-lock.mjs run
 This retains the same points, IDs, clipping and neighbor priority. For elapsed
 time, only after Scott ends the build phase, rerun the parity command in
 perf-history entry 60 under the speed-phase policy.
+
+### Batch 134 packed LDR checkpoint
+
+The private batch-134 draft uses `transcoder/Cargo.toml`; run its native tests and
+release wasm32-unknown-unknown build before `measure/packed-ldr-compare.mjs`.
+The comparison reads frozen prebuilt hashes and the existing CC0 source records;
+it does not run a new timing A/B. `measure/packed-ldr.test.mjs` checks all eight
+frozen conversion-probe payloads and synthetic two-frame/two-mip video through
+the Wasm ABI. `measure/draft-size.mjs` first reproduces the pinned prebuilt
+527,333 raw / 247,535 gzip sizes with Node gzip9, then measures the draft.
+Results: [packed LDR](results/batch-134-packed-ldr.json). Private scripts/assets
+are not a public package or a claim that full replacement acceptance is complete.
