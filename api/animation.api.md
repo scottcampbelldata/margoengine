@@ -21,6 +21,7 @@ export class Animation implements EnginePlugin {
     static attach(model: PBRModel, options?: AnimationOptions): Animation;
     play(clip?: string | number): this;
     seek(time: number): this;
+    setMorph(name: string, weight: number): void;
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;

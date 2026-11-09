@@ -25,6 +25,28 @@ Every skinned or morphed primitive of a device, across all its Animations, lives
 
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Up to eight influences per vertex are supported through paired `JOINTS_0`/`WEIGHTS_0` and optional `JOINTS_1`/`WEIGHTS_1`. Higher sets reject explicitly. No blending between clips is included.
 
+`nodeIndex` is the glTF mesh node with morph targets, which can be a child of an
+armature root. Invalid node/target/weight input throws `RangeError` before changing
+weights; its diagnostic lists available mesh node indices and target counts.
+Find candidates through `model.primitives` (`nodeIndex` and `weights.length`), then
+call `setMorph` with a target index below that count. For a named expression, `setMorph(name, weight)` matches glTF
+`extras.targetNames` across every mesh node and sets every matching target
+atomically. Missing names and invalid weights leave all targets unchanged.
+Names exposed by `primitive.targetNames` include the loader's indexed fallback
+names when the asset omits names. The indexed overload keeps its precise node
+selection and its existing hot path.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/robot-expressive.glb');
+const animation = Animation.attach(model);
+animation.setMorph('Surprised', 0.8);
+animation.dispose(); model.dispose(); engine.dispose();
+```
+
 Four-influence primitives keep their 32-byte influence records and the arithmetic of the per-primitive shader, bit for bit. An eight-influence primitive uses a 64-byte record and a second, lazily created compute pipeline; both formats can coexist in one model. Weights normalize across all present sets, including assets whose positive weights are entirely in the secondary set. Joint indices accept unsigned 8-bit or 16-bit accessors; weights accept Float32 or normalized unsigned 8-bit/16-bit accessors. Both sets require matching vertex counts, valid palette indices, nonnegative weights, and a positive combined sum.
 
 Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and the shared buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.

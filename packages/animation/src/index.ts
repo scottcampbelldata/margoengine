@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
+import { rangeError } from '../../shared/errors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
@@ -466,7 +467,21 @@ export class Animation implements EnginePlugin {
     this.apply(time);
     return this;
   }
-  setMorph(node: number, target: number, weight: number): void {
+  /** Set every model target with this glTF extras.targetNames name, across all mesh nodes. */
+  setMorph(name: string, weight: number): void;
+  /** Set one target on a specific glTF mesh node. */
+  setMorph(node: number, target: number, weight: number): void;
+  setMorph(node: number | string, target: number, weight = NaN): void {
+    if (typeof node === 'string') {
+      const matches: [PBRPrimitive, number][] = [];
+      for (const p of this.model.primitives)
+        for (let i = 0; i < p.targetNames.length; i++)
+          if (p.targetNames[i] === node && i < p.weights.length) matches.push([p, i]);
+      if (!matches.length || !Number.isFinite(Math.fround(target)) || this.disposed)
+        throw this.morphError(`name ${JSON.stringify(node)}`);
+      for (const [p, i] of matches) p.weights[i] = target;
+      return;
+    }
     // Index loops, no filtered copy: keyframe and group playback call this per weight per frame.
     const primitives = this.model.primitives;
     let found = false,
@@ -476,12 +491,21 @@ export class Animation implements EnginePlugin {
         found = true;
         if (target >= primitives[i].weights.length) fits = false;
       }
-    if (!found || !fits || !Number.isFinite(Math.fround(weight)) || this.disposed)
-      throw new RangeError(
-        'Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation',
-      );
+    if (!found || !fits || !Number.isFinite(Math.fround(weight)) || this.disposed) {
+      throw this.morphError(`node ${node}, target ${target}`);
+    }
     for (let i = 0; i < primitives.length; i++)
       if (primitives[i].nodeIndex === node) primitives[i].weights[target] = weight;
+  }
+  private morphError(request: string): RangeError {
+    const candidates = new Map<number, number>();
+    for (const p of this.model.primitives) if (p.weights.length) candidates.set(p.nodeIndex, p.weights.length);
+    return rangeError(
+      'Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation; ' +
+        `requested ${request}; available ` +
+        ([...candidates].map(([index, count]) => `node ${index}: ${count} targets`).join(', ') || 'no morphed nodes'),
+      'geometry',
+    );
   }
   private apply(time: number): void {
     const clip = this.clips[this.clip];
