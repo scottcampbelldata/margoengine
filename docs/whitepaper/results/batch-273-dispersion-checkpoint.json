@@ -1,6 +1,7 @@
 {
   "date": "2026-11-09",
-  "fixCommit": "a402245fa",
+  "fixCommitBeforeRebase": "a402245fa",
+  "fixtureBlob": "74afdcab6cf0ce9ca44c2ef38511a64e7f55e01d",
   "scope": "Fixture serialization repaired; full compatibility suite still open",
   "before": {
     "command": "node scripts/material-dispersion-gpu-check.js --focus=caller with MARGO_COMPAT=1 before the fixture edit",
@@ -11,7 +12,7 @@
     "checks": 278,
     "captures": 254,
     "failures": [],
-    "receipt": "test-results/material-dispersion/native-gpu.json"
+    "receipt": "test-results/batch-273-dispersion-full-native.json"
   },
   "compat": {
     "checks": 278,
@@ -29,7 +30,7 @@
     "oneSampleLiveReset": "exactly equal",
     "liveResourceAllocations": "zero for positive and reset, both sample counts",
     "liveNewBindings": "zero for positive and reset, both sample counts",
-    "receipt": "test-results/material-dispersion/compat-gpu.json"
+    "receipt": "test-results/batch-273-dispersion-full-compat.json"
   },
   "incompleteCombinedRun": {
     "result": "Killed by the three-minute orchestration limit during compatibility 1x cases; not counted as passing",
@@ -40,6 +41,15 @@
     "corePlusStageGzipAfter": 23924,
     "runtimeChanges": false,
     "entryCeilingChanges": false
+  },
+  "completedGatesBeforeLandingRebase": {
+    "verify": "PASS, 13960 repository tests, zero failures/skips; original single invocation, 757.4 s including orchestration",
+    "materialsUnits": "402/402 PASS",
+    "materialsBaseGpu": "PASS native and full compatibility",
+    "materialsReadme": "29/29 PASS",
+    "lint": "PASS",
+    "hygiene": "PASS after building inherited sciviz LIC declarations",
+    "generatedGuide": "PASS"
   },
   "compatSuitesClosed": 2,
   "compatSuitesTotal": 26,
