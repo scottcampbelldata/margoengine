@@ -3426,6 +3426,23 @@ Diagnostics retain the original assertion while recording raw component values,
 GL draws, resolve operations and readbacks. No mismatching component has yet
 been reproduced. No foreign implementation or companion code was read or used.
 
+Follow-up research compared Frederik Dermot Pustelnik, Xhani Marvin Sass and
+Jean-Pierre Seifert, Whispering Pixels: Exploiting Uninitialized Register Accesses
+in Modern GPUs (2024), https://arxiv.org/abs/2401.08881 , with John Jacobson,
+Martin Burtscher and Ganesh Gopalakrishnan, HiRace: Accurate and Fast Source-Level
+Race Checking of GPU Programs (2024), https://arxiv.org/abs/2401.04701 . The former
+distinguishes register initialization from application synchronization; the
+latter motivates observing access histories rather than declaring a race from
+intermittency alone. Neither establishes the cause of Margo's mismatch.
+The WebGL 2 specification's getBufferSubData contract requires sequential
+accesses to remain consistent and the operation to finish earlier writes.
+Our clean-room diagnostic therefore compares two readbacks of the same image,
+raw FLOAT components before binary16 encoding, and buffer-upload bytes.
+The reproduced 24-component difference precedes encoding, while repeated
+reads and upload bytes agree. This evidence narrows the investigation to
+rendering/resolve state; the original exact-zero assertion remains intact.
+No companion implementation or other repository's source was read.
+
 ### Batch 56 review repairs: HDR direction, view state and temporal cameras
 
 The optional staging/ground entry uses the real first-band basis published by
