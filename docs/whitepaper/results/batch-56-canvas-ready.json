@@ -1,0 +1,22 @@
+{
+  "batch": 56,
+  "owner": "environment mirror GPU fixture",
+  "regression": "tests/env-mirror-browser.ts",
+  "before": {
+    "compatibility": "TAA canvas read preceded the first lazy compute submission's completion",
+    "failures": 2,
+    "taa4xMean": 49.79711339539695,
+    "taa4xP99": 64,
+    "taa1xMean": 1.4102609468851508,
+    "taa1xP99": 55,
+    "rejectedIntermediateRepair": "Awaiting before drawImage expired the native canvas texture, yielding empty masks"
+  },
+  "repair": "Configure COPY_SRC; enqueue the canvas texture-to-buffer copy in the render task; map after completion; convert BGRA to RGBA",
+  "after": [
+    {"command": "node scripts/env-mirror-gpu-check.js", "backend": "WebGPU", "checks": 65, "failures": 0, "samples": [1, 4]},
+    {"command": "node scripts/env-mirror-gpu-check.js --compat", "backend": "WebGL2 compatibility", "checks": 65, "failures": 0, "samples": [1, 4]}
+  ],
+  "gate": "environment/test:gpu:mirror now runs both commands",
+  "unchanged": ["pixel thresholds", "frame counts", "scene workload", "production renderer"],
+  "speedClaim": false
+}

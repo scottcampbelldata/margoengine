@@ -13,6 +13,7 @@ import { Tonemap } from '../packages/tonemap/dist/index.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
+declare const GPUTextureUsage: { COPY_SRC: number; RENDER_ATTACHMENT: number };
 declare global {
   var margoLow: number | undefined;
 }
@@ -43,6 +44,8 @@ const canvas = document.querySelector('canvas')!,
   device = engine.gpu!,
   errors: string[] = [];
 engine.stop();
+const output = canvas.getContext('webgpu')!, configuration = output.getConfiguration()!;
+output.configure({...configuration, usage: (configuration.usage ?? GPUTextureUsage.RENDER_ATTACHMENT) | GPUTextureUsage.COPY_SRC});
 engine.onError = (error) => errors.push(String(error));
 device.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
 let sampleCount = 0;
@@ -187,7 +190,6 @@ function apply(state: State, attach = true) {
   // The main camera draws layer 0 only when layers are on; captures keep their own masks.
   setCameraLayers(engine.camera, mode === 'none' ? ALL_LAYERS : 1);
 }
-const reader = new OffscreenCanvas(320, 240).getContext('2d', { willReadFrequently: true })!;
 async function render(state: State & { pristine?: boolean }) {
   apply(state, !state.pristine);
   device.pushErrorScope('validation');
@@ -197,12 +199,19 @@ async function render(state: State & { pristine?: boolean }) {
     if (glass?.node.visible) captured += +glass.update();
     engine.render({ delta: 1 / 60 });
   }
-  // Same task as the last render: the WebGPU canvas texture is still readable.
-  reader.clearRect(0, 0, 320, 240);
-  reader.drawImage(canvas, 0, 0);
-  const pixels = Array.from(reader.getImageData(0, 0, 320, 240).data),
-    visibility = [red.visible, virtualRed.visible];
-  await device.queue.onSubmittedWorkDone();
+  // Enqueue the copy in this task, before the canvas texture expires, and map only after the
+  // queued work completes. This also waits for a first-use compatibility compute-runtime load.
+  const buffer = device.createBuffer({size: 320 * 240 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ});
+  let pixels: number[];
+  try {
+    const encoder = device.createCommandEncoder();
+    encoder.copyTextureToBuffer({texture: output.getCurrentTexture()}, {buffer, bytesPerRow: 320 * 4}, [320, 240]);
+    device.queue.submit([encoder.finish()]);
+    await buffer.mapAsync(GPUMapMode.READ);
+    const bytes = new Uint8Array(buffer.getMappedRange()), bgra = configuration.format.startsWith('bgra');
+    pixels = Array.from(bytes, (_, i) => bytes[bgra && i % 4 !== 3 ? (i & ~3) + 2 - i % 4 : i]);
+  } finally { buffer.destroy(); }
+  const visibility = [red.visible, virtualRed.visible];
   const error = await device.popErrorScope();
   if (error) errors.push(error.message);
   return { pixels, sampleCount, captured, visibility };
