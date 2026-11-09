@@ -1,5 +1,38 @@
 # Clean room
 
+## Sciviz size-record repair (2026-11-10)
+
+The review revalidation also checked the retained implementation against these
+primary sources: Kai Ninomiya, Brandon Jones and Jim Blandy (editors), W3C
+*WebGPU* (2026), https://www.w3.org/TR/2026/CRD-webgpu-20260915/, device loss
+and resource ownership; WHATWG contributors, *DOM Standard* (2026),
+https://dom.spec.whatwg.org/#aborting-ongoing-activities; Maurice P. Herlihy and
+Jeannette M. Wing, *Linearizability: A Correctness Condition for Concurrent
+Objects* (1990), https://www.cs.columbia.edu/~wing/publications/HerlihyWing90.pdf;
+and Kevin Mote, *Fast Point-Feature Label Placement for Dynamic Visualizations*
+(2007), https://arxiv.org/abs/1209.5765. Device-owned resources must be rebuilt,
+cancelled work must lose publication ownership, and label conflicts must use
+measured screen rectangles. The small axes layout uses its own deterministic
+candidate search, rather than Mote's large-map trellis implementation. No claim
+of a formal linearizability proof or cross-browser validation is made.
+
+Research compared experimental artifact provenance, transfer accounting and
+lossless compression: Joelle Pineau, Philippe Vincent-Lamarre, Koustuv Sinha,
+Vincent Lariviere, Alina Beygelzimer, Florence d'Alche-Buc, Emily Fox and Hugo
+Larochelle, *Improving Reproducibility in Machine Learning Research* (2020),
+https://arxiv.org/abs/2003.12206; Yoav Weiss and Noam Rosenthal (editors), W3C
+*Resource Timing* (2026), https://www.w3.org/TR/2026/CRD-resource-timing-20261102/;
+and L. Peter Deutsch, *GZIP file format specification version 4.3*, RFC 1952
+(1996), https://www.rfc-editor.org/rfc/rfc1952.
+
+These support retaining the build provenance and distinguishing compressed file
+bytes from actual HTTP transfer bytes. The cause was a committed size/network
+pair that predated newly registered lazy assets. Regenerate both records from
+the same built tree, keeping commit/dirty metadata truthful. Do not relabel a
+record, omit a lazy asset or change a size ceiling. Existing sizes-page tests
+are the regression gate and already participate in verify/check:merge. No code
+or file from another repository was read or copied; no speed measurement ran.
+
 ## Draco replacement specification review (batch 133, 2026-11-09)
 
 The [published Draco bitstream specification](https://google.github.io/draco/spec/),

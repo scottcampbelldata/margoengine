@@ -1,5 +1,13 @@
 # Design envelope
 
+Sciviz review validation records are regenerated as a pair from one built revision:
+`node examples/package-benchmarks/entry-sizes.mjs`, then
+`node scripts/basic-scene-network.mjs`. The latter captures a real GPU-backed
+basic scene. Both records retain their actual commit and packages-dirty flag;
+`tests/sizes-page.test.js` rejects a mismatched pair or an unmeasured lazy file.
+This measures byte counts only during the deferred speed phase. The core + stage
+ceiling remains 25,000 B; the reviewed build measures 23,924 B gzip.
+
 Mesh position, rotation and scale refs cannot be replaced. Assignment throws TypeError
 with code `transform` and `Retained vector: use a transform setter` plus the help link.
 Use `.set()`, `.setAll()`, components or mesh setters; Camera tuples remain assignable.

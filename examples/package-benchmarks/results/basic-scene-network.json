@@ -1,6 +1,6 @@
 {
-  "commit": "4238614df",
-  "dirty": true,
+  "commit": "57cb6c0a6",
+  "dirty": false,
   "browser": "msedge 157.0.4341.42 headless",
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
@@ -11,35 +11,35 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
-      "brotli": 228
+      "gzip": 369,
+      "brotli": 227
     },
     {
-      "path": "assets/geometry-DbR6RWSs.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2572,
-      "raw": 4311,
-      "gzip": 2202,
-      "brotli": 1977
-    },
-    {
-      "path": "assets/index-Rr5BRfTE.js",
+      "path": "assets/index-Yhwcg1Bb.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24228,
-      "raw": 58035,
-      "gzip": 23846,
-      "brotli": 21055
+      "transferred": 24274,
+      "raw": 58195,
+      "gzip": 23892,
+      "brotli": 21067
     },
     {
-      "path": "assets/dist-B1YrEvPA.js",
+      "path": "assets/geometry-DuxZuGD0.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2631,
+      "raw": 4454,
+      "gzip": 2261,
+      "brotli": 2041
+    },
+    {
+      "path": "assets/dist-Wz4tQbJO.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 7034,
+      "transferred": 7035,
       "raw": 17341,
-      "gzip": 6662,
-      "brotli": 5979
+      "gzip": 6663,
+      "brotli": 5981
     },
     {
       "path": "model.glb",
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 36247,
-    "raw": 81577,
-    "gzip": 33534,
-    "brotli": 29598
+    "transferred": 36353,
+    "raw": 81880,
+    "gzip": 33639,
+    "brotli": 29675
   },
   "notFetched": []
 }

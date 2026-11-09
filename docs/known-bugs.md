@@ -62,18 +62,22 @@ setPosition behaviour. labels/tests/testpage-position.test.js fails before and
 passes after; it also pins use of the declared shared math dependency. Labels
 measure 5,450 B gzip, below the unchanged 5,546 B entry budget.
 
-### Open validation blockers: sciviz final GPU and README run (2026-11-10)
+### Closed: sciviz review validation after main's teardown repair (2026-11-10)
 
-### Open validation blocker: sciviz browser shutdown after the main repair (2026-11-10)
+Main contains cf699846f and 20375ea56. This lane revalidated the review-only
+tree, without the later native drawing or temporal-flow pieces: all 30 base,
+13 bricks, 10 entry, 6 restoration/cancellation and 28 demo cases pass with
+successful browser teardown. The full sciviz README gate passes all 18 examples
+under the unchanged 20-second page budget. All eight head/star captures at
+390 x 844 and 1440 x 900 were visually reviewed on both backends; axis titles,
+ticks and colour bars remain separated. New screenshots retain the 8 CSS-pixel
+assertion. Evidence is in test-results/sciviz-fixes/resume-review-*.log and
+test-results/sciviz-demos/. No teardown code was duplicated here.
 
-After rebasing onto `67f9dab93`, including `6ebbd1aa4`, the exact base suite again passed all 30 assertions and
-failed the unchanged 30-second browser close deadline. The rebuilt README run also failed browser shutdown,
-after all 18 examples passed their individual budgets, including `readme-bricked-volumes-739d75`.
-Evidence: `test-results/sciviz-fixes/teardown-main.log`, `readme-final.log` and `readme-final-examples.json`.
-Neither failed close has phase tracing, so the remaining cause is unconfirmed. A native, non-rendering probe
-records owned-process termination taking 25.7 s, 15.2 s and 2.3 s; client disconnect and driver cleanup are prompt.
-Moving pipe destruction earlier did not improve a paired diagnostic and is not shipped. This is not a timing waiver.
-A phase-traced GPU run is queued; final GPU suites and colour-bar spacing screenshots remain required before push.
+The stale size/network pair was regenerated from the same build with matching
+commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
+verify's sole failure was this record gate; only that failed step was rerun as
+requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 
@@ -82,7 +86,7 @@ The bricked README investigation found real conversion work, rather than a non-s
 The scalar half encoder allocated two typed-array views per voxel, including border copies. Its reusable four-byte
 bit-cast buffer now removes 574,992 temporary views per default brick without changing the loops or output bits.
 `tests/f16-allocation.test.js` fails on the parent allocation count and verifies every half word and rounding ties.
-All 18 rebuilt README examples now pass their page budgets; the overall gate remains blocked by the close above.
+All 18 rebuilt README examples pass their page budgets and the overall gate now exits successfully.
 
 ### Fixed 2026-11-10: GPU lock directory deletion contention on Windows
 
