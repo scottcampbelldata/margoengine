@@ -1100,3 +1100,5 @@ A policy that restricts scripts must permit Wasm compilation with `script-src 'w
 Lighting2d repair candidate entry bytes (min+gzip, other packages external): root 5,421; soft 5,926; cookie 7,374;
 gi 6,687; height 6,698; emissive 4,198. These are unlanded measurements, not an accepted increase of the existing optional
 entry budgets. Core plus stage remains 23,626 B. See the batch-55 repair record and known bugs for remaining blockers.
+
+Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.

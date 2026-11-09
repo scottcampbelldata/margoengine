@@ -31,6 +31,18 @@ export async function frameRegressions({ instance, engine, texture, read, compar
     }
     return values;
   };
+  // Individual .001 contributions round to zero in an unorm blend target. Sum before presentation.
+  {
+    const target = texture(), pass = HeightLighting2D.attach(instance, { target });
+    const lights = Array.from({ length: 100 }, () => pass.addLight({ kind: 'directional', elevation: Math.PI / 2, intensity: 0.001 }));
+    frame();
+    checks['height preserves one hundred sub-byte contributions'] = compare(await read(target), want((x, y) => {
+      const sum = [0, 0, 0];
+      for (const light of lights) heightLightAt(light, [], x, y).forEach((v, i) => sum[i] += v);
+      return sum;
+    }));
+    pass.dispose(); target.destroy();
+  }
   const cases = [
     { Type: HeightLighting2D, label: 'height', add: (p) => p.addLight({ kind: 'directional', elevation: Math.PI / 2, intensity: 0.1 }), sample: (l, x, y) => heightLightAt(l, [], x, y) },
     { Type: EmissiveLighting2D, label: 'emissive', add: (p) => p.addSprite({ radius: 100, intensity: 0.1 }), sample: (l, x, y) => emissiveLightAt(l, x, y) },

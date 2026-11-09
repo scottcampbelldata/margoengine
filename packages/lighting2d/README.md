@@ -291,3 +291,5 @@ lighting targets with pixel layers when combining passes. The regression suite i
 height light uniforms, floating volumes, lights below the receiver, 65-item scenes, frame ordering, repeated frames, target
 format changes, name reuse, HDR extraction, the actual Bloom image adapter and device restoration. GI remains the exception
 to the physical-correctness claims above until its known defects are resolved.
+
+Height lights accumulate into an owned `rgba16float` image and present once to the target. This retains contributions smaller than one target byte (100 lights at intensity .001 sum to .1); the HDR image is rebuilt on resize or device restoration.

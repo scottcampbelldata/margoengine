@@ -569,6 +569,10 @@ let diffuse=max(0.0,dot(n,l));
 let finalRgb=lightColor*lightIntensity*amount*diffuse;
 return vec4f(finalRgb,1.0);
 }
+@group(1)@binding(0)var sum:texture_2d<f32>;
+@fragment fn present(@builtin(position)p:vec4f)->@location(0)vec4f{
+return vec4f(textureLoad(sum,vec2i(p.xy),0).rgb,1);
+}
 fn hypot(x:f32,y:f32)->f32{
 return sqrt(x*x+y*y);
 }
@@ -586,6 +590,8 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   #engine: Engine | null = null;
   #pipeline: GPURenderPipeline | null = null;
   #uniformBuffer: GPUBuffer | null = null;
+  #sum: GPUTexture | null = null;
+  #show: GPURenderPipeline | null = null;
   #storageBuffer: GPUBuffer | null = null;
   #bindGroupLayout: GPUBindGroupLayout | null = null;
   #device: GPUDevice | null = null;
@@ -691,7 +697,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
           module,
           entryPoint: 'fs_main',
           targets: [{
-            format: target.format ?? 'rgba8unorm',
+            format: 'rgba16float',
             blend: {
               color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
               alpha: { srcFactor: 'one', dstFactor: 'zero', operation: 'add' },
@@ -699,6 +705,17 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
           }],
         },
       });
+    }
+
+    if (!this.#sum || this.#sum.width !== target.width || this.#sum.height !== target.height) {
+      this.#sum?.destroy();
+      this.#sum = device.createTexture({ size: [target.width, target.height], format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });
+    }
+    if (!this.#show) {
+      const module = device.createShaderModule({ code: maskShader(2) + HEIGHT_LIGHTING_WGSL });
+      this.#show = device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'vs_main' },
+        fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] } });
     }
 
     const count = this.#occluders.length;
@@ -766,7 +783,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     const encoder = commandEncoder ?? device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [{
-        view: target.createView ? target.createView() : target,
+        view: this.#sum.createView(),
         loadOp: 'clear',
         clearValue: [0, 0, 0, 1],
         storeOp: 'store',
@@ -840,6 +857,13 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
     pass.end();
     device.queue.writeBuffer(this.#uniformBuffer, 0, values);
+    const show = encoder.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear',
+      clearValue: [0, 0, 0, 1], storeOp: 'store' }] });
+    show.setPipeline(this.#show);
+    show.setBindGroup(1, device.createBindGroup({ layout: this.#show.getBindGroupLayout(1),
+      entries: [{ binding: 0, resource: this.#sum.createView() }] }));
+    show.draw(3);
+    show.end();
     if (!commandEncoder) {
       device.queue.submit([encoder.finish()]);
     }
@@ -864,6 +888,8 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   }
 
   #release(): void {
+    this.#sum?.destroy();
+    this.#sum = this.#show = null;
     this.#masks.dispose();
     this.#uniformBuffer?.destroy();
     this.#storageBuffer?.destroy();

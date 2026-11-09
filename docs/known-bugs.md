@@ -73,16 +73,6 @@ Cause: shared GPU mask data, validation, resource lifetime keys and actual HDR e
 that the old broken implementations omitted. Reduce emitted bytes without dropping work or weakening tests before landing.
 The GI candidate remains within its existing 6,941 B budget (6,687 B measured). No optional budget was raised.
 
-### Height lights round away individually dim contributions on unorm targets
-
-Found while checking the F1 repair. On an 8x8 rgba8unorm target, add 100 directional height lights with elevation PI/2
-and intensity .001, no occluders. CPU sum is .10000000000000007 (25.5 byte levels); real RTX A6000 GPU readback is
-[0,0,0,255], with no validation error. Repro: construct that scene in HeightLighting2D and read its first pixel after render.
-Cause: each light additively blends into the caller's unorm texture, rounding to zero separately. The uniform-slice repair
-fixes F1 but cannot fix this separate precision loss. Requires an owned HDR accumulation texture and a single presentation,
-plus a regression for many individually sub-byte lights. It is a release blocker, not an accepted difference. Local probe:
-`test-results/lighting2d-height-dim-probe.mjs` in lane C; its log records the values.
-
 ### Lighting2d batch 55 GI review
 
 The direct-light and emissive repairs are in progress in lane C. GI still requires a spatial-probe hierarchy rewrite;

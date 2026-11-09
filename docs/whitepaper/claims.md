@@ -1269,3 +1269,5 @@ LIM-561 and LIM-562 additionally require format round trips (rgba8unorm, bgra8un
 **PROVEN (STAND-IN):** policy-blocked Wasm initialization produces MargoError code `failed` with the required `script-src` permission and a help link, including decoder and encoder worker replies. Evidence: `tests/deep-core-csp.test.js`, `tests/wasm-csp.test.js` and `packages/{physics,physics2d,decoders,exporters}/tests/csp.test.js` simulate compilation rejection. These do not establish real browser CSP coverage. [Requirements and paths](../csp.md).
 
 Measured with `npm run measure:size` after the CSP diagnostic: core plus stage is 23,797 B gzip (58,792 B raw), below the unchanged 25,000 B gate. This is a size measurement, with no speed claim.
+
+Height sub-byte accumulation: `packages/lighting2d/tests/frame-regressions.js` asserts 100 directional .001 lights against the CPU .1 total on an unorm target. Owned HDR intermediate, single presentation; no float32 precision claim.
