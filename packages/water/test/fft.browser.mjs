@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { referenceOcean } from './fft-reference.js';
+import { fileURLToPath } from 'node:url';
+
+// The page and the results are paths of the repository root; test:gpu runs from packages/water.
+process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 
 await mkdir('test-results', { recursive: true });
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { fileURLToPath } from 'node:url';
+
+// The page and the results are paths of the repository root; test:gpu runs from packages/water.
+process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' }),
   errors = [];
