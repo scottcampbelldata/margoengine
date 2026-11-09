@@ -2651,3 +2651,12 @@ they prove registration, restoration and disposal, not pixel output. Existing
 numerical bars and shaders are unchanged. The terrain/SSR deterministic proof
 retains 6,458 recorded GPU calls. Full GPU/README acceptance is recorded
 separately. No core/stage change or timing measurement is introduced.
+
+### Batch 56 ComputeFrame lifecycle scope
+
+ComputeFrame disposal removes the registered scene identity and its compute
+context/arrays, while the engine device remains borrowed. Restoration clears
+jobs and replaces the context without detaching registration. Unit evidence
+uses a real engine and inert device; the focused GPU fixture checks 1,024 exact
+four-step values on each backend. GPU/README results are recorded separately;
+no new compute capability, kernel, core/stage or speed claim is introduced.

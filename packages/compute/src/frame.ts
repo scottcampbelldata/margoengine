@@ -142,7 +142,7 @@ export class ComputeFrame implements EnginePlugin {
     this.#gpu = undefined;
     const engine = this.#engine;
     this.#engine = undefined;
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
 
   /** Same as `dispose()`, for `using`. */

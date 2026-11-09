@@ -2231,3 +2231,11 @@ same-name scene isolation, borrowed providers, owned stream terrain and stale
 disposal after replacement are exercised. The terrain/SSR proof retains all
 6,458 calls. This is scoped lifecycle evidence, with GPU/README acceptance
 pending and no claim of general scene-owner safety.
+
+### Batch 56 ComputeFrame owner evidence
+
+ComputeFrame's existing optional frame entry detaches by registered identity.
+The direct-disposal parent regression is red and the owner-removal control is
+green; both pass after repair, including old/new context/array disposal and
+same-name isolation. All 111 compute units pass. Focused GPU and complete
+package GPU/README execution remain separate acceptance requirements.

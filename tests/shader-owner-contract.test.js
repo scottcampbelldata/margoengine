@@ -18,3 +18,9 @@ test('shader owner guard rejects absent and active-scene detachment', () => {
     assert.deepEqual(missing(source(body)).problems, ['Pass']);
   assert.deepEqual(missing(source('engine?.sceneOf(this)?.removePlugin(this.name)')).problems, []);
 });
+
+test('compute frame cleanup removes actual scene ownership', () => {
+  const result = missing(readFileSync('packages/compute/src/frame.ts', 'utf8'));
+  assert.equal(result.checked, 1);
+  assert.deepEqual(result.problems, []);
+});

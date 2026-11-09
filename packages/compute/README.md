@@ -436,6 +436,23 @@ frame.add(step, (dt) => (step.set('p', { dt }), { count: 4096 }));
 engine.start();
 ```
 
+`ComputeFrame` can also be registered in a secondary scene. Disposal removes
+that registration, releases its context and arrays, and preserves the engine's
+device and any same-name plugin in another scene. Device restoration replaces
+the context and clears jobs while retaining registration.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {ComputeFrame} from '@margoengine/compute/frame';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const product = engine.createScene('product');
+const frame = new ComputeFrame();
+product.use(frame);
+const data = frame.gpu.zeros(4);
+frame.dispose();
+console.assert(engine.sceneOf(frame) === undefined && data.disposed);
+```
+
 ## Subgroups
 
 `@margoengine/compute/subgroups` runs a context's reductions, flat scans and radix sorts on WebGPU subgroups.

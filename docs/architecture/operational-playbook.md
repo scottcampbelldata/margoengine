@@ -4415,3 +4415,12 @@ removal controls, and 14 passing cases after repair. The package passes all 107
 units; terrain/SSR keeps the same 6,458 recorded calls. GPU/README acceptance
 is pending. Core, stage and rendering algorithms are untouched. Research and
 retained fixture/infrastructure failures are documented in clean-room.md.
+
+### Section 5 evidence: ComputeFrame disposal
+
+The frame entry's disposal now resolves its actual scene registration before
+removal. Its real-engine regression covers direct and owner removal, restoration,
+same-name default preservation, replacement and context/array release. Both
+cases and all 111 compute units pass. The shader/compute source guard covers
+this EnginePlugin in verify/check:merge. No shader arithmetic, core or stage
+change. Focused and complete GPU/README results are recorded separately.

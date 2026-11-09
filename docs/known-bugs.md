@@ -3399,3 +3399,12 @@ NVIDIA event 153, not a numerical assertion. Logs and event XML remain in
  test-results/56fix (terrain-readme-reset-event.xml). No repeat of a passed
 step was started before the new source change; the changed package requires
 its own complete GPU/README sequence.
+
+### Batch 56 ComputeFrame registration repair
+
+Repro: register a new ComputeFrame in a secondary scene, register a same-name
+default sentinel, then call frame.dispose(). Its arrays were freed but its
+registration remained; the default sentinel was removed. The frame entry now
+resolves sceneOf(this). Its direct-disposal regression fails before repair and
+both direct and owner-removal cases pass after repair. Package units pass
+111/111. GPU/README acceptance and the wider audit remain pending.

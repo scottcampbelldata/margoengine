@@ -3132,3 +3132,18 @@ caused a driver reset. The original failure and event XML are retained. A fresh
 post-change package GPU/README sequence is queued once, shared, wait-max 60;
 its result is recorded separately. No engine retry, fallback, assertion change
 or unproven driver-cause claim is added.
+
+### Batch 56 ComputeFrame ownership continuation
+
+The same research comparison above (Clarke, Potter and Noble 1998; Boyapati,
+Liskov and Shrira 2003; Freeman, Pryce, Mackinnon and Walnes 2004) applies to
+ComputeFrame. A real Engine secondary scene plus same-name default sentinel
+reproduces an orphaned registration on direct disposal, with owner removal
+passing. The optional frame entry now resolves sceneOf(this). Both cases pass,
+including restoration, old/new array and context disposal and replacement.
+No kernels, dispatch arithmetic or core/stage code changes. The focused GPU
+fixture retains four dispatches and every one of 1,024 exact values, on native
+and compatibility backends. Its first attempt omitted the required viewport;
+the corrected view supplies [0,0,1,1], with the original failed log retained.
+GPU and runtime README results are recorded separately, without acceptance
+inferred from the unit regression.
