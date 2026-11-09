@@ -43,6 +43,8 @@ fn dissolveThreshold(pixel:vec2u)->f32 {return f32(dissolvePcg(pixel.x+dissolveP
  */
 export class Transitions implements EnginePlugin {
   readonly name = 'transitions';
+  /** Shader source supplied by optional transition entries. */
+  protected shaderCode: string = shader;
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private scene?: GPUTexture;
@@ -90,7 +92,7 @@ export class Transitions implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Transitions requires WebGPU; attach a new Transitions to a WebGPU engine',
+        'Transitions requires WebGPU; attach a new Transitions to a WebGPU engine; see https://margoengine.com/errors#unsupported',
       );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -132,7 +134,7 @@ export class Transitions implements EnginePlugin {
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
           });
           this.capture = new SceneTarget(c.device, this.scene, this.depth, c.descriptor.multisample?.count ?? 1);
-          this.pipeline = render(c.device, shader, c.format, { multisample: c.descriptor.multisample });
+          this.pipeline = render(c.device, this.shaderCode, c.format, { multisample: c.descriptor.multisample });
           this.bind = group(c.device, this.pipeline, [
             { buffer: this.uniform! },
             this.previous.createView(),
@@ -192,6 +194,8 @@ export class Transitions implements EnginePlugin {
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
+    this.elapsed = this.duration;
+    this.request = false;
     this.setup(engine);
   }
   dispose(): void {

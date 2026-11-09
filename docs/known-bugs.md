@@ -1688,3 +1688,7 @@ arcball-only builds to emit only the requested peer and keep it out of the stati
 graph. The original test fails with both arcball modules present. No budget or scene
 was changed. Evidence: controls-red.log and bundle-reference-metrics.json under
 test-results/webgl-merge.
+
+### Fixed in batch 76 job 1: transitions retained lost history
+
+Transitions.onDeviceRestored destroyed both images but kept elapsed/request state. Restoring during a transition blended the new scene against a newly cleared outgoing image. Restoration now finishes the transition and clears its capture request before setup. packages/transitions/test/custom.test.js checks both built-in and custom progress; test/gpu-browser.js destroys a real device, restores the same instance on a replacement and checks every output pixel. WebGL2 refusal now includes the required help link, with CPU and actual WebGL2 regressions. Resize history was already retained; its stale cancellation wording in the README is corrected. No new open defect is claimed closed beyond these tests.

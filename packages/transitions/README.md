@@ -14,7 +14,29 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds. progress ends at one and rendering continues normally. Resize/device restoration cancels an active transition because old-sized images cannot be reused. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. No core or stage code changes are required.
+
+Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createCustomTransition } from 'margoengine/transitions/custom';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const controller = new AbortController();
+const transition = await createCustomTransition(engine, `
+fn transition(a:texture_2d<f32>, b:texture_2d<f32>, uv:vec2f, p:f32)->vec4f {
+  return mix(sample(a,uv), sample(b,uv), p*p);
+}`, { signal: controller.signal });
+engine.render();
+transition.start('wipe', 0.75);
+engine.render({ delta: 0.25 });
+transition.dispose();
+engine.dispose();
+```
+
+Supply the named WGSL function plus optional helper functions, at most 65,536 UTF-16 code units. `sample(image, uv)` is clamped nearest sampling; UV origin is top left. The function receives both images, UV and progress in [0,1]. Exact endpoints bypass it. The returned Transitions uses the supplied function for every kind; kind and displacement do not select built-in effects. Duration defaults to one second. This API validates compilation and its three fixed bindings before attachment; invalid code rejects with code `failed` and a help link. Additional texture, sampler, buffer and bind-group declarations are unsupported. Cancellation defaults to no signal and leaves no attached effect. Compilation itself is browser work and cannot be interrupted. Colors use the capture target's existing transfer function; this entry performs no extra color conversion. Shaders should return finite RGBA values. Device restoration recompiles the validated source and cancels missing history. Dispose the returned transition when finished.
+
+GPU proof uses generated solid-color stand-ins and exact per-pixel value assertions, not a claim of artistic quality or measured speed. Run `npm run test:gpu --workspace @margoengine/transitions` through the shared GPU lock.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

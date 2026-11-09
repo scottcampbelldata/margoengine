@@ -22,6 +22,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./custom": {
+      "types": "./dist/custom.d.ts",
+      "import": "./dist/custom.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
@@ -43,7 +47,8 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js transitions",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test --test-timeout=60000 test/*.test.js",
+    "test:gpu": "node scripts/test-gpu.mjs",
     "prepack": "npm run build"
   }
 }

@@ -2605,7 +2605,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-624). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-625). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3861,6 +3861,10 @@ README runtime evidence (2026-11-09): explicit standard sample aliases prove tha
 format-correct inputs; they do not prove the fictional filenames or authored semantics (for example a carrier aliased
 as teapot, or Source Sans aliased as Inter). The scoped loaders/decoders/FBX/environment/points run passed 73/88,
 with 15 failures retained. Sources, licences and outstanding inputs: [missing-test-items](work-lists/missing-test-items.md).
+
+## Custom WGSL transitions (LIM-625)
+
+Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4280 B (budget 4303 unchanged), custom 5019 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5554,6 +5558,10 @@ arcball-only builds to emit only the requested peer and keep it out of the stati
 graph. The original test fails with both arcball modules present. No budget or scene
 was changed. Evidence: controls-red.log and bundle-reference-metrics.json under
 test-results/webgl-merge.
+
+### Fixed in batch 76 job 1: transitions retained lost history
+
+Transitions.onDeviceRestored destroyed both images but kept elapsed/request state. Restoring during a transition blended the new scene against a newly cleared outgoing image. Restoration now finishes the transition and clears its capture request before setup. packages/transitions/test/custom.test.js checks both built-in and custom progress; test/gpu-browser.js destroys a real device, restores the same instance on a replacement and checks every output pixel. WebGL2 refusal now includes the required help link, with CPU and actual WebGL2 regressions. Resize history was already retained; its stale cancellation wording in the README is corrected. No new open defect is claimed closed beyond these tests.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -8803,7 +8811,29 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds. progress ends at one and rendering continues normally. Resize/device restoration cancels an active transition because old-sized images cannot be reused. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. No core or stage code changes are required.
+
+Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createCustomTransition } from 'margoengine/transitions/custom';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const controller = new AbortController();
+const transition = await createCustomTransition(engine, `
+fn transition(a:texture_2d<f32>, b:texture_2d<f32>, uv:vec2f, p:f32)->vec4f {
+  return mix(sample(a,uv), sample(b,uv), p*p);
+}`, { signal: controller.signal });
+engine.render();
+transition.start('wipe', 0.75);
+engine.render({ delta: 0.25 });
+transition.dispose();
+engine.dispose();
+```
+
+Supply the named WGSL function plus optional helper functions, at most 65,536 UTF-16 code units. `sample(image, uv)` is clamped nearest sampling; UV origin is top left. The function receives both images, UV and progress in [0,1]. Exact endpoints bypass it. The returned Transitions uses the supplied function for every kind; kind and displacement do not select built-in effects. Duration defaults to one second. This API validates compilation and its three fixed bindings before attachment; invalid code rejects with code `failed` and a help link. Additional texture, sampler, buffer and bind-group declarations are unsupported. Cancellation defaults to no signal and leaves no attached effect. Compilation itself is browser work and cannot be interrupted. Colors use the capture target's existing transfer function; this entry performs no extra color conversion. Shaders should return finite RGBA values. Device restoration recompiles the validated source and cancels missing history. Dispose the returned transition when finished.
+
+GPU proof uses generated solid-color stand-ins and exact per-pixel value assertions, not a claim of artistic quality or measured speed. Run `npm run test:gpu --workspace @margoengine/transitions` through the shared GPU lock.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

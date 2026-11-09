@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-624). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-625). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1274,3 +1274,7 @@ README runtime evidence (2026-11-09): explicit standard sample aliases prove tha
 format-correct inputs; they do not prove the fictional filenames or authored semantics (for example a carrier aliased
 as teapot, or Source Sans aliased as Inter). The scoped loaders/decoders/FBX/environment/points run passed 73/88,
 with 15 failures retained. Sources, licences and outstanding inputs: [missing-test-items](work-lists/missing-test-items.md).
+
+## Custom WGSL transitions (LIM-625)
+
+Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4280 B (budget 4303 unchanged), custom 5019 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
