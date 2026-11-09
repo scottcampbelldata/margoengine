@@ -627,6 +627,7 @@ export async function runSteps(
  */
 export const STEP_AFTER = {
   'check:road-invariants': ['verify'],
+  'check:testpage-contracts': ['verify'],
   'check:text-extrude': ['verify'],
   'build:site': ['verify'],
   'check:examples-types': ['verify'],

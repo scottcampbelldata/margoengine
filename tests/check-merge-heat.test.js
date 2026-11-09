@@ -9,7 +9,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { heatWatched, NO_GPU_STEPS, runSteps, SELF_WATCHED_STEPS, summary } from '../scripts/check-merge.mjs';
+import {
+  heatWatched,
+  NO_GPU_STEPS,
+  runSteps,
+  SELF_WATCHED_STEPS,
+  STEP_AFTER,
+  summary,
+} from '../scripts/check-merge.mjs';
 import { HEAT_EXIT } from '../scripts/gpu-package-tests.mjs';
 import { thermalSource } from '../scripts/support/heat.mjs';
 import { machineProfile } from '../scripts/support/machine-profile.mjs';
@@ -266,4 +273,5 @@ test('check:merge always covers the test-page contract and road fold regression 
     assert.ok(manifest.scripts['check:testpage-contracts'].includes(path));
   assert.ok(manifest.scripts['check:road-invariants'].includes('packages/road/test/testpage.test.js'));
   assert.equal(heatWatched('check:testpage-contracts'), false);
+  assert.deepEqual(STEP_AFTER['check:testpage-contracts'], ['verify']);
 });
