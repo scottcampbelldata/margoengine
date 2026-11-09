@@ -634,3 +634,8 @@ This keeps the fixture independent of loaded-machine callback scheduling; no
 runtime interpolation delay or hitbox tolerance is changed.
 
 The 100-client quiet-world resume regression sends zero-movement input through each bot client and verifies that every player stays in its spawn column. Its 10-second resume bound and zero full/chunk-resend assertions are unchanged. Moving views can lose in-flight chunk messages at a cut; resume.test.js separately checks exact missing-chunk recovery and cuts during streaming.
+
+The SQL-store restart tests register resource ownership before waiting or asserting.
+Clients and servers close before databases, and databases before their temporary
+directory. Bounded child-process tests inject setup failures and require natural
+exit, including on Windows where an open SQLite database prevents deletion.

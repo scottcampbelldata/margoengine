@@ -3,26 +3,18 @@
 // Postgres SQL ($n placeholders, BYTEA, the upsert) runs for real without a Postgres server.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join as pathJoin } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { VoxelChunk, VoxelWorld } from '@margoengine/voxel';
-import { VoxelNetClient } from '../dist/index.js';
-import { connectWebSocket, VoxelServer } from '../dist/server.js';
+import { VoxelChunk } from '@margoengine/voxel';
 import { SqlChunkStore } from '../dist/sql-store.js';
 import { testBlocks } from './blocks.js';
+import { sqlFixture } from './sql-fixture.js';
 
 const blocks = testBlocks(),
   LOG = blocks.id('log'),
-  FLAT = { amplitude: 0, caves: 0, trees: 0, height: 8, seaLevel: -10 },
   pause = () => new Promise((done) => setTimeout(done, 16));
-
-async function folder(t) {
-  const dir = await mkdtemp(pathJoin(tmpdir(), 'margo-sql-store-'));
-  t.after(() => rm(dir, { recursive: true, force: true }));
-  return dir;
-}
 const chunkWith = (x, y, z, state) => {
   const chunk = new VoxelChunk();
   chunk.set(x, y, z, state);
@@ -143,26 +135,6 @@ test('a table that cannot be made is retried by the next call', async () => {
   await store.flush(); // the get's failure is not a put's: flush stays clean
 });
 
-function database(file, resources) {
-  const db = new DatabaseSync(file);
-  resources.defer(() => {
-    if (db.isOpen) db.close();
-  });
-  return db;
-}
-async function start(options, resources) {
-  const server = new VoxelServer({ blocks, workers: 2, generator: FLAT, spawn: () => [8, 8], ...options });
-  resources.defer(() => server.close());
-  const { port } = await server.listen(0);
-  return { server, url: `ws://127.0.0.1:${port}` };
-}
-async function join(url) {
-  const conn = await connectWebSocket(url),
-    world = new VoxelWorld({ blocks }),
-    client = new VoxelNetClient(world, { send: (d) => conn.send(d), close: () => conn.close() }, { view: 2 });
-  conn.onmessage = (d) => client.receive(d);
-  return { client, conn, world };
-}
 async function drive(client, done, ms = 10_000) {
   const end = performance.now() + ms;
   let last = performance.now();
@@ -178,22 +150,21 @@ async function drive(client, done, ms = 10_000) {
 test('a server on a SqlChunkStore keeps edits across a restart and a client sees them', {
   timeout: 60_000,
 }, async (t) => {
-  await using resources = new AsyncDisposableStack();
-  const file = pathJoin(await folder(t), 'world.db'),
+  const fixture = await sqlFixture(t),
     cells = [
       [8, 12, 8],
       [40, 12, 8],
     ],
-    firstDb = database(file, resources),
-    first = await start({ store: new SqlChunkStore(firstDb) }, resources),
-    a = await join(first.url);
-  resources.defer(() => a.client.close());
+    firstDatabase = fixture.database(),
+    firstDb = firstDatabase.db,
+    first = await fixture.start({ store: new SqlChunkStore(firstDb) }),
+    a = await fixture.join(first.url);
   assert.ok(await drive(a.client, () => a.client.spawned), 'first client spawned');
   for (const [x, y, z] of cells) first.server.world.setBlock(x, y, z, LOG);
   a.client.close();
   const errors = [];
   first.server.onError = (e) => errors.push(e);
-  await first.server.close(); // saves the edited chunks
+  await first.close(); // saves the edited chunks
   assert.deepEqual(errors, []);
   assert.deepEqual(
     firstDb
@@ -202,13 +173,12 @@ test('a server on a SqlChunkStore keeps edits across a restart and a client sees
       .map((r) => `${r.cx},${r.cy},${r.cz}`),
     ['0,0,0', '1,0,0'],
   );
-  firstDb.close();
+  await firstDatabase.close();
 
   // A new server on the same database file: nothing was edited in this process.
-  const secondDb = database(file, resources),
-    second = await start({ store: new SqlChunkStore(secondDb) }, resources);
-  const b = await join(second.url);
-  resources.defer(() => b.client.close());
+  const { db: secondDb } = fixture.database(),
+    second = await fixture.start({ store: new SqlChunkStore(secondDb) });
+  const b = await fixture.join(second.url);
   assert.ok(await drive(b.client, () => b.client.spawned), 'second client spawned');
   for (const cell of cells) assert.equal(second.server.world.getBlock(...cell), LOG, `server holds ${cell}`);
   assert.ok(
@@ -220,15 +190,27 @@ test('a server on a SqlChunkStore keeps edits across a restart and a client sees
 });
 
 test('failed SQL integration setup closes its database, listener and generator workers before folder cleanup', async (t) => {
-  const file = pathJoin(await folder(t), 'failed.db');
+  const fixture = await sqlFixture(t);
   let db;
   await assert.rejects(async () => {
-    await using resources = new AsyncDisposableStack();
-    db = database(file, resources);
-    await start({ store: new SqlChunkStore(db) }, resources);
-    throw new Error('deliberate failure after listening');
+    try {
+      ({ db } = fixture.database());
+      await fixture.start({ store: new SqlChunkStore(db) });
+      throw new Error('deliberate failure after listening');
+    } finally {
+      await fixture.close();
+    }
   }, /deliberate failure after listening/);
   assert.equal(db.isOpen, false);
-  // Windows refuses this while SQLite is open. The suite's process deadline also detects leaked workers/listeners.
-  await rm(file);
+  assert.equal(existsSync(fixture.directory), false);
 });
+
+for (const stage of ['directory', 'database', 'server', 'client', 'spawn']) {
+  test(`SQL fixture releases its resources after failure at ${stage}`, { timeout: 25_000 }, () => {
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./sql-store-failure.js', import.meta.url)), stage], {
+      encoding: 'utf8', timeout: 20_000, windowsHide: true,
+    });
+    assert.equal(result.error, undefined, `child must exit without retained handles: ${result.error}`);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+  });
+}
