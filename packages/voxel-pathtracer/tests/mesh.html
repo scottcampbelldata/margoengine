@@ -1,0 +1,93 @@
+<!doctype html><html><meta charset="utf-8"><title>Mixed triangle and voxel path tracing</title><style>canvas{width:64px;height:64px}</style><canvas width="64" height="64"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {MeshPathTracer} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const canvas=document.querySelector('canvas'), engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=()=>engineRuntime(engine).gpu,errors=[],messages=[],reports=[],coverage=[];let edgeSource;
+ const watch=()=>{const d=device();d.addEventListener('uncapturederror',e=>errors.push(e.error.message));const create=d.createShaderModule.bind(d);d.createShaderModule=o=>{if(!edgeSource&&o.code.includes('fn meshProduct('))edgeSource=o.code;const m=create(o);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};};watch();
+ let extent=1;
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/(extent*aspect);out[5]=1/extent;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
+ const matrix=(x,y,z)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
+ const pane=(id,z,material=1,reverse=false)=>({id,positions:new Float32Array([-2,-2,z,2,-2,z,2,2,z,-2,2,z]),indices:new Uint32Array(reverse?[0,2,1,0,3,2]:[0,1,2,0,2,3]),material});
+ const blank=()=>({revision:1,models:[],instances:[],materials:[{id:1,type:'emit',color:[0,0,0],emissionColor:[1,0.5,0.25],emission:2}],meshes:[],environment:{ground:false,skyIntensity:0,sunIntensity:0}});
+ const mean=im=>[0,1,2].map(c=>{let s=0;for(let i=c;i<im.color.length;i+=3)s+=im.color[i];return s/(im.color.length/3);});
+ const render=async(name,s,expected,samples=1,options={})=>{
+  const t=await MeshPathTracer.create(engine,{scene:s,denoise:false,maxBounces:16,...options});
+  try {await t.ready;const im=await t.renderImage({width:16,height:16,samples,seed:173,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+   coverage.push({name,actual:mean(im),expected,finite:im.color.every(Number.isFinite)});return im;
+  }finally{t.dispose();}
+ };
+ try {
+  let s=blank();s.meshes=[pane('shared edge',0)];
+  let im=await render('shared edges and flat bounds',s,[2,1,0.5]);
+  coverage.at(-1).maximumError=Math.max(...im.color.map((v,i)=>Math.abs(v-[2,1,0.5][i%3])));
+  coverage.at(-1).ids=Array.from(new Set(im.instance)).sort((a,b)=>b-a);
+  s.meshes=[pane('back face',0,1,true)];await render('double sided emission',s,[2,1,0.5]);
+  s.meshes=[pane('near',0)];s.materials.push({id:2,type:'emit',color:[0,0,0],emissionColor:[0,0,1],emission:3});
+  s.models=[{id:'cube',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}];s.instances=[{id:'cube',modelId:'cube',matrix:matrix(-0.5,-0.5,1)}];
+  await render('voxel before triangles',s,[1.5,0.75,1.125]);
+  s.meshes=[pane('near',3)];await render('triangles before voxel',s,[2,1,0.5]);
+  s=blank();s.materials=[{id:1,type:'diffuse',color:[0.2,0.4,0.8]}];s.meshes=[pane('diffuse',0)];s.environment={ground:false,skyIntensity:0,sunIntensity:Math.PI,sunAngularSize:0,sunDirection:[0,0,1]};
+  await render('diffuse analytic sun',s,[0.2,0.4,0.8],1,{maxBounces:1});
+  engine.camera.position=[0,0,1];engine.render();
+  s.models=[{id:'blocker',revision:1,size:[1,1,1],voxels:new Uint8Array([1])}];s.instances=[{id:'blocker',modelId:'blocker',matrix:matrix(-0.5,-0.5,2)}];
+  await render('voxel shadow on mesh',s,[0.15,0.3,0.6],1,{maxBounces:1});
+  s.meshes=[pane('blocker',2)];s.instances[0].matrix=matrix(-0.5,-0.5,-1);
+  extent=0.2;engine.render();await render('mesh shadow on voxel',s,[0,0,0],1,{maxBounces:1});
+  engine.camera.position=[0,0,4];extent=0.2;engine.render();
+  s=blank();s.materials.push({id:2,type:'metal',color:[1,1,1],roughness:0});
+  s.meshes=[pane('mirror',0,2)];s.models=[{id:'light',revision:1,size:[4,4,1],voxels:new Uint8Array(16).fill(1)}];s.instances=[{id:'light',modelId:'light',matrix:matrix(-2,-2,6)}];
+  await render('mesh reflects voxel emitter',s,[2,1,0.5]);
+  s.meshes=[pane('light',6)];s.models=[{id:'mirror',revision:2,size:[4,4,1],voxels:new Uint8Array(16).fill(2)}];s.instances=[{id:'mirror',modelId:'mirror',matrix:matrix(-2,-2,-1)}];
+  await render('voxel reflects triangle emitter',s,[2,1,0.5]);
+  s=blank();s.materials=[{id:1,type:'glass',color:[1,1,1],ior:1.5,roughness:0}];s.meshes=[pane('entry',0),pane('exit',-1,1,true)];s.environment={ground:false,sunIntensity:0,skyIntensity:1,map:{width:4,height:2,data:new Float32Array(24).fill(1)}};
+  await render('closed glass white furnace',s,[1,1,1],128,{maxBounces:32});
+  // Geometry spanning many leaves; exact emission and finite far coordinates.
+  s=blank();s.meshes=Array.from({length:65},(_,i)=>pane('layer'+i,-i));
+  await render('65 layers nearest traversal',s,[2,1,0.5]);
+  s.meshes=[pane('huge',0)];s.meshes[0].positions=new Float32Array([-1e8,-1e8,0,1e8,-1e8,0,1e8,1e8,0,-1e8,1e8,0]);
+  await render('huge finite geometry',s,[2,1,0.5]);
+  // Independently exact Float64 products (24x24 bits) and differences oracle
+  // 4096 cancellation predicates, including every 16-bit multiplication carry.
+  const values=new Float32Array(4096*4),expected=new Float32Array(4096);
+  let random=0x724981;for(let i=0;i<expected.length;i++){
+   random=(Math.imul(random,1664525)+1013904223)>>>0;
+   const x=Math.fround(1+(random&0x7fffff)/2**23),y=Math.fround(1+((random>>>5)&0x7fffff)/2**23),scale=2**((i%41)-20);
+   const a=Math.fround(x*scale),b=Math.fround(y*scale),c=Math.fround(x*scale),d=Math.fround((y+((i%3)-1)*2**-23)*scale);
+   values.set([a,b,c,d],i*4);expected[i]=a*d-b*c;
+  }
+  const d=device(),input=d.createBuffer({size:values.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),output=d.createBuffer({size:expected.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:expected.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const helpers=edgeSource.slice(edgeSource.indexOf('fn meshProduct('),edgeSource.indexOf('fn triangleHit('));
+  try{
+   const module=d.createShaderModule({code:helpers+'\n@group(0) @binding(0) var<storage,read> values:array<vec4f>;@group(0) @binding(1) var<storage,read_write> out:array<f32>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x<4096u){let v=values[id.x];out[id.x]=meshEdge(v.xy,v.zw);}}'});
+   const pipeline=await d.createComputePipelineAsync({layout:'auto',compute:{module,entryPoint:'main'}}),bind=d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:input}},{binding:1,resource:{buffer:output}}]});
+   d.queue.writeBuffer(input,0,values);const encoder=d.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,bind);pass.dispatchWorkgroups(64);pass.end();encoder.copyBufferToBuffer(output,0,read,0,expected.byteLength);d.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+   const actual=new Float32Array(read.getMappedRange());let differing=0;for(let i=0;i<expected.length;i++)if(actual[i]!==expected[i])differing++;
+   coverage.push({name:'exact cancellation predicates',finite:actual.every(Number.isFinite),actual:[differing,0,0],expected:[0,0,0],cases:expected.length});read.unmap();
+  }finally{input.destroy();output.destroy();read.destroy();}
+  s=blank();await render('empty',s,[0,0,0]);
+  s.meshes=[{id:'zero',positions:new Float32Array(),indices:new Uint32Array(),material:1}];await render('zero triangles',s,[0,0,0]);
+  // An empty mesh entry must preserve the original random stream and all voxel transport.
+  s.models=[{id:'cube',revision:1,size:[1,1,1],voxels:new Uint8Array([1])}];s.instances=[{id:'cube',modelId:'cube',matrix:matrix(-0.5,-0.5,0)}];
+  const base=VoxelPathTracer.attach(engine,{scene:s,denoise:false});await base.ready;const reference=await base.renderImage({width:16,height:16,samples:4,seed:173,jitter:false,signal:AbortSignal.timeout(120000)});base.dispose();
+  im=await render('empty mesh baseline parity',s,mean(reference),4);coverage.at(-1).differing=im.color.filter((v,i)=>v!==reference.color[i]).length;
+  // Real device replacement and exact raster restoration with triangle data alive.
+  s=blank();s.meshes=[pane('lifecycle',0)];const raster=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+  engine.render();await device().queue.onSubmittedWorkDone();engine.render();const before=raster();
+  const t=await MeshPathTracer.create(engine,{scene:s,maxSamples:4,samplesPerFrame:4,denoise:true});await t.ready;
+  const finish=async()=>{const end=performance.now()+120000;while(!t.stats.converged){if(performance.now()>end)throw Error('viewport deadline');engine.render();await device().queue.onSubmittedWorkDone();}engine.render();return raster();};
+  const diff=(a,b)=>a.reduce((n,v,i)=>n+(v!==b[i]?1:0),0);
+  const traced=await finish();t.enabled=false;engine.render();const disabled=raster();t.enabled=true;
+  const old=device();await engine.rebootDevice();watch();await t.ready;const restored=await finish();
+  t.dispose();engine.render();const after=raster();
+  const lifecycle={newDevice:old!==device(),traced:diff(traced,before),disabled:diff(disabled,before),restored:diff(restored,traced),disposed:diff(after,before)};
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});let refusal;
+  try{await MeshPathTracer.create(native,{scene:blank()});}catch(e){refusal={code:e.code,message:e.message};}finally{native.dispose();}
+  await Promise.all(reports);return {coverage,lifecycle,refusal,errors,messages};
+ } finally {engine.dispose();}
+};window.ready=true;
+</script></html>

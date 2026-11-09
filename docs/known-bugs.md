@@ -1928,3 +1928,11 @@ overflow, absent physical-map sampler overflow and silent direct-GPU input retur
 in their own fix commits and regression tests. The real-model whole frame survives actual device
 replacement on native and compatibility backends. No additional framing defect was found.
 The Y-axis orbit, one-time fit and native WebGL2 PBR refusal remain explicit limits.
+
+### Fixed during batch 99 mixed triangle tracing
+
+An ordinary projected-edge multiply/subtract could give inconsistent signs on adjoining triangles after backend arithmetic contraction. The compatibility regression exposed six missed pixels in a 16-by-16 small orthographic view, leaking sunlight through a complete panel and losing reflected emission. Canonical operand ordering alone did not resolve it. The owning mesh entry now filters uncertain determinants and recomputes their two exact significand products with integer limbs, then rounds their difference. mesh-browser.mjs retains the original zero-leak and exact-emission assertions and adds an independent cancellation-predicate oracle. No tolerance or scene-work requirement was reduced.
+
+The optional mesh design limits are documented in its README and limits.md. They do not close batch 99's separate exact-parity or moving-camera denoising defects.
+
+Mixed-tracer creation also redundantly rebuilt the already-copied voxel snapshot to check added storage. This misreported the first packing as reuse. The constructor now keeps its first snapshot; the existing pre-allocation device check validates the combined binding reserve. mesh.test.js requires one packed model and zero reused models on creation, and still rejects an oversized combined binding before GPU allocation.

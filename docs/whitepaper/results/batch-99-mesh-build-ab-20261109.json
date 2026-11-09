@@ -1,0 +1,32 @@
+{
+  "diagnostic": true,
+  "triangles": 16384,
+  "identicalWords": 524284,
+  "rounds": [
+    {
+      "scalar": 123.24440000000001,
+      "wasm": 5.364599999999996
+    },
+    {
+      "scalar": 109.94039999999995,
+      "wasm": 4.121899999999982
+    },
+    {
+      "scalar": 93.53240000000005,
+      "wasm": 4.214200000000119
+    },
+    {
+      "scalar": 112.46350000000007,
+      "wasm": 3.973899999999958
+    },
+    {
+      "scalar": 97.95910000000003,
+      "wasm": 4.328399999999874
+    }
+  ],
+  "simdValidation": {
+    "scalarCoordinatePredicates": 147456,
+    "vectorGroups": 36864,
+    "scalarTail": 0
+  }
+}

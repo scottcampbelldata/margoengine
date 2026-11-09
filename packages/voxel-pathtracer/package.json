@@ -46,6 +46,10 @@
     "./media": {
       "types": "./dist/media.d.ts",
       "import": "./dist/media.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
     }
   },
   "files": [
@@ -78,7 +82,10 @@
     "test:gpu:stall": "cd ../.. && node packages/voxel-pathtracer/tests/stall-check.mjs",
     "test:gpu:guiding": "cd ../.. && node packages/voxel-pathtracer/tests/guiding-browser.mjs",
     "test:gpu:sky": "cd ../.. && node packages/voxel-pathtracer/tests/sky-browser.mjs",
-    "test:gpu:media": "cd ../.. && node packages/voxel-pathtracer/tests/media-browser.mjs"
+    "test:gpu:media": "cd ../.. && node packages/voxel-pathtracer/tests/media-browser.mjs",
+    "build:mesh": "node scripts/build-mesh.mjs",
+    "test:mesh-kernel": "node scripts/build-mesh.mjs --test",
+    "test:gpu:mesh": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -90,7 +97,8 @@
       "test:gpu:viewport": 10,
       "test:gpu:guiding": 10,
       "test:gpu:sky": 10,
-      "test:gpu:media": 10
+      "test:gpu:media": 10,
+      "test:gpu:mesh": 10
     }
   },
   "peerDependenciesMeta": {

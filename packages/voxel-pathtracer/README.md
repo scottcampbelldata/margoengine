@@ -847,3 +847,71 @@ cells produce radiance 3, rather than losing 0.006 to the old 0.002-cell offsets
 At negative grazing directions, cell and brick starts use the forward half-open interval (ceil minus one),
 so a rounded point on a boundary cannot repeatedly re-enter the cell behind it. Both voxel and brick
 boundary regressions check emitted path length with Float32 camera-coordinate uncertainty included.
+
+## Triangle meshes beside voxels
+
+`margoengine/voxel-pathtracer/mesh` (or `@margoengine/voxel-pathtracer/mesh`) exports
+`MeshPathTracer`. Its asynchronous `create` builds a feature-local Rust/Wasm BVH and attaches
+the root integrator. Triangles and voxels intersect the same camera, shadow and secondary paths.
+The root package imports neither this entry nor its Wasm. No CAD or model parser is included.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { MeshPathTracer } from 'margoengine/voxel-pathtracer/mesh';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 1, 4], target: [0, 0, 0]},
+});
+const tracer = await MeshPathTracer.create(engine, {
+  scene: {
+    revision: 1, models: [], instances: [],
+    materials: [{id: 1, type: 'diffuse', color: [0.3, 0.6, 0.8]}],
+    meshes: [{id: 'panel', material: 1,
+      positions: new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]),
+      indices: new Uint32Array([0, 1, 2])}],
+    environment: {skyColor: [0.7, 0.8, 1], sunIntensity: 3},
+  },
+  signal: AbortSignal.timeout(30_000),
+  denoise: true,
+});
+await tracer.ready;
+const image = await tracer.renderImage({
+  width: 64, height: 64, samples: 16, signal: AbortSignal.timeout(30_000), aovs: true,
+});
+tracer.dispose();
+engine.dispose();
+```
+
+Mesh positions are static, indexed, world-space Float32 xyz triplets, finite within +/-1e8 units;
+each mesh names a scene palette material (1..255). Empty meshes and scenes work. Indices must be
+Uint32 triangle triplets referencing existing vertices. Degenerate triangles are rejected. At most
+1,000,000 triangles and 128 MiB of input are accepted, and the combined scene storage must fit the
+device's binding limit. Every triangle adds 64 bytes and each binary BVH node 32 bytes, at most
+two nodes per triangle. Builds use a spatial median, outward-rounded bounds and a stackless walk.
+The ray-space predicate resolves uncertain edge signs by subtracting exact integer significand
+products before rounding, retaining shared edges under shader arithmetic contraction. This is
+Float32 geometry, without a double-precision coordinate fallback or
+a promise of exact intersection for all ill-conditioned triangles.
+
+Surfaces are flat-shaded and double-sided. Diffuse, plastic, metal, emission, blend and glass use
+the root BSDFs. Meshes have no UV textures, alpha cutouts, vertex normals, instancing, skinning or
+motion blur. For glass, supply a closed, consistently outward-wound shell of one material, with
+the camera outside; overlapping/nested mesh volumes and mesh media are unsupported. Mesh emission
+is reached by path sampling; it has no emissive-triangle light sampler or prism/mirror light guide.
+Finite point lights and zero-angular-size suns behind a specular chain retain that sampling limit.
+Existing voxel lights, glass, media, environments, capture tiling and bounce limits remain available.
+
+`setScene(scene, {signal?})` returns a promise and rebuilds all triangles before atomically replacing
+the scene. Caller arrays are copied before waiting. Failed or cancelled updates preserve the old
+scene; overlapping updates commit in call order. Cancellation is checked around synchronous Rust
+work; use a worker when an in-flight CPU build must be interruptible. `whenIdle()` waits for updates
+and captures. `enabled`, `ready`, `status`, `error`, `options`, `stats`, rendering options, captures,
+reset, disposal and `Symbol.dispose` follow the root lifecycle. `raycast` remains CPU voxel picking.
+With image `aovs`, `instance <= -4` means triangle ordinal `-instance - 4`, in mesh order then index
+triplet order; `palette` is zero for triangles. Sky/ground/area and voxel ids keep their root meanings.
+
+Native WebGPU and WebGL2 compatibility execute the same geometry path. Plain WebGL2 returns
+`unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer). Generated GPU tests
+assert constant emission, analytic sunlight, mutual shadows and mirror paths, shared edges, empty
+geometry, glass furnace values, real device replacement and exact raster restoration. They establish
+no outside-renderer equality, arbitrary asset coverage or GPU speed claim. The paired CPU preparation
+driver requires the Rust output to match an independent scalar builder byte for byte.

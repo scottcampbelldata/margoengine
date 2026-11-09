@@ -1916,3 +1916,14 @@ implementation was reused, with no new framing or rotation algorithm and no stag
 The numerical repair follows ECMA-262 floating remainder; resource pressure follows glTF 2.0 and
 WebGL 2.0, as cited in the separate audit records above. No outside engine implementation was read.
 FlightHelmet is an existing licensed standard asset. No new implementation file or library is added.
+
+### Mixed triangle and voxel tracing (batch 99 job 7)
+
+Research began across all packages, including the existing CPU triangle-query APIs. They do not supply mixed GPU light transport. No external implementation was read or copied. The optional mesh entry owns a feature-local Rust spatial-median BVH, SIMD coordinate validation and WGSL intersections; core and stage import none of it.
+
+- Woop, Benthin and Wald, [Watertight Ray/Triangle Intersection](https://jcgt.org/published/0002/01/05/paper.pdf), JCGT 2013: ray-space translation, shear and projected edge predicates. Margo retains Float32 transformed coordinates; it does not claim the paper's double-precision coordinate fallback.
+- Shewchuk, [Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates](https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf), 1997: uncertainty filters and exact recomputation of uncertain predicate signs. Margo's own fallback forms two 24-by-24-bit products with 16-bit integer limbs, aligns and subtracts them before one final floating-point rounding. This is not a port of the paper's expansion-arithmetic software.
+- Karras, [Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees](https://developer.nvidia.com/blog/parallelforall/wp-content/uploads/2012/11/karras2012hpg_paper.pdf), 2012: hierarchy construction trade-offs informed the survey. This static builder uses balanced spatial medians, not a Morton/radix construction or a parallel-build claim.
+- Kajiya, [The Rendering Equation](https://www.cs.cornell.edu/courses/cs667/2004sp/readings/kajiya86.pdf), 1986: surfaces in one transport integral. Both geometry types reuse Margo's existing BSDFs, path sampling, light visibility and volume integration.
+
+Generated triangles, scalar packing references and arithmetic/GPU fixtures are authored here. No outside model or decoder was added. Shared edges are tested on native WebGPU and WebGL2 compatibility; the full Float32 geometry domain is not an exact-arithmetic claim.

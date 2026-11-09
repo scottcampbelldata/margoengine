@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-636). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-637). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1564,3 +1564,13 @@ Native WebGPU and WebGL2 compatibility pass real-model pixel, orbit, rollback, d
 replacement-device whole-frame assertions. Native WebGL2 PBR remains unsupported.
 No staging/frame entry is added. Viewer 2,386 B gzip; staging root 8,129 B; accumulate 9,314 B;
 core plus stage 23,797 B below 25,000 B. No measured speed or photographic-product quality claim.
+
+### Mixed triangle and voxel tracing (batch 99 job 7, LIM-637)
+
+Optional voxel-pathtracer/mesh accepts static world-space Float32 positions within +/-1e8 units and indexed nondegenerate triangle triplets, at most 1,000,000 triangles and 128 MiB of input. Empty geometry is supported. Triangles require a scene palette surface material (1..255); no voxel textures, cutouts, interpolated normals, mesh media, transforms, deformation or mesh motion blur. Every triangle stores 64 bytes; each binary BVH node stores 32 bytes, at most two nodes per triangle. Added words and the root scene must fit one storage binding; other root limits remain unchanged.
+
+Flat surfaces are double-sided. Glass requires closed outward-wound uniform-material shells with the camera outside; nested/overlapping mesh volumes are unsupported. Emissive triangles are reached by path sampling, without an emissive-triangle next-event sampler, prism guide or mirror guide. A delta light behind an unsampled specular chain retains the resulting convergence limitation. CPU raycast still queries voxels. The image instance AOV encodes triangle ordinal as -(4 + ordinal); triangle palette is zero.
+
+Uncertain ray-space edge determinants use exact integer product subtraction, with no geometric edge dilation. Transformed coordinates and transport remain Float32; no universal watertightness, ill-conditioned triangle, production-asset or outside-renderer equality claim. Builds copy caller arrays and check cancellation around synchronous Rust work; a worker is needed to interrupt that work in flight. setScene rebuilds all triangle geometry.
+
+Native WebGPU and WebGL2 compatibility are covered by generated value/pixel fixtures and real device replacement. Plain WebGL2 returns linked unsupported. The entry gate's rebundling method measures 22,864 B gzip (ceiling 23,559 B), including the asset encoding produced by measurement. The installed JavaScript module is 4,716 B gzip and its separately fetched Wasm is 32,413 B raw / 13,241 B gzip; do not add the gate figure and the artifact a second time. The inherited tracer root is 80,918 B gzip, within its unchanged 82,733 B ceiling. No GPU or published release speed claim. Core plus stage remains 23,797 B gzip, below the strict 25,000 B cap.

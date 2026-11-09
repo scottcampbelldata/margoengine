@@ -11,6 +11,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/voxel-pathtracer',
+    file: 'packages/voxel-pathtracer/dist/mesh.wasm',
+    label: 'mesh.wasm',
+    kind: 'Rust SIMD geometry builder',
+    measure: 'file',
+    when: 'MeshPathTracer.create() and setScene(), only from the optional /mesh entry; never loaded by the root tracer',
+  },
+  {
     package: '@margoengine/wfc',
     file: 'packages/wfc/dist/workers/wfc.js',
     label: 'workers/wfc.js',

@@ -1011,3 +1011,9 @@ FlightHelmet is the existing mobile GLB fixture. The tests assert product covera
 orbit radius/height/target, rollback, extreme finite periods, disposal and actual device replacement
 restoring the whole frame exactly. Raw reports are test-results/stage-viewer.json and
 stage-viewer-compat.json; the committed batch-56-frame.json preserves both devices and values.
+
+### Batch 99 mixed triangle geometry
+
+Build with npm run build:mesh --workspace @margoengine/voxel-pathtracer, then npm run build:packages. Run npm run test:mesh-kernel --workspace @margoengine/voxel-pathtracer and the voxel-pathtracer package tests. Run node scripts/gpu-lock.mjs run --owner=codex-99 --max=10 --wait-max=5 -- npm run test:gpu:mesh --workspace @margoengine/voxel-pathtracer for native and compatibility analytic paths, predicate arithmetic, device replacement and raster restoration. The generated-scene record is results/batch-99-mesh-20261109.json. No downloaded reference asset is involved.
+
+node packages/voxel-pathtracer/tests/mesh-build-ab.mjs runs the CPU-only scalar/Rust paired diagnostic and writes test-results/voxel-pathtracer-mesh-build-ab.json. Both builders emit the same 524,284 words for 16,384 triangles; every timed output is compared byte for byte. Alternating rounds use per-round minima. This is a loaded-machine implementation diagnostic, not a quiet release or rival benchmark.

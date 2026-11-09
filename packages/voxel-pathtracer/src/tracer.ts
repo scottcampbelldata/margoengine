@@ -377,6 +377,21 @@ export class VoxelPathTracer implements EnginePlugin {
     return TRACE;
   }
 
+  /** Additional scene-binding words owned by an optional geometry entry. */
+  protected sceneWordReserve(): number {
+    return 0;
+  }
+
+  /** Append optional geometry to the existing scene binding, including capture copies and device restoration. */
+  protected sceneStorage(words: Uint32Array): Uint32Array {
+    return words;
+  }
+
+  /** Decode a non-voxel instance AOV, reserving optional geometry ids for subclasses. */
+  protected imageInstance(id: number): number {
+    return id === -2 ? -2 : id === -3 ? -3 : -1;
+  }
+
   /** Whether the traced image replaces the frame. While false the tracer draws nothing and traces nothing. */
   get enabled(): boolean {
     return this.#enabled;
@@ -441,7 +456,7 @@ export class VoxelPathTracer implements EnginePlugin {
   setScene(scene: VoxelTraceScene): void {
     this.#alive();
     const limit = this.#gpu ? Math.floor(this.#gpu.device.limits.maxStorageBufferBindingSize / 4) : DEFAULT_WORDS;
-    this.#snapshot = moving(buildSnapshot(scene, this.#cache, limit), this.#settings);
+    this.#snapshot = moving(buildSnapshot(scene, this.#cache, limit, this.sceneWordReserve()), this.#settings);
     this.#version++;
     this.#samples = 0;
   }
@@ -647,7 +662,7 @@ export class VoxelPathTracer implements EnginePlugin {
           if (id >= 256) {
             instance![at + i] = sources[Math.floor(id / 256) - 1] ?? -1;
             palette![at + i] = id % 256;
-          } else instance![at + i] = id === -2 ? -2 : id === -3 ? -3 : -1;
+          } else instance![at + i] = this.imageInstance(id);
         }
       });
       return {
@@ -763,7 +778,11 @@ export class VoxelPathTracer implements EnginePlugin {
   // GPU state for `device`: layouts, empty scene buffers, pipelines compiling in the background.
   #state(device: GPUDevice): Gpu {
     if (this.#gpu?.device === device) return this.#gpu;
-    checkSceneStorage(this.#snapshot, Math.floor(device.limits.maxStorageBufferBindingSize / 4));
+    checkSceneStorage(
+      this.#snapshot,
+      Math.floor(device.limits.maxStorageBufferBindingSize / 4),
+      this.sceneWordReserve(),
+    );
     if (this.#gpu) this.#release();
     const C = GPUShaderStage.COMPUTE,
       F = GPUShaderStage.FRAGMENT,
@@ -1000,6 +1019,7 @@ export class VoxelPathTracer implements EnginePlugin {
       }
       if (data.byteLength) device.queue.writeBuffer(gpu.buffers[key], 0, data as Uint32Array<ArrayBuffer>);
     };
+    scene.words = this.sceneStorage(scene.words);
     upload('scene', scene.words);
     const env = s.environment.map;
     if (env && env !== gpu.envSource) {

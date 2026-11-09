@@ -1322,7 +1322,12 @@ function tableHash(t: Float32Array): number {
   return h >>> 0;
 }
 
-export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWords: number): SceneSnapshot {
+export function buildSnapshot(
+  scene: VoxelTraceScene,
+  cache: SceneCache,
+  maxWords: number,
+  reservedSceneWords = 0,
+): SceneSnapshot {
   if (!isObject(scene)) throw new TypeError(`${where} scene must be {revision, models, instances, materials}`);
   if (typeof scene.revision !== 'number' || !Number.isFinite(scene.revision))
     throw new TypeError(`${where} scene.revision must be a finite number`);
@@ -1538,6 +1543,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       materials: { length: tables.length * 256 * MATERIAL_FLOATS },
     },
     maxWords,
+    reservedSceneWords,
   );
   // Success: keep the packed models (and only those) and the environment tables for the next scene.
   cache.models = reused;
@@ -1633,7 +1639,7 @@ export function sceneRecordWords(s: Pick<SceneStorage, 'models' | 'instances' | 
 }
 
 /** Throws RangeError when the scene's buffers exceed `maxWords` (checked again on attach and device restore). */
-export function checkSceneStorage(s: SceneStorage, maxWords: number): void {
+export function checkSceneStorage(s: SceneStorage, maxWords: number, reservedSceneWords = 0): void {
   if (s.voxelWords > maxWords)
     throw new RangeError(
       `${where} scene needs ${s.voxelWords * 4} bytes of voxel bricks; this device binds at most ${maxWords * 4}; use fewer or smaller models`,
@@ -1646,6 +1652,7 @@ export function checkSceneStorage(s: SceneStorage, maxWords: number): void {
     faces = s.emitters.reduce((n, e) => n + e.cdf.length, 0),
     lightWords =
       sceneRecordWords(s) +
+      reservedSceneWords +
       4 +
       2 * MAX_DEFLECTORS * 2 +
       s.emissiveInstances.length * 2 +

@@ -2519,3 +2519,15 @@ The audit's period arithmetic, absent physical-map binding and silent external-i
 resolved in separate fix commits. Raw device/value evidence: whitepaper/results/batch-56-frame.json.
 Root staging is 8,129 B gzip, accumulate 9,314 B, viewer 2,386 B and core plus stage 23,797 B.
 No CPU-heavy loop, photographic quality claim, performance measurement or core change.
+
+### Batch 99 triangle geometry and section 5 evidence
+
+The optional voxel-pathtracer/mesh entry builds a balanced world-space triangle BVH in one lazy Rust/Wasm feature. The root tracer provides protected scene-storage reservation, append and AOV-decoding hooks. Defaults reserve zero words and retain the original layout and shader. Optional triangles use the existing scene binding and its capture copies, byte accounting, atomic replacement and restoration; no core or stage source changes.
+
+The scene storage gate counts added triangle/node words only against the scene binding, without shrinking the independent voxel/material/environment bindings. Flat double-sided surfaces reuse the BSDF integrator, including mutual triangle/voxel shadows and secondary paths. Closed, consistently outward-wound, uniform-material glass shells use the existing medium state; overlapping/nested mesh media, camera-inside initialization and mesh textures/deformation are outside the contract. Triangle emitters are path sampled, without next-event sampling or deflector guides.
+
+Section 5 evidence: mesh.test.js covers hostile data, atomic failed/cancelled updates, call order, copied caller arrays, storage bounds and lifecycle. mesh-browser.mjs asserts analytic radiance and shadows, mirror paths, a glass furnace, shared-edge signs, many-leaf nearest traversal, huge/zero/empty geometry, unchanged empty-entry voxel output, real device replacement and exact raster restoration on native WebGPU and WebGL2 compatibility. The arithmetic probe compares uncertain edge determinants with exact Float64 products. Float32 coordinate transformation still bounds accuracy; cross-vendor and arbitrary production assets remain unmeasured.
+
+mesh-build-ab.mjs compares every output word with an independent scalar median builder, in alternating paired rounds. SIMD validation groups four coordinate predicates per instruction group. Loaded-machine timings are diagnostic and carry no release or rival speed claim.
+
+Mixed-tracer creation builds the voxel snapshot once. Device setup checks the geometry reserve against the actual binding limit before allocating. The packing-stat regression prevents an internal second setScene from hiding initial work as reuse.

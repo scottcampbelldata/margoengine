@@ -2733,3 +2733,7 @@ Loaded SCOTT-DEV diagnostics are in results/batch-69-heap.json: two cases, seven
 ### Batch 69 worker orchestration
 
 Optional worker solving keeps the heap algorithm and seed stream. Bounded TS/host-imported SIMD work reports make progress visible during synchronous work; no search reduction. Device evidence records frames during actual solves on both backends, without a frame-time or throughput claim. The paired heap fixture is rerun on the instrumented artifact; loaded-machine minima are diagnostic, not published release performance.
+
+### Batch 99 triangle preparation
+
+The optional mesh path uses a feature-local Rust/Wasm build rather than new JavaScript geometry loops. The CPU paired driver alternates an independent scalar spatial-median builder and Rust, requiring every output word to agree for 16,384 triangles. SIMD validation replaces 147,456 scalar coordinate predicates with 36,864 four-lane groups, with identical validity decisions. Loaded SCOTT-DEV per-round minima are retained in results/batch-99-mesh-build-ab-20261109.json as diagnostics. No quiet release number or GPU throughput improvement is published; first-call Wasm fetch/compilation is outside the kernel-only comparison.

@@ -397,3 +397,7 @@ The local heap/SIMD comparison in results/batch-69-heap.json is Margo TypeScript
 ### Batch 69 worker evidence
 
 The WFC worker entry has no rival rendering-speed comparison. Its real WebGPU/WebGL2 page records show rendered frames during TS/SIMD heap work and active aborts. Seed output and solver work are preserved; startup and input cloning remain costs. No comparative or release speed claim is inferred from frame counts.
+
+### Batch 99 mixed geometry scope
+
+No rival triangle/voxel path tracer was run for this entry. The recorded CPU preparation A/B compares two Margo implementations with byte-identical geometry and hierarchy output, not an engine-to-engine speed ratio. GPU transport performance and quiet release timings remain unmeasured; this entry makes no competitive speed claim.
