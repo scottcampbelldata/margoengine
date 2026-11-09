@@ -61,6 +61,10 @@
     "./sdf": {
       "types": "./dist/sdf.d.ts",
       "import": "./dist/sdf.js"
+    },
+    "./textures": {
+      "types": "./dist/textures.d.ts",
+      "import": "./dist/textures.js"
     }
   },
   "files": [
@@ -83,7 +87,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
-    "test:gpu": "node test/poisson-browser.mjs",
+    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
     "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",

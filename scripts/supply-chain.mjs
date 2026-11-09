@@ -127,6 +127,11 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/procedural/test/fixtures/textures/structural-reference.json',
+    'Our numerical joint-centre measurements from Lefebvre and Poulin, Analysis and Synthesis of Structural Textures, Graphics Interface 2000, Fig.1(d), https://graphicsinterface.org/wp-content/uploads/gi2000-12.pdf. Source PDF SHA-256, method and uncertainty in the fixture. Original paper/JPEG remain outside shipped files; no image or implementation redistributed. Factual measurements only, with author/title attribution.',
+  ],
+
+  [
     'scripts/support/external-test-assets.json',
     'required outside standard test inputs, each with source, size, SHA-256 and licence; never shipped. The complete PotreeConverter lion_takanawa_normals folder is 80 files / 6157310 bytes at potree/potree 5636cd471d9eb464969e758be45c44d7613d3859, BSD-2-Clause (Markus Schütz, repository LICENSE); 341989 points in all 77 nodes. Per-file hashes are in the manifest and provenance in packages/points/tests/fixtures/NOTICE.md; only standard data, no implementation. Includes the 8080-byte BoxTextured Blender 5.1 USDZ conversion hosted by Needle at https://asset-explorer.needle.tools/downloads/BoxTextured.glb.blender.usdz, SHA-256 b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab. Original BoxTextured by Cesium, 2017, CC-BY-4.0 with trademark limitations (https://asset-explorer.needle.tools/BoxTextured). Only the converted standard model is downloaded; no engine code or conversion implementation is read or copied',
   ],

@@ -1931,3 +1931,21 @@ Generated triangles, scalar packing references and arithmetic/GPU fixtures are a
 ## Batch 65 job 5: Lane markings
 
 A broad search of pavement markings and decal projection preceded implementation. FHWA [historical MUTCD 2009 chapter 3B](https://mutcd.fhwa.dot.gov/htm/2009/part3/part3b.htm) distinguishes line patterns and direction arrows. Sutherland and Hodgman, [Reentrant polygon clipping (1974)](https://doi.org/10.1145/360767.360802), describes successive clipping boundaries; projection and clipping are already implemented by Margo. Margo combines authored world-space line/arrow strokes with its existing box decal renderer. Glyphs are generated stand-ins, not copied standard artwork, and make no current traffic-rule compliance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.
+
+## Batch 68 job 6: GPU tileable textures
+
+Clean-room research: Lagae et al. (2010), A Survey of Procedural Noise Functions,
+https://doi.org/10.1111/j.1467-8659.2010.01827.x (periodic noise and procedural
+pattern construction); Lefebvre and Poulin (2000), Analysis and Synthesis of
+Structural Textures, https://graphicsinterface.org/wp-content/uploads/gi2000-12.pdf
+(section 2 relative row offsets, tile sizes and mortar); Liu et al. (2016),
+Simulating the Structure and Texture of Solid Wood,
+https://research.cs.cornell.edu/wood/simulating_the_structure_and_texture_of_solid_wood.pdf
+(complex wood anatomy is outside our simple periodic band preset).
+The latter two PDFs were downloaded and the actual fourth embedded 256-square
+JPEG on page2 of the structural-textures paper was extracted outside shipped files.
+Our own joint-centre measurements, source hash and uncertainty are in the test
+fixture JSON. No original image, paper or external implementation is redistributed.
+GPU shaders and CPU numeric oracle were written independently from descriptions
+and equations. This is not example-based synthesis, the paper's parameter
+extraction algorithm, Gabor convolution, biological wood or corrosion simulation.

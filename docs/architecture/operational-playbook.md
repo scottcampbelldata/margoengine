@@ -2546,3 +2546,17 @@ core, stage or held physics source changed. No surveyed/normal-decoding/quality/
 ### Batch 65 job 5: Lane markings
 
 The road entry only builds small placement descriptions. The existing post/decals renderer projects them from scene depth, handles angle/depth fades, backend shaders, device restoration and disposal; its built-in white texel removes image-asset requirements. Solid/dashed lines and three-stroke arrows share this renderer. No shader or new geometry solver is introduced. Core and stage are unchanged. Section 5 evidence: Authored extents, dash end trimming, arrow symmetry, headings, ownership and hostile/extreme validation; white line and arrow pixels on a road, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim. See packages/road/test/markings.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.
+
+### GPU periodic textures (batch 68, job 6)
+
+The procedural/textures entry owns a device-bound compute pipeline and RGBA8
+outputs. A fixed 8x8 dispatch uses integer seeded hashes, wrapped lattice corners,
+quintic interpolation, and periodic material functions. Brick alternation requires
+even rows. CPU code only validates settings and submits work. No engine/core/stage
+or physics source changed. Native WebGL2 explicitly refuses with a coded help link.
+Real GPU tests compare 44,415 channels with an independent CPU numerical oracle,
+exact full-period phases and one-pixel seam shifts. Real cancellation, disposal,
+lost-device waits and a fresh adapter/device are exercised. Partial allocations and
+queue failures have stand-in regressions. Compilation diagnostics include the WGSL
+source line. A downloaded published brick raster supplies a calibrated structural
+row offset only; other proofs are stand-ins, not material realism (LIM-639).

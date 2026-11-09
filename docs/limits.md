@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-638). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-639). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1589,3 +1589,32 @@ shared outside manifest now has 457 files and fails if any is missing or changed
 ### Batch 65 job 5: Lane markings (LIM-638)
 
 Optional road/markings: 887 B min+gzip with bare package imports external; dependencies are additional downloads. Synchronous caller-owned decal descriptions, no GPU resources. At most 4096 output projectors, empty input returns empty output. Lines use one projector per dash; arrows use three strokes, with no regulatory-glyph claim. Positions within +/-1,000,000 m; positive length through 10000 m and width/depth through 1000 m; each projector half-extent must be a normal float32 value (at least 2^-126). Uses existing post/decals and a scene-depth capture, such as tonemap. Downward box projection can also paint other upward-facing surfaces inside the box. Box depth and camera/float32 precision set placement accuracy. Unlit over blending, no physical paint or retroreflection model. Authored extents, dash end trimming, arrow symmetry, headings, ownership and hostile/extreme validation; white line and arrow pixels on a road, exact device reboot and double disposal on native WebGPU and real WebGL2 compatibility. No speed claim.
+
+## Tileable GPU texture baking (LIM-639)
+
+The optional procedural/textures entry compiles one WebGPU compute pipeline and
+bakes RGBA8 linear RGB, alpha 1. Native WebGL2 gives linked unsupported. Five
+stylized patterns: periodic value noise, bricks, tiles, longitudinal wood-like
+bands and rust-like threshold patches. No photographic, anatomical, corrosion or
+PBR material accuracy is asserted. Four fixed noise periods 4,8,16,32, weights
+8,4,2,1, quintic interpolation. Every preset shares a caller-set two-colour palette.
+Defaults: bricks, 256 square, seed1, repeats[4,8], detail .2, grout .08, stagger .5,
+color[.55,.2,.08], secondary[.15,.12,.1], offset[0,0]. Dimensions16..2048 and device
+limit; repeats integer1..64, even brick rows; seed uint32; detail/stagger0..1;
+grout0...45; RGB0..1; phase +/-1024 reduced modulo1. Repeat affects brick/tile cells
+and wood bands, not fixed noise/rust octaves. No mipmaps or analytic antialiasing;
+undersampled mortar/noise can alias. Use repeat-addressed sampling. Neighbouring
+pixel centres across a repeat boundary are different samples of a periodic field.
+Bakes are async and abortable; incomplete resources are released on failure, abort,
+disposal or loss. A replacement device requires a new baker. Outputs are owned;
+baker disposal destroys retained outputs. No CPU pixel loop or Wasm is involved.
+44,415 GPU channel checks match an independent generated oracle within one RGBA8
+quantization step. Integer phase translations are byte exact; one-texel shifts
+cross both texture edges. Real WebGPU loss, in-flight abort/disposal and replacement
+are tested. Numerical and lifecycle controls are stand-ins. External reference is
+limited to a calibrated row-offset measurement from Lefebvre/Poulin 2000 Fig.1(d),
+39/88 pitch with two source pixels of uncertainty, plus GPU raster quantization.
+Original PDF/JPEG downloaded for measurement, never redistributed. No external
+colour reconstruction, wood/rust realism, cross-device bytes or speed claim.
+Entry JavaScript plus shader is 2,832 B gzip (new ceiling 2,989 B); no lazy asset.
+Core plus stage remains 23,797 B gzip, strictly below 25,000 B.

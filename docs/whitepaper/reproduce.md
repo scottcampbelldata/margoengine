@@ -1017,3 +1017,21 @@ stage-viewer-compat.json; the committed batch-56-frame.json preserves both devic
 Build with npm run build:mesh --workspace @margoengine/voxel-pathtracer, then npm run build:packages. Run npm run test:mesh-kernel --workspace @margoengine/voxel-pathtracer and the voxel-pathtracer package tests. Run node scripts/gpu-lock.mjs run --owner=codex-99 --max=10 --wait-max=5 -- npm run test:gpu:mesh --workspace @margoengine/voxel-pathtracer for native and compatibility analytic paths, predicate arithmetic, device replacement and raster restoration. The generated-scene record is results/batch-99-mesh-20261109.json. No downloaded reference asset is involved.
 
 node packages/voxel-pathtracer/tests/mesh-build-ab.mjs runs the CPU-only scalar/Rust paired diagnostic and writes test-results/voxel-pathtracer-mesh-build-ab.json. Both builders emit the same 524,284 words for 16,384 triangles; every timed output is compared byte for byte. Alternating rounds use per-round minima. This is a loaded-machine implementation diagnostic, not a quiet release or rival benchmark.
+
+### Batch 68 job 6: tileable GPU textures
+
+`npm test --workspace @margoengine/procedural` runs hostile settings and the
+allocation, shader-error, queue-failure, cancellation/disposal/loss controls on
+stand-ins. `npm run test:gpu --workspace @margoengine/procedural` compiles the
+actual shader and asserts 44,415 numerical channel values, full-period identity,
+one-texel phase shifts across both edges, real loss, in-flight cancellation and
+disposal, fresh-device baking and linked native WebGL2 refusal. One RGBA8 step is
+the comparison bound; no time budget or numerical tolerance was loosened.
+For the external structural reference, download the PDF identified and hashed in
+packages/procedural/test/fixtures/textures/structural-reference.json. The fourth
+embedded raster on PDF page2 is Figure1(d), 256-square. At y38 joint centres are
+34.5,122.5,210.5; at y68 they are83.5,172.5. The pitch88 and nearest offset39 are
+our measurements with two source pixels uncertainty. The GPU repeats this supplied
+stagger and compares measured output joints within source and raster quantization.
+This proves calibrated structure only, not image reconstruction or colour/wood/rust
+quality. Other controls remain generated stand-ins (LIM-639). No speed measured.

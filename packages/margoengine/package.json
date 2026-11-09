@@ -2162,6 +2162,10 @@
       "types": "./dist/procedural/sdf.d.ts",
       "import": "./dist/procedural/sdf.js"
     },
+    "./procedural/textures": {
+      "types": "./dist/procedural/textures.d.ts",
+      "import": "./dist/procedural/textures.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

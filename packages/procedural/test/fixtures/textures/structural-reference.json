@@ -1,0 +1,12 @@
+{
+  "source": "https://graphicsinterface.org/wp-content/uploads/gi2000-12.pdf",
+  "title": "Analysis and Synthesis of Structural Textures",
+  "authors": "Laurent Lefebvre and Pierre Poulin, Graphics Interface 2000",
+  "pdfSha256": "01090e3c86be4d7172fe22bcacaccb061fe9d5bfc14478fc8394da2553e7fd29",
+  "figure": "1(d), fourth embedded raster on PDF page 2, native 256 x 256 pixels",
+  "method": "Read mortar joint centres on two adjacent brick rows from the downloaded original JPEG stream. At y=38: x=34.5,122.5,210.5. At y=68: x=83.5,172.5. Pitch from the first row is 88 pixels; nearest phase distance is 39 pixels. Allow two source pixels for the finite-width, JPEG-encoded joints. These are our numerical measurements, not reproduced paper images or code.",
+  "pitchPixels": 88,
+  "nearestRowOffsetPixels": 39,
+  "uncertaintyPixels": 2,
+  "scope": "Structural relative row offset only. Not a colour, synthesis quality, wood anatomy, rust material or image reconstruction ground truth. Other GPU numerical controls are generated stand-ins. Original paper and extracted image remain outside shipped files."
+}

@@ -448,3 +448,64 @@ identical on WebGPU and WebGL2, including after real device/context loss.
 native tests. The external Khronos Box proves all eight sharp corners, planar
 surface, winding, closed edges and volume; sphere/CSG/extreme controls are generated
 stand-ins. No production model, render-quality or timing claim (LIM-632).
+
+## Tileable GPU textures
+
+`@margoengine/procedural/textures` bakes periodic noise, bricks, tiles, wood-like
+bands and rust-like patches directly into owned RGBA8 GPU textures. It accepts a
+WebGPU device or a Margo engine with a live `gpu`; native WebGL2 gives code
+`unsupported` with a help link. This entry compiles one compute pipeline and uses
+no CPU pixel loop, asset fetch or Wasm.
+
+```ts
+import { createTextureBaker } from '@margoengine/procedural/textures';
+const adapter = await navigator.gpu.requestAdapter();
+if (!adapter) throw new Error('WebGPU adapter required');
+const device = await adapter.requestDevice();
+{
+  using baker = await createTextureBaker(device);
+  using baked = await baker.bake({ pattern: 'bricks', width: 128, height: 128 });
+  console.log(baked.texture.format, baked.width, baked.height);
+}
+device.destroy();
+await device.lost;
+```
+
+| Bake option | Default | Limits |
+| --- | --- | --- |
+| pattern | bricks | noise, bricks, tiles, wood, rust |
+| width, height | 256 each | Integers 16..2048, at most the device maxTextureDimension2D |
+| seed | 1 | Unsigned 32-bit integer, including zero |
+| repeat | [4,8] | Integer columns/rows 1..64; bricks require even rows to repeat the alternate offset |
+| detail | 0.2 | 0..1; per-texel brick/tile variation, wood phase warp, rust threshold softness; ignored by noise |
+| grout | 0.08 | 0..0.45, half mortar width as a cell fraction; bricks/tiles only |
+| stagger | 0.5 | 0..1, alternate brick-row horizontal offset as a cell fraction; bricks only |
+| color | [0.55,0.2,0.08] | Primary linear RGB, each 0..1 |
+| secondary | [0.15,0.12,0.1] | Mortar/secondary linear RGB, each 0..1 |
+| offset | [0,0] | UV phase, finite within +/-1024; integer parts discarded |
+| signal | absent | Cancels compilation/bake waits; caller's exact reason is preserved |
+
+All presets use the same caller-controlled palette. `noise` is four-octave periodic
+value noise with lattice periods 4,8,16,32 and weights 8,4,2,1, quintic interpolation
+and an integer seed hash. Brick/tile mortar is a hard threshold without filtering.
+Wood is periodic wavy longitudinal bands; rust is thresholded periodic noise. These
+are stylized patterns, without wood anatomy, corrosion simulation or PBR maps.
+`repeat` controls brick/tile cells and wood bands; noise/rust use fixed octave
+periods. Bake enough pixels per cell to avoid aliasing. No mipmaps are generated.
+The format is linear `rgba8unorm`, alpha 1, with TEXTURE_BINDING, STORAGE_BINDING and
+COPY_SRC. Use a sampler with repeat addressing on both axes. Pixel centres on
+opposite edges need not match: the underlying function repeats continuously, and
+the adjacent pixel across a repeat boundary is the next sample of that function.
+
+`bake()` resolves after submission completes. Each output is owned and disposable;
+baker disposal destroys retained outputs and cancels pending work. Abort, disposal,
+allocation failure and device loss clean up incomplete outputs. Create a fresh
+baker on a replacement device. The entry does no work on import. Validation and
+compile/driver failures use coded errors with help links and retain original causes;
+shader errors name their source line. CPU lifecycle controls use stand-ins, while
+the actual shader, 44,415 pixel/channel checks, seam-crossing phase shifts, real
+abort/loss/disposal and replacement run on WebGPU. Native WebGL2 explicitly refuses.
+The downloaded Lefebvre/Poulin 2000 figure 1(d) supplies a measured running-bond
+offset for a calibrated structural check only. Generated numerical controls remain
+stand-ins; no photograph reconstruction, wood/rust realism, material quality,
+cross-device byte identity or timing is claimed (LIM-639).
