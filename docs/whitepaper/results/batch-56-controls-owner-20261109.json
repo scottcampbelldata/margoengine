@@ -185,5 +185,13 @@
     "Initial new-wrapper field type rejected registerPasses; preserved typed structural assignment via a local object, then build passed.",
     "Parent probe label change introduced a test parse error; corrected and retained failed diagnostic log.",
     "Expanded parent expected-count assertion assumed 13 failures; actual receipt proves 70 pass/11 fail, including passing initialization controls. No product assertions were changed."
-  ]
+  ],
+  "rebasedFix": "456a2bb2a",
+  "landingBase": "60bb86ab6",
+  "rebase": {
+    "controlsSourceAndTestsIdentical": true,
+    "upstreamChanges": "stage optional diagnostics and documentation",
+    "gpuRepeated": false,
+    "fullVerifyRepeated": false
+  }
 }
