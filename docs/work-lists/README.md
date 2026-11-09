@@ -24,6 +24,7 @@ On another computer, clone the repository first and check that the GPU tests run
 
 ## Staying out of each other's way
 
+- Several machines work these lists at once (Scott, 2026-11-10). Before starting each row: git fetch and re-read the list file on origin/main; skip any row whose status names another machine (for example `list 1 (dev PC)`), and claim your row with a one-line status push before writing code. Before fixing a failure in a package another machine is building, check origin/main and its recent log for a fix first; if a fix is already there, use it instead of writing a second one.
 - Touch only your stream's packages, plus the shared docs each job updates. Never touch `packages/physics`, `packages/physics2d`, `packages/ragdoll`, `packages/voxel/src/physics.ts` or `packages/core`. A core need goes to Scott.
 - More accounts mean more pushes. When main moves during a landing, rebase and follow the short rule in `how-to-work.md`; do not rerun the full check again and again.
 - Claim numbers in `docs/whitepaper/claims.md` collide most often. Take the number from the file after every rebase and check for duplicates before pushing.

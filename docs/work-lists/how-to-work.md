@@ -16,6 +16,7 @@ Missing something? (Scott, 2026-11-06) A test file: download an open-source, fre
 A job is DONE only when the feature works as its name promises without something the user must supply, unless the job says so. A claim reads PROVEN only on a real file, device or tool; stand-in proof must say stand-in.
 
 Rules:
+- Several machines work these lists at once (Scott, 2026-11-10). Before starting each row: git fetch and re-read the list file on origin/main; skip any row whose status names another machine (for example `list 1 (dev PC)`), and claim your row with a one-line status push before writing code. Before fixing a failure in a package another machine is building, check origin/main and its recent log for a fix first; if a fix is already there, use it instead of writing a second one.
 - Keep every script, log and temp file inside your own worktree (a `.lane/` folder). Never write anything into C:DevelopmentProjects itself or the shared scratchpad, and never make a new folder beside the worktrees (Scott, 2026-11-06: about 200 leftovers were dumped there and he will not accept it again). Delete your `.lane/` scratch files you no longer need when the batch ends.
 - Never run a broad kill such as pkill by script name: other lanes run the same scripts. Kill only process ids you started.
 - Other lanes run at once on other packages. Touch only your scope plus shared docs.
