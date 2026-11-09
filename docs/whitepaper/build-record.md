@@ -3969,12 +3969,23 @@ S2/IES validation: lint and hygiene pass; full verify 13,318 pass, zero failures
 
 ## Missing-input continuation: USDZ source investigation (2026-11-09)
 
-The static introduction remains unproved: BoxAnimated needs the animation entry; the old
+The initial static-introduction probes did not fit: BoxAnimated needs the animation entry; the old
 DamagedHelmet USDZ has a duplicate sourceColorSpace declaration and an NC source grant;
 NormalsTextureBiasAndScale requires subdivision; RoughnessTest has non-planar polygons.
 No unsuitable alias or README exception was removed. The misleading default subdivision-cage
 sentence is corrected to the reader's existing strict boundary, covered by the existing
 usdz.test.js unsupported-feature regression. No parser or renderer source changed, and
-no new rendering or speed claim is made. P06 remains open; its outside-tool conformance
-chain still needs the upload/readback rerun. Its solid-colour scope does not establish
-production-texture quality.
+no new rendering or speed claim was made by those probes. The later supplied-mip rerun
+closes P06 upload conformance with all 35 images exact; solid-colour patterns still do
+not establish production-texture quality.
+
+## Static USDZ introduction rerun (2026-11-09)
+
+The original README introduction executes on the complete, published Blender 5.1
+BoxTextured USDZ from Needle. Its USDC layer and PNG remain in the shared outside
+cache; the required manifest pins 8,080 bytes and its SHA-256, with Cesium's 2017
+CC-BY-4.0/trademark grant. The static reader needs no extension for this input.
+A regression fails before the explicit alias and checks its archive hash, one mesh,
+36 vertices, 12 triangles, UVs, PNG and zero issues. The missing-file exception is
+removed. Composition remains a separate open example; this is execution evidence,
+not visual-quality or Apple Quick Look proof. No parser/render code changed.

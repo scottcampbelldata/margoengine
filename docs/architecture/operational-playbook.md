@@ -2438,3 +2438,13 @@ Root/custom capture reads now derive full-target UVs from fragment positions rat
 A shared package-local format-domain check rejects integer/depth outputs and non-resolvable 32-bit float MSAA before live source updates, allocation or progress changes, and before frozen-frame capture allocation. Real-device tests accept baseline normalized/float output formats at 1x/4x, and reject invalid domains without a GPU validation error. Custom WGSL interface tests reject reachable extra textures/samplers/uniforms/storage, accept unused declarations and wrapper-global access, and compile/dispose a high-work loop without dispatch. This validates a resource interface, not execution safety. Trusted source remains mandatory; no timeout or hostile-dispatch safety claim.
 
 The requested scatter audit inspected inclusive far rejection, near/middle selection, fade bands, tileDistance's conservative f32/flush bounds, uploaded LOD representation and ordered compaction/page/ring capacities. Existing fixes/tests cover these cases; no additional defect was found. All 72 scatter unit cases pass, including tiles-budget.test.js. No scatter code or budget changed. Generated fixtures and one RTX A6000 only, no new throughput claim. Review fixes fit existing entry budgets; core and stage remain unchanged.
+
+### Static USDZ sample: section 5 evidence (2026-11-09)
+
+The original introduction now runs on the complete outside Blender 5.1 BoxTextured
+USDZ with its archived PNG. Required external inputs total 353; README aliases
+share that cache and validate the pinned SHA-256 before serving. The regression
+checks one mesh, 36 expanded vertices, 12 triangles, UVs, texture and zero issues.
+No parser, rendering, core or stage code changed. This closes the introduction's
+missing-file execution gap only; composition, reset-stack data, physical Quick
+Look and production image quality remain separate gaps.

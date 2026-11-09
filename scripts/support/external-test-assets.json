@@ -2115,5 +2115,13 @@
     "size": 336,
     "sha256": "2544d943418052f8332a3ac0bc76a859093710dfaf23faef288bdd64f8dc1d48",
     "licence": "Apache-2.0 (CesiumJS standard test data)"
+  },
+  {
+    "file": "usdz-static/BoxTextured.blender.usdz",
+    "url": "https://asset-explorer.needle.tools/downloads/BoxTextured.glb.blender.usdz",
+    "size": 8080,
+    "sha256": "b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab",
+    "licence": "CC-BY-4.0 with trademark limitations (Cesium 2017 BoxTextured), hosted Blender 5.1 USDZ conversion by Needle; no engine code",
+    "licenceUrl": "https://asset-explorer.needle.tools/BoxTextured"
   }
 ]

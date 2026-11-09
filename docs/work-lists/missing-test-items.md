@@ -202,7 +202,7 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | text/readme-prebuilt-atlases-bitmapfont-5ec840 | /fonts/inter.json | sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL | FIXED by lane Q: supplied Margo-generated Source Sans 3 ASCII SDF JSON/PNG, SIL OFL 1.1; README uses source-sans.json; exception removed, scoped run 40/40 |
 | tonemap/readme-margoengine-tonemap-5802b3 | /grade.cube | sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header | Pending file selection, provenance and rerun |
 | usdz/readme-composition-fbebfe | /toy_car.usdz, /Kitchen_set/Kitchen_set.usd, /model.usd | sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404 | Pending file selection, provenance and rerun |
-| usdz/readme-margoengine-usdz-087124 | /model.usdz | sample: LoaderError: load: request for /model.usdz returned HTTP 404 | Pending file selection, provenance and rerun |
+| usdz/readme-margoengine-usdz-087124 | /model.usdz | sample: LoaderError: load: request for /model.usdz returned HTTP 404 | Passed with complete published Blender 5.1 BoxTextured USDZ, CC-BY-4.0 with trademark limitations, 8,080 bytes; static reader plus archived PNG, no extensions; exception removed |
 | voxel-edit/readme-voxel-files-657e4f | /models/robot.qb | sample: RangeError: QB file holds 1634476140 matrices, over 4096; split the file | Pending file selection, provenance and rerun |
 | voxel/readme-bevels-and-baked-light-render-e03f31 | stone.png | sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64 | Pending file selection, provenance and rerun |
 | voxel/readme-lighting-effects-day-and-night-w-9389c7 | stone.png, /studio.hdr | sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64 | Pending file selection, provenance and rerun |
@@ -473,7 +473,7 @@ S2/IES landing validation: full verify passes 13,318 tests with zero failures/sk
 
 ## Further USDZ input investigations (2026-11-09)
 
-The claimed USDZ introduction remains open; no alias or known exception was removed.
+Those initial USDZ probes did not fit the introduction; the later static USDZ input section records its closure.
 At usd-wg/assets 091bb5c6f8eb665ad4cf9d6c10025cecc07eda88, the existing CC-BY-4.0
 BoxAnimated sample correctly requires the animation entry, which the static introduction
 does not import. A fresh DamagedHelmet.usdz download is 4,993,564 bytes, SHA-256
@@ -490,12 +490,12 @@ none and convex planar polygons. Its README incorrectly promised cages without o
 entries; that sentence now matches the existing strict reader and the unmodified subdivision
 rejection regression in packages/usdz/tests/usdz.test.js. No reader behaviour changed.
 
-P06 remains open and claimed by this lane. The outside arraytex_7_mipmap_reference_u.ktx2
+That investigation left P06 open; the later outside-tool supplied mip proof closes upload conformance. The outside arraytex_7_mipmap_reference_u.ktx2
 has five tool-written levels and seven layers, but every image checked in layer zero is
 solid-colour. It is a valid outside-tool conformance candidate; GPU upload/readback remains to run. Existing local
 cube-native files were produced here by KTX-Software from real photographs and have independent
 ktx-extract hashes, but they are not newly downloaded outside-authored chains. No GPU upload
-proof or P06 closure is claimed. A future pass on the outside solid-colour chain must retain its conformance-pattern scope; it would not establish production-texture quality.
+proof or P06 closure was established by that investigation. The later pass retains its conformance-pattern scope; it does not establish production-texture quality.
 
 USDZ investigation validation: lint and hygiene pass; full verify has 13,335 tests with zero failures/skips (297.9 s). All 242 USDZ package tests and the real browser checks pass (16 shader modules, zero errors). README execution is 6/8, retaining the original two known exceptions and zero fresh failures. The excluded NC archive and extracted layer were removed from this lane after inspection; only the source/hash record remains.
 
@@ -520,3 +520,25 @@ The descriptor oracle now follows the documented backing texture and alternate v
 P06 landing validation: full verify 13,356 passed, zero failures/skips (299.2 s); 402 material tests, the default material GPU suite (96 shader modules, zero errors), the supplied-mip proof and all 29 material README examples pass. Lint and hygiene pass. No exports or runtime source changed.
 
 Lane C next claims all five remaining splats README exception rows (capture.splat, capture.ply, capture.spz and capture.sog); the existing USDZ introduction claim remains active. Physics stays held.
+
+## Static USDZ README input (2026-11-09)
+
+The original introduction now loads Needle's published Blender 5.1 conversion of
+Cesium's BoxTextured, CC-BY-4.0 with trademark limitations. Its unmodified 8,080-byte
+USDC/PNG archive is pinned by SHA-256 in the required outside manifest, now 353 files.
+Both fetch commands use one shared cache and source record. Explicit external README
+aliases validate required bytes and their hashes, rather than falling through to a
+file with the same extension. The new regression fails without this mapping and
+checks the exact archive, 36 expanded vertices, 12 triangles, UVs and archived PNG.
+The original browser introduction passes; its exception is removed, leaving 57.
+The composition row remains open. No parser, material or renderer behaviour changed.
+
+P25 source investigation now also searched all 2,234 nonempty testenv USDA files
+below 80 KB and 219 .usd data files below that bound at OpenUSD
+2d39590aac6dde875507d2a334ff6e5b9dc05fe1. The only resetting USDA still has
+Cone/Sphere, no Mesh; no mesh-bearing resetting ASCII .usd candidate was found.
+The first acquisition probe hit a server 501 for a deliberately empty parser-test
+file; nonempty data was then searched. No implementation files were read. This
+is a source-search result, not a reset-stack pass or a hardware blocker.
+
+Static USDZ landing validation: full verify passes with zero failures/skips (270.5 s), lint and hygiene pass; all 242 USDZ tests, 34 root harness/asset tests, USDZ GPU checks (16 shader modules, zero errors) and 7/8 original USDZ examples pass, retaining only composition and no fresh failures. Both download commands validate the same 353 required inputs. The introduction regression fails before the alias. No exports changed.

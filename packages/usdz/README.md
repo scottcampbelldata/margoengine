@@ -17,6 +17,12 @@ engine.start();
 // model.destroy() detaches its PBR plugin and frees meshes/textures.
 ```
 
+For the executable README check, `/model.usdz` maps to Needle's published Blender 5.1 conversion
+of Cesium's BoxTextured sample (CC-BY-4.0 with trademark limitations). Run
+`node scripts/fetch-readme-assets.mjs` from the repository root to fetch its hash-checked USDZ into
+the shared external cache. The example exercises the static reader, including its archived texture;
+it does not require an animation or subdivision extension.
+
 `parseUSDA(textOrBytes)`, `parseUSDC(bytes)`, and async `parseUSDZ(bytes)` return a `USDAsset` with typed mesh streams, a glTF document/buffers, and async `create(engine)` to attach PBR rendering. `loadUSDZ` fetches with streaming byte bounds and creates the model. Malformed, unsupported or oversized input throws a `LoaderError` (`error.format === 'USD'`; `error.code` is `syntax`, `unsupported` or `limit`). Options: `maxBytes`, `maxVertices`, `maxTriangles`, `maxDepth`, `signal`. Defaults: 64 MiB, one million expanded vertices/triangles, depth 32. The engine grows its store when the hierarchy plus the PBR model root exceed the initial capacity. Texture ownership passes to the PBR model and is released on destruction or failed setup.
 
 Supports stored and Deflate ZIP entries with CRC checks, static ASCII/binary hierarchies, Y/Z up and authored units, ordered translate/scale/rotateXYZ/affine transforms, triangles and convex planar polygons, left-handed winding, authored normals and vertex/face-varying UVs including indices, inherited material bindings, and constant UsdPreviewSurface diffuse/roughness/metallic factors. UsdUVTexture diffuse and normal maps are decoded from the archive. A texture's `wrapS`/`wrapT` (`repeat`, `mirror`, `clamp`; `black` and `useMetadata` fall back to repeat) become a glTF sampler, and a `UsdTransform2d` on its `st` becomes `KHR_texture_transform` (same angle and sign, in radians). `mesh.uvs` holds `st` as authored (origin at the image's bottom left); the glTF document holds them as uvs (s, 1 - t). Separate roughness and metallic maps are packed into glTF's green/blue channels during creation.

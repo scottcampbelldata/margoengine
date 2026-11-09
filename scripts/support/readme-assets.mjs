@@ -2,7 +2,8 @@
 import { createReadStream, readFileSync, statSync } from 'node:fs';
 import { delimiter, dirname, resolve } from 'node:path';
 import { requiredFixture } from './required-fixture.mjs';
-import { readmeCache } from '../fetch-readme-assets.mjs';
+import { readmeCache, readmeExternalFiles } from '../fetch-readme-assets.mjs';
+import { externalAssetRoot, requireExternalAssets } from './external-test-assets.mjs';
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
@@ -70,7 +71,9 @@ for (const { file } of JSON.parse(readFileSync(new URL('./readme-companions.json
 }
 
 /** A selected required alias fails on absence/LFS; it never falls through to unrelated bytes or HTML. */
-export function readmeFixture(pathname, base = resolve(import.meta.dirname, '../..'), cache = readmeCache()) {
+export function readmeFixture(pathname, base = resolve(import.meta.dirname, '../..'), cache = readmeCache(), externalRoot = externalAssetRoot()) {
+  const external = readmeExternalFiles[pathname];
+  if (external) return { path: requireExternalAssets(external, { root: externalRoot }) };
   const tracked = README_FILES[pathname],
     downloaded = README_DOWNLOADS[pathname];
   if (!tracked && !downloaded) return undefined;

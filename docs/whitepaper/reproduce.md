@@ -952,3 +952,14 @@ claim. Durable record: `results/mips-real-tool-20261109.json`.
 ### Batch 76 independent review corrections
 
 Run npm test --workspace @margoengine/transitions, then node scripts/gpu-lock.mjs run --owner=codex-76fix --max=8 --wait-max=10 -- node packages/transitions/scripts/test-gpu.mjs. The runner includes viewport-browser.js: compare patterned 8x4 captures with a no-transition baseline inside the right-half viewport and throughout a stacked inset/scissor target, for four built-in kinds/custom/mask at idle/0/0.5/1, 1x/4x. Original code fails at wipe idle 1x pixel 4,0 red (0 versus 127). The live integer-format regression fails against the original code because rgba8uint does not throw. Live real-device tests check integer/depth/non-resolvable float refusal with unchanged source updates/progress and accept baseline float/normalized formats. Additional resource-interface probes compile only; the costly-loop shader is never dispatched. Run node --test --test-timeout=60000 packages/scatter/test/*.test.js for the ring/f32/capacity audit's existing regression suite. Evidence is correctness on generated inputs, not throughput or hostile-shader execution safety.
+
+### Static USDZ README input
+
+Run `node scripts/fetch-readme-assets.mjs` (or the required external downloader),
+then `npm run check:readme-run -- --packages=usdz` and
+`node --test --test-timeout=120000 tests/readme-assets.test.js`. The /model.usdz
+alias requires the published Blender BoxTextured conversion, including its PNG.
+Its 8,080-byte SHA-256 and licence are in scripts/support/external-test-assets.json.
+Missing/LFS/changed bytes fail with the external fetch command. The regression
+asserts 36 expanded vertices and 12 triangles, not a visual-quality metric. The
+composition example's separate known exception remains.

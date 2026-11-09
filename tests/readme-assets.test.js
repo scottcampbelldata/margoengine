@@ -13,6 +13,23 @@ import {
   serveSample,
 } from '../scripts/support/readme-assets.mjs';
 import { parseIES } from '../packages/clustered/dist/ies.js';
+import { parseUSDZ } from '../packages/usdz/dist/index.js';
+import { createHash } from 'node:crypto';
+
+test('the static USDZ introduction resolves the complete outside Blender box with its archived texture', async () => {
+  const fixture = readmeFixture('/model.usdz');
+  assert.ok(fixture, 'The USDZ introduction needs its explicit outside static sample');
+  const bytes = readFileSync(fixture.path);
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    'b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab');
+  const asset = await parseUSDZ(bytes);
+  assert.equal(asset.meshes.length, 1);
+  assert.equal(asset.meshes[0].positions.length, 108);
+  assert.equal(asset.meshes[0].indices.length, 36);
+  assert.equal(asset.meshes[0].uvs.length, 72);
+  assert.deepEqual([...asset.entries.keys()], ['BoxTextured.glb.blender-5-1.usdc', 'textures/Image_0.png']);
+  assert.deepEqual(asset.issues, []);
+});
 
 test('the IES README resolves the complete published photometric profile and its candela values', () => {
   assert.equal(README_FILES['/downlight.ies'], 'packages/gltf-pro/tests/fixtures/lights/LightProfile.ies');
@@ -36,6 +53,7 @@ test('explicit README formats never become another extension sample, HTML, or an
     assert.equal(readmeFixture('/texture.ktx2', base).path, path);
     assert.equal(readmeFixture('/unmapped.ktx2', base), undefined);
     assert.throws(() => readmeFixture('/sims/smoke.vdb', base, base), /fetch-readme-assets/);
+    assert.throws(() => readmeFixture('/model.usdz', base, base, base), /Missing Required test fixture.*BoxTextured.*fetch-skip-assets/);
     assert.ok(README_DOWNLOADS['/sims/smoke.vdb'].endsWith('.vdb'));
   } finally {
     rmSync(base, { recursive: true, force: true });

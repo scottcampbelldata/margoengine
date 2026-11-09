@@ -3,6 +3,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fetchFixture } from './support/fetch-fixture.mjs';
+import { externalAssets, externalAssetRoot } from './support/external-test-assets.mjs';
+
+// Shared required assets keep one cache and one source/hash record for verify and README execution.
+export const readmeExternalFiles = { '/model.usdz': 'usdz-static/BoxTextured.blender.usdz' };
 
 export const readmeCache = () =>
   resolve(process.env.MARGO_README_SAMPLES ?? resolve(import.meta.dirname, '../../engine-bench/readme-samples'));
@@ -61,6 +65,12 @@ readmeDownloads.push({
 });
 
 export async function fetchReadmeAssets() {
+  for (const file of Object.values(readmeExternalFiles)) {
+    const item = externalAssets.find((asset) => asset.file === file);
+    if (!item) throw new Error(`Missing required README external source: ${file}`);
+    await fetchFixture(item.url, resolve(externalAssetRoot(), file), item.sha256, { maxBytes: item.size });
+    console.log(`README shared sample: ${file} (${item.licence})`);
+  }
   for (const item of readmeDownloads) {
     await fetchFixture(item.url, resolve(readmeCache(), item.local), item.sha256, { maxBytes: item.size ?? 32 << 20 });
     console.log(`README sample: ${item.local} (${item.licence})`);

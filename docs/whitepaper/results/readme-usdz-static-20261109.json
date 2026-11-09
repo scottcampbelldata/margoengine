@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-09",
+  "source": {
+    "url": "https://asset-explorer.needle.tools/downloads/BoxTextured.glb.blender.usdz",
+    "sha256": "b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab",
+    "size": 8080
+  },
+  "licence": "CC-BY-4.0 with trademark limitations, Cesium 2017 BoxTextured; hosted Blender 5.1 conversion by Needle",
+  "licenceUrl": "https://asset-explorer.needle.tools/BoxTextured",
+  "regression": "tests/readme-assets.test.js: static USDZ introduction; fails before explicit alias",
+  "assertions": {
+    "meshes": 1,
+    "expandedVertices": 36,
+    "triangles": 12,
+    "uvValues": 72,
+    "archiveEntries": [
+      "BoxTextured.glb.blender-5-1.usdc",
+      "textures/Image_0.png"
+    ],
+    "issues": []
+  },
+  "readmeResults": [
+    {
+      "id": "usdz/readme-margoengine-usdz-087124",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-composition-fbebfe",
+      "result": "fail",
+      "place": "page",
+      "reason": "LoaderError: load: request for /toy_car.usdz returned HTTP 404"
+    },
+    {
+      "id": "usdz/readme-skeletons-and-blend-shapes-522a8c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-time-sampled-transforms-and-visi-afb7d9",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-subdivision-holes-and-concave-po-3036f5",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-lights-and-cameras-b6deef",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-reset-transform-stacks-889a7c",
+      "result": "pass",
+      "place": "page"
+    },
+    {
+      "id": "usdz/readme-materialx-e88fe1",
+      "result": "pass",
+      "place": "page"
+    }
+  ],
+  "scope": "Static browser introduction execution, not production quality, composition, reset stacks, or physical Apple Quick Look"
+}

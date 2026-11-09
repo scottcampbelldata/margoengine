@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'scripts/support/external-test-assets.json',
+    'required outside standard test inputs, each with source, size, SHA-256 and licence; never shipped. Includes the 8080-byte BoxTextured Blender 5.1 USDZ conversion hosted by Needle at https://asset-explorer.needle.tools/downloads/BoxTextured.glb.blender.usdz, SHA-256 b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab. Original BoxTextured by Cesium, 2017, CC-BY-4.0 with trademark limitations (https://asset-explorer.needle.tools/BoxTextured). Only the converted standard model is downloaded; no engine code or conversion implementation is read or copied',
+  ],
+  [
     'packages/procedural/test/fixtures/sdf/NOTICE.md',
     'Dual-contouring reference: unmodified Khronos glTF Sample Assets Box.glb, copyright 2017 Cesium, CC-BY-4.0; source, licence and SHA-256 in the linked notice. Test-only standard asset, never shipped.',
   ],

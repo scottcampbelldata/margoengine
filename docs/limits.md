@@ -1491,3 +1491,11 @@ Custom WGSL must be trusted. Validation checks compilation and the reachable res
 Frozen-frame and live output requires a valid normalized or float color render attachment. Supported formats: r8unorm, rg8unorm, rgba8unorm, rgba8unorm-srgb, bgra8unorm, bgra8unorm-srgb, r16float, rg16float, rgba16float, rgb10a2unorm; feature-dependent r8snorm, rg8snorm, rgba8snorm, r16unorm, r16snorm, rg16unorm, rg16snorm, rgba16unorm, rgba16snorm, rg11b10ufloat require enabled WebGPU format capabilities. r32float/rg32float/rgba32float require 1x engine sampling because the 4x path needs resolve support. Output texture shape/usage limits still apply. Live captures remain RGBA8; float output does not recover HDR source data. Integer/depth rejection, unchanged source updates/progress, and baseline normalized/float acceptance are tested in live.test.js and live-browser.js. Capture-side validation shared by built-in/custom/mask is tested in transitions.test.js. See the [WebGPU capability table](https://www.w3.org/TR/webgpu/#plain-color-formats) for device feature requirements.
 
 Review-fix entry measurements: root 4478 B, custom 5207 B, mask 5429 B, live 2638 B min+gzip, all within unchanged entry budgets. Core plus stage remains 23797 B.
+
+### Static USDZ README execution evidence (2026-11-09)
+
+The introduction now executes on an unmodified 8,080-byte published Blender 5.1
+BoxTextured USDZ (USDC plus PNG), with one mesh, 36 expanded vertices and 12 triangles.
+This proves the static introduction loads that complete standard sample. It does
+not establish arbitrary production USDZ, visual quality, reset-stack evidence or
+physical Apple Quick Look behaviour. The composition example remains open.
