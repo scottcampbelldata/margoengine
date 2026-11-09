@@ -1,5 +1,27 @@
 # Design envelope
 
+## Batch 134 corpus, upload and memory limits
+
+[Current combined-Wasm evidence](whitepaper/results/batch-134-corpus-uploads-memory.json)
+contains 51 real primary seeds / 17,908 historical-target calls, plus 32,784
+new scalar ABI calls and 628 authored-container calls. Complete missing-target
+and public integration fuzz proof remains open. The same 1,296 scalar images
+round-trip 131,581,656 compressed bytes on real RTX A6000 WebGPU. This is
+compressed-byte transport; no sampled-pixel, full mip-chain texture or public
+loader acceptance. Native WebGPU exposes no ETC2/EAC support on this adapter;
+993 such images remain unproven rather than passed.
+
+Fresh old/new processes retain all outputs on all 173 accepted scalar pairs.
+Maximum Wasm high water is 17,170,432 old / 10,747,904 new bytes, with no
+per-pair Wasm loss. Maximum process RSS is 112,460 old / 113,708 new KiB;
+25 per-pair RSS losses remain open. RSS includes runtime/input/output and
+allocator behavior; it is not just Wasm pages or peak-live allocations. The
+JS adapter materializes a full Zstd level then copies it into Wasm, adding
+4,194,304 bytes of duplicate raw-level storage on the diagnosed control.
+No forced GC, reduced work, discarded output, tolerance or timing excuse.
+The same-payload uncompressed diagnostic removes that control's RSS loss,
+with 12 exact old and 12 exact new hashes, but is not a shipped fix.
+
 ## Batch 134 scalar reference ruling (2026-11-09)
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

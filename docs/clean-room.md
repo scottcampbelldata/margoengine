@@ -1,5 +1,35 @@
 # Clean room
 
+## Batch 134 corpus, uploads and memory continuation
+
+Research before instrumentation compared the retained fuzz papers: Patrice
+Godefroid, Adam Kiezun and Michael Y. Levin, *Grammar-based Whitebox Fuzzing*
+(2008), abstract/introduction, https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tr-2007-154.pdf;
+George Klees, Andrew Ruef, Benji Cooper, Shiyi Wei and Michael Hicks,
+*Evaluating Fuzz Testing* (2018), introduction and sections5-6,
+https://arxiv.org/abs/1808.09700, with normative KTX2/UASTC invalid ranges,
+mode codes and .basis CRC rules. New probes combine broken framing,
+framing-preserving inputs, deterministic random blocks and post-failure
+recovery. No coverage-guided/statistical/speed claim or companion code use.
+
+For GPU transport, compared W3C GPU for the Web Working Group (editors Kai
+Ninomiya, Brandon Jones and Jim Blandy), *WebGPU*, CRD 15 September2026,
+https://www.w3.org/TR/2026/CRD-webgpu-20260915/, selected texture block extent,
+texel-copy/layout, writeTexture and format-feature rules, with Khronos Data
+Format1.4 BC4/BC5/ETC2/EAC storage. For memory, consulted Node.js project,
+*Process API* (2026), https://nodejs.org/api/process.html#processresourceusage,
+maxRSS/RSS sections, and W3C WebAssembly WG, *JavaScript Interface* (2026),
+https://webassembly.github.io/spec/js-api/, memory-buffer/grow excerpts.
+These are scoped reviews, not full-standard certification. RSS and monotonic
+Wasm linear memory are distinct; each fresh process retains full output.
+
+The prebuilt remains an outside-folder black box, pinned by its Wasm hash.
+The normalized memory diagnostic changes only KTX2 supercompression/storage,
+retaining exactly the same UASTC blocks and 12 old plus 12 new payload hashes;
+no old endpoints, optimizer or implementation was inferred. No foreign
+implementation source, wrapper source, disassembly or companion code opened.
+[Full evidence and pending RSS losses](whitepaper/results/batch-134-corpus-uploads-memory.json).
+
 ## Batch 134 scalar ruling and byte-fitter restoration (2026-11-09)
 
 Scott's written "Do recommend" ruling in the batch brief authorizes per-file

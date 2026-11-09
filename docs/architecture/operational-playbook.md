@@ -1,5 +1,25 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: batch 134 current-Wasm bounded campaigns
+
+[Corpus, hostile input, uploads and memory](../whitepaper/results/batch-134-corpus-uploads-memory.json)
+pin the scalar-approved combined Wasm. All 51 primary seeds retain their
+historical target controls through 17,908 decode calls / 2,856 mutations;
+new scalar-target probes add 32,784 direct ABI and 628 authored-container
+calls. Real RTX A6000 WebGPU round-trips all 1,296 BC4/BC5 image payloads
+exactly with no validation errors. It lacks ETC2/EAC capability; those 993
+images still need hardware proof. Transport is not sampled-pixel acceptance.
+
+The native harness retains the GPU via the existing installGPU lifetime
+owner through completion; an earlier harness lost that native context during
+collection and terminated mid-corpus. One shared GPU slot, only actual copy/
+readback commands, wait-max60; no CPU memory or fuzz command holds the lock.
+Memory's 173 fresh-process pairs retain identical image/byte work counts:
+all Wasm high-water bars pass but 25 process-RSS bars fail. The TS adapter's
+materialized Zstd level plus Wasm copy is extra storage. The same-payload
+normalization control supports this diagnosis without modifying runtime
+policy. Final public API, other targets, full fuzz/GPU/memory/entry remain open.
+
 ### Section 5 evidence: batch 134 scalar reference ruling
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

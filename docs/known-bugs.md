@@ -1,5 +1,24 @@
 # Known bugs and unverified features
 
+### Open: batch 134 private adapter duplicates decoded Zstd levels
+
+All 173 scalar memory pairs pass Wasm high water, but 25 fail fresh-process
+RSS against the prebuilt. The private TS adapter's levelData produces a full
+JS decoded level; input() then copies it into owned Wasm input. The largest
+loss controls keep 4,194,304 duplicate raw bytes alongside retained outputs.
+Repro: retained `report23-memory.mjs`, especially GlassPlastic normal target5
+(107,436 old / 111,748 new KiB). All 12 output hashes stay exact. Repacking
+only that container's storage to uncompressed, same UASTC payload, gives
+107,308 old / 104,284 new KiB and 12 exact old/12 exact new hashes. This
+supports the supercompression-storage diagnosis; precise RSS includes host
+allocator/JIT behavior and every loss still needs proof after the root fix.
+Implement generic owned-buffer decompression or a clean-room same-feature
+Rust path with full layer/face handling, preserving all output/API/fuzz work;
+then repeat the original corpus memory bar. Do not force GC, discard outputs,
+change runtime source metadata or excuse a memory miss as busy timing.
+[Every pair and diagnosis](whitepaper/results/batch-134-corpus-uploads-memory.json).
+Public replacement, other targets and ETC2/EAC hardware uploads remain open.
+
 ### Resolved scalar bar: batch 134 source-reference mismatch (2026-11-09)
 
 Scott's written "Do recommend" replaces scalar acceptance with per-file SSE

@@ -2590,6 +2590,28 @@ features add no core or stage functionality.
 
 # Design envelope
 
+## Batch 134 corpus, upload and memory limits
+
+[Current combined-Wasm evidence](whitepaper/results/batch-134-corpus-uploads-memory.json)
+contains 51 real primary seeds / 17,908 historical-target calls, plus 32,784
+new scalar ABI calls and 628 authored-container calls. Complete missing-target
+and public integration fuzz proof remains open. The same 1,296 scalar images
+round-trip 131,581,656 compressed bytes on real RTX A6000 WebGPU. This is
+compressed-byte transport; no sampled-pixel, full mip-chain texture or public
+loader acceptance. Native WebGPU exposes no ETC2/EAC support on this adapter;
+993 such images remain unproven rather than passed.
+
+Fresh old/new processes retain all outputs on all 173 accepted scalar pairs.
+Maximum Wasm high water is 17,170,432 old / 10,747,904 new bytes, with no
+per-pair Wasm loss. Maximum process RSS is 112,460 old / 113,708 new KiB;
+25 per-pair RSS losses remain open. RSS includes runtime/input/output and
+allocator behavior; it is not just Wasm pages or peak-live allocations. The
+JS adapter materializes a full Zstd level then copies it into Wasm, adding
+4,194,304 bytes of duplicate raw-level storage on the diagnosed control.
+No forced GC, reduced work, discarded output, tolerance or timing excuse.
+The same-payload uncompressed diagnostic removes that control's RSS loss,
+with 12 exact old and 12 exact new hashes, but is not a shipped fix.
+
 ## Batch 134 scalar reference ruling (2026-11-09)
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),
@@ -5560,6 +5582,25 @@ claim; no core/stage or export change and no size ceiling raised.
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Open: batch 134 private adapter duplicates decoded Zstd levels
+
+All 173 scalar memory pairs pass Wasm high water, but 25 fail fresh-process
+RSS against the prebuilt. The private TS adapter's levelData produces a full
+JS decoded level; input() then copies it into owned Wasm input. The largest
+loss controls keep 4,194,304 duplicate raw bytes alongside retained outputs.
+Repro: retained `report23-memory.mjs`, especially GlassPlastic normal target5
+(107,436 old / 111,748 new KiB). All 12 output hashes stay exact. Repacking
+only that container's storage to uncompressed, same UASTC payload, gives
+107,308 old / 104,284 new KiB and 12 exact old/12 exact new hashes. This
+supports the supercompression-storage diagnosis; precise RSS includes host
+allocator/JIT behavior and every loss still needs proof after the root fix.
+Implement generic owned-buffer decompression or a clean-room same-feature
+Rust path with full layer/face handling, preserving all output/API/fuzz work;
+then repeat the original corpus memory bar. Do not force GC, discard outputs,
+change runtime source metadata or excuse a memory miss as busy timing.
+[Every pair and diagnosis](whitepaper/results/batch-134-corpus-uploads-memory.json).
+Public replacement, other targets and ETC2/EAC hardware uploads remain open.
 
 ### Resolved scalar bar: batch 134 source-reference mismatch (2026-11-09)
 

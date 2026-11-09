@@ -1,5 +1,21 @@
 # Reproducing Margo's numbers
 
+## Batch 134 corpus, upload and memory continuation
+
+[Evidence](results/batch-134-corpus-uploads-memory.json) pins the same combined
+Wasm as the scalar ruling. The author-retained measure folder holds
+`whole-container-fuzz-report23-corpus.mjs` (51 seeds, each180s hard limit,
+controller2400s), `report23-hostile.mjs` (240s), `report23-memory.mjs`
+(173 fresh old/new process pairs, each180s, controller2400s), and
+`report23-uploads.mjs` (real GPU copies/readback, max1minute). Only the last
+runs through gpu-lock with owner codex-134, shared mode, wait-max60 and an
+explicit compressed-texture upload/readback reason. CPU scripts never hold it.
+Source pins, frozen control hashes and all image identities are retained.
+The upload harness uses the existing installGPU lifetime owner. ETC2/EAC
+absence on RTX A6000 WebGPU remains missing hardware evidence. No timing A/B.
+Memory losses and the same-payload normalized control are separate from
+acceptance: the runtime still receives the original source containers.
+
 ## Batch 134 scalar payload bar (2026-11-09)
 
 With the author-retained licensed corpus, control payloads, independent

@@ -1,5 +1,27 @@
 # Claims and evidence
 
+## Batch 134 current-Wasm corpus, hostile input and uploads
+
+The [continuation evidence](results/batch-134-corpus-uploads-memory.json)
+revalidates 51 primary corpus seeds on the scalar-approved combined Wasm:
+17,908 historical-target decode calls and 2,856 mutations, with frozen
+prebuilt or strict specification controls. New scalar targets additionally
+pass 32,784 ABI calls and 628 authored-container calls (4,096 random blocks).
+These are bounded deterministic campaigns, not complete all-target fuzz proof.
+
+All 1,296 candidate BC4/BC5 images, 131,581,656 compressed bytes, upload to
+real RTX A6000 WebGPU textures and read back byte-identically, with zero
+validation errors. Each mip/layer/face is its own block-aligned physical
+texture. This proves byte transport, not sampled-pixel or public API behavior.
+ETC2/EAC WebGPU is unavailable on this adapter: 993 images remain unproven.
+
+Fresh-process memory measurements cover the same 173 accepted scalar pairs,
+all outputs retained. Wasm high water is no worse in every pair; process RSS
+is worse in 25. Memory acceptance is OPEN. The adapter duplicates decoded
+Zstd level storage between JS and Wasm. A same-payload uncompressed control
+preserves 12 old and 12 new hashes and removes the diagnosed RSS loss; it is
+not a runtime workaround or proof that every RSS loss is fixed. No timing A/B.
+
 ## Batch 134 scalar ruling (Scott, 2026-11-09)
 
 Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),

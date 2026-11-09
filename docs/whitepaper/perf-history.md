@@ -1,5 +1,21 @@
 # Performance history: losses, causes and fixes
 
+### Batch 134 scoped memory, with RSS losses retained
+
+The [173-pair measurement](results/batch-134-corpus-uploads-memory.json) runs
+old and new in fresh processes with the same source-pinned scalar workload,
+all images and outputs retained. This is memory measurement, not timing A/B.
+Every Wasm high-water pair is no worse (maximum 17,170,432 old / 10,747,904
+new bytes); process RSS loses 25 pairs (maxima 112,460 old / 113,708 new KiB).
+These are real pending memory losses; busy-machine timing rules do not apply.
+The JS-to-Wasm duplicate decoded Zstd level is 4,194,304 bytes on the
+GlassPlastic normal control. Original BC5 RSS 107,436 old / 111,748 new KiB;
+same-payload uncompressed KTX2 107,308 old / 104,284 new KiB, retaining 12
+old and 12 new payload hashes. That diagnostic does not waive the original
+bar, change runtime metadata or prove every RSS cause. A direct-owned-buffer
+or same-feature Rust supercompression path and full repeat proof remain owed.
+No benchmark, speed/startup measurement or new timing assertion was run.
+
 ### Batch 134 scalar ruling, no timing claim (2026-11-09)
 
 Scott's "Do recommend" adopts payload RGBA8 scalar SSE as the acceptance
