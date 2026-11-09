@@ -2238,6 +2238,18 @@ Research began across all packages, including the existing CPU triangle-query AP
 
 Generated triangles, scalar packing references and arithmetic/GPU fixtures are authored here. No outside model or decoder was added. Shared edges are tested on native WebGPU and WebGL2 compatibility; the full Float32 geometry domain is not an exact-arithmetic claim.
 
+Review 99 glass repair research compares Eric Veach and Leonidas J. Guibas,
+[Optimally Combining Sampling Techniques for Monte Carlo Rendering](https://www.graphics.stanford.edu/papers/combine/),
+1995 (sampling support and weights summing to one), Bruce Walter, Stephen R. Marschner,
+Hongsong Li and Kenneth E. Torrance,
+[Microfacet Models for Refraction through Rough Surfaces](https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf),
+2007 (Snell transport and refractive Jacobians), and Wenzel Jakob and Steve Marschner,
+[Manifold Exploration: A Markov Chain Monte Carlo Technique for Rendering Scenes with Difficult Specular Transport](https://www.cs.cornell.edu/projects/manifolds-sg12/manifolds-sg12.pdf),
+2012 (general specular chains require a geometry-aware proposal). Margo keeps its existing
+box-specific light sampler and assigns full path weight to interior triangle-glass chains
+it cannot construct. A triangle marker never enters voxel instance lookup. The furnace oracle
+is analytic equilibrium, not another tracer. No companion code or outside repository was read.
+
 ## Batch 65 job 5: Lane markings
 
 A broad search of pavement markings and decal projection preceded implementation. FHWA [historical MUTCD 2009 chapter 3B](https://mutcd.fhwa.dot.gov/htm/2009/part3/part3b.htm) distinguishes line patterns and direction arrows. Sutherland and Hodgman, [Reentrant polygon clipping (1974)](https://doi.org/10.1145/360767.360802), describes successive clipping boundaries; projection and clipping are already implemented by Margo. Margo combines authored world-space line/arrow strokes with its existing box decal renderer. Glyphs are generated stand-ins, not copied standard artwork, and make no current traffic-rule compliance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.

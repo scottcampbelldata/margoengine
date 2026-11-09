@@ -17,6 +17,12 @@ for (const compat of [false, true]) {
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);
+    assert.equal(result.furnaces.length, 4);
+    for (const row of result.furnaces) {
+      assert.equal(row.finite, true, row.name);
+      // Same 0.02 glass-furnace bound as the root analytic GPU suite.
+      for (const value of row.actual) assert.ok(Math.abs(value - 1) < 0.02, `${row.name}: ${value}`);
+    }
     for (const row of result.coverage) {
       assert.equal(row.finite, true, row.name);
       // Analytic constant paths incur only f32 arithmetic and camera projection;

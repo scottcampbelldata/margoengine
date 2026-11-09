@@ -1,5 +1,5 @@
 {
-  "commit": "50db66934",
+  "commit": "9a550ecfe",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3652,8 +3652,8 @@
         "gzip": 1954
       },
       "./mesh": {
-        "raw": 54485,
-        "gzip": 22864
+        "raw": 54809,
+        "gzip": 22954
       },
       "./spectral": {
         "raw": 3647,

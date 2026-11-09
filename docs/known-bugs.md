@@ -19,6 +19,16 @@ retained for native termination. A deterministic asynchronous-session regression
 in `tests/browser-teardown.test.js` fails on the parent; all 56 scoped tests pass.
 All nine fresh voxel GPU suites and the README gate now pass, with the README
 gate retaining its existing five known failures and no new failure.
+### Review 99 remaining tracer findings (2026-11-09)
+
+- Root glass: a white diffuse centre voxel in a 3x3x3 IOR-1 glass block under a constant unit environment returns 1.03826 at 1024 spp. The interior distant-light candidate/chain partition counts identical unrefracted directions more than once; fix and cover in the root GPU suite.
+- Spectral: a white scene without dispersion has nonzero per-sample RGB spread because four identical traversals receive random spectral reconstruction weights. Delay wavelength-specific transport until a dispersive event; retain valid hero/companion sampling.
+- Composition: restir, guiding, media, mesh and spectral independently override tracingSource, so users cannot combine arbitrary entries. Shared transforms, validators and overlap regression coverage are required.
+- Full-scene meshes: missing UV textures, smooth normals, shared geometry instance transforms and emissive-triangle light sampling; zero-area triangles reject an entire scene and the BVH uses spatial medians. Real scene import needs each of these addressed, including SAH construction.
+- Guiding evidence: guiding.html renders its convergence reference with the guided estimator itself and uses absolute bounds for dim scenes. Use an independent root/analytic reference and justified relative bounds.
+- Many-light evidence: restir.html covers diffuse receivers and absorption only. Rough metal, coat and scattering-media vertices need root-reference comparisons with relative bounds.
+- Reuse naming: /restir implements per-pixel RIS without spatial or temporal reuse. Implement reuse or rename the entry and documentation; retain the equal-cost work-count question without timing runs during the build phase.
+- Root emitter MIS: the full-distance medium-boundary regression is currently only in the optional restir GPU suite. Add it to the root GPU suite so a root-only run detects reversion.
 
 ### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
 

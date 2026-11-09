@@ -1,0 +1,612 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "shared edges and flat bounds",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true,
+          "maximumError": 0,
+          "ids": [
+            -4,
+            -5
+          ]
+        },
+        {
+          "name": "double sided emission",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel before triangles",
+          "actual": [
+            1.5,
+            0.75,
+            1.125
+          ],
+          "expected": [
+            1.5,
+            0.75,
+            1.125
+          ],
+          "finite": true
+        },
+        {
+          "name": "triangles before voxel",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse analytic sun",
+          "actual": [
+            0.20000000298023224,
+            0.4000000059604645,
+            0.800000011920929
+          ],
+          "expected": [
+            0.2,
+            0.4,
+            0.8
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel shadow on mesh",
+          "actual": [
+            0.15000000223517418,
+            0.30000000447034836,
+            0.6000000089406967
+          ],
+          "expected": [
+            0.15,
+            0.3,
+            0.6
+          ],
+          "finite": true
+        },
+        {
+          "name": "mesh shadow on voxel",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "mesh reflects voxel emitter",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel reflects triangle emitter",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "closed glass white furnace",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "65 layers nearest traversal",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "huge finite geometry",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "exact cancellation predicates",
+          "finite": true,
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "cases": 4096
+        },
+        {
+          "name": "empty",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "zero triangles",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "empty mesh baseline parity",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true,
+          "differing": 0
+        }
+      ],
+      "furnaces": [
+        {
+          "name": "diffuse inside mesh glass ior 1",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse behind mesh glass ior 1",
+          "actual": [
+            0.9967486849054694,
+            0.9967486849054694,
+            0.9967486849054694
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse inside mesh glass ior 1.5",
+          "actual": [
+            0.9999809265136719,
+            0.9999809265136719,
+            0.9999809265136719
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse behind mesh glass ior 1.5",
+          "actual": [
+            0.9992528599686921,
+            0.9992528599686921,
+            0.9992528599686921
+          ],
+          "finite": true
+        }
+      ],
+      "lifecycle": {
+        "newDevice": true,
+        "traced": 12288,
+        "disabled": 0,
+        "restored": 0,
+        "disposed": 0
+      },
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "shared edges and flat bounds",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true,
+          "maximumError": 0,
+          "ids": [
+            -4,
+            -5
+          ]
+        },
+        {
+          "name": "double sided emission",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel before triangles",
+          "actual": [
+            1.5,
+            0.75,
+            1.125
+          ],
+          "expected": [
+            1.5,
+            0.75,
+            1.125
+          ],
+          "finite": true
+        },
+        {
+          "name": "triangles before voxel",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse analytic sun",
+          "actual": [
+            0.20000000298023224,
+            0.4000000059604645,
+            0.800000011920929
+          ],
+          "expected": [
+            0.2,
+            0.4,
+            0.8
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel shadow on mesh",
+          "actual": [
+            0.15000000223517418,
+            0.30000000447034836,
+            0.6000000089406967
+          ],
+          "expected": [
+            0.15,
+            0.3,
+            0.6
+          ],
+          "finite": true
+        },
+        {
+          "name": "mesh shadow on voxel",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "mesh reflects voxel emitter",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "voxel reflects triangle emitter",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "closed glass white furnace",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "65 layers nearest traversal",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "huge finite geometry",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true
+        },
+        {
+          "name": "exact cancellation predicates",
+          "finite": true,
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "cases": 4096
+        },
+        {
+          "name": "empty",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "zero triangles",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true
+        },
+        {
+          "name": "empty mesh baseline parity",
+          "actual": [
+            2,
+            1,
+            0.5
+          ],
+          "expected": [
+            2,
+            1,
+            0.5
+          ],
+          "finite": true,
+          "differing": 0
+        }
+      ],
+      "furnaces": [
+        {
+          "name": "diffuse inside mesh glass ior 1",
+          "actual": [
+            1,
+            1,
+            1
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse behind mesh glass ior 1",
+          "actual": [
+            0.9967486867681146,
+            0.9967486867681146,
+            0.9967486867681146
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse inside mesh glass ior 1.5",
+          "actual": [
+            0.9999809265136719,
+            0.9999809265136719,
+            0.9999809265136719
+          ],
+          "finite": true
+        },
+        {
+          "name": "diffuse behind mesh glass ior 1.5",
+          "actual": [
+            0.9992528604343534,
+            0.9992528604343534,
+            0.9992528604343534
+          ],
+          "finite": true
+        }
+      ],
+      "lifecycle": {
+        "newDevice": true,
+        "traced": 12288,
+        "disabled": 0,
+        "restored": 0,
+        "disposed": 0
+      },
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

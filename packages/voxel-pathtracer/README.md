@@ -947,6 +947,9 @@ the camera outside; overlapping/nested mesh volumes and mesh media are unsupport
 is reached by path sampling; it has no emissive-triangle light sampler or prism/mirror light guide.
 Finite point lights and zero-angular-size suns behind a specular chain retain that sampling limit.
 Existing voxel lights, glass, media, environments, capture tiling and bounce limits remain available.
+Diffuse surfaces inside a glass shell receive distant light by path sampling. The voxel-box
+inverse-refraction sampler does not apply to triangle shells; their path weights retain the
+entire contribution. Straight-through walks from outside the shell still use matched MIS.
 
 `setScene(scene, {signal?})` returns a promise and rebuilds all triangles before atomically replacing
 the scene. Caller arrays are copied before waiting. Failed or cancelled updates preserve the old

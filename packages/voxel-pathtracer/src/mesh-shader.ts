@@ -131,6 +131,15 @@ export function meshSource(input: string): string {
   );
   edit('fn prismAt(inst:u32)->bool {return', 'fn prismAt(inst:u32)->bool {if(inst==TRIANGLE){return false;}return');
   edit('fn mirrorAt(inst:u32)->bool {return', 'fn mirrorAt(inst:u32)->bool {if(inst==TRIANGLE){return false;}return');
+  // Inside a mesh shell there is no voxel box frame from which to construct
+  // inverse Snell candidates. Give these distant-light paths their full path
+  // sampling weight. Exterior straight-through walks still have matching MIS.
+  edit(
+    'let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;',
+    'let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;\n if(inGlass&&mInst==TRIANGLE){return;}',
+  );
+  edit('chainOk=true;chainSet=md.media;', 'chainOk=mInst!=TRIANGLE;chainSet=md.media;');
+  edit('chainOk=true;chainSet=inAir;', 'chainOk=mInst!=TRIANGLE;chainSet=inAir;');
   edit('let wn=h.sgn*normalize(rowOf(localX(h.inst),h.axis));', 'let wn=hitNormal(h);');
   edit('let woff=h.sgn*EPS*colOf(worldX(h.inst),h.axis);', 'let woff=hitOffset(h,wp);');
   edit('if(h.inst!=GROUND){n=rowOf(localX(h.inst),h.axis);}', 'if(h.inst!=GROUND){n=hitNormal(h);}');
