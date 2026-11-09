@@ -1,0 +1,505 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "scope": "Media README initialization and explicit unchanged-quality capture only",
+  "originalFailure": {
+    "id": "voxel-pathtracer/readme-heterogeneous-coloured-media-e94c34",
+    "deadlineMs": 20000,
+    "phase": "module completion",
+    "code": 1,
+    "processTimedOut": false,
+    "precisePendingPhase": "Not instrumented in the original failed run"
+  },
+  "isolatedColdBaseline": {
+    "phase": "done",
+    "events": [
+      {
+        "phase": "engine create",
+        "at": 308.60000002384186
+      },
+      {
+        "phase": "attach",
+        "at": 671.6000000238419
+      },
+      {
+        "entry": "preview",
+        "started": 679.5,
+        "finished": 3197
+      },
+      {
+        "entry": "trace",
+        "started": 679.6000000238419,
+        "finished": 13402.600000023842
+      },
+      {
+        "entry": "ids",
+        "started": 679.6000000238419,
+        "finished": 2192.800000011921
+      },
+      {
+        "entry": "prepare",
+        "started": 679.6000000238419,
+        "finished": 870.6999999880791
+      },
+      {
+        "entry": "atrous",
+        "started": 679.6000000238419,
+        "finished": 827.6000000238419
+      },
+      {
+        "entry": "tables",
+        "started": 679.6000000238419,
+        "finished": 830.6999999880791
+      },
+      {
+        "entry": "combine",
+        "started": 679.6000000238419,
+        "finished": 1008.1999999880791
+      },
+      {
+        "phase": "ready",
+        "at": 679.8000000119209
+      },
+      {
+        "phase": "renderImage",
+        "at": 13403.100000023842
+      },
+      {
+        "phase": "renderImage done",
+        "at": 13422.600000023842
+      },
+      {
+        "phase": "done",
+        "at": 13423.100000023842
+      }
+    ],
+    "errors": [],
+    "finished": true,
+    "imageSummary": {
+      "width": 32,
+      "height": 32,
+      "length": 3072,
+      "finite": true
+    },
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--disable-gpu-shader-disk-cache"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    }
+  },
+  "runnerBaseline": {
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 22.94,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        "--import",
+        "./.lane/99-r9-media-runner-probe.mjs",
+        "scripts/run-readme-examples.mjs",
+        "--packages=voxel-pathtracer",
+        "--only=heterogeneous"
+      ]
+    },
+    "reproducedDeadlineFailure": false,
+    "traceCompilationMs": 13611.4,
+    "captureMs": 22.6
+  },
+  "regression": {
+    "path": "packages/voxel-pathtracer/tests/media-readme.test.js",
+    "baselineFailsInitialization": true,
+    "baselineReceipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 0.578,
+      "command": [
+        "node",
+        ".lane/99-r9-media-baseline-final.mjs"
+      ]
+    },
+    "fixedReceipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 0.454,
+      "command": [
+        "node",
+        "--test",
+        "--test-timeout=30000",
+        "packages/voxel-pathtracer/tests/media-readme.test.js"
+      ]
+    },
+    "startupIndependentOfTrace": true,
+    "preview": true,
+    "explicitCapture": {
+      "width": 32,
+      "height": 32,
+      "samples": 16,
+      "signalMs": 30000,
+      "awaitsFullReadiness": true
+    },
+    "captureErrorsPropagate": true,
+    "pagehideDisposal": true,
+    "allBuffersDestroyed": true,
+    "wallClockAssertion": false
+  },
+  "runtime": {
+    "readme": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 5.374,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=voxel-pathtracer",
+        "--only=heterogeneous"
+      ]
+    },
+    "native": {
+      "compat": false,
+      "initial": {
+        "status": "compiling",
+        "buttons": 1,
+        "compat": false
+      },
+      "image": {
+        "width": 32,
+        "height": 32,
+        "length": 3072,
+        "finite": true,
+        "maximum": 1.3284614086151123
+      },
+      "result": {
+        "samples": 1,
+        "status": "disposed",
+        "gpuBytes": 0,
+        "buttons": 0,
+        "errors": []
+      },
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      }
+    },
+    "compat": {
+      "compat": true,
+      "initial": {
+        "status": "ready",
+        "buttons": 1,
+        "compat": true
+      },
+      "image": {
+        "width": 32,
+        "height": 32,
+        "length": 3072,
+        "finite": true,
+        "maximum": 1.3284610509872437
+      },
+      "result": {
+        "samples": 6,
+        "status": "disposed",
+        "gpuBytes": 0,
+        "buttons": 0,
+        "errors": []
+      },
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+          "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [
+          "--use-angle=vulkan"
+        ],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      }
+    },
+    "currentCompat": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 2.849,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        ".lane/99-r9-media-lifecycle.mjs",
+        "--compat"
+      ]
+    },
+    "nativeReceipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 21.303,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        ".lane/99-r9-media-lifecycle.mjs"
+      ]
+    },
+    "compatVulkanReceipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 50.794,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        ".lane/99-r9-media-lifecycle.mjs",
+        "--compat"
+      ]
+    }
+  },
+  "gates": {
+    "package": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 7.9,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "test",
+        "--workspace",
+        "@margoengine/voxel-pathtracer"
+      ]
+    },
+    "fullVerifyRerun": false,
+    "reason": "Coordinator directs rerun only failed steps. Original verify failure and scoped repair retained in guiding proof.",
+    "currentPackage": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 7.716,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "test",
+        "--workspace",
+        "@margoengine/voxel-pathtracer"
+      ]
+    },
+    "finalChecks": [
+      {
+        "label": "99-r9-media-types",
+        "code": 0,
+        "signal": null,
+        "timed": false,
+        "seconds": 1.131,
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          ".lane/99-r9-media-types.mjs"
+        ]
+      },
+      {
+        "label": "99-r9-media-sizes-recheck",
+        "code": 0,
+        "signal": null,
+        "timed": false,
+        "seconds": 1.757,
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "--test",
+          "--test-timeout=120000",
+          "tests/sizes-page.test.js"
+        ]
+      },
+      {
+        "label": "99-r9-media-hygiene-recheck",
+        "code": 0,
+        "signal": null,
+        "timed": false,
+        "seconds": 20.342,
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "hygiene"
+        ]
+      }
+    ],
+    "lint": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 4.131,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "lint"
+      ]
+    },
+    "artifacts": {
+      "initial": {
+        "code": 1,
+        "signal": null,
+        "timed": false,
+        "seconds": 9.954,
+        "command": [
+          "node",
+          "--test",
+          "--test-timeout=120000",
+          "tests/llms.test.js",
+          "tests/sizes-page.test.js",
+          "tests/claims-file.test.js",
+          "tests/run-readme-examples.test.js",
+          "tests/readme-types.test.js"
+        ]
+      },
+      "passed": 75,
+      "failed": 1,
+      "cause": "New sciviz fallback dist files absent after rebase. Workspace build materialized the committed inputs.",
+      "repairBuild": {
+        "code": 0,
+        "signal": null,
+        "timed": false,
+        "seconds": 43.491,
+        "command": [
+          "node",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "build:packages"
+        ]
+      },
+      "recheck": "99-r9-media-sizes-recheck"
+    },
+    "hygieneInitial": {
+      "code": 1,
+      "signal": null,
+      "timed": false,
+      "seconds": 8.321,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "hygiene"
+      ]
+    }
+  },
+  "size": "No executable source or export changes; main entry/network measurements retained",
+  "diagnosticFailures": {
+    "direct3D": {
+      "receipt": {
+        "code": 124,
+        "signal": null,
+        "timed": false,
+        "seconds": 45.933,
+        "command": [
+          "node",
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-99",
+          "--wait-max=60",
+          "--max=0.75",
+          "--",
+          "node",
+          ".lane/99-r9-media-lifecycle.mjs",
+          "--compat"
+        ]
+      },
+      "cause": "Diagnostic omitted the existing Windows compatibility test Vulkan argument. Direct3D trace compilation is already documented as non-finishing in the WebGL2 compatibility README.",
+      "resolution": "Used the existing --use-angle=vulkan configuration without changing any deadline."
+    },
+    "instrumentedDirect3D": {
+      "receipt": {
+        "code": 1,
+        "signal": null,
+        "timed": false,
+        "seconds": 48.282,
+        "command": [
+          "node",
+          "scripts/gpu-lock.mjs",
+          "run",
+          "--owner=codex-99",
+          "--wait-max=60",
+          "--max=0.75",
+          "--",
+          "node",
+          ".lane/99-r9-media-lifecycle.mjs",
+          "--compat"
+        ]
+      },
+      "phase": "Initialized and requested capture; then explicitly terminated only its owned process tree after confirming the documented backend limitation."
+    }
+  },
+  "rebase": {
+    "head": "98ac2fcd39db0d064b60a91c48aa7644a6ad6f76",
+    "target": "854a90ac46d0f5860bf90ee002c698d2e392e0e4",
+    "validation": "Current package tests and forced compatibility lifecycle run after rebuilding the changed WebGL2 preview dependency. No tracer/core/math change; successful native/readme checks reused."
+  }
+}

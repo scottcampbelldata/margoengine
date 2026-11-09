@@ -2405,3 +2405,33 @@ Missing triangles are rejected as whole primitives; no NaN reaches a surviving p
 The generation validity check follows WebGL object invalidation on restored contexts; no invalid object is
 deleted or rebound. The preview's first-frame clear follows Margo's existing WebGPU attachment initialization
 and Khronos scissor/clear rules. Exact images and GL errors are checked; no foreign implementation was read.
+
+### Batch 99: media example initialization and explicit capture
+
+Research first: Kai Ninomiya, Brandon Jones and Jim Blandy (editors), WebGPU
+(W3C Candidate Recommendation Draft, 2026),
+https://www.w3.org/TR/2026/CRD-webgpu-20260915/#asynchronous-pipeline-creation ,
+defines asynchronous pipeline readiness without a fixed compilation-time bound.
+Steven G. Parker, James Bigler, Andreas Dietrich, Heiko Friedrich, Jared Hoberock,
+David Luebke, David McAllister, Morgan McGuire, Keith Morley, Austin Robison and
+Martin Stich, OptiX: A General Purpose Ray Tracing Engine (2010),
+https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/parker10_optix.pdf ,
+abstract and introduction only, describes runtime composition/compilation of ray
+tracing kernels. Brian Guenter, Todd B. Knoblock and Erik Ruf, Specializing Shaders
+(SIGGRAPH, 1995), https://www.microsoft.com/en-us/research/publication/specializing-shaders/ ,
+abstract only, describes specialization of parameter-dependent work. These were
+compared with the progressive-feedback research already recorded for guiding.
+No companion code or foreign source was opened. Shader specialization is not
+needed for this lifecycle defect and no compiler-speed claim is made.
+
+The media example coupled module completion to full tracing readiness and a
+capture, without starting a viewport. Two instrumented diagnostics finished
+within the original deadline and do not reproduce the prior full-run timeout:
+full tracing compilation dominates them; their captures take about 20 ms.
+A controlled unresolved-trace promise proves the dependency independently of
+machine load. The repair initializes the existing progressive media viewport
+and retains the exact 32x32, 16-sample float capture as an explicitly awaited
+button action. Errors propagate and pagehide disposes both owners and the button.
+No transport, coefficient, shader, sample count, signal duration or gate changes.
+The regression checks startup, preview, requested capture readiness, full tracing,
+capture failure propagation and complete buffer disposal without timing assertions.

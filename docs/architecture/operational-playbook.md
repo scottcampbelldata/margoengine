@@ -3536,3 +3536,17 @@ not a speed budget. A real native-WebGPU cache-disabled probe reproduced the old
 20-second module-completion failure at pipeline readiness and completes the revised
 example with the same limit. All 9 runtime README examples and 134 package tests pass on the rebased tree. The earlier verify stopped at stale API size rows caused by API generation preceding entry measurement. Regeneration in input order and the scoped API recheck pass; the coordinator directed no second full verify on this code. Pipeline
 compilation itself has no new latency guarantee and no gate tolerance was raised.
+
+### Media README lifecycle evidence (Batch 99)
+
+The media module no longer depends on full tracing compilation and a capture
+before starting its viewport. The controlled-promise regression in
+media-readme.test.js fails the original startup, then verifies preview, requested
+capture waiting, the original capture dimensions and samples, full tracing, error
+propagation and disposal. The button awaits the real renderImage API. Native and
+forced WebGL2 checks inspect its float result and resumed viewport. This is
+lifecycle correctness evidence; the two baseline diagnostics did not reproduce
+the original timeout and do not establish a driver/compiler failure. The deadline,
+shaders and transport stay unchanged. Scope and receipts are in the media startup
+proof; the earlier verify API-generation failure and successful scoped recheck
+remain recorded in the guiding proof. The coordinator directs failed steps only.

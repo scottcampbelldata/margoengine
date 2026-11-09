@@ -1423,3 +1423,17 @@ bytes. The full volume ceiling remains 13,792,000. Native WebGL2 refusal is
 covered by run.mjs. Run gltf-pro's native-volume GPU test for twenty exact slab
 readbacks on each backend, and its unit tests for transformed/instanced shader
 math and exact absent normal-map fallbacks. No benchmark is part of this proof.
+
+### Batch 99 media README initialization
+
+Build voxel-pathtracer, then run node --test --test-timeout=30000
+packages/voxel-pathtracer/tests/media-readme.test.js. With the original media
+example, the controlled unresolved-trace promise fails the initialization assertion.
+The replacement also checks the real renderImage API with its original dimensions,
+sample count and cancellation signal, capture error propagation and disposal.
+Run check:readme-run with --packages=voxel-pathtracer --only=heterogeneous in one
+shared GPU slot (wait-max at least 60, max measured duration plus a small margin).
+The 20-second module deadline is unchanged. Click Render 32 x 32 image to request
+the awaited float capture; leaving the page disposes both owners. Forced WebGL2
+uses the existing compatibility shim. Proof:
+results/batch-99-media-readme-startup-20261109.json.

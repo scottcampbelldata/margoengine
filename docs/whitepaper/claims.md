@@ -1864,3 +1864,14 @@ deadline failure at readiness and complete the replacement without changing the
 20-second gate. This is scoped initialization evidence, not a bound on compilation
 or a rendering-speed result. Scoped landing validation and the retained verify failure are recorded in
 results/batch-99-guiding-readme-startup-20261109.json.
+
+### Batch 99 media README lifecycle ordering
+
+The media example initializes its progressive viewport independently of full
+tracing compilation. It retains an explicitly requested, awaited 32x32, 16-sample
+float capture, its original cancellation bound and error propagation. A controlled
+unresolved-pipeline regression checks initialization, preview, capture readiness,
+eventual tracing and disposal. The unchanged 20-second module deadline remains in
+force. Later baseline diagnostics did not reproduce the prior full-run failure;
+this is an ordering repair, not a compiler-speed claim. Scoped evidence:
+results/batch-99-media-readme-startup-20261109.json.

@@ -837,11 +837,29 @@ const tracer = MediaVoxelPathTracer.attach(engine, {
   },
   denoise: false,
 });
-await tracer.ready;
-const image = await tracer.renderImage({ width: 32, height: 32, samples: 16, signal: AbortSignal.timeout(30000) });
-tracer.dispose();
-engine.dispose();
+engine.start();
+const capture = document.createElement('button');
+capture.textContent = 'Render 32 x 32 image';
+document.body.append(capture);
+capture.addEventListener('click', async () => {
+  capture.disabled = true;
+  try {
+    const image = await tracer.renderImage({ width: 32, height: 32, samples: 16, signal: AbortSignal.timeout(30000) });
+    console.log(image);
+  } finally {
+    capture.disabled = false;
+  }
+});
+window.addEventListener('pagehide', () => {
+  tracer.dispose();
+  engine.dispose();
+  capture.remove();
+}, { once: true });
 ```
+
+The viewport starts while the full tracing pipelines compile. The button explicitly requests and
+awaits the same 16-sample float image; `renderImage` waits for readiness internally. Initialization
+does not depend on a capture. Capture errors propagate, and page exit disposes both owners.
 
 The existing hierarchy walks piecewise constant palette regions. Shadow rays integrate RGB optical depth
 analytically. Free flights mix the three exponential channel distributions and divide by their actual

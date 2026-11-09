@@ -2074,3 +2074,9 @@ are unchanged, and no runtime speed claim is made.
 Native sciviz corrections: root 36,916 B gzip and /webgl2 4,476 B meet the explicitly revised optional ceilings
 above. Missing triangles are completely rejected, with finite one-sided boundary normals. Core + stage remains
 23,924 B under 25,000 B. The strict all-pixel bound and all timeouts are unchanged.
+
+Media README startup (Batch 99): module initialization starts the existing
+progressive viewport independently of full tracing compilation. An explicit button
+awaits the unchanged 32x32, 16-sample renderImage request and its 30-second signal.
+The module deadline remains 20 seconds. No pipeline compilation-time guarantee,
+transport change, optional-entry size change or rendering-speed result is claimed.

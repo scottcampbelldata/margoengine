@@ -2592,3 +2592,16 @@ Graphics, SIGGRAPH 1995, https://graphics.stanford.edu/papers/camera/; W3C GPU f
 the Web Working Group, WebGPU, 2026, https://www.w3.org/TR/webgpu/.
 Sampling and optical exposure are separate concerns; the attachment/resource
 rules support sharing the existing PostStack capture. No foreign code was read.
+
+### Fixed: media README blocked module initialization (Batch 99)
+
+The media example exceeded the unchanged 20-second module-completion deadline in
+the full README run. Startup awaited full pipeline readiness and an off-screen
+capture before any viewport loop. Two later instrumented runs finish within the
+deadline; neither reproduces the original timeout. In those runs trace compilation
+dominates while capture completes in about 20 ms. The controlled-promise regression
+fails the original initialization dependency. The replacement starts the actual
+media viewport and retains the same awaited 16-sample float capture on a button.
+Capture errors propagate; pagehide disposes tracer, engine and button. Evidence:
+whitepaper/results/batch-99-media-readme-startup-20261109.json. No new compilation
+latency guarantee, timing exemption or smaller rendering workload is claimed.
