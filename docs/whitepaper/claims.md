@@ -1527,3 +1527,28 @@ accuracy, normal decoding, production rendering quality and speed remain separat
 Evidence: results/readme-potree-complete-20261109.json. Reproduce with the shared
 fetch command, `node --test packages/points/tests/potree-complete.test.js` and
 `npm run check:readme-run -- --packages=points`.
+
+### Batch 160: static blend variation below Margo (2026-11-09, OPEN)
+
+The independent raw-API control imports no Margo renderer into its page. It clears
+RGBA8, multiplies by fixed finite flat tints, adds zero, and checks every byte of
+200 frames in each of two fresh browser processes. GPU completion precedes WebGPU
+mapping; WebGL readPixels is synchronous and DITHER is disabled. Both draws retain
+all 1,280 selected fixture triangles. There are no texture, PBR, volume, IBL,
+tone-map, derivative, atomic or time inputs.
+
+| Adapter and API | Samples | Frames | Unique byte hashes |
+| --- | --- | --- | --- |
+| NVIDIA RTX A6000 617.42, raw WebGPU | 4 | 400 | 3 (FAIL) |
+| Same, raw WebGL2 / ANGLE D3D11 | 4 | 400 | 7 (FAIL) |
+| AMD RDNA 2, each raw API | 4 | 400 each | 1 each |
+| NVIDIA, each raw API | 1 | 400 each | 1 each |
+| NVIDIA, standalone Dawn D3D12 / D3D11 | 4 | 200 each | 2 / 5 (FAIL) |
+| AMD, standalone Dawn D3D12 | 4 | 200 | 1 |
+
+[Recorded evidence](results/batch-160-determinism.json) pins every input and outside
+report hash. The measured problem exists below Margo's renderer and translator.
+A NVIDIA driver/device problem is implicated; its internal mechanism remains
+unproved. This establishes no package repair, cross-vendor byte equality, corrected
+material accuracy or speed. Jobs 4/5's original budgets still fail on affected
+captures, and batch 160 remains open.

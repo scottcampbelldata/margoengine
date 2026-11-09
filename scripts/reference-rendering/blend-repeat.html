@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Raw API blend repeat regression</title></head><body><script>
+// No engine, compatibility translator, texture sampling, lighting, atomics, derivatives or time uniforms.
+const size=512;
+async function webgpu(data,samples){
+ const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
+ if(!adapter)throw Error('WebGPU adapter unavailable');
+ const device=await adapter.requestDevice();device.pushErrorScope('validation');
+ const renderer=Object.fromEntries(['vendor','architecture','device','description'].map(k=>[k,adapter.info[k]]));
+ const uniform=device.createBuffer({size:208,usage:72});device.queue.writeBuffer(uniform,0,new Float32Array(data.uniform));
+ const vertices=new Float32Array(data.vertices),vertex=device.createBuffer({size:vertices.byteLength,usage:40});device.queue.writeBuffer(vertex,0,vertices);
+ const indices=new Uint32Array(data.indices),index=device.createBuffer({size:indices.byteLength,usage:24});device.queue.writeBuffer(index,0,indices);
+ const module=device.createShaderModule({code:`
+ struct Frame{camera:mat4x4f,model:mat4x4f,normal:mat4x4f,eye:vec4f};
+ @group(0) @binding(0) var<uniform> f:Frame;
+ struct Input{@location(0) position:vec4f,@location(1) normal:vec4f};
+ struct Out{@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) @interpolate(flat) normal:vec3f};
+ @vertex fn vertex(i:Input)->Out{var o:Out;let p=f.model*vec4f(i.position.xyz,1);o.clip=f.camera*p;o.position=p.xyz;o.normal=(f.normal*vec4f(i.normal.xyz,0)).xyz;return o;}
+ @fragment fn tint(i:Out)->@location(0) vec4f{return vec4f(vec3f(i.normal.x),1);}
+ @fragment fn zero(i:Out)->@location(0) vec4f{return vec4f(0,0,0,1);}`});
+ const pipelines=[];
+ for(const entryPoint of ['tint','zero'])pipelines.push(await device.createRenderPipelineAsync({
+  layout:'auto',vertex:{module,entryPoint:'vertex',buffers:[{arrayStride:80,attributes:[{shaderLocation:0,offset:0,format:'float32x4'},{shaderLocation:1,offset:16,format:'float32x4'}]}]},
+  fragment:{module,entryPoint,targets:[{format:'rgba8unorm',blend:entryPoint==='tint'?{color:{srcFactor:'zero',dstFactor:'src'},alpha:{srcFactor:'zero',dstFactor:'one'}}:{color:{srcFactor:'one',dstFactor:'one'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},
+  primitive:{topology:'triangle-list',cullMode:'back'},multisample:{count:samples},
+ }));
+ const groups=pipelines.map(p=>device.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}}]}));
+ const output=device.createTexture({size:[size,size],format:'rgba8unorm',usage:17}),
+  ms=samples===1?output:device.createTexture({size:[size,size],format:'rgba8unorm',usage:20,sampleCount:samples}),
+  buffer=device.createBuffer({size:size*size*4,usage:9}),
+  attachment={view:ms.createView(),...(samples===4?{resolveTarget:output.createView()}:{}),loadOp:'clear',storeOp:'store',clearValue:[72/255,72/255,72/255,1]};
+ return{renderer,async read(){
+  const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[attachment]});
+  pass.setVertexBuffer(0,vertex);pass.setIndexBuffer(index,'uint32');
+  for(let i=0;i<2;i++){pass.setPipeline(pipelines[i]);pass.setBindGroup(0,groups[i]);pass.drawIndexed(indices.length);}pass.end();
+  encoder.copyTextureToBuffer({texture:output},{buffer,bytesPerRow:size*4},[size,size]);device.queue.submit([encoder.finish()]);
+  await device.queue.onSubmittedWorkDone();await buffer.mapAsync(1);const bytes=new Uint8Array(buffer.getMappedRange()).slice();buffer.unmap();return bytes;
+ },async close(){const error=await device.popErrorScope();device.destroy();if(error)throw Error(error.message);}};
+}
+function webgl2(data,samples){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=size;
+ const gl=canvas.getContext('webgl2',{antialias:false});if(!gl)throw Error('WebGL2 unavailable');
+ const debug=gl.getExtension('WEBGL_debug_renderer_info'),renderer=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+ const programs=[];
+ for(const zero of [false,true]){
+  const program=gl.createProgram();
+  for(const [type,source] of [[gl.VERTEX_SHADER,`#version 300 es
+   precision highp float;layout(location=0) in vec4 position;layout(location=1) in vec4 tint;
+   uniform mat4 camera;uniform mat4 model;flat out float value;
+   void main(){vec4 p=camera*model*vec4(position.xyz,1.0);gl_Position=vec4(p.x,-p.y,p.z,p.w);value=tint.x;}`],[gl.FRAGMENT_SHADER,`#version 300 es
+   precision highp float;flat in float value;out vec4 color;void main(){color=${zero?'vec4(0.0,0.0,0.0,1.0)':'vec4(vec3(value),1.0)'};}`]]){
+   const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));gl.attachShader(program,shader);gl.deleteShader(shader);
+  }
+  gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+  gl.useProgram(program);gl.uniformMatrix4fv(gl.getUniformLocation(program,'camera'),false,data.uniform.slice(0,16));gl.uniformMatrix4fv(gl.getUniformLocation(program,'model'),false,data.uniform.slice(16,32));programs.push(program);
+ }
+ const vao=gl.createVertexArray();gl.bindVertexArray(vao);const vertex=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vertex);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data.vertices),gl.STATIC_DRAW);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,80,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,80,16);
+ const ms=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,ms);
+ if(samples===4)gl.renderbufferStorageMultisample(gl.RENDERBUFFER,4,gl.RGBA8,size,size);else gl.renderbufferStorage(gl.RENDERBUFFER,gl.RGBA8,size,size);
+ if(gl.getRenderbufferParameter(gl.RENDERBUFFER,gl.RENDERBUFFER_SAMPLES)!==(samples===4?4:0))throw Error('Requested sample count unavailable');
+ const from=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,from);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,ms);
+ if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Incomplete multisample framebuffer');
+ const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);gl.texStorage2D(gl.TEXTURE_2D,1,gl.RGBA8,size,size);
+ const to=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,to);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);
+ if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Incomplete resolve framebuffer');
+ gl.viewport(0,0,size,size);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.frontFace(gl.CW);gl.enable(gl.BLEND);gl.disable(gl.DITHER);
+ return{renderer,async read(){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,from);gl.clearColor(72/255,72/255,72/255,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(programs[0]);gl.blendFuncSeparate(gl.ZERO,gl.SRC_COLOR,gl.ZERO,gl.ONE);gl.drawArrays(gl.TRIANGLES,0,data.indices.length);
+  gl.useProgram(programs[1]);gl.blendFuncSeparate(gl.ONE,gl.ONE,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,data.indices.length);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER,from);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,to);gl.blitFramebuffer(0,0,size,size,0,0,size,size,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER,to);const bytes=new Uint8Array(size*size*4);gl.readPixels(0,0,size,size,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+  const error=gl.getError();if(error)throw Error('WebGL error '+error);return bytes;
+ },async close(){gl.getExtension('WEBGL_lose_context')?.loseContext();}};
+}
+window.repeatBlend=async(data,{api,samples,frames,first:previous})=>{
+ const renderer=api==='webgpu'?await webgpu(data,samples):webgl2(data,samples),hashes=[],differences=[];
+ let first=previous?new Uint8Array(previous):undefined;
+ const seen=new Set();
+ try{
+  for(let frame=0;frame<frames;frame++){
+   const bytes=await renderer.read();first??=bytes.slice();
+   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');hashes.push(hash);
+   if(!seen.has(hash)){
+    seen.add(hash);const diff=[];
+    for(let i=0;i<bytes.length;i++)if(bytes[i]!==first[i])diff.push({x:(i>>2)%size,y:Math.floor((i>>2)/size),channel:i%4,first:first[i],actual:bytes[i]});
+    differences.push({frame,hash,diff});
+   }
+  }
+ }finally{await renderer.close();}
+ return{renderer:renderer.renderer,first:Array.from(first),hashes,differences,errors:[]};
+};
+</script></body></html>

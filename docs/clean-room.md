@@ -1953,3 +1953,16 @@ extraction algorithm, Gabor convolution, biological wood or corrosion simulation
 ## Batch 65 job 6: Road network graph
 
 A broad search of road linkage, shortest-path papers and traffic travel-time models preceded implementation. ASAM [OpenDRIVE 1.8.1 section 10.3 Road linkage](https://publications.pages.asam.net/standards/ASAM_OpenDRIVE/ASAM_OpenDRIVE_Specification/v1.8.1/specification/10_roads/10_03_road_linkage.html) describes explicit predecessor/successor connections and isolation; section [12.4 Connecting roads](https://publications.pages.asam.net/standards/ASAM_OpenDRIVE/ASAM_OpenDRIVE_Specification/v1.8.1/specification/12_junctions/12_04_connecting_roads.html) separates junction connections from spatial overlap. Bellman, [On a routing problem (1958)](https://www.cs.yale.edu/homes/lans/readings/routing/bellman-routing-1958.pdf), models minimum travel-time routing. Margo combines explicit links with arc length / speed * traffic + delay, then reuses its existing Bellman-Ford solver; there is no new shortest-path implementation or file-format conformance claim. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.
+
+### Batch 160 raw blend repeatability control (2026-11-09)
+
+The diagnostic shaders and WebGPU/WebGL calls are written here from the public API
+specifications. Only standard Khronos fixture coordinates are read. Reference,
+Dawn, ANGLE and driver implementation source is not inspected. Flat finite tints
+remove material equations and texture derivatives from the reproducer. Sources:
+[WGSL interpolation](https://www.w3.org/TR/WGSL/#interpolation),
+[WebGPU rendering](https://www.w3.org/TR/webgpu/#rendering) and
+[Direct3D 11.3 blending precision](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#17.5%20Blending%20Precision).
+These specifications define the API operations; they do not identify the closed
+NVIDIA mechanism behind the observed variable bytes. No driver-internal algorithm
+or engine bug is inferred solely from a precision allowance.

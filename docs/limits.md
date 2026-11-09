@@ -1622,3 +1622,15 @@ Core plus stage remains 23,797 B gzip, strictly below 25,000 B.
 ### Batch 65 job 6: Road network graph (LIM-640)
 
 Optional road/graph: 665 B min+gzip with bare package imports external; dependencies are additional downloads. Explicit vertex topology only; at most 65536 vertices and 65536 roads, zero allowed. No geometric intersection detection, snapping, lane/turn restrictions, traffic simulation, live updates or OpenDRIVE parser. Split links at intended junctions; bridges remain distinct IDs. Parallel arcs retain the least travel time, losing road identity; remove closed roads and rebuild for changed traffic. Weights and solver sums are float32, with normal positive edge seconds from 2^-126 to 2^127/max(1,vertices); f32 rounding and generic compute/graph predecessor limitations apply. The bounded adapter reuses the existing graph builder and solver; no new CPU-heavy solver. Dispose graph, solver output arrays and caller-owned context separately. A graph bound to a lost device must be rebuilt with a new context after engine reboot. Generated stand-in networks: arc-length/default costs, one-way/reverse links, minimum parallel edges, traffic rerouting, isolation, ownership, empty/maximum topology, hostile/extreme values and aborts. Native WebGPU and real WebGL2 compatibility verify route distances/predecessors, reachability, extreme normal f32 weights, solver abort, double disposal, and reconstruction after engine device reboot. No speed or real traffic-data claim.
+
+### Batch 160 static-frame platform blocker (2026-11-09, OPEN)
+
+On RTX A6000 / NVIDIA 617.42, fixed 4x-MSAA blend draws can produce different bytes
+across frames and processes through raw WebGPU, raw WebGL2 and standalone Dawn
+D3D11/D3D12. A page containing no Margo imports reproduces it with finite flat
+colours and zero additive output. AMD and one-sample controls are deterministic
+on the tested configurations. The internal NVIDIA mechanism is unresolved; no
+accepted backend difference or package workaround is declared. Exact repeat tests
+and original error budgets remain required. Jobs 4/5 and batch 160 remain open.
+See [the evidence](whitepaper/results/batch-160-determinism.json) and
+[reproduction](whitepaper/reproduce.md).

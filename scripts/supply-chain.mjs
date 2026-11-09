@@ -366,7 +366,7 @@ const ASSETS = [
   ],
   [
     'scripts/reference-rendering/NOTICE.md',
-    'batch 160 outside reference data, never shipped: Khronos MetalRoughSpheresNoTextures (CC0-1.0, Krill Gavrilov, 2019), pinned source/scene/picture hashes and hosted Sample Viewer PNG provenance; original assets, legal notices and pictures stay in engine-bench/batch-160. Also records outside standard assets for the existing gltf-pro GPU checks',
+    'batch 160 outside reference data, never shipped: Khronos MetalRoughSpheresNoTextures (CC0-1.0, Krill Gavrilov, 2019) and the IORTestGrid determinism fixture (CC0-1.0, Eric Chadwick, 2023), pinned source/scene/picture hashes and hosted Sample Viewer PNG provenance; original assets, legal notices and pictures stay in engine-bench/batch-160. Also records outside standard assets for the existing gltf-pro GPU checks',
   ],
 ];
 

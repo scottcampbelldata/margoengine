@@ -4210,6 +4210,18 @@ Core plus stage remains 23,797 B gzip, strictly below 25,000 B.
 
 Optional road/graph: 665 B min+gzip with bare package imports external; dependencies are additional downloads. Explicit vertex topology only; at most 65536 vertices and 65536 roads, zero allowed. No geometric intersection detection, snapping, lane/turn restrictions, traffic simulation, live updates or OpenDRIVE parser. Split links at intended junctions; bridges remain distinct IDs. Parallel arcs retain the least travel time, losing road identity; remove closed roads and rebuild for changed traffic. Weights and solver sums are float32, with normal positive edge seconds from 2^-126 to 2^127/max(1,vertices); f32 rounding and generic compute/graph predecessor limitations apply. The bounded adapter reuses the existing graph builder and solver; no new CPU-heavy solver. Dispose graph, solver output arrays and caller-owned context separately. A graph bound to a lost device must be rebuilt with a new context after engine reboot. Generated stand-in networks: arc-length/default costs, one-way/reverse links, minimum parallel edges, traffic rerouting, isolation, ownership, empty/maximum topology, hostile/extreme values and aborts. Native WebGPU and real WebGL2 compatibility verify route distances/predecessors, reachability, extreme normal f32 weights, solver abort, double disposal, and reconstruction after engine device reboot. No speed or real traffic-data claim.
 
+### Batch 160 static-frame platform blocker (2026-11-09, OPEN)
+
+On RTX A6000 / NVIDIA 617.42, fixed 4x-MSAA blend draws can produce different bytes
+across frames and processes through raw WebGPU, raw WebGL2 and standalone Dawn
+D3D11/D3D12. A page containing no Margo imports reproduces it with finite flat
+colours and zero additive output. AMD and one-sample controls are deterministic
+on the tested configurations. The internal NVIDIA mechanism is unresolved; no
+accepted backend difference or package workaround is declared. Exact repeat tests
+and original error budgets remain required. Jobs 4/5 and batch 160 remain open.
+See [the evidence](whitepaper/results/batch-160-determinism.json) and
+[reproduction](whitepaper/reproduce.md).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5992,6 +6004,35 @@ GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=irid
 Per Scott's manager ruling, job 4 is preserved locally as 97c74a713 on batch-160-job4-parked and job 5 as bfd887103 on batch-160-job5-parked. Neither is pushed as passing evidence. Original budgets remain unchanged: volume compatibility full-Cycles absolute error 13,792,003 exceeds 13,792,000; native IOR can measure 2,423,421 against its frozen 2,423,418. Volume varies at blue samples (213,199), (214,199), (219,199); IOR varies at RGB (403,299). The bounded shared investigation did not establish the root cause.
 
 Repro on the job 5 branch: GPU-locked node scripts/reference-rendering/repeat.mjs --case=ior and the same command with --case=volume --compat. Each captures 24 static frames, waits for GPU completion before each read and asserts identical decoded bytes. Both fail; all pictures and repeat.json are retained outside engine-bench/batch-160. Fixed GPU command replays also vary with unchanged uploads and draw order, without compute dispatches or float atomics. Native stored multisample values vary before final resolve. Splitting, merging or instrumenting passes changes the observed output, so these interventions do not establish a package-owned API defect or an inherent backend rule. No workaround, bias or tolerance is substituted. Jobs 6 to 8 are independent measurements and do not close this release-blocking defect.
+
+Dedicated continuation (2026-11-09): the variation now reproduces below Margo. Run GPU-locked
+`node scripts/reference-rendering/blend-repeat.mjs --api=webgpu`, then `--api=webgl2`.
+The page imports no engine or compatibility package. It clears RGBA8, draws fixed finite flat
+tints with destination multiplication, draws zero with additive blending, then reads every byte
+after completion. There are no sampled textures, PBR/volume/IBL/tone-map calculations, derivatives,
+atomics, frame uniforms or uninitialised resources. All 1,280 fixture triangles remain.
+
+On the RTX A6000 with NVIDIA 617.42 (Windows 32.0.16.1742), 400 frames across two fresh browser
+processes produced 3 WebGPU hashes and 7 raw-WebGL2 hashes. WebGL dithering is disabled. The same
+program through standalone Dawn Node 0.6.2 produces 2 D3D12 and 5 D3D11 hashes in 200 frames each,
+with no validation errors. Exclusive GPU access retains the variation in a separate control.
+On AMD RDNA 2 (32.0.21042.62), both raw browser APIs give one hash across 400 frames; NVIDIA's
+one-sample controls also give one hash. Both complete reference scenes repeat identically on AMD.
+Records, input/report hashes and reproduction commands are in
+`whitepaper/results/batch-160-determinism.json` and `whitepaper/reproduce.md`.
+
+This isolates an observed NVIDIA multisample-blend platform problem, rather than establishing
+an owning Margo package defect. The closed driver/device mechanism is still unknown. A package
+patch is not justified by this evidence. Quantizing source colours still varies; reducing MSAA
+or substituting AMD would change the tested configuration. AMD's IOR error is 2,424,918, which
+also exceeds the original NVIDIA budget. Fresh NVIDIA full-scene captures retain volume error
+13,792,000..13,792,003 and IOR 2,423,418..2,423,421. Both original budgets remain frozen. The exact
+repeat assertions deliberately fail on the affected platform; jobs 4/5 and batch 160 stay OPEN
+until a platform repair or a proven package repair makes those assertions and budgets pass.
+
+Rechecked after the main rebase to bfa1aabc6, including the native physical-sampler binding
+repairs: 24 complete frames still give 2 IOR variants and 4 volume variants, with the same
+error ranges above. The original parked jobs remain unchanged.
 
 ### Fixed: medium boundary offsets shortened physical transport (Batch 99)
 

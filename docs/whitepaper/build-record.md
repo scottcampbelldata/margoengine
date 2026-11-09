@@ -4038,3 +4038,38 @@ All 18 original points examples pass; only these two exceptions are removed, lea
 49 overall. Package GPU checks pass at 1x and 4x (21 and 22 checks). The combined
 package/root run passes 192 tests, zero failures/skips. No reader, renderer, core,
 stage or held physics source changed. Record: results/readme-potree-complete-20261109.json.
+
+## Batch 160 dedicated determinism hunt (2026-11-09, OPEN)
+
+The new portable exact regression isolates variation below Margo's renderers. A
+fully cleared RGBA8 target receives fixed flat tint multiplication and zero additive
+output. All 1,280 selected fixture triangles and every output byte are retained.
+Across two fresh browser processes and 400 frames, NVIDIA 617.42 produces 3 native
+WebGPU hashes and 7 raw-WebGL2 hashes. Independent standalone Dawn 0.6.2 gives 2
+D3D12 and 5 D3D11 hashes in 200 frames each. AMD and one-sample controls give one
+hash. Exclusive GPU access retains variation in a separate NVIDIA control.
+No material/texture/IBL/volume/tone-map/derivative/atomic/time input is involved.
+
+The inference is a NVIDIA multisample-blend platform problem. The internal
+mechanism and a package-owned repair are not established, so no renderer patch is
+shipped. Fresh full-scene NVIDIA captures retain the original failing ranges:
+volume absolute 13,792,000..13,792,003 and IOR 2,423,418..2,423,421. Both budgets,
+all four job-4 comparisons, both job-5 comparisons and the original parked branches
+are preserved. Jobs 4/5 are not pushed as passing, and the list-1 row stays OPEN.
+The stable AMD IOR result exceeds the frozen budget too; adapter substitution,
+source quantization and sample-count reduction are not repairs.
+
+Evidence: results/batch-160-determinism.json; scripts/reference-rendering/blend-repeat.mjs
+and blend-repeat-node.mjs assert identical bytes across repeats. CPU fixture and
+concurrent-download regressions are in tests/reference-blend-repeat.test.js.
+This push contains root harness/docs only, without package README or export changes.
+Validation before the final main rebase: lint/hygiene passed; 15 focused tests and
+13,375 full-verify tests passed with zero failures/skips. Core plus stage is
+23,797 B gzip. The first verify correctly rejected a stale generated fixture
+notice; its generator was updated and the existing supply-chain regression passed.
+The failed run is retained. Final rebase to bfa1aabc6 passed lint, hygiene, all 15 focused tests and full
+verify: 13,401 passed, zero failed/skipped. Core plus stage remains 23,797 B.
+The fresh complete-scene repeats still fail exactly: 2 IOR and 4 volume hashes
+in 24 frames each, with unchanged original error ranges. Their reports are
+recorded under currentMainRepeats in the evidence JSON. No package README or
+public export changed, so package README execution/API regeneration do not apply.

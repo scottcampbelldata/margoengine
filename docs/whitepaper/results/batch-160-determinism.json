@@ -1,0 +1,447 @@
+{
+  "date": "2026-11-09",
+  "status": "OPEN: jobs 4 and 5 remain parked; no production fix",
+  "scope": "Raw API repeatability of two fixed blend draws; no Margo renderer imports in browser, no PBR/texture/derivative/time/atomic inputs",
+  "fixture": {
+    "source": "Khronos IORTestGrid, CC0-1.0, Eric Chadwick 2023",
+    "triangles": 1280,
+    "width": 512,
+    "height": 512,
+    "clearRGBA": [
+      72,
+      72,
+      72,
+      255
+    ],
+    "draws": 2,
+    "tintRange": [
+      0.83,
+      0.866
+    ],
+    "program": "scripts/reference-rendering/blend-repeat.html",
+    "programSha256": "9d002499774747c967570de8f041f2995bd96a8dea597614ceb1259318bfcb8a",
+    "inputHashScope": "Packed Float32 vertex bytes followed by Float32 uniform bytes; index buffer is sequential uint32 0..3839"
+  },
+  "drivers": {
+    "nvidia": "RTX A6000, 617.42 / Windows 32.0.16.1742",
+    "amd": "Radeon Graphics RDNA 2, Windows 32.0.21042.62",
+    "browser": "Edge 157.0.4341.42",
+    "standalone": "webgpu / Dawn Node 0.6.2, existing development dependency"
+  },
+  "rows": [
+    {
+      "api": "webgpu",
+      "backend": "browser default",
+      "renderer": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": ""
+      },
+      "samples": 4,
+      "frames": 400,
+      "processes": 2,
+      "variants": 3,
+      "assertion": "fail",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "b95ae999b05ac36f8319fa818965701f1bf118ad8edab8d9e4f3422abff7c9cc",
+        "e6fe474c0d6a4eb90e5382b51e4e8a431facdd12fa0aea3eb3d5d3db65c5340c",
+        "2117c1fd9e262da2bec3373236abb6f6e9f8b0eb46ff39685cd1d7530d1d23ea"
+      ],
+      "outsideReport": "determinism/webgpu-4-1794223608556-53548/repeat.json",
+      "reportSha256": "45815fb6e33b8ada91e6c72f11bb83286c2a6a241d52b526ebcda5f034cebc2c"
+    },
+    {
+      "api": "webgl2",
+      "backend": "browser default",
+      "renderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "samples": 4,
+      "frames": 400,
+      "processes": 2,
+      "variants": 7,
+      "assertion": "fail",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "05e05ac989f9a813b1a8bfaf2e022a04a16d3f8a895f7970f3e4e6dab79633cf",
+        "4560ee619644d6271e53628d6189fac7cfa4762aabf9188aab9b4592cc892165",
+        "b95ae999b05ac36f8319fa818965701f1bf118ad8edab8d9e4f3422abff7c9cc",
+        "56b323d63ac15c1d0dac8d335e5c6a015c60d10a303c6778b84a7846da89bb3c",
+        "2117c1fd9e262da2bec3373236abb6f6e9f8b0eb46ff39685cd1d7530d1d23ea",
+        "10a3ad86d3db63019ffe647660a2f836b4a2da2ab136591068d430e10531656b",
+        "e6fe474c0d6a4eb90e5382b51e4e8a431facdd12fa0aea3eb3d5d3db65c5340c"
+      ],
+      "outsideReport": "determinism/webgl2-4-1794223808160-40868/repeat.json",
+      "reportSha256": "e675d20b1cad5b472b0f2a199b86810d540dcc42cbedfe4fcd6c5c3b1a51b711"
+    },
+    {
+      "api": "webgpu",
+      "backend": "browser default",
+      "renderer": {
+        "vendor": "amd",
+        "architecture": "rdna-2",
+        "device": "",
+        "description": ""
+      },
+      "samples": 4,
+      "frames": 400,
+      "processes": 2,
+      "variants": 1,
+      "assertion": "pass",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "b36c9bbac3d0f66b8b5b562ba49065f710a78ad9bdc69f2ffefb33f4944249b0"
+      ],
+      "outsideReport": "determinism/webgpu-4-1794223795451-90980/repeat.json",
+      "reportSha256": "a2a20b40bfa7e0ad6915d575b315705075f64d283034cde4a40fc695ff38a2f3"
+    },
+    {
+      "api": "webgl2",
+      "backend": "browser default",
+      "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "samples": 4,
+      "frames": 400,
+      "processes": 2,
+      "variants": 1,
+      "assertion": "pass",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "95b8b7b434acd4e4ced8308f92544246d3c2443adb830370a9ff7a63dc83cfc1"
+      ],
+      "outsideReport": "determinism/webgl2-4-1794223821410-56668/repeat.json",
+      "reportSha256": "327e98788861e218a2bc4c653de00cd234a6493815ef6f2b599e138db32f8392"
+    },
+    {
+      "api": "webgpu",
+      "backend": "browser default",
+      "renderer": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": ""
+      },
+      "samples": 1,
+      "frames": 400,
+      "processes": 2,
+      "variants": 1,
+      "assertion": "pass",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "eafc644058f52161e9a62fdf9348561bb4489dec3ac8b2d128a4267d1aa67140"
+      ],
+      "outsideReport": "determinism/webgpu-1-1794223844053-95036/repeat.json",
+      "reportSha256": "7e83757369575d6ef09f596b03f0b13c51d74d5c5cc7ad74b7ce107f1c2ce2e0"
+    },
+    {
+      "api": "webgl2",
+      "backend": "browser default",
+      "renderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "samples": 1,
+      "frames": 400,
+      "processes": 2,
+      "variants": 1,
+      "assertion": "pass",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "eafc644058f52161e9a62fdf9348561bb4489dec3ac8b2d128a4267d1aa67140"
+      ],
+      "outsideReport": "determinism/webgl2-1-1794223871098-24952/repeat.json",
+      "reportSha256": "eeca694c8677d840fa4dae695948f82ab3ff6174593dc0698bec994c48eb2414"
+    },
+    {
+      "api": "Dawn Node",
+      "backend": "d3d12",
+      "renderer": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "nvidia-rtx-a6000",
+        "description": "D3D12 driver version 32.0.16.1742"
+      },
+      "samples": 4,
+      "frames": 200,
+      "processes": 1,
+      "variants": 2,
+      "assertion": "fail",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "b95ae999b05ac36f8319fa818965701f1bf118ad8edab8d9e4f3422abff7c9cc",
+        "e6fe474c0d6a4eb90e5382b51e4e8a431facdd12fa0aea3eb3d5d3db65c5340c"
+      ],
+      "outsideReport": "determinism/node-d3d12-nvidia-1794224146518-13904/repeat.json",
+      "reportSha256": "918088a5c82a6979b4413096e51aa2bad348557b13708d2b87bfb5143347219c"
+    },
+    {
+      "api": "Dawn Node",
+      "backend": "d3d11",
+      "renderer": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "nvidia-rtx-a6000",
+        "description": "D3D11 driver version 32.0.16.1742"
+      },
+      "samples": 4,
+      "frames": 200,
+      "processes": 1,
+      "variants": 5,
+      "assertion": "fail",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "10a3ad86d3db63019ffe647660a2f836b4a2da2ab136591068d430e10531656b",
+        "05e05ac989f9a813b1a8bfaf2e022a04a16d3f8a895f7970f3e4e6dab79633cf",
+        "b95ae999b05ac36f8319fa818965701f1bf118ad8edab8d9e4f3422abff7c9cc",
+        "2117c1fd9e262da2bec3373236abb6f6e9f8b0eb46ff39685cd1d7530d1d23ea",
+        "4560ee619644d6271e53628d6189fac7cfa4762aabf9188aab9b4592cc892165"
+      ],
+      "outsideReport": "determinism/node-d3d11-nvidia-1794224147558-18740/repeat.json",
+      "reportSha256": "5283e06cb2c03d766bd56d16ab4821f70b34fde8aec2d9a93e95a1c520e4846b"
+    },
+    {
+      "api": "Dawn Node",
+      "backend": "d3d12",
+      "renderer": {
+        "vendor": "amd",
+        "architecture": "rdna-2",
+        "device": "amd-radeon-tm-graphics",
+        "description": "D3D12 driver version 32.0.21042.62"
+      },
+      "samples": 4,
+      "frames": 200,
+      "processes": 1,
+      "variants": 1,
+      "assertion": "pass",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "inputSha256": "5df4403a5b26fdd82f8582681deccd77ba9928c8175407de69e38da4c46fe519",
+      "hashes": [
+        "b36c9bbac3d0f66b8b5b562ba49065f710a78ad9bdc69f2ffefb33f4944249b0"
+      ],
+      "outsideReport": "determinism/node-d3d12-amd-1794224148295-52780/repeat.json",
+      "reportSha256": "8346da767ad0a31b4125aaad6024a7cdbc037c7706b6c8767078ff2f4d6181e6"
+    }
+  ],
+  "fullScenes": [
+    {
+      "family": "volume",
+      "folder": "repeat-compat-1794223095486-67324",
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      },
+      "hashes": 4,
+      "range": {
+        "absolute": [
+          13792000,
+          13792003
+        ],
+        "square": [
+          1394430492,
+          1394430667
+        ],
+        "max": [
+          148,
+          148
+        ],
+        "mae": [
+          17.537434895833332,
+          17.537438710530598
+        ]
+      }
+    },
+    {
+      "family": "ior",
+      "folder": "repeat-native-1794220931827-83004",
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "hashes": 2,
+      "range": {
+        "absolute": [
+          2423418,
+          2423421
+        ],
+        "square": [
+          73048596,
+          73048869
+        ],
+        "max": [
+          255,
+          255
+        ],
+        "mae": [
+          3.0815353393554688,
+          3.0815391540527344
+        ]
+      }
+    },
+    {
+      "family": "ior",
+      "folder": "repeat-native-1794222855713-29644",
+      "hardware": {
+        "webglRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "amd",
+          "architecture": "rdna-2",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "hashes": 1,
+      "range": {
+        "absolute": [
+          2424918,
+          2424918
+        ],
+        "square": [
+          73221084,
+          73221084
+        ],
+        "max": [
+          255,
+          255
+        ],
+        "mae": [
+          3.0834426879882812,
+          3.0834426879882812
+        ]
+      }
+    }
+  ],
+  "amdVolumeRepeat": {
+    "frames": 24,
+    "variants": 1,
+    "outsideReport": "volume/repeat-compat-1794223860488-94668/repeat.json"
+  },
+  "frozenAbsoluteBudgets": {
+    "volumeFullCyclesCompat": 13792000,
+    "iorNative": 2423418
+  },
+  "rejectedChanges": [
+    "sample-count reduction",
+    "switching the official evidence to AMD",
+    "source quantization: it still varies",
+    "changing any error budget"
+  ],
+  "inference": "The observed variation occurs below Margo on the NVIDIA multisample blend path. A driver/device issue is implicated by independent raw API and AMD controls. The closed implementation mechanism and a package-owned failure are not established.",
+  "productionCodeChanged": false,
+  "budgetsChanged": false,
+  "rawProbeBaseCommit": "94daf4df9",
+  "fullSceneEngineCommit": "e9e3fde94",
+  "currentMainRepeats": [
+    {
+      "family": "ior",
+      "frames": 24,
+      "variants": 2,
+      "engineCommit": "bfa1aabc6c46505c0ece86b62e13d5dbffd768e0",
+      "outsideReport": "ior/repeat-native-1794225989330-13288/repeat.json",
+      "reportSha256": "fbcef479c42ec88141ef4043d3e046088e16d23e0d6298269dc361c9610f2736",
+      "range": {
+        "absolute": [
+          2423418,
+          2423421
+        ],
+        "square": [
+          73048596,
+          73048869
+        ],
+        "max": [
+          255,
+          255
+        ],
+        "mae": [
+          3.0815353393554688,
+          3.0815391540527344
+        ]
+      }
+    },
+    {
+      "family": "volume",
+      "frames": 24,
+      "variants": 4,
+      "engineCommit": "bfa1aabc6c46505c0ece86b62e13d5dbffd768e0",
+      "outsideReport": "volume/repeat-compat-1794226007502-16864/repeat.json",
+      "reportSha256": "bd48a757614777e560f7fa0e4bc17216fc4e45d14cb504a4bac07218cd998fdd",
+      "range": {
+        "absolute": [
+          13792000,
+          13792003
+        ],
+        "square": [
+          1394430492,
+          1394430667
+        ],
+        "max": [
+          148,
+          148
+        ],
+        "mae": [
+          17.537434895833332,
+          17.537438710530598
+        ]
+      }
+    }
+  ],
+  "validation": {
+    "mainBase": "bfa1aabc6c46505c0ece86b62e13d5dbffd768e0",
+    "lint": "pass",
+    "hygiene": "pass",
+    "focused": {
+      "pass": 15,
+      "fail": 0,
+      "skip": 0
+    },
+    "verify": {
+      "pass": 13401,
+      "fail": 0,
+      "skip": 0
+    },
+    "coreStageGzip": 23797,
+    "initialFailure": "Generated THIRD-PARTY-NOTICES fixture entry was updated at its generator; existing supply-chain regression and final verify pass",
+    "packageReadmesOrExportsChanged": false
+  }
+}

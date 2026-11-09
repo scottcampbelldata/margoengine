@@ -50,3 +50,14 @@ Job 6: IridescenceMetallicSpheres, CC0-1.0, UX3D, 2022, pinned 8f492390ddc7a2ae2
 Job 7 reuses job 1 MetalRoughSpheresNoTextures without changing any mesh/material. Mitsuba 3.9.1 (BSD-3-Clause) is an outside black-box reference, https://www.mitsuba-renderer.org/ and https://mitsuba.readthedocs.io/. Only its public scene/mesh/render APIs and output are used. No implementation was read or copied. Binary, dependencies, EXRs, float32 output and derived PNGs stay outside under engine-bench; JSON hashes/provenance only are committed.
 
 Job 8 reuses the existing Margo-authored Cornell numerical fixture and its source/licence statement in packages/lightmap/tests/CORNELL-NOTICE.md and THIRD-PARTY-NOTICES.md. Cornell's published measurement facts/specification have no separate SPDX licence stated. No external scene/renderer file or photograph is imported. Mitsuba binary/dependencies/output remain outside, with the same BSD-3-Clause/public-API provenance as job 7.
+
+Batch 160 dedicated determinism probe: IORTestGrid, CC0-1.0, Eric Chadwick, 2023,
+at Khronos glTF-Sample-Assets commit 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
+Source: https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/IORTestGrid/glTF-Binary/IORTestGrid.glb
+SHA-256 863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12.
+The complete standard GLB remains outside in engine-bench/batch-160/IORTestGrid.
+The probe retains the selected sphere's 1,280 triangles in order and expands its
+vertices to assign finite constant tints per triangle. This is a blend-state
+repeatability control. Jobs 4/5's complete reference scenes and budgets are unchanged.
+Standalone Dawn Node 0.6.2 uses the existing webgpu development dependency through
+its public API; no Dawn, ANGLE, driver or reference-renderer implementation was read.

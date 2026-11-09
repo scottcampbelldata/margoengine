@@ -2591,3 +2591,18 @@ the factory on an already lost device. No core or stage source changed.
 ### Batch 65 job 6: Road network graph
 
 road/graph adapts authored junction IDs, spline arc lengths, direction and static travel costs to compute/graph, which keeps the existing CSR ownership, solvers and WebGPU/CPU backends. The root road entry does not import compute. Its synchronous bounded pass builds at most two arcs per road; it adds no shader or solver. Both native device and real WebGL2 compatibility use the existing device-backed compute route, and CPU is available explicitly with createCompute({backend:"cpu"}). Graph/context recreation after reboot is explicit, not automatic restoration. Core and stage are unchanged. Section 5 evidence: Generated stand-in networks: arc-length/default costs, one-way/reverse links, minimum parallel edges, traffic rerouting, isolation, ownership, empty/maximum topology, hostile/extreme values and aborts. Native WebGPU and real WebGL2 compatibility verify route distances/predecessors, reachability, extreme normal f32 weights, solver abort, double disposal, and reconstruction after engine device reboot. No speed or real traffic-data claim. See packages/road/test/graph.test.js and browser-check.mjs. Generated stand-ins only; no surveyed-data, other-hardware or speed claim.
+
+### Batch 160 raw API determinism: section 5 evidence (2026-11-09)
+
+The static-render defect is reproduced below the Margo renderers: two fixed blend
+draws, a fully cleared RGBA8 target, finite flat tints and no texture/material/time
+inputs. Both native WebGPU and raw WebGL2 vary on NVIDIA 617.42 at four samples;
+standalone Dawn reproduces it independently through D3D11 and D3D12. All report
+and input hashes are retained in whitepaper/results/batch-160-determinism.json.
+AMD four-sample and NVIDIA one-sample controls are exact across fresh processes.
+These controls isolate the affected platform path, while its internal mechanism
+remains unknown. No core, stage, package renderer, hardware default, size gate,
+error budget or merge gate is changed. The exact assertions remain failing
+regressions on the affected platform; batch 160 jobs 4/5 cannot land as passing
+and the list row stays open. tests/reference-blend-repeat.test.js verifies the
+fixture's uint32 indices, all retained triangles and atomic concurrent downloads.

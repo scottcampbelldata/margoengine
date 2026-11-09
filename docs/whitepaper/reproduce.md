@@ -1035,3 +1035,42 @@ our measurements with two source pixels uncertainty. The GPU repeats this suppli
 stagger and compares measured output joints within source and raster quantization.
 This proves calibrated structure only, not image reconstruction or colour/wood/rust
 quality. Other controls remain generated stand-ins (LIM-639). No speed measured.
+
+### Batch 160: independent raw blend repeat regression
+
+From this checkout, after npm ci, run through the shared GPU lock:
+
+```sh
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgpu
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgl2
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d12
+node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d11
+```
+
+The browser commands render 200 frames per process, in two fresh processes. Each
+command requires one unique full RGBA byte hash, records all hashes and every
+changed pixel per distinct image, and exits nonzero on variation. Browser work
+has a 120-second deadline per process. Node uses the existing webgpu 0.6.2 development
+dependency and the exact same checked-in draw program, with a 120-second deadline.
+The commands currently fail on NVIDIA 617.42. This is preserved failing evidence.
+
+For controls, pass --samples=1 to each browser command, or set MARGO_GPU=amd in
+the child environment and retain four samples. The Node control uses --vendor=amd
+with --backend=d3d12. Vendor controls compare repeats within one adapter, not bytes
+between adapters. --frames=2..4096 and browser --processes=1..16 control the capture
+counts without changing the exact assertion.
+
+The pinned CC0 IORTestGrid GLB is reused from the outside batch-160 cache, or fetched
+from its pinned standard-asset URL if missing. Changed bytes fail SHA-256 validation;
+concurrent downloads publish atomically. Source/legal details are in
+scripts/reference-rendering/NOTICE.md. Reports stay outside under
+engine-bench/batch-160/determinism; the committed summary is
+results/batch-160-determinism.json. No renderer or driver implementation is read.
+
+Full-scene reproductions still live on batch-160-job5-parked:
+GPU-locked scripts/reference-rendering/repeat.mjs --case=ior, and
+--case=volume --compat. Both compare 24 complete-scene frames with unchanged inputs
+and budgets. Volume full-Cycles absolute error still spans 13,792,000..13,792,003
+against 13,792,000; native IOR spans 2,423,418..2,423,421 against 2,423,418. AMD repeats
+are stable but its IOR absolute error is 2,424,918, so changing adapter does not
+satisfy the original gate. Both jobs remain parked until repaired.
