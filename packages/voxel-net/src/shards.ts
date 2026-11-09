@@ -414,6 +414,7 @@ export function connectShards(
 ): VoxelShardClient {
   if (!(map instanceof ShardMap)) throw new TypeError('connectShards map must be a ShardMap');
   const url = map.shards[index];
-  if (url === undefined) throw new RangeError(`connectShards index ${index} is not in map.shards; pass 0 to ${map.shards.length - 1}`);
+  if (url === undefined)
+    throw new RangeError(`connectShards index ${index} is not in map.shards; pass 0 to ${map.shards.length - 1}`);
   return new VoxelShardClient(url, world, options);
 }

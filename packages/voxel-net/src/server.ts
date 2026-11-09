@@ -32,7 +32,7 @@ import {
   type ServerMessage,
 } from './protocol.js';
 import type { ChunkStore } from '@margoengine/voxel/stream';
-import { acceptWebSocket, type WebSocketConnection } from './websocket.js';
+import { acceptWebSocket } from './websocket.js';
 
 /** Options of {@link VoxelServer}. Distances in chunks unless named otherwise. */
 export interface VoxelServerOptions {
@@ -148,6 +148,34 @@ export interface VoxelServerOptions {
 }
 
 /**
+ * A connection the server talks to a client over: `WebSocketConnection`, or one of your own for
+ * {@link VoxelServer.accept}. `datagrams: true` says messages may be lost or come out of order (WebTransport
+ * datagrams): the server then sends player snapshots each in full and mends inputs that skip or repeat steps.
+ */
+export interface VoxelServerConnection {
+  /** Sends one message. */
+  send(data: Uint8Array): void;
+  /** Closes with a WebSocket close code and reason. */
+  close(code?: number, reason?: string): void;
+  /** Each message from the client. */
+  onmessage: ((data: Uint8Array) => void) | null;
+  /** Once, when it closes from either end; 1006 for a drop. */
+  onclose: ((code: number, reason: string) => void) | null;
+  /** Bytes received so far. */
+  readonly bytesIn: number;
+  /** Bytes queued and not yet sent. */
+  readonly buffered: number;
+  /** Holds sends until uncork, to write a tick's messages together. */
+  cork(): void;
+  /** Writes what cork held. */
+  uncork(): void;
+  /** A keep-alive the client answers without the app seeing it. */
+  ping(): void;
+  /** True when messages may be lost or reordered. */
+  readonly datagrams?: boolean;
+}
+
+/**
  * The login check of {@link VoxelServerOptions.authenticate}: `hello` is undefined on the upgrade request and holds
  * the player's chosen name on the hello. Return (or resolve) `true`, or a non-empty string that becomes the player's
  * `identity`, to let the client on; anything else refuses it.
@@ -252,6 +280,8 @@ export interface VoxelServerMetrics {
   chunksResent: number;
   /** Resumes that had to send the whole view again. */
   fullResends: number;
+  /** Input steps lost over datagrams with every copy, filled with the last keys held. */
+  stepsLost: number;
 }
 
 // A chunk position; `d` orders a view nearest first.
@@ -270,7 +300,9 @@ interface Generated {
 }
 // A connection and its player.
 interface Client extends VoxelServerPlayer {
-  conn: WebSocketConnection;
+  conn: VoxelServerConnection;
+  lossy: boolean; // inputs may be lost, reordered or repeated; players go in full
+  keys: number; // keys of the last step moved
   name: string;
   identity: string | undefined;
   // 'auth': the hello came and authenticate is running.
@@ -330,6 +362,7 @@ interface Client extends VoxelServerPlayer {
   quietTicks: number;
 }
 
+const NO_BASELINE: ReadonlyMap<number, PreparedEntity> = new Map();
 const NAMES: Record<number, ServerMessage['type']> = {
     16: 'welcome',
     17: 'chunk',
@@ -652,6 +685,7 @@ export class VoxelServer {
   #timer: ReturnType<typeof setTimeout> | undefined;
   #tick = 0;
   #start = 0;
+  #started: Promise<void> | undefined;
   #closed = false;
   /**
    * @throws TypeError when `blocks` is not a BlockTypes or an option has the wrong type.
@@ -827,6 +861,25 @@ export class VoxelServer {
     else this.#leave(c);
     return true;
   }
+  /**
+   * Takes a player on over a connection you accepted yourself (WebTransport through
+   * `@margoengine/voxel-net/webtransport`, or any {@link VoxelServerConnection}), as `listen` does for a WebSocket.
+   * `request` is what your `authenticate` gets; `address` counts toward `maxPerAddress`.
+   * @throws TypeError when `connection` lacks a send, close, cork or uncork; MargoError `state` once closed, or when
+   * `authenticate` is set and there is no `request`.
+   */
+  accept(connection: VoxelServerConnection, request?: IncomingMessage, address = ''): void {
+    if (!connection || typeof connection !== 'object')
+      throw new TypeError('VoxelServer.accept needs a connection; pass one from @margoengine/voxel-net/webtransport');
+    for (const name of ['send', 'close', 'cork', 'uncork', 'ping'] as const)
+      if (typeof connection[name] !== 'function')
+        throw new TypeError(`VoxelServer.accept connection has no ${name}(); pass a VoxelServerConnection`);
+    if (this.#closed) throw new MargoError('state', 'VoxelServer is closed; make a new server to accept connections');
+    if (!this.#started) throw new MargoError('state', 'VoxelServer has not started; await server.start() first');
+    if (this.#authenticate && !request)
+      throw new MargoError('state', 'VoxelServer has authenticate, so accept needs the request; pass it');
+    this.#connect(connection, request, String(address));
+  }
   #queueApp(c: Client, message: Uint8Array): boolean {
     // Only a client the server holds, past its hello: before the welcome there is nothing to deliver to.
     if (!this.#clients.has(c) || c.phase === 'hello' || c.phase === 'auth' || c.phase === 'gone') return false;
@@ -966,7 +1019,7 @@ export class VoxelServer {
   async listen(port = 0, host = '127.0.0.1'): Promise<AddressInfo> {
     if (this.#http || this.#closed)
       throw new MargoError('state', 'VoxelServer is already listening or closed; create a new VoxelServer');
-    this.#air = await encodeChunk(new VoxelChunk(), { light: false, compress: false });
+    await this.start();
     const http = createServer((_req, res) => {
       res.writeHead(426, { 'Content-Type': 'text/plain' });
       res.end('voxel-net: connect with a WebSocket\n');
@@ -991,9 +1044,23 @@ export class VoxelServer {
       http.once('error', fail);
       http.listen(port, host, () => done());
     });
-    this.#start = performance.now();
-    this.#timer = setTimeout(this.#run, 1000 / this.#tickRate);
     return http.address() as AddressInfo;
+  }
+  /**
+   * Starts the tick without a WebSocket listener, for a server that takes players only through
+   * {@link VoxelServer.accept} (WebTransport). `listen` calls it; a second call does nothing.
+   * @throws MargoError `state` once closed.
+   */
+  async start(): Promise<void> {
+    if (this.#closed) throw new MargoError('state', 'VoxelServer is closed; create a new VoxelServer');
+    if (this.#started) return this.#started;
+    this.#started = (async () => {
+      this.#air = await encodeChunk(new VoxelChunk(), { light: false, compress: false });
+      if (this.#closed) return;
+      this.#start = performance.now();
+      this.#timer = setTimeout(this.#run, 1000 / this.#tickRate);
+    })();
+    return this.#started;
   }
   /**
    * Stops the tick, closes every connection (1001) and the listener, ends the generator threads and, with a `store`,
@@ -1046,13 +1113,16 @@ export class VoxelServer {
       replaced: 0,
       chunksResent: 0,
       fullResends: 0,
+      stepsLost: 0,
     };
   }
 
   // Connections.
-  #connect(conn: WebSocketConnection, req: IncomingMessage, address: string): void {
+  #connect(conn: VoxelServerConnection, req: IncomingMessage | undefined, address: string): void {
     const c: Client = {
       conn,
+      lossy: conn.datagrams === true,
+      keys: 0,
       id: ++this.#nextId,
       name: '',
       identity: undefined,
@@ -1114,7 +1184,7 @@ export class VoxelServer {
     this.#wire(c, conn);
     if (this.#authenticate) c.upgradeAuth = this.#authorize(c, undefined);
   }
-  #wire(c: Client, conn: WebSocketConnection): void {
+  #wire(c: Client, conn: VoxelServerConnection): void {
     conn.onmessage = (bytes) => this.#receive(c, bytes);
     conn.onclose = (code, reason) => {
       const silent = code === 1008 && reason === 'client-silent';
@@ -1209,9 +1279,54 @@ export class VoxelServer {
       return this.#hello(c, m);
     }
     if (c.phase !== 'playing') return this.#kick(c, 1008, `${m.type} before spawning`);
+    if (c.lossy && m.type === 'input') {
+      const mended = this.#mend(c, m);
+      if (!mended) return;
+      m = mended;
+    }
     if (c.queue.length < MAX_QUEUED) return void c.queue.push(m);
     if (!c.held) return this.#kick(c, 1008, 'too many messages');
     this.#fold(c, m);
+  }
+  // An input over datagrams, made to follow the steps the server has: steps it had already (a repeat, or a late copy)
+  // are cut, and a gap (inputs lost with every copy) is filled with the last keys held, as if the player held them.
+  // Undefined when nothing in it is new.
+  #mend(
+    c: Client,
+    m: Extract<ClientMessage, { type: 'input' }>,
+  ): Extract<ClientMessage, { type: 'input' }> | undefined {
+    let next = c.step + 1,
+      keys = c.keys,
+      yaw = c.yaw,
+      pitch = c.pitch;
+    for (const q of c.queue)
+      if (q.type === 'input') {
+        for (const run of q.runs) next += run.steps;
+        const last = q.runs[q.runs.length - 1];
+        if (last) ({ keys, yaw, pitch } = last);
+      }
+    let runs = m.runs;
+    if (m.step < next) {
+      let cut = next - m.step;
+      runs = [];
+      for (const run of m.runs) {
+        if (cut >= run.steps) cut -= run.steps;
+        else {
+          runs.push(cut ? { ...run, steps: run.steps - cut } : run);
+          cut = 0;
+        }
+      }
+      if (!runs.length) return undefined;
+    } else if (m.step > next) {
+      const lost = m.step - next;
+      if (lost > MAX_STEPS) {
+        this.#kick(c, 1002, `${lost} input steps lost; the link is too lossy`);
+        return undefined;
+      }
+      this.metrics.stepsLost += lost;
+      runs = [{ steps: lost, keys, yaw, pitch }, ...m.runs];
+    }
+    return { ...m, step: next, runs };
   }
   // A full queue while the client's inputs wait on chunks this server has not made: the wait is ours, so it is not
   // closed for it, however long the generator takes. Nothing grows: after the wait the bank moves at most BANK steps,
@@ -1817,7 +1932,8 @@ export class VoxelServer {
           }
         // Before its first state, so a client's RemotePlayer has its name from the start.
         if (names) this.#write(c, encodeServerMessage({ type: 'names', names }));
-        const data = this.#codec.encode(nearby, c.baseline);
+        // Over datagrams a message may be lost, so each one stands alone: against no baseline.
+        const data = this.#codec.encode(nearby, c.lossy ? NO_BASELINE : c.baseline);
         c.baseline = nearby;
         if (data.length > 1 || c.announce)
           this.#write(c, encodeServerMessage({ type: 'players', tick: this.#tick, data }));
@@ -1866,6 +1982,7 @@ export class VoxelServer {
           ch.update(STEP_SECONDS, intent);
         }
         c.yaw = run.yaw;
+        c.keys = run.keys;
         c.pitch = run.pitch;
       }
       c.step += total;

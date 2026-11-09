@@ -196,6 +196,7 @@ export class VoxelNetClient {
 
 export interface VoxelNetClientOptions {
     name?: string;
+    inputCopies?: number;
     view?: number;
     decodeDistance?: number;
     players?: boolean;
@@ -246,6 +247,7 @@ export interface VoxelNetResumed {
 export interface VoxelNetTransport {
     send(data: Uint8Array): void;
     close(): void;
+    readonly datagrams?: boolean;
 }
 
 export function blockTableHash(blocks: BlockTypes): number;

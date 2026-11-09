@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11440780,
+  "total": 11448592,
   "history": [
     {
       "date": "2026-10-24",
@@ -4766,6 +4766,12 @@
       "commit": "13cf4d7ac",
       "reason": "lighting2d light masks and layers (LIM-597)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "e81f2af6c",
+      "reason": "voxel-net gains the ./webtransport entry, server.accept and server.start",
+      "grew": 4
     }
   ],
   "items": {
@@ -5565,12 +5571,13 @@
     "@margoengine/voxel-edit/sparse": 6873,
     "@margoengine/voxel-edit/vox": 12202,
     "@margoengine/voxel-edit/voxelize": 3724,
-    "@margoengine/voxel-net": 8267,
-    "@margoengine/voxel-net/bot": 9726,
+    "@margoengine/voxel-net": 8623,
+    "@margoengine/voxel-net/bot": 10054,
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
-    "@margoengine/voxel-net/server": 17313,
+    "@margoengine/voxel-net/server": 17930,
     "@margoengine/voxel-net/shards": 9655,
+    "@margoengine/voxel-net/webtransport": 6511,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,

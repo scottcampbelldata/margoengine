@@ -40,6 +40,7 @@ export class VoxelServer {
     onTick(listener: (tick: number, dt: number) => void): () => void;
     sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;
     disconnect(player: VoxelServerPlayer, code?: number, reason?: string): boolean;
+    accept(connection: VoxelServerConnection, request?: IncomingMessage, address?: string): void;
     get counts(): {
         players: number;
         parked: number;
@@ -57,7 +58,21 @@ export class VoxelServer {
     exportEdits(): Promise<Map<string, PackedChunk>>;
     importEdits(edits: ReadonlyMap<string, PackedChunk>): Promise<void>;
     listen(port?: number, host?: string): Promise<AddressInfo>;
+    start(): Promise<void>;
     close(): Promise<void>;
+}
+
+export interface VoxelServerConnection {
+    send(data: Uint8Array): void;
+    close(code?: number, reason?: string): void;
+    onmessage: ((data: Uint8Array) => void) | null;
+    onclose: ((code: number, reason: string) => void) | null;
+    readonly bytesIn: number;
+    readonly buffered: number;
+    cork(): void;
+    uncork(): void;
+    ping(): void;
+    readonly datagrams?: boolean;
 }
 
 export interface VoxelServerMetrics {
@@ -83,6 +98,7 @@ export interface VoxelServerMetrics {
     replaced: number;
     chunksResent: number;
     fullResends: number;
+    stepsLost: number;
 }
 
 export interface VoxelServerOptions {

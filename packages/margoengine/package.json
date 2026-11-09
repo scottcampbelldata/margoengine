@@ -3258,6 +3258,10 @@
       "types": "./dist/voxel-net/shards.d.ts",
       "import": "./dist/voxel-net/shards.js"
     },
+    "./voxel-net/webtransport": {
+      "types": "./dist/voxel-net/webtransport.d.ts",
+      "import": "./dist/voxel-net/webtransport.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

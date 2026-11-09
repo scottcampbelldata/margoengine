@@ -177,6 +177,7 @@ class VoxelNetClient {
 
 interface VoxelNetClientOptions {
     name?: string;
+    inputCopies?: number;
     view?: number;
     decodeDistance?: number;
     players?: boolean;
@@ -227,6 +228,7 @@ interface VoxelNetResumed {
 interface VoxelNetTransport {
     send(data: Uint8Array): void;
     close(): void;
+    readonly datagrams?: boolean;
 }
 
 class WebSocketConnection {

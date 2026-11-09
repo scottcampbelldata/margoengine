@@ -369,6 +369,53 @@ follower.onApp = (data) => console.log(`your app message, ${data.length} bytes`)
   that shard's edits, until it crosses. A handoff keeps the position, not the velocity, and lands the player on the
   ground. The chunks around the player are fetched again from the next shard (one round trip of empty world).
 
+## WebTransport datagrams (`./webtransport`)
+
+Over a WebSocket one lost packet holds up everything behind it until it is sent again. Over WebTransport (HTTP/3)
+movement goes as unreliable datagrams instead, so a lost packet costs nothing: each input datagram carries copies of
+the last `inputCopies` (default 3) inputs, and the server cuts the steps it has and fills a gap it never got with the
+keys last held (`server.metrics.stepsLost` counts those steps); each players snapshot is sent whole, not as a delta, and
+a late one is dropped. Chunks, edits, corrections, names and app messages stay on the one reliable stream. It runs on
+`@margoengine/netcode/webtransport`. Node has no HTTP/3 server of its own: your HTTP/3 server hands each session (of the
+W3C shape) to `acceptVoxelNetWebTransport`, and `server.start()` runs the tick without a WebSocket listener (or call
+`listen` too, to take both).
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+import { acceptVoxelNetWebTransport, connectVoxelNetWebTransport } from 'margoengine/voxel-net/webtransport';
+import type { WebTransportSession } from 'margoengine/netcode/webtransport';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+
+// Server: tick without a WebSocket listener; your HTTP/3 server calls onSession for each WebTransport session.
+const server = new VoxelServer({ blocks });
+await server.start();
+const onSession = (session: WebTransportSession) => acceptVoxelNetWebTransport(server, session);
+console.log(typeof onSession);
+
+// Browser: where WebTransport exists, join over it; otherwise use connectVoxelNet (a WebSocket).
+if ('WebTransport' in globalThis) {
+  const client = await connectVoxelNetWebTransport('https://play.example.com/voxel', new VoxelWorld({ blocks }), {
+    name: 'Ada',
+  });
+  client.onClose = ({ code }) => console.log(`closed ${code}`);
+}
+```
+
+- **Server.** `server.start()`, `acceptVoxelNetWebTransport(server, session, {request?, address?})`, or
+  `server.accept(connection, request?, address?)` for a `VoxelServerConnection` of your own (`datagrams: true` when
+  messages may be lost or reordered). `voxelNetServerConnection(netcodeConnection)` makes one.
+- **Client.** `connectVoxelNetWebTransport(url, world, options)` (the client options plus netcode's
+  `serverCertificateHashes`, `congestionControl` and `signal`), or `joinOver(connection, world, options)` for a netcode
+  `Connection` you opened. `inputCopies` (0 to 8) sets the copies.
+- **Limits.** A dropped session is not resumed (connect again). The server's slow-client check does not see a
+  WebTransport stream backing up (its writer does not say how much waits); netcode drops datagrams instead while the
+  stream holds over `dropUnreliableAbove`. A snapshot bigger than a datagram goes on the stream. The tests run over a
+  stand-in link in memory (a third of datagrams lost, some reordered); the session itself is netcode's, proved there
+  against a real HTTP/3 server.
+
 ## Limits of the prototype
 
 No chat or inventories, no TLS (put `wss://` behind a reverse proxy); one world over several processes is `./shards` above. The server trusts

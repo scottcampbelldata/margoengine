@@ -241,7 +241,8 @@ Bots: four bots for two seconds with no errors.
 ## Not in the prototype
 
 Chat, inventories, TLS. (Login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
-several server processes for one world through `./shards` have since been added; see the README.)
+several server processes for one world through `./shards` and WebTransport datagrams through `./webtransport` have
+since been added; see the README.)
 
 ## Open questions (all answered yes)
 

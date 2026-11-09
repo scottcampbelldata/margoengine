@@ -46,6 +46,10 @@
     "./shards": {
       "types": "./dist/shards.d.ts",
       "import": "./dist/shards.js"
+    },
+    "./webtransport": {
+      "types": "./dist/webtransport.d.ts",
+      "import": "./dist/webtransport.js"
     }
   },
   "files": [
@@ -59,6 +63,7 @@
   "dependencies": {
     "@margoengine/math": "^1.0.0",
     "@margoengine/net": "^1.0.0",
+    "@margoengine/netcode": "^1.0.0",
     "@margoengine/voxel": "^1.0.0"
   },
   "scripts": {

@@ -31,12 +31,22 @@ export interface VoxelNetTransport {
   send(data: Uint8Array): void;
   /** Closes the connection. */
   close(): void;
+  /**
+   * True when messages may be lost or come out of order (WebTransport datagrams): the client then sends each input
+   * with copies of the ones before (`inputCopies`) and reads player snapshots each on its own, dropping late ones.
+   */
+  readonly datagrams?: boolean;
 }
 
 /** Options of {@link VoxelNetClient}. */
 export interface VoxelNetClientOptions {
   /** Display name, at most 32 UTF-8 bytes. Default ''. */
   name?: string;
+  /**
+   * Over a transport with `datagrams`, how many earlier inputs each input message carries again, so a datagram lost
+   * on the way costs no steps (0 to 8, default 3). A WebSocket ignores it.
+   */
+  inputCopies?: number;
   /** View distance to ask for, in chunks; the server clamps it to its own limits. Default 6. */
   view?: number;
   /**
@@ -157,7 +167,9 @@ interface Entry {
   swap: boolean;
 }
 
-const HISTORY = 1200, // steps of input kept for replay: 10 s
+const COPY_STEPS = 120, // most steps one input message carries with its copies, over datagrams
+  NO_PLAYERS = new Map<number, never>(),
+  HISTORY = 1200, // steps of input kept for replay: 10 s
   SEND_EVERY = 6, // steps per input message: one per 20 Hz tick
   SILENT_CHECKS = 15, // serverTimeout is watched by this many timer firings
   ATTEMPT_MS = 5000, // one try to take a player back may take this long
@@ -272,6 +284,9 @@ export class VoxelNetClient {
   readonly #keys = new Uint8Array(HISTORY);
   readonly #yaw = new Uint16Array(HISTORY);
   #runs: InputRun[] = [];
+  #copies: { step: number; runs: InputRun[] }[] = []; // the last inputs sent, over datagrams
+  #lastTick = -1; // tick of the newest players message, over datagrams
+  readonly #inputCopies: number;
   #first = 0; // first step in #runs
   #pending = 0; // steps in #runs
   #center = ''; // chunk of the player when chunks near it were last decoded
@@ -296,6 +311,10 @@ export class VoxelNetClient {
     this.#decodeDistance = decodeDistance;
     this.#decodePlayers = options.players ?? true;
     this.#delay = options.interpolationDelay ?? 0.1;
+    const copies = options.inputCopies ?? 3;
+    if (!(Number.isInteger(copies) && copies >= 0 && copies <= 8))
+      throw new RangeError(`VoxelNetClient inputCopies ${copies} must be a whole number from 0 to 8`);
+    this.#inputCopies = copies;
     this.#view = view;
     this.#name = options.name ?? '';
     this.#send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view, name: this.#name }));
@@ -359,12 +378,29 @@ export class VoxelNetClient {
   /** Sends the inputs of the steps since the last send now (an edit does this first, so the server sees them in order). */
   flush(): void {
     if (!this.#runs.length || this.#closed || this.detached) return;
+    let step = this.#first,
+      runs = this.#runs;
+    if (this.#transport.datagrams) {
+      // Each datagram carries the steps of the last few too, so one lost on the way costs nothing; the server cuts
+      // the steps it has. Copies stop at COPY_STEPS steps, well inside the server's 240 a message.
+      this.#copies.push({ step, runs });
+      while (this.#copies.length > this.#inputCopies + 1) this.#copies.shift();
+      let steps = 0;
+      for (const run of runs) steps += run.steps;
+      while (this.#copies.length > 1) {
+        const [first] = this.#copies as [{ step: number; runs: InputRun[] }];
+        if (step - first.step + steps <= COPY_STEPS) break;
+        this.#copies.shift();
+      }
+      step = (this.#copies[0] as { step: number }).step;
+      runs = this.#copies.flatMap((copy) => copy.runs);
+    }
     this.#send(
       encodeClientMessage({
         type: 'input',
-        step: this.#first,
+        step,
         acked: this.#acked,
-        runs: this.#runs,
+        runs,
         position: this.player.position,
       }),
     );
@@ -409,6 +445,7 @@ export class VoxelNetClient {
     if (this.#closed || this.detached) return;
     this.#detachedAt = performance.now();
     this.#runs = [];
+    this.#copies = [];
     this.#pending = 0;
     this.#time = 0;
     this.stats.drops++;
@@ -632,7 +669,10 @@ export class VoxelNetClient {
     const rate = this.welcome?.tickRate || 20,
       time = tick / rate,
       now = performance.now() / 1000,
-      decoded = this.#codec.decode(data, this.#entities);
+      lossy = this.#transport.datagrams === true;
+    if (lossy && tick <= this.#lastTick) return; // a datagram that came late: a newer one is in
+    this.#lastTick = tick;
+    const decoded = this.#codec.decode(data, lossy ? NO_PLAYERS : this.#entities);
     // Server clock: the least delayed arrival so far, drifting up slowly in case the clocks run apart.
     this.#offset = Math.min(now - time, this.#offset + 0.0005);
     for (const [id, state] of decoded) {
