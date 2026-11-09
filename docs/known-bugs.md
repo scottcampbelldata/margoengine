@@ -24,6 +24,17 @@ The coordinator requires the existing local test-page follow-ups to land first;
 entry 45 is retained for subsequent owning-package triage, alongside 42-44 in
 testpage-bugs.md. No core change is implied by this report.
 
+Independent bounded D3D11 evidence: immediate attach/dispose returns from both
+tracer.dispose and engine.dispose, including loseContext entry/exit. A separate
+ready/render case stalls before render, at tracer.ready, and its whole process
+tree is killed at the unchanged 180 s limit. The disposal cause remains
+unverified. An isolated pipeline-boundary probe distinguishes pending compiler
+promises from engine disposal; browser teardown remains with its dedicated owner.
+That isolated probe resolves every requested pipeline except trace before the
+same three-minute hold limit terminates its process tree. GL completion queries
+and JavaScript heartbeats return while trace remains pending. The cause of this
+readiness failure still needs attribution; it is not proof of a loseContext hang.
+
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
 Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs
@@ -2337,5 +2348,11 @@ A twice-extruded cylinder also exposes the centroid-based winding guess.
 The local repair triangulates invalid generated loops and follows half edges
 for cap cycles/winding. Twelve persistent regressions pass; the first full gate
 found an entry size overrun, now reduced to 30,180 B against unchanged 30,203 B.
-Full verification, browser and runnable README checks still must finish before
-landing; this entry closes only after those checks and the push.
+All four required exporter/mesh-edit browser suites pass. The scoped README gate
+exits successfully with 49/52 examples passing and three pre-existing known-list
+failures, named in docs/testpage-bugs.md. Initial full verification finds only a
+stale generated research index (13,561/13,562 tests pass); regenerating that index
+passes all nine index tests. A subsequent full verification exits without a unit
+summary, so no full pass is claimed. Its cause is not attributed, and browser
+teardown belongs to the dedicated hunter. Landing still requires that gate;
+this entry closes only after successful verification and the push.

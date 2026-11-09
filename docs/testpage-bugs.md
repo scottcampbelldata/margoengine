@@ -412,3 +412,45 @@ from the generated site/llms.txt index. Regenerating that index repairs the stal
 artifact, and all nine existing LLM-index regressions pass. Build, API and quality
 checks passed in that run. Verification must finish again with the repaired
 artifact; browser and executable README validation remain pending.
+
+### Continuation: entries 36 and 32 landed, entry 44 still gated
+
+Entry 36 landed as 1dbb3bec8 after core GPU passed in native, compat and preview
+modes (8.3 s) and all 15 core/umbrella README programs passed (18.7 s).
+Entry 32 landed as 99b7dafec after the labels browser suite passed (11.9 s) and
+all six labels README programs passed (13.1 s). Both pushes fetched/rebased current
+main and used fast-forward pushes. Their retained full verification/unit/lint/
+hygiene results above were not duplicated. The research record and generated
+index precede both commits, so their early landings include the cited sources.
+
+Exporters' browser, PNG and capture suites and mesh-edit's browser suite passed
+in 23.1 s total. The exporters/mesh-edit README command exited successfully in
+22.6 s: 49/52 examples passed, with three pre-existing known-list failures:
+exporters render-to-file (undefined tuple), exporters Unity support bundle
+(fixture lacks the required source profile), and mesh-edit import-to-editable
+(fixture lacks the requested glTF accessor). These are not 52 passing examples.
+The report is test-results/readme-run/run-88656/report.json.
+
+The repaired full verification exited unsuccessfully after 700 s including its
+GPU queue wait. Build, API, quality and other completed chains passed; the unit
+chain produced no final output or failure summary before the process exited.
+There is no successful verify result for entry 44 and no new attributed cause.
+Do not replace that missing result with a blind retry or a passing focused test.
+Browser teardown remains the dedicated hunter's work. Entry 44 is not pushed.
+
+Entry 45's D3D11 probe confirms that immediate tracer/engine disposal returns
+through loseContext. Its separate ready/render case reached await tracer.ready,
+then hit the unchanged 180 s hard limit; its entire process tree was killed.
+It never reached render or disposal in that case, so this neither establishes
+nor disproves the reported disposal hang. The subsequent isolated pipeline probe
+records individual promises and first GL status queries to locate the readiness
+boundary, rather than changing tracing work or the timeout.
+
+The isolated probe also ends at its unchanged three-minute GPU hold limit
+(182.8 s supervisor result including termination). Add, prepare, atrous, tables,
+combine, ids and preview all resolve; only the trace render pipeline remains
+pending. First COMPLETION_STATUS_KHR queries return without blocking, and page
+heartbeats continue until termination. No render/disposal boundary is reached.
+The trace compilation/readiness boundary needs further attribution; no package
+runtime change or NOT A BUG conclusion was made. Logs and supervisors use the
+testpage-45-pipeline-probe prefix. The final live BUGS.md reread still ends at 45.
