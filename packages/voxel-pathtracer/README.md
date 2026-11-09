@@ -392,6 +392,10 @@ disposal releases them.
   pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
   history, kept in two textures (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
   metal or glossy coats skip the caustic chain, which more than makes up for it (256 MiB for the dense scene).
+- Reprojected viewport history uses only the bilinear taps that pass the surface mask. Rejected taps contribute
+  neither color nor sample weight; surviving taps retain normalized weights. The controlled native WebGPU and
+  WebGL2 regression covers all 16 masks, HDR 32768, zero/exhausted history and actual device replacement. Newly
+  visible surfaces can still be noisy; this does not establish a noise-free first frame after a camera move.
 - `enabled = false` leaves ordinary rendering unchanged (measured bit-identical); the tracer then encodes nothing.
 - Until then the viewport shows a preview: a small kernel (compiled in a fraction of the full tracer's time, about 0.15
   against 2 s on an RTX A6000) draws the first hit lit by the sun and the sky; accumulation starts over when the full
@@ -426,7 +430,11 @@ const scene: VoxelTraceScene = {
 await install();
 const engine = await Engine.create(canvas);
 const tracer = VoxelPathTracer.attach(engine, { scene });
-await tracer.ready; // the raster image, then the preview, until the kernels compile
+engine.start(); // the viewport progresses while full tracing compiles
+window.addEventListener('pagehide', () => {
+  tracer.dispose();
+  engine.dispose();
+}, { once: true });
 ```
 
 The WebGL2 kernels are the WebGPU ones except `trace`: its stores cannot run on the GPU on WebGL2, so the same sample loop
@@ -782,8 +790,11 @@ const environment = await traceSkyEnvironment(engineRuntime(engine).gpu!, {
 const tracer = VoxelPathTracer.attach(engine, {
   scene: { revision: 1, models: [], instances: [], materials: [], environment },
 });
-await tracer.ready;
-engine.render();
+engine.start(); // retain progressive feedback while full tracing compiles
+window.addEventListener('pagehide', () => {
+  tracer.dispose();
+  engine.dispose();
+}, { once: true });
 ```
 
 Options and defaults: `width: 256` (1..2048), `height: 128` (1..1024), `hours: 12` (finite, wraps at 24),

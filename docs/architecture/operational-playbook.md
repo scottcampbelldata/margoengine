@@ -3635,3 +3635,18 @@ the original timeout and do not establish a driver/compiler failure. The deadlin
 shaders and transport stay unchanged. Scope and receipts are in the media startup
 proof; the earlier verify API-generation failure and successful scoped recheck
 remain recorded in the guiding proof. The coordinator directs failed steps only.
+
+### 5. Batch 99 viewport history tap repair
+
+The combine kernel now consumes the prepare kernel's valid-tap mask per tap.
+Rejected geometry contributes neither color nor sample weight. The mandatory
+voxel-pathtracer test:gpu:history-taps is discovered by check:merge, has a six
+minute process-tree limit, and tests all 16 masks with HDR 32768, samples
+1/8/65536, zero history, native WebGPU and WebGL2 compatibility, and actual
+device replacement. The original shader fails 112 partial-mask cases; all
+448 pass after repair. Device and tracer disposal remain exercised. Evidence:
+whitepaper/results/batch-99-history-taps-20261109.json. The existing moving
+camera oracle and its thresholds are unchanged. This proves tap rejection,
+not noise-free disocclusions or the requested optional /denoise entry.
+
+History landing evidence (Batch 99): all 448 history cases pass again on native WebGPU and WebGL2/Vulkan with actual replacement devices; all 137 package tests and all 9 runtime README examples pass. The tracer, core, stage and math sources match the successful r6 base/denoise GPU checks, which are retained without repetition. The changed compatibility preview ownership and browser teardown are covered by the fresh history and media lifecycle checks. Genuine paired entry/network records were generated from one clean package revision, API rows afterward, and the documentation corpus after final docs. The earlier 13,545-test verify is historical; no fresh full verify is claimed. Evidence: whitepaper/results/batch-99-history-landing-20261109.json. Jobs 1 and 2 remain open.

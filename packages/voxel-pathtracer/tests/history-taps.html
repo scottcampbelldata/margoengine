@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>Production history tap regression</title><canvas width="8" height="8"></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {historyTapCheck} from './history-taps-browser.js';
+window.run=async()=>{
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu'}),errors=[],reports=[],messages=[];
+ let source;
+ const watch=()=>{const d=engineRuntime(engine).gpu,create=d.createShaderModule.bind(d);d.addEventListener('uncapturederror',e=>errors.push(e.error.message));d.createShaderModule=desc=>{if(/\bfn\s+combine\b/.test(desc.code)&&/\bfn\s+prepare\b/.test(desc.code))source=desc.code;const m=create(desc);reports.push(m.getCompilationInfo().then(info=>messages.push(...info.messages.filter(m=>m.type==='error').map(m=>m.message))));return m;};};watch();
+ const tracer=VoxelPathTracer.attach(engine,{scene:{revision:1,models:[],instances:[],materials:[],environment:{skyIntensity:0}},denoise:true});
+ try{
+  await tracer.ready;
+  const first=await historyTapCheck(engineRuntime(engine).gpu,source),old=engineRuntime(engine).gpu;
+  await engine.rebootDevice();watch();await tracer.ready;
+  const restored=await historyTapCheck(engineRuntime(engine).gpu,source),replaced=old!==engineRuntime(engine).gpu;
+  tracer.dispose();tracer.dispose();engine.render();await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+  await Promise.all(reports);return {first,restored,replaced,errors,messages};
+ }finally{tracer.dispose();engine.dispose();}
+};window.ready=true;
+</script>

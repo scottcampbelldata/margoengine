@@ -2626,3 +2626,25 @@ media viewport and retains the same awaited 16-sample float capture on a button.
 Capture errors propagate; pagehide disposes tracer, engine and button. Evidence:
 whitepaper/results/batch-99-media-readme-startup-20261109.json. No new compilation
 latency guarantee, timing exemption or smaller rendering workload is claimed.
+
+### Fixed: viewport denoiser admitted rejected history taps (Batch 99)
+
+The prepare kernel's four-bit surface mask was used only as a nonzero test in
+combine, so one surviving tap admitted all four colors and history weights.
+Combine now excludes each rejected tap before loading it and normalizes the
+remaining bilinear weights. The corrected finite-ray baseline failed 112 of 448
+cases, exactly the partial-mask cases with live history; all controls passed.
+The repair passes all 448 on native WebGPU and WebGL2 compatibility, on first and
+replacement devices, plus the unchanged moving-camera denoisehistory oracle.
+Repro: voxel-pathtracer's test:gpu:history-taps. Evidence:
+whitepaper/results/batch-99-history-taps-20261109.json. Earlier local probes used
+invalid zero rays and do not establish the bug. Noise-free camera moves, newly
+visible surfaces and the requested optional /denoise entry remain open above.
+
+### Fixed: WebGL2 README waited for tracing before starting (Batch 99)
+
+The history landing README run failed at the unchanged 20-second module-completion limit in the compatibility example. Its top-level await of tracer.ready preceded any engine.start call. The example now starts the progressive viewport and disposes both owners on pagehide. A controlled unresolved-trace regression fails the original initialization assertion and passes the replacement, including install-before-create, preview dispatch, eventual tracing and disposal. The README runner prefers native WebGPU when available; this failure alone is not WebGL2 shader-compilation evidence. All 9 runtime README examples now pass; the 448-case history test separately covers WebGL2.
+
+### Fixed: sky README waited for tracing before starting (Batch 99)
+
+After the compatibility example repair, the runtime README gate reached the sky example and hit the unchanged 20-second module-completion limit. The isolated cache-disabled diagnostic completed: the sky bake finished before attach, while trace compilation took most of initialization. This did not reproduce the full-run deadline failure. The example nevertheless awaited full readiness before its sole render call. A controlled unresolved-trace regression fails that initialization dependency and passes with the existing progressive loop, eventual tracing and pagehide disposal. All 9 runtime README examples now pass with the unchanged 20-second module limit.

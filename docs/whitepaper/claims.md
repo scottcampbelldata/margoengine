@@ -1888,3 +1888,17 @@ eventual tracing and disposal. The unchanged 20-second module deadline remains i
 force. Later baseline diagnostics did not reproduce the prior full-run failure;
 this is an ordering repair, not a compiler-speed claim. Scoped evidence:
 results/batch-99-media-readme-startup-20261109.json.
+
+### Batch 99 viewport history tap correctness
+
+The existing viewport combine kernel now rejects each history tap independently
+using prepare's surface mask. A real-GPU finite-ray baseline has exactly 112
+partial-mask failures among 448 cases, with all controls passing. The repaired
+source has zero failures, on native WebGPU and WebGL2 compatibility before and
+after actual device replacement; HDR 32768 and zero/exhausted history are included.
+Evidence: results/batch-99-history-taps-20261109.json. The unchanged moving-camera
+oracle passes. This proves the geometric rejection bug fix, without claiming
+noise-free camera moves, newly visible surfaces, a learned model or a /denoise
+entry. No speed result is published.
+
+Batch 99 history/artifact landing evidence: 448 current controlled history cases pass on native WebGPU and WebGL2/Vulkan, including actual replacement devices; all 137 package tests and 9 README examples pass. The same clean package revision produced both entry/network records, followed by API and documentation generation. Successful base/denoise checks with identical tracer/core/math sources are retained, with their exact scope in results/batch-99-history-landing-20261109.json. The previous full verify is historical. This does not establish reference-renderer equality, noise-free camera motion or a speed result.

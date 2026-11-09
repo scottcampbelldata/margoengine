@@ -2044,7 +2044,7 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
 // The filtered caustics (src) added to the filtered rest (dst), both remodulated. The viewport (flag 8) blends that with
 // its previous displayed colour, reprojected and bilinearly read, into dst2: the frames' jittered samples average into
 // antialiased edges. Where all four taps saw an occluder in front of this pixel's surface (prepare's mask; the camera's
-// move uncovered it) the history is dropped; one clear tap is enough, which keeps both sides of an edge. After a restart
+// move uncovered it) the history is dropped; otherwise only clear taps contribute, with normalized weights. After a restart
 // (flag 64) the history is clamped to this frame's 3x3 neighbourhood (its mean and 1.25 standard deviations, in YCoCg),
 // which limits what lags behind the move. The history counts as at most 8 samples against this frame's; while the
 // camera holds still nothing moved, it is not clamped and fades out by 8 samples, whose jitter antialiases as well.
@@ -2071,6 +2071,7 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
   let b=floor(q);let fr=q-b;
   var s=vec4f(0.0);var sw=0.0;
   for(var k=0u;k<4u;k++){
+   if((mask&(1u<<k))==0u){continue;}
    let at=b+vec2f(f32(k&1u),f32(k>>1u));
    if(at.x<0.0||at.y<0.0||at.x>=f32(w)||at.y>=f32(h)){continue;}
    let wk=select(1.0-fr.x,fr.x,(k&1u)!=0u)*select(1.0-fr.y,fr.y,(k>>1u)!=0u);

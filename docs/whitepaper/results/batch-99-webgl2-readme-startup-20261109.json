@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "scope": "Compatibility README initialization and lifecycle ordering, no shader or transport change",
+  "originalRuntimeFailure": {
+    "id": "voxel-pathtracer/readme-on-the-webgl2-compatibility-laye-0d5270",
+    "deadlineMs": 20000,
+    "phase": "module completion",
+    "code": 1,
+    "processTimedOut": false
+  },
+  "controlledPromiseRegression": {
+    "baselineExit": 1,
+    "baselineAssertion": "viewport initialization must not await full tracing compilation",
+    "fixedExit": 0,
+    "installBeforeEngineCreation": true,
+    "previewDispatch": true,
+    "eventualTracing": true,
+    "pagehideDisposal": true,
+    "allBuffersDestroyed": true,
+    "wallClockAssertion": false,
+    "path": "packages/voxel-pathtracer/tests/webgl2-readme.test.js"
+  },
+  "runtimeConfirmation": {
+    "examples": 9,
+    "deadlineMs": 20000,
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 59.7,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=2",
+        "--",
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=voxel-pathtracer"
+      ]
+    }
+  }
+}

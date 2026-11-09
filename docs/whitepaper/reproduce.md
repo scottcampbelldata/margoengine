@@ -1446,3 +1446,20 @@ The 20-second module deadline is unchanged. Click Render 32 x 32 image to reques
 the awaited float capture; leaving the page disposes both owners. Forced WebGL2
 uses the existing compatibility shim. Proof:
 results/batch-99-media-readme-startup-20261109.json.
+
+### Batch 99 viewport history mask
+
+Build packages, then run
+`node scripts/gpu-lock.mjs run --owner=codex-99 --wait-max=60 --max=0.75 -- node packages/voxel-pathtracer/tests/history-taps-browser.mjs`.
+The suite captures the DENOISE shader from the built root entry, dispatches its
+combine kernel on controlled finite-ray inputs, and checks all 16 masks, live
+and exhausted/zero history, HDR 32768, native WebGPU and WebGL2 compatibility,
+and a real replacement device. It writes
+`test-results/voxel-pathtracer-history-taps.json`. The declared package GPU
+gate enforces its six minute tree limit. Removing only the per-tap mask guard
+reproduces 112 failures among 448 cases; the full repair evidence is in
+`results/batch-99-history-taps-20261109.json`. The unchanged denoisehistory
+case remains an additional camera-motion quality check, without a noise-free
+claim. No baseline test or tolerance was weakened.
+
+Batch 99 history/artifact landing: build the current workspace, run voxel-pathtracer package tests and test:gpu:history-taps, then check:readme-run -- --packages=voxel-pathtracer. GPU commands use one shared slot per lane, wait-max at least 60 and measured holds plus a small margin. Preserve successful equivalent-source checks and rerun failed steps only, as the coordinator directs. Commit package inputs, regenerate examples/package-benchmarks/entry-sizes.mjs and scripts/basic-scene-network.mjs from that same clean revision, api:update after entries, api:check, and scripts/build-llms.mjs after final docs. Do not edit provenance metadata. Current scoped receipts and retained historical verify evidence are in results/batch-99-history-landing-20261109.json.

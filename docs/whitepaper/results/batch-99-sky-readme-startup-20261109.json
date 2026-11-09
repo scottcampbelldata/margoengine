@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "scope": "Sky README lifecycle ordering only",
+  "originalRuntimeFailure": {
+    "id": "voxel-pathtracer/readme-multiple-scattering-sky-margoeng-4dbb33",
+    "deadlineMs": 20000,
+    "phase": "module completion",
+    "code": 1,
+    "processTimedOut": false
+  },
+  "isolatedColdProbe": {
+    "finished": true,
+    "phase": "done",
+    "errors": [],
+    "events": [
+      {
+        "entry": "main",
+        "started": 548.8000000119209,
+        "finished": 646.5
+      },
+      {
+        "entry": "preview",
+        "started": 731.3999999761581,
+        "finished": 2758.800000011921
+      },
+      {
+        "entry": "trace",
+        "started": 731.3999999761581,
+        "finished": 8359.899999976158
+      },
+      {
+        "entry": "ids",
+        "started": 731.3999999761581,
+        "finished": 2011.800000011921
+      },
+      {
+        "entry": "prepare",
+        "started": 731.5,
+        "finished": 879.6999999880791
+      },
+      {
+        "entry": "atrous",
+        "started": 731.5,
+        "finished": 833.3000000119209
+      },
+      {
+        "entry": "tables",
+        "started": 731.5,
+        "finished": 838
+      },
+      {
+        "entry": "combine",
+        "started": 731.5,
+        "finished": 991.3999999761581
+      }
+    ],
+    "reproducedDeadlineFailure": false
+  },
+  "controlledPromiseRegression": {
+    "baselineExit": 1,
+    "fixedExit": 0,
+    "bakeCompletesBeforeAttach": true,
+    "previewDispatch": true,
+    "eventualTracing": true,
+    "pagehideDisposal": true,
+    "allBuffersDestroyed": true,
+    "wallClockAssertion": false,
+    "path": "packages/voxel-pathtracer/tests/sky-readme.test.js"
+  },
+  "runtimeConfirmation": {
+    "examples": 9,
+    "deadlineMs": 20000,
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 59.7,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=2",
+        "--",
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=voxel-pathtracer"
+      ]
+    }
+  }
+}

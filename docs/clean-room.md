@@ -2460,3 +2460,47 @@ button action. Errors propagate and pagehide disposes both owners and the button
 No transport, coefficient, shader, sample count, signal duration or gate changes.
 The regression checks startup, preview, requested capture readiness, full tracing,
 capture failure propagation and complete buffer disposal without timing assertions.
+
+### Batch 99: rejecting individual viewport history taps
+
+Research-first comparison: Schied, Kaplanyan, Wyman, Patney, Chaitanya, Burgess,
+Liu, Dachsbacher, Lefohn and Salvi, **Spatiotemporal Variance-Guided Filtering:
+Real-time Reconstruction for Path Traced Global Illumination** (2017),
+https://research.nvidia.com/labs/rtr/publication/schied2017spatiotemporal/ ,
+section 4.1 of the author paper: each bilinear tap is checked independently and
+inconsistent geometry contributes no history. Schied, Peters and Dachsbacher,
+**Gradient Estimation for Real-Time Adaptive Temporal Filtering** (2018),
+https://cg.ivd.kit.edu/publications/2018/adaptive_temporal_filtering/adaptive_temporal_filtering.pdf ,
+sections 2 and 3: geometric rejection alone does not solve changing illumination;
+replayed shading gradients adapt accumulation. Vogels, Rousselle, McWilliams,
+Roethlin, Harvill, Adler, Meyer and Novak, **Denoising with Kernel Prediction and
+Asymmetric Loss Functions** (2018),
+https://jannovak.info/publications/KPAL/index.html , author abstract and method
+description: trained multiscale temporal kernels trade variance against bias.
+The SVGF paper text and A-SVGF paper sections were read; the KPAL author page
+was read, not its full paper or code. These comparisons select independent
+geometric tap rejection for this bug; no gradient estimator, trained denoiser
+or noise-free disocclusion result is claimed. Margo retains its existing
+bilinear normalization, history weights, thresholds and fallback. The W3C
+WGSL floating-point accuracy rules, https://www.w3.org/TR/WGSL/#accuracy-of-concrete-and-abstract-expressions ,
+inform the regression's unchanged eight-binary32-ULP bound. No companion code
+or foreign implementation was opened or copied. The constant four-tap GPU
+repair adds no CPU-heavy loop or Wasm.
+
+The follow-up artifact repair regenerates the actual network record from the
+same source revision as the entry-size record, then regenerates the documentation
+corpus after its inputs are final. Chris Lamb and Stefano Zacchiroli,
+**Reproducible Builds: Increasing the Integrity of Software Supply Chains**
+(2021), https://arxiv.org/html/2104.06020v1 , definition 1 and the recording-build-
+information discussion, inform the source/toolchain provenance check. Yoav Weiss
+and Noam Rosenthal (editors), **Resource Timing** (W3C Candidate Recommendation
+Draft, 2026), https://www.w3.org/TR/2026/CRD-resource-timing-20261102/ , distinguishes
+encoded and decoded body sizes from transfer accounting. Margo retains its actual
+Playwright body-plus-header observation; it does not substitute Resource Timing's
+privacy-rounded header estimate. Existing llms and sizes-page regressions reject
+stale corpus text and records from different revisions. No measurement metadata
+is edited by hand, and no speed result is inferred from these byte counts.
+
+The WebGL2 README startup repair applies the same research comparison recorded above under nonblocking guiding initialization: WebGPU (Ninomiya, Jones and Blandy, editors, 2026), The Lightspeed Automatic Interactive Lighting Preview System (Ragan-Kelley, 2007), Shader Metaprogramming (McCool, Qin and Popa, 2002), and Specializing Shaders (Guenter, Knoblock and Ruf, 1995), with the same linked sources and reading limits. The example used unbounded full-pipeline readiness before starting its loop. Progressive initialization and pagehide disposal fix that dependency without shader specialization or a compilation-time promise. A deterministic unresolved-promise regression checks the same ordering class for this separate example. No companion code, transport or deadline change.
+
+The sky README startup repair uses the same four-source progressive-initialization research comparison recorded for guiding and compatibility above. The isolated cold diagnostic separates the atmosphere bake from full tracer readiness; it completes and is not described as a reproduced deadline failure. A controlled unresolved-trace promise independently proves the initialization dependency. The existing atmosphere bake, its options, shaders and returned floats are unchanged. The example starts the progressive viewport after baking and disposes both owners on pagehide; no full-compilation or runtime speed guarantee.

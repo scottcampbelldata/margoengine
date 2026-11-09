@@ -2110,3 +2110,17 @@ progressive viewport independently of full tracing compilation. An explicit butt
 awaits the unchanged 32x32, 16-sample renderImage request and its 30-second signal.
 The module deadline remains 20 seconds. No pipeline compilation-time guarantee,
 transport change, optional-entry size change or rendering-speed result is claimed.
+
+Viewport history tap repair (Batch 99): each of the four reprojected bilinear
+taps must pass the existing surface mask. A six minute GPU regression covers
+448 native/compatibility and first/replacement-device cases, including HDR
+32768, sample counts 1/8/65536 and zero history. The numerical bound remains
+eight binary32 ULP, with exact accumulated sample weights. This is a correctness
+repair to the existing viewport denoiser; no noise-free disocclusion guarantee
+or new /denoise entry is established. No performance claim.
+
+The WebGL2 compatibility README example also initializes independently of full tracing readiness and disposes on pagehide. Its install call retains native WebGPU when available; the runtime README run alone therefore does not establish fallback rendering. The separate history regression covers native and WebGL2 devices. No driver-compilation bound or larger module deadline.
+
+The sky README bakes its environment, then starts the progressive viewport independently of full tracer readiness. The bake still has its documented AbortSignal; no bake or driver-compilation deadline was raised. Preview-to-tracing startup is proven separately from any compilation-time bound.
+
+History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.

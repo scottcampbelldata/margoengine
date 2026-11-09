@@ -1,0 +1,313 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "sourceHead": "50db66934efae05841f0a864c13c70817cea6a81",
+  "target": "5d5ac6efc1917e43c5c82200eb2583d6251462b6",
+  "restoredFrom": "50e39c07c95fae3852a4073be7dd955d7ac2614c",
+  "shaderBlob": "7fd6e5729e1a8f8d94d7ebbf7a280dc8c12c4b69",
+  "originalRegression": "batch-99-history-taps-20261109.json",
+  "currentHistory": {
+    "cases": 448,
+    "failures": 0,
+    "backends": [
+      "native WebGPU",
+      "WebGL2 compatibility on Vulkan"
+    ],
+    "actualReplacementDevices": true,
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 23.585,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=0.75",
+        "--",
+        "node",
+        "packages/voxel-pathtracer/tests/history-taps-browser.mjs"
+      ]
+    }
+  },
+  "package": {
+    "tests": 137,
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 5.452,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "test",
+        "--workspace",
+        "@margoengine/voxel-pathtracer"
+      ]
+    }
+  },
+  "readme": {
+    "examples": 9,
+    "failed": 0,
+    "deadlineMs": 20000,
+    "receipt": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 59.7,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=2",
+        "--",
+        "node",
+        "scripts/run-readme-examples.mjs",
+        "--packages=voxel-pathtracer"
+      ]
+    },
+    "closedFailures": [
+      "compatibility readiness",
+      "sky readiness",
+      "media initialization now landed separately in 7fa0ba5e0"
+    ],
+    "otherExamples": "Root, ReSTIR, mesh and spectral examples retain their full off-screen requests and pass."
+  },
+  "reused": [
+    {
+      "label": "99-r6-history-base-gpu",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 78.249,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=2.5",
+        "--",
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "test:gpu",
+        "--workspace",
+        "@margoengine/voxel-pathtracer"
+      ]
+    },
+    {
+      "label": "99-r6-history-quality",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 35.72,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "quality"
+      ]
+    },
+    {
+      "label": "99-r6-history-denoise-gpu",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 52.284,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-99",
+        "--wait-max=60",
+        "--max=1.5",
+        "--",
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "test:gpu:denoise",
+        "--workspace",
+        "@margoengine/voxel-pathtracer"
+      ]
+    }
+  ],
+  "reuseScope": "Tracer/core/stage/math sources identical to the successful r6 checks. Updated WebGL2 preview ownership and browser teardown are covered by fresh 448-case history replacement-device proof and media native/compatibility lifecycle. No repeat of successful base/denoise GPU steps or full verify.",
+  "priorFullVerify": {
+    "source": "dc62093e631d44edd24d9f1ba3487319ec11dc30",
+    "tests": 13545,
+    "code": 0,
+    "receipt": ".lane/99-r5-verify-status.json",
+    "currentFullVerifyRerun": false,
+    "coordinator": "Rerun only failed steps; no second full verify on identical sources"
+  },
+  "pairedRecords": {
+    "commit": "50db66934",
+    "dirty": false,
+    "entries": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 41.629,
+      "command": [
+        "node",
+        "examples/package-benchmarks/entry-sizes.mjs"
+      ]
+    },
+    "network": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 3.426,
+      "command": [
+        "node",
+        "--import",
+        "./.lane/99-r6-network-limit.mjs",
+        "scripts/basic-scene-network.mjs"
+      ]
+    },
+    "gpuAcquisition": "Existing network acquire call receives process-local shared max=0.5 and waitMax=60 only. Build and hashing outside the GPU slot.",
+    "sizes": {
+      "coreStage": {
+        "raw": 59077,
+        "gzip": 23924,
+        "limit": 25000
+      },
+      "voxel": {
+        ".": {
+          "raw": 230917,
+          "gzip": 81007
+        },
+        "./restir": {
+          "raw": 4182,
+          "gzip": 1934
+        },
+        "./studio": {
+          "raw": 2228,
+          "gzip": 1047
+        },
+        "./guiding": {
+          "raw": 5736,
+          "gzip": 2535
+        },
+        "./sky": {
+          "raw": 313,
+          "gzip": 212
+        },
+        "./media": {
+          "raw": 4661,
+          "gzip": 1954
+        },
+        "./mesh": {
+          "raw": 54485,
+          "gzip": 22864
+        },
+        "./spectral": {
+          "raw": 3647,
+          "gzip": 1541
+        }
+      }
+    }
+  },
+  "artifactFailure": {
+    "receipt": {
+      "code": 1,
+      "signal": null,
+      "timed": false,
+      "seconds": 29.841,
+      "command": [
+        "node",
+        "examples/package-benchmarks/entry-sizes.mjs"
+      ]
+    },
+    "cause": "New sciviz flow dist/Wasm output absent after rebase. No record was written by the failed measurement.",
+    "repair": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 1.054,
+      "command": [
+        "node",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "build",
+        "--workspace",
+        "@margoengine/sciviz"
+      ]
+    },
+    "recheck": {
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 41.629,
+      "command": [
+        "node",
+        "examples/package-benchmarks/entry-sizes.mjs"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "label": "99-r10-current-umbrella-build",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 2.595,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "scripts/build-modern.js",
+        "--precompiled",
+        "--only=margoengine"
+      ]
+    },
+    {
+      "label": "99-r10-history-api-update",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 12.587,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "api:update"
+      ]
+    },
+    {
+      "label": "99-r10-history-api-check",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 14.312,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "api:check"
+      ]
+    },
+    {
+      "label": "99-r10-history-types",
+      "code": 0,
+      "signal": null,
+      "timed": false,
+      "seconds": 0.898,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        ".lane/99-r9-media-types.mjs"
+      ]
+    }
+  ],
+  "scope": "History tap correctness, saved compatibility/sky README lifecycle repairs and genuine paired artifact records. Jobs 1 and 2 remain open; no speed or noise-free disocclusion claim.",
+  "finalRebase": {
+    "head": "a3801a4625bbbf9e309481413c3a75de894a66f1",
+    "target": "5b7877b3b2fb04eb4ba0f3e9fd02d0588c53bca0",
+    "packagesTree": "3b180e717f5cdd05ada631763da021949fcfa2ad",
+    "identicalMeasuredRevision": "50db66934efae05841f0a864c13c70817cea6a81",
+    "changes": "Main GPU admission/activity tools and docs only; every package tree byte-identical. Genuine paired measurements and successful GPU/package checks retained. No metadata edits or repeated full verify."
+  }
+}
