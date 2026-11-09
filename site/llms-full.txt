@@ -5670,6 +5670,29 @@ claim; no core/stage or export change and no size ceiling raised.
 | @margoengine/controls/third-person | 3118 | 3378 |
 | @margoengine/controls/walk | 13930 | 14349 |
 
+### Animator registration lifetime (batch 56)
+
+Animator and AnimatorGraph factories follow the registered Animation's scene.
+Direct updates and disposal query the owning scene. Disposal is terminal and
+idempotent; reattachment rejects without retaining a registration. Fourteen owner
+cases and 213 package/guard checks pass. All eight GPU owner cases (242 model
+pixels each), the complete game browser and fifteen runtime README examples pass.
+No core/stage source, public exports, timing budgets or size ceilings changed.
+
+Animator entry sizes after the owner repair (min+gzip, package dependencies external):
+
+| Entry | Bytes | Unchanged ceiling |
+| --- | ---: | ---: |
+| @margoengine/animator | 19150 | 19297 |
+| @margoengine/animator/graph | 8527 | 8542 |
+| @margoengine/animator/inertialize | 1894 | 2150 |
+| @margoengine/animator/sync | 1859 | 2070 |
+| @margoengine/animator/warping | 4650 | 4883 |
+| @margoengine/animator/fbik | 5434 | 5618 |
+| @margoengine/animator/motion-matching | 6994 | 7250 |
+| @margoengine/animator/mirror | 1774 | 2030 |
+| @margoengine/animator/spline-ik | 3862 | 4094 |
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9432,6 +9455,17 @@ from sceneOf(wrapper). The original expanded parent suite has eleven failures;
 all 83 owner cases and 304 package/guard checks now pass. The complete browser
 proof passes 17 checks including twelve owner pixel cases; all three walk checks
 and fourteen runtime README examples pass. See the [acceptance receipt](whitepaper/results/batch-56-controls-owner-20261109.json).
+
+### Animator secondary ownership and runnable examples: resolved
+
+Five parent failures in fourteen real-engine owner cases are repaired in the
+optional package. All 213 package/guard checks, eight real-GPU owner cases
+(242 model pixels each), the complete game browser and all fifteen README
+examples pass. The README now uses the bundled mannequins' authored clip,
+marker-table and bone names; twelve of fourteen old asset-contract cases failed
+with the fictional hero path. Ten obsolete known-list failures are removed only
+after every replacement example executes successfully.
+[Acceptance receipt](whitepaper/results/batch-56-animator-owner-20261109.json).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -13817,13 +13851,13 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial:'locomotion', parameters:{speed:0},
   states:{
-    locomotion:{parameter:'speed', samples:[{value:0,clip:'Idle'},{value:1,clip:'Walk'},{value:3,clip:'Run'}]},
-    idle:'Idle'
+    locomotion:{parameter:'speed', samples:[{value:0,clip:'Idle_Loop'},{value:1,clip:'Walk_Loop'},{value:3,clip:'Jog_Fwd_Loop'}]},
+    idle:'Idle_Loop'
   },
   transitions:[{from:'locomotion',to:'idle',when:p=>p.speed<0,duration:0.15}]
 });
@@ -13838,6 +13872,8 @@ helper bones between the three endpoints retain their local pose and move with
 the solved endpoints; only the hip, knee and optional ankle orientation are
 written. Disconnected, duplicated or reversed endpoints reject before installation
 with code `unsupported` and a help link. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
+
+The examples use [Quaternius' bundled CC0 mannequin](../../examples/assets/quaternius/UAL1_Standard_RM.glb). Serve that file at `/UAL1_Standard_RM.glb`; its authored clip and bone names are used below. The root-motion example instead serves [KayKit's CC0 mannequin](../../examples/assets/kaykit/adventurers/animations/Rig_Medium/Rig_Medium_MovementBasic.glb) at `/Rig_Medium_MovementBasic.glb`.
 
 ## CCD chains (any length)
 

@@ -322,5 +322,9 @@
         "seconds": 31.9
       }
     }
+  },
+  "finalRebase": {
+    "mainBase": "234f94fdbe82b51d4fcbba84ff3cfcfab2cf7c01",
+    "scope": "Two later animator-only owner commits; no changed sciviz, geometry, compute, math, core, stage, controls or shared files relative to measured source da96932cb. Keep genuine measured IDs; never relabel records."
   }
 }
