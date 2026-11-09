@@ -2240,3 +2240,7 @@ no longer exempts those four files. Regression evidence includes empty-cache ver
 subprocess, digest corruption, a missing companion and override/default path resolution.
 Existing glTF importer mechanics tests remain unchanged apart from input enforcement;
 physics and physics2d packages remain held. No hardware or performance claim is added.
+
+### Texture mask transitions: section 5 evidence (batch 76, job 2)
+
+The optional mask entry appends one owned RGBA8 texture binding through the transitions capture's protected binding seam. Capture and composite orders remain -80/50. ImageData is snapshotted; bitmap uploads retain a borrowed open image for restoration. Texture upload includes WebGPU's required render-attachment usage. 1344 generated-mask pixel assertions cover both upload paths, hard/soft thresholds, black/mid-grey/white, exact endpoints, odd-size resize, replacement-device reupload and native WebGL2 refusal at 1x/4x. An interpolated-UV nearest tie initially selected the wrong row after a 7x3 resize; integer centre addressing fixes the cause, with no tolerance change. Unit checks cover overflow rejection, closed images, upload rollback and disposal. Evidence is single-device correctness, not measured speed or branded-image aesthetics.

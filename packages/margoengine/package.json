@@ -2946,6 +2946,10 @@
       "types": "./dist/toon/hatch.d.ts",
       "import": "./dist/toon/hatch.js"
     },
+    "./transitions/mask": {
+      "types": "./dist/transitions/mask.d.ts",
+      "import": "./dist/transitions/mask.js"
+    },
     "./transitions/custom": {
       "types": "./dist/transitions/custom.d.ts",
       "import": "./dist/transitions/custom.js"

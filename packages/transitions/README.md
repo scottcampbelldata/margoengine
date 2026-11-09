@@ -38,6 +38,28 @@ Supply the named WGSL function plus optional helper functions, at most 65,536 UT
 
 GPU proof uses generated solid-color stand-ins and exact per-pixel value assertions, not a claim of artistic quality or measured speed. Run `npm run test:gpu --workspace @margoengine/transitions` through the shared GPU lock.
 
+Texture mask wipes use `@margoengine/transitions/mask` (or `margoengine/transitions/mask`). Black reveals first, white last; the encoded red channel of a greyscale image sets the threshold. Alpha is ignored.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createMaskTransition } from 'margoengine/transitions/mask';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mask = new ImageData(new Uint8ClampedArray([
+  0,0,0,255, 255,255,255,255,
+  64,64,64,255, 192,192,192,255,
+]), 2, 2);
+const transition = createMaskTransition(engine, mask, { softness: 0.02 });
+engine.scene.background = '#0044ff';
+engine.render();
+transition.start('wipe', 1);
+engine.scene.background = '#ff4400';
+engine.render({ delta: 0.5 });
+transition.dispose();
+engine.dispose();
+```
+
+Accepts 8-bit ImageData (copied immediately) or an ImageBitmap, such as one decoded with `createImageBitmap(blob)`. Keep a borrowed bitmap open until transition disposal so device restoration can reupload it; the transition never closes your bitmap. Closed images are refused. Image dimensions are 1..min(4096, device maxTextureDimension2D); capture dimensions are at most 65,535, also within the device's limit. The mask stretches across the full capture with nearest sampling, top-left origin. Integer pixel-center addressing makes exact texel ties stable through odd-size resizes. ImageData bytes have no color conversion; bitmap upload uses WebGPU's default sRGB destination encoding. `softness` is a threshold half-width, default 0.02: zero gives hard edges; otherwise use 0.000001..1. Exact endpoints bypass the threshold. Call `start('wipe', seconds)`; kind and displacement do not alter the mask. Resize retains history/progress. Device replacement reuploads the mask and cancels unavailable scene history. Native WebGL2 gives linked code `unsupported`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/transitions

@@ -1,8 +1,9 @@
 // Generated color targets are stand-ins, read back on a real GPU.
 export async function transitionChecks() {
   const { Engine, FrameGraph } = await import('../../core/dist/extension.js');
-  const { webglRenderer } = await import('../../webgl/dist/index.js');
+  const { webglRenderer } = await import('../../webgl2-compat/dist/preview.js');
   const { createCustomTransition } = await import('../dist/custom.js');
+  const { createMaskTransition } = await import('../dist/mask.js');
   const assert = (ok, message) => {
     if (!ok) throw new Error(message);
   };
@@ -17,10 +18,18 @@ export async function transitionChecks() {
       refused = error.code === 'unsupported' && /https:/.test(error.message);
     }
     assert(fallback.backend === 'webgl2' && refused, 'actual WebGL2 rejects with code and help');
+    let maskRefused = false;
+    try {
+      createMaskTransition(fallback, new ImageData(1, 1));
+    } catch (error) {
+      maskRefused = error.code === 'unsupported' && /https:/.test(error.message);
+    }
+    assert(maskRefused, 'mask WebGL2 refusal includes code and help');
   } finally {
     fallback.dispose();
   }
   let pixels = 0;
+  let maskPixels = 0;
   for (const samples of [1, 4]) {
     let device = await (await navigator.gpu.requestAdapter()).requestDevice();
     const errors = [];
@@ -186,7 +195,58 @@ export async function transitionChecks() {
       check(await frame(0), [0, 0, 1, 1]);
       effect.dispose();
       effect.dispose();
-      replacement.destroy();
+      const greys = [0, 127, 128, 255];
+      const maskCheck = (bytes, progress, softness) => {
+        for (let y = 0; y < height; y++)
+          for (let x = 0; x < width; x++) {
+            const edge = greys[Math.floor(((y + 0.5) / height) * 2) * 2 + Math.floor(((x + 0.5) / width) * 2)] / 255;
+            const t = Math.max(0, Math.min(1, (edge - (progress - softness)) / (2 * softness)));
+            const weight =
+              progress === 0 ? 0 : progress === 1 ? 1 : softness === 0 ? +(edge <= progress) : 1 - t * t * (3 - 2 * t);
+            const expected = [weight, 0, 1 - weight, 1];
+            for (let ch = 0; ch < 4; ch++) {
+              const tolerance = progress === 0 || progress === 1 ? 0 : 1;
+              assert(
+                Math.abs(bytes[y * 256 + x * 4 + ch] - Math.round(expected[ch] * 255)) <= tolerance,
+                `mask ${samples}x p=${progress} softness=${softness} at ${x},${y},${ch}`,
+              );
+            }
+            maskPixels++;
+          }
+      };
+      for (const softness of [0, 0.1])
+        for (const kind of ['data', 'bitmap']) {
+          const image = new ImageData(new Uint8ClampedArray(greys.flatMap((g) => [g, g, g, 255])), 2, 2);
+          const input = kind === 'bitmap' ? await createImageBitmap(image) : image;
+          effect = createMaskTransition(engine, input, { softness });
+          color = [0, 0, 1, 1];
+          maskCheck(await frame(0), 0, softness);
+          effect.start('wipe', 1);
+          color = [1, 0, 0, 1];
+          maskCheck(await frame(0), 0, softness);
+          maskCheck(await frame(0.5), 0.5, softness);
+          width = width === 5 ? 7 : 5;
+          height = height === 7 ? 3 : 7;
+          target = allocate();
+          maskCheck(await frame(0), 0.5, softness);
+          assert(effect.progress === 0.5, 'mask progress survives resize');
+          maskCheck(await frame(0.5), 1, softness);
+          effect.start();
+          await frame(0.1);
+          if (kind === 'bitmap' && softness === 0.1) {
+            device.destroy();
+            await device.lost;
+            device = await (await navigator.gpu.requestAdapter()).requestDevice();
+            engine.gpu = device;
+            device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+            target = allocate();
+          }
+          effect.onDeviceRestored(engine);
+          maskCheck(await frame(0), 1, softness);
+          effect.dispose();
+          effect.dispose();
+          if (kind === 'bitmap') input.close();
+        }
       assert(plugins.size === 0, 'dispose detaches');
       assert(errors.length === 0, errors.join('\n'));
     } finally {
@@ -195,5 +255,5 @@ export async function transitionChecks() {
       device.destroy();
     }
   }
-  return { pixels, samples: [1, 4], fallback: 'unsupported', restoration: true };
+  return { pixels, maskPixels, samples: [1, 4], fallback: 'unsupported', restoration: true };
 }

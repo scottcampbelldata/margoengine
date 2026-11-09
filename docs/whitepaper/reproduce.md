@@ -789,3 +789,7 @@ inclusive capacity fixtures. After the package build, run the scatter browser sc
 node scripts/gpu-lock.mjs run --owner=codex-69fix --max=15 --wait-max=8 --
 node scripts/gpu-package-tests.mjs --no-build --only=scatter --serial.
 The ordered compaction, per-ring caps and conservative tile-distance arithmetic are unchanged.
+
+### Batch 76 mask wipes
+
+Run the same transitions unit, GPU-lock and README commands as job 1. The GPU suite also creates a 2x2 four-grey ImageData and ImageBitmap, checks 1344 pixels across hard/soft thresholds at 1x/4x, resizes through odd 5x7 and 7x3 captures and replaces a real device. A double-precision threshold oracle is independent of the integer WGSL addressing. Endpoints are byte-exact; blended channels allow one UNORM code. The fixtures are stand-ins. Native WebGL2 must refuse with linked unsupported. No performance comparison was made.

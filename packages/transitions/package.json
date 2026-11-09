@@ -22,6 +22,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./mask": {
+      "types": "./dist/mask.d.ts",
+      "import": "./dist/mask.js"
+    },
     "./custom": {
       "types": "./dist/custom.d.ts",
       "import": "./dist/custom.js"

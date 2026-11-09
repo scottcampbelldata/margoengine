@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-626). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-627). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1279,7 +1279,7 @@ with 15 failures retained. Sources, licences and outstanding inputs: [missing-te
 
 ## Custom WGSL transitions (LIM-625)
 
-Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4280 B (budget 4303 unchanged), custom 5019 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
+Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4300 B (budget 4303 unchanged), custom 5038 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
 
 ## Multiple-scattering tracer sky (batch 99, LIM-626)
 
@@ -1331,3 +1331,7 @@ This also applies to ScatterTiles, TrampledScatter and ImposterScatter through t
 The inclusive outer rejection and conservative f32 tile-distance budget remain unchanged; ordered compaction
 and indirect counts retain the explicit capacity cap. Scatter root currently measures 19,094 B min+gzip;
 other scatter entries are unchanged. No speed or new rendering-quality claim.
+
+## Texture mask wipes (LIM-627)
+
+Optional transitions/mask uses encoded red values as reveal thresholds, alpha ignored. 8-bit ImageData is snapshotted; ImageBitmap is borrowed and must stay open through restoration, and is never closed by the transition. Mask dimensions 1..min(4096, device limit), capture dimensions <=65535 and within the device limit. Integer centre addressing is overflow-free within those bounds, including odd-size exact ties. Nearest full-capture stretch, top-left origin, no tiling or aspect fitting. Softness default 0.02, zero or finite 0.000001..1. Exact endpoints bypass thresholding; built-in kind/displacement are ignored. ImageData bytes have no conversion; bitmap upload uses WebGPU default sRGB destination encoding. Resize retains history/progress; replacement cancels scene history and reuploads the mask. Closed borrowed images cause linked state errors. Native WebGL2 is linked unsupported. Generated 2x2 fixtures at 1x/4x on RTX A6000 only; no throughput or artistic-quality claim. Root 4300 B and custom 5038 B remain in existing budgets; mask 5266 B min+gzip, new budget 5522, umbrella mask 65 B, new budget 321. Core plus stage remains 23797 B.

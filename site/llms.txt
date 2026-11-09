@@ -211,7 +211,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 4 entry points
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 3 entry points
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 3 entry points
-- [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 2 entry points
+- [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 3 entry points
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 11 entry points
 - [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 28 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 21 entry points

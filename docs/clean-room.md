@@ -1750,3 +1750,7 @@ The coarse procedural-star aggregate is derived here: the radial smoothstep disc
 the existing star-cell threshold and fixed half-amplitude have expected weight (1 - 0.975 squared) / 4. This restores
 the mean energy where the existing night shader fades unresolved cells. No external source code or asset was read,
 copied or downloaded into the repository. GPU cases are generated stand-ins, documented as such.
+
+## Greyscale texture wipes (batch 76, job 2)
+
+Wide reference search combined [W3C CSS Masking](https://www.w3.org/TR/css-masking-1/#MaskValues) on image masks, the previously cited Porter/Duff paper on separate image contributions, and [WGSL smoothstep and textureLoad](https://www.w3.org/TR/WGSL/). This wipe uses a threshold of encoded greyscale red, not CSS's full luminance/alpha model. Integer centre mapping derives from floor((pixel+1/2)*sourceSize/outputSize), evaluated as (pixel*sourceSize+floor(sourceSize/2))/outputSize; the stated dimension bounds keep all u32 numerators below overflow. [WebGPU copyExternalImageToTexture](https://www.w3.org/TR/webgpu/#dom-gpuqueue-copyexternalimagetotexture) requires COPY_DST and RENDER_ATTACHMENT. Uploads/snapshots are platform operations; there is no new CPU-heavy loop or Wasm kernel. No external code read or adapted.

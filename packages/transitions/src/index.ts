@@ -45,6 +45,10 @@ export class Transitions implements EnginePlugin {
   readonly name = 'transitions';
   /** Shader source supplied by optional transition entries. */
   protected shaderCode: string = shader;
+  /** Image bindings used by optional entries; images remain owned by the capture. */
+  protected transitionBindings(before: GPUTexture, after: GPUTexture): GPUBindingResource[] {
+    return [{ buffer: this.uniform! }, before.createView(), after.createView()];
+  }
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private scene?: GPUTexture;
@@ -135,11 +139,7 @@ export class Transitions implements EnginePlugin {
           });
           this.capture = new SceneTarget(c.device, this.scene, this.depth, c.descriptor.multisample?.count ?? 1);
           this.pipeline = render(c.device, this.shaderCode, c.format, { multisample: c.descriptor.multisample });
-          this.bind = group(c.device, this.pipeline, [
-            { buffer: this.uniform! },
-            this.previous.createView(),
-            this.scene.createView(),
-          ]);
+          this.bind = group(c.device, this.pipeline, this.transitionBindings(this.previous, this.scene));
           this.request = false;
         }
         if (this.request) {
@@ -155,11 +155,7 @@ export class Transitions implements EnginePlugin {
               format: c.format,
               usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
             });
-            this.bind = group(c.device, this.pipeline!, [
-              { buffer: this.uniform! },
-              this.previous.createView(),
-              this.scene!.createView(),
-            ]);
+            this.bind = group(c.device, this.pipeline!, this.transitionBindings(this.previous, this.scene!));
           }
           c.encoder.copyTextureToTexture({ texture: this.scene! }, { texture: this.previous! }, [c.width, c.height]);
           this.request = false;

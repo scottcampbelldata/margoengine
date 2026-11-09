@@ -19,6 +19,7 @@ type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 class Transitions implements EnginePlugin {
     readonly name = "transitions";
     protected shaderCode: string;
+    protected transitionBindings(before: GPUTexture, after: GPUTexture): GPUBindingResource[];
     constructor();
     static attach(engine: EngineKernel): Transitions;
     get progress(): number;

@@ -1,5 +1,17 @@
 # Known bugs and unverified features
 
+### Open: transitions disposal from a non-default scene (batch 76 continuation)
+
+Repro on a real WebGPU engine: create a scene with `engine.createScene('outgoing')`, create a `new Transitions()`,
+attach it with `scene.use(effect)`, then call `effect.dispose()` outside a render. The scene still has its
+`transitions` plugin and passes, although the effect has destroyed its resources. Rendering that scene afterward
+can use released resources. The default-scene attach routes used by the custom and mask README examples pass.
+Cause: `Transitions.dispose` calls `engine.removePlugin(this.name)` without its owning scene, so removal defaults
+to the currently active scene. The package can obtain its owner through the extension engine's `sceneOf` method;
+no core change is needed. The real-device probe observed scene plugin counts 1 before disposal and 1 afterward.
+Fix this in transitions with a failing non-default-scene regression before delivering batch 76's live entry.
+Disposing the owning scene or engine does remove the stale registration. This remains open at this handoff.
+
 ### Fixed in batch 68 draft: tiny triangle area underflow
 
 Squaring cross-product components before their norm rounded representable tiny triangle areas to zero.
@@ -1718,3 +1730,7 @@ large-mean-free-path approximation; no epsilon clamp or scattering-order truncat
 environment bake rejects vertical scattering depth above 6 before allocating, keeping an upward-quarter
 escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
 not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.
+
+### Fixed while building batch 76 job 2: mask addressing and bitmap usage
+
+The new draft mask shader used interpolated UVs, whose rounding selected the adjacent texel at an exact boundary after an odd-size resize. The unchanged per-pixel oracle failed at pixel 0,1 in a 7x3 capture. It now uses integer centre mapping within explicit overflow-safe dimensions. The bitmap draft also lacked the RENDER_ATTACHMENT usage required by WebGPU external-image copies; both that usage and COPY_DST are now required by a unit regression and actual bitmap pixel proof. A reserved WGSL identifier found by the compile guard was corrected before delivery. packages/transitions/test/mask.test.js and test/gpu-browser.js retain these checks; no new open defect remains from these failures.
