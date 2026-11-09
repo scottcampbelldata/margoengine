@@ -2632,6 +2632,20 @@ stdio/CDP pipes, and releases those pipes before awaiting termination completion
 Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
 5,000 ms process-list bound are unchanged. The controlled regression proves
 pipe-dependent completion, not a measured browser shutdown speed guarantee.
+Batch 56 proof continuation keeps exact outside-view RGB equality and exact
+shadow-mask return statistics. The fixtures now use the supported view-clear and
+camera-up APIs; no core/stage code, sample count or numerical bar changes. Fog-all
+has analytic correctness evidence without a stored earlier-build image baseline.
+Shader plugin disposal resolves identity through sceneOf; no rendering feature
+or speed claim is introduced. Wider owner and capture acceptance remain open.
+
+The optional TAA upscale entry is 7,112 B min+gzip versus the previous recorded
+7,079 B. Its ceiling increases from 7,093 to 7,112 B under Scott's optional-package
+ruling: retain camera identity, scene disposal and mainline preview diagnostics.
+Splitting the synchronous camera wrapper would split identity/restoration
+ownership or require a loader. Core plus stage remains 23,924 B. All shader
+entries fit their unchanged ceilings; shader root is 18,489 B, raw 14,270 B,
+scene pass 12,476 B. These are byte measurements, not performance results.
 
 GPU `run` and `enqueue` accept GPU leaves only; known CPU aggregators cannot be
 overridden, and unclassified GPU leaves require a logged `--gpu` reason. New
@@ -5295,6 +5309,34 @@ after the repair; all 42 teardown, shutdown and page-ready tests pass. The full
 verify had 13,665 successes and one page-ready cleanup timeout; those successful
 results are retained and the failed page-ready test passes after this repair.
 The original loaded timeout's native phase was not captured. No deadline changed.
+### Batch 56 continuation: fixture and shader ownership repairs
+
+The review56 fixture used different full/partial frame layouts and an unsupported
+string view.clear. Matching partial frames with a clear object retain the exact
+pixel bar; two deliberately unscoped surface controls expose the original leak.
+Both backend proofs now pass. The HDR proof passed up in CameraOptions, which
+does not accept it, so its vertical view rejected. It now assigns camera.up;
+hdr-shadow-fixture.test.js executes the real fixture initialization and fails on
+the old fixture. No core camera repair or tolerance change is needed.
+
+The wider audit also reproduces three shader lifecycle defects: ComputePass
+removes the active scene's same-name plugin; ScenePass and RawShaders release
+resources but keep their registration. scene-owner.test.js exercises direct
+disposal, owning-scene removal, restore, same-name isolation and replacement
+with a real engine. Repairs are local; package acceptance and the remaining
+non-PostStack audit are open. Capture stability remains with its separate hunter.
+The [wider inventory](work-lists/batch-56-scene-owners.md) retains every candidate
+and explicitly distinguishes syntactic review from proven defects.
+
+Four terrain provider defects are also reproduced and repaired locally:
+TerrainMaterials, TerrainDisplacement, TerrainVirtualTexture and TerrainDeformation
+store an Engine in owner and disposed by its active scene. Route their public
+attach factory's use into a real secondary scene, install a same-name default
+sentinel, then dispose directly: registration remains and the default sentinel
+is removed. The scene-owner regression now passes all eight disposal/removal
+cases, including provider cardinality after restore. Reverting only the owner
+lookups reproduces four failures with four passing controls. Package tests pass
+93/93; their full GPU and README gates remain pending in the shared queue.
 
 ### Fixed 2026-11-10: labels duplicate attachment lost its error contract
 
@@ -9920,6 +9962,31 @@ The coat receives directional lighting and its shadow visibility. Clustered ligh
 
 # @margoengine/shader
 
+`ComputePass`, `ScenePass` and `RawShaders` also detach from their actual scene
+on disposal, leaving same-name plugins in other scenes alone. Restoration keeps
+the registration. For example:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ComputePass, storage} from 'margoengine/shader';
+import {ScenePass} from 'margoengine/shader/pass';
+import {RawShaders} from 'margoengine/shader/raw';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const values = storage(1, 'u32');
+const compute = new ComputePass(1, i => values.store(i, 1));
+const outputs = new ScenePass({outputs:{color:'rgba16float'}});
+const raw = new RawShaders();
+product.use(compute);
+product.use(outputs);
+product.use(raw);
+compute.dispose();
+outputs.dispose();
+raw.dispose();
+values.dispose();
+engine.dispose();
+```
+
 `NodePass.dispose()` detaches the pass from its owning scene. A same-name pass in
 another scene is preserved; device restoration keeps the registration. For a
 secondary scene, attach the PostStack with `scene.use()`:
@@ -9982,17 +10049,6 @@ new NodeMaterial({colorNode: field.element(3).xyz});                 // any node
 ```
 
 Cut-outs and slicing with `discard(condition, value)`, GPU counters and compaction with atomics:
-
-```ts
-import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
-import {loadTexture} from 'margoengine/materials';
-import {createStage} from 'margoengine';
-const n = 1024;
-const stage = await createStage('#viewport', {backend: 'webgpu'});
-const slice = uniform(1.5), leaf = await loadTexture('/leaf.png'), radii = new Float32Array(n).fill(0.2);
-new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
-new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
-```
 
 [README continues: https://margoengine.com/llms/packages/shader.md]
 
@@ -11571,20 +11627,6 @@ For exposure driven by aperture, shutter time and ISO, use
 Its runnable example shares an HDR stack with Tonemap, depth of field and motion blur; `camera.apply({exposure: tonemap})`
 sets Tonemap's exposure in stops.
 
-`Tonemap` detaches from its owning scene on disposal, preserving same-name
-effects in other scenes. Use `scene.use()` for a secondary scene:
-
-```ts
-import {Engine} from 'margoengine/core';
-import {Tonemap} from 'margoengine/tonemap';
-const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
-const product = engine.createScene('product');
-const tonemap = new Tonemap();
-product.use(tonemap);
-tonemap.dispose();
-engine.dispose();
-```
-
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
@@ -11606,6 +11648,20 @@ tonemap.setLUT(`LUT_3D_SIZE 2
 tonemap.setLUT(null);
 tonemap.dispose();
 stage.dispose();
+```
+
+`Tonemap` detaches from its owning scene on disposal, preserving same-name
+effects in other scenes. Use `scene.use()` for a secondary scene:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const tonemap = new Tonemap();
+product.use(tonemap);
+tonemap.dispose();
+engine.dispose();
 ```
 
 `agx` is the AgX Base display transform computed in the shader: Rec.2020 inset, log2 encoding over 16.5 stops around 18% grey, the parametric AgX sigmoid, hue restoration, then the outset back to Rec.709. 18% grey stays 18% grey. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).
@@ -11789,6 +11845,13 @@ User code shares the wrapper's WGSL module. It can read the supplied captures an
 
 # @margoengine/terrain
 
+`TerrainMaterials`, `TerrainDisplacement`, `TerrainVirtualTexture` and
+`TerrainDeformation` dispose their actual scene registration, preserving a
+same-name plugin in another scene. Device restoration keeps registration and
+one terrain-lighting provider; explicit disposal removes both. Their public
+`owner` field continues to identify the Engine, so use `engine.sceneOf(effect)`
+to inspect the scene. All existing options and examples below are unchanged.
+
 Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
@@ -11844,15 +11907,6 @@ where stone shows within 60 m, plus about 30 for the blends and the bump. That i
 roughly 200 operations on meadow and sand and 380 on near stone (counted from the
 WGSL, not timed). There are no texture fetches and no derivatives, so it runs
 inside the mesh-ID branch without uniformity limits.
-
-For a moving wet-sand band, add `wetness: {texture: () => water.coastalDepthTexture,
-origin: [-80,-80], size: [160,160]}` using the same world bounds as water's terrain.
-The borrowed texture's red channel contains water depth in meters; it must be a
-single-layer, single-sample 2D `r32float`, `rgba32float` or `rgba16float` texture
-with `COPY_SRC`. Undefined uses dry sand while water initializes or restores.
-The module keeps a stable GPU snapshot so flow ping-pong does not rebuild scene
-or vegetation bindings each frame. A 256 × 256 `rgba32float` snapshot costs 1 MiB
-and one GPU copy per frame. Terrain owns that snapshot, not the provider texture.
 
 [README continues: https://margoengine.com/llms/packages/terrain.md]
 

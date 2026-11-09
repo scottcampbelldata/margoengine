@@ -85,7 +85,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,630 |
 | @margoengine/sprites | `.` 17, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8, `./shader` 8, `./skeletal` 11 | 11 |  | 7,404 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |
-| @margoengine/staging | `.` 4, `./accumulate` 2, `./pathtrace` 2 | 13 |  | 8,520 |
+| @margoengine/staging | `.` 4, `./accumulate` 2, `./pathtrace` 2, `./ground` 3 | 21 |  | 8,520 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6 | 11 |  | 4,853 |
 | @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2 | 3 |  | 14,228 |
 | @margoengine/terrain | `.` 13, `./query` 6, `./layers-pbr` 4, `./stream` 4, `./sculpt` 7, `./holes` 2, `./rvt` 5, `./displace` 3, `./deform` 4, `./blend` 2, `./planet` 8 | 65 |  | 12,858 |

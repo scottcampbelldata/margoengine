@@ -74,6 +74,45 @@ retained; the failed test is revalidated after the repair. Its original native
 phase was not observed, so the controlled wait defect is the precise claim.
 Process listing still precedes client disconnect and driver cleanup still waits
 for process close. Every existing shutdown bound remains unchanged.
+## Batch 56 continuation evidence (section 5, 2026-11-09)
+
+On current main plus the local batch repairs, review56 passes both backends:
+six exact viewport/scissor comparisons, two deliberate unscoped leak controls,
+three owning-scene captures and every finite studio cube component. Fog-all
+passes 87 checks; all 16 environment README programs execute. Fog's historical
+unfogged-image baselines are absent, so no old-build identity is claimed.
+The HDR gate initially rejected a vertical camera because its fixture supplied
+up as a constructor option. The fixture now assigns camera.up and retains the
+real HDR/model, radiance alignment, rotated centroid and exact-return assertions.
+Research and the fixture/owner repairs are recorded in clean-room.md.
+
+ComputePass, ScenePass and RawShaders have additional owning-scene regressions.
+Their package/GPU/README gates and the wider lifecycle audit must finish before
+acceptance. Capture stability is assigned to the separate capture-msaa-hunt
+branch; this continuation neither changes nor clears that regression. No push.
+
+The source inventory is retained in
+[the wider owner audit](../work-lists/batch-56-scene-owners.md): 181 actual calls,
+including 118 registration-review candidates in 46 packages. It also scans
+explicit EnginePlugin disposal methods to catch missing calls. This remains
+open; syntactic inventory is not a substitute for per-owner runtime proof.
+
+Optional TAA upscale now measures 7,112 B against a 7,093 B ceiling (previous
+recorded size 7,079 B). Scott's optional-package exception permits a 19 B ceiling
+increase while retaining source-camera, scene-identity and preview diagnostics.
+The root budget stays 23,924 B under 25,000 B; shader entry ceilings are unchanged.
+The quality rerun is scoped to the failed size gate after this recorded change.
+
+The reset-interrupted DOF comparison subsequently passes after confirmed driver
+recovery, retaining all original pixel/extent bounds; the reset/OOM log remains.
+Staging and TAA GPU suites pass, including native/compatibility HDR shadows and
+idle convergence. Their 20 runtime README examples pass. Post, DOF, tonemap,
+creative, cameras and shader GPU suites pass; their 84 runtime README examples
+pass. Creative's paint resource host now supplies the unregistered sceneOf
+contract and keeps all 20,528 comparisons and real device replacement. The new
+shader owner GPU proof passes native and compatibility dispatch/target/pixel
+checks. Terrain's four provider repairs pass 93 units and the shared class guard;
+their full GPU/README command sequence is queued, not accepted.
 
 ## Optional labels diagnostic restoration (section 5 evidence, 2026-11-10)
 

@@ -42,6 +42,20 @@ stdio/CDP pipes, and releases those pipes before awaiting termination completion
 Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
 5,000 ms process-list bound are unchanged. The controlled regression proves
 pipe-dependent completion, not a measured browser shutdown speed guarantee.
+Batch 56 proof continuation keeps exact outside-view RGB equality and exact
+shadow-mask return statistics. The fixtures now use the supported view-clear and
+camera-up APIs; no core/stage code, sample count or numerical bar changes. Fog-all
+has analytic correctness evidence without a stored earlier-build image baseline.
+Shader plugin disposal resolves identity through sceneOf; no rendering feature
+or speed claim is introduced. Wider owner and capture acceptance remain open.
+
+The optional TAA upscale entry is 7,112 B min+gzip versus the previous recorded
+7,079 B. Its ceiling increases from 7,093 to 7,112 B under Scott's optional-package
+ruling: retain camera identity, scene disposal and mainline preview diagnostics.
+Splitting the synchronous camera wrapper would split identity/restoration
+ownership or require a loader. Core plus stage remains 23,924 B. All shader
+entries fit their unchanged ceilings; shader root is 18,489 B, raw 14,270 B,
+scene pass 12,476 B. These are byte measurements, not performance results.
 
 GPU `run` and `enqueue` accept GPU leaves only; known CPU aggregators cannot be
 overridden, and unclassified GPU leaves require a logged `--gpu` reason. New

@@ -1,0 +1,785 @@
+{
+  "status": "Local only. No push or overall acceptance.",
+  "sourceCommit": "85d33051bdfb90954a17600db1a9feece5f69578",
+  "historicalVerify": {
+    "receipt": "test-results/56fix/coordinator-current-verify.json",
+    "pass": 13704,
+    "total": 13705,
+    "soleFailure": "tests/no-private-paths.test.js",
+    "followup": "Already fixed on main; current focused regression passes. This is not a fresh full-verify pass."
+  },
+  "originalNamedGPUAndReadmeGates": "passed, including DOF compatibility after confirmed NVIDIA driver-reset recovery",
+  "runtimeReadmes": {
+    "environment": 16,
+    "stagingTaaRoot": 20,
+    "postPeers": 84,
+    "unexpectedFailures": 0
+  },
+  "caveats": [
+    "Fog-all: 87 analytic checks pass; old-build unfogged baselines absent.",
+    "Initial partial-frame and HDR camera fixtures were invalid and repaired without changing numerical bars.",
+    "Painterly numerical GPU host lacked sceneOf; host contract repaired, all 20528 comparisons retained.",
+    "DOF first compatibility attempt failed requestDevice after confirmed NVIDIA reset, then passed once after recovery.",
+    "Wider owner audit remains open: 118 active-engine/delegated-owner calls in 46 packages, plus one stored-scene binding.",
+    "Terrain provider fixes have 93 passing units and four failing direct-disposal mutations with four passing controls; extra GPU/README sequence is pending.",
+    "Capture-stability is assigned to capture-msaa-hunt. This continuation did not edit or run its regression."
+  ],
+  "coreStageGzip": 23924,
+  "taaUpscale": {
+    "recordedBefore": 7079,
+    "current": 7112,
+    "oldCeiling": 7093,
+    "newCeiling": 7112,
+    "authorization": "Final brief optional-package size ruling"
+  },
+  "cpu": {
+    "owed-build": {
+      "code": 1,
+      "timedOut": false,
+      "seconds": 3.299,
+      "log": "test-results/56fix/owed-build.log"
+    },
+    "owed-build-corrected": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 13.24,
+      "log": "test-results/56fix/owed-build-corrected.log"
+    },
+    "owed-package-units": {
+      "code": 1,
+      "timedOut": false,
+      "seconds": 7.675,
+      "log": "test-results/56fix/owed-package-units.log"
+    },
+    "owed-lut-regression": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 0.395,
+      "log": "test-results/56fix/owed-lut-regression.log"
+    },
+    "owed-shader-units-complete": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 3.017,
+      "log": "test-results/56fix/owed-shader-units-complete.log"
+    },
+    "owed-terrain-units-complete": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 5.661,
+      "log": "test-results/56fix/owed-terrain-units-complete.log"
+    },
+    "owed-owner-guards-complete": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 0.297,
+      "log": "test-results/56fix/owed-owner-guards-complete.log"
+    },
+    "owed-final-quality": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 71.422,
+      "log": "test-results/56fix/owed-final-quality.log"
+    },
+    "owed-final-lint": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 3.839,
+      "log": "test-results/56fix/owed-final-lint.log"
+    },
+    "owed-final-hygiene": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 32.568,
+      "log": "test-results/56fix/owed-final-hygiene.log"
+    },
+    "owed-final-api-check": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 26.722,
+      "log": "test-results/56fix/owed-final-api-check.log"
+    },
+    "owed-readme-types": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 4.035,
+      "log": "test-results/56fix/owed-readme-types.log"
+    },
+    "owed-final-metadata-tests": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 6.563,
+      "log": "test-results/56fix/owed-final-metadata-tests.log"
+    }
+  },
+  "priorGateFailures": [
+    {
+      "id": "staging-test-gpu-11",
+      "command": "node packages/staging/test/hdr-shadow-browser.mjs",
+      "cwd": ".",
+      "code": 1,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-11.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "dof-test-gpu-12",
+      "command": "node packages/dof/tests/gpu/lens-check.mjs",
+      "cwd": ".",
+      "code": 2,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-dof-test-gpu-12.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "dof-test-gpu-13",
+      "command": "node packages/dof/tests/gpu/compat-check.mjs",
+      "cwd": ".",
+      "code": 1,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-rest-dof-test-gpu-13.log",
+      "receipt": "test-results/56fix/owed-results-dof-test-gpu-12-rest.json"
+    },
+    {
+      "id": "creative-test-gpu-paint-22",
+      "command": "node scripts/test-paint.js",
+      "cwd": "packages/creative",
+      "code": 1,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-creative-test-gpu-paint-22.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    }
+  ],
+  "latestGPUReceipts": [
+    {
+      "id": "environment-test-gpu-mirror-13",
+      "command": "node packages/environment/tests/review56-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-environment-test-gpu-mirror-13.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "environment-test-gpu-mirror-14",
+      "command": "node packages/environment/tests/review56-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-environment-test-gpu-mirror-14.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "environment-test-gpu-fog-all-15",
+      "command": "node scripts/fog-all-gpu-check.js",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-environment-test-gpu-fog-all-15.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "readmes-environment",
+      "command": "node scripts/run-readme-examples.mjs --packages=environment",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-readmes-environment.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-0",
+      "command": "node packages/staging/test/browser-check.mjs --no-record",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-0.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-1",
+      "command": "node packages/staging/test/ground-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-1.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-2",
+      "command": "node packages/staging/test/ground-browser.mjs --studio",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-2.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-3",
+      "command": "node packages/staging/test/ground-browser.mjs --studio --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-3.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-4",
+      "command": "node packages/staging/test/accumulate-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-4.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-5",
+      "command": "node packages/staging/test/accumulate-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-5.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-6",
+      "command": "node packages/staging/test/pathtrace-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-6.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-7",
+      "command": "node packages/staging/test/orientation-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-7.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-8",
+      "command": "node packages/staging/test/orientation-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-8.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-9",
+      "command": "node packages/staging/test/floor-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-9.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-10",
+      "command": "node packages/staging/test/floor-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-10.log",
+      "receipt": "test-results/56fix/owed-results-environment-test-gpu-mirror-13.json"
+    },
+    {
+      "id": "staging-test-gpu-11",
+      "command": "node packages/staging/test/hdr-shadow-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-11.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "staging-test-gpu-12",
+      "command": "node packages/staging/test/hdr-shadow-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-staging-test-gpu-12.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-13",
+      "command": "node packages/taa/test/upscale-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-13.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-14",
+      "command": "node packages/taa/test/velocity-only-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-14.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-15",
+      "command": "node packages/taa/test/reactive-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-15.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-16",
+      "command": "node packages/taa/test/rejection-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-16.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-17",
+      "command": "node packages/taa/test/sharpen-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-17.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-18",
+      "command": "node packages/taa/test/xr-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-18.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "taa-test-gpu-19",
+      "command": "node packages/taa/test/deform-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-taa-test-gpu-19.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "readmes-staging-taa-margoengine",
+      "command": "node scripts/run-readme-examples.mjs --packages=staging,taa,margoengine",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-readmes-staging-taa-margoengine.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-0",
+      "command": "node packages/post/test/image-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-0.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-1",
+      "command": "node packages/post/test/outline-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-1.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-2",
+      "command": "node packages/post/test/contact-shadows-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-2.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-3",
+      "command": "node packages/post/test/sss-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-3.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-4",
+      "command": "node packages/post/test/material-decals-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-4.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-5",
+      "command": "node packages/post/test/decals-cull-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-5.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-6",
+      "command": "node packages/post/test/ssr-rough-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-6.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-7",
+      "command": "node packages/post/test/ssgi-bounce-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-7.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-8",
+      "command": "node packages/post/test/anamorphic-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-8.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-9",
+      "command": "node packages/post/test/blur-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-9.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-10",
+      "command": "node packages/post/test/lens-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-10.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "post-test-gpu-looks-11",
+      "command": "node scripts/post-looks-gpu-check.js",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-post-test-gpu-looks-11.log",
+      "receipt": "test-results/56fix/owed-results-staging-test-gpu-11.json"
+    },
+    {
+      "id": "dof-test-gpu-12",
+      "command": "node packages/dof/tests/gpu/lens-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-rest-dof-test-gpu-12.log",
+      "receipt": "test-results/56fix/owed-results-dof-test-gpu-12-rest.json"
+    },
+    {
+      "id": "dof-test-gpu-13",
+      "command": "node packages/dof/tests/gpu/compat-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-confirmed-reset-recovery-dof-test-gpu-13.log",
+      "receipt": "test-results/56fix/owed-results-dof-test-gpu-13-confirmed-reset-recovery.json"
+    },
+    {
+      "id": "tonemap-test-gpu-lut-sizes-14",
+      "command": "node scripts/tonemap-lut-sizes-gpu-check.js",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-lut-sizes-14.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "tonemap-test-gpu-grade-15",
+      "command": "node packages/tonemap/tests/grade-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-grade-15.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "tonemap-test-gpu-curves-16",
+      "command": "node packages/tonemap/tests/curves-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-curves-16.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "tonemap-test-gpu-custom-17",
+      "command": "node packages/tonemap/tests/custom-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-custom-17.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "tonemap-test-gpu-metering-18",
+      "command": "node packages/tonemap/tests/metering-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-metering-18.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "tonemap-test-gpu-local-19",
+      "command": "node packages/tonemap/tests/local-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-tonemap-test-gpu-local-19.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "creative-test-browser-20",
+      "command": "node scripts/test-browser.js",
+      "cwd": "packages/creative",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-creative-test-browser-20.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "creative-test-gpu-targets-21",
+      "command": "node scripts/test-targets.js",
+      "cwd": "packages/creative",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-after-reset-creative-test-gpu-targets-21.log",
+      "receipt": "test-results/56fix/owed-results-tonemap-test-gpu-lut-sizes-14-after-reset.json"
+    },
+    {
+      "id": "creative-test-gpu-paint-22",
+      "command": "node scripts/test-paint.js",
+      "cwd": "packages/creative",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-creative-test-gpu-paint-22.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "cameras-test-gpu-23",
+      "command": "node packages/cameras/test/browser-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-cameras-test-gpu-23.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-24",
+      "command": "node packages/shader/test/browser-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-24.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-25",
+      "command": "node packages/shader/test/noise-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-25.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-26",
+      "command": "node packages/shader/test/readback-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-26.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-27",
+      "command": "node packages/shader/test/editor-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-27.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-28",
+      "command": "node packages/shader/test/compute-texture-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-28.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-29",
+      "command": "node packages/shader/test/compute-model-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-29.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-30",
+      "command": "node packages/shader/test/lighting-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-30.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-31",
+      "command": "node packages/shader/test/passes-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-31.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-32",
+      "command": "node packages/shader/test/inputs-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-32.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-33",
+      "command": "node packages/shader/test/deform-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-33.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-34",
+      "command": "node packages/shader/test/pass-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-34.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-35",
+      "command": "node packages/shader/test/utils-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-35.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-36",
+      "command": "node packages/shader/test/raw-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-36.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-37",
+      "command": "node packages/shader/test/subgroups-check.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-37.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-test-gpu-raw-38",
+      "command": "node scripts/shader-raw-gpu-check.js",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-test-gpu-raw-38.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "readmes-post-peers",
+      "command": "node scripts/run-readme-examples.mjs --packages=post,dof,tonemap,creative,cameras,shader",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-readmes-post-peers.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-owner-native",
+      "command": "node packages/shader/test/scene-owner-browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-owner-native.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "shader-owner-compat",
+      "command": "node packages/shader/test/scene-owner-browser.mjs --compat",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-paint-host-shader-owner-compat.log",
+      "receipt": "test-results/56fix/owed-results-creative-test-gpu-paint-22-paint-host.json"
+    },
+    {
+      "id": "terrain-gpu-0",
+      "command": "node packages/terrain/test/wetness.browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-terrain-terrain-gpu-0.log",
+      "receipt": "test-results/56fix/owed-results-terrain-gpu-0-terrain.json"
+    },
+    {
+      "id": "terrain-gpu-1",
+      "command": "node packages/terrain/test/edge.browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-terrain-terrain-gpu-1.log",
+      "receipt": "test-results/56fix/owed-results-terrain-gpu-0-terrain.json"
+    },
+    {
+      "id": "terrain-gpu-2",
+      "command": "node packages/terrain/test/bump.browser.mjs",
+      "cwd": ".",
+      "code": 0,
+      "timedOut": false,
+      "log": "test-results/56fix/owed-terrain-terrain-gpu-2.log",
+      "receipt": "test-results/56fix/owed-results-terrain-gpu-0-terrain.json"
+    }
+  ]
+}

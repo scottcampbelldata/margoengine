@@ -72,6 +72,34 @@ after the repair; all 42 teardown, shutdown and page-ready tests pass. The full
 verify had 13,665 successes and one page-ready cleanup timeout; those successful
 results are retained and the failed page-ready test passes after this repair.
 The original loaded timeout's native phase was not captured. No deadline changed.
+### Batch 56 continuation: fixture and shader ownership repairs
+
+The review56 fixture used different full/partial frame layouts and an unsupported
+string view.clear. Matching partial frames with a clear object retain the exact
+pixel bar; two deliberately unscoped surface controls expose the original leak.
+Both backend proofs now pass. The HDR proof passed up in CameraOptions, which
+does not accept it, so its vertical view rejected. It now assigns camera.up;
+hdr-shadow-fixture.test.js executes the real fixture initialization and fails on
+the old fixture. No core camera repair or tolerance change is needed.
+
+The wider audit also reproduces three shader lifecycle defects: ComputePass
+removes the active scene's same-name plugin; ScenePass and RawShaders release
+resources but keep their registration. scene-owner.test.js exercises direct
+disposal, owning-scene removal, restore, same-name isolation and replacement
+with a real engine. Repairs are local; package acceptance and the remaining
+non-PostStack audit are open. Capture stability remains with its separate hunter.
+The [wider inventory](work-lists/batch-56-scene-owners.md) retains every candidate
+and explicitly distinguishes syntactic review from proven defects.
+
+Four terrain provider defects are also reproduced and repaired locally:
+TerrainMaterials, TerrainDisplacement, TerrainVirtualTexture and TerrainDeformation
+store an Engine in owner and disposed by its active scene. Route their public
+attach factory's use into a real secondary scene, install a same-name default
+sentinel, then dispose directly: registration remains and the default sentinel
+is removed. The scene-owner regression now passes all eight disposal/removal
+cases, including provider cardinality after restore. Reverting only the owner
+lookups reproduces four failures with four passing controls. Package tests pass
+93/93; their full GPU and README gates remain pending in the shared queue.
 
 ### Fixed 2026-11-10: labels duplicate attachment lost its error contract
 

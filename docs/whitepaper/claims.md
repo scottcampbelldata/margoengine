@@ -60,6 +60,25 @@ ordering. The pipe-dependent regression in `tests/browser-teardown.test.js`
 fails before the repair; all 42 teardown, shutdown and page-ready tests pass
 after it. This proves the controlled wait dependency, without a shutdown speed
 claim or conclusive native attribution of the earlier loaded timeout.
+Batch 56 continuation: review56's matching-view browser proof passes on native
+WebGPU and full WebGL2 compatibility, including deliberately unscoped negative
+controls and exact outside RGB equality. Fog-all passes 87 analytic checks and
+environment's 16 runtime README examples pass. Historical fog image baselines
+are absent, so old-build equality is not claimed. Shader owner regressions are
+expanded to ComputePass, ScenePass and RawShaders; remaining package acceptance
+and the wider owner audit are pending. Capture stability belongs to its separate
+hunter and is not cleared by these results. No speed or broader parity claim.
+
+The remaining named batch 56 GPU/README gates pass, including DOF compatibility
+after a confirmed driver-reset interruption. Environment has 16 runtime examples,
+staging/TAA/root 20 and the six post-peer packages 84, all passing. New shader
+owner GPU dispatch/target/pixel regressions pass on both backends. Four terrain
+provider ownership repairs have 93 passing package units and four direct-disposal
+negative controls; their GPU/README acceptance remains pending. The 118-call
+wider candidate inventory remains open and does not claim general owner safety.
+The scoped receipts, repaired fixture failures and retained reset interruption are
+in [the local gate record](results/batch-56-owner-gates-20261109.json). It records
+local evidence only; the combined fixes have not been pushed or accepted.
 
 Labels duplicate attachment preserves the existing renderer and reports a linked
 state MargoError with the collision and both repair choices. Evidence:
