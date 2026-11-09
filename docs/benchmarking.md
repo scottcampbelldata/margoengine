@@ -507,3 +507,9 @@ Unchanged:
 - `npm run proofs`.
 - `scripts/quiet-gate.mjs` and `scripts/gpu-lock.mjs`, which the gate uses.
 - The per-feature GPU scripts in `examples/package-benchmarks/` and their committed results.
+
+### GPU suite hold and portable evidence records (2026-11-09)
+
+The parallel-plan regression compares each suite hold with twice that suite's declared hard limit, including the 6-minute parity-gamma suite; the default 10-minute limit is not substituted for an explicit limit. The hold implementation and all time budgets are unchanged. `tests/parallel-check.test.js` covers short, default and long declared limits. The decoder evidence records' excluded-directory pointers were corrected separately on main in 988ba0005; `tests/no-private-paths.test.js` checks every tracked file.
+
+`tests/gpu-lock-integration.test.js` adds live shared-holder and stale-mutex acquisition coverage to the landed mutex retirement fix. Both regressions fail on b9985bd07 and pass on e926c998d. The existing real Win32 pending-deletion test remains required. A separate native Windows parent-release probe succeeded for shared and exclusive acquisition; a broader synthetic model that marked every removed parent pending did not reproduce that native behavior and is not evidence of an additional defect.

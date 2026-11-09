@@ -18,7 +18,7 @@ import {
 import { compareRuns } from '../scripts/compare-check-runs.mjs';
 import { holdMinutes, lockOrder, PREPARE, plan, planSteps, suiteJobs, testId } from '../scripts/gpu-package-tests.mjs';
 import { longestFirst, parallelMode, runJobs, tailOf } from '../scripts/support/parallel-run.mjs';
-import { runLimited } from '../scripts/support/run-limited.mjs';
+import { runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
 import { fixedPorts, outputPaths, suiteResources, usesDefaultViteCache } from '../scripts/support/suite-resources.mjs';
 
 const root = join(import.meta.dirname, '..');
@@ -267,7 +267,15 @@ test('the parallel plan is the serial plan: every suite once, the same timing te
     jobs.some((j) => j.exclusive),
     'there are timing tests',
   );
-  for (const job of jobs) assert.ok(holdMinutes(job) * 60_000 > 2 * 10 * 60_000, job.label);
+  for (const job of jobs) assert.ok(holdMinutes(job) * 60_000 > 2 * testLimitMs(job.minutes), job.label);
+});
+
+test('suite hold accounting follows each declared limit, including short suites', () => {
+  for (const minutes of [0.5, 6, 10, 15, 60]) {
+    const job = { name: 'a-suite-without-prepare', minutes };
+    assert.equal(holdMinutes(job), 2 * minutes + 5);
+    assert.ok(holdMinutes(job) * 60_000 > 2 * testLimitMs(minutes));
+  }
 });
 
 test('real suites that share a port or an output are told apart', () => {
