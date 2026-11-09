@@ -22,6 +22,18 @@ No forced GC, reduced work, discarded output, tolerance or timing excuse.
 The same-payload uncompressed diagnostic removes that control's RSS loss,
 with 12 exact old and 12 exact new hashes, but is not a shipped fix.
 
+Batch 171 job 3 acceptance: 14,012 tests in the single full verify, 14,010 passed;
+two metadata failures repaired (help catalogue and generated notices); all seven affected checks pass.
+190 sciviz/site CPU tests, all six sciviz GPU suites and all 25 README runtime examples pass.
+The 16 entry parity cases include zero pixel differences and exact actual-device restoration for tubes
+and ribbons (3793/3890 lit pixels). All 40 demo/layout/backend cases pass, including the four NOAA
+wind-path layouts/backends. Fresh genuine entry/network records both identify c333a7390, packages
+clean. /tubes 2533 B, /grids 23735 B, /maths 5703 B, root 50599 B, LIC 23461 B; core/stage 23924 B.
+The analytical sink and real NOAA regressions fail old fields.ts and pass the root repair. Numerical
+termination/geometry/native-backend limits stay explicit; no speed claim. Earlier job 3 checkpoint
+paragraphs and their then-open repros below are historical, superseded by this acceptance.
+[Full receipt](whitepaper/results/batch-171-tubes-validation.json).
+
 ## Batch 171 tracer numerical limits and size attribution
 
 The CPU streamline step is a maximum arc step, adaptively shortened. Local error estimate is the RK4

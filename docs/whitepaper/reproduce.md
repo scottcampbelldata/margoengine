@@ -16,6 +16,17 @@ absence on RTX A6000 WebGPU remains missing hardware evidence. No timing A/B.
 Memory losses and the same-payload normalized control are separate from
 acceptance: the runtime still receives the original source containers.
 
+## Batch 171 job 3 final acceptance
+
+One npm run verify (hard 40-minute process-tree limit): 14012 tests, 14010 passed,
+two metadata failures subsequently corrected; all seven affected checks pass. Do not rerun the full suite.
+Run the six sciviz *-browser.mjs leaves through scripts/gpu-lock.mjs in shared mode, one at a time,
+--wait-max=60, with command limits from their measured duration plus margin. Do not hold a slot for
+package builds, units, lint, hygiene or verify. check:readme-run -- --packages=sciviz runs 25 examples.
+The [receipt](results/batch-171-tubes-validation.json) records exact counts, backend/restore evidence
+and the coherent c333a7390 measurement pair. No benchmark, exclusive GPU run or time-only assertion.
+
+
 ## Batch 171 critical-point regression and LIC attribution
 
 Build sciviz, then run under a 4-minute process-tree deadline:

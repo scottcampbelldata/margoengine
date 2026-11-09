@@ -1,0 +1,232 @@
+{
+  "checkpoint": "job3-complete-correctness-acceptance",
+  "source": "c333a7390",
+  "cpu": {
+    "tests": 190,
+    "pass": 190,
+    "fail": 0,
+    "regression": "packages/sciviz/tests/streamline-stagnation.test.js",
+    "oldMargoTracer": "a9469f557:packages/sciviz/src/fields.ts",
+    "oldFailures": [
+      "analytical sink repeated sample 2",
+      "NOAA ordered chord reverses",
+      "physical coordinate just beyond grid edge sampled as inside"
+    ],
+    "noaaDays": 8,
+    "seedsPerDay": 12,
+    "bothMeshes": true
+  },
+  "gpu": [
+    {
+      "name": "sciviz",
+      "max": 1.5,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10
+    },
+    {
+      "name": "bricks",
+      "max": 1,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 16.9
+    },
+    {
+      "name": "entries",
+      "max": 1.5,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 33.4
+    },
+    {
+      "name": "restoration",
+      "max": 1,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 15.7
+    },
+    {
+      "name": "demos",
+      "max": 3,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 115.5
+    },
+    {
+      "name": "webgl2",
+      "max": 1,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.6
+    }
+  ],
+  "readme": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 31.8,
+    "examples": 25,
+    "node": 4,
+    "browser": 21
+  },
+  "data": {
+    "file": "examples/assets/sciviz/wind.bin",
+    "sha256": "e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd",
+    "license": "NOAA US-government public domain"
+  },
+  "entrySizes": {
+    "tubes": 2533,
+    "grids": 23735,
+    "lic": 23461,
+    "index": 50599,
+    "maths": 5703,
+    "flow": 8665
+  },
+  "pairedRecordSource": {
+    "commit": "c333a7390",
+    "packagesDirty": false
+  },
+  "licAttribution": {
+    "method": "Same current LIC source and canonical bundler; only local pre-f33472ed6 colormaps.ts/tables.ts substituted through Vite load hook. No timings.",
+    "reports": [
+      {
+        "colourPrecision": "published precision",
+        "raw": 53632,
+        "gzip": 23461
+      },
+      {
+        "colourPrecision": "pre-restoration Margo code and data",
+        "raw": 26495,
+        "gzip": 10429
+      }
+    ],
+    "delta": 13032
+  },
+  "fullVerify": {
+    "ranOnce": true,
+    "ok": false,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 887.6,
+    "tests": 14012,
+    "passed": 14010,
+    "failed": 2,
+    "allFailuresClosed": true,
+    "failedFiles": [
+      "tests/errors-page.test.js",
+      "tests/supply-chain.test.js"
+    ],
+    "closure": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.1,
+      "tests": 7,
+      "pass": 7
+    }
+  },
+  "coreStage": {
+    "raw": 59077,
+    "gzip": 23924,
+    "limit": 25000
+  },
+  "noaaDemo": [
+    {
+      "name": "tubes",
+      "compat": false,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "name": "tubes",
+      "compat": false,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "tubes",
+      "compat": true,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "name": "tubes",
+      "compat": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "meshParity": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "checks": [
+      {
+        "name": "tubes",
+        "triangles": 6172,
+        "lit": 3793
+      },
+      {
+        "name": "ribbons",
+        "triangles": 384,
+        "lit": 3890
+      }
+    ],
+    "compatChecks": [
+      {
+        "name": "tubes",
+        "triangles": 6172,
+        "lit": 3793
+      },
+      {
+        "name": "ribbons",
+        "triangles": 384,
+        "lit": 3890
+      }
+    ],
+    "results": [
+      {
+        "name": "tubes",
+        "lit": 3793,
+        "share": 0,
+        "mean": 0
+      },
+      {
+        "name": "ribbons",
+        "lit": 3890,
+        "share": 0,
+        "mean": 0
+      }
+    ]
+  },
+  "status": "accepted"
+}

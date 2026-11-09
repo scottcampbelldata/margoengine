@@ -9,7 +9,9 @@ shapes. The analytical and NOAA regressions independently fail the old tracer an
 Small periodic orbits continue and a near-saddle trajectory preserves xy through the close encounter.
 Physical boundary rounding, zero-speed/minSpeed=0 and invalid controls have permanent regressions too.
 Numerical floor and local-error limitations are documented in the package README and limits.md.
-GPU demo/final job acceptance is recorded separately; the earlier checkpoint remains historical.
+GPU demo/final job acceptance now passes. Single full verify: 14012 tests, 14010 passed,
+two metadata failures corrected and all seven affected checks passing.
+The [final receipt](whitepaper/results/batch-171-tubes-validation.json) supersedes the earlier checkpoint.
 
 ### Fixed: scientific mesh failed construction/publication leaked resources
 

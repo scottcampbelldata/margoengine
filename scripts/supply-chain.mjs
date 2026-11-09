@@ -202,7 +202,7 @@ const ASSETS = [
   ],
   [
     'examples/assets/sciviz/README.md',
-    'real scientific demo data: OpenNeuro ds000030 UCLA CNP sub-10159 T1w MRI (CC0), one million 2MASS All-Sky Point Source Catalog rows from NASA/IPAC IRSA (public domain), and eight January 2024 daily NCEP-NCAR Reanalysis 1 near-surface wind fields from NOAA PSL (public domain), also reused unchanged by the moving-flow and LIC wind-texture examples; exact source URLs, queries, reductions, binary layouts and SHA-256 manifests beside the assets',
+    'real scientific demo data: OpenNeuro ds000030 UCLA CNP sub-10159 T1w MRI (CC0), one million 2MASS All-Sky Point Source Catalog rows from NASA/IPAC IRSA (public domain), and eight January 2024 daily NCEP-NCAR Reanalysis 1 near-surface wind fields from NOAA PSL (public domain), also reused unchanged by the moving-flow, LIC wind-texture and North Atlantic wind-path tube/ribbon examples (wind.bin SHA-256 e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd; radii and widths are drawing aids, horizontal streamwise curl is zero); exact source URLs, queries, reductions, binary layouts and SHA-256 manifests beside the assets',
   ],
   [
     'packages/physics/tests/fixtures/thingi10k/NOTICE.md',

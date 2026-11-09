@@ -1,5 +1,5 @@
 {
-  "source": "deefe99a2118769cabc6d24b7527d0646013454e",
+  "source": "c333a73900a6a53887dbd33482f11424238a56a9",
   "method": "Unchanged canonical Vite ES2022 + compactOutput, bare imports external, zlib gzip default",
   "lic": {
     "raw": 53632,
@@ -55,6 +55,7 @@
       ]
     }
   ],
+  "packagesDirty": false,
   "attribution": {
     "method": "Same current LIC source and canonical bundler; only local pre-f33472ed6 colormaps.ts/tables.ts substituted through Vite load hook. No timings.",
     "reports": [
