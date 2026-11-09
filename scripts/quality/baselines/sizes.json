@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11439313,
+  "total": 11440780,
   "history": [
     {
       "date": "2026-10-24",
@@ -4760,6 +4760,12 @@
       "commit": "c9397eb2f",
       "reason": "Correctness repair of all 14 extruded text review findings. Bounded font decoding and Type 2 semantics, nonzero contour union, complete visible hole triangulation, outward closed bevel meshes, and allocation limits require 10834 gzip bytes instead of 6214. Tests and core-stage size limit are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "13cf4d7ac",
+      "reason": "lighting2d light masks and layers (LIM-597)",
+      "grew": 3
     }
   ],
   "items": {
@@ -5094,9 +5100,9 @@
     "@margoengine/labels": 5546,
     "@margoengine/labels/callouts": 1603,
     "@margoengine/labels/declutter": 1512,
-    "@margoengine/lighting2d": 4389,
-    "@margoengine/lighting2d/cookie": 6732,
-    "@margoengine/lighting2d/soft": 5248,
+    "@margoengine/lighting2d": 5152,
+    "@margoengine/lighting2d/cookie": 7079,
+    "@margoengine/lighting2d/soft": 5605,
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
