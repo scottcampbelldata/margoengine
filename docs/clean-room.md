@@ -3758,3 +3758,11 @@ scenes are preserved. The owning package holds all code; core and stage do not
 change. The standard Save test command and check:merge run the 16-case real-engine
 owner suite, covering the original six failures plus default controls, partial
 attachment, helper cleanup, scope collisions and replacement identity.
+
+## Batch 234 wave-query research
+
+The research checkpoint in [water-query.md](water-query.md) compares Finch
+(2004), Tessendorf (1999-2004), Moller and Trumbore (1997), and Woop, Benthin
+and Wald (2013) before implementation. Only papers, public descriptions and
+Margo code were read; no companion or rival implementation.
+
