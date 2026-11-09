@@ -76,7 +76,8 @@ test('an ambient MARGO_GPU_* setting does not reach the locks under test, and is
   }
 });
 
-const takeNew = (gpu, owner, mode) => gpu.acquire({ owner, mode, poll: 10, log: quiet });
+const takeNew = (gpu, owner, mode) =>
+  gpu.acquire({ owner, mode, timing: 'CPU-only scheduler regression', poll: 10, log: quiet });
 const takeOld = (gpu, owner) => gpu.acquire({ owner, poll: 10, log: quiet });
 
 test('an old-style holder blocks new shared and exclusive requests until it releases', () =>
@@ -228,7 +229,7 @@ test('every explicitly selected lock other than gpu.lock is exclusive with a 30 
     process.env.MARGO_GPU_LOCK = join(folder, 'gpu.lock');
     const gpu = await import(`../scripts/gpu-lock.mjs?defaults=${copies++}`);
     assert.equal(gpu.defaultMaxMinutes('shared'), 20);
-    assert.equal(gpu.defaultMaxMinutes('exclusive'), 60);
+    assert.equal(gpu.defaultMaxMinutes('exclusive'), 20);
   } finally {
     restore();
     rmSync(folder, { recursive: true, force: true });

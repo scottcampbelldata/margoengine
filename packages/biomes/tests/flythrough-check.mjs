@@ -32,7 +32,12 @@ const summary = (run) => ({
   copyMax: run.copies.length ? Math.max(...run.copies) : 0,
 });
 
-const release = await acquire({ owner: 'biomes-flythrough', mode: 'exclusive', max: 15 });
+const release = await acquire({
+  owner: 'biomes-flythrough',
+  mode: 'exclusive',
+  timing: 'biomes flight frame-time budgets',
+  max: 15,
+});
 const context = await openBrowser({ startPath: '/packages/biomes/tests/flythrough-check.html', port: 'free' }),
   { page, hardware } = context,
   pageErrors = [];

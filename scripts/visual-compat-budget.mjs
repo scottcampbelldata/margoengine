@@ -49,6 +49,7 @@ try {
     const waited = Date.now();
     release = await acquire({
       mode: 'exclusive',
+      timing: 'visual compatibility median frame-time budget',
       owner: `visual-compat-budget ${n + 1}/${chunks.length}`,
       max: chunkMinutes + 2,
     });

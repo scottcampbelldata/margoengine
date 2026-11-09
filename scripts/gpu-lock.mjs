@@ -1,11 +1,11 @@
 // GPU access across agents and worktrees, as a reader/writer lock in test-results/gpu.lock of the MAIN checkout.
 //   shared     correctness tests: up to MARGO_GPU_SLOTS (default 3) holders at once. The default for `gpu.lock`.
-//   exclusive  anything that measures speed: `--exclusive` / acquire({mode: 'exclusive'}), and automatically every
+//   exclusive  only commands that measure speed: `--exclusive` / acquire({mode: 'exclusive'}), and automatically every
 //              `bench*` npm script and every script under bench/, benchmarks/ or *-benchmarks/ (or named bench*.mjs).
 //              It waits until no holder is left and, while it waits, new shared holders queue behind it, so it cannot
 //              starve. Every explicitly selected non-GPU lock is exclusive.
 // Nothing hangs while holding or waiting:
-//   hold limit  every holder has a maximum hold time (default 20 min shared, 60 min exclusive, 30 min for any other
+//   hold limit  every holder has a maximum hold time (default 20 min shared, at most 20 min exclusive, 30 min for any other
 //               explicitly selected lock; `--max=<min>` / acquire({max})). `run` kills the command's whole process tree
 //               (Windows: taskkill /T /F) when it is exceeded, frees the lock and exits 124 with
 //               "TIMEOUT after N min: <command>". A holder that called acquire() itself is ended the same way by its
@@ -26,8 +26,8 @@
 // owner.json, so it is waited for too. Old clients therefore take turns with new ones as with each other.
 // CLI: node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<agent id> -- <command...>
 //      node scripts/gpu-lock.mjs status
-// Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 makes every acquire exclusive (it can only
-// raise a request to exclusive, never lower it); MARGO_GPU_LOCK=<folder> uses another lock.
+// Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 requests exclusive but still needs speed
+// classification or a timing reason. MARGO_GPU_LOCK=<folder> uses another lock. Refusals are logged beside the lock.
 // Scripts that take the lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it excuses only that
 // lock, so a GPU test inside a different lock still takes the GPU lock) when run under `run`, so wrapping them can't
 // deadlock; acquire() is a no-op there. MARGO_GPU_LOCK_NESTED_MODE names the outer holder's mode: an exclusive request
@@ -292,8 +292,49 @@ export function resolveMode(requested) {
   return isGpuLock ? (requested ?? 'shared') : 'exclusive';
 }
 
-/** The default longest hold, in minutes: 20 for a shared slot, 60 exclusive on the GPU lock, 30 for any other lock. */
-export const defaultMaxMinutes = (mode) => (isGpuLock ? (mode === 'shared' ? 20 : 60) : 30);
+/** GPU holds default to 20 minutes; other named locks default to 30 minutes. */
+export const defaultMaxMinutes = () => (isGpuLock ? 20 : 30);
+export const EXCLUSIVE_MAX_MINUTES = 20;
+
+function refusal(code, message, request) {
+  mkdirSync(dirname(lockDir), { recursive: true });
+  appendFileSync(
+    join(dirname(lockDir), 'gpu-lock-refusals.log'),
+    JSON.stringify({ at: new Date().toISOString(), code, ...request, message }) + '\n',
+  );
+  throw Object.assign(new Error(`${code}: ${message}`), { code });
+}
+
+/** Validate exclusive GPU use before waiting or entering an outer holder. Other locks are unaffected. */
+function validateRequest({ owner, mode, maxMinutes, command, timing }) {
+  if (!Number.isFinite(maxMinutes) || maxMinutes <= 0)
+    throw new RangeError('gpu-lock: max must be a finite positive number of minutes');
+  if (!isGpuLock || mode !== 'exclusive') return;
+  const request = { owner, mode, maxMinutes, command, timing };
+  if (
+    !measuresSpeed(command.split(/\s+/)) &&
+    !measuresSpeed(process.argv.slice(1, 2)) &&
+    !(typeof timing === 'string' && timing.trim())
+  )
+    refusal(
+      'ERR_GPU_EXCLUSIVE_NOT_TIMING',
+      'exclusive GPU access is only for speed measurement; correctness gates use shared slots. For an unclassified timing command pass --timing=<reason>.',
+      request,
+    );
+  if (maxMinutes > EXCLUSIVE_MAX_MINUTES)
+    refusal(
+      'ERR_GPU_EXCLUSIVE_LIMIT',
+      `exclusive GPU holds cannot exceed ${EXCLUSIVE_MAX_MINUTES} minutes; split the speed suite into bounded measurements.`,
+      request,
+    );
+  if (timing) {
+    mkdirSync(dirname(lockDir), { recursive: true });
+    appendFileSync(
+      join(dirname(lockDir), 'gpu-lock-timing.log'),
+      JSON.stringify({ at: new Date().toISOString(), ...request }) + '\n',
+    );
+  }
+}
 
 /** Remove a mutex from its reusable name before deleting it (Windows may keep a deleted name pending). */
 export function retireMutex(path, { rename = renameSync, remove = rmSync } = {}) {
@@ -482,11 +523,14 @@ export async function acquire({
   max,
   waitMax = number('MARGO_GPU_WAIT_MAX_MIN', 60),
   command = process.argv.slice(1).join(' ').slice(0, 300),
+  timing,
   poll = 1_000,
   log = console.error,
 } = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
   const mode = resolveMode(requested);
+  const maxMinutes = max ?? defaultMaxMinutes(mode);
+  validateRequest({ owner, mode, maxMinutes, command, timing });
   // Inside `run` of this same lock the command already holds it; a different lock is still taken.
   if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) {
     if (mode === 'exclusive' && process.env.MARGO_GPU_LOCK_NESTED_MODE === 'shared')
@@ -497,7 +541,6 @@ export async function acquire({
     noop.mode = mode;
     return noop;
   }
-  const maxMinutes = max ?? defaultMaxMinutes(mode);
   const token = `${owner.replace(/[^\w.-]/g, '_')}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     entry = (beats = true) => {
       const now = Date.now();
@@ -507,6 +550,7 @@ export async function acquire({
         token,
         mode,
         command,
+        ...(timing ? { timing } : {}),
         takenAt: new Date(now).toISOString(),
         maxMinutes,
         deadline: now + maxMinutes * MIN,
@@ -541,15 +585,15 @@ export async function acquire({
         if (queued && others.length === state.waiting.length) queued = false;
         const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
         if (mode === 'shared') {
-          if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
+        if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
             mkdirSync(sharedDir, { recursive: true });
             const file = join(sharedDir, `${token}.json`);
             writeFileSync(file, entry());
             return { file };
           }
-          return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
+        return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
         }
-        if (!state.exclusive && !state.shared.length && first) {
+      if (!state.exclusive && !state.shared.length && first) {
           if (queued) rmSync(join(waitingDir, ticket), { force: true });
           writeFileSync(exclusiveFile, entry());
           return { file: exclusiveFile };
@@ -606,8 +650,9 @@ export const USAGE = `usage: node scripts/gpu-lock.mjs run [--exclusive] [--max=
 Runs a command while holding the GPU lock (test-results/gpu.lock of the main checkout), or prints the holders.
 
 Options:
-  --exclusive                hold the whole GPU (benchmarks do this automatically)
-  --max=<min>                hold limit in minutes (default 20 shared, 60 exclusive)
+  --exclusive                hold the whole GPU for speed measurement only
+  --timing=<reason>          classify an otherwise unrecognized timing command (logged)
+  --max=<min>                hold limit in minutes (default 20; exclusive GPU maximum 20)
   --wait-max=<min>           give up waiting after this many minutes (default 60)
   --owner=<id>              name shown to other waiters
   -h, --help                 print this help and exit
@@ -657,7 +702,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       flags = rest.slice(0, split < 0 ? rest.length : split),
       flag = (name) => flags.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3),
       owner = flag('owner'),
-      mode = flags.includes('--exclusive') || measuresSpeed(rest.slice(split + 1)) ? 'exclusive' : undefined,
+      mode =
+        flags.includes('--exclusive') || flag('timing') !== undefined || measuresSpeed(rest.slice(split + 1))
+          ? 'exclusive'
+          : undefined,
       command = rest.slice(split + 1);
     if (split < 0 || !command.length)
       throw new Error(
@@ -674,7 +722,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       text = command.join(' ');
     let release;
     try {
-      release = await acquire({ owner, mode, max: given('max'), waitMax: given('wait-max'), command: text });
+      release = await acquire({
+        owner,
+        mode,
+        timing: flag('timing'),
+        max: given('max'),
+        waitMax: given('wait-max'),
+        command: text,
+      });
     } catch (error) {
       console.error(error.message);
       process.exit(2);

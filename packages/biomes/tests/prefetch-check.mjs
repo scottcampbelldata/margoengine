@@ -81,7 +81,7 @@ async function prove() {
 process.chdir(resolve(import.meta.dirname, '../../..'));
 if (process.argv.includes('--child')) await prove();
 else {
-  const release = await acquire({ owner: 'codex-missing', mode: 'exclusive', max: 6, waitMax: 10 });
+  const release = await acquire({ owner: 'codex-missing', mode: 'shared', max: 6, waitMax: 60 });
   await runSuite(
     async () => {
       const result = await runLimited('node packages/biomes/tests/prefetch-check.mjs --child', {

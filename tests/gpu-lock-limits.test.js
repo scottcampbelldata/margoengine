@@ -168,7 +168,13 @@ const heartbeatKeepsHolder = (env, ready) =>
       await firstBeat(lock, ready);
       // Longer than the lease: only the heartbeat process keeps the entry fresh.
       const waited = [],
-        waiter = gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: (m) => waited.push(m) });
+        waiter = gpu.acquire({
+          owner: 'bench',
+          mode: 'exclusive',
+          timing: 'CPU-only scheduler regression',
+          poll: 10,
+          log: (m) => waited.push(m),
+        });
       // fixed-wait: two leases must pass with the holder still in
       assert.equal(await settled(waiter, 4000), 'waiting', 'a live heartbeat is not reclaimed');
       // A reclaimed holder's slot is not handed over at once, so 'waiting' alone does not prove it was kept.
@@ -192,7 +198,13 @@ const heartbeatKeepsHolder = (env, ready) =>
       const old = new Date(Date.now() - 10 * 60_000);
       utimesSync(entry, old, old);
       const logs = [];
-      const taken = await gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: (m) => logs.push(m) });
+      const taken = await gpu.acquire({
+        owner: 'bench',
+        mode: 'exclusive',
+        timing: 'CPU-only scheduler regression',
+        poll: 10,
+        log: (m) => logs.push(m),
+      });
       assert.match(logs.join('\n'), /stale shared entry of frozen \(no heartbeat/);
       assert.deepEqual(readdirSync(join(lock, 'shared')), []);
       taken();
@@ -211,9 +223,12 @@ test('a heartbeat process that starts slowly still keeps its holder alive', asyn
     slow = join(folder, 'slow-start.mjs'),
     ready = join(folder, 'heartbeat-started');
   try {
-    writeFileSync(slow, `import {existsSync, writeFileSync} from 'node:fs';
+    writeFileSync(
+      slow,
+      `import {existsSync, writeFileSync} from 'node:fs';
 const end = Date.now() + 2500; while (Date.now() < end);
-if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) writeFileSync(${JSON.stringify(ready)}, String(process.pid));`);
+if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) writeFileSync(${JSON.stringify(ready)}, String(process.pid));`,
+    );
     await heartbeatKeepsHolder({ NODE_OPTIONS: `--import=${pathToFileURL(slow).href}` }, () => existsSync(ready));
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -222,19 +237,39 @@ if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) writeFi
 
 test('heartbeat readiness ignores metadata changes before its worker has started', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-ready-')),
-    lock = join(folder, 'gpu.lock'), dir = join(lock, 'shared'), entry = join(dir, 'holder.json');
-  let ready = false, observed = false, polls = 0, nextPoll;
-  const polled = new Promise(resolve => {nextPoll = resolve;});
-  mkdirSync(dir, {recursive: true});writeFileSync(entry, '{}');
-  const pending = firstBeat(lock, () => {if (++polls === 2) nextPoll();observed = ready;return ready;});
+    lock = join(folder, 'gpu.lock'),
+    dir = join(lock, 'shared'),
+    entry = join(dir, 'holder.json');
+  let ready = false,
+    observed = false,
+    polls = 0,
+    nextPoll;
+  const polled = new Promise((resolve) => {
+    nextPoll = resolve;
+  });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(entry, '{}');
+  const pending = firstBeat(lock, () => {
+    if (++polls === 2) nextPoll();
+    observed = ready;
+    return ready;
+  });
   try {
-    const changed = new Date(Date.now() + 1000);utimesSync(entry, changed, changed);
-    assert.equal(await Promise.race([pending.then(() => 'beat'), polled.then(() => 'poll')]),
-      'poll', 'metadata does not acknowledge startup');
-    ready = true;await waitUntil(() => observed, 'the startup acknowledgement is observed');
-    const beat = new Date(Date.now() + 2000);utimesSync(entry, beat, beat);
+    const changed = new Date(Date.now() + 1000);
+    utimesSync(entry, changed, changed);
+    assert.equal(
+      await Promise.race([pending.then(() => 'beat'), polled.then(() => 'poll')]),
+      'poll',
+      'metadata does not acknowledge startup',
+    );
+    ready = true;
+    await waitUntil(() => observed, 'the startup acknowledgement is observed');
+    const beat = new Date(Date.now() + 2000);
+    utimesSync(entry, beat, beat);
     await pending;
-  } finally { rmSync(folder, {recursive: true, force: true}); }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test('a waiter gives up after --wait-max and names the holder and its command', () =>
@@ -242,6 +277,7 @@ test('a waiter gives up after --wait-max and names the holder and its command', 
     const held = await gpu.acquire({
       owner: 'slow-job',
       mode: 'exclusive',
+      timing: 'CPU-only scheduler regression',
       command: 'npm run slow',
       poll: 10,
       log: quiet,
@@ -259,7 +295,14 @@ test('a request that gave up leaves nothing in the queue', () =>
   withLock(async (gpu, lock) => {
     const reader = await gpu.acquire({ owner: 'reader', poll: 10, log: quiet });
     await assert.rejects(
-      gpu.acquire({ owner: 'bench', mode: 'exclusive', waitMax: 0.02, poll: 10, log: quiet }),
+      gpu.acquire({
+        owner: 'bench',
+        mode: 'exclusive',
+        timing: 'CPU-only scheduler regression',
+        waitMax: 0.02,
+        poll: 10,
+        log: quiet,
+      }),
       /gave up/,
     );
     assert.equal(gpu.status().waiting, undefined);

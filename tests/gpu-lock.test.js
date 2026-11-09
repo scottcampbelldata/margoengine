@@ -68,7 +68,7 @@ test('run under another lock points the command at the GPU lock beside it, which
     // A GPU test inside another lock: its exclusive request takes the GPU lock instead of failing as nested.
     const probe = [
       "const m = await import('./scripts/gpu-lock.mjs');",
-      "const release = await m.acquire({ owner: 'gpu-test', mode: 'exclusive', poll: 10 });",
+      "const release = await m.acquire({ owner: 'gpu-test', mode: 'exclusive', timing: 'CPU-only scheduler regression', poll: 10 });",
       'console.log(process.env.MARGO_GPU_LOCK + "|" + JSON.stringify(m.status()));',
       'release();',
     ].join(' ');
@@ -92,7 +92,10 @@ test('run: --exclusive holds exclusively and tells the command; the default is a
     const shared = run(lock, [process.execPath, '-e', probe, lock]);
     assert.equal(shared.status, 0, shared.stderr);
     assert.match(shared.stdout, /^shared .*shared/);
-    const exclusive = run(lock, [process.execPath, '-e', probe, lock], {}, ['--exclusive']);
+    const exclusive = run(lock, [process.execPath, '-e', probe, lock], {}, [
+      '--exclusive',
+      '--timing=CPU-only scheduler regression',
+    ]);
     assert.equal(exclusive.status, 0, exclusive.stderr);
     assert.match(exclusive.stdout, /^exclusive .*exclusive\.json/);
   } finally {
@@ -133,7 +136,8 @@ const settled = (promise, ms = 500) => {
 // As long as it takes, past any load: only a real failure reaches this bound.
 const BOUND = 30_000;
 const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid;
-const take = (gpu, owner, mode) => gpu.acquire({ owner, mode, poll: 10, log: quiet });
+const take = (gpu, owner, mode) =>
+  gpu.acquire({ owner, mode, timing: 'CPU-only scheduler regression', poll: 10, log: quiet });
 // Runs `body(gpu, folder)` against a fresh gpu.lock; `env` is set while the module loads and, for MARGO_GPU_SLOTS and
 // MARGO_GPU_LOCK_NESTED*, while the body runs.
 async function withLock(body, envOrFn = {}) {

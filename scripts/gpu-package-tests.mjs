@@ -760,6 +760,7 @@ export async function runSideBySide(
       acquire({
         owner: `check:gpu-packages ${step.label}`,
         mode,
+        timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
         max: holdMinutes(step),
         poll: 2000,
         command: step.command,
@@ -877,6 +878,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           acquire({
             owner: mode === 'exclusive' ? `check:gpu-packages ${step.label}` : 'check:gpu-packages',
             mode,
+            timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
             max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
             poll: 2000,
           }),

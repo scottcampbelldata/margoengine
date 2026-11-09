@@ -21,7 +21,12 @@ import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 
 const BEFORE = { '01 off': 19.8, '01 on': 53.2, '02 off': 23.4, '02 on': 63.4 };
-const release = await acquire({ owner: 'biomes-objects-frame', mode: 'exclusive', max: 10 });
+const release = await acquire({
+  owner: 'biomes-objects-frame',
+  mode: 'exclusive',
+  timing: 'biomes object frame-time budgets',
+  max: 10,
+});
 const context = await openBrowser({ startPath: '/packages/biomes/tests/objects-frame-check.html', port: 'free' }),
   { page, hardware } = context,
   pageErrors = [];

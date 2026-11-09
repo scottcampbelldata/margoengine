@@ -9,6 +9,13 @@ Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip agains
 its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
+Exclusive GPU holds are reserved for classified speed commands or an explicit,
+logged timing reason, with a 20-minute maximum including wrapper overhead.
+Oversize holds and correctness requests fail before waiting and are recorded in
+`test-results/gpu-lock-refusals.log`. Long matrices must release between bounded
+suites. This scheduling cap is based on existing 88.4/113.3/184.4-second benchmark
+records, not a new measurement on the busy build machine.
+
 GPU scheduling mutexes publish owner identity atomically and reclaim only an
 identified dead process. A live or anonymous legacy mutex is never reclaimed by
 age; its owner's release is required. Acquisition has a bounded wait (default

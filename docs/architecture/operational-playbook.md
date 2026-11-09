@@ -120,6 +120,34 @@ Research guiding the remaining queue and phase work, read before implementation:
 
 ## Purpose and authority
 
+### GPU exclusive request policy
+
+`scripts/gpu-lock.mjs` refuses correctness requests for exclusive GPU access,
+including `MARGO_GPU_EXCLUSIVE` requests. Existing benchmark classification
+(`bench*` npm scripts and benchmark paths) authorizes measurement; other speed
+commands must give `--timing=<reason>` (API `timing`), logged in
+`test-results/gpu-lock-timing.log`. Refusals append structured coded records to
+`test-results/gpu-lock-refusals.log` before any lock wait or nested admission.
+Exclusive holds default to and cannot exceed 20 minutes; oversize requests fail
+with `ERR_GPU_EXCLUSIVE_LIMIT`. Other explicitly named locks retain their
+30-minute default. Correctness requests use the three shared GPU slots.
+
+Cap evidence is existing run history, not a new loaded-machine measurement:
+the three JSON records under `benchmarks/records/` took 88.4, 113.3 and 184.4
+seconds total. The valid official compute/viz run took 184.4 seconds, with
+74.3/74.9-second suites. Twenty minutes leaves more than six times that longest
+recorded total while bounding interference. This sample does not establish a
+limit for every future benchmark; longer matrices must select bounded suites
+and release between them rather than increase the exclusive hold. The previous
+130-minute benchmark wrapper is capped too. No performance number is newly
+published. `tests/gpu-lock-policy.test.js` proves refusal, recorded reasons,
+benchmark admission and the cap on isolated CPU-only lock folders.
+
+The biome prefetch correctness proof now uses shared access with a 60-minute
+wait. Mixed biome timing suites, the visual frame budget and dynamically
+scheduled GPU timing steps identify their measurement reasons explicitly;
+their correctness/speed split and build-phase deferral remain separate work.
+
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that
 were previously mixed with repository coordination instructions. It does not define task assignment, branches,
 integration, publishing, or source-control operations. Those are external workspace responsibilities.

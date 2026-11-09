@@ -15,7 +15,10 @@ const SHADED = 0.6,
   LIT = 0.93;
 const measuringCost = process.argv.includes('--cost');
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-cutout-casters', ...(measuringCost ? { mode: 'exclusive' } : {}) });
+const release = await acquire({
+  owner: 'shadows-cutout-casters',
+  ...(measuringCost ? { mode: 'exclusive', timing: 'cutout caster paired frame cost' } : {}),
+});
 const context = await openBrowser({ startPath: '/packages/shadows/test/cutout-casters.html', port: 5268 }),
   { page } = context,
   pageErrors = [];
@@ -43,7 +46,14 @@ const patch = async (image, p) => {
 // Where each half of the quad (x -3 to -2 solid, -2 to -1 cut) lands on the floor, through its middle.
 const directional = { solid: [-0.5, 0, 0], cut: [0.5, 0, 0] },
   local = { solid: [-0.75, 0, 0], cut: [0.75, 0, 0] },
-  passes = { directional, virtual: directional, spot: local, point: local, integratedSpot: local, integratedPoint: local };
+  passes = {
+    directional,
+    virtual: directional,
+    spot: local,
+    point: local,
+    integratedSpot: local,
+    integratedPoint: local,
+  };
 // Whether each half's floor point is in shadow, per caster.
 const expected = {
   map: { solid: true, cut: false },
