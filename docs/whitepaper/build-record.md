@@ -3804,3 +3804,10 @@ Verify's existing watchdog killed the process after 360 silent seconds. The owni
 within the test body before folder hooks; a deliberate setup-failure regression closes a real listener, workers
 and database before immediately removing the file. Parent diagnostic logs reproduce the exact `EBUSY` and live
 handles; the repaired seven-test file passes and exits in one second. No runtime API or assertion budget changed.
+
+First landing gates: full verify passed 13,214 tests with zero failures/skips (444.2 s), plus lint, hygiene and
+the scoped README commands. Those README commands retain their recorded exceptions (62/94 for the original four
+packages; 11/12 for voxel-net), including the other causes Scott deferred. No exception was loosened. Rebased onto
+main `14af78269`; regenerated the tracked llms pages after that merge. Lane-M's teardown fix is `cff40d127`.
+The capture-only rerun could not acquire any of the three GPU slots within its 480-second tree deadline, so it
+never started the test and supplies no new rendering evidence; the original 18 successful GPU suites remain recorded.

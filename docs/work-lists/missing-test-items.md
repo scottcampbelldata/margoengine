@@ -250,6 +250,16 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 
 ## Check results
 
+First landing evidence: full verify on `cff40d127` plus the required-input and SQL-cleanup commits passed
+13,214 tests, zero failures/skips (444.2 s). Lint and hygiene passed; the earlier standalone hygiene invocation
+overlapped verify clearing `dist`, so its absent biomes declaration was repaired by that build before the passing
+standalone run. The scoped voxel-net README check ran 11/12 examples, with its one pre-existing other-cause exception;
+the earlier four-package README run remains 62/94 with its existing exceptions explicitly inventoried above.
+After lane-M's GPU teardown fix landed, a capture-only validation request waited for all three GPU slots until its
+480-second acquisition/process-tree deadline; no capture test started. It is not a test pass or a new renderer failure.
+The earlier 18 passing GPU suites and the original capture rendering assertions remain the available GPU evidence.
+The branch was rebased onto current main `14af78269` before this landing; no core, stage or physics source was changed.
+
 The rebased full verify uncovered a separate SQL-store test lifecycle defect from current main. Windows
 returned `EBUSY` when the first after-hook removed its open database; the failed hook prevented the later server
 and generator-worker cleanup, and the watchdog ended that process after 360 silent seconds. The owning test now

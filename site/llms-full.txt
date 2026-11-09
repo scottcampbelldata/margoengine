@@ -11569,7 +11569,7 @@ process.once('SIGINT', async () => {
   when near; see [Entities and mobs](#entities-and-mobs-entities).
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
-- **Database store** (`./sql-store`, Node): `new Sq
+- **Built-in TLS** (`./server` option `tls`): the s
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 
