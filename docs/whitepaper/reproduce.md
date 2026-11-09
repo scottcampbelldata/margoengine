@@ -1945,3 +1945,15 @@ Logs: test-results/batch-273-features-before.log and -features-after.log.
 Materials units pass 402/402. No pixel bound, shader, runtime entry or ceiling
 changed. Core plus stage remains 23,924 B; the size gate is recorded with the
 landing checks. This closes features separately from vertex-inputs (2/26 total).
+
+Failure 6 landing gates: materials units 402/402, full features native/compat
+15/15 groups each, base materials GPU on both backends and README 29/29 pass.
+The one full verify ran 13,939/13,940 units; all other chains passed. Its sole
+failure was generated llms documentation freshness after the README edit.
+Regenerated those files rather than repeating full verify. Rebased onto current
+main, rebuilt inherited stats/sciviz, and passed all 184 affected source tests
+(including llms), API, lint, hygiene and size. The inherited compute owner GPU
+leaf passes both backends with all four intermediate readbacks. Core plus stage
+remains 23,924 B gzip; runtime entries and size ceilings are unchanged by this
+fixture fix. Receipts: test-results/batch-273-features-{verify,rebase-*,final-size}.
+No whole-verify pass is claimed for the original failed invocation.
