@@ -17,7 +17,8 @@ export function createMaskTransition(engine: EngineKernel, image: ImageData | Im
 type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 
 class Transitions implements EnginePlugin {
-    readonly name = "transitions";
+    readonly name: string;
+    protected readonly captureLayer: number;
     protected shaderCode: string;
     protected transitionBindings(before: GPUTexture, after: GPUTexture): GPUBindingResource[];
     constructor();

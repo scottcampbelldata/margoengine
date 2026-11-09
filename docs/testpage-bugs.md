@@ -254,3 +254,19 @@ index validation), 43 (exportUSDZ root export), and 44 (bevel mesh planarity).
 They remain untriaged at this mandatory stop, rather than being silently omitted.
 Read their exact live steps and check current main before writing fixes. Lane S
 still owns the preview class, and physics remains on hold.
+
+## Resumed local follow-up landing
+
+The stopped run had already regenerated the three changed transition API reports
+and passed lint (11.1 s) and hygiene (23.8 s). Its verify process stopped during
+the package build, and its GPU request never ran. Only those incomplete gates
+are resumed; the completed package and environment/transition results above
+remain valid. Logs use test-results/testpage-followup-resumed-*.
+
+Scott's newest ruling approves the bug 36 core repair and prescribes rejection
+of retained-reference assignment, with `.set()`/`.copy()` for mutation. Bug 32
+keeps the Label getter-only contract and gains the same coded TypeError wording.
+This supersedes the historical stop and copy-on-assignment proposal above.
+The coordinator's order remains: land these local follow-ups, then continue the
+approved work and triage the new live entries 42-44. No core edit is included in
+this follow-up landing.

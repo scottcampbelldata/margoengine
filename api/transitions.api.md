@@ -9,7 +9,8 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 export type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 
 export class Transitions implements EnginePlugin {
-    readonly name = "transitions";
+    readonly name: string;
+    protected readonly captureLayer: number;
     protected shaderCode: string;
     protected transitionBindings(before: GPUTexture, after: GPUTexture): GPUBindingResource[];
     constructor();

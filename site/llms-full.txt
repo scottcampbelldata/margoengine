@@ -4509,13 +4509,13 @@ guard all mesh construction and assignment; an inspector-only repair would leave
 rendering transforms stale. Fixing the property contract belongs in core.
 
 Label.position is getter-only and the corresponding array assignment throws a raw
-TypeError; setPosition currently works. The test-page brief requires one consistent
-public assignment rule for both packages. Proposed rule: vector-like assignment
-copies validated components into the existing reference, preserving its identity
-and updating the store. Invalid input must reject before any mutation.
-Scott's brief explicitly requires stopping for his yes when 36 needs core. No
-core or bug-32 implementation is changed pending that approval; the empty-Geometry
-exception does not authorize it. Bounded real-Engine/JSDOM reproduction is retained
+TypeError; setPosition currently works. Scott's latest ruling in the private
+brief approves the core repair for 36: retained transform references reject
+assignment; users mutate them with `.set()` or `.copy()`. Label keeps its
+getter-only contract and will report the same coded TypeError wording. This
+supersedes the earlier proposed copy-on-assignment rule. The coordinator requires
+landing the other local follow-ups first; implementation and regression proof
+for 32/36 remain pending. The bounded real-Engine/JSDOM reproduction is retained
 in this lane's test-results/testpage-32-36-repro.mjs and .log.
 
 ### Fixed 2026-11-09: decoder Node Basis README example
