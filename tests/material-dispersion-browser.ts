@@ -355,10 +355,14 @@ const dispersionFixture = {
         fixed = Object.fromEntries(
           Object.entries(extension).map(([key, value]) => [
             key,
-            typeof value === 'string' ? value.replace('materialTransmissionF0=r0*r0;', 'materialTransmissionF0=0.0;') : value,
+            typeof value === 'string'
+              ? value.replace('materialTransmissionF0=r0*r0;', 'materialTransmissionF0=0.0;')
+              : value,
           ]),
         );
-      if (JSON.stringify(fixed) === JSON.stringify(extension)) throw new Error('the caller Fresnel moved; update this fixture');
+      // The shallow edit retains GPU handles by identity. Compat handles can contain cycles.
+      if (Object.entries(extension).every(([key, value]) => Object.is(fixed[key], value)))
+        throw new Error('the caller Fresnel moved; update this fixture');
       model.primitives[0].material.extension = { ...fixed, replacesPhysical: true };
       model.primitives[0].material.settings[0] = 2;
       model.root.visible = true;

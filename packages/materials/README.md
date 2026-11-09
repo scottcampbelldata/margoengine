@@ -680,6 +680,21 @@ the extension. For imported `KHR_materials_volume.thicknessTexture`, use `instal
 uses scalar thickness. Constructed meshes support their live `thicknessMap` through `Transmission`.
 The screen-space volume approximation and existing transmission limitations still apply.
 
+After building packages, run the complete dispersion reference checks with:
+
+```sh
+node scripts/gpu-lock.mjs run --owner=materials-dispersion --wait-max=60 --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native
+node scripts/gpu-lock.mjs run --owner=materials-dispersion --wait-max=60 --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat
+```
+
+The canonical leaf without `--backend` selects native WebGPU and full WebGL2
+compatibility explicitly, with separate captures/reports. The commands above
+run each complete backend grid with its own shared GPU hold. Its caller-owned reference checks the shallow
+shader edit by field value and resource identity; it never serializes GPU handles.
+The independent scalar-IOR images, resource counts, restoration and 1x/4x sample
+checks retain their original bounds. This is correctness coverage on the tested
+adapter, not certification of other browsers/devices or lower hardware tiers.
+
 ## More maps and options
 
 Every `Material` takes these maps and options, live like the others. Each one compiles into a material's shader only
