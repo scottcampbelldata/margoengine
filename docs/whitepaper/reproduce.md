@@ -1742,3 +1742,8 @@ targeted runs. API, llms, size-page and lazy-boundary checks pass afterward. Thi
 is composed step evidence, not a claim that an unconditional full verify passed.
 The retained README evidence is 16 compat/umbrella and 25 post examples, unchanged.
 No passed step was rerun without an affected input; no tolerance or workload changed.
+Final integration inherits fc20cdca6's named TRS repair and migrated consumers.
+It changes no compat, post, shared, core or stage source. Those consumers are
+rebuilt and API/llms regenerated. The paired entry/network records retain their
+actual pre-TRS measured revision 4e441cc88 and clean package state; they are
+historical measurements, not relabeled as the final integration revision.

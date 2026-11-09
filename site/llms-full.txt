@@ -5114,6 +5114,66 @@ still supplies an affine matrix; Infinity tolerance permits approximate rotation
 on sheared matrices, not an exact affine decomposition. No timing claim.
 Research, migration and regression evidence: [size restoration](size-restore.md).
 
+### Batch 273 lower compatibility tiers (device entry and proven packages)
+
+The optional webgl2-compat/tiers entry permits half-float and LDR devices explicitly;
+root install keeps its full-tier default. Highp fragment floats/ints remain required.
+Only render/storage colour targets are substituted. Half-float uses R16F/RG16F/
+RGBA16F, LDR uses R8/RG8/RGBA8, with three-channel packed HDR expanded to RGBA.
+The requested texture format and copy layout remain public; stored range/precision
+are those of the physical target. Sample-only float32 data is preserved, including
+negative and HDR values, and read back through integer framebuffer bit encodings.
+Unblended LDR stores round nearest with upward ties; blended outputs retain the
+hardware's permitted fixed-point conversion. No implicit tone mapping is performed.
+
+Device checks pass with masked extensions on the available GPU. This is not a
+physical half-float/LDR hardware result or a full package/browser matrix. Cross-usage float copies and view synchronization use one synchronous GPU readback
+stall per copied slice when GL cannot blit the physical storage. Lower-tier device
+creation loads the readback helper for those ordinary-render view copies. The full
+tier retains lazy readback loading. Exact cube-face and cross-usage copy probes pass.
+Remaining package picture gates and attach-time refusal wiring are tracked below. Core plus stage
+measures 23,924 B gzip, unchanged and below 25,000 B. Built and source entry measurements are recorded in
+whitepaper/results/batch-273-tier-sizes.json with the two methods distinguished.
+Only the optional entries and their base split raise ceilings; the shared device
+policy and correct float view copies avoid duplicating renderer resource ownership.
+
+The seven tier package scenes now measure core, shadows, virtual shadows, material
+meshes/instances, culling and a Bloom/Tonemap stack. All half-float images and the
+first six LDR images are pixel-identical to the full layer. The LDR HDR-stack
+capture differs at 5.322265625 percent of pixels by more than 2 channel units,
+mean maximum RGB difference 2.09423828125 and maximum 6. This exceeds the existing
+0.1 percent / 0.25 parity rule. PostStack therefore requires at least half-float
+for HDR/display stages at setup and after device restore, before new GPU resource
+allocation. LDR-only stacks remain allowed. This measured refusal does not cover
+standalone HDR effects or the rest of the package matrix. Original difference:
+whitepaper/results/batch-273-tier-packages-initial.json.
+
+Standalone Bloom and SSAO also require at least half-float before GPU allocation
+(Bloom includes encodeImage). Their original LDR errors are, respectively,
+5.322265625 percent over 2 / mean 1.685546875 / maximum 7, and
+14.1357421875 percent over 2 / mean 8.579345703125 / maximum 108. Half-float
+passes: Bloom is identical, SSAO has mean 0.008544921875 and maximum 1. LDR-only
+FXAA is identical on both lower tiers. The same checks apply on device restore
+after releasing old resources, including SSAO's GTAO subclass. Repaired refusal
+receipts and original failing images' metrics are retained under
+whitepaper/results/batch-273-tier-packages-standalone*.json.
+
+Tracked follow-up **T273-COVERAGE** (batch 273, after the 26 full-tier compat
+failures): remaining post effects and standalone Tonemap, TAA, DOF, transitions,
+animation, BVH, cameras, clustered, compute, creative, environment, geometry,
+glTF/glTF-pro, headless, HTML, inspector, lighting2d, lines, points, text, pixel,
+procedural, quality, React, scatter, sciviz, selection, shader, sky, splats,
+sprites, staging, stats, terrain, tilemap, toon, VFX, video, voxel,
+voxel-pathtracer, water, weather, XR, UI, biomes, scenery, stage, controls, LOD
+and OIT require per-feature
+half-float/LDR images and measured attach-time refusals. Other optional rendering
+entries remain uncovered until included. The landed scope is the device entry
+plus ten scenes (17 accepted lower-tier images and three measured LDR refusals),
+not complete package parity. Physical lower-tier hardware and cross-browser
+measurements remain separate outstanding evidence.
+Untested features of the scoped core, shadows, materials and culling packages
+also remain in T273-COVERAGE; a passing scene does not certify a whole package.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -8262,6 +8322,56 @@ model-node errors. package-order now retains paths through unselected packages.
 The regression lists the consumer before the provider at one and three jobs:
 tests/package-order.test.js. No retries or declaration/type relaxations.
 
+### Batch 273 lower-tier validation remains open
+
+The new optional tiers policy is not yet a completed parity row. Repro for the repaired
+copy class: on an LDR device, create two rgba32float textures, one
+sample-only (COPY_SRC | COPY_DST | TEXTURE_BINDING) and one additionally used as
+RENDER_ATTACHMENT, then copy between them. Their logical formats match but their
+physical formats differ. The existing copy path compares logical format internals
+and previously attempted an invalid framebuffer blit or attached unrenderable float storage.
+The owner is webgl2-compat/src/device/render.ts copyTextureToTexture and its
+format-view synchronization. The repair uses a counted synchronous bit-fetch and upload for incompatible physical
+storage, including view synchronization. Exact GPU regressions pass both copy
+directions and all six sample-only cube faces plus a 2D face view on all three tiers.
+No sample-only precision is lost and no GL error is suppressed.
+Package-wide lower-tier image comparisons and tested attach-time requirements are
+still pending beyond the seven new package scenes. The LDR Bloom/Tonemap stack's
+HDR capture was clamped before display conversion, exceeding the existing parity
+rule (5.322265625 percent over 2, mean 2.09423828125, maximum 6). The owning
+PostStack now refuses HDR/display stages on LDR at setup and after device restore;
+its CPU regressions verify no partial attachment/allocation, resource release,
+and continued half-float and LDR-only support. Standalone Bloom and SSAO now have
+the same measured refusal: their LDR images exceed the rule by 5.322265625 percent
+over 2 / mean 1.685546875 / maximum 7, and 14.1357421875 percent over 2 /
+mean 8.579345703125 / maximum 108 respectively. Half-float passes (SSAO maximum 1,
+mean 0.008544921875); LDR-only FXAA is pixel-identical. Their resource-owning
+initializers now refuse LDR before allocation and after releasing old resources
+on restore; tests include SSAO's GTAO subclass in its real PostStack.
+Other standalone HDR effects and other
+package entries still need their measured requirement checks.
+The brief's separate full-tier compatibility failures remain in scope;
+the voxel-pathtracer D3D11 hang has a separate owner and was not investigated here.
+
+### Batch 273 tooling observation: verify import from eval
+
+Repro: node --input-type=module -e "import('./scripts/verify.mjs')".
+The exported verify plan cannot be imported from an eval entry: its final CLI
+guard passes undefined process.argv[1] to pathToFileURL. The same import from a
+normal .mjs file works. Root cause is scripts/verify.mjs's unguarded CLI-entry
+comparison, outside this package lane's edit scope. The batch resumes verify's
+exported unit-test command from an owned .mjs runner with the same work and bounds.
+The tooling owner should guard the missing argument and add an eval-import
+regression; no exception is suppressed here.
+
+New-tier creation now accepts AbortSignal with tested pre-abort, pending-wait,
+listener cleanup and concurrent ownership semantics. A cancelled native-adapter
+probe cannot install when its native request eventually settles. A second probe
+also preserves an installation completed by another caller while it waited; the
+old implementation could overwrite that owner's restore chain. CPU regressions
+cover both interleavings. The selected-minimum refusal diagnostic names the missing
+half-float extension rather than the full-tier extension and changes no globals.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -11241,6 +11351,20 @@ disposal ends an active export. Dispose `ImagePost` before its engine, and detac
 unattached `Bloom`, `rgba16float` views of the image size, and submit before disposing it.
 
 ## Combining effects: `PostStack`
+
+On the WebGL2 compatibility layer, a stack with HDR or display effects requires
+the half-float or full device tier. LDR clamps linear scene radiance and fails the
+layer's existing pixel rule, so these stacks throw linked `unsupported` at setup,
+before attaching effects or allocating their GPU resources. A device restore to
+LDR releases the old capture and refuses the same requirement. Stacks containing
+only LDR effects remain available on LDR devices. The example below runs unchanged
+on native WebGPU, full WebGL2 and half-float WebGL2.
+Standalone Bloom and SSAO have the same minimum tier, including Bloom's image
+encoding path. Their initialization refuses LDR before allocating; restoration
+releases old resources before rechecking. SSAO's geometry buffers need signed
+values, while Bloom needs linear radiance above one. GTAO inherits SSAO's check
+inside its required PostStack. No effect silently replaces these values with
+clamped eight-bit data.
 
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
 (`@margoengine/post/stack`) captures the scene once in linear HDR and runs its effects on that
