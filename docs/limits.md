@@ -1531,3 +1531,10 @@ Extracting the views changes no encoded bytes. Replacing either with a whole
 multi-view buffer, another Draco format, or another view's IDs/counts is invalid.
 These runnable examples establish no new production quality or throughput result.
 No codec source, exports or entry-size budgets changed.
+
+### Viewer numeric turntable domain (batch 56)
+
+The existing stage/viewer accepts any finite nonzero turn period, including subnormals and negative
+periods. Resume delay is finite and nonnegative. Modulo-before-division bounds the angular step.
+The camera still rotates around world Y, and the existing viewer's model/shadow/backend limits apply.
+No core or stage-root bytes change.

@@ -495,7 +495,7 @@ export const entries = [
       'Invalid stage options',
       'Expected element',
       'shadows: contact, cascaded or false',
-      'Turntable: seconds not 0, resumeAfter 0 or more',
+      'Turntable: finite seconds not 0, finite resumeAfter 0 or more',
     ],
     cause:
       'An argument had the wrong type: not a canvas or element, an unknown backend, a camera, geometry or material not from core, a plugin without a unique name and `setup`, a pass without a unique name, finite order and `execute`, a frame delta outside 0..1 seconds, or a non-boolean flag.',

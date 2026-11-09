@@ -2479,3 +2479,11 @@ outside source and SIMD output to an existing independent hash. The real Wasm
 regression checks Draco output channel/count/index bounds. No codec, backend,
 core or stage source changed. This is example execution, with no new performance
 or production-model quality claim. Sources/hashes live in the decoder fixture notice.
+
+### Viewer period safety: section 5 evidence (batch 56)
+
+The optional stage/viewer turntable reduces elapsed time before dividing by seconds per turn.
+Finite subnormal periods no longer overflow and poison the camera; infinite resume delays now
+reject before loading. CPU regressions cover signed minimum/maximum finite periods and huge
+deltas, and the real-device viewer harness asserts a visible helmet at three extreme periods.
+Core and the stage root are unchanged. No new rendering or framing feature.

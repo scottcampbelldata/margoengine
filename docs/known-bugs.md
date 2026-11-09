@@ -1892,3 +1892,12 @@ No open defect found within the documented contract. Heightfield only, no bridge
 No open defect found within the documented contract. Constant-elevation XZ footprint only, no banked/graded/curb repair or overpass classification. Width defaults 6 m, in (0,1000]; 1..4095 arc-distance chords (default 128), at most 4096 samples. Junction coordinate, UV and snap-grid bounds apply. Curves are approximated by chords; raise segments for detail. Float32-collapsed boundaries and remaining inverted/zero-area output reject, never silently drop faces or holes.
 
 Closed precision defect: a local 8 m wide hairpin previously rejected after two thin ears inverted on float32 conversion. junction-bends.test.js failed before the correction and passes after rounding boundaries before choosing diagonals. The final face/boundary guards remain in force.
+
+### Batch 56 viewer period regression (resolved)
+
+The viewer accepted finite subnormal turn periods but divided an unreduced elapsed angle by them,
+producing Infinity and then NaN camera coordinates. stage/viewer now reduces elapsed time modulo
+the period before division, bounding the trigonometric argument. Nonfinite resume delays reject
+before loading instead of silently preventing resume forever. stage/tests/viewer.test.js proves both
+regressions, finite extreme positive/negative periods and large deltas; the actual-device viewer test
+keeps the real helmet visible at extreme periods. No core change or new stage feature.

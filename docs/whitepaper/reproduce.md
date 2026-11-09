@@ -977,3 +977,10 @@ All 14 examples must execute. Regenerate the local
 real-excerpt .splat with `node packages/splats/scripts/make-readme-splat.mjs`;
 its 268,320 bytes and SHA-256 are in the fixture notice. This is not an outside
 .splat oracle. Full SPZ capture proofs retain their separate required shared inputs.
+
+### Batch 56 viewer numeric safety
+
+Build packages, run the stage package tests, then run scripts/stage-viewer-gpu-check.js through
+the GPU lock (owner codex-56). Append --compat for the compatibility path. Extreme periods are
+Number.MIN_VALUE, -1e-309 and Number.MAX_VALUE, with a visible real helmet and no GPU errors.
+The CPU test includes both signs and huge finite deltas; old code produces nonfinite coordinates.

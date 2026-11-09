@@ -71,6 +71,13 @@ try {
   assert.ok(covered(first) > 0.1 && covered(second) > 0.1);
   assert.deepEqual(await close(), { plugins: [], meshes: 0, gpuErrors: [] });
 
+  for (const seconds of [Number.MIN_VALUE, -1e-309, Number.MAX_VALUE]) {
+    const extreme = await open({ shadows: false, turntable: { seconds } });
+    assert.ok(extreme.position.every(Number.isFinite), `finite camera at period ${seconds}`);
+    assert.ok(covered(await shot(`period-${seconds}`)) > 0.1, 'extreme period keeps the product visible');
+    assert.deepEqual(await close(), { plugins: [], meshes: 0, gpuErrors: [] });
+  }
+
   // The cast shadow falls away from the sun at +x +y +z: seen from the side, it lies on the floor in frame.
   const cast = await open({ shadows: 'cascaded', turntable: false }),
     side = [cast.target[0] + 0.9, cast.position[1], cast.target[2] - 0.5];

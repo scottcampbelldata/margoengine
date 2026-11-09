@@ -1477,3 +1477,11 @@ output channels and counts. Reproduce extraction with
 `npm run check:readme-run -- --packages=decoders`.
 Evidence: results/readme-decoder-streams-20261109.json. Execution on these standard
 files supplies no new arbitrary-model accuracy, quality or performance claim.
+
+## Batch 56 viewer numeric safety
+
+Resolved: finite subnormal periods could overflow the optional stage/viewer's angular step.
+The CPU regression in packages/stage/tests/viewer.test.js fails on the old code and covers signed
+minimum/maximum finite periods, huge elapsed deltas, finite positions and preserved radius.
+scripts/stage-viewer-gpu-check.js also asserts the real helmet stays visible at extreme periods.
+This is numerical safety evidence, with no performance or photographic quality claim.

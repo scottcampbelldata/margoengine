@@ -137,8 +137,8 @@ export async function addViewer(
     throw typeError('shadows: contact, cascaded or false', 'arguments');
   if (typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
   const { seconds = 30, resumeAfter = 3 } = typeof turntable === 'object' ? turntable : {};
-  if (!Number.isFinite(seconds) || !seconds || !(resumeAfter >= 0))
-    throw rangeError('Turntable: seconds not 0, resumeAfter 0 or more', 'arguments');
+  if (!Number.isFinite(seconds) || !seconds || !Number.isFinite(resumeAfter) || !(resumeAfter >= 0))
+    throw rangeError('Turntable: finite seconds not 0, finite resumeAfter 0 or more', 'arguments');
   const abort = stageSignal(stage, signal),
     { engine, canvas } = stage;
   abort.throwIfAborted();
@@ -279,7 +279,8 @@ export async function addViewer(
       stage.onTick((delta) => {
         if (!spinning || held) return;
         if (wait > 0) wait -= delta;
-        else orbit(stage, (delta * Math.PI * 2) / seconds);
+        // Reduce elapsed time before dividing: even finite subnormal periods must not overflow the angle.
+        else orbit(stage, ((delta % seconds) / seconds) * (Math.PI * 2));
       }),
     );
     // Last, because nothing can undo it: it ends any fit in flight, and `dispose` leaves the camera to the visitor.

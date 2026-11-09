@@ -452,3 +452,33 @@ test('bad options throw before anything loads', async () => {
   await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { resumeAfter: -1 } }), RangeError);
   assert.deepEqual(log, []);
 });
+
+test('finite extreme turn periods retain the reduced phase without overflowing the camera', async () => {
+  for (const seconds of [Number.MIN_VALUE, -Number.MIN_VALUE, 1e-309, -1e-309, Number.MAX_VALUE, -Number.MAX_VALUE]) {
+    const { stage, tick } = fixture();
+    const viewer = await addViewer(stage, '/shoe.glb', { turntable: { seconds }, fit: false });
+    for (const delta of [1 / 60, Number.MAX_VALUE]) {
+      const before = [...stage.engine.camera.position];
+      const angle = ((delta % seconds) / seconds) * (2 * Math.PI);
+      tick(delta);
+      const actual = stage.engine.camera.position;
+      assert.ok(actual.every(Number.isFinite), `finite position for seconds=${seconds}, delta=${delta}`);
+      const expected = [before[0] * Math.cos(angle) + before[2] * Math.sin(angle), before[1],
+        -before[0] * Math.sin(angle) + before[2] * Math.cos(angle)];
+      for (let k = 0; k < 3; k++) assert.ok(Math.abs(actual[k] - expected[k]) < 1e-12);
+      assert.ok(Math.abs(Math.hypot(...actual) - Math.hypot(...before)) < 1e-12);
+    }
+    viewer.dispose();
+  }
+});
+
+test('nonfinite turntable settings reject before loading', async () => {
+  const { stage } = fixture();
+  for (const key of ['seconds', 'resumeAfter']) {
+    for (const value of [NaN, Infinity, -Infinity]) {
+      await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { [key]: value } }),
+        { name: 'RangeError', message: /Turntable.*https:\/\/margoengine.com\/errors#arguments/ });
+    }
+  }
+  assert.deepEqual(log, []);
+});

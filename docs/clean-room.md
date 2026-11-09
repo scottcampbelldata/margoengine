@@ -1889,3 +1889,8 @@ A broad road/earthwork/terrain-modelling paper search preceded implementation. G
 ## Batch 65 job 4: Self intersection repair
 
 A broad search of offset self-intersections, polygon union and snap rounding preceded implementation. Wallner et al., [Self-intersections of offset curves and surfaces (2001)](https://doi.org/10.1142/S0218654301000023), distinguishes local/global offset intersections; [Snap Rounding: A Cautionary Tale (SoCG 2025)](https://drops.dagstuhl.de/storage/00lipics/lipics-vol332-socg2025/html/LIPIcs.SoCG.2025.57/LIPIcs.SoCG.2025.57.html) discusses polygon union and topology changes under rounding. Margo combines footprint union with triangulation on the final float32 boundary. This repairs planar overlap, not general 3D mesh intersections. No other implementation was opened. No foreign source was read or used. Existing Margo APIs hold the heavy algorithms; this entry orchestrates them, without a new CPU-heavy solver or measured Wasm gain.
+
+### Batch 56 viewer period arithmetic
+
+Existing Margo viewer wiring only. [ECMA-262 section 6.1.6.1.6](https://262.ecma-international.org/16.0/#sec-numeric-types-number-remainder) defines the finite floating remainder, allowing phase reduction before a potentially overflowing division.
+The existing Y-axis rotation is unchanged. No third-party source or asset is added.
