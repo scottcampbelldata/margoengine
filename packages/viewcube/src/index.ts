@@ -9,6 +9,11 @@ export type Face = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
 export type View = Face | 'iso' | readonly [number, number, number];
 /** Camera projection the toggle switches between. */
 export type Projection = 'orthographic' | 'perspective';
+/** A camera placement for the home view: where the camera is and the target it looks at. */
+export interface HomeView {
+  position: readonly number[];
+  target: readonly number[];
+}
 /** Options for {@link ViewCube}; every field has a default. */
 export interface ViewCubeOptions {
   /** Element the cube is placed in. Default: the canvas's parent. */
@@ -35,6 +40,11 @@ export interface ViewCubeOptions {
   /** Dragging the cube orbits the camera around its target; a press that moves under 3 pixels is still a click.
    * Default true; also a public field. */
   drag?: boolean;
+  /**
+   * The app's home view: shows a home button, and the button and the Home key animate there (position, target and
+   * distance). `true` takes the camera as it is when the cube attaches. Default none: Home goes to the isometric view.
+   */
+  home?: HomeView | boolean;
 }
 type V3 = [number, number, number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
@@ -79,6 +89,7 @@ const CSS = `.mvc{position:absolute;z-index:1;touch-action:none;user-select:none
 .mvc-face>*{border:0;margin:0;padding:0;background:none;color:inherit;font:inherit;text-transform:uppercase;cursor:pointer;outline:none}
 .mvc-face>:hover,.mvc-face>:focus-visible{background:rgba(52,128,246,.45)}
 .mvc button:focus-visible{box-shadow:inset 0 0 0 2px #1a63d6}
+.mvc-home{position:absolute;left:-10px;top:-10px;width:20px;height:20px;padding:0;border:1px solid #868d98;border-radius:50%;background:rgba(236,238,242,.92);color:#262a31;font:15px/1 system-ui,sans-serif;cursor:pointer}
 .mvc-projection{position:absolute;left:0;right:0;bottom:-26px;height:22px;border:1px solid #868d98;border-radius:4px;background:rgba(236,238,242,.92);color:#262a31;font:inherit;cursor:pointer}`;
 
 /** Spherical angles of a direction: azimuth about +Y from +Z (0 when vertical, so top and bottom keep -Z and +Z up), polar from +Y. */
@@ -102,7 +113,7 @@ let count = 0;
 /**
  * A CAD orientation cube in a corner of the view (Autodesk-style ViewCube). It turns with the camera; a click on a face,
  * edge or corner animates the camera around its target to that view, keeping the distance. Keyboard: the six faces are
- * buttons; arrow keys step the view 45°, Home goes to the isometric view. Works with the stage's CADCameraControls and
+ * buttons; arrow keys step the view 45°, Home goes to the home view (isometric without one). Works with the stage's CADCameraControls and
  * `@margoengine/controls` OrbitControls (they read the camera each frame), and toggles a `@margoengine/cameras` projection.
  */
 export class ViewCube {
@@ -127,10 +138,15 @@ export class ViewCube {
     dTheta: number;
     dPhi: number;
     radius: number;
+    dRadius: number;
+    from: V3;
+    to?: V3;
     elapsed: number;
     duration: number;
     at?: readonly number[];
   };
+  private homeView?: { position: V3; target: V3 };
+  private homeButton?: HTMLButtonElement;
   private last = '';
   private disposed = false;
   private upSet?: V3;
@@ -155,6 +171,7 @@ export class ViewCube {
       labels = {},
       flip = false,
       drag = true,
+      home,
       view,
     }: ViewCubeOptions = {},
   ) {
@@ -233,6 +250,7 @@ export class ViewCube {
       t.setAttribute('aria-label', 'Orthographic projection');
       this.showProjection();
     }
+    if (home) this.setHome(home === true ? undefined : home);
     root.addEventListener('click', this.onClick);
     root.addEventListener('keydown', this.onKey);
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'])
@@ -261,6 +279,40 @@ export class ViewCube {
       throw new RangeError("Invalid view; use a face, 'iso' or [x, y, z]");
     this.orbit(...angles(d), duration);
   }
+  /** Sets the home view (default: the camera as it is now) and shows the home button. */
+  setHome(home: HomeView = this.camera): void {
+    const position = [...home.position] as V3,
+      target = [...home.target] as V3;
+    if (
+      position.length !== 3 ||
+      target.length !== 3 ||
+      ![...position, ...target].every(Number.isFinite) ||
+      !Math.hypot(...position.map((x, i) => x - target[i]))
+    )
+      throw new RangeError('Invalid home; use a position and a target apart, three finite numbers each');
+    this.homeView = { position, target };
+    if (this.homeButton) return;
+    const b = (this.homeButton = this.element.ownerDocument.createElement('button'));
+    b.type = 'button';
+    b.className = 'mvc-home';
+    b.dataset.home = '';
+    b.title = 'Home';
+    b.setAttribute('aria-label', 'Home view');
+    b.textContent = '⌂';
+    this.element.appendChild(b);
+  }
+  /** A copy of the home view, or undefined before one is set. */
+  getHome(): HomeView | undefined {
+    const h = this.homeView;
+    return h && { position: [...h.position], target: [...h.target] };
+  }
+  /** Animates to the home view: its position, target and distance (`duration` 0 jumps). Without one, the isometric view. */
+  home(duration = this.duration): void {
+    const h = this.homeView;
+    if (!h) return this.view('iso', duration);
+    const d = h.position.map((x, i) => x - h.target[i]);
+    this.orbit(...angles(d), duration, h.target, Math.hypot(...d));
+  }
   /** Current projection mode, or undefined without a projection. */
   getProjection(): Projection | undefined {
     return this.projection?.mode;
@@ -285,7 +337,9 @@ export class ViewCube {
     const t = a.duration ? Math.min(1, (a.elapsed += Math.max(0, delta)) / a.duration) : 1,
       s = t * t * (3 - 2 * t),
       theta = a.theta + a.dTheta * s;
-    a.at = this.place(theta, a.phi + a.dPhi * s, a.radius);
+    // Home moves the target too; the last step lands on it exactly.
+    if (a.to) c.target = a.from.map((x, i) => (t === 1 ? a.to![i] : x + (a.to![i] - x) * s)) as V3;
+    a.at = this.place(theta, a.phi + a.dPhi * s, t === 1 ? a.radius + a.dRadius : a.radius + a.dRadius * s);
     this.pole(theta);
     if (t === 1) this.animation = undefined;
   }
@@ -388,9 +442,10 @@ export class ViewCube {
       a[0] = d[1] > 0 ? Math.atan2(-u[0], -u[2]) : Math.atan2(u[0], u[2]);
     return a;
   }
-  private orbit(theta: number, phi: number, duration: number): void {
+  /** Animates the azimuth and polar angle around the target; home also moves the target to `to` and the distance to `radius`. */
+  private orbit(theta: number, phi: number, duration: number, to?: readonly number[], radius?: number): void {
     const c = this.camera,
-      offset = c.position.map((x, i) => x - c.target[i]),
+      r = Math.hypot(...c.position.map((x, i) => x - c.target[i])),
       [t0, p0] = this.current();
     c.cancelFit?.();
     this.animation = {
@@ -398,7 +453,10 @@ export class ViewCube {
       phi: p0,
       dTheta: ((((theta - t0) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI,
       dPhi: phi - p0,
-      radius: Math.hypot(...offset),
+      radius: r,
+      dRadius: (radius ?? r) - r,
+      from: [...c.target] as V3,
+      to: to && ([...to] as V3),
       elapsed: 0,
       duration,
     };
@@ -412,7 +470,7 @@ export class ViewCube {
   }
   private readonly onClick = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest?.(
-      '[data-view],[data-projection]',
+      '[data-view],[data-projection],[data-home]',
     ) as HTMLElement | null;
     // The click that ends a drag is not a click on a face.
     if (this.dragged) return void (this.dragged = false);
@@ -427,7 +485,8 @@ export class ViewCube {
         !this.animation &&
         (o[0] * d[0] + o[1] * d[1] + o[2] * d[2]) / Math.hypot(...o) / Math.hypot(...d) > 1 - 1e-9;
       this.view(same ? (d.map((x) => -x) as V3) : d);
-    } else this.setProjection(this.projection!.mode === 'orthographic' ? 'perspective' : 'orthographic');
+    } else if (target.dataset.home !== undefined) this.home();
+    else this.setProjection(this.projection!.mode === 'orthographic' ? 'perspective' : 'orthographic');
   };
   /**
    * Drag to orbit: turntable angles as OrbitControls moves them, so dragging right turns the cube's front to the right
@@ -438,7 +497,8 @@ export class ViewCube {
       c = this.camera;
     if (event.type === 'pointerdown') {
       this.dragged = false;
-      if (this.drag && !event.button && (event.target as HTMLElement).dataset?.projection === undefined) {
+      // Only the cube's own cells start a drag, not the buttons beside it.
+      if (this.drag && !event.button && (event.target as HTMLElement).dataset?.view !== undefined) {
         const [theta, phi] = this.current();
         this.grab = { id: event.pointerId, x: event.clientX, y: event.clientY, theta, phi };
       }
@@ -488,7 +548,7 @@ export class ViewCube {
         this.orbit(theta, Math.min(Math.PI, snap(phi) + STEP), this.duration);
         break;
       case 'Home':
-        this.view('iso');
+        this.home();
         break;
       default:
         return;

@@ -66,7 +66,8 @@ class FakeElement {
   }
   closest() {
     let node = this;
-    while (node && !('view' in node.dataset || 'projection' in node.dataset)) node = node.parentElement;
+    while (node && !('view' in node.dataset || 'projection' in node.dataset || 'home' in node.dataset))
+      node = node.parentElement;
     return node;
   }
   all() {
@@ -505,6 +506,64 @@ test('drag to orbit: the cube follows the pointer, stops at the poles, and the c
   cube.dispose();
 });
 
+test('home: a button and the Home key return to the view the app set, target and distance included', () => {
+  const { engine } = setup({ position: [3, 4, 12], target: [1, 2, 0] }),
+    c = engine.camera,
+    cube = new ViewCube(engine, { home: true, duration: 0.5 }),
+    button = cube.element.all().find((e) => e.dataset.home !== undefined);
+  assert.equal(button.tagName, 'BUTTON');
+  assert.equal(button.getAttribute('aria-label'), 'Home view');
+  assert.equal(button.className, 'mvc-home');
+  assert.deepEqual(cube.getHome(), { position: [3, 4, 12], target: [1, 2, 0] });
+  // Somewhere else: another view, and a control panned the target and zoomed out.
+  cube.view('top', 0);
+  c.target = [-5, 0, 2];
+  c.position = [-5, 30, 2];
+  button.dispatch('click');
+  assert.ok(cube.animating);
+  engine.run(0.25);
+  const mid = c.target;
+  assert.ok(mid[0] > -5 && mid[0] < 1, 'the target moves during the animation');
+  engine.run(0.3);
+  assert.ok(!cube.animating);
+  assert.deepEqual([...c.target], [1, 2, 0], 'the target lands exactly');
+  assert.ok(close(c.position, [3, 4, 12], 1e-9), `${c.position}`);
+  assert.deepEqual([...c.up], [0, 1, 0], 'the app up is back off the pole');
+  // setHome takes the current camera or a placement; the Home key goes there; getHome is a copy.
+  cube.setHome({ position: [1, 10, 0], target: [1, 0, 0] });
+  cube.getHome().position[0] = 99;
+  assert.equal(cube.element.all().filter((e) => e.dataset.home !== undefined).length, 1, 'one button');
+  cube.element.dispatch('keydown', { key: 'Home' });
+  engine.run(0.6);
+  assert.deepEqual([...c.target], [1, 0, 0]);
+  assert.ok(close(c.position, [1, 10, 0], 1e-9) && direction(c)[1] === 1, 'a vertical home is exactly vertical');
+  assert.ok(close(screen(c).up, [0, 0, -1]), 'with a standard top orientation');
+  engine.run(0.1);
+  cube.view('front', 0);
+  cube.setHome();
+  cube.view('right', 0);
+  cube.home(0);
+  assert.ok(close(direction(c), [0, 0, 1]), 'setHome() keeps the camera as it was');
+  for (const bad of [
+    { position: [0, 0, 0], target: [0, 0, 0] },
+    { position: [0, 0], target: [0, 0, 1] },
+    { position: [0, NaN, 1], target: [0, 0, 0] },
+  ])
+    assert.throws(() => cube.setHome(bad), /Invalid home; use/);
+  // A drag from the home button does not orbit; without a home, Home is the isometric view and there is no button.
+  cube.view('front', 0);
+  button.dispatch('pointerdown', { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  button.dispatch('pointermove', { pointerId: 1, clientX: 50, clientY: 0 });
+  assert.ok(close(direction(c), [0, 0, 1]));
+  cube.dispose();
+  const plain = new ViewCube(engine);
+  assert.equal(plain.getHome(), undefined);
+  assert.ok(!plain.element.all().some((e) => e.dataset.home !== undefined));
+  plain.home(0);
+  assert.ok(close(direction(c), unit([1, 1, 1])));
+  plain.dispose();
+});
+
 test('dispose removes the widget and its plugin; engine removal disposes it', () => {
   const { engine, container, plugins } = setup(),
     cube = new ViewCube(engine);
@@ -560,6 +619,6 @@ test('size budget', async (t) => {
   });
   const gzip = gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
   console.log(`viewcube gzip: ${gzip} B`);
-  // 3,394 B before drag to orbit; drag measured 3,709 B (2026-11-08).
-  assert.ok(gzip < 3800, `${gzip} B`);
+  // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B (2026-11-08).
+  assert.ok(gzip < 4200, `${gzip} B`);
 });

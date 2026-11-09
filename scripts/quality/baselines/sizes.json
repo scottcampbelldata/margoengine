@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11375728,
+  "total": 11376120,
   "history": [
     {
       "date": "2026-10-24",
@@ -4670,6 +4670,12 @@
       "commit": "8e6dcdce0",
       "reason": "viewcube drag to orbit adds 315 B gzip (3394 to 3709 B measured)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "7b836e3b3",
+      "reason": "viewcube home view adds 392 B gzip (3709 to 4101 B measured)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5435,7 +5441,7 @@
     "@margoengine/video/codecs": 3593,
     "@margoengine/video/material": 1407,
     "@margoengine/video/record": 1396,
-    "@margoengine/viewcube": 3965,
+    "@margoengine/viewcube": 4357,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,

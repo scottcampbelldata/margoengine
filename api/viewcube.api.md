@@ -7,6 +7,11 @@ import { Camera, EngineKernel, RenderView } from "@margoengine/core";
 
 export type Face = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
 
+export interface HomeView {
+    position: readonly number[];
+    target: readonly number[];
+}
+
 export type Projection = 'orthographic' | 'perspective';
 
 export type View = Face | 'iso' | readonly [number, number, number];
@@ -20,8 +25,11 @@ export class ViewCube {
     drag: boolean;
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
-    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, view }?: ViewCubeOptions);
+    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, home, view }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
+    setHome(home?: HomeView): void;
+    getHome(): HomeView | undefined;
+    home(duration?: number): void;
     getProjection(): Projection | undefined;
     setProjection(mode: Projection): void;
     update(delta: number): void;
@@ -43,5 +51,6 @@ export interface ViewCubeOptions {
     labels?: Partial<Record<Face, string>>;
     flip?: boolean;
     drag?: boolean;
+    home?: HomeView | boolean;
 }
 ```

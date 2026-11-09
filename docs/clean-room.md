@@ -1379,7 +1379,6 @@ Unity VFX Graph and Shuriken, Godot particles, three.js and Babylon particle sys
 
 | Feature | Source |
 | --- | --- |
-| Drag to orbit (`drag`) | Spherical coordinates (azimuth about +Y, polar angle from +Y) as in any analytic geometry text, the same turntable the package already animates with; W3C Pointer Events Level 3 (pointer ids, `setPointerCapture`, the `touch-action` property) |
 | Ribbons and trails (`vfx/ribbons`) | W. T. Reeves, "Particle Systems: A Technique for Modeling a Class of Fuzzy Objects", SIGGRAPH 1983 (particles drawn as streaks along their motion); T. Akenine-Moller, E. Haines, N. Hoffman et al., *Real-Time Rendering*, 4th ed., 2018, axial billboards (a strip turned about its own axis toward the eye by a cross product). The ring of records per slot, the birth-angle life stamp and the binary search for a life's records are Margo's own |
 | Mesh particles (`vfx/mesh`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles as rendered primitives with orientation); O. Rodrigues, "Des lois geometriques qui regissent les deplacements d'un systeme solide", J. Math. Pures Appl. 5, 1840 (rotation about an axis); G. Marsaglia, "Choosing a Point from the Surface of a Sphere", Ann. Math. Stat. 43, 1972, and Archimedes' hat-box result (uniform z and longitude give a uniform axis); J. H. Lambert, *Photometria*, 1760 (diffuse shading); W3C WebGPU specification, `drawIndirect` and instancing. Reusing the billboards' culled list and copying its count into the draw's arguments are Margo's own |
 | Sub-emitters and GPU events (`vfx/events`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles that spawn further particle systems, the fireworks of *Star Trek II*'s Genesis sequence); G. E. Blelloch, "Prefix Sums and Their Applications", CMU-CS-90-190, 1990, and M. Harris, S. Sengupta, J. D. Owens, "Parallel Prefix Sum (Scan) with CUDA", *GPU Gems 3*, ch. 39, 2007 (stream compaction of the event list by an exclusive scan). The frame-parity halves of the event data, the free-slot tickets past the emitter's budget and the generation flag are Margo's own |
@@ -1410,6 +1409,12 @@ Written from the W3C [WebCodecs working draft](https://www.w3.org/TR/webcodecs/)
 
 Written from W3C [Compositing and Blending, simple alpha/source-over](https://www.w3.org/TR/compositing-1/#simplealphacompositing), [WGSL smoothstep/distance](https://www.w3.org/TR/WGSL/#smoothstep-builtin), and [WebGPU external textures](https://www.w3.org/TR/webgpu/#external-texture). Stacked image rectangles and half-texel clamping are derived from pixel centres. The RGB-distance key and smoothstep opacity are this package's explicit method, not a claim to production matte recovery. The existing Margo material pipeline owns colour conversion and output blending; its direct canvas path blends encoded sRGB values. No other renderer/keying-library code was read or copied, and no external assets downloaded. Generated masks/colours are stand-ins.
 
+## View cube: `@margoengine/viewcube` (batch 109)
+
 Written from the specifications and textbook maths below. No other engine's or CAD application's view cube or axis
 gizmo source was read; Autodesk, Blender and SolidWorks behaviour is described from their public user documentation.
-## View cube: `@margoengine/viewcube` (batch 109)
+
+| Feature | Source |
+| --- | --- |
+| Drag to orbit (`drag`) | Spherical coordinates (azimuth about +Y, polar angle from +Y) as in any analytic geometry text, the same turntable the package already animates with; W3C Pointer Events Level 3 (pointer ids, `setPointerCapture`, the `touch-action` property) |
+| Home view (`home`, `setHome`) | The same spherical coordinates for the view angles, with the target and distance moved linearly under the cube's existing smoothstep easing (any analysis text); the home button's behaviour is described from Autodesk's public ViewCube user documentation ("Home" view). The button and the exact landing on the stored target are Margo's own |

@@ -9,7 +9,7 @@ engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 // Red at +X, blue at -Z, green at the origin: top view puts red right of centre and blue above it.
 for(const [color,position] of [['#ff0000',[2,0,0]],['#0000ff',[0,0,-2]],['#00ff00',[0,0,0]]])engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
 const projection=new CameraProjection({mode:'perspective'});engine.use(projection);
-const orbit=new OrbitControls(engine),cube=new ViewCube(engine,{projection,duration:0.25});
+const orbit=new OrbitControls(engine),cube=new ViewCube(engine,{projection,duration:0.25,home:true});
 engine.start();
 const direction=()=>{const c=engine.camera,d=c.position.map((v,i)=>v-c.target[i]),l=Math.hypot(...d);return d.map(v=>v/l);};
 window.check={
@@ -21,6 +21,7 @@ window.check={
   async settle(){await new Promise(r=>setTimeout(r,400));await engine.gpu.queue.onSubmittedWorkDone();return {direction:direction(),animating:cube.animating,errors:errors.splice(0),mode:projection.mode,ortho:!engine.camera.matrix[11]};},
   focus(){const tabbable=[...cube.element.querySelectorAll('button[tabindex="0"]:not([data-projection])')].map(b=>b.getAttribute('aria-label'));cube.element.querySelector('[aria-label="Top view"]').focus();return {tabbable,active:document.activeElement.getAttribute('aria-label')};},
   front(){cube.view('front',0);},
+  home(){const r=cube.element.querySelector('[data-home]').getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return document.elementFromPoint(x,y)?.dataset.home===''?{x,y}:null;},
   toggle(){const r=cube.element.querySelector('[data-projection]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},
 };
 window.ready=true;

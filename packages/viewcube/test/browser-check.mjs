@@ -68,7 +68,8 @@ try {
     'only visible faces are tabbable',
   );
   await page.keyboard.press('Home');
-  near((await page.evaluate(() => window.check.settle())).direction, [s3, s3, s3], 'Home is isometric');
+  // The page sets home: true, so Home returns to the front view it attached with.
+  near((await page.evaluate(() => window.check.settle())).direction, [0, 0, 1], 'Home key goes to the home view', 1e-6);
   await page.keyboard.press('ArrowLeft');
   await page.evaluate(() => window.check.settle());
   await page.keyboard.press('Enter');
@@ -79,6 +80,12 @@ try {
   assert.equal(r.mode, 'orthographic');
   assert.ok(r.ortho, 'orthographic matrix');
   near((await click('-1,1,0')).direction, [-s2, s2, 0], 'top-left edge in orthographic');
+  // The home button with the real mouse: back to the camera the page attached with.
+  const home = await page.evaluate(() => window.check.home());
+  assert.ok(home, 'home button hit-tests');
+  await page.mouse.click(home.x, home.y);
+  near((await page.evaluate(() => window.check.settle())).direction, [0, 0, 1], 'home button', 1e-6);
+  console.log('ok home button');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {
