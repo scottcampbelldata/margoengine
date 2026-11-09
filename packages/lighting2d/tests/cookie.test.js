@@ -225,3 +225,16 @@ test('CookieLighting2D lifecycle and WebGL2 refusal', () => {
     /CookieLighting2D has been disposed/,
   );
 });
+
+test('cookieSample picks the texel of an exact edge for a coordinate a few f32 ULP under it (as the GPU computes it)', () => {
+  // 16 x 1 cookie whose texel i holds i * 16: the texel picked is readable from the red value.
+  const data = [];
+  for (let i = 0; i < 16; i++) data.push(i * 16, 0, 0, 255);
+  const tex = createCookieTexture(16, 1, data);
+  // -7.5 / 20 + 0.5 is exactly 0.125, the edge between texels 1 and 2. WGSL allows 2.5 ULP of division error, and
+  // Metal returns a value just under it: both must pick texel 2.
+  const exact = cookieSample(tex, -7.5 / 20 + 0.5, 0.5);
+  const under = cookieSample(tex, 0.125 - 2 ** -26, 0.5);
+  assert.equal(Math.round(exact[0] * 255), 32);
+  assert.equal(Math.round(under[0] * 255), 32);
+});

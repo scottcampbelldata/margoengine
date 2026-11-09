@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11420225,
+  "total": 11432205,
   "history": [
     {
       "date": "2026-10-24",
@@ -4742,6 +4742,12 @@
       "commit": "batch-111",
       "reason": "New optional @margoengine/mixer/reflections, isolated from mixer root, core and stage",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "b6152cf08",
+      "reason": "lighting2d/soft and lighting2d/cookie entries landed without size records",
+      "grew": 2
     }
   ],
   "items": {
@@ -5077,6 +5083,8 @@
     "@margoengine/labels/callouts": 1603,
     "@margoengine/labels/declutter": 1512,
     "@margoengine/lighting2d": 4389,
+    "@margoengine/lighting2d/cookie": 6732,
+    "@margoengine/lighting2d/soft": 5248,
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,

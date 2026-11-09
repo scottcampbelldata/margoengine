@@ -18,6 +18,7 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: numb
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
+/** Options for one {@link SoftLight2D}: the plain light options plus its penumbra size and ray samples. */
 export interface SoftLight2DOptions extends Light2DOptions {
   /** Light emitter radius in world units for penumbra softening; 0 is hard shadow. Default 4. */
   sourceRadius?: number;
@@ -308,6 +309,7 @@ const SUM_FORMAT = 'rgba16float';
 const SUM_LAYERS = 4;
 const FLOATS = STRIDE / 4;
 
+/** Options for {@link SoftLighting2D}: the plain lighting options plus the default penumbra size and ray samples. */
 export interface SoftLighting2DOptions extends Lighting2DOptions {
   /** Default light emitter radius in world units for penumbra softening. Default 4. */
   sourceRadius?: number;

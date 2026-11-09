@@ -24,6 +24,7 @@ export type CookieWrapMode = 'zero' | 'clamp' | 'repeat' | 'mirror';
 /** How the cookie texture combines with the light color. */
 export type CookieBlendMode = 'multiply' | 'alpha' | 'color';
 
+/** Size and pixels of a cookie texture: width by height RGBA texels. */
 export interface CookieTextureOptions {
   width: number;
   height: number;
@@ -122,6 +123,14 @@ export function createSpotCookie(
   return new CookieTexture2D({ width: size, height: size, data });
 }
 
+/**
+ * Texels a coordinate is nudged by before the cookie texel is chosen, on the CPU and in the shader alike. WGSL lets
+ * f32 division be off by 2.5 ULP, so a coordinate that lands exactly on a texel edge in exact arithmetic can come out a
+ * few ULP under it on one GPU (Metal) and on it on another: without the nudge the two pick neighbouring texels.
+ * 1/1024 texel is far above that error and far below anything a picture shows.
+ */
+const COOKIE_TEXEL_BIAS = 1 / 1024;
+
 /** Samples a cookie texture at normalized coordinate (u, v) with wrapping. */
 export function cookieSample(
   cookie: CookieTexture2D,
@@ -148,8 +157,8 @@ export function cookieSample(
   }
 
   const { width, height, data } = cookie;
-  const x = Math.max(0, Math.min(width - 1, Math.floor(su * width)));
-  const y = Math.max(0, Math.min(height - 1, Math.floor(sv * height)));
+  const x = Math.max(0, Math.min(width - 1, Math.floor(su * width + COOKIE_TEXEL_BIAS)));
+  const y = Math.max(0, Math.min(height - 1, Math.floor(sv * height + COOKIE_TEXEL_BIAS)));
   const idx = (y * width + x) * 4;
 
   return [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]];
@@ -393,7 +402,11 @@ fn clip(d: vec2f) -> vec2f {
     if (oob) {
       cookieMod = vec4f(0.0);
     } else {
-      cookieMod = textureSampleLevel(cookie_tex, cookie_samp, uv, 0.0);
+      // The texel is chosen as cookieSample does (floor plus COOKIE_TEXEL_BIAS), not by the nearest sampler, whose
+      // choice on a texel edge depends on the GPU's division error.
+      let dims = vec2i(textureDimensions(cookie_tex));
+      let texel = clamp(vec2i(floor(uv * vec2f(dims) + vec2f(${COOKIE_TEXEL_BIAS}))), vec2i(0), dims - vec2i(1));
+      cookieMod = textureLoad(cookie_tex, texel, 0);
     }
   }
 
@@ -417,6 +430,7 @@ const SUM_FORMAT = 'rgba16float';
 const SUM_LAYERS = 4;
 const FLOATS = STRIDE / 4;
 
+/** Options for CookieLighting2D: the plain lighting options plus the default cookie scale, wrap and blend for its lights. */
 export interface CookieLighting2DOptions extends Lighting2DOptions {
   /** Default cookie scale in world units if not set per light. Default 64. */
   cookieScale?: number | readonly [number, number];
