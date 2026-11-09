@@ -2021,6 +2021,14 @@ assertions. The package GPU suite used by check:merge runs this two-backend leaf
 No renderer, shader or runtime API changed. Other indexed compatibility failures
 remain separate obligations.
 
+The inherited compute scene-owner browser regression was missing from its package
+GPU scripts. The planner correctly rejected that gap. A dedicated package script
+and planner regression now keep it in check:merge. Its four render calls define
+an exact four-dispatch oracle, explicitly documented as work rather than readiness.
+The leaf starts with native browser APIs even under an outer compatibility shim,
+then explicitly installs full compatibility for its second case. Both retain
+all 1,024 values, ownership and disposal assertions. No runtime entry changes.
+
 The optional tiers entry selects physical colour formats inside the existing
 device: half-float or UNORM8 for render/storage targets, with logical WebGPU
 formats and upload/copy layouts retained. Integer and depth/stencil targets and

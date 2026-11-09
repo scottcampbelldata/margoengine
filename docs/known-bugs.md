@@ -212,7 +212,8 @@ finishes its own attachment, translator and DOF repairs without chasing them.
 - `gltf-pro/test:extensions:browser`: the first KTX2 streaming case compares a
   fully streamed level-zero quad against the plain loader at the same camera and
   gets unequal RGBA buffers (`Buffer.compare` returns -1). The divergence is in
-  these two upload/sampling paths; the precise cause is not yet isolated.
+  rendering/capture comparison; a repeat capture of the unchanged plain model
+  can also differ, so the precise cause is not yet isolated.
 - `gltf-pro/test:gpu:materials`: the all-authored-map shader combined with shadows,
   clustered local shadows and IBL exceeds the adapter's 16 fragment texture image
   units after translation. The fixture counts WGSL sampled textures but does not
@@ -3527,3 +3528,13 @@ leaf explicitly runs both backends, and the existing exact regression retains
 all input counts and image assertions. Forced compatibility fails before the
 repair (`inputs fetched` is empty), while native and compatibility each pass
 with 47,234 lit pixels and zero differing pixels afterwards. No renderer change.
+
+Batch 273 resolved inherited compute gate registration: scene-owner-browser.mjs
+had no GPU package script, so plan() rejected it. A dedicated script and planner
+regression now cover it. Its four render calls are documented as the exact
+four-dispatch value oracle, not a readiness wait. The native baseline explicitly
+disables the outer shim before the second case installs compatibility. All
+1,024 values and owner/disposal assertions pass both backends; 133 tests in
+the nine failed planner/scanner files pass after repair. The original full
+verify failure and the invalid README run overlapping a rebuild are retained.
+A sequenced materials README run passes 29/29 after the build completes.

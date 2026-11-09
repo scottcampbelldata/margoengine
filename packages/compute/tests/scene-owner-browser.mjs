@@ -1,6 +1,6 @@
 ﻿import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-const context = await openBrowser({ startPath: '/tests/modern-game.html', port: 'free' });
+const context = await openBrowser({ startPath: '/tests/modern-game.html', port: 'free', compat: false });
 try {
   for (const compat of [false, true]) {
     if (compat) await context.page.reload();
@@ -44,6 +44,7 @@ try {
           return { count: 1024 };
         });
         const render = () => e.render({ delta: 1 / 60, views: [{ camera: e.camera, scene, viewport: [0, 0, 1, 1] }] });
+        // fixed-wait: exactly four dispatches define the asserted values and step count, not readiness.
         for (let i = 0; i < 4; i++) render();
         const values = Array.from(await array.read());
         const gpu = frame.gpu;

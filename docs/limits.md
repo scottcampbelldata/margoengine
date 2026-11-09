@@ -2556,6 +2556,11 @@ zero differing pixels with input trimming disabled. This fixture-only repair
 changes no package runtime entry, precision limit or size ceiling, and closes
 only that indexed suite failure.
 
+The separate compute scene-owner GPU leaf is registered in its package manifest,
+with an explicit native baseline before the full-layer case. Exactly four
+dispatches are the value oracle, not a readiness delay. No runtime size or
+precision limit changes in this gate repair.
+
 The optional webgl2-compat/tiers entry permits half-float and LDR devices explicitly;
 root install keeps its full-tier default. Highp fragment floats/ints remain required.
 Only render/storage colour targets are substituted. Half-float uses R16F/RG16F/

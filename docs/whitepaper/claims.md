@@ -2168,6 +2168,11 @@ leaf now tests both backends with identical input-count and pixel assertions:
 47,234 lit pixels, zero differing pixels per backend. No runtime, speed or
 whole-package compatibility claim follows from this one regression.
 
+The compute scene-owner regression is now registered in the package GPU plan;
+the planner still rejects unregistered browser leaves. Its native and full-layer
+cases retain all 1,024 four-dispatch values and every owner/disposal assertion.
+This repairs test scheduling, with no new compute or engine behavior claim.
+
 The lower-tier device probes cover seven requested float target formats, exact
 logical readback bytes, uploads, same-storage and cross-usage copies, sample-only float32 range and
 precision, mip/array views, four-sample resolve, additive blending and fragment/CPU

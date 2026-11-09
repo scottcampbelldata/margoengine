@@ -1703,6 +1703,17 @@ fails `inputs fetched`; after repair both report 47,234 lit pixels and no
 differences. Receipts: test-results/batch-273-vertex-inputs-before.log and
 batch-273-vertex-inputs-after.log. No timing assertion or benchmark was run.
 
+The inherited compute scheduling repair is reproduced by
+`node --test tests/modern-extension-suite.test.js tests/check-fixed-waits.test.js`
+and the GPU-locked `node packages/compute/tests/scene-owner-browser.mjs` leaf.
+The manifest previously omitted this browser file, making plan() throw; the
+fixed-work scanner also required the exact four-dispatch oracle to state its
+reason. All 133 tests in the nine originally failing planner/scanner files
+pass after registering the leaf, including the new planner regression. The
+real leaf passes both backends with all 1,024 values equal to four. Receipts:
+test-results/batch-273-vertex-failed-units-repaired.log and
+batch-273-compute-scene-owner.log. This does not relabel the failed full verify.
+
 Build with npm run build --workspace @margoengine/webgl2-compat. Run the CPU tests
 with npm test --workspace @margoengine/webgl2-compat (hard limit 5 minutes). Run
 node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node

@@ -3369,3 +3369,19 @@ trimmed/untrimmed RGBA equality. Materials unit tests: 402/402 pass. Package
 runtime entries are unchanged. Full landing gates are recorded separately.
 LOD's earlier bounded diagnostic reached row 15 before the lock killed its
 process tree at 3.5 minutes; it remains an unresolved failure, not a busy pass.
+
+### Batch 273 landing gate: inherited compute GPU registration
+
+The WebGPU queue/dispatch specification and Freeman, Pryce, Mackinnon and
+Walnes 2004 paper compared above also guide this scheduling repair: preserve
+the complete real-device collaborator contract and test its registration, not
+an invented native-only handle. The fixed four dispatches are the exact value
+oracle, not a readiness heuristic. No companion source or runtime code changed.
+The inherited browser file was absent from compute's GPU package scripts, so
+the existing planner guard rejected it and its dependent tests. Its manifest
+now names a dedicated GPU script; a new regression requires that plan entry.
+The fixture's native baseline explicitly opts out of an outer compat shim.
+The existing 1,024-value, four-step and owner/disposal assertions stay exact.
+Both backends pass the leaf; all 133 tests in the nine originally failing
+planner/scanner files pass. The full verify remains recorded as failed
+(13,856/13,873) before repair; all other chains passed. No full-pass relabeling.

@@ -674,3 +674,6 @@ public `autotune` and `tuneCompute` behavior is unchanged.
 `npm run test:gpu:owners --workspace @margoengine/compute` runs the real
 ComputeFrame ownership regression on native WebGPU and the WebGL2 compatibility
 layer. It is registered in the package GPU plan, including affected merge checks.
+
+It checks all 1,024 exact four-dispatch values, direct disposal, the secondary
+scene registration, the default-scene sentinel, and context/array release.
