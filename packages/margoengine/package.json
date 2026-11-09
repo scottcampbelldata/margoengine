@@ -2770,6 +2770,10 @@
       "types": "./dist/text/msdf.d.ts",
       "import": "./dist/text/msdf.js"
     },
+    "./text/animate": {
+      "types": "./dist/text/animate.d.ts",
+      "import": "./dist/text/animate.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"

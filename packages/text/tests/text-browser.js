@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
+import { AnimatedText } from '@margoengine/text/animate';
 import { webglRenderer } from '@margoengine/webgl';
 import { buildColorFont, COLOR_FONT_FAMILY } from './color-font.js';
 
@@ -322,6 +323,29 @@ window.runTextTests = async () => {
   assert(fieldInk > 500, `A prebuilt distance field did not draw: ${fieldInk}`);
   report.colors.rich = { richRed, richGreen, fieldInk };
   report.checks.push('RichText draws coloured runs and inline images; BitmapFont draws a prebuilt field');
+
+  // 2b. AnimatedText per-glyph typewriter reveal and wave motion on the GPU.
+  label.visible = false;
+  const animated = new AnimatedText({ text: 'ABC', font, fontSize: 3, color: '#00ff00', position: [0, 0, 0] });
+  animated.addTo(renderer);
+  animated.typewriter({ count: 1 });
+  image = await frame();
+  const oneGlyphInk = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  assert(oneGlyphInk > 50, `AnimatedText single glyph did not draw: ${oneGlyphInk}`);
+
+  animated.typewriter(1);
+  image = await frame();
+  const allGlyphsInk = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  assert(allGlyphsInk > oneGlyphInk * 2, `AnimatedText full reveal did not draw all glyphs: ${allGlyphsInk}`);
+
+  animated.wave(0.5, { amplitude: 0.5 });
+  image = await frame();
+  const waveInk = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  assert(waveInk > 50, `AnimatedText wave did not draw: ${waveInk}`);
+
+  animated.dispose();
+  label.visible = true;
+  report.checks.push('AnimatedText renders per-glyph motion and typewriter reveals on the GPU');
 
   // 3. Depth test against a core mesh with reversed-Z, and onTop.
   const mesh = engine

@@ -369,7 +369,7 @@ engine.createMesh().setGeometry(box());
 const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
 const picking = Picking.attach(engine);
 const splatPicking = SplatPicking.attach(picking, cloud); // {threshold: 0.1} by default
-const hit = await engine.pick(128, 96); // canvas CSS pixels
+const hit = await picking.pick(128, 96); // canvas CSS pixels
 if (hit && splatPicking.splatsOf(hit.mesh)) console.log('splat', hit.splat, 'of', hit.splats);
 else if (hit) console.log('mesh', hit.mesh);
 const hits = await picking.pickMany([[10, 20], [64, 64]]); // one readback for both

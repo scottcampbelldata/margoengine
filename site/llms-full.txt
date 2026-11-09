@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-576). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-577). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2819,6 +2819,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Palette cycling and ramps (`@margoengine/pixel/palette`, 2026-11-08) | `cyclePalette` and `mixPalettes` run on the CPU per call; `setSwap` writes one 256 x 1 row at most each frame. | Rotating the drawn colours animates water and fire without repainting a pixel, and the matching stays. | By method: cycles rotate the colours drawn, not the matching (a pixel keeps its index); one rate per run, no ping-pong or easing; mixing is linear in Oklab between two palettes. Time not measured. | For more than two palettes over a day, mix the neighbouring pair. |
 | Hatching and halftone (`@margoengine/toon/hatch`, 2026-11-08) | Core meshes only, one shader patch: up to 4 stroke layers or one dot a pixel, in the mesh's own fragment pass. | A screen-space pattern needs no textures or UVs and keeps the same stroke width at any distance. | By method: the pattern is fixed to the screen, so it slides over a moving surface (no texture-space strokes); tone is Lambert n.l of the sun only (clustered lights and shadows are not inked); hatching steps by whole layers; the paper takes the full lit colour without the 1/pi of Lambert, as `ToonShading` does. Time not measured. | `@margoengine/shader` `halftone` for a screen effect over everything; a `NodeMaterial` lighting function for glTF-pro and materials meshes. |
 | Text atlas eviction (`@margoengine/text`, 2026-11-08) | `TextRenderer.evictUnused()` and `GlyphAtlas.evict()` free texture array pages whose glyphs are no longer in any active visible `Text` block (LIM-572). When `maxPages` is full, `place()` evicts an unused page before failing. | For chat and user-generated text: keeps memory capped without leaking full atlas pages when old messages are removed or modified. | By method: only pages without active visible glyphs are evicted; if all pages contain active visible glyphs, `place()` throws `RangeError`. Time not measured. | Call `evictUnused()` after disposing old messages, or raise `maxPages` / `atlasSize`. |
+| Per-glyph animation (`@margoengine/text/animate`, 2026-11-08) | `AnimatedText` drives position, scale, rotation, color and opacity per glyph quad over time (LIM-577). | Typewriter reveals and wave/bounce/color procedural motion while keeping global typography and line wrapping. | By method: each non-whitespace glyph is an individual `Text` block sharing the parent font and renderer, with individual model matrices and uniform colors; whitespace glyphs advance layout without GPU quads. Time not measured. | Use plain `Text` for static blocks with one draw call. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -4130,6 +4131,12 @@ Measured but not fixed. Their history, sources and rerun commands are in
   either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Cause not yet
   found. `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the
   hole. It does not freeze Detour's length. Publishing the number does not close it.
+- **Volume-64 frame is slower than VTK.js 38.0.5** (`@margoengine/sciviz`, perf history entry 102): 1.500 ms against
+  1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
+  rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.
+  Repro: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`
+  after the sciviz build. The rival is installed outside the repository. Cause not yet found. Publishing the number
+  does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node

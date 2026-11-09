@@ -129,6 +129,26 @@ const font = await BitmapFont.load('/fonts/inter.json');
 const label = new Text({text: 'Hello', font});
 ```
 
+## Per-glyph animation: `AnimatedText`
+
+`@margoengine/text/animate` provides per-glyph control over position, scale, rotation, color and opacity over time,
+including typewriter reveals, wave motion, bouncing and color cycling, while preserving global line wrapping and baseline layout.
+
+```ts
+import {AnimatedText} from 'margoengine/text/animate';
+
+const animated = new AnimatedText({
+  text: 'Hello Margo',
+  fontSize: 1.5,
+});
+
+// Typewriter reveal (0 = none visible, 1 = all visible):
+animated.typewriter(0.5);
+
+// Sine wave motion across glyphs:
+animated.wave(1.0, { amplitude: 0.2, speed: 4 });
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.

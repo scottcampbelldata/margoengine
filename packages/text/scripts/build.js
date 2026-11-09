@@ -22,6 +22,7 @@ await build({
         index: resolve(root, 'src/index.ts'),
         rich: resolve(root, 'src/rich.ts'),
         msdf: resolve(root, 'src/msdf.ts'),
+        animate: resolve(root, 'src/animate.ts'),
       },
       formats: ['es'],
     },

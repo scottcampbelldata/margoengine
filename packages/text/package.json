@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/text.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js",
+    "test": "npm run build && node --test tests/text.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js tests/animate.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },
@@ -42,6 +42,10 @@
     "./msdf": {
       "types": "./dist/msdf.d.ts",
       "import": "./dist/msdf.js"
+    },
+    "./animate": {
+      "types": "./dist/animate.d.ts",
+      "import": "./dist/animate.js"
     }
   },
   "files": [
