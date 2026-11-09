@@ -1,7 +1,7 @@
 # Test-page bug review
 
 Implementation is preserved in separate commits and rebased onto origin/main
-4238614df. Corrective verify and all remaining GPU/README gates pass. No
+31bd81d60. Corrective verify and all remaining GPU/README gates pass. No
 next-batch bug has been taken before this landing.
 
 Source: the read-only, untracked test-page log in the main checkout. Reviewed on
