@@ -11,7 +11,8 @@
       "2518dd32e",
       "66e8a50cf"
     ],
-    "integratedMain": "1f538fa11"
+    "integratedMain": "1f538fa11",
+    "landingRebase": "eab22fe6a"
   },
   "fullVerify": {
     "ranOnce": true,
@@ -211,6 +212,7 @@
     "The later main rebase preserves compute GPU registration and voxel composition; fresh entry/network records include both. The composition bitmask-loop annotation preserves all 32 inputs and every assertion.",
     "After main restored published colormap precision, actual paired records measure clean source c1a799e75. Full build, affected LIC/umbrella/planner/wait CPU checks, LIC/circular GPU cases, NOAA demo and LIC README pass. The LIC case itself includes the permanent mixed-magnitude normalization regression.",
     "An extra ignored runner requested the nonexistent lic-normalization selector and failed before rendering a case. The correct lic selector already passed its mixed-magnitude assertion; no source, test, assertion or timeout was changed.",
-    "Main full-precision tables increase LIC 10429 -> 23461 B gzip; optional ceiling 10517 -> 24165 B. Preserve complete colour data and synchronous API, with no size-driven loader split."
+    "Main full-precision tables increase LIC 10429 -> 23461 B gzip; optional ceiling 10517 -> 24165 B. Preserve complete colour data and synchronous API, with no size-driven loader split.",
+    "Final rebase onto eab22fe6a changes materials tests/README and shared documentation only; no runtime package or LIC test bytes change. Retain the genuine c1a799e75 paired records and affected runtime passes; the source is preserved on private sciviz-lic-size-source-c1a799e75."
   ]
 }
