@@ -14,7 +14,7 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
 
 Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
 

@@ -3934,21 +3934,17 @@ in flight. Identical seeded integer output and cell-work counts are tested; no t
 visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
 and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The new JS ceiling is 1,479 B, the measured entry plus the standard 256 B allowance. The shared internal loader makes Poisson JS 1,290 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
 
+### Transitions owner-scene disposal repair
+
+The root entry now measures 4307 B min+gzip (7 B above job 2); its budget is 4563 B, restoring the usual 256 B headroom. Removal resolves the actual scene by plugin identity and never removes another scene's same-named effect. Core plus stage remains 23797 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
 
-### Open: transitions disposal from a non-default scene (batch 76 continuation)
+### Fixed in batch 76 continuation: transitions scene disposal
 
-Repro on a real WebGPU engine: create a scene with `engine.createScene('outgoing')`, create a `new Transitions()`,
-attach it with `scene.use(effect)`, then call `effect.dispose()` outside a render. The scene still has its
-`transitions` plugin and passes, although the effect has destroyed its resources. Rendering that scene afterward
-can use released resources. The default-scene attach routes used by the custom and mask README examples pass.
-Cause: `Transitions.dispose` calls `engine.removePlugin(this.name)` without its owning scene, so removal defaults
-to the currently active scene. The package can obtain its owner through the extension engine's `sceneOf` method;
-no core change is needed. The real-device probe observed scene plugin counts 1 before disposal and 1 afterward.
-Fix this in transitions with a failing non-default-scene regression before delivering batch 76's live entry.
-Disposing the owning scene or engine does remove the stale registration. This remains open at this handoff.
+Transitions.dispose removed the active scene's plugin by name instead of its own registration. It now resolves its owning scene through engine.sceneOf(this) and removes only that registration. Disposing an already removed or unattached instance leaves other scenes alone. packages/transitions/test/scene-disposal.test.js fails against the old implementation; test/gpu-browser.js checks two actual scenes, preserves the default effect and renders both after disposal. No core change was needed.
 
 ### Fixed in batch 68 draft: tiny triangle area underflow
 
@@ -8851,7 +8847,7 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
 
 Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
 

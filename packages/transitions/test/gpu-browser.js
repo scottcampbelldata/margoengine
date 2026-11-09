@@ -4,11 +4,31 @@ export async function transitionChecks() {
   const { webglRenderer } = await import('../../webgl2-compat/dist/preview.js');
   const { createCustomTransition } = await import('../dist/custom.js');
   const { createMaskTransition } = await import('../dist/mask.js');
+  const { Transitions } = await import('../dist/index.js');
   const assert = (ok, message) => {
     if (!ok) throw new Error(message);
   };
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 8;
+  const sceneCanvas = document.createElement('canvas');
+  sceneCanvas.width = sceneCanvas.height = 8;
+  const sceneEngine = await Engine.create(sceneCanvas);
+  try {
+    const owner = sceneEngine.createScene('outgoing');
+    const defaultEffect = Transitions.attach(sceneEngine);
+    const effect = new Transitions();
+    owner.use(effect);
+    effect.dispose();
+    effect.dispose();
+    assert(owner.plugins.size === 0 && !sceneEngine.sceneOf(effect), 'disposal removes owning scene registration');
+    assert(sceneEngine.scene.plugins.get(defaultEffect.name) === defaultEffect, 'default-scene effect stays attached');
+    sceneEngine.render({ views: [{ scene: owner, camera: sceneEngine.camera, viewport: [0, 0, 1, 1] }] });
+    sceneEngine.render();
+    defaultEffect.dispose();
+    owner.dispose();
+  } finally {
+    sceneEngine.dispose();
+  }
   const fallback = await Engine.create(canvas, { backend: 'webgl2', fallback: webglRenderer });
   try {
     let refused = false;
@@ -49,6 +69,9 @@ export async function transitionChecks() {
       removePlugin(name) {
         graph.removeOwner(name);
         plugins.delete(name);
+      },
+      sceneOf(effect) {
+        return plugins.get(effect.name) === effect ? engine : undefined;
       },
     };
     let effect;

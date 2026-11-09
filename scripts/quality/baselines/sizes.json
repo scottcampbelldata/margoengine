@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11543542,
+  "total": 11543802,
   "history": [
     {
       "date": "2026-10-24",
@@ -4970,6 +4970,12 @@
       "commit": "2c5952143",
       "reason": "procedural/dungeon: new optional BSP layout entry with one independent lazy Rust/Wasm asset; no root change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-76-scene-disposal",
+      "reason": "Owner-scene disposal correctness adds 7 B to the 4300 B transitions root; restore standard 256 B headroom above measured 4307 B. No core or stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5713,7 +5719,7 @@
     "@margoengine/toon": 1665,
     "@margoengine/toon/hatch": 1998,
     "@margoengine/toon/models": 4843,
-    "@margoengine/transitions": 4303,
+    "@margoengine/transitions": 4563,
     "@margoengine/transitions/custom": 5275,
     "@margoengine/tween": 5759,
     "@margoengine/tween/custom-ease": 2002,

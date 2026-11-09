@@ -94,6 +94,9 @@ export function gpuHarness() {
       hasPlugin(name) {
         return plugins.has(name);
       },
+      sceneOf(plugin) {
+        return plugins.get(plugin.name) === plugin ? engine : undefined;
+      },
       use(plugin) {
         try {
           graph.withOwner(plugin.name, () => {

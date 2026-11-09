@@ -1,16 +1,8 @@
 # Known bugs and unverified features
 
-### Open: transitions disposal from a non-default scene (batch 76 continuation)
+### Fixed in batch 76 continuation: transitions scene disposal
 
-Repro on a real WebGPU engine: create a scene with `engine.createScene('outgoing')`, create a `new Transitions()`,
-attach it with `scene.use(effect)`, then call `effect.dispose()` outside a render. The scene still has its
-`transitions` plugin and passes, although the effect has destroyed its resources. Rendering that scene afterward
-can use released resources. The default-scene attach routes used by the custom and mask README examples pass.
-Cause: `Transitions.dispose` calls `engine.removePlugin(this.name)` without its owning scene, so removal defaults
-to the currently active scene. The package can obtain its owner through the extension engine's `sceneOf` method;
-no core change is needed. The real-device probe observed scene plugin counts 1 before disposal and 1 afterward.
-Fix this in transitions with a failing non-default-scene regression before delivering batch 76's live entry.
-Disposing the owning scene or engine does remove the stale registration. This remains open at this handoff.
+Transitions.dispose removed the active scene's plugin by name instead of its own registration. It now resolves its owning scene through engine.sceneOf(this) and removes only that registration. Disposing an already removed or unattached instance leaves other scenes alone. packages/transitions/test/scene-disposal.test.js fails against the old implementation; test/gpu-browser.js checks two actual scenes, preserves the default effect and renders both after disposal. No core change was needed.
 
 ### Fixed in batch 68 draft: tiny triangle area underflow
 

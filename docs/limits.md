@@ -1346,3 +1346,7 @@ furnishing or agent-clearance guarantee. Abort before synchronous generation; us
 in flight. Identical seeded integer output and cell-work counts are tested; no timing/SIMD acceleration,
 visual quality or external-level corpus claim. All maps are STAND-IN. Wasm is CPU-side on both renderers
 and owns no device resources. Entry JS 1,223 B gzip; separate dungeon.wasm 23,281 B raw / 10,028 B gzip. The new JS ceiling is 1,479 B, the measured entry plus the standard 256 B allowance. The shared internal loader makes Poisson JS 1,290 B gzip, within its unchanged 1,525 B ceiling; its Wasm stays 29,914 B raw / 13,192 B gzip. Core plus stage remains 23,797 B gzip below the strict 25,000 B ceiling. For the fixed seed-19 grid, 1,540 direct writes versus 288,768 whole-grid membership visits produce identical cells; both exclude common zero initialization and do not measure elapsed time.
+
+### Transitions owner-scene disposal repair
+
+The root entry now measures 4307 B min+gzip (7 B above job 2); its budget is 4563 B, restoring the usual 256 B headroom. Removal resolves the actual scene by plugin identity and never removes another scene's same-named effect. Core plus stage remains 23797 B.
