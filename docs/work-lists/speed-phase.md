@@ -229,6 +229,20 @@ the build phase (2026-11-10). Correctness gates still run under the shared GPU l
   after the build phase. No workload was narrowed and no timing budget changed.
 
 
+### LOD mixed correctness/benchmark page
+
+The inherited `lod/test:gpu` command included a benchmark in `browser-check.mjs`,
+which the exclusive/timing-assertion selector did not detect. One continuation
+invocation reached that mixed check before this was found; its timing output is
+not accepted or published. The normal gate now calls `correctness(120)`, retaining
+the same 140 rendered frames in each of three modes and every existing pixel,
+visibility, level and error assertion. No clock is read. The page's original
+measurement path remains behind explicit `?benchmark=1` for the future speed
+phase, including bake timing. `correctness-without-timing.test.js` executes the
+real HTML fixture with a clock that throws and checks all 426 renders and one
+bake; it fails on the original fixture. Both LOD's GPU command and the full
+compatibility command reuse that corrected default check.
+
 ## Preview contract continuation, 2026-11-10 restart
 
 Scott forbids speed and timing tests during this continuation. No new timing

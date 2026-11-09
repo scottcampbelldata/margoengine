@@ -1,4 +1,4 @@
-// Real-adapter check and benchmark (run from the repository root after building packages): node packages/lod/test/browser-check.mjs
+// Real-adapter correctness check (run from the repository root after building packages): node packages/lod/test/browser-check.mjs
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -23,7 +23,7 @@ try {
     const r = await page.evaluate((m) => window.check.mode(m), mode);
     assert.equal(r.error, null, mode);
     assert.deepEqual(r.errors, [], mode);
-    results[mode] = await page.evaluate(() => window.check.measure(120));
+    results[mode] = await page.evaluate(() => window.check.correctness(120));
     assert.deepEqual(results[mode].errors, [], mode);
     delete results[mode].errors;
     if (mode !== 'empty') results[mode].image = await shot(mode);
@@ -54,7 +54,7 @@ try {
   assert.ok(results.image.coverage > 0.9, 'imposters cover what the meshes cover');
   assert.ok(results.image.meanAbsDiff < 12, 'LOD frame looks like the full-detail frame');
   assert.deepEqual(pageErrors, []);
-  await writeFile('test-results/lod-benchmark.json', JSON.stringify(results, null, 1));
+  await writeFile('test-results/lod-correctness.json', JSON.stringify(results, null, 1));
   console.log('lod browser check passed');
 } finally {
   await context.close();

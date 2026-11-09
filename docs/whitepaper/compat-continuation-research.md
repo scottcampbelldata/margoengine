@@ -42,3 +42,13 @@ before the following repairs. These are correctness changes, with no speed claim
 
 Validation and remaining failures are recorded in the operational playbook and
 known-bug list. No teardown fix or core/stage source change belongs to this work.
+
+The LOD gate's later separation of correctness and optional measurement follows
+David L. Parnas, *On the Criteria To Be Used in Decomposing Systems into Modules*
+(1972), [author record](https://doi.org/10.1184/r1/6607958), compared with the
+economy-of-mechanism principle in Jerome H. Saltzer and Michael D. Schroeder,
+*The Protection of Information in Computer Systems* (1975),
+[author publication](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html).
+One common rendering loop preserves the same scene, frame count and image
+assertions; the default gate cannot read the measurement clock. This is test
+responsibility separation, with no rendering algorithm or speed improvement.

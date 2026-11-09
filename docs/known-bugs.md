@@ -65,6 +65,59 @@ Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repa
 piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
 and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
 
+### Open: preview continuation full-layer validation
+
+Run the following package GPU scripts after building, with `MARGO_COMPAT=1` and
+one shared GPU slot. These are open gate failures, not accepted differences or
+passing results. The completed native evidence remains separate.
+
+- `culling/test:gpu`: `dynamic-check.mjs` reports 3 to 7 shadowed instance/core
+  pixels differing by one channel level after moving boxes. The exact assertion
+  stays unchanged. Disabling dithering at device creation did not fix it and was
+  reverted. The cause remains under investigation between shadow arithmetic and
+  asynchronous frame/resource readiness; it is not proven to be dithering.
+- `gltf-pro/test:extensions:browser`: the first KTX2 streaming case compares a
+  fully streamed level-zero quad against the plain loader at the same camera and
+  gets unequal RGBA buffers (`Buffer.compare` returns -1). The divergence is in
+  these two upload/sampling paths; the precise cause is not yet isolated.
+- `gltf-pro/test:gpu:materials`: the all-authored-map shader combined with shadows,
+  clustered local shadows and IBL exceeds the adapter's 16 fragment texture image
+  units after translation. The fixture counts WGSL sampled textures but does not
+  include the layer's storage-buffer data textures. Ownership of a viable route
+  or an explicit hardware-limit diagnostic still needs review; do not drop maps.
+- `lod/test:gpu`: after the initial browser scene completes, `imposter-check.mjs`
+  does not finish its picking operation before the continuation's 172 s body
+  deadline; the process tree was killed. Native evidence for the complete suite
+  was 113 s. No new timeout or speed claim is justified; isolate the await and
+  determine actual compatibility work before changing a limit.
+- `materials/test:gpu:vertex-inputs`: fails `inputs fetched` on the full layer.
+  `materials/test:gpu:features` assumes this adapter advertises `clip-distances`,
+  which it does not. The input-fetch divergence and feature expectation need
+  separate owning-package investigation, preserving native feature coverage.
+- `materials/test:gpu:more`: the full layer refuses an sRGB view of a BC7 linear
+  compressed texture because its view-copy path requires a renderable format.
+  The compressed view route needs investigation; no texture or colour work may
+  be silently removed. `materials/test:gpu:back-side` also reached the 60 s body
+  deadline without output and had its process tree killed; its awaited operation
+  has not yet been isolated.
+- `materials/test:gpu:dispersion`: the fixture's `JSON.stringify` reaches the
+  compatibility device/queue/device cycle at `tests/material-dispersion-browser.ts`.
+  Native GPU handles are opaque to that serialization, so the snapshot method's
+  resource assumptions need review before any rendering conclusion.
+  `materials/test:gpu:render-state` also reached its 60 s body deadline; the
+  awaited operation remains unisolated. `materials/test:gpu:wireframe` reports
+  mirrored/reference pixel hashes and duplicate-edge alpha differences, and
+  `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
+  rasterization/orientation divergences still need numeric root-cause proof.
+
+The serial continuation is still collecting the other suites. Additional
+failures must be diagnosed and tracked before this work can be pushed as gated.
+
+`oit/test:gpu` also reaches ExactOIT's setup refusal on the full layer: it needs
+fragment-stage storage buffers and recommends weighted OIT. The base OIT check
+passes first. Review the advertised storage capabilities, the existing documented
+ExactOIT limit, and its refusal/help contract before changing either test or route.
+
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
 ChildProcess `exit` does not establish that its stdio has closed. The shared

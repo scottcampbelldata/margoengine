@@ -1788,7 +1788,15 @@ The culling discrepancy persists when dithering is disabled, so that speculative
 change was removed. DOF passes its compatibility lens bounds; culling and the
 unfinished compatibility suites remain pending. Prior completed suites are
 preserved. Research: `docs/whitepaper/compat-continuation-research.md`.
-No teardown work or speed test is included in this continuation.
+No teardown work is included. Timing checks remain deferred, with the LOD
+correction recorded below.
+
+Correction: the inherited LOD GPU command also included a benchmark without a
+timing assertion, and ran once before that was noticed. The default gate now
+uses the same 140 frames per mode and all original assertions without reading
+timing clocks. Its regression executes the actual fixture and checks every
+render; the old fixture fails when it reads the forbidden clock. The optional
+measurement path is explicitly deferred in `docs/work-lists/speed-phase.md`.
 
 ### Bevel polygon validity (test-page 44)
 

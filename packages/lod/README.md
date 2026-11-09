@@ -1,5 +1,10 @@
 # @margoengine/lod
 
+The GPU correctness check renders all 140 frames per scene mode and keeps its
+existing image and level assertions, without collecting CPU/GPU timings. The
+manual page's timing path requires `?benchmark=1` and is deferred during the build
+phase. Correctness output is `test-results/lod-correctness.json`.
+
 Import `margoengine/lod` from the `margoengine` package, or `@margoengine/lod` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Level of detail for scenes with thousands of objects (CAD assemblies, simulators, forests, cities), plus
