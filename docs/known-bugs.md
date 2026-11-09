@@ -1571,3 +1571,13 @@ Job 4 verify reported SHUTDOWN_TIMEOUT in tests/catalog.test.js after its five a
 ### Fixed 2026-11-09: audio review timing, lifecycle and authored pitch
 
 Live Doppler divided frame displacement by a quantized audio clock and retained pre-suspension poses, producing warble/resume spikes. It now uses monotonic frame time and explicit state/discontinuity history resets. A source-kind switch detaches rather than throwing from a frame hook. Authored sound/pool/event pitch now composes with Doppler and is validated before pool stealing. Occlusion previously inferred no lifecycle state, continuing BVH work after sound disposal, and threw on a missing engine; explicit sound.isDisposed and deferred tracing resolve both. Regression: packages/audio/tests/doppler-live.test.js and occlusion.test.js. Offline PCM claims now state their actual scope, checked by evidence.test.js. The suspected fractional music loop drift is not a bug in the measured browser: subsample endpoints and long-run marker tests retain the authored grid without a music implementation change.
+
+### Fixed 2026-11-09: heartbeat test startup acknowledgement
+
+The slow-start lease test treated any mtime change as proof that the worker had completed its injected startup. Full verification failed its waiting assertion after 5.5 seconds, too soon to include the Windows two-process 2.5-second startup delays and full four-second observation. The preload now acknowledges worker startup explicitly, and firstBeat waits for a subsequent update. The metadata-before-readiness regression fails the old helper. No lock implementation, lease, observation window or timeout was changed. Regression: tests/gpu-lock-limits.test.js.
+
+### Fixed 2026-11-09: quiet crowd resume fixture moved its players
+
+Full verification observed chunksResent 21 instead of zero in resume-crowd.test.js. Its update loop called VoxelBot.update, which always sends forward movement, so an initially loaded client could stream a new view before the cut. Resending messages lost from that stream is required, not a server defect. The quiet fixture now drives public client.update with zero controls and asserts all spawn columns. All 100 clients, cadence, timing and original zero-resend assertions stay intact; missing/in-flight recovery tests are unchanged.
+
+The voxel-net quickstart previously put Node server imports and browser Engine code in one executable block, so the runtime README gate externalized node:http. It now runs a complete Node server/client example on a free loopback port, with explicit shutdown; the obsolete known-failure entry is removed. All 19 audio/voxel-net examples execute successfully.

@@ -29,8 +29,10 @@ test('100 bots cut at once: all resumed within 10 s, no full resend, no chunk se
     proxy = await cutProxy(port),
     bots = [];
   server.onError = () => {};
+  const quietControls = {keys: 0, yaw: 0, pitch: 0};
   const driving = setInterval(() => {
-    for (const bot of bots) bot.update(0.016);
+    // Keep sending and simulating inputs without the bot AI walking into new chunk views.
+    for (const bot of bots) bot.client.update(0.016, quietControls);
   }, 16);
   t.after(async () => {
     clearInterval(driving);
@@ -53,6 +55,11 @@ test('100 bots cut at once: all resumed within 10 s, no full resend, no chunk se
       )),
     );
   await until('every bot to have its view', () => bots.every((bot) => bot.client.loaded && bot.client.spawned), 60_000);
+  for (const bot of bots) {
+    bot.client.update(0.016, quietControls);
+    assert.deepEqual([bot.client.player.position[0], bot.client.player.position[2]], [0.5, 0.5],
+      'the zero-resend fixture must stay in its spawn column');
+  }
   assert.equal(server.counts.players, CROWD);
   const ids = bots.map((bot) => bot.client.welcome.id),
     joins = server.metrics.joins;

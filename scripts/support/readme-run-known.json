@@ -92,7 +92,6 @@
   "usdz/readme-composition-fbebfe": "sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404",
   "usdz/readme-margoengine-usdz-087124": "sample: LoaderError: load: request for /model.usdz returned HTTP 404",
   "voxel-edit/readme-voxel-files-657e4f": "sample: RangeError: QB file holds 1634476140 matrices, over 4096; split the file",
-  "voxel-net/readme-margoengine-voxel-net-b6eba6": "example: Error: Module \"node:http\" has been externalized for browser compatibility: a server and a page in one example",
   "voxel/readme-bevels-and-baked-light-render-e03f31": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
   "voxel/readme-codecs-and-chunk-stores-codec-st-7e6699": "sample: InvalidStateError: Failed to execute 'send' on 'WebSocket': Still in CONNECTING state.",
   "voxel/readme-lighting-effects-day-and-night-w-9389c7": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",

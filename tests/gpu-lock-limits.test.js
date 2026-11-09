@@ -142,25 +142,30 @@ test('a holder that called acquire() itself and hangs in a synchronous loop is e
 // The heartbeat is a process of its own, so its first beat comes after a Node start-up: about 0.2 s here, but seconds
 // on a machine busy with a package build, past this test's 2 s lease (production leases are 2 min). The test waits
 // for the first beat, then checks that a beating holder outlives two leases.
-async function firstBeat(lock) {
+async function firstBeat(lock, ready = () => true) {
   const dir = join(lock, 'shared'),
     entry = join(
       dir,
       readdirSync(dir).find((name) => name.endsWith('.json')),
     ),
-    written = statSync(entry).mtimeMs,
     until = Date.now() + 30_000;
+  // A metadata change alone cannot prove that a deliberately delayed heartbeat has started.
+  while (!ready()) {
+    assert.ok(Date.now() < until, 'the heartbeat process never started');
+    await sleep(10);
+  }
+  const written = statSync(entry).mtimeMs;
   while (statSync(entry).mtimeMs === written) {
     assert.ok(Date.now() < until, 'the heartbeat process never refreshed the entry');
     await sleep(10);
   }
 }
 
-const heartbeatKeepsHolder = (env) =>
+const heartbeatKeepsHolder = (env, ready) =>
   withLock(
     async (gpu, lock) => {
       const held = await gpu.acquire({ owner: 'holder', poll: 10, log: quiet });
-      await firstBeat(lock);
+      await firstBeat(lock, ready);
       // Longer than the lease: only the heartbeat process keeps the entry fresh.
       const waited = [],
         waiter = gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: (m) => waited.push(m) });
@@ -203,13 +208,33 @@ test('a heartbeat keeps a holder alive, and a stale heartbeat is reclaimed even 
 // A start-up delay in the heartbeat process (NODE_OPTIONS reaches it, as the environment does) stands in for the load.
 test('a heartbeat process that starts slowly still keeps its holder alive', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-slow-')),
-    slow = join(folder, 'slow-start.mjs');
+    slow = join(folder, 'slow-start.mjs'),
+    ready = join(folder, 'heartbeat-started');
   try {
-    writeFileSync(slow, 'const end = Date.now() + 2500; while (Date.now() < end);');
-    await heartbeatKeepsHolder({ NODE_OPTIONS: `--import=${pathToFileURL(slow).href}` });
+    writeFileSync(slow, `import {existsSync, writeFileSync} from 'node:fs';
+const end = Date.now() + 2500; while (Date.now() < end);
+if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) writeFileSync(${JSON.stringify(ready)}, String(process.pid));`);
+    await heartbeatKeepsHolder({ NODE_OPTIONS: `--import=${pathToFileURL(slow).href}` }, () => existsSync(ready));
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+test('heartbeat readiness ignores metadata changes before its worker has started', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-ready-')),
+    lock = join(folder, 'gpu.lock'), dir = join(lock, 'shared'), entry = join(dir, 'holder.json');
+  let ready = false, observed = false, polls = 0, nextPoll;
+  const polled = new Promise(resolve => {nextPoll = resolve;});
+  mkdirSync(dir, {recursive: true});writeFileSync(entry, '{}');
+  const pending = firstBeat(lock, () => {if (++polls === 2) nextPoll();observed = ready;return ready;});
+  try {
+    const changed = new Date(Date.now() + 1000);utimesSync(entry, changed, changed);
+    assert.equal(await Promise.race([pending.then(() => 'beat'), polled.then(() => 'poll')]),
+      'poll', 'metadata does not acknowledge startup');
+    ready = true;await waitUntil(() => observed, 'the startup acknowledgement is observed');
+    const beat = new Date(Date.now() + 2000);utimesSync(entry, beat, beat);
+    await pending;
+  } finally { rmSync(folder, {recursive: true, force: true}); }
 });
 
 test('a waiter gives up after --wait-max and names the holder and its command', () =>

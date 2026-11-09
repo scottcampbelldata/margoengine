@@ -8,33 +8,28 @@ is written here on `node:http` and `node:crypto`. Optional and tree-shakable; co
 Design and decisions: [DESIGN.md](DESIGN.md). Measured capacity: [bench/results.json](bench/results.json) and
 `docs/voxel-net-capacity-2026-10-21.md`.
 
+This Node quickstart runs a server and a headless client together. Browser apps import only the client side; keep the server in Node.
+
 ```ts
-// Server (Node)
 import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { VoxelServer } from 'margoengine/voxel-net/server';
-const blocks = new BlockTypes();
-blocks.define('stone');
-const server = new VoxelServer({ blocks, generator: { seed: 7 }, flight: true });
-await server.listen(8787, '0.0.0.0');
-
-// Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
 import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
-import {Engine} from 'margoengine/core';
-const yaw = 0;
-const pitch = 0;
-const x = 0;
-const y = 0;
-const z = 0;
-const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+const server = new VoxelServer({ blocks, generator: { seed: 7 }, flight: true });
+const {port} = await server.listen(0); // free loopback port
 const world = new VoxelWorld({ blocks });
-const drawBox = (...pose: unknown[]) => console.log(...pose); // your renderer
-const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
-engine.onFrame((_, dt) => {
-  client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps
-  const [x, y, z] = client.renderPosition; // the camera follows this
-  for (const other of client.samplePlayers().values()) drawBox(other.snapshot.position, other.snapshot.rotation);
+const client = connectVoxelNet(`ws://127.0.0.1:${port}`, world, { name: 'Ada', view: 6 });
+client.onSpawn = () => console.log('Spawned at', client.player.position);
+const timer = setInterval(() => {
+  client.update(1 / 60, { keys: Keys.forward | Keys.jump, yaw: 0, pitch: 0 });
+  for (const other of client.samplePlayers().values()) console.log(other.snapshot.position);
+}, 1000 / 60);
+process.once('SIGINT', async () => {
+  clearInterval(timer);
+  client.close();
+  await server.close();
 });
-client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the cell back
 ```
 
 ## How it works
@@ -634,3 +629,5 @@ snapshot. They run with both the normal frame clock and a simulated 30-second
 clock stall, checking the same sampled tick, rewound hit and unrewound miss.
 This keeps the fixture independent of loaded-machine callback scheduling; no
 runtime interpolation delay or hitbox tolerance is changed.
+
+The 100-client quiet-world resume regression sends zero-movement input through each bot client and verifies that every player stays in its spawn column. Its 10-second resume bound and zero full/chunk-resend assertions are unchanged. Moving views can lose in-flight chunk messages at a cut; resume.test.js separately checks exact missing-chunk recovery and cuts during streaming.
