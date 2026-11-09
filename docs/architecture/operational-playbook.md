@@ -1351,6 +1351,11 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+The required-input audit also exercised the newly landed SQL-store restart test. The unit watchdog caught a
+Windows `EBUSY` folder hook before database closure, followed by a leaked server and generator workers. Its
+test-body `AsyncDisposableStack` now closes resources before directory removal, including failed setup; the
+unchanged watchdog remains the check for process leaks. Regression: `packages/voxel-net/tests/sql-store.test.js`.
+
 ### WebGL2 consolidation evidence
 
 The optional compatibility package also owns `/preview`, `/pick`, `/restore` and

@@ -624,6 +624,9 @@ does, send the page's `Origin`, stay connected from step to step and read server
 
 Apache-2.0. Build and tests: `npm test --workspace @margoengine/voxel-net`.
 
+The SQL integration tests dispose clients, servers, generator workers and databases before removing their
+temporary folder, including when setup or an assertion fails. A failed-setup regression exercises that lifetime.
+
 The rewind integration tests choose a rendered frame five ticks behind a received
 snapshot. They run with both the normal frame clock and a simulated 30-second
 clock stall, checking the same sampled tick, rewound hit and unrewound miss.

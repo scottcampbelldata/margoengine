@@ -250,6 +250,12 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 
 ## Check results
 
+The rebased full verify uncovered a separate SQL-store test lifecycle defect from current main. Windows
+returned `EBUSY` when the first after-hook removed its open database; the failed hook prevented the later server
+and generator-worker cleanup, and the watchdog ended that process after 360 silent seconds. The owning test now
+uses test-body async disposal, with a real failed-setup regression. Its seven focused tests pass with zero skips.
+The GPU teardown fix remains owned by lane-M and has since landed as `cff40d127`; this lane makes no GPU cleanup change.
+
 Lint and hygiene passed; the strict package/support run passed 1,471 tests and the fixture gate 15,
 zero failures/skips. Selected GPU suites: 18 pass, one teardown failure after all capture assertions
 passed. Scott assigned the GPU teardown root cause to batch 160 in lane-M; this lane records it

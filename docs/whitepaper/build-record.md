@@ -3797,3 +3797,10 @@ inventory records all 85 sample-labelled known exceptions across packages; no ex
 or relaxed. Scott assigned the capture shutdown failure to batch 160 in lane-M; this lane makes no teardown change.
 The README inventory separates missing or misserved inputs from other causes deferred to a later job.
 The continuation verify is supervised with a 40-minute process-tree deadline; the prior run left no final result.
+
+Continuation uncovered an independent defect in the newly landed SQL-store integration harness: a Windows
+`EBUSY` deleting its open database made the first after-hook fail, so later server/worker cleanup never ran.
+Verify's existing watchdog killed the process after 360 silent seconds. The owning test now disposes resources
+within the test body before folder hooks; a deliberate setup-failure regression closes a real listener, workers
+and database before immediately removing the file. Parent diagnostic logs reproduce the exact `EBUSY` and live
+handles; the repaired seven-test file passes and exits in one second. No runtime API or assertion budget changed.

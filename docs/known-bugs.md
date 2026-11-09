@@ -4,6 +4,16 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+### Fixed 2026-11-09: SQL-store integration cleanup kept verify alive
+
+The newly landed SQL-store restart test registered folder removal before its second server/database cleanup.
+Windows refused to unlink the still-open `world.db` with `EBUSY`; that failed hook prevented the later cleanup,
+leaving the listener and two generator workers alive. Verify's unchanged watchdog named the file and killed its
+process after 360 silent seconds. The test now uses an `AsyncDisposableStack` in the test body, registering each
+resource as it is created, so all resources are disposed before the folder hook and on failed setup. An actual
+server/database failure-path regression checks database closure and immediate file removal. The parent diagnostic
+reproduced `EBUSY` and the live server/worker ports; the repaired seven-test file exits normally with no skips.
+
 ### Batch 99: exact parity and noise-free disocclusions remain unproven
 
 - **Job 1, repro:** voxel-pathtracer's README and `tests/magicavoxel/` record subsurface differences of 7-16 display levels, glass over a lit floor 1-2 levels brighter, and atmosphere residuals. The renderer uses a fitted single-density random-walk subsurface model and a fitted single-scattering atmosphere; neither establishes the external editor's full transport model. No checked-in repeatable zero-error image oracle exists. These partial implementations do not satisfy exact pixel parity. Closing this needs an external black-box reference corpus across density, glass and atmosphere settings and a root-cause transport comparison, without changing the oracle or its zero-error requirement. Job 1 remains BLOCKED.

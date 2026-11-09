@@ -143,9 +143,17 @@ test('a table that cannot be made is retried by the next call', async () => {
   await store.flush(); // the get's failure is not a put's: flush stays clean
 });
 
-async function start(options) {
-  const server = new VoxelServer({ blocks, workers: 2, generator: FLAT, spawn: () => [8, 8], ...options }),
-    { port } = await server.listen(0);
+function database(file, resources) {
+  const db = new DatabaseSync(file);
+  resources.defer(() => {
+    if (db.isOpen) db.close();
+  });
+  return db;
+}
+async function start(options, resources) {
+  const server = new VoxelServer({ blocks, workers: 2, generator: FLAT, spawn: () => [8, 8], ...options });
+  resources.defer(() => server.close());
+  const { port } = await server.listen(0);
   return { server, url: `ws://127.0.0.1:${port}` };
 }
 async function join(url) {
@@ -170,14 +178,16 @@ async function drive(client, done, ms = 10_000) {
 test('a server on a SqlChunkStore keeps edits across a restart and a client sees them', {
   timeout: 60_000,
 }, async (t) => {
+  await using resources = new AsyncDisposableStack();
   const file = pathJoin(await folder(t), 'world.db'),
     cells = [
       [8, 12, 8],
       [40, 12, 8],
     ],
-    firstDb = new DatabaseSync(file),
-    first = await start({ store: new SqlChunkStore(firstDb) }),
+    firstDb = database(file, resources),
+    first = await start({ store: new SqlChunkStore(firstDb) }, resources),
     a = await join(first.url);
+  resources.defer(() => a.client.close());
   assert.ok(await drive(a.client, () => a.client.spawned), 'first client spawned');
   for (const [x, y, z] of cells) first.server.world.setBlock(x, y, z, LOG);
   a.client.close();
@@ -195,13 +205,10 @@ test('a server on a SqlChunkStore keeps edits across a restart and a client sees
   firstDb.close();
 
   // A new server on the same database file: nothing was edited in this process.
-  const secondDb = new DatabaseSync(file),
-    second = await start({ store: new SqlChunkStore(secondDb) });
-  t.after(async () => {
-    await second.server.close();
-    secondDb.close();
-  });
+  const secondDb = database(file, resources),
+    second = await start({ store: new SqlChunkStore(secondDb) }, resources);
   const b = await join(second.url);
+  resources.defer(() => b.client.close());
   assert.ok(await drive(b.client, () => b.client.spawned), 'second client spawned');
   for (const cell of cells) assert.equal(second.server.world.getBlock(...cell), LOG, `server holds ${cell}`);
   assert.ok(
@@ -210,4 +217,18 @@ test('a server on a SqlChunkStore keeps edits across a restart and a client sees
   );
   assert.equal(b.world.getBlock(9, 12, 8), 0, "next to them the world is the generator's");
   b.client.close();
+});
+
+test('failed SQL integration setup closes its database, listener and generator workers before folder cleanup', async (t) => {
+  const file = pathJoin(await folder(t), 'failed.db');
+  let db;
+  await assert.rejects(async () => {
+    await using resources = new AsyncDisposableStack();
+    db = database(file, resources);
+    await start({ store: new SqlChunkStore(db) }, resources);
+    throw new Error('deliberate failure after listening');
+  }, /deliberate failure after listening/);
+  assert.equal(db.isOpen, false);
+  // Windows refuses this while SQLite is open. The suite's process deadline also detects leaked workers/listeners.
+  await rm(file);
 });
