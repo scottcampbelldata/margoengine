@@ -2207,3 +2207,14 @@ tracing; native restoration reproduces the converged image exactly. Unit failure
 mapping and cancellation. Evidence: `docs/whitepaper/results/batch-99-sky-20261109.json`. Proof uses generated
 maps and scenes, not an outside radiometric oracle. Isotropic higher orders, finite angular maps and stylized night
 remain accepted approximations; MagicaVoxel parity and moving-camera denoising remain separate unfinished jobs.
+
+### WFC review regressions: section 5 evidence
+
+Batch 69 review fixes enforce the overlapping 4096-pattern cap during extraction and dense validation across
+legacy, heap, constrained, overlapping, socket and chunk inputs. A 128 MiB heap subprocess reproduced native OOM
+on the parent; it now exits normally with RangeError. Input tests exercise every missing coordinate/dimension and
+adjacency direction, tile groups and sparse collections. Socket tests reject rotation-weight division that rounds
+to zero while retaining representable subnormals. Loading tests cover network/body/local-file/instantiation failures,
+exact abort reasons and unsupported SIMD; actual shipped worker tests preserve coded missing-asset failures.
+All regressions are in verify's package-test glob and therefore check:merge. No new gate or reduced budget.
+Core/stage, Rust SIMD artifact, solver algorithms and benchmark workloads are unchanged.

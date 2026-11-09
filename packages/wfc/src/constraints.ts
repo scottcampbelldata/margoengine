@@ -62,19 +62,19 @@ export class ConstrainedWFC {
     const group = (ids: readonly number[]) => {
       if (
         !ids.length ||
-        ids.some((t) => !Number.isInteger(t) || t < 0 || t >= tiles.length) ||
+        Array.from(ids).some((t) => !Number.isInteger(t) || t < 0 || t >= tiles.length) ||
         new Set(ids).size !== ids.length
       )
         throw new RangeError('Invalid WFC tile group; use a nonempty list of distinct existing tile IDs');
       return [...ids];
     };
     this.connected = constraints.connected && group(constraints.connected);
-    this.paths = (constraints.paths ?? []).map((p) => ({
+    this.paths = Array.from(constraints.paths ?? [], (p) => ({
       from: this.index(p.from),
       to: this.index(p.to),
       tiles: group(p.tiles),
     }));
-    this.limits = (constraints.counts ?? []).map((c) => {
+    this.limits = Array.from(constraints.counts ?? [], (c) => {
       const min = c.min ?? 0,
         max = c.max ?? size;
       if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > size)
@@ -83,7 +83,10 @@ export class ConstrainedWFC {
     });
   }
   private index(position: CellPosition): number {
-    if (position.length !== 3 || position.some((v, a) => !Number.isInteger(v) || v < 0 || v >= this.dimensions[a]))
+    if (
+      position.length !== 3 ||
+      Array.from(position).some((v, a) => !Number.isInteger(v) || v < 0 || v >= this.dimensions[a])
+    )
       throw new RangeError('Invalid WFC position; use three integer coordinates inside the grid');
     return position[0] + this.dimensions[0] * (position[1] + this.dimensions[1] * position[2]);
   }
@@ -102,7 +105,7 @@ export class ConstrainedWFC {
     const T = this.tiles.length,
       C = this.size,
       [W, H, D] = this.dimensions;
-    const fixed = pins.map((pin) => {
+    const fixed = Array.from(pins, (pin) => {
       if (!Number.isInteger(pin.tile) || pin.tile < 0 || pin.tile >= T)
         throw new RangeError('Invalid WFC pin tile; use an existing tile ID');
       return { cell: this.index(pin.position), tile: pin.tile };

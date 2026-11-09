@@ -35,13 +35,15 @@ const cross = (a: number[], b: number[]) => [
 /** Build reciprocal adjacency and stable Uint16-compatible IDs for ConstrainedWFC; at most 4096 variants. */
 export function buildSocketTiles(sources: readonly SocketTile[]): SocketVariant[] {
   const variants: SocketVariant[] = [];
-  if (!sources.length) throw new RangeError('WFC sockets need at least one source tile');
-  sources.forEach((source, index) => {
+  if (!sources.length || sources.length > 4096) throw new RangeError('WFC sockets need 1..4096 source tiles');
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index];
+    if (!source) throw new RangeError('Invalid WFC sockets; provide a source tile at every index');
     const mode = source.rotations ?? 'y',
       weight = source.weight ?? 1;
     if (
       source.sockets.length !== 6 ||
-      source.sockets.some((s) => typeof s !== 'string') ||
+      Array.from(source.sockets).some((s) => typeof s !== 'string') ||
       !['y', 'cube', 'none'].includes(mode) ||
       !Number.isFinite(weight) ||
       weight <= 0
@@ -59,6 +61,13 @@ export function buildSocketTiles(sources: readonly SocketTile[]): SocketVariant[
         if (mode === 'none' && x[0] !== 1) continue;
         rotations.push(matrix);
       }
+    if (variants.length + rotations.length > 4096)
+      throw new RangeError('WFC sockets support at most 4096 expanded variants');
+    const variantWeight = weight / rotations.length;
+    if (!(variantWeight > 0))
+      throw new RangeError(
+        'WFC socket weight underflows after rotation splitting; increase the source weight or use fewer rotations',
+      );
     for (const rotation of rotations) {
       const sockets = Array<string>(6);
       faces.forEach((face, d) => {
@@ -68,10 +77,9 @@ export function buildSocketTiles(sources: readonly SocketTile[]): SocketVariant[
         const target = faces.findIndex((f) => f.every((v, r) => v === transformed[r]));
         sockets[target] = source.sockets[d];
       });
-      variants.push({ source: index, rotation, sockets, weight: weight / rotations.length, neighbors: [] });
+      variants.push({ source: index, rotation, sockets, weight: variantWeight, neighbors: [] });
     }
-    if (variants.length > 4096) throw new RangeError('WFC sockets support at most 4096 expanded variants');
-  });
+  }
   for (const variant of variants)
     variant.neighbors = variant.sockets.map((label, d) =>
       variants.flatMap((other, id) => (other.sockets[d ^ 1] === label ? [id] : [])),

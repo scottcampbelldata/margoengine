@@ -146,6 +146,24 @@ class RealWorker {
     void this.thread.terminate();
   }
 }
+
+test('actual worker forwards coded missing-asset failures and rejects sparse grid inputs', {
+  timeout: 60000,
+}, async (t) => {
+  class MissingAssetWorker extends RealWorker {
+    postMessage(data) {
+      super.postMessage({ ...data, wasmURL: new URL('./absent-wfc-artifact.wasm', import.meta.url).href });
+    }
+  }
+  globals(t, MissingAssetWorker);
+  using missing = new WFCWorkerSolve([1, 1, 1], tiles, { backend: 'wasm' });
+  await assert.rejects(
+    missing.result,
+    (e) => e.code === 'failed' && /https:\/\/margoengine.com\/docs\/wfc/.test(e.message),
+  );
+  using sparse = new WFCWorkerSolve([1, , 1], tiles, { backend: 'wasm' });
+  await assert.rejects(sparse.result, RangeError);
+});
 test('actual classic worker runs TS and SIMD with live work reports and identical seed streams', {
   timeout: 60000,
 }, async (t) => {

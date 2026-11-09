@@ -771,3 +771,13 @@ sun illuminance times albedo divided by pi on the planet. Empty-scene tracing re
 destroys/restores the real native device and requires an identical converged image and raster restoration on
 disposal. Unit tests in `packages/voxel-pathtracer/tests/sky-environment.test.js` inject pipeline/readback failures
 and cancellation while each waits. No wall-time performance result or outside-renderer radiometric parity is claimed.
+
+### WFC batch 69 review regressions
+
+Run npm test --workspace @margoengine/wfc after building. The overlapping extraction subprocess has a 128 MiB heap,
+a 30-second hard timeout and a finite 512x512 sample; it must throw RangeError instead of exhausting the process.
+inputs.test.js, loading.test.js, sockets.test.js and worker.test.js exercise the other review findings and their
+related input/error classes. All run in verify/check:merge. Run node scripts/gpu-lock.mjs run --owner=codex-69fix
+--max=8 --wait-max=8 -- npm run test:gpu --workspace @margoengine/wfc for both real browser backends, and the same
+lock wrapper around npm run check:readme-run -- --packages=wfc. No measured-speed rerun is needed: output algorithms,
+work counts, benchmark scenes and the Rust artifact are unchanged.

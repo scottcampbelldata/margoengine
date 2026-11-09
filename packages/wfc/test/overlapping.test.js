@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { OverlappingModel } from '../dist/overlapping.js';
 
+test('pattern extraction rejects the 4097th distinct pattern inside a bounded heap', { timeout: 40000 }, () => {
+  const code = `import assert from 'node:assert/strict';
+    import {OverlappingModel} from ${JSON.stringify(new URL('../dist/overlapping.js', import.meta.url).href)};
+    let s=12345;
+    const data=Array.from({length:512*512},()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return s&255;});
+    assert.throws(()=>new OverlappingModel({data,width:512,height:512},{N:5,symmetry:8}),
+      {name:'RangeError',message:/4096 patterns/});
+    console.log('bounded rejection');`;
+  const child = spawnSync(process.execPath, ['--max-old-space-size=128', '--input-type=module', '-e', code], {
+    encoding: 'utf8',
+    timeout: 30000,
+    maxBuffer: 1024 * 1024,
+  });
+  assert.equal(child.error, undefined, child.error?.message);
+  assert.equal(child.status, 0, child.stderr);
+  assert.match(child.stdout, /bounded rejection/);
+});
+
 // A 12 x 12 sample: rooms of walls (1) around floors (0) with doors (2).
 const rows = [
   '111111111111',

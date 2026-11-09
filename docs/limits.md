@@ -1307,3 +1307,17 @@ at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground
 representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
 2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
 discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
+
+## WFC review input and loading bounds (batch 69 fixes)
+
+The overlapping extractor rejects the 4097th distinct pattern before retaining it; the 1,048,576-value input cap
+and existing output limits remain. All entries reject sparse dimensions/coordinates/rules/constraint lists.
+Socket sources must contain six strings; variant counts are checked before retaining orientations. Source weight
+division by 1, 4 or 24 must remain positive in float64. Quotients that round to zero throw RangeError; representable
+subnormal weights remain supported, with ordinary floating-point rounding of source totals.
+Wasm network, response-body, local-file and instantiation failures throw coded failed with a help link and cause;
+AbortSignal reasons are preserved. Worker transport retains the failure code and help link. Legacy exhaustion now
+also includes its help link. These are synthetic hostile-input regressions, not a new performance claim.
+Current bare-peer entry sizes: root 1,868 B, overlapping 2,457 B, constraints 2,484 B, sockets 776 B, chunks 3,647 B,
+worker 1,331 B min+gzip; bundled worker 3,399 B gzip. Earlier batch sizes above are historical.
+Core plus stage remains 23,797 B gzip against its unchanged strict 25,000-byte gate.

@@ -19,10 +19,10 @@ export class ChunkedWFC {
     private readonly seed = 1,
   ) {
     if (!Number.isSafeInteger(seed)) throw new RangeError('Invalid WFC world seed; use a safe integer');
+    if (dimensions.length !== 3 || Array.from(dimensions).some((n) => !Number.isInteger(n) || n < 1))
+      throw new RangeError('Invalid WFC chunk; use positive integer dimensions');
     new HeapWFC(dimensions.map((n) => n + 2) as unknown as CellPosition, tiles);
     this.dimensions = [...dimensions];
-    if (dimensions.length !== 3 || dimensions.some((n) => !Number.isInteger(n) || n < 1))
-      throw new RangeError('Invalid WFC chunk; use positive integer dimensions');
     this.tiles = tiles.map((t) => ({ weight: t.weight, neighbors: t.neighbors.map((n) => [...n]) }));
   }
   /** Number of retained chunks. Memory grows with visited coordinates until clear/dispose. */

@@ -1339,3 +1339,13 @@ The original workspace and umbrella paths are removed before release. Real
 WebGL2 preview and full-device suites retain their existing output assertions;
 AST isolation and the duplicate-gate TEMP fixture guard package boundaries. This
 is an API/package consolidation, with no new rendering or speed claim.
+
+### WFC batch 69 review input and loading contracts
+
+The bounded-heap extraction regression in packages/wfc/test/overlapping.test.js fails with native OOM on the parent
+and requires the documented RangeError under the same 128 MiB heap. packages/wfc/test/inputs.test.js covers missing
+dimensions, coordinates, adjacency directions/IDs and constraint collections across the entries; sockets.test.js
+covers weight division underflow and accepted subnormal boundaries. loading.test.js exercises network/body/file
+and instantiation failures, exact abort reasons and unsupported SIMD; worker.test.js uses the actual shipped worker
+for missing-asset error forwarding. These strengthen LIM-613/614/616/623/624 input/error evidence with generated
+hostile inputs. They make no new speed, authored-asset or GPU output claim.

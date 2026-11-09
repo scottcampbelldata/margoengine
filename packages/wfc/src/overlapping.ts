@@ -104,13 +104,14 @@ export class OverlappingModel {
           const key = p.join();
           const k = found.get(key);
           if (k === undefined) {
+            if (pixels.length === 4096)
+              throw new RangeError('Sample has more than 4096 patterns; use a smaller N or sample');
             found.set(key, pixels.length);
             pixels.push(p);
             weights.push(1);
           } else weights[k]++;
         }
       }
-    if (pixels.length > 4096) throw new RangeError('Sample has more than 4096 patterns; use a smaller N or sample');
     this.pixels = pixels;
     this.patterns = pixels.length;
     this.weights = Float64Array.from(weights);
@@ -168,7 +169,7 @@ export class OverlappingModel {
     for (const pin of pins)
       if (
         pin.position.length !== 2 ||
-        pin.position.some((v, axis) => !Number.isInteger(v) || v < 0 || v >= [width, height][axis]) ||
+        Array.from(pin.position).some((v, axis) => !Number.isInteger(v) || v < 0 || v >= [width, height][axis]) ||
         !Number.isFinite(pin.value)
       )
         throw new RangeError('Invalid overlapping pin; use an output pixel inside the image and a finite sample value');

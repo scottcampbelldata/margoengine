@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 import { buildSocketTiles } from '../dist/sockets.js';
 import { ConstrainedWFC } from '../dist/constraints.js';
 
+test('rotation weight splitting rejects underflow and preserves representable boundary weights', () => {
+  const sockets = Array(6).fill('a');
+  for (const [rotations, count] of [
+    ['none', 1],
+    ['y', 4],
+    ['cube', 24],
+  ]) {
+    if (count > 1)
+      for (const weight of [Number.MIN_VALUE, Number.MIN_VALUE * (count / 2)])
+        assert.throws(() => buildSocketTiles([{ sockets, rotations, weight }]), RangeError);
+    const weight = Number.MIN_VALUE * count;
+    const boundary = buildSocketTiles([{ sockets, rotations, weight: Number.MIN_VALUE * (Math.floor(count / 2) + 1) }]);
+    assert.ok(boundary.every((v) => v.weight === Number.MIN_VALUE));
+    const variants = buildSocketTiles([{ sockets, rotations, weight }]);
+    assert.ok(variants.every((v) => v.weight === Number.MIN_VALUE));
+    assert.equal(
+      variants.reduce((sum, v) => sum + v.weight, 0),
+      weight,
+    );
+    assert.equal(new ConstrainedWFC([1, 1, 1], variants).solve().length, 1);
+  }
+});
+
 test('proper cube transforms rotate every labelled face, without reflections', () => {
   const labels = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
   const variants = buildSocketTiles([{ sockets: labels, rotations: 'cube', weight: 12 }]);

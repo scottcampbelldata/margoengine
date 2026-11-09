@@ -82,29 +82,38 @@ export class HeapWFC {
         `WFC SIMD needs at most 32 unit-weight tiles; use typescript or auto. ${help}`,
       );
     if (backend === 'typescript' || !eligible) return model;
-    const url = this.wasmURL();
     let bytes: ArrayBuffer | Uint8Array;
-    if (url.protocol === 'file:') {
-      const { readFile } = await import(/* @vite-ignore */ 'node:fs/promises');
-      bytes = await readFile(url, { signal });
-    } else {
-      const response = await fetch(url, { signal });
-      if (!response.ok)
-        throw new MargoError('failed', `WFC SIMD download failed (${response.status}); check the asset URL. ${help}`);
-      bytes = await response.arrayBuffer();
+    try {
+      const url = this.wasmURL();
+      if (url.protocol === 'file:') {
+        const { readFile } = await import(/* @vite-ignore */ 'node:fs/promises');
+        bytes = await readFile(url, { signal });
+      } else {
+        const response = await fetch(url, { signal });
+        if (!response.ok)
+          throw new MargoError('failed', `WFC SIMD download failed (${response.status}); check the asset URL. ${help}`);
+        bytes = await response.arrayBuffer();
+      }
+      signal?.throwIfAborted();
+      if (!WebAssembly.validate(bytes as BufferSource)) {
+        if (backend === 'auto') return model;
+        throw new MargoError('unsupported', `WFC SIMD unavailable; use the typescript backend. ${help}`);
+      }
+      const instance = await WebAssembly.instantiate(bytes as BufferSource, {
+        progress: {
+          report: (a: number, b: number, c: number, d: number) => model.report(a >>> 0, b >>> 0, c >>> 0, d >>> 0),
+        },
+      });
+      signal?.throwIfAborted();
+      model.wasm = instance.instance.exports as unknown as Wasm;
+    } catch (cause) {
+      signal?.throwIfAborted();
+      if (cause instanceof MargoError) throw cause;
+      throw Object.assign(
+        new MargoError('failed', `WFC SIMD loading failed; check asset hosting and availability. ${help}`),
+        { cause },
+      );
     }
-    signal?.throwIfAborted();
-    if (!WebAssembly.validate(bytes as BufferSource)) {
-      if (backend === 'auto') return model;
-      throw new MargoError('unsupported', `WFC SIMD unavailable; use the typescript backend. ${help}`);
-    }
-    const instance = await WebAssembly.instantiate(bytes as BufferSource, {
-      progress: {
-        report: (a: number, b: number, c: number, d: number) => model.report(a >>> 0, b >>> 0, c >>> 0, d >>> 0),
-      },
-    });
-    signal?.throwIfAborted();
-    model.wasm = instance.instance.exports as unknown as Wasm;
     model.backend = 'wasm';
     return model;
   }
@@ -116,10 +125,10 @@ export class HeapWFC {
       B = Math.ceil(T / 32);
     if (!Number.isSafeInteger(seed) || !Number.isInteger(attempts) || attempts < 1 || attempts > 64)
       throw new RangeError('Invalid heap WFC budget; use an integer seed and 1..64 attempts');
-    const fixed = pins.map((p) => {
+    const fixed = Array.from(pins, (p) => {
       if (
         p.position.length !== 3 ||
-        p.position.some((v, a) => !Number.isInteger(v) || v < 0 || v >= this.dims[a]) ||
+        Array.from(p.position).some((v, a) => !Number.isInteger(v) || v < 0 || v >= this.dims[a]) ||
         !Number.isInteger(p.tile) ||
         p.tile < 0 ||
         p.tile >= T

@@ -56,7 +56,8 @@ export class WFC {
   ) {
     if (
       dimensions.length !== 3 ||
-      dimensions.some((n) => !Number.isInteger(n) || n < 1) ||
+      Array.from(dimensions).some((n) => !Number.isInteger(n) || n < 1) ||
+      !Number.isSafeInteger(dimensions[0] * dimensions[1] * dimensions[2]) ||
       dimensions[0] * dimensions[1] * dimensions[2] > 1_000_000 ||
       tiles.length < 1 ||
       tiles.length > 32
@@ -181,7 +182,7 @@ export class WFC {
     for (const pin of pins)
       if (
         pin.position.length !== 3 ||
-        pin.position.some((v, axis) => !Number.isInteger(v) || v < 0 || v >= this.dimensions[axis]) ||
+        Array.from(pin.position).some((v, axis) => !Number.isInteger(v) || v < 0 || v >= this.dimensions[axis]) ||
         !Number.isInteger(pin.tile) ||
         pin.tile < 0 ||
         pin.tile >= this.tiles.length
@@ -266,7 +267,7 @@ export class WFC {
     }
     throw new MargoError(
       'failed',
-      'WFC constraints contradicted within the retry budget; raise the retry budget, relax the pins or try another seed',
+      'WFC constraints contradicted within the retry budget; raise the retry budget, relax the pins or try another seed. Help: https://margoengine.com/docs/wfc',
     );
   }
 }

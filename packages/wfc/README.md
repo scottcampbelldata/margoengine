@@ -12,7 +12,7 @@ const cells = generator.solve(123);
 
 Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
 
-## Overlapping model (`@margoengine/wfc/overlapping`, 2,451 B min+gzip)
+## Overlapping model (`@margoengine/wfc/overlapping`, 2,457 B min+gzip)
 
 Learns N x N patterns from a sample image and generates outputs in which every N x N window appears in the sample.
 
@@ -32,7 +32,8 @@ latest choice is undone from the trail and forbidden in its cell (chronological 
 attempt restarts from scratch with the seed stream continuing; when the attempts run out `solve` throws. Every loop is
 bounded by the budgets, so an unsatisfiable sample fails instead of hanging (the tests run one in a child process with a
 timeout). A 7 x 7 maze sample with `symmetry: 1` fails every seed without backtracking and solves them all with it.
-Limits: at most 4096 patterns and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
+Limits: at most 4096 patterns, rejected during extraction before retaining a 4097th distinct pattern,
+and `cells x patterns` <= 4,194,304 (memory: 18 bytes per cell and pattern); the
 min-entropy scan is O(cells) per choice, fine to about 128 x 128; CPU only; works identically beside WebGPU and WebGL2 (tested in a real browser).
 Example: `examples/overlapping.html`.
 
@@ -64,7 +65,7 @@ throws its reason; synchronous checkpoints cannot receive new events while JavaS
 or shaders are used. Existing attempt/backtrack and memory limits apply. Generated binary/maze samples are stand-ins.
 Heap/chunk backend selection and the paired Rust/Wasm SIMD measurement are documented below. Pattern extraction and the existing overlapping solver remain TypeScript.
 
-## Global constraints (`@margoengine/wfc/constraints`, 2,460 B min+gzip)
+## Global constraints (`@margoengine/wfc/constraints`, 2,484 B min+gzip)
 
 ```ts
 import {ConstrainedWFC} from '@margoengine/wfc/constraints';
@@ -96,7 +97,7 @@ The entropy pick scans the grid; this entry does not promise fast large worlds. 
 cell/tile pairs; connectivity scratch scales with cells. CPU only, tested beside real WebGPU and WebGL2 contexts with
 identical seeded output. AbortSignal checks are synchronous and cannot receive new events on the blocked thread.
 
-## Sockets and rotations (optional wfc/sockets, 676 B min+gzip)
+## Sockets and rotations (optional wfc/sockets, 776 B min+gzip)
 
 ```ts
 import {buildSocketTiles} from 'margoengine/wfc/sockets';
@@ -114,17 +115,23 @@ Six socket strings describe +X, -X, +Y, -Y, +Z, -Z. Opposite labels must be exac
 Labels represent orientation-independent connectors, not textured face patterns or gendered plugs. Default rotations
 are four proper +Y-axis orientations; cube selects all 24 proper cube rotations, none selects identity. Identity is
 first, followed by stable signed-axis enumeration. No reflections or symmetry deduplication. Each source weight
-(default 1) is divided across its orientations, preserving total source frequency. Metadata gives the source index,
+(default 1) is divided across its orientations, preserving total source frequency within floating-point rounding.
+The quotient must remain positive in float64: a weight that rounds to zero after division by 4 or 24 is rejected
+with RangeError. `Number.MIN_VALUE` is accepted with `rotations: 'none'`. Source weights at or below
+`2 * Number.MIN_VALUE` for y or `12 * Number.MIN_VALUE` for cube round to zero per variant and are rejected;
+`4 * Number.MIN_VALUE` and `24 * Number.MIN_VALUE`, respectively, split exactly into `Number.MIN_VALUE` variants.
+Metadata gives the source index,
 rotated sockets and a column-major 3x3 rotation to apply to geometry. Inputs are copied.
 
-Up to 4096 expanded variants, Uint16 IDs through ConstrainedWFC; legacy root WFC remains 32 IDs. Adjacency building
+Up to 4096 expanded variants, checked before adding a source's orientations, Uint16 IDs through ConstrainedWFC;
+legacy root WFC remains 32 IDs. Socket source arrays and all six string labels must be dense. Adjacency building
 is O(variants squared), with six lists per variant; invalid inputs throw RangeError. Solver budgets and memory limits
 still apply. Pure CPU, identical on WebGPU and WebGL2 pages. Generated 48-variant tests are stand-ins; no artist
 asset compatibility claim. This entry builds rules only and imports no solver or rendering backend.
 
 `npm run test:gpu --workspace @margoengine/wfc` runs the overlapping solver beside WebGPU and WebGL2. Its server resolves the repository root from the script location, so workspace execution uses the same imports, and teardown closes the browser and server together.
 
-## Large outputs and chunks (optional wfc/chunks, 3,589 B min+gzip)
+## Large outputs and chunks (optional wfc/chunks, 3,647 B min+gzip)
 
 ```ts
 import {ChunkedWFC, HeapWFC} from 'margoengine/wfc/chunks';
@@ -143,11 +150,15 @@ overlapping and constraints seed streams keep their previous behavior. Local adj
 bounded restarts, without global counts/connectivity or chronological backtracking. Defaults: seed 1, attempts 4
 (1..64), pins empty, signal absent. Grid limits: 1..4096 IDs, <=1,000,000 cells, <=16,777,216 cell/tile pairs.
 Invalid inputs throw RangeError/TypeError; exhausted attempts throw coded failed with a help link.
+All WFC entries reject holes in dimensions, coordinates, pins, rules and constraint lists before search;
+all three dimensions and their safe integer product are validated before grid allocation.
 
 Constructor HeapWFC is synchronous TypeScript. Async HeapWFC.create defaults to backend auto: lazily loads the
 feature's own Rust/Wasm SIMD artifact for <=32 unit-weight tiles, using new URL relative to the module; wider or
 weighted sets use TypeScript. Explicit typescript forces JS; explicit wasm rejects ineligible sets or missing SIMD
-with coded unsupported and a help link. Load accepts AbortSignal; fetch failures are coded failed. Build inputs and
+with coded unsupported and a help link. Load accepts AbortSignal; network, response-body, local-file and
+instantiation failures are coded failed with a help link and the original cause. Abort throws the exact signal
+reason. Build inputs and
 artifact hashes live in native/solver, rebuild with node packages/wfc/scripts/build-wasm.mjs (Rust wasm32 target).
 No shared Wasm bundle, core/stage import or import-time loading. Both implementations perform the same local solve
 and produce identical IDs for identical seeds; benchmark decision is recorded below. Browser WebGPU and WebGL2 use
