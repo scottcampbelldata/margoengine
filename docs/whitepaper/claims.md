@@ -1,5 +1,14 @@
 # Claims and evidence
 
+Lighting2d validation names failing scalar fields, mask constraints and allowed
+enum values directly in linked RangeErrors. Evidence:
+`packages/lighting2d/tests/diagnostics.test.js` fails on the shortened diagnostics
+and passes after restoration, including accepted numeric boundaries. The real
+GPU suite passes 236 pixel checks with no wrong pixels or validation errors and
+11 distinct shader modules compile without errors. The nine README examples
+run as written. This is diagnostic quality evidence, not a new rendering or
+speed claim; method and sources: [size restoration](../size-restore.md).
+
 Shared compression errors distinguish corrupt data, unsupported preset
 dictionaries and caller byte limits. GLB argument errors name each header field
 and chunk constraint. Synthetic DEFLATE/GLB fixtures and valid compressed

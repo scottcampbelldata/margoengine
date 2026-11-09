@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11643900,
+  "total": 11646227,
   "history": [
     {
       "date": "2026-10-24",
@@ -5126,6 +5126,12 @@
       "commit": "17e876ee3",
       "grew": 38,
       "reason": "Size restoration findings 2 and 5: 38 optional entries/workers grow for complete linked DEFLATE/zlib and GLB diagnostics, byte counts and caller-specific policy guidance. PNG 3798 to 4316 B, sciviz/formats 13312 to 13846 B, gltf 6698 to 6913 B; all before/after measurements and ceilings in docs/limits.md. Retain at least standard headroom and existing headroom. Splitting synchronous errors into lazy entries would complicate every codec failure; readable messages are worth these bytes. Core plus stage unchanged at 23924 B. Rebased onto ba9248a85: affected sizes and standard headroom remeasured on the combined source; the table in docs/limits.md preserves current main before figures."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b5822d106",
+      "grew": 6,
+      "reason": "Size restoration finding 3: lighting2d field/range guidance restored without changing accepted scalar boundaries or rendering. Root 5394 to 5639 B, soft 5901 to 6136 B, cookie 7350 to 7636 B, GI 8598 to 8834 B, height 6855 to 7081 B, emissive 4087 to 4154 B gzip. Six ceilings raised with standard headroom; full before/after ceilings in docs/limits.md. A separate synchronous-diagnostic entry would complicate constructors and mutable-light checks, so keep clear messages in the owner. Core plus stage unchanged at 23924 B."
     }
   ],
   "items": {
@@ -5467,12 +5473,12 @@
     "@margoengine/labels": 5806,
     "@margoengine/labels/callouts": 1603,
     "@margoengine/labels/declutter": 1512,
-    "@margoengine/lighting2d": 5394,
-    "@margoengine/lighting2d/cookie": 7350,
-    "@margoengine/lighting2d/emissive": 4087,
-    "@margoengine/lighting2d/gi": 8856,
-    "@margoengine/lighting2d/height": 7111,
-    "@margoengine/lighting2d/soft": 5901,
+    "@margoengine/lighting2d": 5895,
+    "@margoengine/lighting2d/cookie": 7892,
+    "@margoengine/lighting2d/emissive": 4410,
+    "@margoengine/lighting2d/gi": 9100,
+    "@margoengine/lighting2d/height": 7337,
+    "@margoengine/lighting2d/soft": 6392,
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,

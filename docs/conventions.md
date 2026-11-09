@@ -79,9 +79,12 @@ scripts/errors/page.mjs`); `tests/errors-page.test.js` checks that every link po
 MargoError code has one, and that the page matches the file. The quality gate counts a linked message as naming its
 fix, and a link to a missing entry as naming none.
 
-Packages may follow the same pattern: a short message, the same helpers, and their entries on the same page (add them
-to `scripts/errors/entries.js`, one entry per message family). A package message without a link must name its fix
-itself, as the table above says.
+Optional packages use the same helpers and help page entries (add them to
+`scripts/errors/entries.js`, one entry per message family), but the message itself
+names the failing field, allowed range and fix. A help link supplements that
+guidance; it does not replace it. Raise an optional entry's recorded ceiling with
+before/after measurements rather than shorten diagnostics to fit. Core and the
+stage root retain their size-limited message convention.
 
 ## Core freeze
 

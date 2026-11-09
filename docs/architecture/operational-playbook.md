@@ -4021,3 +4021,16 @@ Scatter sources and passing proof inputs are unchanged. Its changed package was
 rebuilt and the paired entry/network records regenerated from 21ff80d28,
 dirty=false; scatter/interact stays 3345 B and core + stage 23924 B.
 The pre-rebase GPU/README proof above remains the scatter execution evidence.
+
+### Section 5 evidence: optional lighting diagnostics restoration
+
+Size-restoration finding 3 restores field and range guidance in lighting2d's
+shared, emissive, soft and cookie validators. RangeError identity and help links
+remain; scalar boundaries and rendering equations do not change. The package's
+diagnostics regression fails on the shortened implementation and covers rejected
+fields plus valid zero, positive and inclusive upper boundaries. Optional
+ceilings retain the full diagnostics; core plus stage stays at 23924 B. Research
+and before/after measurements are in size-restore.md and limits.md. The real GPU
+suite passes 236 pixel checks with zero wrong pixels or validation errors, and
+11 shader modules compile. All nine README examples run as written. Execution
+uses one shared GPU slot per worktree and wait-max 60.

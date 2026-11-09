@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MaskData, maskShader } from './masks.js';
-import { checkLight, checkCamera, checkLayer } from './validation.js';
+import { checkLight, checkCamera, checkLayer, checkNumber } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -196,17 +196,15 @@ export class CookieLight2D extends Light2D {
   }
 }
 
-const invalid = () => rangeError('Invalid cookie light value', 'pixel-lighting');
-
 function checkCookieLight(l: CookieLight2D): void {
   checkLight(l);
-  const good =
-    l.cookieScale.every((v) => Number.isFinite(v) && v > 0) &&
-    l.cookieOffset.every(Number.isFinite) &&
-    Number.isFinite(l.cookieRotation) &&
-    ['zero', 'clamp', 'repeat', 'mirror'].includes(l.cookieWrap) &&
-    ['multiply', 'alpha', 'color'].includes(l.cookieMode);
-  if (!good) throw invalid();
+  for (const value of l.cookieScale) checkNumber(value, 'cookieScale', Number.MIN_VALUE);
+  for (const value of l.cookieOffset) checkNumber(value, 'cookieOffset');
+  checkNumber(l.cookieRotation, 'cookieRotation');
+  if (!['zero', 'clamp', 'repeat', 'mirror'].includes(l.cookieWrap))
+    throw rangeError('Invalid cookieWrap: use zero, clamp, repeat or mirror', 'pixel-lighting');
+  if (!['multiply', 'alpha', 'color'].includes(l.cookieMode))
+    throw rangeError('Invalid cookieMode: use multiply, alpha or color', 'pixel-lighting');
 }
 
 /** Unit vector pointing toward light source for directional lights. */
@@ -484,7 +482,7 @@ export class CookieLighting2D implements EnginePlugin {
   constructor(options: CookieLighting2DOptions) {
     if (!options?.target) throw typeError('Lighting2D needs a target', 'pixel-lighting');
     const order = options.order ?? 20;
-    if (!Number.isFinite(order)) throw invalid();
+    checkNumber(order, 'order');
     this.#target = options.target;
     this.#normals = options.normals;
     this.#order = order;
@@ -700,7 +698,7 @@ export class CookieLighting2D implements EnginePlugin {
       camera = this.camera,
       ambient = hexColor(this.ambient),
       lights = this.lights.filter((light) => (light.layers & this.layer) !== 0);
-    if (!ambient) throw invalid();
+    if (!ambient) throw rangeError('Invalid ambient color: use a hex color such as #rrggbb', 'pixel-lighting');
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
     checkCamera(camera);

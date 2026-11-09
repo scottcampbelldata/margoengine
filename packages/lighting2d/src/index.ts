@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MaskData, maskShader } from './masks.js';
-import { checkLight, checkCamera, checkLayer } from './validation.js';
+import { checkLight, checkCamera, checkLayer, checkNumber } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -119,8 +119,6 @@ export class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
     checkLight(this);
   }
 }
-
-const invalid = () => rangeError('Invalid light value', 'pixel-lighting');
 
 /** Where a directional light comes from, as a unit vector. */
 const towards = (l: Light2D): [number, number, number] => [
@@ -366,7 +364,7 @@ export class Lighting2D implements EnginePlugin {
   constructor(options: Lighting2DOptions) {
     if (!options?.target) throw typeError('Lighting2D needs a target', 'pixel-lighting');
     const order = options.order ?? 20;
-    if (!Number.isFinite(order)) throw invalid();
+    checkNumber(order, 'order');
     this.#target = options.target;
     this.#normals = options.normals;
     this.#order = order;
@@ -532,7 +530,7 @@ export class Lighting2D implements EnginePlugin {
       lights = this.lights;
     checkCamera(camera);
     checkLayer(this.layer);
-    if (!ambient) throw invalid();
+    if (!ambient) throw rangeError('Invalid ambient color: use a hex color such as #rrggbb', 'pixel-lighting');
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
     lights.forEach(checkLight);

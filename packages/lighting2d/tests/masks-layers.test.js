@@ -80,23 +80,23 @@ test('Light masks: rect, circle, and polygon masks', () => {
 test('Light layer and mask validation', () => {
   assert.throws(
     () => new Light2D({ layers: -1 }),
-    /Invalid light value/,
+    /Invalid layers: must be an integer in \[0, 4294967295\]/,
   );
   assert.throws(
     () => new Light2D({ layers: 1.5 }),
-    /Invalid light value/,
+    /Invalid layers: must be an integer in \[0, 4294967295\]/,
   );
   assert.throws(
     () => new Light2D({ mask: { kind: 'rect', minX: 30, maxX: 10, minY: 0, maxY: 10 } }),
-    /Invalid light value/,
+    /Invalid rect mask bounds: use finite minX <= maxX and minY <= maxY/,
   );
   assert.throws(
     () => new Light2D({ mask: { kind: 'circle', radius: -5 } }),
-    /Invalid light value/,
+    /Invalid circle mask radius: must be finite and non-negative/,
   );
   assert.throws(
     () => new Light2D({ mask: { kind: 'polygon', points: [[0, 0], [1, 1]] } }),
-    /Invalid light value/,
+    /Invalid polygon mask points: use at least three points with two finite coordinates each/,
   );
 });
 

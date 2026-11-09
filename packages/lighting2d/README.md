@@ -307,6 +307,24 @@ Height lights accumulate into an owned `rgba16float` image and present once to t
 
 Direct-light bind groups use the current mask buffer and normal target every frame. Contiguous uniform fields are packed together; validation still checks every numeric field before rendering.
 
+Validation errors identify the field and its allowed range, with a link to the
+pixel-lighting help page. Coordinates, angles and order must be finite; radius,
+dimensions, cone and falloff must also be positive. Intensity, height, glow radius,
+bloom controls and soft source radius allow zero. Softness is in `[0, 1]`, samples
+are integers in `[1, 64]`, and layer masks are integers in `[0, 4294967295]`.
+Cookie scale is positive, offsets and rotation are finite, and mode/wrap errors
+list the accepted names. Rect masks require ordered finite bounds, circles require
+a non-negative radius and optional two-coordinate centre, and polygons require at
+least three finite two-coordinate points. These checks apply before rendering and
+in CPU helpers; changing a mutable light to an invalid value reports that field.
+
+```ts
+import {EmissiveSprite2D, checkEmissiveSprite} from 'margoengine/lighting2d/emissive';
+const sprite = new EmissiveSprite2D({radius: 8, glowRadius: 0});
+sprite.glowRadius = 24;
+checkEmissiveSprite(sprite); // A negative glowRadius reports "must be finite and non-negative".
+```
+
 ## Rendering tiers
 
 GPU attachments refuse the small `@margoengine/webgl2-compat/preview` engine during setup with linked `MargoError` code `unsupported`. Use native WebGPU, the full WebGL2 compatibility layer, or awaited [automatic escalation](../webgl2-compat/README.md#automatic-escalation). The package-tier browser regression checks refusal and escalation; the package GPU suite checks drawing on both complete tiers.

@@ -94,3 +94,43 @@ with this combined build and keeps standard headroom in all 38 raised ceilings;
 historical figures above describe the original restoration build. Core plus
 stage is still 23924 B. No codec implementation conflict or output change was
 introduced by the rebase.
+
+## Lighting2d diagnostics (audit finding 3)
+
+Verified on b5822d106: emissive fields lost their range guidance; root, soft,
+cookie and shared validation conflated unrelated fields. Restore the existing
+checks with field names, finite/positive/non-negative ranges and accepted enum
+values. Shared scalar validation keeps these constraints readable. Global bloom
+threshold errors now name bloomThreshold rather than bloomIntensity. Numeric
+acceptance and lighting calculations are unchanged. All six entries include
+shared validation; their measured changes and raised ceilings are in limits.md.
+Synchronous validation remains in its owner: a diagnostic entry would complicate
+constructors and mutable-light validation without improving the API.
+
+Research compared Ecma International / TC39, *ECMAScript 2026 Language
+Specification*, 2026, [Native Error Types](https://tc39.es/ecma262/2026/multipage/fundamental-objects.html#sec-native-error-types-used-in-this-standard),
+which defines RangeError for values outside an allowable set or range, with W3C
+Accessibility Guidelines Working Group (editors Alastair Campbell, Chuck Adams,
+Rachael Bradley Montgomery, Michael Cooper and Andrew Kirkpatrick), *Web Content
+Accessibility Guidelines 2.2*, 2024, [Error identification and suggestion](https://www.w3.org/TR/WCAG22/#input-assistance).
+The latter motivates identifying the input and giving its correction. Applying
+that communication guidance to API diagnostics is a design inference, not a WCAG
+conformance claim. Preserve RangeError and the existing help link while making
+the correction available directly in the message. No foreign code read or copied.
+
+Regression: packages/lighting2d/tests/diagnostics.test.js fails on the old
+diagnostics and covers each restored field, mask constraints, soft/cookie enums,
+CPU checks, pass options and ambient validation, including accepted boundaries.
+Existing rendering and lifecycle tests remain in place. No timing or speed claim.
+
+Validation: 119 package tests pass; the added ambient regression also passes.
+All 236 real-GPU pixel checks have zero wrong pixels and no validation errors;
+11 distinct shader modules compile. All nine README examples run (one Node,
+eight browser). Lint and hygiene pass. One shared slot per worktree, wait-max
+60, only the real browser commands inside the GPU lock. No successful step
+rerun to obtain this evidence. Full verify has 13744 passing unit tests and two
+stale-record failures: the API size table and the network record paired with
+entry sizes. Regenerated both from the measured build; only those two failed
+test files were rerun, both pass (12 tests total). All other verify steps pass
+and are retained. The network fixture makes five requests with no unused build
+files. API summary and paired size/network records are committed together.

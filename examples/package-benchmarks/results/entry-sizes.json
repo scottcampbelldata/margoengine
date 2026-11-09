@@ -1,5 +1,5 @@
 {
-  "commit": "3822a22f5",
+  "commit": "b5822d106",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1428,28 +1428,28 @@
     },
     "@margoengine/lighting2d": {
       ".": {
-        "raw": 13554,
-        "gzip": 5394
+        "raw": 14353,
+        "gzip": 5639
       },
       "./soft": {
-        "raw": 15544,
-        "gzip": 5901
+        "raw": 16330,
+        "gzip": 6136
       },
       "./cookie": {
-        "raw": 20491,
-        "gzip": 7350
+        "raw": 21458,
+        "gzip": 7636
       },
       "./gi": {
-        "raw": 22192,
-        "gzip": 8598
+        "raw": 22986,
+        "gzip": 8834
       },
       "./height": {
-        "raw": 18898,
-        "gzip": 6855
+        "raw": 19692,
+        "gzip": 7081
       },
       "./emissive": {
-        "raw": 10968,
-        "gzip": 4087
+        "raw": 11039,
+        "gzip": 4154
       }
     },
     "@margoengine/lightmap": {

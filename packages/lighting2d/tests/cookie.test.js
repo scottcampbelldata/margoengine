@@ -95,15 +95,15 @@ test('CookieLight2D validation and defaults', () => {
 
   assert.throws(
     () => new CookieLight2D({ cookieScale: [0, 10] }),
-    /Invalid cookie light value/,
+    /Invalid cookieScale: must be finite and positive/,
   );
   assert.throws(
     () => new CookieLight2D({ cookieWrap: 'invalid' }),
-    /Invalid cookie light value/,
+    /Invalid cookieWrap: use zero, clamp, repeat or mirror/,
   );
   assert.throws(
     () => new CookieLight2D({ cookieMode: 'invalid' }),
-    /Invalid cookie light value/,
+    /Invalid cookieMode: use multiply, alpha or color/,
   );
 });
 

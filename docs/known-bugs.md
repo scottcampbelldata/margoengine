@@ -11,6 +11,17 @@ tests/readme-live.test.js proves lifecycle ordering and refusal of missing work
 or cleanup, and fails against the old runner. Sources and repro:
 `docs/readme-live.md`.
 
+### Fixed 2026-11-10: lighting2d validation lost field and range guidance
+
+The size-shaving emissive validation table emitted only `Invalid <label>`;
+shared direct-light, soft and cookie checks used one generic message for many
+fields. Reproduce with `new EmissiveSprite2D({glowRadius: -1})` or
+`new CookieLight2D({cookieWrap: 'bad'})`. The owning validators now identify
+the field and accepted range or names, with their original RangeError and help
+link. The scalar predicates and rendering equations are unchanged. Regression:
+`packages/lighting2d/tests/diagnostics.test.js`; measurements and research:
+[size-restore.md](size-restore.md). No new open defect.
+
 ### Fixed 2026-11-10: shared codec diagnostics obscured causes and caller limits
 
 Size-driven generic inflate errors called valid files damaged when they exceeded

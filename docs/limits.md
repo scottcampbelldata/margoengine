@@ -2366,3 +2366,26 @@ Data-texture uniform representations and a dynamic lighting-loop bound do not
 repair the full program. Smaller compile probes link, but a complete staged
 route, GPU output parity and a passing lifecycle regression are still missing.
 See known-bugs.md and testpage-research.md for the reproduction and evidence.
+
+### Optional lighting diagnostics restoration (audit finding 3, 2026-11-10)
+
+Measured from b5822d106 and the restoration build using the entry-size method
+(Vite minify es2022, other packages external, default gzip). These current
+measurements supersede the historical exact ceilings above; GI and height already
+include the later edge-contact repair. Every entry that grows receives a raised
+ceiling with at least max(3%, 256 B) headroom.
+
+| Entry | Before gzip B | After gzip B | Old ceiling B | New ceiling B |
+| --- | ---: | ---: | ---: | ---: |
+| `@margoengine/lighting2d` | 5394 | 5639 | 5394 | 5895 |
+| `@margoengine/lighting2d/soft` | 5901 | 6136 | 5901 | 6392 |
+| `@margoengine/lighting2d/cookie` | 7350 | 7636 | 7350 | 7892 |
+| `@margoengine/lighting2d/gi` | 8598 | 8834 | 8856 | 9100 |
+| `@margoengine/lighting2d/height` | 6855 | 7081 | 7111 | 7337 |
+| `@margoengine/lighting2d/emissive` | 4087 | 4154 | 4087 | 4410 |
+
+The bytes retain field names, finite/positive/non-negative ranges, mask bounds,
+enum choices and the help link. Splitting diagnostics would add indirection to
+synchronous construction and per-frame mutable-value checks. No lighting work,
+quality or features are removed. Core plus stage remains 23924 B. Research and
+regression evidence: [size restoration](size-restore.md).

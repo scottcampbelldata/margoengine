@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MaskData, maskShader } from './masks.js';
-import { checkLight, checkCamera, checkLayer } from './validation.js';
+import { checkLight, checkCamera, checkLayer, checkNumber } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -40,19 +40,15 @@ export class SoftLight2D extends Light2D {
   }
 }
 
-const invalid = () => rangeError('Invalid light value', 'pixel-lighting');
+function checkSoftOptions(sourceRadius: number, samples: number): void {
+  checkNumber(sourceRadius, 'sourceRadius', 0);
+  if (!Number.isInteger(samples) || samples < 1 || samples > 64)
+    throw rangeError('Invalid samples: must be an integer in [1, 64]', 'pixel-lighting');
+}
 
 function checkSoftLight(l: SoftLight2D): void {
   checkLight(l);
-  if (
-    !Number.isFinite(l.sourceRadius) ||
-    l.sourceRadius < 0 ||
-    !Number.isInteger(l.samples) ||
-    l.samples < 1 ||
-    l.samples > 64
-  ) {
-    throw invalid();
-  }
+  checkSoftOptions(l.sourceRadius, l.samples);
 }
 
 /** Where a directional light comes from, as a unit vector. */
@@ -84,7 +80,7 @@ export function softShadowFactor(
   checkLight(light);
   const value = options?.samples ?? (light as SoftLight2D).samples ?? 16;
   const source = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
-  if (!Number.isInteger(value) || value < 1 || value > 64 || !Number.isFinite(source) || source < 0) throw invalid();
+  checkSoftOptions(source, value);
   if (!light.shadows || edges.length < 4) return 1;
   const radius = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
   const samples = Math.max(1, Math.min(64, Math.round(options?.samples ?? (light as SoftLight2D).samples ?? 16)));
@@ -375,7 +371,7 @@ export class SoftLighting2D implements EnginePlugin {
   constructor(options: SoftLighting2DOptions) {
     if (!options?.target) throw typeError('Lighting2D needs a target', 'pixel-lighting');
     const order = options.order ?? 20;
-    if (!Number.isFinite(order)) throw invalid();
+    checkNumber(order, 'order');
     this.#target = options.target;
     this.#normals = options.normals;
     this.#order = order;
@@ -527,7 +523,7 @@ export class SoftLighting2D implements EnginePlugin {
       camera = this.camera,
       ambient = hexColor(this.ambient),
       lights = this.lights.filter((light) => (light.layers & this.layer) !== 0);
-    if (!ambient) throw invalid();
+    if (!ambient) throw rangeError('Invalid ambient color: use a hex color such as #rrggbb', 'pixel-lighting');
     if (bump && (bump.width !== target.width || bump.height !== target.height))
       throw fault('state', 'Lighting2D normals differ in size from the target', 'pixel-lighting');
     checkCamera(camera);

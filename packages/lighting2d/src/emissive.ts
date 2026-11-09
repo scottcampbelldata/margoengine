@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { checkCamera, checkLayer } from './validation.js';
+import { checkCamera, checkLayer, checkNumber } from './validation.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
@@ -84,7 +84,7 @@ export class EmissiveSprite2D implements Required<EmissiveSpriteItem2D> {
 /** Validates an {@link EmissiveSpriteItem2D}. Throws RangeError if invalid. */
 export function checkEmissiveSprite(sp: EmissiveSpriteItem2D): void {
   if (sp.shape !== undefined && sp.shape !== 'circle' && sp.shape !== 'box') {
-    throw rangeError('Unknown emissive sprite shape', 'pixel-lighting');
+    throw rangeError('Unknown emissive sprite shape: use circle or box', 'pixel-lighting');
   }
   for (const [field, minimum, label] of [
     ['x', -Infinity, 'x'],
@@ -94,17 +94,16 @@ export function checkEmissiveSprite(sp: EmissiveSpriteItem2D): void {
     ['height', Number.MIN_VALUE, 'sprite height'],
     ['falloff', Number.MIN_VALUE, 'falloff'],
     ['intensity', 0, 'sprite intensity'],
-    ['glowRadius', 0, 'glow radius'],
+    ['glowRadius', 0, 'glow radius (glowRadius)'],
     ['bloomStrength', 0, 'bloomStrength'],
     ['bloomThreshold', 0, 'bloomThreshold'],
   ] as const) {
     const value = sp[field];
-    if (value !== undefined && (!Number.isFinite(value) || value < minimum))
-      throw rangeError(`Invalid ${label}`, 'pixel-lighting');
+    if (value !== undefined) checkNumber(value, label, minimum);
   }
   if (sp.layer !== undefined) checkLayer(sp.layer);
   if (sp.color !== undefined && !hexColor(sp.color)) {
-    throw rangeError('Invalid emissive color', 'pixel-lighting');
+    throw rangeError('Invalid emissive color: use a hex color such as #rrggbb', 'pixel-lighting');
   }
 }
 
@@ -121,8 +120,8 @@ export function emissiveLightAt(
   bloomThreshold: number = 0.8,
 ): number[] {
   checkEmissiveSprite(sprite);
-  if (![bloomIntensity, bloomThreshold].every(Number.isFinite) || bloomIntensity < 0 || bloomThreshold < 0)
-    throw rangeError('Invalid bloomIntensity', 'pixel-lighting');
+  checkNumber(bloomIntensity, 'bloomIntensity', 0);
+  checkNumber(bloomThreshold, 'bloomThreshold', 0);
   const spLayer = sprite.layer ?? 0xffffffff;
   if (layerMask !== undefined && (spLayer & layerMask) === 0) return [0, 0, 0];
 
@@ -592,10 +591,9 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   #validate(): void {
     checkCamera(this.camera);
     checkLayer(this.layer);
-    if (!Number.isFinite(this.order)) throw rangeError('Invalid emissive order', 'pixel-lighting');
-    for (const value of [this.bloomThreshold, this.bloomIntensity]) {
-      if (!Number.isFinite(value) || value < 0) throw rangeError('Invalid emissive pass value', 'pixel-lighting');
-    }
+    checkNumber(this.order, 'emissive order');
+    checkNumber(this.bloomThreshold, 'bloomThreshold', 0);
+    checkNumber(this.bloomIntensity, 'bloomIntensity', 0);
   }
 
   #release(): void {
