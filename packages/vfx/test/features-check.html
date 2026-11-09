@@ -405,7 +405,10 @@ window.checkShadows=async()=>{
   device.queue.submit([encoder.finish()]);
   await device.queue.onSubmittedWorkDone();
  }
- effect.dispose();hold.destroy();holdDepth.destroy();
+ const published=seen.at(-1)??null;
+ effect.dispose();
+ const cleared=seen.at(-1)??null;
+ hold.destroy();holdDepth.destroy();
  const data=buffers[0];
  const header=[data[0],data[1],data[2]];
  const lightAt=(i)=>{const o=4+i*8;return {position:[data[o],data[o+1],data[o+2]],range:data[o+3],color:[data[o+4],data[o+5],data[o+6]],intensity:data[o+7]};};
@@ -436,7 +439,7 @@ window.checkShadows=async()=>{
   return Math.min(1,Math.max(0,0.5-Math.sqrt(1-d)*0.05));
  };
  const samples=[[32,32],[47,32],[0,0]];
- return {error:error??depthRun.error??depthError?.message??null,errors:errors.splice(0),header,lights:[0,1,2].map(lightAt),published:seen.at(-1)??null,depthGot:samples.map(([px,py])=>depth[py*depthN+px]),depthWant:samples.map(([px,py])=>expectDepth(px,py))};
+ return {error:error??depthRun.error??depthError?.message??null,errors:errors.splice(0),header,lights:[0,1,2].map(lightAt),published,cleared,depthGot:samples.map(([px,py])=>depth[py*depthN+px]),depthWant:samples.map(([px,py])=>expectDepth(px,py))};
 };
 // Update nodes. One particle, velocity (1, 0, 0), a constant force (0, 2, 0) and drag 0.5. The loop here is
 // independent of evaluateNodes: velocity += (force - drag * velocity) * dt, then position += velocity * dt.

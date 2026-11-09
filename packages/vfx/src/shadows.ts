@@ -185,6 +185,7 @@ export const shadows: VFXExtension<VFXShadows> = {
     let pending: Float32Array | null = null;
     let released = false;
     let removed = false;
+    let published = false;
     let unbind: (() => void) | undefined;
     const matrices: GPUBuffer[] = [];
     const depthGroups: GPUBindGroup[] = [];
@@ -236,8 +237,11 @@ export const shadows: VFXExtension<VFXShadows> = {
       released = true;
       source.disposed = true;
       unbind?.();
+      // This effect owns the list it last handed to `into`. Disposal and plugin removal both come through here.
+      if (published) into!.setLights([]);
     };
     const publish = (data: Float32Array) => {
+      if (released) return;
       const n = Math.min(MAX_PARTICLE_LIGHTS, Math.max(0, Math.round(data[0] ?? 0)));
       const list: VFXParticleLight[] = [];
       for (let i = 0; i < n; i++) {
@@ -251,6 +255,7 @@ export const shadows: VFXExtension<VFXShadows> = {
         });
       }
       into!.setLights(list);
+      published = true;
     };
     return {
       write(c) {
@@ -290,7 +295,7 @@ export const shadows: VFXExtension<VFXShadows> = {
             },
           );
         }
-        if (pending && into) {
+        if (pending && into && !released) {
           const data = pending;
           pending = null;
           publish(data);

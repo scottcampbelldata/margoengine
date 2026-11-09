@@ -59,6 +59,7 @@ try {
   assert.deepEqual(shadows.published[0].position, [1, 2, 3], 'shadows');
   assert.deepEqual(shadows.published[1].position, [4, 5, 6], 'shadows');
   assert.deepEqual(shadows.published[1].color, [0, 0, 1], 'shadows');
+  assert.equal(shadows.cleared?.length, 0, 'shadows');
   for (let i = 0; i < 3; i++)
     assert.ok(
       Math.abs(shadows.depthGot[i] - shadows.depthWant[i]) < 1e-4,

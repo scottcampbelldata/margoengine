@@ -185,6 +185,7 @@ try {
     assert.deepEqual(r.published[0].position, [1, 2, 3], name);
     assert.deepEqual(r.published[1].position, [4, 5, 6], name);
     assert.deepEqual(r.published[1].color, [0, 0, 1], name);
+    assert.equal(r.cleared?.length, 0, name);
     for (let i = 0; i < 3; i++)
       assert.ok(
         Math.abs(r.depthGot[i] - r.depthWant[i]) < 1e-4,

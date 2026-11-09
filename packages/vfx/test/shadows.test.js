@@ -218,3 +218,78 @@ setImmediate(() => {
     await rm(file, { force: true });
   }
 });
+
+test('disposing a vfx removes the point lights it published', async () => {
+  const copy = (lights) =>
+    lights.map((light) => ({
+      position: [...light.position],
+      range: light.range,
+      intensity: light.intensity,
+    }));
+  const seen = [];
+  const { h, effect } = attach({
+    capacity: 1,
+    shadows: {
+      into: {
+        setLights(lights) {
+          seen.push(copy(lights));
+        },
+      },
+      count: 1,
+      range: 4,
+      intensity: 1,
+    },
+  });
+  h.frame();
+  const staging = h.resources.find((resource) => resource.usage === 9);
+  assert.ok(staging, 'the light read-back buffer');
+  const data = new Float32Array(staging.data);
+  data[0] = 1;
+  data[4] = 1;
+  data[5] = 2;
+  data[6] = 3;
+  data[7] = 4;
+  data[11] = 1;
+  h.frame();
+  await flush();
+  h.frame();
+  assert.equal(seen.at(-1).length, 1);
+  assert.deepEqual(seen.at(-1)[0].position, [1, 2, 3]);
+  assert.equal(seen.at(-1)[0].range, 4);
+  assert.equal(seen.at(-1)[0].intensity, 1);
+  effect.dispose();
+  assert.equal(seen.at(-1).length, 0);
+
+  const calls = [];
+  const quiet = attach({ capacity: 1, shadows: { into: { setLights(lights) { calls.push(lights); } } } });
+  quiet.effect.dispose();
+  assert.equal(calls.length, 0);
+
+  const again = [];
+  const removed = attach({
+    capacity: 1,
+    shadows: {
+      into: {
+        setLights(lights) {
+          again.push(lights.length);
+        },
+      },
+      count: 1,
+    },
+  });
+  removed.h.frame();
+  const next = removed.h.resources.find((resource) => resource.usage === 9);
+  assert.ok(next, 'the light read-back buffer');
+  const packed = new Float32Array(next.data);
+  packed[0] = 1;
+  packed[4] = 1;
+  packed[5] = 2;
+  packed[6] = 3;
+  packed[7] = 4;
+  removed.h.frame();
+  await flush();
+  removed.h.frame();
+  assert.equal(again.at(-1), 1);
+  removed.h.engine.removePlugin(removed.effect.name);
+  assert.equal(again.at(-1), 0);
+});
