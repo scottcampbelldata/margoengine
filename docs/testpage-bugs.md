@@ -362,3 +362,13 @@ exporters/tests/testpage-triangles.test.js passes unchanged implementation:
 72 rejections across three writers, ordinary/Uint16/Uint32 arrays, lengths
 1/2/4/5 and ordinary/mirrored scales. Inputs remain identical; complete triangles
 still export. No exporter behaviour or public entry was changed for this finding.
+
+### Entry 43: NOT A BUG, USDZ is a documented optional entry
+
+The current README explicitly says to import exportUSDZ from
+@margoengine/exporters/usdz and that the root does not export it. The package
+description lists supported formats, not a promise to put every writer in the
+root. exporters/tests/testpage-usdz-entry.test.js imports the actual documented
+package subpath, writes a ZIP/USDZ header and pins the README's explicit optional
+entry contract. The unchanged implementation passes. Adding a root reexport
+would reverse this documented choice; no export or behaviour change is needed.
