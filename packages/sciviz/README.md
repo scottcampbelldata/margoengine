@@ -980,3 +980,7 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
   for the lasso). All of this runs on the CPU and is exported from `@margoengine/sciviz/maths`.
 - **Errors.** Argument errors throw `TypeError` or `RangeError` naming the fix; every message links to
   [margoengine.com/errors](https://margoengine.com/errors#sciviz).
+
+LIC is a separate optional entry: 23,461 B minified gzip in the integrated build (24,165 B ceiling).
+This includes the same full-precision published colormap data as the other colour-bearing entries; the
+normalized pre-restoration measurement was 10,429 B. Core + stage remains 23,924 B combined gzip.

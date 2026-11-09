@@ -31,9 +31,11 @@ bridge. Readback temporarily adds one image-sized buffer and a luminance array. 
 LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
 backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
 exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
-The NOAA demo passes both layouts/backends. New entry: 10,429 B gzip (+219 B from 10,210 B for scaled norms),
-ceiling 10,517 B; the final build
-records root 36,916 B, flow 8,665 B and native driver 4,476 B, all unchanged from the prior full build.
+The NOAA demo passes both layouts/backends. The normalized pre-integration entry was 10,429 B gzip.
+After main restored full published colormap precision, LIC is 23,461 B gzip, ceiling 24,165 B (was 10,517 B).
+The coherent clean-source entry/network records name c1a799e75: root 50,303 B, flow 8,665 B and
+native driver 4,476 B. The optional bytes preserve published colour values and the synchronous colormap API;
+a lazy table split would add loading/API/deployment complexity only to reduce optional size.
 Core/stage source is unchanged at 23,924 B combined gzip, with the strict 25,000 B ceiling intact.
 The one full verify ran 13,769 tests: 13,765 passed; four metadata/test-fixture failures were corrected and the
 affected checks pass. Package CPU/GPU, README, lint, hygiene and quality checks pass; no speed claim.

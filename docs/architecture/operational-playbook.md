@@ -4650,3 +4650,13 @@ unrun unit cases pass scoped continuation. Details and standards:
 production slot policy or timeout is loosened. A combined post-rebase build
 passes, followed by genuine paired measurements and generated API/llms records;
 sciviz sizes and the 23924 B core plus stage remain unchanged.
+
+### Section 5 evidence: batch 171 LIC after published colour precision
+
+The integrated optional LIC entry uses main's full published colour-map decimals. The unchanged convolution
+shaders retain analytical box/circular, missing-data, anisotropic slice, mixed-magnitude and exact restored
+image assertions on WebGPU and real WebGL2 compatibility. Current source c1a799e75 has clean, genuinely
+regenerated entry/network records: LIC 23,461 B (previously 10,429), optional ceiling 24,165 B (previously
+10,517). Keeping complete shared data avoids a loading contract solely for optional size. Root 50,303 B,
+flow 8,665 B, native driver 4,476 B and core/stage 23,924 B. No core/stage source or timing claim changes.
+Prior full verification and unaffected package checks are retained; closure records distinguish affected reruns.

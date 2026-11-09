@@ -42,8 +42,9 @@ four-step invariant, with its original GPU value/count assertions unchanged and 
 The [normalization regression](results/batch-171-lic-normalization.json) records zero error for mixed parallel
 speeds spanning 24 orders against the unit-speed image on both backends. The old
 squared norm changed 928/2,048 luminances. Permanent GPU/CPU regressions cover scaled norms and portable input
-headroom without changing any existing bounds. New entry is 10,429 B gzip (+219 B from 10,210 B, ceiling
-10,517 B), core + stage 23,924 B. No speed result;
+headroom without changing any existing bounds. Normalized LIC was 10,429 B gzip before main's colormap
+precision restoration. The integrated entry is 23,461 B, ceiling 24,165 B, and core + stage is 23,924 B.
+The coherent entry/network pair measures clean source c1a799e75. No speed result;
 [method sources](../clean-room.md#batch-171-job-2-line-integral-convolution).
 
 Pixel's readable palette shader preserves the prior operations, literals and

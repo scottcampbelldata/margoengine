@@ -28,6 +28,9 @@ separate shared lease (max 3 minutes) for both layouts/backends and the NOAA con
 use separate shared leases, one at a time per lane; CPU builds/lint/hygiene/verify do not hold a lease.
 `examples/sciviz-lic.html` reuses hash-pinned `examples/assets/sciviz/wind.bin`; phase is a direction cue,
 not atmospheric elapsed time. No new timing claim.
+After the full package build, regenerate `node examples/package-benchmarks/entry-sizes.mjs` and
+`node scripts/basic-scene-network.mjs` from the same clean package source; the latter self-locks only its GPU
+step. Run `npm run api:update`, the size quality gate and paired-record tests for the refreshed artifacts.
 
 The [rational scalar experiment](results/batch-134-scalar-rational.json) is an
 unaccepted negative research checkpoint. Retained author-workspace identifiers:

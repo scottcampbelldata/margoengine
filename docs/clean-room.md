@@ -3720,3 +3720,16 @@ pixel conformance: the fixture accumulates comparisons until its final assert,
 which the killed run never reaches. No busy exemption or longer passing budget
 is claimed. Logs and generator output stay in this worktree's test-results.
 Failure 8 remains open; continue to failure 9, with Bug 45 still lane-U's.
+
+
+## Batch 171 LIC landing integration
+
+Main's full published-precision colormap restoration changes shared data, not LIC tracing or shader source.
+A full package build followed by actual entry/network measurement records clean source c1a799e75.
+LIC grows 10,429 to 23,461 B gzip and its optional ceiling rises 10,517 to 24,165 B. Retain every published
+decimal and synchronous lookup; a data-loader split would introduce API and deployment complexity solely
+for optional size. See [colour precision research](size-restore.md#published-colour-map-precision-audit-finding-8)
+for Smith/van der Walt 2015, Nunez/Anderton/Renslow 2018 and Kovesi 2015. No source or shader is altered
+for this size change, and the 23,924 B core/stage measurement stays below 25,000 B. Old measurement sources
+a58dda187, 2518dd32e and 66e8a50cf remain historical audit checkpoints, not current figures.
+The strengthened main compute dispatch oracle and its subset/wait classifier are preserved unchanged.

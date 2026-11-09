@@ -1,12 +1,17 @@
 {
   "source": {
-    "commit": "2518dd32e",
+    "commit": "c1a799e75",
     "packagesDirty": false,
     "records": [
       "entry-sizes.json",
       "basic-scene-network.json"
     ],
-    "previousAudit": "a58dda187"
+    "previousAudits": [
+      "a58dda187",
+      "2518dd32e",
+      "66e8a50cf"
+    ],
+    "integratedMain": "1f538fa11"
   },
   "fullVerify": {
     "ranOnce": true,
@@ -122,6 +127,57 @@
     },
     "final-incoming-build": {
       "passed": true
+    },
+    "integrated-build": {
+      "passed": true
+    },
+    "integrated-measure": {
+      "passed": true
+    },
+    "integrated-entry": {
+      "passed": true
+    },
+    "integrated-network": {
+      "passed": true
+    },
+    "integrated-cpu": {
+      "passed": true
+    },
+    "integrated-api": {
+      "passed": true
+    },
+    "integrated-supply": {
+      "passed": true
+    },
+    "integrated-gpu-lic": {
+      "passed": true
+    },
+    "integrated-gpu-curve": {
+      "passed": true
+    },
+    "integrated-gpu-demo": {
+      "passed": true
+    },
+    "integrated-gpu-readme": {
+      "passed": true
+    },
+    "integrated-quality": {
+      "passed": true
+    },
+    "integrated-lint": {
+      "passed": true
+    },
+    "integrated-hygiene": {
+      "passed": true
+    },
+    "integrated-llms": {
+      "passed": true
+    },
+    "integrated-artifacts": {
+      "passed": true
+    },
+    "integrated-links": {
+      "passed": true
     }
   },
   "rebasedGpu": [
@@ -139,9 +195,9 @@
     }
   ],
   "sizes": {
-    "lic": 10210,
-    "licCeiling": 10517,
-    "root": 36916,
+    "lic": 23461,
+    "licCeiling": 24165,
+    "root": 50303,
     "flow": 8665,
     "nativeDriver": 4476,
     "coreStage": 23924,
@@ -152,6 +208,9 @@
     "Each real GPU command used one shared lane slot and wait-max 60.",
     "The compute-owner loop annotation preserves its original four-step work and every exact assertion.",
     "The initial raw build omitted the separate Wasm-copy step; restored package assets closed the affected CPU/GPU failures.",
-    "The later main rebase preserves compute GPU registration and voxel composition; fresh entry/network records include both. The composition bitmask-loop annotation preserves all 32 inputs and every assertion."
+    "The later main rebase preserves compute GPU registration and voxel composition; fresh entry/network records include both. The composition bitmask-loop annotation preserves all 32 inputs and every assertion.",
+    "After main restored published colormap precision, actual paired records measure clean source c1a799e75. Full build, affected LIC/umbrella/planner/wait CPU checks, LIC/circular GPU cases, NOAA demo and LIC README pass. The LIC case itself includes the permanent mixed-magnitude normalization regression.",
+    "An extra ignored runner requested the nonexistent lic-normalization selector and failed before rendering a case. The correct lic selector already passed its mixed-magnitude assertion; no source, test, assertion or timeout was changed.",
+    "Main full-precision tables increase LIC 10429 -> 23461 B gzip; optional ceiling 10517 -> 24165 B. Preserve complete colour data and synchronous API, with no size-driven loader split."
   ]
 }
