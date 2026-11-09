@@ -1,5 +1,23 @@
 # Known bugs and unverified features
 
+### Open: batch 134 ETC2 and EAC RG11 source-quality losses
+
+ETC1S ETC2 RGBA passes 22/23 files; Seaside normal fails by 9,562,857 SSE.
+Its encoded alpha is normal Y while the JPEG reference alpha is opaque 255.
+All decoded RGB remains identical. Alpha reconstruction SSE improves from
+92,110 to 65,595, but the source-interaction term is +9,589,372. EAC RG11
+fails all 26 UASTC pairs under the existing conventional RG source reference:
+its observed output mapping is R/alpha. Even opaque input alpha is quantized
+slightly below 255 by the old output; exact reconstruction can increase that
+reference's error. These are retained losses, not waived differences or proof
+that no encoder can pass. EAC R11 passes all 26 source-quality pairs.
+Reproduce with the author-retained `measure/remaining-quality-report21.mjs`
+and `measure/remaining-quality-report21-etc2.mjs`; captured payloads support
+diagnostics without repeating transcodes. No source/channel/bar change.
+[Per-file evidence and diagnostics](whitepaper/results/batch-134-remaining-targets.json).
+Public integration, complete expanded container fuzz, memory and new-Wasm GPU
+acceptance remain open. The prebuilt is retained.
+
 ### Fixed: moving-flow sort centre on offset grids
 
 The initial moving-flow layer returned its model translation as the transparent sorting centre. That is

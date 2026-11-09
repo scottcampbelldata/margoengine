@@ -1,0 +1,28 @@
+{
+  "status": "documentation-and-evidence-checkpoint-with-composed-gates",
+  "scope": "Private ETC2/EAC draft remains unaccepted as a whole. No public runtime/package/README/export change; shipped prebuilt retained. EAC R11 source quality passes26/26, RG11 fails26/26, ETC2 fails1/23. No bar change or fourth scalar campaign.",
+  "verify": {
+    "freshRunsForThisCheckpoint": 1,
+    "passed": 13939,
+    "failed": 1,
+    "skipped": 0,
+    "failure": "tests/check-fixed-waits.test.js: compute scene-owner-browser four-dispatch oracle lacked its fixed-work annotation",
+    "upstreamRootFix": "50596778a826b65fc70597b74a9d0d9bb2eb424b",
+    "resolution": "Fetched the existing main fix before any local change, rebased, preserved all four dispatches and every successful verify step. Actual fixed-wait/private-path/llms/docs-guides/docs-encoding/docs-react-names/sizes-page selection passes48/48; links pass. No second full verify or unconditional all-green claim."
+  },
+  "lint": "pass",
+  "hygiene": "pass after build",
+  "decodersCpu": { "passed": 260, "failed": 0, "skipped": 0 },
+  "gltfCpu": { "packagePassed": 59, "integrationPassed": 2, "failed": 0 },
+  "gpu": {
+    "mode": "shared; one active slot per lane; real GPU leaves only; wait-max60",
+    "gltf": "pass, max0.75 minutes",
+    "decodersBrowser": "pass, max1 minute",
+    "nativeNodeGltf": "pass, max0.5 minutes",
+    "candidateWasmUploadAcceptance": false
+  },
+  "nativeDraft": "67 full-suite tests pass before added EAC hostile test; all4 EAC tests pass afterward, including the added24580-call hostile test. These composed68 tests are not a fresh68-test full-suite run.",
+  "wasmDraftNode": { "passed": 16, "failed": 0 },
+  "readmeAndApi": "No public package/README/export changed; no new README or api:update gate applies.",
+  "timing": "Deferred. No benchmark, wall-clock A/B, timing-only assertion or exclusive GPU. Palette-construction counts prove only the stated work reduction."
+}

@@ -1918,6 +1918,18 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 134's private ETC2/EAC draft has exact independent alpha and EAC
+parameter oracles, edge-padding and coded-error checks. EAC interval masks
+preserve error and header ties while reducing full palette constructions on
+90 nonconstant oracle blocks from 5,898,240 to 79,844; 292 captured corpus
+payloads also remain byte-identical. Native EAC hostile checks make 24,580
+calls over 4,096 random blocks, prefixes and oversized dimensions. These
+are not final expanded container fuzz or GPU upload evidence. All 993 old
+source/payload controls hold: EAC R11 passes 26/26 quality pairs, RG11 fails
+26/26 and ETC1S ETC2 fails 1/23. No bar changed, no fourth BC4/BC5 round,
+no public integration or timing claim. Full record:
+[remaining-target evidence](../whitepaper/results/batch-134-remaining-targets.json).
+
 Batch 234 water `/fft`: a separate GPU spectrum/evolution/2D-FFT/folding-foam
 pass owns all of its buffers and writes surface colour and depth at order 4.
 Core and stage are untouched. The [batch record](../water-fft.md) defines the

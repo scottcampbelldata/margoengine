@@ -1,5 +1,43 @@
 # Clean room
 
+## Batch 134 ETC1S ETC2 and UASTC EAC draft (2026-11-09)
+
+Research preceded implementation. Compared Andrew Garrard / Khronos Group,
+*Khronos Data Format Specification v1.4.0* (2025), sections22.1,22.3,
+Table145/146,22.5/22.6 and25.8.3, scoped subsection rereads,
+https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html;
+Jacob Strom and Martin Pettersson, *ETC2: Texture Compression using Invalid
+Combinations* (Graphics Hardware 2007), abstract and sections4/5,
+https://www.jacobstrom.com/publications/StromPetterssonGH07.pdf;
+Per Wennersten and Jacob Strom, *Table-based Alpha Compression* (2009),
+retained text sections4.1-4.3,
+https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf.
+The latter online fetch timed out; the retained paper was reread. These are
+scoped reviews, not new full-document certifications. The first paper
+establishes ETC1 color compatibility; the alpha paper motivates scoring the
+actual discrete table palette. Only normative tables are used, not the
+paper's other codec or learned tables. No companion/implementation code,
+foreign wrapper, disassembly or remembered optimizer was read or used.
+
+ETC2 alpha searches all 61,440 legal headers (nonzero multiplier), with
+clipped integer output and zero weight for invisible padding. EAC searches
+all 65,536 headers including multiplier zero, retaining full 11-bit UNORM
+precision. A candidate with total SSE B must satisfy each weighted sample's
+integer error interval. Inverting those intervals through the normative
+clamped palette gives exact admissible base bitsets. Every surviving header
+is scored; initial seeds supply bounds only. Equal costs retain the least
+header and smallest selector. Independent exhaustive oracles check the
+objective and ties; the mask change also preserves 292 captured payloads.
+
+EAC-CHANNEL-1 was recorded before wiring: frozen prebuilt target21 G against
+UASTC RGBA8 gives SSE223.46 versus A and15,406,034 versus G on 2d UASTC;
+Dot_N gives2288.27 versus A and280,111,273 versus G. This establishes observed
+R/alpha output mapping, not endpoints or an optimizer. The existing source
+comparison still uses conventional RG. No bar, source or channel comparison
+was changed. ETC2 1/23 and EAC RG11 26/26 losses stay unaccepted; R11 source
+quality passes26/26. No BC4/BC5 work or fourth scalar campaign. Evidence:
+[remaining targets](whitepaper/results/batch-134-remaining-targets.json).
+
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
 Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches

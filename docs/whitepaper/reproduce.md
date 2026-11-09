@@ -1,5 +1,21 @@
 # Reproducing Margo's numbers
 
+The [remaining-target draft](results/batch-134-remaining-targets.json) uses
+author-retained measurement scripts `remaining-quality-report21.mjs`
+(UASTC EAC) and `remaining-quality-report21-etc2.mjs` (ETC1S ETC2).
+Run with Node's type stripping after building the one candidate Wasm in the
+retained decoder workspace. Each full campaign keeps a 900-second process-tree
+limit, unchanged references, old hashes, per-channel source controls and the
+frozen image summation order. A source-quality loss returns failure; it is not
+turned into a passing status. `report21-publish.mjs` verifies 993 final payload
+hashes, 292 retained EAC payloads and exact ETC2 color blocks from captures.
+The native EAC test independently enumerates every header and verifies equal
+cost/header ties, constants, clipping and padding; its work count includes
+all seed palettes. Native hostile tests cover 4,096 random blocks and 24,580
+calls, not final whole-container fuzz. The first EAC campaign was deliberately
+interrupted for an exact work reduction before its cap; its partial results
+are preserved. No timing A/B or completed replacement claim follows.
+
 The [rational scalar experiment](results/batch-134-scalar-rational.json) is an
 unaccepted negative research checkpoint. Retained author-workspace identifiers:
 `planner/scalar-research-report17.md` records the chosen method before code;

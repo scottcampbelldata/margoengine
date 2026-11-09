@@ -22,6 +22,17 @@ never a replacement passing number, and never a raised budget.
 
 ## Retained cases and budgets
 
+Batch 134 ETC2/EAC continuation retains cold/warm per-file/per-target timing,
+startup, peak memory and final optional-entry proof for the quiet phase.
+The initial unmasked EAC campaign was deliberately interrupted before its
+900-second correctness cap to remove redundant work; it was not a completed
+or passed campaign or a hang. The exact mask implementation keeps that full
+corpus and cap, with byte-identical retained payloads and independent header
+oracles. The measured work count is 79,844 versus 5,898,240 full palette
+constructions on 90 nonconstant oracle blocks, including new seed work and
+excluding the unchanged constant path. No wall-clock A/B, benchmark, timing-only
+assertion or exclusive GPU was run. This does not satisfy the deferred speed bar.
+
 Budgets below are unchanged. Mixed-file assertions live in
 `scripts/speed/budgets.mjs`; pure speed callbacks register through `speedTest`
 only in the active named suite. Scenes, seeds, warmup and repeats stay unchanged

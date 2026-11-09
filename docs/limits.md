@@ -1,5 +1,14 @@
 # Design envelope
 
+Batch 134 remaining-target draft: UASTC EAC R11 source quality passes 26/26
+pairs; EAC RG11 fails 26/26; ETC1S ETC2 RGBA passes 22/23. All 993 original
+payload/source controls and zero-tolerance per-file bars remain unchanged.
+The private combined Wasm is 202,177 B raw / 74,823 B gzip9, versus the
+ETC2-only draft's 191,266 / 71,609 B. This includes the unaccepted scalar
+experiment. No public integration, final entry/memory, complete fuzz or new
+Wasm GPU acceptance is claimed. The shipped prebuilt remains.
+[Results, every loss and source pins](whitepaper/results/batch-134-remaining-targets.json).
+
 Batch 134 scalar ideal-fidelity diagnostic reproduces **17/98** failing
 file/target pairs against the existing original-source bars; the untouched
 source-size subset has **3/82** failing pairs (130 image comparisons).

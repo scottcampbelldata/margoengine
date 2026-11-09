@@ -1,5 +1,16 @@
 # Claims and evidence
 
+The [remaining-target draft](results/batch-134-remaining-targets.json) passes
+all 26 UASTC EAC R11 original-source pairs (345 images). EAC RG11 fails all
+26 pairs and ETC1S ETC2 RGBA fails one of 23, so neither is accepted.
+All 993 frozen controls and rehashed candidate payloads are checked; all
+2,337,354 ETC2 color blocks match the old bytes. The exact EAC mask search
+constructs 79,844 full palettes versus 5,898,240 on 90 nonconstant oracle
+blocks, retaining the exhaustive oracle's errors and header ties. All 292
+retained partial-campaign payloads remain bit-identical. This is a work count,
+not a timing claim or completed decoder job. Scalar bars stay with Scott;
+there was no fourth scalar campaign or bar change.
+
 The [scalar ideal-fidelity diagnostic](results/batch-134-scalar-ideal-bound.json)
 reproduces 17/98 failures on all images and 3/82 on untouched source-size
 pairs, using frozen prebuilt RGBA8 as a zero-added-reconstruction-error
