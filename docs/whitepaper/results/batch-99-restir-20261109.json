@@ -1,0 +1,221 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "baseError": 2.8840961019804077,
+      "risError": 0.9190890946692996,
+      "referenceMean": 0.9515103853773326,
+      "risMean": 0.9526237011887133,
+      "maxBaselineDelta": 0,
+      "coverage": [
+        {
+          "name": "coloured emitters",
+          "reference": [
+            0.5007441606139764,
+            0.5720921255415305,
+            0.9526146119460464
+          ],
+          "actual": [
+            0.4997505556093529,
+            0.5707621781621128,
+            0.9494908121414483
+          ],
+          "finite": true
+        },
+        {
+          "name": "half-block absorbing media",
+          "reference": [
+            0.6937376456335187,
+            0.6937376456335187,
+            0.6937376456335187
+          ],
+          "actual": [
+            0.6915185505058616,
+            0.6915185505058616,
+            0.6915185505058616
+          ],
+          "finite": true,
+          "expected": 0.6916533686083476
+        },
+        {
+          "name": "area light through absorbing media",
+          "reference": [
+            0.6903092656284571,
+            0.6903092656284571,
+            0.6903092656284571
+          ],
+          "actual": [
+            0.689690408995375,
+            0.689690408995375,
+            0.689690408995375
+          ],
+          "finite": true,
+          "expected": 0.6916533686083476
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "baseError": 2.8840963150894687,
+      "risError": 0.9190892980623779,
+      "referenceMean": 0.9515103839803487,
+      "risMean": 0.9526237035170197,
+      "maxBaselineDelta": 0,
+      "coverage": [
+        {
+          "name": "coloured emitters",
+          "reference": [
+            0.5007441610796377,
+            0.5720921251922846,
+            0.9526146142743528
+          ],
+          "actual": [
+            0.4997505566570908,
+            0.5707621758338064,
+            0.9494908086489886
+          ],
+          "finite": true
+        },
+        {
+          "name": "half-block absorbing media",
+          "reference": [
+            0.693737645400688,
+            0.693737645400688,
+            0.693737645400688
+          ],
+          "actual": [
+            0.6915185472462326,
+            0.6915185472462326,
+            0.6915185472462326
+          ],
+          "finite": true,
+          "expected": 0.6916533686083476
+        },
+        {
+          "name": "area light through absorbing media",
+          "reference": [
+            0.690309266326949,
+            0.690309266326949,
+            0.690309266326949
+          ],
+          "actual": [
+            0.6896904113236815,
+            0.6896904113236815,
+            0.6896904113236815
+          ],
+          "finite": true,
+          "expected": 0.6916533686083476
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": []
+    }
+  },
+  {
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 249
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 76.89999997615814,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 20.80000001192093,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 20.80000001192093,
+        "gpuBytes": 4980816,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

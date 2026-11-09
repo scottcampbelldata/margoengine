@@ -657,3 +657,14 @@ is preserved. Camera [-0.18, 0, 1.8] targets [-0.18, 0, 0], 35 degrees, near .01
 scale 1; the same sun as job 1. Frozen reference PNG SHA-256: 240715ff0a53416190448056a5aa7eeb767a0d7b2f52aa0a0a77e4ca17dc529a.
 The default gltf-pro physical path is measured; shared/sheen.js is also used by materials.
 No standalone material or IBL equivalence follows from this direct-light picture.
+
+## Batch 99 emissive resampling accuracy
+
+After `npm run build:packages`, run `node scripts/gpu-lock.mjs run --owner=restir-proof --max=10 --wait-max=10 -- npm run test:gpu:restir --workspace packages/voxel-pathtracer`.
+The generated scene contains 1,024 contiguous emissive ceiling voxels, a white floor and a fixed orthographic camera.
+The unchanged 16 x 16 image, seed 17, 32 samples and 8 candidates must have less than half the original tracer's
+squared RGB error against its 8,192-sample seed-987 reference. The score sums all 768 channel errors; it is not MSE.
+The driver also checks baseline identity at one candidate, finite values at 64, coloured and occluded emission,
+absorbing half-block media, camera and delta emission, empty scenes, native WebGL2 refusal, compatibility rendering,
+disposal and real device restoration. Output: `test-results/voxel-pathtracer-restir.json`.
+The accuracy result is from generated geometry on one RTX A6000 and Edge 157. No quiet-machine speed result is claimed.

@@ -21,7 +21,8 @@ export const entries = [
     title: '@margoengine/creative: texture render targets',
     kind: 'family',
     messages: [],
-    cause: 'A texture target dimension, mip, layer, format, load operation or clear color is outside its supported range.',
+    cause:
+      'A texture target dimension, mip, layer, format, load operation or clear color is outside its supported range.',
     fix: 'Use cube, array or 3d with positive integer dimensions within device limits and a total allocation at most 256 MiB. Cubes have six square faces. Render one mip and layer at a time. Use rgba8unorm or rgba16float, and finite four-component clear colors. See the creative package README for every default and range.',
   },
   {
@@ -63,7 +64,9 @@ export const entries = [
     id: 'state',
     title: 'state: not valid right now',
     kind: 'code',
-    messages: ['XR button needs a canvas on the page or the parent option', 'Viewer model has no geometry to frame',
+    messages: [
+      'XR button needs a canvas on the page or the parent option',
+      'Viewer model has no geometry to frame',
       'Physics exists on this stage: pass its options on the first call or set them on the world',
     ],
     cause:
@@ -1232,6 +1235,18 @@ export const entries = [
     fix: 'Pass hull corners as flat `x, y, z` values (`convexGeometry` makes them from a mesh) and raise `maxPoints` above 64 only if you need to. Pass a column-major affine matrix of 16 finite values to `setTransform`. Give each link a separate hull with `axis` and `hinge` not parallel. A custom collider in a solver with link hulls implements `hullClearanceInto(hull, outDistance)`.',
   },
   {
+    id: 'voxel-pathtracer',
+    title: 'Voxel path tracer backend and kernel',
+    kind: 'family',
+    messages: [
+      'VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer',
+      'Emissive sampling kernel does not match this tracer',
+    ],
+    cause:
+      'The engine has the native WebGL2 backend, or the optional resampling entry and tracing kernel do not match.',
+    fix: 'Use the WebGPU backend, or install @margoengine/webgl2-compat before Engine.create. Rebuild @margoengine/voxel-pathtracer as a whole when its optional resampling entry reports a kernel mismatch.',
+  },
+  {
     id: 'voxel-net-names-snapshots',
     title: 'voxel-net: names, snapshots and refused connections',
     kind: 'family',
@@ -1290,7 +1305,7 @@ export const entries = [
     ],
     cause:
       'An option or argument of a scatter entry is out of its range or of the wrong type: for `InstancePicker`, transforms that are not 16 floats an instance, a box with its min above its max, a mesh index past its positions, a ray with no direction, or an instance number past `count`; for `TrampledScatter`, a trample option out of range or an interactor with no position or radius; for `ImposterScatter`, no lod `Imposter` in `imposter`.',
-    fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. Give each interactor `{ position: [x, y, z], radius }` with a radius above 0 and a strength from 0 to 1. Bake the far mesh with `Imposter.bake(engine, mesh)` from `@margoengine/lod` and pass it as `imposter`. The package README lists every option with its range.',
+    fix: "Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh's local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. Give each interactor `{ position: [x, y, z], radius }` with a radius above 0 and a strength from 0 to 1. Bake the far mesh with `Imposter.bake(engine, mesh)` from `@margoengine/lod` and pass it as `imposter`. The package README lists every option with its range.",
   },
   {
     id: 'vfx-float',

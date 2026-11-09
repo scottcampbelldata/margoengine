@@ -3318,6 +3318,10 @@
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"
     },
+    "./voxel-pathtracer/restir": {
+      "types": "./dist/voxel-pathtracer/restir.d.ts",
+      "import": "./dist/voxel-pathtracer/restir.js"
+    },
     "./voxel-pathtracer/studio": {
       "types": "./dist/voxel-pathtracer/studio.d.ts",
       "import": "./dist/voxel-pathtracer/studio.js"

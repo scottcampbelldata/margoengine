@@ -17,14 +17,15 @@ equations or images.
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
 import {Engine} from 'margoengine/core';
-const voxels = new Uint8Array(await (await fetch('/house.voxels')).arrayBuffer());
+// A generated solid block, so this example needs no external model file.
+const voxels = new Uint8Array(4 * 4 * 4).fill(1);
 const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {
   revision: 1,
-  models: [{ id: 'house', revision: 1, size: [32, 24, 32], voxels }], // voxels: Uint8Array of palette indices
-  instances: [{ id: 'house-1', modelId: 'house', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -16, 0, -16, 1] }],
+  models: [{ id: 'block', revision: 1, size: [4, 4, 4], voxels }], // voxels: Uint8Array of palette indices
+  instances: [{ id: 'block-1', modelId: 'block', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, -2, 1] }],
   materials: [
     { id: 1, color: [0.8, 0.75, 0.7], type: 'diffuse' },
     { id: 2, color: [0.9, 1, 0.95], type: 'glass', ior: 1.5 },
@@ -36,10 +37,49 @@ const tracer = VoxelPathTracer.attach(engine, { scene, maxSamples: 512, denoise:
 await tracer.ready; // until then frames show the ordinary raster image
 const nextScene = {...scene, revision: 2};
 tracer.setScene(nextScene); // validated as a whole; accumulation restarts
-const png = await tracer.capture({ width: 3840, height: 2160, samples: 1024, signal });
+const png = await tracer.capture({ width: 512, height: 512, samples: 64, signal });
 tracer.enabled = false; // back to the raster frame, bit for bit
 tracer.dispose();
 ```
+
+## Resampled emissive lighting
+
+`margoengine/voxel-pathtracer/restir` (or `@margoengine/voxel-pathtracer/restir`) exports
+`ResampledVoxelPathTracer`. Its options and lifecycle are the root tracer's, with `candidates` added:
+an integer from 1 to 64, default 8. One uses the original kernel exactly. Larger values combine
+`ceil(candidates / 2)` power-weighted emissive-face proposals and `floor(candidates / 2)` cosine
+proposals (phase-function proposals inside media) in a visibility-aware reservoir with balance MIS.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { ResampledVoxelPathTracer } from 'margoengine/voxel-pathtracer/restir';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [3, 2, 5], target: [0, 0, 0]},
+});
+const tracer = ResampledVoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{id: 'lamp', revision: 1, size: [1, 1, 1], voxels: new Uint8Array([1])}],
+    instances: [{id: 'lamp', modelId: 'lamp', matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,3,0,1]}],
+    materials: [{id: 1, type: 'emit', color: [1, 0.8, 0.5], emission: 5}],
+    environment: {groundColor: [0.8, 0.8, 0.8], skyIntensity: 0},
+  },
+  candidates: 8,
+  denoise: false,
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 8, signal: AbortSignal.timeout(30_000)});
+tracer.dispose();
+engine.dispose();
+```
+
+This is independent resampled importance sampling, without spatial or temporal reservoir reuse. It only changes
+emissive surface lighting; camera emission, delta paths, sun, area lights and the environment retain their treatment.
+Every valid candidate evaluates visibility, and directional proposals also trace an intersection. Increasing the
+candidate count costs work; no wall-time speedup or universal variance reduction is claimed. Native WebGL2 reports
+`unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer); the WebGL2 compatibility layer runs
+the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
+scene at 32 samples against an 8,192-sample baseline reference. See `tests/restir-browser.mjs`.
 
 ## Scene data
 

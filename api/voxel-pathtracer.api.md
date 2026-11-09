@@ -232,8 +232,9 @@ export const VOXEL_PATHTRACER_DEFAULTS: Readonly<ResolvedTraceOptions>;
 
 export class VoxelPathTracer implements EnginePlugin {
     readonly name: string;
-    private constructor();
+    protected constructor(options: VoxelPathTracerOptions);
     static attach(engine: EngineKernel, options: VoxelPathTracerOptions): VoxelPathTracer;
+    protected tracingSource(): string;
     get enabled(): boolean;
     set enabled(value: boolean);
     get stats(): VoxelPathTracerStats;

@@ -1665,3 +1665,14 @@ are inspected to name known differences, without claiming an ablation of the com
 ## WFC sockets (batch 69, job 3)
 
 Clean-room equality matching on opposite face labels and the 24 determinant-positive signed-axis permutations of a cube. Rotations transform each face normal; the right-handed cross product supplies the third basis vector. Constraint formulation follows the already cited Karth and Smith (2017) description; no other implementation read or copied. Generated labelled-cube fixtures are stand-ins.
+
+## Batch 99: resampled emissive lighting
+
+The optional voxel-pathtracer/restir entry was written from these papers only:
+
+- Talbot, Cline and Egbert, [Importance Resampling for Global Illumination](https://diglib.eg.org/bitstream/handle/10.2312/EGWR.EGSR05.139-146/139-146.pdf), 2005, sections 3-5: resampling correction, support and variance.
+- Bitterli et al., [Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting](https://research.nvidia.com/sites/default/files/pubs/2020-07_Spatiotemporal-reservoir-resampling/ReSTIR.pdf), 2020, sections 2-3: streaming reservoirs and combining proposals with MIS.
+- Wyman et al., [A Gentle Introduction to ReSTIR](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf), SIGGRAPH 2023 course, sections 2.2, 3.2-3.4 and 4.3: support coverage, balance weights between light and directional candidates, and full-contribution targets.
+- Lin et al., [Generalized Resampled Importance Sampling](https://dqlin.xyz/data/paper/GRIS.pdf), 2022, sections 3.3 and 4.2-4.4: contribution weights and the restrictions needed for unbiased reuse. This entry does not reuse reservoirs across frames or pixels.
+
+The initial light-only reservoir left the BSDF emitter contribution outside resampling and retained its original MIS partition. The implemented mixture instead integrates emissive direct illumination with a common solid-angle measure and complementary balance weights, including visibility in its target. The continued path's directly sampled emitter contribution is excluded only when covered by this integral; camera and delta paths retain emission. Media are ignored only while locating a directional candidate, then evaluated by the same transmittance walk as light candidates. No other renderer's source or paper-linked implementation was read or copied.

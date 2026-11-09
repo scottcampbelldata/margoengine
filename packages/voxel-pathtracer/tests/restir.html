@@ -1,0 +1,99 @@
+<!doctype html><html><meta charset="utf-8"><title>Emissive RIS value checks</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {ResampledVoxelPathTracer} from '/packages/voxel-pathtracer/dist/restir.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+const errors=[];
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,0]}});
+ const gpu=engineRuntime(engine).gpu;
+ gpu.addEventListener('uncapturederror',event=>errors.push(event.error.message));
+ engine.camera.up=[0,0,-1];
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=1/1000;out[14]=1;out[15]=1;};
+ engine.render();
+ const transform=(x,y,z)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
+ const scene={revision:1,models:[
+  {id:'floor',revision:1,size:[32,1,32],voxels:new Uint8Array(1024).fill(1)},
+  {id:'ceiling',revision:1,size:[32,1,32],voxels:new Uint8Array(1024).fill(2)}],
+  instances:[{id:'floor',modelId:'floor',matrix:transform(-16,-1,-16)},{id:'ceiling',modelId:'ceiling',matrix:transform(-16,4,-16)}],
+  materials:[{id:1,type:'diffuse',color:[1,1,1]},{id:2,type:'emit',color:[1,1,1],emission:1}],
+  environment:{skyIntensity:0,sunIntensity:0,ground:false}};
+ const render=async(Tracer,candidates,samples,seed)=>{
+  const tracer=Tracer.attach(engine,{scene,denoise:false,maxBounces:1,...(candidates===undefined?{}:{candidates})});
+  try{await tracer.ready;return await tracer.renderImage({width:16,height:16,samples,seed,jitter:false});}
+  finally{tracer.dispose();}
+ };
+ try{
+  const reference=await render(VoxelPathTracer,undefined,8192,987);
+  const original=await render(VoxelPathTracer,undefined,32,17);
+  const one=await render(ResampledVoxelPathTracer,1,32,17);
+  const many=await render(ResampledVoxelPathTracer,8,32,17);
+  const extreme=await render(ResampledVoxelPathTracer,64,1,19);
+  if(!extreme.color.every(Number.isFinite))throw new Error('Candidate limit produced non-finite radiance');
+  let baseError=0,risError=0,referenceMean=0,risMean=0,maxBaselineDelta=0;
+  for(let i=0;i<reference.color.length;i++){
+   if(!Number.isFinite(many.color[i]))throw new Error('Non-finite RIS radiance');
+   baseError+=(original.color[i]-reference.color[i])**2;risError+=(many.color[i]-reference.color[i])**2;
+   referenceMean+=reference.color[i];risMean+=many.color[i];
+   maxBaselineDelta=Math.max(maxBaselineDelta,Math.abs(original.color[i]-one.color[i]));
+  }
+  const means=image=>[0,1,2].map(channel=>{
+   let sum=0;for(let i=channel;i<image.color.length;i+=3)sum+=image.color[i];
+   return sum/(image.color.length/3);
+  });
+  const compare=async name=>{
+   const reference=await render(VoxelPathTracer,undefined,512,317);
+   const actual=await render(ResampledVoxelPathTracer,8,256,419);
+   return {name,reference:means(reference),actual:means(actual),finite:actual.color.every(Number.isFinite)};
+  };
+  // Coloured candidates exercise RGB reservoir correction rather than only a scalar target.
+  scene.materials.push({id:4,type:'emit',color:[0.05,0.2,1],emission:1});
+  scene.models[1].voxels=Uint8Array.from({length:1024},(_,i)=>i%32<16?2:4);
+  scene.models[1].revision++;scene.revision++;
+  const coverage=[await compare('coloured emitters')];
+  scene.models[1].voxels.fill(2);scene.models[1].revision++;
+  scene.materials[2]={id:4,type:'media',color:[0,0,0],density:0.4};
+  scene.models.push({id:'occluder',revision:1,size:[32,1,32],voxels:new Uint8Array(1024).fill(4),shapes:new Uint8Array(1024).fill(0x33)});
+  scene.instances.push({id:'occluder',modelId:'occluder',matrix:transform(-16,2.5,-16)});scene.revision++;
+  coverage.push(await compare('half-block absorbing media'));
+  // Independent midpoint quadrature of the cosine-weighted square emitter at
+  // height 4 through the 0.5-unit, density-0.4 slab. Receivers span +/-1 unit:
+  // the same 0.02 sampling bound includes their small displacement from centre.
+  let expected=0;
+  for(let z=0;z<128;z++)for(let x=0;x<128;x++){
+   const dx=-16+(x+0.5)*0.25,dz=-16+(z+0.5)*0.25,r2=16+dx*dx+dz*dz;
+   expected+=16/(Math.PI*r2*r2)*Math.exp(-0.2*Math.sqrt(r2)/4)*0.25*0.25;
+  }
+  coverage.at(-1).expected=expected;
+  // Area-hit MIS must use the same full vertex-to-light distance too.
+  const ceiling=scene.instances.splice(1,1)[0];
+  scene.lights=[{id:'panel',position:[0,4,0],direction:[0,-1,0],width:32,height:32,color:[1,1,1],intensity:1}];
+  scene.revision++;
+  coverage.push({...await compare('area light through absorbing media'),expected});
+  scene.lights=[];scene.instances.splice(1,0,ceiling);scene.revision++;
+  // Every proposal must see the same opaque visibility, including null directional candidates.
+  scene.materials[2]={id:4,type:'diffuse',color:[0,0,0]};scene.revision++;
+  const blocked=await render(ResampledVoxelPathTracer,8,4,31);
+  if(!blocked.color.every(value=>value===0))throw new Error('Occluded emitters leaked light');
+  scene.models.pop();scene.instances.pop();scene.materials.pop();scene.revision++;
+  scene.instances[1].matrix=transform(-16,0,-16);scene.revision++;
+  const cameraEmission=await render(ResampledVoxelPathTracer,8,1,37);
+  if(!cameraEmission.color.every(value=>value===1))throw new Error('Camera emission was suppressed');
+  scene.instances[1].matrix=transform(-16,4,-16);
+  scene.materials[0]={id:1,type:'metal',color:[1,1,1],roughness:0};scene.revision++;
+  const deltaEmission=await render(ResampledVoxelPathTracer,8,1,41);
+  if(!deltaEmission.color.every(value=>value===1))throw new Error('Delta-path emission was suppressed');
+  scene.models=[];scene.instances=[];scene.materials=[];scene.revision++;
+  const empty=await render(ResampledVoxelPathTracer,8,1,13);
+  if(!empty.color.every(value=>value===0))throw new Error('An empty black scene must remain black');
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});
+  let refusal;
+  try{ResampledVoxelPathTracer.attach(native,{scene});}catch(error){refusal={code:error.code,message:error.message};}
+  finally{native.dispose();}
+  return {baseError,risError,referenceMean:referenceMean/reference.color.length,risMean:risMean/reference.color.length,maxBaselineDelta,coverage,refusal,errors};
+ }finally{engine.dispose();}
+};
+window.ready=true;
+</script></html>

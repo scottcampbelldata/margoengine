@@ -4,6 +4,15 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+### Batch 99: exact parity and noise-free disocclusions remain unproven
+
+- **Job 1, repro:** voxel-pathtracer's README and `tests/magicavoxel/` record subsurface differences of 7-16 display levels, glass over a lit floor 1-2 levels brighter, and atmosphere residuals. The renderer uses a fitted single-density random-walk subsurface model and a fitted single-scattering atmosphere; neither establishes the external editor's full transport model. No checked-in repeatable zero-error image oracle exists. These partial implementations do not satisfy exact pixel parity. Closing this needs an external black-box reference corpus across density, glass and atmosphere settings and a root-cause transport comparison, without changing the oracle or its zero-error requirement. Job 1 remains BLOCKED.
+- **Job 2, repro:** `tests/browser-check.mjs denoisehistory` and the README's viewport measurements retain noise on newly uncovered surfaces after a camera move. Reprojection has no valid history there, and a finite noisy first-frame spatial estimate cannot in general recover an arbitrary hidden radiance field exactly. Schied et al., [Spatiotemporal Variance-Guided Filtering](https://research.nvidia.com/sites/default/files/pubs/2017-07_Spatiotemporal-Variance-Guided-Filtering%3A/svgf_preprint.pdf), section 6, also reports low-light and motion limitations. The existing classical temporal filter is partial coverage, not the requested noise-free guarantee. A repeatable disocclusion oracle and an algorithm meeting that guarantee remain missing. Job 2 remains BLOCKED.
+
+### Fixed in batch 99: media-boundary emitter MIS distance
+
+The root voxel tracer used the final ray segment's `h.t` to convert the emitter PDF to solid angle after crossing a medium without scattering. NEE used the whole vertex-to-light distance, so the two MIS shares did not sum to one and over-counted energy. The tracer retains the last scattering position and uses its full distance for both voxel emission and area hits. `packages/voxel-pathtracer/tests/restir-browser.mjs` compares an absorbing half-block slab under a square light against independent quadrature, for both light types and both native WebGPU and compatibility. Before the correction, voxel emission averaged 0.756703 against about 0.69 physically expected, failing the unchanged 0.02 bound. The many-light 2x requirement is unchanged.
+
 ### Fixed 2026-11-08: text extrusion API report
 
 The batch 110 baseline `npm run verify` found that the text extrusion repair changed
@@ -111,14 +120,14 @@ The byte ceilings above are approved; all normal checks are required before push
 
 ## README examples
 
-### 106 of 767 README examples do not run yet
+### 101 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 106 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 101 are left there, each with its error. The voxel-pathtracer introduction now builds a complete generated model instead of fetching an absent raw array; its package regression executes the actual scene setup and the browser runner checks capture. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 89 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 84 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
   get-up is in this group: it needs prone and supine get-up clips (getting up from the front and from the back) on a humanoid rig, and no free rig in the repository has them; the Quaternius Universal Animation Library Standard 3.0 pack (CC0) was checked on 2026-11-07 and has none (its closest clips, `Sitting_Exit`, `Death01` and `Fixing_Kneeling`, are not get-ups). Fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group too. 17 start
   `example:`, and these need reading one at a time:

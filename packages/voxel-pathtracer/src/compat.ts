@@ -107,7 +107,7 @@ export class TraceRoute {
     | { width: number; height: number; textures: GPUTexture[]; views: GPUTextureView[]; group: GPUBindGroup }
     | undefined;
 
-  constructor(device: GPUDevice) {
+  constructor(device: GPUDevice, source = TRACE) {
     this.#device = device;
     const F = GPUShaderStage.FRAGMENT,
       C = GPUShaderStage.COMPUTE,
@@ -137,7 +137,7 @@ export class TraceRoute {
         texture: { sampleType: 'unfilterable-float' as const },
       })),
     });
-    this.#module = device.createShaderModule({ code: fragmentTrace() });
+    this.#module = device.createShaderModule({ code: fragmentTrace(source) });
   }
 
   /** Compiles the fragment shader (with `TABLES` when the scene has model tables) and, once, the add kernel. */

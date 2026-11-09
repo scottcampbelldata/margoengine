@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-616). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-617). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3747,6 +3747,14 @@ Optional wfc/sockets 676 B min+gzip (peers external): up to 4096 expanded varian
 
 Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics entry 1,921 B; core plus stage unchanged at 23,626 B. Earlier batch sizes above are historical. README loading examples use WAV filenames so the runtime example gate supplies its available WAV fixture.
 
+## Resampled emissive lighting
+
+| Capability | Limit | Cost and evidence |
+| --- | --- | --- |
+| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
+
+Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,797 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -3754,6 +3762,15 @@ Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics en
 What is known to be wrong or not yet proven, and what it would take to close each item. Design limits (where a
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
+
+### Batch 99: exact parity and noise-free disocclusions remain unproven
+
+- **Job 1, repro:** voxel-pathtracer's README and `tests/magicavoxel/` record subsurface differences of 7-16 display levels, glass over a lit floor 1-2 levels brighter, and atmosphere residuals. The renderer uses a fitted single-density random-walk subsurface model and a fitted single-scattering atmosphere; neither establishes the external editor's full transport model. No checked-in repeatable zero-error image oracle exists. These partial implementations do not satisfy exact pixel parity. Closing this needs an external black-box reference corpus across density, glass and atmosphere settings and a root-cause transport comparison, without changing the oracle or its zero-error requirement. Job 1 remains BLOCKED.
+- **Job 2, repro:** `tests/browser-check.mjs denoisehistory` and the README's viewport measurements retain noise on newly uncovered surfaces after a camera move. Reprojection has no valid history there, and a finite noisy first-frame spatial estimate cannot in general recover an arbitrary hidden radiance field exactly. Schied et al., [Spatiotemporal Variance-Guided Filtering](https://research.nvidia.com/sites/default/files/pubs/2017-07_Spatiotemporal-Variance-Guided-Filtering%3A/svgf_preprint.pdf), section 6, also reports low-light and motion limitations. The existing classical temporal filter is partial coverage, not the requested noise-free guarantee. A repeatable disocclusion oracle and an algorithm meeting that guarantee remain missing. Job 2 remains BLOCKED.
+
+### Fixed in batch 99: media-boundary emitter MIS distance
+
+The root voxel tracer used the final ray segment's `h.t` to convert the emitter PDF to solid angle after crossing a medium without scattering. NEE used the whole vertex-to-light distance, so the two MIS shares did not sum to one and over-counted energy. The tracer retains the last scattering position and uses its full distance for both voxel emission and area hits. `packages/voxel-pathtracer/tests/restir-browser.mjs` compares an absorbing half-block slab under a square light against independent quadrature, for both light types and both native WebGPU and compatibility. Before the correction, voxel emission averaged 0.756703 against about 0.69 physically expected, failing the unchanged 0.02 bound. The many-light 2x requirement is unchanged.
 
 ### Fixed 2026-11-08: text extrusion API report
 
@@ -3862,14 +3879,14 @@ The byte ceilings above are approved; all normal checks are required before push
 
 ## README examples
 
-### 106 of 767 README examples do not run yet
+### 101 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 106 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 101 are left there, each with its error. The voxel-pathtracer introduction now builds a complete generated model instead of fetching an absent raw array; its package regression executes the actual scene setup and the browser runner checks capture. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 89 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 84 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
   get-up is in this group: it needs prone and supine get-up clips (getting up from the front and from the back) on a humanoid rig, and no free rig in the repository has them; the Quaternius Universal Animation Library Standard 3.0 pack (CC0) was checked on 2026-11-07 and has none (its closest clips, `Sitting_Exit`, `Death01` and `Fixing_Kneeling`, are not get-ups). Fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group too. 17 start
   `example:`, and these need reading one at a time:
@@ -8763,14 +8780,15 @@ equations or images.
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
 import {Engine} from 'margoengine/core';
-const voxels = new Uint8Array(await (await fetch('/house.voxels')).arrayBuffer());
+// A generated solid block, so this example needs no external model file.
+const voxels = new Uint8Array(4 * 4 * 4).fill(1);
 const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {
   revision: 1,
-  models: [{ id: 'house', revision: 1, size: [32, 24, 32], voxels }], // voxels: Uint8Array of palette indices
-  instances: [{ id: 'house-1', modelId: 'house', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -16, 0, -16, 1] }],
+  models: [{ id: 'block', revision: 1, size: [4, 4, 4], voxels }], // voxels: Uint8Array of palette indices
+  instances: [{ id: 'block-1', modelId: 'block', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, -2, 1] }],
   materials: [
     { id: 1, color: [0.8, 0.75, 0.7], type: 'diffuse' },
     { id: 2, color: [0.9, 1, 0.95], type: 'glass', ior: 1.5 },
@@ -8782,10 +8800,49 @@ const tracer = VoxelPathTracer.attach(engine, { scene, maxSamples: 512, denoise:
 await tracer.ready; // until then frames show the ordinary raster image
 const nextScene = {...scene, revision: 2};
 tracer.setScene(nextScene); // validated as a whole; accumulation restarts
-const png = await tracer.capture({ width: 3840, height: 2160, samples: 1024, signal });
+const png = await tracer.capture({ width: 512, height: 512, samples: 64, signal });
 tracer.enabled = false; // back to the raster frame, bit for bit
 tracer.dispose();
 ```
+
+## Resampled emissive lighting
+
+`margoengine/voxel-pathtracer/restir` (or `@margoengine/voxel-pathtracer/restir`) exports
+`ResampledVoxelPathTracer`. Its options and lifecycle are the root tracer's, with `candidates` added:
+an integer from 1 to 64, default 8. One uses the original kernel exactly. Larger values combine
+`ceil(candidates / 2)` power-weighted emissive-face proposals and `floor(candidates / 2)` cosine
+proposals (phase-function proposals inside media) in a visibility-aware reservoir with balance MIS.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { ResampledVoxelPathTracer } from 'margoengine/voxel-pathtracer/restir';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [3, 2, 5], target: [0, 0, 0]},
+});
+const tracer = ResampledVoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{id: 'lamp', revision: 1, size: [1, 1, 1], voxels: new Uint8Array([1])}],
+    instances: [{id: 'lamp', modelId: 'lamp', matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,3,0,1]}],
+    materials: [{id: 1, type: 'emit', color: [1, 0.8, 0.5], emission: 5}],
+    environment: {groundColor: [0.8, 0.8, 0.8], skyIntensity: 0},
+  },
+  candidates: 8,
+  denoise: false,
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 8, signal: AbortSignal.timeout(30_000)});
+tracer.dispose();
+engine.dispose();
+```
+
+This is independent resampled importance sampling, without spatial or temporal reservoir reuse. It only changes
+emissive surface lighting; camera emission, delta paths, sun, area lights and the environment retain their treatment.
+Every valid candidate evaluates visibility, and directional proposals also trace an intersection. Increasing the
+candidate count costs work; no wall-time speedup or universal variance reduction is claimed. Native WebGL2 reports
+`unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer); the WebGL2 compatibility layer runs
+the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
+scene at 32 samples against an 8,192-sample baseline reference. See `tests/restir-browser.mjs`.
 
 ## Scene data
 

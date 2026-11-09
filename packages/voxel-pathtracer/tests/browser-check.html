@@ -4,7 +4,8 @@
 // here. window.check.* return plain data (numbers measured on this GPU); the script asserts and prints them.
 import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
-import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {VoxelPathTracer as BaseVoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+const VoxelPathTracer=new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
 import {motionCheck} from './motion-browser.js';
 const canvas=document.querySelector('canvas'),errors=[],messages=[],reports=[];
 const runtime=()=>engineRuntime(engine);

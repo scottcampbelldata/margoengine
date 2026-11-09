@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11502030,
+  "total": 11506642,
   "history": [
     {
       "date": "2026-10-24",
@@ -4886,6 +4886,12 @@
       "commit": "0f912f407",
       "reason": "batch-69-job-3-new-optional-socket-builder-676B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "571fb8d30",
+      "reason": "Batch 99 adds optional emissive RIS (1934 B gzip) and root subclass kernel hook, backend setup help and full-distance MIS correction (80431 B, 120 B over the old 80311 B budget). The root budget 82733 includes standard headroom measured at the initial integration. Core plus stage stays 23797 B under the unchanged 25000 B gate.",
+      "grew": 2
     }
   ],
   "items": {
@@ -5705,7 +5711,8 @@
     "@margoengine/voxel-net/server": 17930,
     "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/webtransport": 6511,
-    "@margoengine/voxel-pathtracer": 80311,
+    "@margoengine/voxel-pathtracer": 82733,
+    "@margoengine/voxel-pathtracer/restir": 2190,
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,
     "@margoengine/voxel/codec": 9368,

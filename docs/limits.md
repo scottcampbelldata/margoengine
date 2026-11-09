@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-616). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-617). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1159,3 +1159,11 @@ drawn-ring limits still apply. No speed measurement or increase to supported wor
 Optional wfc/sockets 676 B min+gzip (peers external): up to 4096 expanded variants, four Y orientations by default or 24 proper cube rotations; no reflections/deduplication. Exact equality of orientation-independent face labels. O(variants squared) adjacency construction; output rule lists may be dense. Uses constraints Uint16 solver without changing legacy root IDs. Generated 48-variant fixture only, no physical asset proof.
 
 Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics entry 1,921 B; core plus stage unchanged at 23,626 B. Earlier batch sizes above are historical. README loading examples use WAV filenames so the runtime example gate supplies its available WAV fixture.
+
+## Resampled emissive lighting
+
+| Capability | Limit | Cost and evidence |
+| --- | --- | --- |
+| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
+
+Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,797 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.

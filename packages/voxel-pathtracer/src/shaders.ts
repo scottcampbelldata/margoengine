@@ -1400,6 +1400,9 @@ fn radiance(px:vec2u)->Path {
  var thr=vec3f(1.0);var L=vec3f(0.0);
  var medium=0u;var mInst=NONE;
  var lastPdf=0.0;
+ // Light PDFs use the distance from the last scattering vertex, including
+ // non-scattering medium boundaries crossed since then, rather than the last segment.
+ var lastVertex=o;
  var bounces=0u;
  // Events per kind for the caps in f.limits: diffuse, specular (low 16 bits of y), scatter (low 16 bits of z),
  // scattering in sun-lit media (subsurface, high 16 bits of z); reflections inside glass (high 16 bits of y: kept in
@@ -1539,7 +1542,7 @@ fn radiance(px:vec2u)->Path {
     break;
    }
    if(h.inst==AREA){
-    let add=thr*areaHit(h.value,d,h.t,lastPdf);L+=add;if(focused){C+=add;}
+    let add=thr*areaHit(h.value,d,distance(p,lastVertex),lastPdf);L+=add;if(focused){C+=add;}
     if(feature){feature=false;res.albedo=tint;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
     break;
    }
@@ -1609,7 +1612,8 @@ fn radiance(px:vec2u)->Path {
    if((m.flags&EMISSIVE)!=0u||m.seen.w>0.0){
     // Camera rays (nothing scattered yet) see the camera radiance when one is set.
     let e=select(m.emission,m.seen.xyz,bounces==0u&&m.seen.w>0.0);
-    let add=thr*e*emitWeight(h,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}
+    var lightHit=h;lightHit.t=distance(p,lastVertex);
+    let add=thr*e*emitWeight(lightHit,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}
    }
    let pb=max(0.0,1.0-m.metal-m.glass);
    soft=pb>1e-6||((m.flags&SMOOTH)==0u&&m.metal>0.0);
@@ -1633,6 +1637,7 @@ fn radiance(px:vec2u)->Path {
    diffuse=true;
    let wi=sampleHg(d,md.g);
    lastPdf=select(0.0,hgPdf(dot(d,wi),md.g),md.media);
+   lastVertex=p;
    sunPdf=hgPdf(dot(d,wi),md.g);jChain=1.0;chainOk=true;chainSet=md.media;
    glassStart=!md.media;deflections=0u;deflectOk=true;
    o=p;d=wi;
@@ -1671,7 +1676,7 @@ fn radiance(px:vec2u)->Path {
    medium=h.value;mInst=h.inst;o=p-off;if((m.flags&UNTINTED)==0u){thr*=m.color;}
   } else {o=p+off;}
   if(feature){tint*=s.w;}
-  d=s.wi;lastPdf=select(0.0,s.pdf,inAir);
+  d=s.wi;lastPdf=select(0.0,s.pdf,inAir);lastVertex=o;
   bounces++;
   if(bounces>f.config.x||!roulette(&thr,bounces)){done=true;}
  }

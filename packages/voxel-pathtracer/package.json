@@ -27,6 +27,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./restir": {
+      "types": "./dist/restir.d.ts",
+      "import": "./dist/restir.js"
+    },
     "./studio": {
       "types": "./dist/studio.d.ts",
       "import": "./dist/studio.js"
@@ -49,6 +53,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-pathtracer",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu:restir": "cd ../.. && node packages/voxel-pathtracer/tests/restir-browser.mjs",
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism convergence",
     "test:gpu:denoise": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise denoise-diffuse denoise-opaque denoisepeak denoisehistory",
@@ -62,6 +67,7 @@
   "margo": {
     "gpuTestTimeoutMinutes": {
       "test:gpu": 10,
+      "test:gpu:restir": 10,
       "test:gpu:denoise": 10,
       "test:gpu:denoise-materials": 15,
       "test:gpu:denoise-caustics": 15,

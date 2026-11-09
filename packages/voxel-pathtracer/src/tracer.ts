@@ -345,7 +345,7 @@ export class VoxelPathTracer implements EnginePlugin {
   #inverse = new Float64Array(16);
   #corners = new Float32Array(32);
 
-  private constructor(options: VoxelPathTracerOptions) {
+  protected constructor(options: VoxelPathTracerOptions) {
     if (!options || typeof options !== 'object')
       throw new TypeError('VoxelPathTracer.attach expects (engine, {scene, ...options})');
     const { scene, ...rest } = options;
@@ -362,7 +362,7 @@ export class VoxelPathTracer implements EnginePlugin {
    * @throws MargoError `unsupported` without the WebGPU backend.
    */
   static attach(engine: EngineKernel, options: VoxelPathTracerOptions): VoxelPathTracer {
-    const tracer = new VoxelPathTracer(options);
+    const tracer = new this(options);
     try {
       engineRuntime(engine).use(tracer);
     } catch (error) {
@@ -370,6 +370,11 @@ export class VoxelPathTracer implements EnginePlugin {
       throw error;
     }
     return tracer;
+  }
+
+  /** Tracing kernel for an optional tracer subclass; called again after device restoration. */
+  protected tracingSource(): string {
+    return TRACE;
   }
 
   /** Whether the traced image replaces the frame. While false the tracer draws nothing and traces nothing. */
@@ -665,7 +670,10 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#alive();
     const device = engine.gpu;
     if (!device)
-      throw new MargoError('unsupported', 'VoxelPathTracer needs the WebGPU backend; create the engine with WebGPU');
+      throw new MargoError(
+        'unsupported',
+        'VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer',
+      );
     this.#engine = engine;
     this.#state(device);
   }
@@ -829,7 +837,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#gpu = gpu;
     if (compatTier(device) === 'webgl2') gpu.inputs = new WeakMap();
     gpu.route = loadCompatRoute(device, () => import('./compat.js'))?.then(
-      ({ TraceRoute }) => (gpu.routeReady = new TraceRoute(device)),
+      ({ TraceRoute }) => (gpu.routeReady = new TraceRoute(device, this.tracingSource())),
     );
     gpu.buffers = {
       table0: this.#buffer(
@@ -854,7 +862,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#samples = 0;
     if (this.#status !== 'compiling') this.#newReady();
     this.#status = 'compiling';
-    const trace = (gpu.traceModule = device.createShaderModule({ code: TRACE })),
+    const trace = (gpu.traceModule = device.createShaderModule({ code: this.tracingSource() })),
       denoise = device.createShaderModule({ code: DENOISE }),
       tables = device.createShaderModule({ code: TABLES }),
       layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
