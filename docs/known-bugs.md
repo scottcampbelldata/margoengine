@@ -281,6 +281,24 @@ These fixtures have no voxel geometry and do not prove glass traversal, a full
 staged route, state-texture serialization or GPU output parity. That repair and
 the actual failing lifecycle regression remain required; bug 45 stays OPEN.
 
+An additional raw one-light control calls context loss one second after link
+submission with completion still false. That call returns before the same
+180 s deadline; the whole supervised command completes in 92.2 s. This is a
+lifecycle observation, not a speed claim or a responsiveness guarantee. It
+supports dependence on the submitted compiler workload and is compatible with
+context destruction waiting for compilation; it does not identify a native
+deadlock. The initial compile probe's Walk starts empty, so carried-state
+compilation is a separate required check. No smaller-program result closes the
+monolithic trace defect or permits blocking application disposal for that long.
+
+The stronger one-light probe loads all Walk inputs and the partial light sum
+from runtime uniforms, retaining carried reservoir evaluation. Its 60,463-byte
+fragment is still incomplete at the 120 s poll deadline; context loss then
+returns before the unchanged 180 s process-tree limit. The command fails its
+compile-completion check (176.1 s overall), not the outer supervisor deadline.
+Thus the empty-reservoir success does not prove a bounded complete transport
+stage. A finer split, including the final reservoir/BSDF evaluation, needs proof.
+
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
 Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs

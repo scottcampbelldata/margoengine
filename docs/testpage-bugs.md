@@ -536,3 +536,16 @@ locally for the staged-route implementation. Full transport, GPU output parity,
 state serialization and an actual passing lifecycle regression are still owed.
 No runtime package, README or export changed. Bug 45 remains OPEN, with no
 FIXED or NOT A BUG claim and no speed measurement.
+
+The one-light early-loss control subsequently observes pending completion after
+one second and returns from context loss before the unchanged deadline. The
+supervised command takes 92.2 s; this is no responsiveness guarantee. It further
+implicates the submitted workload without identifying a native deadlock. A
+carried-reservoir shader compile is distinct from the empty-Walk probe and must
+be checked before a staged route can claim full work preservation.
+
+That stronger carried-state check remains incomplete at the 120 s poll. Context
+loss returns before the unchanged 180 s limit, but the command fails completion
+(176.1 s overall). No complete bounded transport stage or fix is established.
+The original real-engine hang remains open, and finer decomposition of final
+reservoir/BSDF, shadow and candidate work is still required.

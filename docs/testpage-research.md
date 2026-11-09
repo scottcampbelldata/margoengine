@@ -207,3 +207,25 @@ and its supervisor (`large`, `all --ready`, `dynamic --ready`),
 plus `testpage-45-light-equivalence.mjs` and `testpage-45-state-budget.mjs`.
 Sources, logs and result JSON files retain the inputs and observed boundaries.
 These diagnostics do not replace the failing real-engine disposal regression.
+
+The one-light active-compilation control subsequently waits one second after
+submission, observes completion false and calls context loss. It returns before
+the unchanged 180 s limit (92.2 s for the supervised command, including launch
+and shutdown). This is evidence that the input workload affects the lifecycle
+boundary, not proof of responsive cleanup or a native deadlock. The source
+initializes Walk to zero; a further compile check loads every Walk field and
+the partial lighting sum from runtime uniforms, keeping the final reservoir
+evaluation live for a carried-state stage. Compilation of that representation
+must be observed separately, and no result is assumed from source size alone.
+
+Carried-state result: the 60,463-byte shader, SHA-256
+a290ea09511921309aa138c65b9f43508efe73e5de91a372b33f1d1f3678d5b7,
+is still incomplete at the 120 s poll deadline. Context loss subsequently
+returns before the 180 s kill limit. The supervisor records failure at 176.1 s
+because the completion check failed; it did not time out. This strengthens the
+scope limit: loading the real staged inputs changes compiler work, and a
+zero-initialized reservoir is insufficient compile evidence for all transport.
+The next decomposition should isolate the final reservoir/BSDF evaluation as
+well as shadow/candidate work, preserving all operations and their order.
+Command: `node test-results/testpage-45-split-light-supervisor.mjs light --carried`.
+All own GPU commands have ended and released their shared slot.

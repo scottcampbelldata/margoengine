@@ -1861,6 +1861,21 @@ missing. A conservative inventory finds 98 scalar words across path-loop
 variables and private globals before phase scratch, liveness or bool packing;
 the older approximate 18-vec4 state estimate must not become an allocation.
 
+The smaller one-light raw program also returns from context loss requested
+while its completion status is false, before the same process-tree deadline.
+The supervised run still takes 92.2 s overall; this does not establish prompt
+disposal. The initial fixture starts with an empty reservoir, so a carried-state
+compile must retain every input field and its final BSDF evaluation before it
+can support a real staged implementation. Shader splitting and safe lifecycle
+coordination both remain work in the owning optional packages.
+
+The carried-state compile check is not green: its 60,463-byte fragment remains
+pending at the 120 s poll. Context loss returns before the 180 s tree limit,
+but the command reports failed completion at 176.1 s overall. The initial
+empty-reservoir success therefore does not prove that a complete transport
+stage is bounded. Final reservoir/BSDF evaluation and shadow/candidate work need
+finer separation with actual carried-state and GPU-output regression evidence.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for
