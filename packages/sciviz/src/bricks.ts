@@ -460,11 +460,11 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
   restore(): void {
     for (const load of this.#loading.values()) load.abort();
     this.#loading.clear();
+    this.#failed.clear();
     this.#cache = new BrickCache(this.budget.capacity);
     this.#selected = false;
     this.#settled = false;
     this.#build();
-    for (const s of this.#slices) s.restore();
   }
 
   /** @internal The figure's data-to-scene transform. */
@@ -545,7 +545,17 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
         this.#frame = index;
         this.#selected = false;
       }
-      return this.ready(options);
+      const cancel = () => {
+        // Revoke publication as well as the waiter, even when a source ignores its aborted signal.
+        this.#frame = this.#shown;
+        this.#selected = false;
+        this.#settled = false;
+        this.#failed.clear();
+        for (const load of this.#loading.values()) load.abort(options.signal!.reason);
+        this.#loading.clear();
+      };
+      options.signal?.addEventListener('abort', cancel, { once: true });
+      return this.ready(options).finally(() => options.signal?.removeEventListener('abort', cancel));
     });
     this.#frames = run.catch(() => {});
     return run;

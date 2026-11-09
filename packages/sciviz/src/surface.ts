@@ -46,7 +46,10 @@ export interface SurfaceLayerOptions {
 }
 
 /** WGSL of the surface pipeline. */
-const surfaceShader = /* wgsl */ `${frameWGSL}
+const surfaceShader = /* Shader notes kept outside the uploaded source:
+ * Central differences in data units (one-sided at the edges through the clamped reads).
+ * Contours: darken within about one pixel of each level.
+ */ /* wgsl */ `${frameWGSL}
 struct Surface { model: mat4x4f, normalModel: mat4x4f, grid: vec4f, size: vec4u, style: vec4f }
 @group(1) @binding(0) var<uniform> surface: Surface;
 @group(1) @binding(1) var<storage, read> heights: array<f32>;
@@ -68,7 +71,6 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
   let i = i32(cell % cells + di);
   let j = i32(cell / cells + dj);
   let h = height(i, j);
-  // Central differences in data units (one-sided at the edges through the clamped reads).
   let dx = surface.grid.y;
   let dy = surface.grid.w;
   let gx = (height(i + 1, j) - height(i - 1, j)) / (dx * f32(min(i + 1, i32(surface.size.x) - 1) - max(i - 1, 0)));
@@ -87,7 +89,6 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
   let t = clamp((in.value - surface.style.x) / max(surface.style.y - surface.style.x, 1e-30), 0.0, 1.0);
   var albedo = textureSampleLevel(colours, colourSampler, vec2f(t, 0.5), 0.0).rgb;
-  // Contours: darken within about one pixel of each level.
   if (surface.style.z > 0.0) {
     let level = t * surface.style.z;
     let width = fwidth(level);
@@ -177,7 +178,7 @@ export class SurfaceLayer implements Drawable {
 
   #build(): void {
     const device = this.#renderer.device!;
-    this.#heights = storageOf(device, this.#data, 'Surface heights');
+    this.#heights = storageOf(device, this.#cpu ?? this.#data, 'Surface heights');
     this.#texture = colormapTexture(device, this.colormap);
     this.#uniform = device.createBuffer({
       size: this.#values.byteLength,
@@ -206,6 +207,10 @@ export class SurfaceLayer implements Drawable {
   /** @internal The device was restored: rebuild from the CPU data (a GpuArray source must be rebuilt by you). */
   restore(): void {
     if (!isGpuArray(this.#data)) this.#build();
+    else {
+      this.#group = undefined;
+      this.visible = false;
+    }
   }
 
   /** Heights are blended only when opacity is below 1. */
@@ -277,6 +282,7 @@ export class SurfaceLayer implements Drawable {
 
   /** @internal */
   prepare(): void {
+    if (!this.#group) return;
     if (!this.#dirty) return;
     const v = this.#values,
       m = this.#model;
@@ -293,6 +299,7 @@ export class SurfaceLayer implements Drawable {
 
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
+    if (!this.#group) return;
     const transparent = this.transparent;
     const pipeline = renderer.pipeline(`surface|${transparent}`, context, (target) => {
       const module = renderer.device!.createShaderModule({ code: surfaceShader, label: 'sciviz surface' });

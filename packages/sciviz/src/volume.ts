@@ -61,14 +61,21 @@ export interface VolumeLayerOptions {
 const MAX_PLANES = 4;
 
 /** WGSL of the volume pipeline. */
-const volumeShader = /* wgsl */ `${frameWGSL}
+const volumeShader = /* Shader notes kept outside the uploaded source:
+ * The 36 vertices of the unit box, counter-clockwise seen from outside.
+ * Every face's (u, v, normal) order is left-handed toward its outward side, so the swapped quad winds
+ * counter-clockwise seen from outside.
+ * The ray through this pixel, from the near plane, in box coordinates.
+ * At most 2048 samples: a longer ray takes wider steps, so it still reaches the far side of the box.
+ * Opacity was defined per voxel; correct it for the step length (1 - (1 - a)^(step / voxel)).
+ * The gradient points up the data; the surface faces the other way.
+ */ /* wgsl */ `${frameWGSL}
 struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4> }
 @group(1) @binding(0) var<uniform> volume: Volume;
 @group(1) @binding(1) var data: texture_3d<f32>;
 @group(1) @binding(2) var transfer: texture_2d<f32>;
 @group(1) @binding(3) var linearSampler: sampler;
 struct Out { @builtin(position) clip: vec4f, @location(0) world: vec3f, @location(1) ndc: vec4f }
-// The 36 vertices of the unit box, counter-clockwise seen from outside.
 fn corner(index: u32) -> vec3f {
   let faces = array<vec3u, 6>(vec3u(0u, 1u, 2u), vec3u(0u, 2u, 1u), vec3u(1u, 2u, 0u), vec3u(1u, 0u, 2u), vec3u(2u, 0u, 1u), vec3u(2u, 1u, 0u));
   let face = index / 6u;
@@ -77,8 +84,6 @@ fn corner(index: u32) -> vec3f {
   let axes = faces[face];
   let side = f32(face % 2u);
   var p = vec3f(0.0);
-  // Every face's (u, v, normal) order is left-handed toward its outward side, so the swapped quad winds
-  // counter-clockwise seen from outside.
   let uv = quad[k].yx;
   p[axes.x] = uv.x;
   p[axes.y] = uv.y;
@@ -102,7 +107,6 @@ fn kept(p: vec3f) -> bool {
   return true;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  // The ray through this pixel, from the near plane, in box coordinates.
   let ndc = in.ndc.xy / in.ndc.w;
   let nearWorld = frame.inverse * vec4f(ndc, 1.0, 1.0);
   let origin = (volume.toBox * vec4f(nearWorld.xyz / nearWorld.w, 1.0)).xyz;
@@ -115,7 +119,6 @@ fn kept(p: vec3f) -> bool {
   let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
   if (exit <= enter) { discard; }
   let voxel = 1.0 / max(max(volume.dims.x, volume.dims.y), volume.dims.z);
-  // At most 2048 samples: a longer ray takes wider steps, so it still reaches the far side of the box.
   let stride = max(voxel / volume.params.x, (exit - enter) / 2048.0);
   let count = min(u32((exit - enter) / stride) + 1u, 2048u);
   var t = enter + stride * hash(in.clip.xy);
@@ -131,7 +134,6 @@ fn kept(p: vec3f) -> bool {
     let v = sample(p);
     if (volume.params.y > 0.5) { peak = max(peak, v); continue; }
     let tf = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0);
-    // Opacity was defined per voxel; correct it for the step length (1 - (1 - a)^(step / voxel)).
     let a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride / voxel);
     if (a < 0.002) { continue; }
     var rgb = tf.rgb;
@@ -141,7 +143,6 @@ fn kept(p: vec3f) -> bool {
         sample(p + vec3f(0.0, texel.y, 0.0)) - sample(p - vec3f(0.0, texel.y, 0.0)),
         sample(p + vec3f(0.0, 0.0, texel.z)) - sample(p - vec3f(0.0, 0.0, texel.z)));
       if (dot(g, g) > 1e-8) {
-        // The gradient points up the data; the surface faces the other way.
         let n = normalize((volume.normalModel * vec4f(-g / texel, 0.0)).xyz);
         rgb = shade(rgb, n, toEye);
       }
@@ -458,6 +459,11 @@ export class VolumeLayer implements Drawable {
   /** @internal The device was restored: rebuild from the CPU data (a GpuArray source must be rebuilt by you). */
   restore(): void {
     if (!isGpuArray(this.#data)) this.#build();
+    else {
+      this.#group = undefined;
+      this.visible = false;
+      for (const slice of this.#slices) slice.visible = false;
+    }
   }
 
   /** @internal The figure's data-to-scene transform. */
@@ -486,6 +492,11 @@ export class VolumeLayer implements Drawable {
     return { data: this.#texture!, transfer: this.#transfer!, sampler: this.#sampler! };
   }
 
+  /** @internal Whether the source texture belongs to the current device. */
+  get valid(): boolean {
+    return !!this.#group;
+  }
+
   /**
    * A slice through the volume: the plane `axis = position` (position in [0, 1] across the box), coloured by the
    * volume's colour map. Returns the slice layer; move it with `slice.position = ...`.
@@ -505,6 +516,7 @@ export class VolumeLayer implements Drawable {
 
   /** @internal */
   prepare(): void {
+    if (!this.valid) return;
     const v = this.#values,
       m = this.#model;
     v.set(m, 0);
@@ -525,6 +537,7 @@ export class VolumeLayer implements Drawable {
 
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
+    if (!this.valid) return;
     // Outside the box: front faces, tested against the scene's depth. Inside it: back faces, always.
     const eye = context.camera.position,
       toBox = this.#values.subarray(16, 32),
@@ -642,7 +655,8 @@ export class SliceLayer implements Drawable {
 
   /** @internal */
   restore(): void {
-    this.#build();
+    if (this.#volume.valid) this.#build();
+    else this.visible = false;
   }
 
   /** Opaque slices write depth; translucent ones blend. */
@@ -662,6 +676,7 @@ export class SliceLayer implements Drawable {
 
   /** @internal */
   prepare(): void {
+    if (!this.#volume.valid) return;
     if (!(this.position >= 0 && this.position <= 1))
       throw rangeError(`Slice position must be in [0, 1], got ${this.position}`, 'sciviz');
     this.#values.set(this.#model, 0);
@@ -671,6 +686,7 @@ export class SliceLayer implements Drawable {
 
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
+    if (!this.#volume.valid) return;
     const transparent = this.transparent;
     const pipeline = renderer.pipeline(`slice|${transparent}`, context, (target) => {
       const module = renderer.device!.createShaderModule({ code: sliceShader, label: 'sciviz slice' });

@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Figure, IsosurfaceLayer, Timeline, VolumeLayer } from '@margoengine/sciviz';
-import { BrickedVolumeLayer } from '@margoengine/sciviz/bricks';
+import {
+  Figure,
+  IsosurfaceLayer,
+  Timeline,
+  VolumeLayer,
+  SurfaceLayer,
+  SliceLayer,
+  RectsLayer,
+} from '@margoengine/sciviz';
+import { BrickedVolumeLayer, BrickedSliceLayer } from '@margoengine/sciviz/bricks';
+import { MeshLayer } from '@margoengine/sciviz/grids';
+import { GraphLayer } from '@margoengine/sciviz/graph';
+import { TileLayer } from '@margoengine/sciviz/geo';
 
 globalThis.GPUBufferUsage = { UNIFORM: 1, COPY_DST: 2, STORAGE: 4 };
 globalThis.GPUTextureUsage = { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 };
@@ -11,6 +22,22 @@ const deferred = () => Promise.withResolvers();
 const drain = async () => {
   for (let i = 0; i < 12; i++) await Promise.resolve();
 };
+
+test('every renderer-owned layer implements the required device restoration protocol', () => {
+  for (const Layer of [
+    IsosurfaceLayer,
+    SurfaceLayer,
+    VolumeLayer,
+    SliceLayer,
+    RectsLayer,
+    BrickedVolumeLayer,
+    BrickedSliceLayer,
+    MeshLayer,
+    GraphLayer,
+    TileLayer,
+  ])
+    assert.equal(typeof Layer.prototype.restore, 'function', `${Layer.name} must rebuild device resources`);
+});
 
 // Only scheduling and publication are mocked. The real GPU suite also checks extraction and rendered pixels.
 function fixture() {
@@ -201,6 +228,29 @@ test('volume and isosurface distinguish insufficient axes from mismatched data l
   }
 });
 
+test('removing a surface cancels its reconstruction without failing the remaining figure', {
+  timeout: 5000,
+}, async () => {
+  const f = fixture();
+  f.renderer.compute = async () => f.gpu;
+  const iso = new IsosurfaceLayer(f.renderer, f.gpu, new Float32Array(8));
+  const initial = iso.update(2);
+  await drain();
+  f.waiting.shift().resolve();
+  await initial;
+  const active = iso.update(8);
+  const rejected = assert.rejects(active, (e) => e.code === 'state');
+  await drain();
+  const restoring = iso.restore();
+  await rejected;
+  f.waiting.shift();
+  await drain();
+  assert.equal(f.waiting.length, 1, 'the committed surface is being reconstructed');
+  iso.dispose();
+  await restoring;
+  assert(f.buffers.every((b) => b.destroyed));
+});
+
 test('bricked frame requests serialize their own readiness, recover after abort, and reject after disposal', {
   timeout: 5000,
 }, async () => {
@@ -243,6 +293,89 @@ test('bricked frame requests serialize their own readiness, recover after abort,
   await c;
   layer.dispose();
   await assert.rejects(layer.setFrame(1), /disposed/);
+});
+
+test('aborting an active frame cancels the source and prevents late publication', { timeout: 5000 }, async () => {
+  const f = fixture(),
+    held = deferred(),
+    signals = [];
+  const layer = new BrickedVolumeLayer(
+    f.renderer,
+    {
+      dims: [4, 4, 4],
+      frames: 2,
+      range: [0, 1],
+      async read(request) {
+        if (request.frame === 1) {
+          signals.push(request.signal);
+          await held.promise;
+        }
+        return new Float32Array(request.size[0] * request.size[1] * request.size[2]).fill(request.frame ? 0.8 : 0.4);
+      },
+    },
+    { brickSize: 4, memoryBudget: 4096 },
+  );
+  const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  layer.setModel(identity);
+  const frame = async () => {
+    layer.schedule({ camera: { matrix: identity }, width: 400, height: 300 });
+    await drain();
+  };
+  const pump = async (promise) => {
+    let done = false;
+    const result = promise.finally(() => {
+      done = true;
+    });
+    result.catch(() => {});
+    for (let i = 0; i < 32 && !done; i++) await frame();
+    assert(done, 'readiness settles within deterministic scheduling turns');
+    return result;
+  };
+  await pump(layer.ready());
+  assert.equal(layer.frame, 0);
+  const controller = new AbortController();
+  const pending = layer.setFrame(1, { signal: controller.signal });
+  const rejected = assert.rejects(pending, (e) => e === controller.signal.reason);
+  await drain(); // setFrame selects its step in the serialized request queue, before the next render.
+  await frame();
+  assert.equal(signals.length, 1);
+  controller.abort();
+  await rejected;
+  assert(
+    signals.every((s) => s.aborted),
+    'source read receives cancellation',
+  );
+  held.resolve();
+  await pump(layer.ready());
+  for (let i = 0; i < 12; i++) {
+    await frame();
+    assert.equal(layer.frame, 0, 'cancelled frame never publishes');
+  }
+  await pump(layer.setFrame(1));
+  assert.equal(layer.frame, 1);
+  layer.dispose();
+});
+
+test('the renderer owns slice restoration so a bricked parent cannot allocate a duplicate slice uniform', () => {
+  const f = fixture();
+  f.renderer.add = () => {};
+  const layer = new BrickedVolumeLayer(
+    f.renderer,
+    {
+      dims: [4, 4, 4],
+      range: [0, 1],
+      read: () => new Float32Array(64),
+    },
+    { brickSize: 4, memoryBudget: 4096 },
+  );
+  const slice = layer.slice('x');
+  const sliceUniforms = () => f.buffers.filter((buffer) => buffer.size === 16).length;
+  assert.equal(sliceUniforms(), 1);
+  layer.restore();
+  assert.equal(sliceUniforms(), 1, 'the parent rebuild must not allocate a slice buffer');
+  slice.restore();
+  assert.equal(sliceUniforms(), 2, 'the renderer rebuilds the registered slice exactly once');
+  layer.dispose();
 });
 
 test('concurrent timeline seeks never overlap and disposal cannot publish a pending frame', {

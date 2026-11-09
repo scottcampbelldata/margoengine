@@ -3,6 +3,7 @@
 // camera from the frame. Layers may also encode compute work before the pass (an isosurface extraction, an upload).
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
+import type { ComputeContext } from '@margoengine/compute';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -20,6 +21,8 @@ export interface Drawable {
   readonly transparent: boolean;
   /** False skips the layer. */
   visible: boolean;
+  /** Rebuilds device-owned resources after replacement. */
+  restore(): void | Promise<void>;
   /** Scene-space point for sorting transparent layers. */
   center(): readonly [number, number, number];
   /** Compute or uploads before the render pass, in the frame's encoder. */
@@ -31,15 +34,16 @@ export interface Drawable {
 }
 
 /** WGSL every sciviz pipeline shares: the frame uniform and the output encoding. */
-export const frameWGSL = /* wgsl */ `struct Frame { clip: mat4x4f, inverse: mat4x4f, eye: vec4f, viewport: vec4f }
+export const frameWGSL = /* Shader notes kept outside the uploaded source:
+ * Linear light to the canvas: sRGB-encoded unless the target format encodes it already (viewport.z).
+ * A key light from over the viewer's shoulder plus a soft fill, so shapes read without a scene light set-up.
+ */ /* wgsl */ `struct Frame { clip: mat4x4f, inverse: mat4x4f, eye: vec4f, viewport: vec4f }
 @group(0) @binding(0) var<uniform> frame: Frame;
-// Linear light to the canvas: sRGB-encoded unless the target format encodes it already (viewport.z).
 fn toOutput(c: vec3f) -> vec3f {
   if (frame.viewport.z < 0.5) { return c; }
   let x = clamp(c, vec3f(0.0), vec3f(1.0));
   return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, 12.92 * x, x <= vec3f(0.0031308));
 }
-// A key light from over the viewer's shoulder plus a soft fill, so shapes read without a scene light set-up.
 fn shade(albedo: vec3f, normal: vec3f, toEye: vec3f) -> vec3f {
   let n = select(-normal, normal, dot(normal, toEye) >= 0.0);
   let key = normalize(toEye + vec3f(0.35, 0.6, 0.2));
@@ -71,6 +75,23 @@ export class SciRenderer implements EnginePlugin {
   readonly #pass = overlayDepthPass();
   #engine: Engine | undefined;
   #disposed = false;
+  #restoring: Promise<void> = Promise.resolve();
+  #restoreError: unknown;
+  #compute: Promise<ComputeContext> | undefined;
+
+  /** @internal One lazily created compute context shared by the figure's CPU-backed extractions. */
+  compute(): Promise<ComputeContext> {
+    const device = this.device!;
+    return (this.#compute ??= import('@margoengine/compute').then(({ createCompute }) => createCompute({ device })));
+  }
+
+  #clearCompute(): void {
+    void this.#compute?.then(
+      (gpu) => gpu.dispose(),
+      () => {},
+    );
+    this.#compute = undefined;
+  }
 
   /** Creates a renderer and adds it to `engine` (WebGPU backend). */
   static attach(engine: EngineKernel, options: { readonly order?: number } = {}): SciRenderer {
@@ -112,7 +133,21 @@ export class SciRenderer implements EnginePlugin {
   /** @internal EnginePlugin hook: layers rebuild their GPU data on the new device. */
   onDeviceRestored(engine: Engine): void {
     if (engine.gpu) this.#create(engine.gpu);
-    for (const d of this.#drawables) (d as Drawable & { restore?(): void }).restore?.();
+    this.#restoreError = undefined;
+    const restoring = Promise.all([...this.#drawables].map((d) => Promise.resolve().then(() => d.restore()))).then(
+      () => {},
+    );
+    this.#restoring = restoring;
+    // Observe failures immediately, and report them through ready() and subsequent renders.
+    void restoring.catch((error: unknown) => {
+      if (this.#restoring === restoring) this.#restoreError = error;
+    });
+    this.#clearCompute();
+  }
+
+  /** @internal Waits for asynchronous layer reconstruction. */
+  ready(): Promise<void> {
+    return this.#restoring;
   }
 
   /** @internal EnginePlugin hook. */
@@ -159,6 +194,7 @@ export class SciRenderer implements EnginePlugin {
   }
 
   #execute(context: PassContext): void {
+    if (this.#restoreError) throw this.#restoreError;
     if (context.backend !== 'webgpu' || this.#disposed || !this.#drawables.size) return;
     const visible = [...this.#drawables].filter((d) => d.visible);
     if (!visible.length) return;
@@ -206,6 +242,7 @@ export class SciRenderer implements EnginePlugin {
     for (const d of this.#drawables) d.dispose();
     this.#drawables.clear();
     this.#frameBuffer?.destroy();
+    this.#clearCompute();
     this.#pipelines.clear();
     const engine = this.#engine;
     this.#engine = undefined;

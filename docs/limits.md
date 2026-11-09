@@ -52,6 +52,10 @@ all 292 unique default-world worker outputs match the parent exactly. The view e
 requests (view 204 to 144; placement 190 to 144), without a wall-clock speed claim. Evidence:
 whitepaper/results/biomes-prefetch-20261109.json and packages/biomes/tests/view-prefetch.test.js.
 
+Windows GPU-lock directory creation waits at most 10 seconds per name when a removed directory is still held
+delete-pending. Permanent permission failures and other errors remain failures; ownership and GPU slot limits
+are unchanged. `tests/gpu-lock-mutex.test.js` checks a real pending deletion and the failure bound.
+
 The real-data sciviz demos keep a 2 mm, 88 x 128 x 128 CC0 head MRI, one million public-domain 2MASS sources,
 and eight daily North Atlantic NOAA wind fields locally in Git LFS. The 2MASS axes are observed RA, Dec and J-Ks
 colour, with no inferred distance. Its systematic, truncated sample is biased and not a complete survey.
@@ -60,6 +64,17 @@ projection and speed-preserving direction conversion are documented in `examples
 The MRI intensities are arbitrary scan units. The four older synthetic pages are package test fixtures only.
 The demo checks cover 1440 x 900 and 390 x 844 on native WebGPU and forced WebGL2 in Chromium; they do not
 establish a new frame-rate, clinical, forecast, browser-family or hardware-tier claim.
+
+Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
+isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
+cannot survive device loss without a CPU copy: their layers hide and must be recreated on the replacement
+device. CPU isosurfaces retain 4 bytes per voxel; meshes retain positions, normals and values (28 bytes per
+corner), graphs retain 12 bytes per node for positions plus 4 bytes per node value and 8 bytes per edge, and map
+tiles retain 4 bytes per decoded pixel for restoration. Bricked volumes reread their source.
+3D axis labels use 8 CSS pixels of clearance; crowded tick labels are omitted, with data ticks and grid lines
+unchanged. Active bricked frame aborts cancel source signals and late publication; standalone `ready` aborts
+cancel only the wait. Regression coverage: `packages/sciviz/tests/restoration-browser.mjs`,
+`entries-browser.js`, `updates.test.js` and `demos-browser.mjs` (head/stars at 390 x 844 and 1440 x 900).
 
 Sciviz volume and isosurface grids require integer dimensions of at least two samples per axis; single slices
 belong in a 2D `Figure.heatmap`. Axis errors are reported separately from mismatched sample counts.

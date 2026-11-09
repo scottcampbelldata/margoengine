@@ -6,7 +6,67 @@ import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
-import { retireMutex } from '../scripts/gpu-lock.mjs';
+import { makeLockDirectory, retireMutex } from '../scripts/gpu-lock.mjs';
+
+test('Windows pending directory deletion is bounded contention; permission failures still surface', {
+  timeout: 5000,
+}, async () => {
+  const failure = Object.assign(new Error('delete pending or denied'), { code: 'EPERM' });
+  let time = 0,
+    calls = 0;
+  assert.equal(
+    await makeLockDirectory('owned.lock', {
+      windows: true,
+      now: () => time,
+      create() {
+        if (++calls < 3) throw failure;
+      },
+      wait: async (ms) => {
+        time += ms;
+      },
+    }),
+    true,
+  );
+  assert.equal(calls, 3);
+  assert.equal(
+    await makeLockDirectory('owned.lock', {
+      create() {
+        throw Object.assign(new Error('exists'), { code: 'EEXIST' });
+      },
+      wait() {
+        assert.fail('a live directory is not pending deletion');
+      },
+    }),
+    false,
+  );
+  await assert.rejects(
+    makeLockDirectory('owned.lock', {
+      windows: false,
+      create() {
+        throw failure;
+      },
+      wait() {
+        assert.fail('POSIX permission failures are not contention');
+      },
+    }),
+    (e) => e === failure,
+  );
+  time = 0;
+  await assert.rejects(
+    makeLockDirectory('owned.lock', {
+      windows: true,
+      now: () => time,
+      create() {
+        throw failure;
+      },
+      wait: async (ms) => {
+        time += ms;
+      },
+    }),
+    (e) => e === failure,
+  );
+  assert.equal(time, 10000, 'a persistent access failure cannot wait indefinitely');
+});
 
 test('mutex retirement makes its reusable name available before Windows deletion completes', () => {
   const mutex = join('test-results', 'owned.lock', 'mutex'),
@@ -110,8 +170,9 @@ test('retired mutex names stay reusable with a real pending Windows directory de
       const markDeleted = await hold();
       await markDeleted();
       assert.throws(() => mkdirSync(mutex), { code: 'EPERM' });
+      const creating = makeLockDirectory(mutex);
       await close();
-      mkdirSync(mutex);
+      assert.equal(await creating, true, 'creation waits for the native pending deletion to finish');
     }
     const markDeleted = process.platform === 'win32' ? await hold() : undefined;
     let retired;

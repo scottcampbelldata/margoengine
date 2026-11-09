@@ -135,6 +135,70 @@ async function run(compat) {
           false,
           `${name}: horizontal overflow at ${viewport.width}`,
         );
+        if (name === 'head' || name === 'stars') {
+          await settled(path);
+          await page.evaluate(async (path) => {
+            const m = await import(path);
+            m.figure.render();
+          }, path);
+          const labels = await page.locator('[data-axis]').evaluateAll((elements) =>
+            elements
+              .filter((el) => getComputedStyle(el).display !== 'none')
+              .map((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                  text: el.textContent,
+                  title: el.dataset.axisTitle === 'true',
+                  axis: el.dataset.axis,
+                  x: r.x,
+                  y: r.y,
+                  w: r.width,
+                  h: r.height,
+                };
+              }),
+          );
+          assert.equal(labels.filter((l) => l.title).length, 3, 'all axis titles are visible');
+          for (const axis of ['x', 'y', 'z'])
+            assert.ok(
+              labels.some((l) => l.axis === axis && !l.title),
+              `${name}: ${axis} ticks visible`,
+            );
+          for (let i = 0; i < labels.length; i++) {
+            const a = labels[i];
+            assert.ok(
+              a.x >= 0 && a.y >= 0 && a.x + a.w <= viewport.width && a.y + a.h <= viewport.height,
+              `${name}: clipped label ${JSON.stringify(a)}`,
+            );
+            for (const b of labels.slice(i + 1)) {
+              const dx = Math.max(a.x - b.x - b.w, b.x - a.x - a.w),
+                dy = Math.max(a.y - b.y - b.h, b.y - a.y - a.h);
+              assert.ok(
+                Math.max(dx, dy) >= 7.9,
+                `${name} ${viewport.width}: labels need 8 CSS pixels of clearance: ${JSON.stringify({ a, b, dx, dy })}`,
+              );
+            }
+          }
+          const bars = await page.locator('[aria-label^="Colour scale"]').evaluateAll((elements) =>
+            elements
+              .flatMap((el) => [el, ...el.querySelectorAll('span')])
+              .map((el) => {
+                const r = el.getBoundingClientRect();
+                return { x: r.x, y: r.y, w: r.width, h: r.height };
+              }),
+          );
+          for (const a of labels)
+            for (const b of bars) {
+              const dx = Math.max(a.x - b.x - b.w, b.x - a.x - a.w),
+                dy = Math.max(a.y - b.y - b.h, b.y - a.y - a.h);
+              assert.ok(
+                Math.max(dx, dy) >= 7.9,
+                `${name}: axis label overlaps the colour bar ${JSON.stringify({ a, b, dx, dy })}`,
+              );
+            }
+          await page.screenshot({
+            path: `test-results/sciviz-fixes/${name}-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png`,
+          });
+        }
         if (name === 'head') {
           const hashes = [await structure(path)];
           await select('view', 'slice');

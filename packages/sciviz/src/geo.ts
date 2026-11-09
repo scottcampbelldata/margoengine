@@ -177,6 +177,7 @@ interface LoadedTile {
   readonly z: number;
   readonly x: number;
   readonly y: number;
+  readonly pixels: ImageData;
   readonly texture: GPUTexture;
   readonly uniform: GPUBuffer;
   readonly group: GPUBindGroup;
@@ -209,8 +210,9 @@ export class TileLayer implements Drawable {
   missing = 0;
   readonly #renderer: SciRenderer;
   readonly #tiles: LoadedTile[] = [];
-  readonly #layout: GPUBindGroupLayout;
-  readonly #sampler: GPUSampler;
+  #layout!: GPUBindGroupLayout;
+  #sampler!: GPUSampler;
+  #device: GPUDevice | undefined;
   readonly #model = new Float32Array(16);
   readonly #values = new Float32Array(24);
   #note: HTMLElement | undefined;
@@ -226,7 +228,12 @@ export class TileLayer implements Drawable {
     if (!Number.isInteger(this.zoom) || this.zoom < 0 || this.zoom > 24)
       throw rangeError('Tile zoom must be a whole number from 0 to 24', 'sciviz');
     this.attribution = options.attribution;
-    const device = renderer.device!;
+    this.#build();
+  }
+
+  #build(): void {
+    const device = this.#renderer.device!;
+    this.#device = device;
     this.#layout = device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -275,7 +282,6 @@ export class TileLayer implements Drawable {
       if (!response.ok) throw rangeError(`Tile ${z}/${x}/${y} answered ${response.status}`, 'sciviz');
       return response.blob();
     };
-    const device = this.#renderer.device!;
     let next = 0;
     const worker = async () => {
       while (next < list.length) {
@@ -290,28 +296,9 @@ export class TileLayer implements Drawable {
         const pixels = await pixelsOf(image);
         // A layer disposed while this tile decoded (another tile failed, say) must not take a texture it never frees.
         if (this.#disposed) return;
-        const texture = device.createTexture({
-          size: [pixels.width, pixels.height],
-          format: 'rgba8unorm-srgb',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        device.queue.writeTexture({ texture }, pixels.data, { bytesPerRow: pixels.width * 4 }, [
-          pixels.width,
-          pixels.height,
-        ]);
-        const uniform = device.createBuffer({
-          size: this.#values.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        const group = device.createBindGroup({
-          layout: this.#layout,
-          entries: [
-            { binding: 0, resource: { buffer: uniform } },
-            { binding: 1, resource: texture.createView() },
-            { binding: 2, resource: this.#sampler },
-          ],
-        });
-        this.#tiles.push({ z, x, y, texture, uniform, group });
+        this.#tiles.push(
+          this.#upload(z, x, y, new ImageData(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height)),
+        );
         this.loaded++;
       }
     };
@@ -325,6 +312,44 @@ export class TileLayer implements Drawable {
       host.append(note);
       this.#note = note;
     }
+  }
+
+  #upload(z: number, x: number, y: number, pixels: ImageData): LoadedTile {
+    if (this.#device !== this.#renderer.device) this.restore();
+    const device = this.#renderer.device!;
+    const texture = device.createTexture({
+      size: [pixels.width, pixels.height],
+      format: 'rgba8unorm-srgb',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture }, pixels.data, { bytesPerRow: pixels.width * 4 }, [
+      pixels.width,
+      pixels.height,
+    ]);
+    const uniform = device.createBuffer({
+      size: this.#values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const group = device.createBindGroup({
+      layout: this.#layout,
+      entries: [
+        { binding: 0, resource: { buffer: uniform } },
+        { binding: 1, resource: texture.createView() },
+        { binding: 2, resource: this.#sampler },
+      ],
+    });
+    return { z, x, y, pixels, texture, uniform, group };
+  }
+
+  /** @internal Reuploads retained tile pixels without fetching or decoding again. */
+  restore(): void {
+    const tiles = this.#tiles.splice(0);
+    for (const tile of tiles) {
+      tile.texture.destroy();
+      tile.uniform.destroy();
+    }
+    this.#build();
+    for (const tile of tiles) this.#tiles.push(this.#upload(tile.z, tile.x, tile.y, tile.pixels));
   }
 
   /** @internal */

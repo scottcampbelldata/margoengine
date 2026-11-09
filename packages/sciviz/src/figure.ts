@@ -7,7 +7,6 @@
 import { Engine } from '@margoengine/core';
 import { hexColor } from '@margoengine/math/color';
 import type { EngineKernel } from '@margoengine/core';
-import type { ComputeContext } from '@margoengine/compute';
 import type { PointCloud, PointsPlugin } from '@margoengine/points';
 import type { Line, Lines } from '@margoengine/lines';
 import type { OrbitControls } from '@margoengine/controls/orbit';
@@ -379,7 +378,6 @@ export class Figure extends EventTarget {
   #axes: Axes | undefined;
   #points: Promise<PointsPlugin> | undefined;
   #lines: Promise<Lines> | undefined;
-  #compute: Promise<ComputeContext> | undefined;
   #model: Float32Array;
   #bounds: Bounds = [-1, 1, -1, 1, -1, 1];
   #ownsEngine = false;
@@ -796,7 +794,7 @@ export class Figure extends EventTarget {
    * the error if one failed.
    */
   ready(): Promise<void> {
-    return this.#pending;
+    return Promise.all([this.#pending, this.renderer.ready()]).then(() => {});
   }
 
   /** The layers, in the order they were added. */
@@ -1219,14 +1217,15 @@ export class Figure extends EventTarget {
     this.#check();
     this.#need3d('An isosurface');
     this.#linear('An isosurface');
-    const gpu = await (this.#compute ??= import('@margoengine/compute').then(({ createCompute }) =>
-      createCompute({ engine: this.engine }),
-    ));
+    const gpu = await this.renderer.compute();
     this.#check();
+    if (gpu.device !== this.renderer.device)
+      throw fault('state', 'Device replaced; request the isosurface again', 'sciviz');
     const layer = new IsosurfaceLayer(this.renderer, gpu, data, {
       ...options,
       color: options.color ?? levelColour(level, options.range, options.colormap),
     });
+    this.renderer.add(layer);
     try {
       await layer.update(level, { signal: options.signal });
       this.#check();
@@ -1234,7 +1233,6 @@ export class Figure extends EventTarget {
       layer.dispose();
       throw error;
     }
-    this.renderer.add(layer);
     return this.#add(layer);
   }
 
@@ -1637,7 +1635,6 @@ export class Figure extends EventTarget {
       if (!this.#ownsEngine) engine.camera.project = undefined;
     }
     this.#interaction?.dispose();
-    void this.#compute?.then((gpu) => gpu.dispose());
     this.renderer.dispose();
     if (this.#ownsEngine) (this.engine as unknown as Engine).dispose();
   }

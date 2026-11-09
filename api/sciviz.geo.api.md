@@ -26,6 +26,7 @@ export class TileLayer implements Drawable {
     get bounds(): Bounds;
     project(lon: number, lat: number, height?: number): [number, number, number];
     load(options: TileLayerOptions): Promise<void>;
+    restore(): void;
     setModel(model: Float32Array): void;
     center(): readonly [number, number, number];
     prepare(): void;
@@ -149,6 +150,7 @@ type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
 interface Drawable {
     readonly transparent: boolean;
     visible: boolean;
+    restore(): void | Promise<void>;
     center(): readonly [number, number, number];
     prepare?(context: GpuContext, renderer: SciRenderer): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
@@ -286,6 +288,7 @@ class IsosurfaceLayer implements Drawable {
     readonly dims: readonly [number, number, number];
     readonly bounds: Bounds;
     constructor(renderer: SciRenderer, gpu: ComputeContext, data: DataSource, options?: IsosurfaceLayerOptions);
+    restore(): Promise<void>;
     get level(): number;
     get triangles(): number;
     update(level: number, options?: {
@@ -459,6 +462,7 @@ class SciRenderer implements EnginePlugin {
     device: GPUDevice | undefined;
     frameLayout: GPUBindGroupLayout | undefined;
     frameGroup: GPUBindGroup | undefined;
+    compute(): Promise<ComputeContext>;
     static attach(engine: EngineKernel, options?: {
         readonly order?: number;
     }): SciRenderer;
@@ -467,6 +471,7 @@ class SciRenderer implements EnginePlugin {
     });
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
+    ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     get engine(): Engine;
     add(drawable: Drawable): void;
@@ -607,6 +612,7 @@ class VolumeLayer implements Drawable {
         transfer: GPUTexture;
         sampler: GPUSampler;
     };
+    get valid(): boolean;
     slice(axis: 'x' | 'y' | 'z', position?: number, options?: {
         readonly opacity?: number;
     }): SliceLayer;

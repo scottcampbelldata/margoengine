@@ -1604,7 +1604,28 @@ and covers array/object/self/null/number assignment, Reflect.set, store growth,
 component/set/setAll mutation and inspector snapshot/restore with ref identity.
 Core + stage measures 23,837 B before and 23,924 B after (+87 B); no speed claim.
 
+GPU coordination on Windows (2026-11-10): a real delete-pending directory handle reproduces `EPERM` on the
+shared lock's parent or mutex name. `makeLockDirectory` handles this as bounded acquisition contention (10 seconds
+per name), including older clients' in-place deletion; live ownership is never changed. Native Windows and
+deterministic tests in `tests/gpu-lock-mutex.test.js` also require permanent permission failures to remain visible.
+
 ### Sciviz asynchronous updates and trace replacement (2026-11-10)
+
+Restore audit: every sciviz `Drawable` must implement `restore`; package type checks and the layer protocol
+regression guard this class of missing hook. SciRenderer rebuilds frame uniforms/layouts and pipelines, observes
+asynchronous restoration errors and exposes them through `Figure.ready()` and rendering. Figure invalidates its
+cached compute context. Isosurfaces abort old-device work before clearing bindings, reconstruct CPU-backed
+fields/tables/compute contexts, and queue re-extraction of the last committed level ahead of new updates. GPU-only
+sources have no CPU mirror and require caller recreation; their old bindings can never be submitted again.
+The audit also covers the latest CPU surface heights, mesh triangles, graph positions, decoded tile pixels,
+volumes and both slice types, rectangles, point/line plugins and the renderer frame state. The renderer alone
+restores registered slices; bricked parents do not allocate a duplicate slice uniform. `restoration-browser.mjs`
+replaces actual devices and checks the exact MRI input, a held extraction, later update/creation, all root layers
+and successful source completion after frame cancellation. `entries-browser.js` compares every entry's full pixels
+before/after device replacement. These are in the package browser script, hence `check:merge`'s GPU closure.
+`demos-browser.mjs` asserts measured label bounds and 8 px separation for all visible head/star axis labels at both
+required sizes and backends. Evidence scope remains Chromium/native WebGPU and WebGL2 compatibility on this
+machine; other hardware/browser families and performance remain unmeasured.
 
 Real-data demo evidence: `packages/sciviz/tests/demos-browser.mjs` runs the OpenNeuro head MRI, million-source
 2MASS catalogue and NOAA daily wind pages, plus the four retained synthetic API exercise pages. The package's
@@ -1620,8 +1641,8 @@ triangle count and level publish together after GPU completion; abort, failure a
 partial surface. Bricked `setFrame` requests serialize their own readiness instead of sharing whichever step
 was selected last. Timeline seeks already serialize callbacks; disposal now suppresses a pending callback's
 index and event publication. Ordinary volumes have no asynchronous frame setter.
-Figure isosurface creation also checks disposal after compute loading and after extraction, freeing an unregistered
-layer rather than adding it after the figure has been disposed.
+Figure isosurface creation also checks disposal after compute loading and after extraction, freeing the unfinished
+layer rather than leaving it registered after the figure has been disposed.
 `packages/sciviz/tests/updates.test.js` deterministically holds completions to check overlap, buffer identity,
 counts, cancellation, disposal and queue recovery, plus the distinct single-slice validation errors. These tests
 join the existing package test closure in `check:merge`, guarding asynchronous publication as a class.

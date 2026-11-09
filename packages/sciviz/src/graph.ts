@@ -520,13 +520,16 @@ export class GraphLayer implements Drawable {
   readonly colormap: Colormap;
   readonly #renderer: SciRenderer;
   readonly #bounds: Bounds;
-  readonly #nodeBuffer: GPUBuffer;
-  readonly #edgeBuffer: GPUBuffer;
-  readonly #valueBuffer: GPUBuffer;
-  readonly #uniform: GPUBuffer;
-  readonly #texture: GPUTexture;
-  readonly #layout: GPUBindGroupLayout;
-  readonly #group: GPUBindGroup;
+  #nodeBuffer!: GPUBuffer;
+  #edgeBuffer!: GPUBuffer;
+  #valueBuffer!: GPUBuffer;
+  #uniform!: GPUBuffer;
+  #texture!: GPUTexture;
+  #layout!: GPUBindGroupLayout;
+  #group!: GPUBindGroup;
+  #positions: Float32Array;
+  readonly #edges: Uint32Array;
+  readonly #nodeValues: Float32Array;
   readonly #range: [number, number];
   readonly #edge: [number, number, number, number];
   readonly #size: number;
@@ -569,20 +572,27 @@ export class GraphLayer implements Drawable {
     this.#size = options.nodeSize ?? 4;
     if (!(this.#size > 0)) throw rangeError('Graph nodeSize must be above 0', 'sciviz');
     this.#bounds = options.bounds ?? boundsOf(positions);
-    const device = renderer.device!,
+    this.#positions = positions.slice();
+    this.#edges = Uint32Array.from(graph.edges);
+    this.#nodeValues = Float32Array.from(values);
+    this.#build();
+  }
+
+  #build(): void {
+    const device = this.#renderer.device!,
       limit = device.limits.maxStorageBufferBindingSize;
-    if (graph.edges.length * 4 > limit)
+    if (this.#edges.byteLength > limit)
       throw rangeError(`Graph of ${this.edges} edges is over this GPU's storage limit of ${limit} bytes`, 'sciviz');
     const storage = (bytes: number) =>
       device.createBuffer({
         size: Math.max(16, Math.ceil(bytes / 16) * 16),
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
-    this.#nodeBuffer = storage(n * 12);
-    this.#edgeBuffer = storage(graph.edges.length * 4);
-    this.#valueBuffer = storage(n * 4);
-    device.queue.writeBuffer(this.#edgeBuffer, 0, Uint32Array.from(graph.edges));
-    device.queue.writeBuffer(this.#valueBuffer, 0, Float32Array.from(values));
+    this.#nodeBuffer = storage(this.#positions.byteLength);
+    this.#edgeBuffer = storage(this.#edges.byteLength);
+    this.#valueBuffer = storage(this.#nodeValues.byteLength);
+    device.queue.writeBuffer(this.#edgeBuffer, 0, this.#edges);
+    device.queue.writeBuffer(this.#valueBuffer, 0, this.#nodeValues);
     this.#uniform = device.createBuffer({
       size: this.#values.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -609,7 +619,14 @@ export class GraphLayer implements Drawable {
         { binding: 5, resource: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) },
       ],
     });
-    this.setPositions(positions);
+    device.queue.writeBuffer(this.#nodeBuffer, 0, this.#positions);
+  }
+
+  /** @internal Rebuilds buffers, textures and bindings, preserving the latest positions. */
+  restore(): void {
+    for (const b of [this.#nodeBuffer, this.#edgeBuffer, this.#valueBuffer, this.#uniform]) b.destroy();
+    this.#texture.destroy();
+    this.#build();
   }
 
   /** Data bounds the figure frames. */
@@ -622,7 +639,8 @@ export class GraphLayer implements Drawable {
     if (this.#disposed) throw typeError('Graph layer disposed; create a new one', 'sciviz');
     if (positions.length !== this.nodes * 3)
       throw rangeError(`Graph positions need xyz for ${this.nodes} nodes`, 'sciviz');
-    const data = positions instanceof Float32Array ? positions : Float32Array.from(positions);
+    const data = Float32Array.from(positions);
+    this.#positions = data;
     this.#renderer.device!.queue.writeBuffer(this.#nodeBuffer, 0, data);
   }
 

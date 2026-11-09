@@ -633,6 +633,7 @@ export const entries = [
       'play needs a timeline: call figure.timeline(times, frame) first',
       'Isosurface GpuArray must live on the engine device: createCompute({ engine })',
       'Isosurface disposed; create a new one',
+      'Device replaced; request the isosurface again',
       'sciviz needs the WebGPU backend; the engine runs WebGL2',
       'sciviz renderer is not attached; create a Figure on an engine',
       'project needs finite lon, lat and height',

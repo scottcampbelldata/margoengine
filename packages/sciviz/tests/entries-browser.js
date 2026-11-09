@@ -60,6 +60,14 @@ window.runEntryChecks = async () => {
     try {
       const facts = await run(figure, { pixels: () => pixels(figure), at, lit, assert });
       const image = await pixels(figure);
+      figure.engine.stop();
+      await figure.engine.rebootDevice();
+      figure.renderer.device.addEventListener('uncapturederror', (event) =>
+        errors.push(`${name} restored: ${event.error.message}`),
+      );
+      await figure.ready();
+      const restored = await pixels(figure);
+      assert(encode(restored) === encode(image), 'actual device replacement preserves every rendered pixel');
       report.images[name] = { width: image.width, height: image.height, data: encode(image), lit: lit(image) };
       report.checks.push({ name, ...facts });
     } catch (error) {

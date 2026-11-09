@@ -85,7 +85,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/demos-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs",
     "prepack": "npm run build"
   }
 }

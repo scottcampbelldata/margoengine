@@ -62,6 +62,29 @@ setPosition behaviour. labels/tests/testpage-position.test.js fails before and
 passes after; it also pins use of the declared shared math dependency. Labels
 measure 5,450 B gzip, below the unchanged 5,546 B entry budget.
 
+### Fixed 2026-11-10: GPU lock directory deletion contention on Windows
+
+A sciviz validation waiter failed with `EPERM` creating `gpu.lock/mutex`. Mutex-name retirement already prevents
+new clients from deleting that reusable name, but the parent lock directory is still removed when empty and older
+clients can delete mutexes in place. Windows reserves either name until the last open directory handle closes.
+Directory creation now treats this Windows state as bounded lock contention (at most 10 seconds), while other
+errors and persistent permission failures still surface unchanged. `tests/gpu-lock-mutex.test.js` holds a real
+Windows directory delete-pending, proves acquisition resumes only after closure, and checks permanent failures.
+
+### Sciviz review repairs (2026-11-10)
+
+The review's exact head MRI reproduction lost isosurface uniforms, layouts, vertices, field and compute context on
+device replacement; Figure also kept its old context. Reconstruction now invalidates old work and rebuilds the
+last committed CPU-backed surface. The audit found the same missing hooks on meshes, graphs and map tiles,
+and stale initial heights after `setHeights`; their latest CPU state is retained and rebuilt. GPU-only arrays require
+caller recreation and their lost bindings are suppressed. `restoration-browser.mjs` and `entries-browser.js`
+exercise actual replacement devices on both backends.
+The held `[4,4,4]`, two-frame read reproduction canceled only a readiness waiter, leaving publication active.
+Active frame cancellation now aborts source signals and restores the selected frame to the displayed one before
+late reads can complete; unit and real-backend regressions continue rendering after release.
+Phone axis offsets were data fractions, so shrinking the viewport collapsed title/tick spacing. Axes now use
+measured screen-space spacing; `demos-browser.mjs` checks every visible label at both requested sizes/backends.
+
 ### Fixed 2026-11-09: decoder Node Basis README example
 
 The Node `nodeKTX2` example used a page's `document` and fetched the placeholder

@@ -92,6 +92,32 @@ keeps the previous surface. Disposal aborts active and queued extractions. Durin
 the displayed surface and one new surface (96 bytes per triangle each); no extraction speed improvement is claimed.
 Disposing the figure while `fig.isosurface` is pending rejects creation and frees the unfinished layer.
 
+After device replacement, CPU-backed isosurfaces rebuild their field, compute context, tables and draw bindings,
+then extract the last committed level again. `await fig.ready()` waits for this reconstruction. Active and queued
+extractions from the old device reject with code `state`; updates requested after replacement run on the new
+device. The Figure drops its old compute context, so new isosurfaces also use the replacement device.
+CPU-backed surfaces (including the latest `setHeights`), volumes and slices, rectangles, meshes, graphs and map
+tiles rebuild too. Graphs retain the latest positions; meshes retain the latest triangles; tiles retain decoded RGBA
+pixels and do not fetch again. Bricked volumes read their bricks again as frames render.
+Caller-owned GPU arrays have no CPU mirror: their surface, volume, slice and isosurface layers become hidden after
+replacement. Recreate the arrays and layers on the new engine device. Setting `visible` cannot revive lost data.
+Custom layers passed to `fig.addLayer` implement `restore(): void | Promise<void>` to rebuild their device state.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+const fig = await Figure.create(document.querySelector('canvas')!);
+const values = new Float32Array([0, 1, 0, 1, 0, 1, 0, 1]);
+const shell = await fig.isosurface(values, 0.5, { dims: [2, 2, 2] });
+await fig.engine.rebootDevice();
+await fig.ready();
+fig.render(); // the same CPU-backed surface on the new device
+await shell.update(0.6);
+```
+
+3D axes place titles and ticks using measured CSS-pixel sizes, with 8 px clearance. At smaller sizes or after a
+camera change, crowded tick labels are omitted; the titles keep their spacing outside the tick row. Data ticks and
+grid lines are unchanged. This is recomputed every rendered frame, including resize and orbit.
+
 ```ts
 import { Figure } from '@margoengine/sciviz';
 import { createCompute } from '@margoengine/compute';
@@ -293,7 +319,9 @@ await fig.play({ fps: 30, signal: AbortSignal.timeout(10_000) });
 ## Bricked volumes
 
 `layer.setFrame(index, { signal })` requests on bricked volumes run in order, including overlapping calls. Each
-promise resolves for its own time step; an aborted queued request never selects a step. Ordinary `VolumeLayer`
+promise resolves for its own time step. An aborted queued request never selects a step. Aborting an active request
+also aborts its source reads and cancels publication: the displayed step stays put even if a source finishes late.
+`ready({ signal })` alone cancels only that readiness wait. Ordinary `VolumeLayer`
 has no asynchronous `setFrame` method.
 
 `brickedVolume(fig, source, options)` from `@margoengine/sciviz/bricks` draws a grid larger than one 3D texture or

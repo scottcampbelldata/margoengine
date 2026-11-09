@@ -108,20 +108,28 @@ export function checkGrid(grid: UnstructuredGrid): number {
   const points = grid.points.length / 3,
     cells = grid.types.length;
   if (!Number.isInteger(points)) throw rangeError('Grid points must hold xyz per point', 'sciviz');
-  if (grid.offsets.length !== cells) throw rangeError(`Grid offsets hold ${grid.offsets.length} cells, types ${cells}`, 'sciviz');
+  if (grid.offsets.length !== cells)
+    throw rangeError(`Grid offsets hold ${grid.offsets.length} cells, types ${cells}`, 'sciviz');
   let start = 0;
   for (let c = 0; c < cells; c++) {
     const type = grid.types[c],
       end = grid.offsets[c];
-    if (!NODES[type]) throw rangeError(`Grid cell ${c} has VTK type ${type}; tetra 10, hexahedron 12, wedge 13 and pyramid 14 are read`, 'sciviz');
-    if (end - start !== NODES[type]) throw rangeError(`Grid cell ${c} of type ${type} has ${end - start} points, not ${NODES[type]}`, 'sciviz');
+    if (!NODES[type])
+      throw rangeError(
+        `Grid cell ${c} has VTK type ${type}; tetra 10, hexahedron 12, wedge 13 and pyramid 14 are read`,
+        'sciviz',
+      );
+    if (end - start !== NODES[type])
+      throw rangeError(`Grid cell ${c} of type ${type} has ${end - start} points, not ${NODES[type]}`, 'sciviz');
     for (let k = start; k < end; k++) {
       const p = grid.connectivity[k];
-      if (!Number.isInteger(p) || p < 0 || p >= points) throw rangeError(`Grid cell ${c} names point ${p} of ${points}`, 'sciviz');
+      if (!Number.isInteger(p) || p < 0 || p >= points)
+        throw rangeError(`Grid cell ${c} names point ${p} of ${points}`, 'sciviz');
     }
     start = end;
   }
-  if (start !== grid.connectivity.length) throw rangeError('Grid offsets do not end at the connectivity length', 'sciviz');
+  if (start !== grid.connectivity.length)
+    throw rangeError('Grid offsets do not end at the connectivity length', 'sciviz');
   if (grid.pointData && grid.pointData.length !== points)
     throw rangeError(`Grid pointData holds ${grid.pointData.length} values for ${points} points`, 'sciviz');
   if (grid.cellData && grid.cellData.length !== cells)
@@ -253,12 +261,17 @@ export function sliceGrid(
     value = valueOf(grid, options.values ?? (grid.pointData || !grid.cellData ? 'point' : 'cell'));
   const [nx, ny, nz] = plane.normal,
     length = Math.hypot(nx, ny, nz);
-  if (!(length > 0) || !Number.isFinite(plane.offset)) throw rangeError('A slice plane needs a non-zero normal and a finite offset', 'sciviz');
+  if (!(length > 0) || !Number.isFinite(plane.offset))
+    throw rangeError('A slice plane needs a non-zero normal and a finite offset', 'sciviz');
   const n = [nx / length, ny / length, nz / length],
     d = plane.offset / length;
   // Two axes in the plane, for ordering a polygon's corners by angle.
   const helper = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const u = [n[1] * helper[2] - n[2] * helper[1], n[2] * helper[0] - n[0] * helper[2], n[0] * helper[1] - n[1] * helper[0]],
+  const u = [
+      n[1] * helper[2] - n[2] * helper[1],
+      n[2] * helper[0] - n[0] * helper[2],
+      n[0] * helper[1] - n[1] * helper[0],
+    ],
     ul = Math.hypot(u[0], u[1], u[2]);
   for (let k = 0; k < 3; k++) u[k] /= ul;
   const w = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
@@ -306,7 +319,8 @@ export function sliceGrid(
         const kept = corners.filter(
           (corner, k) => k === 0 || Math.hypot(...corner.p.map((x, i) => x - corners[k - 1].p[i])) > 1e-12,
         );
-        if (kept.length > 2 && Math.hypot(...kept[0].p.map((x, i) => x - kept[kept.length - 1].p[i])) <= 1e-12) kept.pop();
+        if (kept.length > 2 && Math.hypot(...kept[0].p.map((x, i) => x - kept[kept.length - 1].p[i])) <= 1e-12)
+          kept.pop();
         for (let k = 1; k + 1 < kept.length; k++)
           out.triangle(kept[0].p, kept[k].p, kept[k + 1].p, kept[0].v, kept[k].v, kept[k + 1].v, c);
       }
@@ -380,12 +394,17 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
     return n;
   };
   const version = /^# vtk DataFile Version (\d+)\.(\d+)/i.exec(line());
-  if (!version) throw rangeError('Not a legacy VTK file: the first line must be "# vtk DataFile Version x.x"', 'sciviz');
+  if (!version)
+    throw rangeError('Not a legacy VTK file: the first line must be "# vtk DataFile Version x.x"', 'sciviz');
   if (Number(version[1]) >= 5)
-    throw rangeError(`VTK legacy version ${version[1]}.${version[2]} (OFFSETS and CONNECTIVITY) is not read; versions up to 4.2 are`, 'sciviz');
+    throw rangeError(
+      `VTK legacy version ${version[1]}.${version[2]} (OFFSETS and CONNECTIVITY) is not read; versions up to 4.2 are`,
+      'sciviz',
+    );
   const title = line(),
     format = line().trim().toUpperCase();
-  if (format !== 'ASCII' && format !== 'BINARY') throw rangeError(`VTK file format must be ASCII or BINARY, got ${format}`, 'sciviz');
+  if (format !== 'ASCII' && format !== 'BINARY')
+    throw rangeError(`VTK file format must be ASCII or BINARY, got ${format}`, 'sciviz');
   const binary = format === 'BINARY';
   // Binary data starts right after the newline that ends the keyword line.
   const endLine = () => {
@@ -400,12 +419,14 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       for (let i = 0; i < n; i++) {
         const text = word();
         out[i] = Number(text);
-        if (Number.isNaN(out[i]) && !/^nan$/i.test(text)) throw rangeError(`VTK value ${text} is not a number`, 'sciviz');
+        if (Number.isNaN(out[i]) && !/^nan$/i.test(text))
+          throw rangeError(`VTK value ${text} is not a number`, 'sciviz');
       }
       return out;
     }
     const size = VTK_BYTES[type];
-    if (!size) throw rangeError(`VTK binary data type ${type} is not read (unsigned_char to double, not bit or long)`, 'sciviz');
+    if (!size)
+      throw rangeError(`VTK binary data type ${type} is not read (unsigned_char to double, not bit or long)`, 'sciviz');
     if (at + n * size > bytes.length) throw rangeError('VTK file ends early', 'sciviz');
     const view = new DataView(bytes.buffer, bytes.byteOffset + at, n * size),
       get =
@@ -462,7 +483,8 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       attached = key === 'POINT_DATA' ? 'point' : 'cell';
       attachedCount = count(`${key} count`);
       const expected = attached === 'point' ? (points?.length ?? 0) / 3 : cells;
-      if (attachedCount !== expected) throw rangeError(`VTK ${key} ${attachedCount} differs from the ${expected} ${attached}s`, 'sciviz');
+      if (attachedCount !== expected)
+        throw rangeError(`VTK ${key} ${attachedCount} differs from the ${expected} ${attached}s`, 'sciviz');
     } else if (!attached) {
       throw rangeError(`VTK keyword ${key} is not part of an UNSTRUCTURED_GRID`, 'sciviz');
     } else if (key === 'SCALARS') {
@@ -477,7 +499,8 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
           throw rangeError(`VTK SCALARS ${name} has ${next} components; 1 to 4 are allowed`, 'sciviz');
         next = word();
       }
-      if (next.toUpperCase() !== 'LOOKUP_TABLE') throw rangeError(`VTK SCALARS ${name} needs a LOOKUP_TABLE line`, 'sciviz');
+      if (next.toUpperCase() !== 'LOOKUP_TABLE')
+        throw rangeError(`VTK SCALARS ${name} needs a LOOKUP_TABLE line`, 'sciviz');
       word();
       endLine();
       const data = values(attachedCount * components, type),
@@ -520,7 +543,8 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       throw rangeError(`VTK keyword ${key} is not read`, 'sciviz');
     }
   }
-  if (!points || !list || !types) throw rangeError('A VTK UNSTRUCTURED_GRID needs POINTS, CELLS and CELL_TYPES', 'sciviz');
+  if (!points || !list || !types)
+    throw rangeError('A VTK UNSTRUCTURED_GRID needs POINTS, CELLS and CELL_TYPES', 'sciviz');
   // Keep the volume cells; a voxel numbers its corners x fastest, then y, then z, so it is reordered to a hexahedron.
   const connectivity: number[] = [],
     offsets: number[] = [],
@@ -530,7 +554,8 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
   for (let c = 0; c < cells; c++) {
     const n = list[p],
       type = types[c];
-    if (!(Number.isInteger(n) && n >= 0 && p + n < list.length)) throw rangeError(`VTK cell ${c} runs past the CELLS list`, 'sciviz');
+    if (!(Number.isInteger(n) && n >= 0 && p + n < list.length))
+      throw rangeError(`VTK cell ${c} runs past the CELLS list`, 'sciviz');
     const ids = list.subarray(p + 1, p + 1 + n);
     p += 1 + n;
     const voxel = type === 11;
@@ -605,7 +630,6 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
   return vec4f(toOutput(colour), mesh.style.z);
 }`;
 
-
 /**
  * Triangles coloured by value through a colour map, in data units: the surface or a slice of an unstructured grid,
  * or any {@link TriangleSet}. Create it with {@link meshLayer} or {@link gridLayer}; `update(set)` replaces the
@@ -631,6 +655,7 @@ export class MeshLayer implements Drawable {
   #sampler: GPUSampler | undefined;
   readonly #model = new Float32Array(16);
   readonly #values = new Float32Array(40);
+  #set: TriangleSet;
   #disposed = false;
 
   /** @internal Use {@link meshLayer}. */
@@ -640,14 +665,25 @@ export class MeshLayer implements Drawable {
     this.#opacity = options.opacity ?? 1;
     if (!(this.#opacity >= 0 && this.#opacity <= 1)) throw rangeError('Mesh opacity must be in [0, 1]', 'sciviz');
     const missing = hexColor(options.missing ?? '#9aa4b2');
-    if (!missing) throw typeError(`Mesh missing colour ${options.missing} is not a hex colour such as #rrggbb`, 'sciviz');
+    if (!missing)
+      throw typeError(`Mesh missing colour ${options.missing} is not a hex colour such as #rrggbb`, 'sciviz');
     this.#missing = [SRGBToLinear(missing[0]), SRGBToLinear(missing[1]), SRGBToLinear(missing[2])];
     this.#fixedRange = !!options.range;
     this.#range = options.range ? [options.range[0], options.range[1]] : [0, 1];
-    if (options.range && !(options.range[0] < options.range[1])) throw rangeError('Mesh range must be [min, max] with min < max', 'sciviz');
+    if (options.range && !(options.range[0] < options.range[1]))
+      throw rangeError('Mesh range must be [min, max] with min < max', 'sciviz');
     this.#bounds = set.bounds;
-    const device = renderer.device!;
-    this.#uniform = device.createBuffer({ size: this.#values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.#set = set;
+    this.#build();
+    this.update(set);
+  }
+
+  #build(): void {
+    const device = this.#renderer.device!;
+    this.#uniform = device.createBuffer({
+      size: this.#values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.#layout = device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -658,7 +694,17 @@ export class MeshLayer implements Drawable {
     });
     this.#texture = colormapTexture(device, this.colormap);
     this.#sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
-    this.update(set);
+  }
+
+  /** @internal Rebuilds all bindings and the latest triangle data. */
+  restore(): void {
+    this.#corners?.destroy();
+    this.#uniform?.destroy();
+    this.#texture?.destroy();
+    this.#capacity = 0;
+    this.#group = undefined;
+    this.#build();
+    this.update(this.#set);
   }
 
   /** Blended when `opacity` is below 1. */
@@ -686,12 +732,25 @@ export class MeshLayer implements Drawable {
     if (this.#disposed) throw typeError('Mesh layer disposed; create a new one', 'sciviz');
     const count = set.positions.length / 3;
     if (!Number.isInteger(count / 3) || set.normals.length !== set.positions.length || set.values.length !== count)
-      throw rangeError('A triangle set needs xyz, a normal and a value per corner, three corners per triangle', 'sciviz');
+      throw rangeError(
+        'A triangle set needs xyz, a normal and a value per corner, three corners per triangle',
+        'sciviz',
+      );
+    this.#set = {
+      ...set,
+      positions: set.positions.slice(),
+      normals: set.normals.slice(),
+      values: set.values.slice(),
+      bounds: [...set.bounds] as Bounds,
+    };
     const device = this.#renderer.device!;
     if (count > this.#capacity) {
       this.#corners?.destroy();
       this.#capacity = Math.max(3, Math.ceil(count * 1.25));
-      this.#corners = device.createBuffer({ size: this.#capacity * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.#corners = device.createBuffer({
+        size: this.#capacity * 32,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
       this.#group = device.createBindGroup({
         layout: this.#layout!,
         entries: [
@@ -716,7 +775,8 @@ export class MeshLayer implements Drawable {
     if (count) device.queue.writeBuffer(this.#corners!, 0, packed);
     this.#count = count;
     this.#bounds = set.bounds;
-    if (!this.#fixedRange) this.#range = min < max ? [min, max] : min === max && Number.isFinite(min) ? [min - 0.5, min + 0.5] : [0, 1];
+    if (!this.#fixedRange)
+      this.#range = min < max ? [min, max] : min === max && Number.isFinite(min) ? [min - 0.5, min + 0.5] : [0, 1];
   }
 
   /** @internal The figure's data-to-scene transform. */
@@ -729,7 +789,11 @@ export class MeshLayer implements Drawable {
     const [x0, x1, y0, y1, z0, z1] = this.#bounds,
       m = this.#model,
       c = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
-    return [0, 1, 2].map((r) => m[r] * c[0] + m[4 + r] * c[1] + m[8 + r] * c[2] + m[12 + r]) as unknown as [number, number, number];
+    return [0, 1, 2].map((r) => m[r] * c[0] + m[4 + r] * c[1] + m[8 + r] * c[2] + m[12 + r]) as unknown as [
+      number,
+      number,
+      number,
+    ];
   }
 
   /** @internal */

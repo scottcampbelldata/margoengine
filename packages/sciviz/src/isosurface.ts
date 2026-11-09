@@ -6,7 +6,7 @@
 import type { ComputeContext, GpuArray } from '@margoengine/compute';
 import { SRGBToLinear, hexColor } from '@margoengine/math/color';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { cubeTables } from './cubes.js';
 import { isGpuArray, resolveColormap, sizeOf, type Bounds, type ColormapSource, type DataSource } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
@@ -56,6 +56,10 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
 
 /** WGSL that writes each cell's triangles at its scanned offset. */
 function generateShader(stride: number): string {
+  /* Shader notes kept outside the uploaded source:
+   * Edge e joins corners (a, b): x edges, then y, then z (cubes.ts).
+   * The field rises inward, so the outward normal is minus the gradient.
+   */
   return /* wgsl */ `struct Grid { nx: u32, ny: u32, nz: u32, cells: u32, level: f32, pad0: f32, pad1: f32, pad2: f32 }
 struct Vertex { position: vec4f, normal: vec4f }
 @group(0) @binding(0) var<storage, read> field: array<f32>;
@@ -73,7 +77,6 @@ fn gradient(p: vec3i) -> vec3f {
   return vec3f(at(p + vec3i(1, 0, 0)) - at(p - vec3i(1, 0, 0)), at(p + vec3i(0, 1, 0)) - at(p - vec3i(0, 1, 0)), at(p + vec3i(0, 0, 1)) - at(p - vec3i(0, 0, 1)));
 }
 fn corner(c: u32) -> vec3i { return vec3i(i32(c & 1u), i32((c >> 1u) & 1u), i32((c >> 2u) & 1u)); }
-// Edge e joins corners (a, b): x edges, then y, then z (cubes.ts).
 fn edgeCorners(e: u32) -> vec2u {
   let bit = 1u << (e / 4u);
   var k = e % 4u;
@@ -103,7 +106,6 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     let vb = at(pb);
     let t = clamp((grid.level - va) / (vb - va), 0.0, 1.0);
     let p = mix(vec3f(pa), vec3f(pb), t);
-    // The field rises inward, so the outward normal is minus the gradient.
     let n = -mix(gradient(pa), gradient(pb), t);
     vertices[first + k] = Vertex(vec4f(p / vec3f(f32(grid.nx - 1u), f32(grid.ny - 1u), f32(grid.nz - 1u)), 1.0), vec4f(n, 0.0));
   }
@@ -150,9 +152,10 @@ export class IsosurfaceLayer implements Drawable {
   /** Data bounds of the grid. */
   readonly bounds: Bounds;
   readonly #renderer: SciRenderer;
-  readonly #gpu: ComputeContext;
-  readonly #field: GpuArray<'f32'>;
-  readonly #ownsField: boolean;
+  #gpu: ComputeContext;
+  #field: GpuArray<'f32'>;
+  #ownsField: boolean;
+  readonly #cpu: Float32Array | undefined;
   #level = 0;
   #triangles = 0;
   #vertices: GPUBuffer | undefined;
@@ -160,12 +163,13 @@ export class IsosurfaceLayer implements Drawable {
   #layout: GPUBindGroupLayout | undefined;
   #group: GPUBindGroup | undefined;
   readonly #colour: [number, number, number];
-  readonly #tables: { counts: GpuArray<'u32'>; edges: GpuArray<'u32'>; stride: number };
+  #tables: { counts: GpuArray<'u32'>; edges: GpuArray<'u32'>; stride: number };
   #model = new Float32Array(16);
   readonly #values = new Float32Array(36);
   #disposed = false;
   #updates: Promise<unknown> = Promise.resolve();
-  readonly #lifetime = new AbortController();
+  #lifetime = new AbortController();
+  #committed = false;
 
   /** @internal Use `figure.isosurface()`. */
   constructor(renderer: SciRenderer, gpu: ComputeContext, data: DataSource, options: IsosurfaceLayerOptions = {}) {
@@ -196,7 +200,8 @@ export class IsosurfaceLayer implements Drawable {
       ) as GpuArray<'f32'>;
       this.#ownsField = this.#field !== data;
     } else {
-      this.#field = gpu.array(data as ArrayLike<number>, 'f32');
+      this.#cpu = Float32Array.from(data as ArrayLike<number>);
+      this.#field = gpu.array(this.#cpu, 'f32');
       this.#ownsField = true;
     }
     const tables = cubeTables();
@@ -220,6 +225,50 @@ export class IsosurfaceLayer implements Drawable {
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       ],
+    });
+  }
+
+  /** @internal Recreates CPU-backed data and the last committed surface on the replacement device. */
+  restore(): Promise<void> {
+    if (this.#disposed) return Promise.resolve();
+    const reason = fault('state', 'Device replaced; request the isosurface again', 'sciviz');
+    this.#lifetime.abort(reason);
+    this.#lifetime = new AbortController();
+    this.#vertices?.destroy();
+    this.#uniform?.destroy();
+    this.#vertices = undefined;
+    this.#uniform = undefined;
+    this.#layout = undefined;
+    this.#group = undefined;
+    const signal = this.#lifetime.signal;
+    const run = this.#updates.then(async () => {
+      signal.throwIfAborted();
+      this.#tables.counts.dispose();
+      this.#tables.edges.dispose();
+      if (this.#ownsField) this.#field.dispose();
+      if (!this.#cpu) {
+        // Caller-owned GPU data is lost with its device. Never submit its old bindings on the new one.
+        this.visible = false;
+        return;
+      }
+      const gpu = await this.#renderer.compute();
+      signal.throwIfAborted();
+      this.#gpu = gpu;
+      this.#field = gpu.array(this.#cpu, 'f32');
+      this.#ownsField = true;
+      const tables = cubeTables();
+      this.#tables = {
+        counts: gpu.array(tables.counts, 'u32'),
+        edges: gpu.array(tables.edges, 'u32'),
+        stride: tables.stride,
+      };
+      this.#build();
+      if (this.#committed) await this.#extract(this.#level, signal);
+    });
+    this.#updates = run.catch(() => {});
+    // Removing a layer deliberately cancels its reconstruction, without failing the remaining figure.
+    return run.catch((error: unknown) => {
+      if (!this.#disposed || error !== this.#lifetime.signal.reason) throw error;
     });
   }
 
@@ -253,6 +302,8 @@ export class IsosurfaceLayer implements Drawable {
   }
 
   async #extract(level: number, signal: AbortSignal): Promise<number> {
+    if (this.#gpu.device && this.#gpu.device !== this.#renderer.device)
+      throw fault('state', 'Device replaced; request the isosurface again', 'sciviz');
     const gpu = this.#gpu,
       [nx, ny, nz] = this.dims,
       cells = (nx - 1) * (ny - 1) * (nz - 1);
@@ -314,6 +365,7 @@ export class IsosurfaceLayer implements Drawable {
       this.#group = group;
       this.#triangles = triangles;
       this.#level = level;
+      this.#committed = true;
       return triangles;
     } finally {
       vertices?.destroy();
@@ -336,6 +388,7 @@ export class IsosurfaceLayer implements Drawable {
 
   /** @internal */
   prepare(): void {
+    if (!this.#uniform) return;
     const v = this.#values;
     v.set(this.#model, 0);
     const inverse = new Float32Array(16);

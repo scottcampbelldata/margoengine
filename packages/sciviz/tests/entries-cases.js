@@ -1,6 +1,6 @@
 // The drawing cases of entries-browser.js, one per entry feature. Each places the camera, adds its layer and returns
 // the facts it checked.
-import { gridLayer, CELL_TYPES } from '@margoengine/sciviz/grids';
+import { gridLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
 import { tileLayer } from '@margoengine/sciviz/geo';
 
@@ -141,6 +141,13 @@ addCase('grid-slice', async (figure, { pixels, lit, assert }) => {
     count = lit(image);
   assert(layer.triangles > 0, 'the slice cut no cells');
   assert(count > 2000, `the slice lit ${count} pixels`);
+  const updated = sliceGrid(block(4), { normal: [1, 1, 1], offset: 5 });
+  layer.update(updated);
+  const moved = await pixels();
+  assert(
+    image.data.some((v, i) => v !== moved.data[i]),
+    'updated mesh differs from its initial data before restore',
+  );
   return { triangles: layer.triangles, lit: count };
 });
 
@@ -174,6 +181,12 @@ for (const dimensions of [2, 3])
     assert(layer.edges === graph.edges.length / 2, `the layer holds ${layer.edges} edges`);
     // 120 discs of 6 pixels across cover about 120 x 28 = 3,400 pixels; at least half must show past overlaps.
     assert(count > 1700, `the graph lit ${count} pixels`);
+    layer.setPositions(layout.positions.map((v) => v * 0.8));
+    const moved = await pixels();
+    assert(
+      image.data.some((v, i) => v !== moved.data[i]),
+      'updated graph positions differ before restore',
+    );
     return { edges: layer.edges, lit: count };
   });
 

@@ -6,6 +6,7 @@ import type { Label, LabelRenderer } from '@margoengine/labels';
 import type { EngineKernel } from '@margoengine/core';
 import { axisScale, type Scale } from './scales.js';
 import { toScene, type Bounds } from './layer.js';
+import { AxisLayout } from './axis-layout.js';
 
 /** Colours of a figure's chrome. */
 export interface Theme {
@@ -83,7 +84,11 @@ export class Axes {
       ty = at(1, y0, y1),
       tz = at(2, z0, z1);
     this.drawnTicks = { x: tx.values, y: ty.values };
-    if (flat) return this.#flat(Line, bounds, model, tx, ty);
+    if (flat) {
+      this.#labels.layout = null;
+      return this.#flat(Line, bounds, model, tx, ty);
+    }
+    this.#labels.layout = new AxisLayout(this.engine, toScene(model, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2));
     // The box: 12 edges.
     const box = [
       [x0, y0, z0, x1, y0, z0],
@@ -117,23 +122,21 @@ export class Axes {
           ),
         );
     }
-    const span = (lo: number, hi: number) => (hi - lo || 1) * 0.06,
-      dx = span(x0, x1),
-      dy = span(y0, y1),
-      dz = span(z0, z1);
-    const text = (content: string, data: [number, number, number], strong = false) => {
+    const text = (content: string, axis: string, data: [number, number, number], strong = false) => {
       const element = document.createElement('span');
       element.textContent = content;
+      element.dataset.axis = axis;
+      element.dataset.axisTitle = String(strong);
       element.style.cssText = `font: ${strong ? '600 13px' : '12px'} system-ui, sans-serif; color: ${this.theme.text}; white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 0 3px ${this.theme.background}`;
       this.#texts.push(this.#labels!.add(element, { position: toScene(model, ...data) }));
     };
-    tx.values.forEach((v, k) => text(tx.labels[k], [v, y0 - dy, z0]));
-    ty.values.forEach((v, k) => text(ty.labels[k], [x1 + dx, v, z0]));
-    tz.values.forEach((v, k) => text(tz.labels[k], [x0 - dx, y0 - dy, v]));
+    tx.values.forEach((v, k) => text(tx.labels[k], 'x', [v, y0, z0]));
+    ty.values.forEach((v, k) => text(ty.labels[k], 'y', [x1, v, z0]));
+    tz.values.forEach((v, k) => text(tz.labels[k], 'z', [x0, y0, v]));
     const titles = this.options.titles ?? {};
-    text(titles.x ?? 'x', [(x0 + x1) / 2, y0 - 3 * dy, z0], true);
-    text(titles.y ?? 'y', [x1 + 3 * dx, (y0 + y1) / 2, z0], true);
-    text(titles.z ?? 'z', [x0 - 3 * dx, y0 - 3 * dy, (z0 + z1) / 2 + dz], true);
+    text(titles.x ?? 'x', 'x', [(x0 + x1) / 2, y0, z0], true);
+    text(titles.y ?? 'y', 'y', [x1, (y0 + y1) / 2, z0], true);
+    text(titles.z ?? 'z', 'z', [x0, y0, (z0 + z1) / 2], true);
   }
 
   #span(content: string, css = ''): HTMLSpanElement {

@@ -25,6 +25,15 @@ disposal are covered by packages/biomes/tests/view-prefetch.test.js. The entry i
 against the unchanged ceiling of 10,454 B. This is a work-count and correctness claim, not a
 wall-clock ratio or a rival comparison.
 
+Sciviz review corrections (2026-11-10): `restoration-browser.mjs` uses the head MRI with an actual replacement
+device, a held active extraction, a later level update and new surface creation, and compares the restored pixels.
+It also tests the review's held `[4,4,4]` two-frame source after cancellation and late completion. All root layer
+types are audited, and `entries-browser.js` compares the grids, graphs and map entries before/after replacement.
+`demos-browser.mjs` measures every visible head/star axis label at 390 x 844 and 1440 x 900 on both backends,
+requiring 8 CSS pixels of separation. CPU-backed layers rebuild; caller-owned GPU data has no mirror and must
+be recreated after loss. These checks add lifecycle and layout correctness evidence in Chromium on this machine;
+they establish no new performance, browser-family or hardware claim.
+
 Real-data sciviz examples (2026-11-10): the MRI page renders a CC0 OpenNeuro T1w volume, slices and isosurface;
 the catalogue page plots one million public-domain 2MASS measurements with EDL, box/lasso selection and a linked
 colour histogram; the wind page replaces streamlines and arrows over eight real NOAA daily fields.

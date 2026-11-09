@@ -385,6 +385,26 @@ export function retireMutex(path, { rename = renameSync, remove = rmSync } = {})
   remove(retired, { recursive: true, force: true });
 }
 
+/** Windows keeps a removed directory name reserved until its last open handle closes. */
+export async function makeLockDirectory(
+  path,
+  { create = mkdirSync, wait = sleep, now = Date.now, windows = process.platform === 'win32', limit = 10_000 } = {},
+) {
+  const started = now();
+  for (;;) {
+    try {
+      create(path);
+      return true;
+    } catch (error) {
+      if (error.code === 'EEXIST') return false;
+      // A pending deletion is contention, like EEXIST, but cannot be inspected or renamed.
+      // Bound it separately so a permanent ACL failure still surfaces with its original error.
+      if (!windows || error.code !== 'EPERM' || now() - started >= limit) throw error;
+      await wait(10);
+    }
+  }
+}
+
 // Runs `fn` (synchronous, short) while holding a mutex with atomically published owner identity.
 // `fn` gets {fresh}: true when the folder was made by someone else less than freshMs() ago (an old client mid-acquire
 // when nothing is in it; see Compatibility). A folder `fn` leaves empty is removed again unless it is fresh: an empty
@@ -395,11 +415,8 @@ async function locked(fn, deadline) {
   let fresh = false;
   let release;
   for (;;) {
-    try {
-      mkdirSync(lockDir);
-      fresh = false;
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
+    if (await makeLockDirectory(lockDir)) fresh = false;
+    else {
       try {
         const made = statSync(lockDir);
         fresh = Date.now() - (made.birthtimeMs || made.mtimeMs) < freshMs();
