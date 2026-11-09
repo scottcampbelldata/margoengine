@@ -1645,3 +1645,9 @@ spacing, increases angular samples, and traces separate connectors from each nea
 it composes before bilinear weighting. Diffuse surface gathers use finite-order Jacobi radiosity with two-sided
 midpoint patches and normalized cosine quadrature. The independent circular-source check is asin(r/d)/pi from
 geometry. Only these papers were consulted; no third-party engine files, code or assets were imported.
+
+Job 2 uses the ratified KHR_materials_clearcoat specification's independent-normal and layering
+contract: https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md.
+Only the specification prose/equations and standard sample assets were read, never viewer source.
+The VdotH versus NdotV formulation difference is recorded for investigation; the nonnormative
+example alone is not evidence attributing the complete measured image loss.

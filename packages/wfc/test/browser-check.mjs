@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 const server = await createServer({
   configFile: false,
+  // This suite serves only its middleware page, not the repository's unrelated HTML entries.
+  optimizeDeps: { entries: [] },
   plugins: [
     {
       name: 'wfc-test-page',
@@ -17,9 +20,10 @@ const server = await createServer({
   server: { host: '127.0.0.1', port: 0 },
   logLevel: 'error',
 });
-await server.listen();
-const browser = await launchBrowser();
+let browser;
 try {
+  await server.listen();
+  browser = await launchBrowser();
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -58,6 +62,5 @@ try {
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ routes: result.map((r) => r.route), pixels: 64, errors: 0 }));
 } finally {
-  await browser.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

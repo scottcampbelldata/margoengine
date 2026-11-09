@@ -16,7 +16,7 @@ export function lookMatrix(position, target) {
 }
 
 /** Preserve the entire original scene and all material values; add only a shared scale, camera and sun. */
-export function prepareScene(input) {
+export function prepareScene(input, { settings = SETTINGS, scale = 1000 } = {}) {
   const bytes = new Uint8Array(input),
     view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) throw new Error('Expected GLB 2');
@@ -25,17 +25,17 @@ export function prepareScene(input) {
   const binLength = view.getUint32(20 + length, true);
   const bin = bytes.slice(28 + length, 28 + length + binLength);
   const roots = doc.scenes[doc.scene ?? 0].nodes;
-  const root = doc.nodes.push({ name: 'reference-world-units', scale: [1000, 1000, 1000], children: roots }) - 1;
+  const root = doc.nodes.push({ name: 'reference-world-units', scale: [scale, scale, scale], children: roots }) - 1;
   const camera =
     doc.nodes.push({
       name: 'Batch 160 camera',
       camera: 0,
-      matrix: lookMatrix(SETTINGS.camera.position, SETTINGS.camera.target),
+      matrix: lookMatrix(settings.camera.position, settings.camera.target),
     }) - 1;
   const light =
     doc.nodes.push({
       name: 'Batch 160 sun',
-      matrix: lookMatrix(SETTINGS.light.direction, [0, 0, 0]),
+      matrix: lookMatrix(settings.light.direction, [0, 0, 0]),
       extensions: { KHR_lights_punctual: { light: 0 } },
     }) - 1;
   doc.scenes = [{ name: 'Batch 160 matched scene', nodes: [root, camera, light] }];
@@ -45,9 +45,9 @@ export function prepareScene(input) {
       name: 'Batch 160 camera',
       type: 'perspective',
       perspective: {
-        yfov: (SETTINGS.camera.fov * Math.PI) / 180,
-        znear: SETTINGS.camera.near,
-        zfar: SETTINGS.camera.far,
+        yfov: (settings.camera.fov * Math.PI) / 180,
+        znear: settings.camera.near,
+        zfar: settings.camera.far,
         aspectRatio: 1,
       },
     },
@@ -55,7 +55,7 @@ export function prepareScene(input) {
   doc.extensionsUsed = [...new Set([...(doc.extensionsUsed ?? []), 'KHR_lights_punctual'])];
   doc.extensions = {
     ...doc.extensions,
-    KHR_lights_punctual: { lights: [{ type: 'directional', color: [1, 1, 1], intensity: SETTINGS.light.intensity }] },
+    KHR_lights_punctual: { lights: [{ type: 'directional', color: [1, 1, 1], intensity: settings.light.intensity }] },
   };
   const json = new TextEncoder().encode(JSON.stringify(doc));
   const padded = Math.ceil(json.length / 4) * 4,

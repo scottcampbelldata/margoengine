@@ -635,3 +635,14 @@ per-material exclusion or path-tracer claim is made. Foreground is the union of 
 The compatibility run installs Margo's WebGL2 compatibility device; native WebGL2 is independently asserted
 to reject PBR with code unsupported. This job does not rerun batch 168 OIT, sky, staging or lightmap.
 --measure is for collecting a new scene before establishing its budget, not accepting a failed existing test.
+
+### Batch 160 clearcoat
+
+Use the job 1 commands with `--case=clearcoat`, including the asset downloader and both backend
+runs. New camera/scale settings are in scripts/reference-rendering/cases.mjs. The complete original
+scene, geometry, material factors and textures are preserved. All 27 primitives load; 19 draws are submitted. The camera is [-1.5, 0.3, 25] looking at
+[-1.5, 0.3, 0], 35 degrees; scale 1, sun [0.4, 0.7, 0.6], intensity 3, IBL off, background black.
+Frozen reference 49a82f5e1990209481b28f3bf64afc390e407e2eb9ab3571cb904a28ab4bdd09.
+The recorded outside legal README credits Ed Mackey / Analytical Graphics, Inc. under CC-BY-4.0.
+`--measure` now refuses an established result file, preventing accidental budget replacement.
+See [the skip audit](../work-lists/batch-160-skips.md) for all 14 former missing-data skips and setup.

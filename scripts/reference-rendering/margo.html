@@ -7,14 +7,14 @@ import {webglRenderer} from '/packages/webgl/dist/index.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {SETTINGS} from './scene.mjs';
 window.referenceMargo={
-  async render(bytes,{backend='webgpu'}={}){
+  async render(bytes,{backend='webgpu',settings=SETTINGS}={}){
     const canvas=document.body.appendChild(document.createElement('canvas'));
-    const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:SETTINGS.camera});
+    const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera});
     const errors=[];
     engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
     try{
       engine.scene.background='#000000';
-      engine.lighting.direction.set([...SETTINGS.light.direction,SETTINGS.light.intensity]);
+      engine.lighting.direction.set([...settings.light.direction,settings.light.intensity]);
       engine.lighting.radiance.set([1,1,1,0]);
       const model=await parseGLTFAsync(engine,new Uint8Array(bytes));
       await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});

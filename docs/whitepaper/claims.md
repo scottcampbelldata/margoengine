@@ -1276,3 +1276,9 @@ Lighting2d uniform-field preservation: `gi-scenes.js` and `gi-regressions.js` te
 opaque unit source enclosing every interval. The GPU test reads every float32 cascade sample and requires RGB exactly
 one and transmission zero, and checks allocation sizes for every requested direction. Integer direction counts and
 constant-preserving bilinear/mean arithmetic provide this fixture invariant; no arbitrary-scene exactness claim.
+
+### Clearcoat, job 2
+
+| Measurement | Proof | Scope |
+| --- | --- | --- |
+| RGB-byte MAE 1.6809107462565105 WebGPU; 1.6809145609537761 WebGL2 compatibility | [Exact result and frozen hashes](results/batch-160-clearcoat.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=clearcoat` | Entire ClearCoatTest, 27 primitives, 512 x 512, shared embedded camera/sun, no IBL, neutral/sRGB, all pixels. Native WebGL2 rejects PBR. Picture loss stays open; no physical-equivalence claim. |

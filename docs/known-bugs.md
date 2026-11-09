@@ -1466,3 +1466,17 @@ of this entire picture error. The residual including the thin model text and sil
 sampling/display resolution and BRDF effects need separate controls. No shader change is justified by a
 guess about that residual, and recording a budget does not close the loss. No physical/path-traced parity
 is established by this first job; the environment/Cornell jobs remain outstanding.
+
+### Batch 160 clearcoat picture loss (open)
+
+Repro: `node scripts/reference-rendering/run.mjs --case=clearcoat` through the GPU lock, after
+fetching its source and capturing the reference as documented in whitepaper/reproduce.md.
+Entire Khronos ClearCoatTest, 27 primitives, no IBL, identical camera and sun, 512 x 512.
+All-pixel RGB MAE 1.6809107462565105 (WebGPU), 1.6809145609537761 (compatibility WebGL2),
+maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json.
+Cause of the complete residual is not yet isolated. Known formulation differences to investigate:
+Margo clamps clearcoat roughness to .045 and uses separable single-scatter Smith; its coat direct
+Fresnel uses VdotH, while the extension's nonnormative layering example uses NdotV.
+None of these has been proved to explain the full image error. Base-material, texture-filtering,
+normal-map and silhouette errors are included, not removed by masking. No reference-specific
+shader adjustment or core change is justified by this measurement alone.

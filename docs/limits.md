@@ -1118,3 +1118,9 @@ soft 5,901; cookie 7,350; GI 8,589; height 6,832; emissive 4,087 B. Scott approv
 Every normal quality gate must pass before landing.
 
 Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.
+
+Clearcoat job 2: full Khronos ClearCoatTest, 27 primitives, neutral/sRGB, identical camera and sun,
+no IBL, 512 x 512. RGB-byte MAE 1.6809107462565105 WebGPU and 1.6809145609537761 WebGL2
+compatibility, max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
+whitepaper/results/batch-160-clearcoat.json. The image residual remains an open defect, with
+formulation differences recorded separately from its unisolated complete cause.

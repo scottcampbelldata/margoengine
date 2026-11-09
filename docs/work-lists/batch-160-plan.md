@@ -22,3 +22,6 @@ Fix a clear small package defect with a failing regression test. A reference-mod
 reported separately from a demonstrated implementation bug. Update claims, reproduction, limits,
 operational evidence and build record with each result. Run lint, hygiene, verify and the changed
 package checks with hard deadlines before rebasing and pushing. Mark the list row done only after job 8.
+
+Completed: job 1 on cfe0d2b54; job 2 clearcoat plus all 14 missing-asset skip removals.
+Jobs 3 through 8 remain; the list-1 row stays open.

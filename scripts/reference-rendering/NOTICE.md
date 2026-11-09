@@ -23,3 +23,17 @@ Their original legal READMEs and download URL/hash manifest are beside the outsi
 their repository fixture notices already document the tests. No renderer source is read.
 
 packages/gltf-pro/tests/fixtures/pointer-show.glb is Margo-authored test data, not third-party content.
+
+## Clearcoat, job 2
+
+ClearCoatTest is pinned at the same glTF-Sample-Assets commit as job 1, SHA-256
+c3a1cbe318cd043b937130af4eb83ec2ea0b03613387b1b7d769dfab4ac15948. CC-BY-4.0,
+2020 Analytical Graphics, Inc., Ed Mackey. The original legal README, unmodified model,
+matched-camera model and hosted Sample Viewer pictures stay outside in engine-bench/batch-160.
+The full 27-primitive scene includes texture masks, roughness and independent base/coat normals.
+
+The skip audit downloader reads only test assets: Khronos glTF-Test-Assets-Interactivity f99d9b6
+(CC-BY-4.0, The Khronos Group); Niantic SPZ 11312e4ad836ed06e3da2f3d5b633688d17ebebb
+(MIT, Niantic Labs, 2024); the already-documented Cesium tower; and eoineoineoin/glTF_Physics
+9dc61cb3474ff9a51f58d3592f79d5c9e572056a (no stated licence, retained outside only).
+The outside skip-audit-provenance.json records every downloaded URL and SHA-256.

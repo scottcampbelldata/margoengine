@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pictureError, assertBudget } from '../scripts/reference-rendering/compare.mjs';
-import { lookMatrix } from '../scripts/reference-rendering/scene.mjs';
+import { lookMatrix, prepareScene } from '../scripts/reference-rendering/scene.mjs';
+import { referenceCase } from '../scripts/reference-rendering/cases.mjs';
 import { saveReference } from '../scripts/reference-rendering/reference.mjs';
 
 test('changed outside deployment cannot overwrite the frozen reference', () => {
@@ -68,4 +69,35 @@ test('metallic-roughness budget is the measured unrounded result, with real WebG
   }
   assert.equal(baseline.compat.hardware.webgpu.vendor, 'margo-webgl2');
   assert.equal(baseline.referenceSha256, baseline.compat.referenceSha256);
+});
+
+test('material-family camera preparation preserves source materials, geometry and nodes', () => {
+  const original = readFileSync(new URL('../packages/gltf-pro/tests/fixtures/pointer-show.glb', import.meta.url));
+  const source = JSON.parse(original.subarray(20, 20 + original.readUInt32LE(12)).toString());
+  const scene = prepareScene(original, referenceCase('clearcoat'));
+  assert.deepEqual(scene.doc.materials, source.materials);
+  assert.deepEqual(scene.doc.meshes, source.meshes);
+  assert.deepEqual(scene.doc.nodes.slice(0, source.nodes.length), source.nodes);
+  assert.deepEqual(scene.doc.nodes[source.nodes.length].children, source.scenes[source.scene ?? 0].nodes);
+  assert.deepEqual(scene.doc.nodes[source.nodes.length].scale, [1, 1, 1]);
+  assert.deepEqual(scene.doc.nodes.at(-2).matrix, lookMatrix([-1.5, 0.3, 25], [-1.5, 0.3, 0]));
+  assert.throws(() => referenceCase('not-a-scene'), /Unknown reference case/);
+});
+
+test('clearcoat has frozen all-pixel budgets on both supported PBR backends', () => {
+  const baseline = JSON.parse(
+    readFileSync(new URL('../docs/whitepaper/results/batch-160-clearcoat.json', import.meta.url)),
+  );
+  for (const row of [baseline, baseline.compat]) {
+    assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+    assert.equal(row.metrics.pixels, 512 * 512);
+    assert.equal(row.margo.primitives, 27);
+    assert.equal(row.nativeWebGL2.code, 'unsupported');
+    assert.equal(row.sourceSha256, referenceCase('clearcoat').sourceSha256);
+  }
+  assert.equal(baseline.referenceSha256, baseline.compat.referenceSha256);
+  assert.equal(baseline.sceneSha256, baseline.compat.sceneSha256);
+  assert.equal(baseline.compat.hardware.webgpu.vendor, 'margo-webgl2');
+  assert.equal(baseline.metrics.absolute, 1321922);
+  assert.equal(baseline.compat.metrics.absolute, 1321925);
 });

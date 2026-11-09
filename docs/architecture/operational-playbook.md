@@ -1966,3 +1966,16 @@ correction described above. Fresh integration checks passed the build, lint, hyg
 or validation errors across 11 WGSL modules. Full API update/check reports 99 packages, 856 entries and 8,525 exports;
 all five quality gates pass, including 938 size items. All 8 README examples and generated LLM/claims/umbrella regressions pass;
 the link check reports 208 documents with zero broken links. The full verify measurement above applies to the earlier `7bc32a1cb` base.
+
+Batch 160 job 2 extends the outside picture evidence to all 27 ClearCoatTest primitives, including
+factor/roughness textures and independent normal maps. All-pixel RGB error budgets are frozen on
+WebGPU and actual compatibility WebGL2; native WebGL2 rejection is asserted. No core or GPU math
+was changed. The full cause of the image loss remains unisolated in known-bugs. The 14 original
+verify skips were missing assets, not hardware: docs/work-lists/batch-160-skips.md lists each;
+external fixtures now run all 63 tests in the four affected files, with zero skips.
+
+Job 2 verification also repairs the WFC browser harness's unbounded shutdown: closeAll now
+covers startup and normal/failing assertions, with the existing repository-wide teardown
+regression. The 14 missing-data skip conditions were all removed for the full verify run:
+13,064 executed, zero skipped. A first-run stale-generated-doc failure is resolved by rebuilding
+llms outputs from the authored source documentation.

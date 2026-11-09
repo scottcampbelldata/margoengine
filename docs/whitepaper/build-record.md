@@ -3642,9 +3642,31 @@ primitives, adds a shared camera/sun, and keeps every pixel in the score. RTX A6
 rejects PBR. Measured integer error budgets are exact, with comparison-contract tests and a real-GPU
 runner. The known image loss remains open. No core or shader change; the package README's obsolete
 ACES statement is corrected to the already-implemented Khronos PBR Neutral transform.
-Jobs 2 through 8 and the final list-1 completion mark remain outstanding.
+Jobs 3 through 8 and the final list-1 completion mark remain outstanding.
 
 The required README run found that pointer-show.glb was missing. Added a Margo-authored public-example
 fixture with animated camera, material and sun, a README download link and a regression test of the
 three values after seeking. Removed only the two now-runnable pointer-example entries from the
 README known-failure list (gltf-pro and animation use the same sample). No API behavior was loosened.
+
+Job 2 measures the complete 27-primitive ClearCoatTest against the hosted Sample Viewer, with
+all source factors/textures preserved and matched camera/sun. RGB MAE is 1.6809107462565105
+(WebGPU) and 1.6809145609537761 (WebGL2 compatibility); native WebGL2 rejection is tested.
+The open picture loss is recorded with known formulation differences and an unisolated full cause.
+No shader or core changes. The harness now selects families without changing job 1's scene/hash
+or budget and refuses --measure for an established result. All 14 former verify skips are audited
+individually in work-lists/batch-160-skips.md and their missing outside assets supplied; 63 tests
+in the affected four files pass with zero skips. Physics package code is untouched.
+
+The first job 2 verify run executed 13,064 tests with zero skips and found two non-timing gate
+failures: the WFC GPU harness closed its browser/server without the shared bounded teardown,
+and generated llms files were stale. WFC now uses closeAll in a finally covering listen and
+launch as well as the assertions; tests/browser-teardown.test.js is the regression that failed
+before the fix. Regenerated the llms files from their sources. No gate or test was loosened.
+The optional materials README audit reports 27/29 passes and its two existing documented
+placeholder KTX2 URL failures; no materials package source or README was changed in this job.
+
+Job 2 final checks: lint, hygiene, full verify (13,064 pass, zero failures/skips), 402 materials
+unit tests and its 96-module GPU browser suite, 11 WFC unit tests, both WFC browser backends,
+WFC README 3/3, 22 teardown/llms regressions, six reference-contract tests, both clearcoat
+picture budgets and the unchanged job 1 WebGPU budget. No exported API changed.
