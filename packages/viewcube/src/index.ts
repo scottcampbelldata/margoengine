@@ -32,6 +32,9 @@ export interface ViewCubeOptions {
   /** Clicking the view already shown turns to the opposite one (Blender, SolidWorks "Normal To" twice). Default false.
    * A `@margoengine/controls` profile carries it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. */
   flip?: boolean;
+  /** Dragging the cube orbits the camera around its target; a press that moves under 3 pixels is still a click.
+   * Default true; also a public field. */
+  drag?: boolean;
 }
 type V3 = [number, number, number];
 /** Normal, then the face's right and up as seen from outside. Y up, front is +Z, right is +X. */
@@ -70,7 +73,7 @@ const FACES: Record<Face, [V3, V3, V3]> = {
 /** Arrow-key step; polar angles within POLE of 0 or π land exactly on the pole. */
 const STEP = Math.PI / 4,
   POLE = 1e-9;
-const CSS = `.mvc{position:absolute;z-index:1;user-select:none;-webkit-user-select:none;font:600 11px system-ui,sans-serif}
+const CSS = `.mvc{position:absolute;z-index:1;touch-action:none;user-select:none;-webkit-user-select:none;font:600 11px system-ui,sans-serif}
 .mvc-cube{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
 .mvc-face{position:absolute;inset:0;display:grid;grid-template:20% 60% 20%/20% 60% 20%;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;box-sizing:border-box;border:1px solid #868d98;background:rgba(236,238,242,.92);color:#262a31}
 .mvc-face>*{border:0;margin:0;padding:0;background:none;color:inherit;font:inherit;text-transform:uppercase;cursor:pointer;outline:none}
@@ -109,6 +112,8 @@ export class ViewCube {
   duration: number;
   /** See ViewCubeOptions.flip. */
   flip: boolean;
+  /** See ViewCubeOptions.drag. */
+  drag: boolean;
   readonly name = 'margoengine-viewcube:' + count++;
   private readonly cube: HTMLDivElement;
   private readonly buttons: [HTMLElement, V3][] = [];
@@ -130,6 +135,10 @@ export class ViewCube {
   private disposed = false;
   private upSet?: V3;
   private upPrev?: Camera['up'];
+  /** The press being dragged: pointer, where it went down, the camera's angles then, radians per CSS pixel. */
+  private grab?: { id: number; x: number; y: number; theta: number; phi: number };
+  private dragged = false;
+  private readonly speed: number;
 
   /** Creates the ViewCube on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube {
@@ -145,6 +154,7 @@ export class ViewCube {
       projection,
       labels = {},
       flip = false,
+      drag = true,
       view,
     }: ViewCubeOptions = {},
   ) {
@@ -158,6 +168,9 @@ export class ViewCube {
     this.camera = view?.camera ?? engine.camera;
     this.duration = duration;
     this.flip = flip;
+    this.drag = drag;
+    // The cube's surface follows the pointer: a drag of half the cube's width turns it one radian.
+    this.speed = 2 / size;
     this.projection = projection;
     this.container = container;
     const names: Record<Face, string> = {
@@ -222,6 +235,8 @@ export class ViewCube {
     }
     root.addEventListener('click', this.onClick);
     root.addEventListener('keydown', this.onKey);
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'])
+      root.addEventListener(type, this.onPointer as EventListener);
     // Absolute placement needs a positioned container; restored on dispose.
     this.position = container.style.position;
     if (!this.position && doc.defaultView?.getComputedStyle(container).position === 'static')
@@ -318,6 +333,9 @@ export class ViewCube {
     }
     this.element.removeEventListener('click', this.onClick);
     this.element.removeEventListener('keydown', this.onKey);
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'])
+      this.element.removeEventListener(type, this.onPointer as EventListener);
+    this.grab = undefined;
     this.element.remove();
     this.container.style.position = this.position;
     if (!this.engine.disposed && this.engine.hasPlugin(this.name)) this.engine.removePlugin(this.name);
@@ -396,6 +414,8 @@ export class ViewCube {
     const target = (event.target as HTMLElement | null)?.closest?.(
       '[data-view],[data-projection]',
     ) as HTMLElement | null;
+    // The click that ends a drag is not a click on a face.
+    if (this.dragged) return void (this.dragged = false);
     if (!target) return;
     if (target.dataset.view) {
       const d = target.dataset.view.split(',').map(Number) as V3,
@@ -409,7 +429,49 @@ export class ViewCube {
       this.view(same ? (d.map((x) => -x) as V3) : d);
     } else this.setProjection(this.projection!.mode === 'orthographic' ? 'perspective' : 'orthographic');
   };
+  /**
+   * Drag to orbit: turntable angles as OrbitControls moves them, so dragging right turns the cube's front to the right
+   * (the camera goes left) and dragging down tips the top toward the viewer, up to the poles.
+   */
+  private readonly onPointer = (event: PointerEvent): void => {
+    const g = this.grab,
+      c = this.camera;
+    if (event.type === 'pointerdown') {
+      this.dragged = false;
+      if (this.drag && !event.button && (event.target as HTMLElement).dataset?.projection === undefined) {
+        const [theta, phi] = this.current();
+        this.grab = { id: event.pointerId, x: event.clientX, y: event.clientY, theta, phi };
+      }
+      return;
+    }
+    if (!g || event.pointerId !== g.id) return;
+    if (event.type !== 'pointermove') {
+      this.grab = undefined;
+      return;
+    }
+    const dx = event.clientX - g.x,
+      dy = event.clientY - g.y;
+    if (!this.dragged) {
+      if (Math.hypot(dx, dy) < 3) return;
+      this.dragged = true;
+      this.animation = undefined;
+      c.cancelFit?.();
+      // Keeps the drag when the pointer leaves the cube; synthetic events have no pointer to capture.
+      try {
+        this.element.setPointerCapture(g.id);
+      } catch {}
+    }
+    const theta = g.theta - dx * this.speed;
+    this.place(
+      theta,
+      Math.min(Math.PI, Math.max(0, g.phi - dy * this.speed)),
+      Math.hypot(...c.position.map((x, i) => x - c.target[i])),
+    );
+    this.pole(theta);
+    event.preventDefault();
+  };
   private readonly onKey = (event: KeyboardEvent): void => {
+    this.dragged = false;
     const [theta, phi] = this.current(),
       snap = (x: number) => Math.round(x / STEP) * STEP;
     switch (event.key) {

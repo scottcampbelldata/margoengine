@@ -20,6 +20,7 @@ window.check={
   },
   async settle(){await new Promise(r=>setTimeout(r,400));await engine.gpu.queue.onSubmittedWorkDone();return {direction:direction(),animating:cube.animating,errors:errors.splice(0),mode:projection.mode,ortho:!engine.camera.matrix[11]};},
   focus(){const tabbable=[...cube.element.querySelectorAll('button[tabindex="0"]:not([data-projection])')].map(b=>b.getAttribute('aria-label'));cube.element.querySelector('[aria-label="Top view"]').focus();return {tabbable,active:document.activeElement.getAttribute('aria-label')};},
+  front(){cube.view('front',0);},
   toggle(){const r=cube.element.querySelector('[data-projection]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},
 };
 window.ready=true;

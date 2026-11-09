@@ -89,7 +89,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6 | 11 |  | 4,853 |
 | @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2 | 3 |  | 14,202 |
 | @margoengine/terrain | `.` 13, `./query` 6, `./layers-pbr` 4, `./stream` 4, `./sculpt` 7, `./holes` 2, `./rvt` 5, `./displace` 3, `./deform` 4, `./blend` 2, `./planet` 8 | 65 |  | 12,812 |
-| @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4, `./animate` 8 | 44 |  | 16,396 |
+| @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4, `./animate` 8 | 44 |  | 16,394 |
 | @margoengine/tilemap | `.` 42, `./autotile` 13, `./ldtk` 8, `./tiled` 6, `./iso` 13, `./hex` 17, `./path` 9, `./fov` 11 | 88 |  | 7,303 |
 | @margoengine/tiles | `.` 80, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11 | 84 |  | 15,586 |
 | @margoengine/tonemap | `.` 9, `./grade` 5, `./custom` 2, `./local` 2 | 6 |  | 12,460 |
@@ -100,7 +100,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3 | 95 |  | 12,337 |
 | @margoengine/vfx | `.` 22, `./base` 26, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3, `./flipbook` 1 | 400 |  | 27,335 |
 | @margoengine/video | `.` 2, `./material` 3, `./record` 3, `./360` 5, `./codecs` 3, `./alpha` 4 | 3 |  | 2,094 |
-| @margoengine/viewcube | `.` 5 |  |  | 3,394 |
+| @margoengine/viewcube | `.` 5 |  |  | 3,709 |
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 26, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5, `./shaders` 4, `./rig` 10, `./gpu` 2, `./collab` 5 | 93 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 13, `./bot` 4, `./file-store` 1, `./entities` 14 | 15 |  | 8,141 |

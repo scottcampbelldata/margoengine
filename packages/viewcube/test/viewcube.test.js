@@ -441,6 +441,70 @@ test('navigation profiles: flip turns a repeated click to the opposite view; a p
   cube.dispose();
 });
 
+test('drag to orbit: the cube follows the pointer, stops at the poles, and the click that ends a drag does nothing', () => {
+  const { engine } = setup({ position: [0, 0, 10], target: [0, 0, 0] }),
+    cube = new ViewCube(engine, { duration: 0.5 }),
+    c = engine.camera,
+    front = cells(cube).find((e) => e.dataset.view === '0,0,1'),
+    drag = (from, to, cell = front, id = 1) => {
+      cell.dispatch('pointerdown', { pointerId: id, button: 0, clientX: from[0], clientY: from[1] });
+      const move = cell.dispatch('pointermove', { pointerId: id, clientX: to[0], clientY: to[1] });
+      cell.dispatch('pointerup', { pointerId: id, clientX: to[0], clientY: to[1] });
+      cell.dispatch('click');
+      return move;
+    };
+  // 40 px right on an 80 px cube is one radian: the front turns right, so the camera goes left (azimuth -1).
+  const move = drag([100, 100], [140, 100]);
+  assert.ok(move.defaultPrevented, 'a drag move is not a page scroll');
+  assert.ok(close(direction(c), [Math.sin(-1), 0, Math.cos(-1)], 1e-12), `${direction(c)}`);
+  assert.ok(!cube.animating, 'the click ending the drag did not start a view');
+  assert.ok(Math.abs(Math.hypot(...c.position) - 10) < 1e-9, 'distance kept');
+  // Dragging down tips the top toward the viewer and stops exactly on the pole with a screen up, then frames run.
+  cube.view('front', 0);
+  drag([100, 100], [100, 400]);
+  assert.deepEqual(direction(c), [0, 1, 0]);
+  assert.ok(close(screen(c).up, [0, 0, -1]) && close(screen(c).right, [1, 0, 0]), 'top view keeps -Z up');
+  engine.run(0.1);
+  // Off the pole again, the app's up comes back.
+  drag([100, 100], [100, 80]);
+  assert.ok(direction(c)[1] < 1 && direction(c)[2] > 0);
+  assert.deepEqual([...c.up], [0, 1, 0]);
+  // A press that moves under 3 px is a click; Enter after a drag still activates a face.
+  cube.view('front', 0);
+  drag(
+    [100, 100],
+    [102, 101],
+    cells(cube).find((e) => e.dataset.view === '0,1,0'),
+  );
+  assert.ok(cube.animating, 'small move is a click');
+  engine.run(0.6);
+  assert.deepEqual(direction(c), [0, 1, 0]);
+  cube.view('front', 0);
+  drag([100, 100], [120, 100]);
+  cube.element.dispatch('keydown', { key: 'Enter' });
+  front.dispatch('click');
+  assert.ok(cube.animating, 'Enter activates after a drag');
+  // A drag cancels a running animation; another pointer, a right-button press and drag = false do not orbit.
+  cube.view('top');
+  engine.run(0.1);
+  drag([0, 0], [10, 0]);
+  assert.ok(!cube.animating, 'drag cancels the animation');
+  cube.view('front', 0);
+  front.dispatch('pointerdown', { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  front.dispatch('pointermove', { pointerId: 2, clientX: 50, clientY: 0 });
+  front.dispatch('pointerup', { pointerId: 1, clientX: 0, clientY: 0 });
+  assert.ok(close(direction(c), [0, 0, 1]), 'another pointer');
+  front.dispatch('pointerdown', { pointerId: 4, button: 2, clientX: 0, clientY: 0 });
+  front.dispatch('pointermove', { pointerId: 4, clientX: 50, clientY: 0 });
+  assert.ok(close(direction(c), [0, 0, 1]), 'a right-button press');
+  cube.drag = false;
+  cube.view('front', 0);
+  drag([0, 0], [50, 0]);
+  assert.ok(close(direction(c), [0, 0, 1]), 'drag = false');
+  assert.equal(new ViewCube(engine, { drag: false }).drag, false);
+  cube.dispose();
+});
+
 test('dispose removes the widget and its plugin; engine removal disposes it', () => {
   const { engine, container, plugins } = setup(),
     cube = new ViewCube(engine);
@@ -496,5 +560,6 @@ test('size budget', async (t) => {
   });
   const gzip = gzipSync((Array.isArray(out) ? out[0] : out).output.map((chunk) => chunk.code ?? '').join('\n')).length;
   console.log(`viewcube gzip: ${gzip} B`);
-  assert.ok(gzip < 3500, `${gzip} B`);
+  // 3,394 B before drag to orbit; drag measured 3,709 B (2026-11-08).
+  assert.ok(gzip < 3800, `${gzip} B`);
 });

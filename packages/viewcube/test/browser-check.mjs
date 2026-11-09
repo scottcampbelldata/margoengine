@@ -35,6 +35,18 @@ try {
     null,
     'top face is edge-on from the front and not hit',
   );
+  // Drag to orbit with the real mouse: 40 px right on the 80 px cube turns the camera one radian left; no click view.
+  const start = await page.evaluate(() => window.check.cell('0,0,1'));
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 20, start.y, { steps: 4 });
+  await page.mouse.move(start.x + 40, start.y, { steps: 4 });
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => window.check.settle());
+  near(dragged.direction, [Math.sin(-1), 0, Math.cos(-1)], 'drag right orbits', 1e-6);
+  assert.ok(!dragged.animating, 'the click ending a drag starts no view');
+  console.log('ok drag to orbit');
+  await page.evaluate(() => window.check.front());
   near((await click('0,1,1')).direction, [0, s2, s2], 'front-top edge');
   near((await click('0,1,0')).direction, [0, 1, 0], 'top face', 1e-5);
   const shot = await decodePNG(await page.locator('canvas').screenshot()),

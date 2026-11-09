@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11375371,
+  "total": 11375728,
   "history": [
     {
       "date": "2026-10-24",
@@ -4664,6 +4664,12 @@
       "commit": "e165bfedf",
       "reason": "Batch 112 adds optional video/alpha, reusing external video sampling for stacked masks and RGB chroma key. Existing entry budgets unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "8e6dcdce0",
+      "reason": "viewcube drag to orbit adds 315 B gzip (3394 to 3709 B measured)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5429,7 +5435,7 @@
     "@margoengine/video/codecs": 3593,
     "@margoengine/video/material": 1407,
     "@margoengine/video/record": 1396,
-    "@margoengine/viewcube": 3608,
+    "@margoengine/viewcube": 3965,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,

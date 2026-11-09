@@ -1,5 +1,5 @@
 {
-  "commit": "3ef73763c",
+  "commit": "8e6dcdce0",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2930,8 +2930,8 @@
     },
     "@margoengine/text": {
       ".": {
-        "raw": 42462,
-        "gzip": 16396
+        "raw": 42458,
+        "gzip": 16394
       },
       "./rich": {
         "raw": 27191,
@@ -2940,6 +2940,10 @@
       "./msdf": {
         "raw": 9789,
         "gzip": 4246
+      },
+      "./animate": {
+        "raw": 30704,
+        "gzip": 11439
       }
     },
     "@margoengine/tilemap": {
@@ -3212,12 +3216,20 @@
       "./360": {
         "raw": 3597,
         "gzip": 1694
+      },
+      "./codecs": {
+        "raw": 7187,
+        "gzip": 3337
+      },
+      "./alpha": {
+        "raw": 4372,
+        "gzip": 1898
       }
     },
     "@margoengine/viewcube": {
       ".": {
-        "raw": 7950,
-        "gzip": 3394
+        "raw": 9023,
+        "gzip": 3709
       }
     },
     "@margoengine/voxel": {

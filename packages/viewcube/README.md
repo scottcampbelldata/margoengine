@@ -23,6 +23,7 @@ cube.view('top');                                      // 'top' | 'bottom' | 'fr
 cube.view([1, 1, 0]);                                  // any direction from the target toward the camera
 cube.view('front', 0);                                 // jump without animating
 cube.setProjection('orthographic');
+cube.drag = false;                                     // dragging the cube orbits the camera unless turned off
 cube.dispose();                                        // engine.dispose() also disposes it
 ```
 
@@ -30,7 +31,8 @@ Options: `container` (default: the canvas's parent; made `position: relative` if
 (`'top-right'` default, `'top-left'`, `'bottom-right'`, `'bottom-left'`), `size` (cube edge in CSS pixels, 80),
 `duration` (seconds, 0.4), `projection` (a CameraProjection, or anything with `mode`), `labels` (face names, for
 translation), `flip` (false; also a public field: clicking the view already shown turns to the opposite one, as
-Blender's navigation gizmo and SolidWorks' "Normal To" pressed twice do; Autodesk's ViewCube keeps the view).
+Blender's navigation gizmo and SolidWorks' "Normal To" pressed twice do; Autodesk's ViewCube keeps the view),
+`drag` (true; also a public field: dragging the cube orbits the camera).
 `@margoengine/controls` navigation profiles carry it: `ViewCube.attach(engine, {...BLENDER.viewCube})`. The toggle
 also follows projection changes made elsewhere (Blender's numpad 5 through a profile) on the next frame.
 `cube.element` is the widget root for your own styling.
@@ -42,6 +44,12 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   leaves the pole, or on `dispose` (then 1e-6 rad off the pole, same image). An up it did not set is left alone, such as
   a CameraProjection's vertical `up`. OrbitControls and CADCameraControls leave an exact pole at azimuth 0, so after a
   top view reached from the side they start from the front.
+- **Drag to orbit.** Press on the cube and drag: the camera orbits its target at the same distance, with the
+  azimuth and elevation OrbitControls uses, so the cube's surface follows the pointer (half the cube's width is one
+  radian). Dragging right turns the front to the right; dragging down tips the top toward you and stops on the pole
+  in a standard top view. A press that moves under 3 pixels is still a click on the face, edge or corner, and the
+  click that ends a drag does nothing. The cube keeps the pointer while dragging, a drag cancels a view animation,
+  and only the primary button drags (`touch-action: none` on the widget, so a touch drag does not scroll the page).
 - **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
 - **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and the stage's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
@@ -58,9 +66,9 @@ Why a separate package and not `@margoengine/controls`: the cube is a DOM widget
 (including the stage's CADCameraControls, which does not use controls) and optionally `@margoengine/cameras`; keeping it
 out leaves controls' bundle and dependencies unchanged.
 
-Limits: no drag-to-orbit on the cube itself, no roll (the cube sets `camera.up` only on the poles), no "home" view of your own (use
+Limits: no roll (the cube sets `camera.up` only on the poles), no "home" view of your own (use
 `camera.fitToBoundingBox`), and the colours are fixed light-grey (restyle `.mvc-face` and `.mvc-projection`).
 
-Size: 3.1 kB min + gzip (the test enforces under 3.5 kB). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
+Size: 3,709 B min + gzip (the test enforces under 3,800 B). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
 
 Unit tests: `npm test --workspace @margoengine/viewcube`. Browser check with real clicks: `node packages/viewcube/test/browser-check.mjs`.

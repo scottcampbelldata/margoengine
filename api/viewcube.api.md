@@ -17,9 +17,10 @@ export class ViewCube {
     readonly camera: Camera;
     duration: number;
     flip: boolean;
+    drag: boolean;
     readonly name: string;
     static attach(engine: EngineKernel, options?: ViewCubeOptions): ViewCube;
-    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, view }?: ViewCubeOptions);
+    constructor(engine: EngineKernel, { container, corner, size, duration, projection, labels, flip, drag, view }?: ViewCubeOptions);
     view(view: View, duration?: number): void;
     getProjection(): Projection | undefined;
     setProjection(mode: Projection): void;
@@ -41,5 +42,6 @@ export interface ViewCubeOptions {
     };
     labels?: Partial<Record<Face, string>>;
     flip?: boolean;
+    drag?: boolean;
 }
 ```
