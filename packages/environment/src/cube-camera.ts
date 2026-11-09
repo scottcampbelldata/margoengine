@@ -320,6 +320,7 @@ export class CubeCamera {
           entries: [{ binding: 0, resource: source.createView() }],
         }),
       };
+    // view-state: offscreen cube face, full capture target.
     const pass = c.encoder.beginRenderPass({
       label: 'cube camera face',
       colorAttachments: [{ view: state.levels[face][0], loadOp: 'clear', storeOp: 'store' }],
@@ -351,6 +352,7 @@ export class CubeCamera {
     );
     for (let layer = 0; layer < 6; layer++)
       for (let level = 1; level < state.levels[layer].length; level++) {
+        // view-state: offscreen cube mip, full reduced target.
         const reduce = c.encoder.beginRenderPass({
           label: 'cube camera mips',
           colorAttachments: [{ view: state.levels[layer][level], loadOp: 'clear', storeOp: 'store' }],
@@ -375,8 +377,7 @@ export class CubeCamera {
     this.release();
     const engine = this.engine;
     this.engine = undefined;
-    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === (this as unknown))
-      engine.removePlugin(this.name);
+    if (engine && !engine.disposed) engineRuntime(engine).sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

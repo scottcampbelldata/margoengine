@@ -132,7 +132,7 @@ export abstract class ShaderEffect {
     this.disposed = true;
     for (const release of [...this.models.values()]) release();
     this.shaders.clear();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
@@ -222,7 +222,8 @@ export class EnvironmentLighting extends ShaderEffect {
     const engine = this.loadedInto;
     this.loadedInto = undefined;
     super.dispose();
-    if (engine && !this.environment.disposed) engine.removePlugin(this.environment.name);
+    if (engine && !this.environment.disposed)
+      engineRuntime(engine).sceneOf(this.environment)?.removePlugin(this.environment.name);
   }
   protected get device(): GPUDevice | null {
     return this.environment.disposed ? null : this.environment.device;

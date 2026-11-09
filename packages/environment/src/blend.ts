@@ -118,7 +118,10 @@ function pipelinesFor(device: GPUDevice): Pipelines {
       sh: device.createComputePipeline({
         label: 'environment blend SH',
         layout: 'auto',
-        compute: { module: device.createShaderModule({ label: 'environment blend SH', code: SH_WGSL }), entryPoint: 'main' },
+        compute: {
+          module: device.createShaderModule({ label: 'environment blend SH', code: SH_WGSL }),
+          entryPoint: 'main',
+        },
       }),
     };
     pipelines.set(device, p);
@@ -193,7 +196,8 @@ export class EnvironmentBlend implements EnginePlugin {
     const environmentOptions: EnvironmentOptions = {
       size,
       specularSize,
-      specularMips: options.specularMips ?? Math.min(Math.log2(specularSize) + 1, Math.max(from.specularMips, to.specularMips)),
+      specularMips:
+        options.specularMips ?? Math.min(Math.log2(specularSize) + 1, Math.max(from.specularMips, to.specularMips)),
       brdfSize: options.brdfSize,
       brdfSamples: options.brdfSamples,
       // The seed is black and is overwritten by every blend: one sample, no equirect kept, tiny CPU source to restore.
@@ -300,6 +304,7 @@ export class EnvironmentBlend implements EnginePlugin {
     const p = pipelinesFor(device);
     const encoder = device.createCommandEncoder({ label: 'environment blend' });
     for (const pass of state.passes) {
+      // view-state: offscreen blend target, independent of camera views.
       const render = encoder.beginRenderPass({
         label: 'environment blend',
         colorAttachments: [{ view: pass.target, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }],
@@ -356,7 +361,8 @@ export class EnvironmentBlend implements EnginePlugin {
   private live(): GPUDevice {
     if (this.disposed) throw new MargoError('disposed', 'EnvironmentBlend is disposed; create a new EnvironmentBlend');
     const device = this.environment.device;
-    if (!device) throw new MargoError('state', 'EnvironmentBlend is being restored; wait for the device restore to finish');
+    if (!device)
+      throw new MargoError('state', 'EnvironmentBlend is being restored; wait for the device restore to finish');
     return device;
   }
   // Reblend once every part has resources on the output's device (sources and output restore in any order).
@@ -448,7 +454,8 @@ export class EnvironmentBlend implements EnginePlugin {
         target = scratch.createView({ baseMipLevel: mip, mipLevelCount: 1 });
       const lodA = Math.max(0, Math.log2(a.size / edge)),
         lodB = Math.max(0, Math.log2(b.size / edge));
-      for (let face = 0; face < 6; face++) passes.push({ group: level(edge, face, lodA, lodB), target, copy: { mip, face, edge } });
+      for (let face = 0; face < 6; face++)
+        passes.push({ group: level(edge, face, lodA, lodB), target, copy: { mip, face, edge } });
     }
     // Prefiltered specular: each output mip reads each source at the same roughness.
     for (let mip = 0; mip < specularMips; mip++) {
@@ -490,7 +497,8 @@ function checkSources(device: GPUDevice, from: Environment, to: Environment): vo
   for (const source of [from, to]) {
     if (!source || typeof source.onChange !== 'function')
       throw new TypeError('EnvironmentBlend needs two Environments');
-    if (source.disposed) throw new MargoError('disposed', 'EnvironmentBlend source is disposed; pass a live Environment');
+    if (source.disposed)
+      throw new MargoError('disposed', 'EnvironmentBlend source is disposed; pass a live Environment');
     if (source.device !== device)
       throw new MargoError(
         'state',

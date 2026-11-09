@@ -14,7 +14,15 @@ import { LightProbes } from '../dist/probes.js';
 const coreShader = readFileSync(new URL('../../core/src/shaders.ts', import.meta.url), 'utf8').split('`')[1];
 const fragment = (shader) => shader.slice(shader.lastIndexOf('@fragment fn fragment'));
 const linearLine = (shader) => /let linear=[^;]+;/.exec(fragment(shader))[0];
-const fakeEngine = (device) => ({ backend: 'webgpu', gpu: device, onError() {}, removePlugin() {} });
+const fakeEngine = (device) => ({
+  backend: 'webgpu',
+  gpu: device,
+  onError() {},
+  sceneOf() {
+    return this;
+  },
+  removePlugin() {},
+});
 const fakeEnvironment = (device) => ({
   device,
   disposed: false,
@@ -81,7 +89,10 @@ test('LightProbes without an environment fall back to the hemisphere in either o
     assert.doesNotMatch(f, /frame\.radiance\.w/);
   }
   for (const code of [sky.shader(envProbes.shader(coreShader, 0), 0), envProbes.shader(sky.shader(coreShader, 0), 0)])
-    assert.ok(linearLine(code).includes('*margoSkyLight(n)') && fragment(code).includes(',vec3f(0),vec3f(0.04),1.0);'), 'adds to IBL');
+    assert.ok(
+      linearLine(code).includes('*margoSkyLight(n)') && fragment(code).includes(',vec3f(0),vec3f(0.04),1.0);'),
+      'adds to IBL',
+    );
 });
 
 test("gltf-pro's sky hook replaces the fixed gradient in every gltf-pro-family shader, beside IBL, inside probes' fallback", () => {

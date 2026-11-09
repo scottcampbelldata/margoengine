@@ -45,6 +45,9 @@ const fakeEngine = (device) => ({
   onError(error) {
     this.errors.push(error);
   },
+  sceneOf() {
+    return this;
+  },
   removePlugin(name) {
     this.removed.push(name);
   },
@@ -843,6 +846,9 @@ function pluginEngine(device) {
       if (plugins.has(plugin.name)) throw new TypeError('Invalid plugin');
       plugin.setup(this);
       plugins.set(plugin.name, plugin);
+      return this;
+    },
+    sceneOf() {
       return this;
     },
     removePlugin(name) {

@@ -37,6 +37,9 @@ function story(make, samples, edit) {
       plugins.set(plugin.name, plugin);
       return engine;
     },
+    sceneOf() {
+      return this;
+    },
     removePlugin(name) {
       const plugin = plugins.get(name);
       plugins.delete(name);

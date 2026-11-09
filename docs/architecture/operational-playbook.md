@@ -4254,3 +4254,13 @@ initializers use the shared requirement before allocation, with restoration
 cleanup tested, including SSAO's GTAO subclass. Bloom's image encoding path is
 covered by the same initializer. Only the measured scope is claimed; other
 standalone effects and package features still need equivalent evidence.
+
+Batch 56 reflection-shapes fixture follow-up: the complete environment GPU gate
+exposed TypeError (sceneOf missing) in the shader-only fixture, after its GPU
+comparisons had passed. That fixture now uses the real engine already created
+by the page and asserts registration plus detachment in both blend modes. The
+unchanged sphere/box comparisons and real room bake pass under the shared GPU
+lock. The red and green logs are test-results/56fix/resume-gpu-environment-test-
+reflection-shapes-browser-10.log and resume-reflection-shapes-green.log.
+The complete environment acceptance still requires the remaining package GPU
+and runtime README gates; this fixture repair changes no rendering algorithm.

@@ -20,6 +20,9 @@ function rig(options = {}) {
     gpu: gpu.device,
     plugins: new Map(),
     lighting: { direction: new Float32Array([0, 0.6, -0.8, 3]), radiance: new Float32Array([1, 0.9, 0.8, 0.1]) },
+    sceneOf() {
+      return this;
+    },
     removePlugin() {},
   };
   const target = new SceneTarget(

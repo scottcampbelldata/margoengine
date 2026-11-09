@@ -39,6 +39,9 @@ const fakeEngine = (gpu) => ({
   onError(error) {
     this.errors.push(error);
   },
+  sceneOf() {
+    return this;
+  },
   removePlugin(name) {
     this.removed.push(name);
   },
@@ -932,5 +935,30 @@ test('a probe baked inside a multi-view frame draws each face as a whole-target 
     assert.notEqual(view.camera, host.camera);
   }
   assert.equal(h.frame.c.view, host, 'the host view is restored');
+  h.probes.dispose();
+});
+
+test('external probe baking renders its owning scene on every bounce', async () => {
+  const h = pooledProbes(),
+    owner = {
+      name: 'product-owner',
+      removePlugin(name) {
+        assert.equal(name, h.probes.name);
+      },
+    },
+    render = h.engine.render,
+    seen = [];
+  h.engine.sceneOf = (plugin) => {
+    assert.equal(plugin, h.probes);
+    return owner;
+  };
+  h.engine.render = (options) => {
+    seen.push(options);
+    assert.equal(options.views?.[0].scene, owner);
+    assert.deepEqual(options.views[0].viewport, [0, 0, 1, 1]);
+    return render(options);
+  };
+  await h.probes.bake({ bounces: 2 });
+  assert.equal(seen.length, 3);
   h.probes.dispose();
 });

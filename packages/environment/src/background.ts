@@ -165,7 +165,7 @@ export class EnvironmentBackground {
     if (this.disposed) return;
     this.disposed = true;
     this.releaseState();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
@@ -524,7 +524,7 @@ export class ImageBackground {
     if (this.disposed) return;
     this.disposed = true;
     this.release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

@@ -140,8 +140,14 @@ const BEGIN: FramePass = {
     // A scene background or layer mask gives even a full-canvas render an explicit view. That outer
     // rectangle must not leak into this differently sized target (including captures before a resize).
     c.view = {
-      id: 'capture', camera: c.camera, viewport: [0, 0, job.width, job.height], index: 0, count: 1,
-      clear: saved.view?.clear, layers: job.layers, target: {color: target.color!, depth: target.depth!},
+      id: 'capture',
+      camera: c.camera,
+      viewport: [0, 0, job.width, job.height],
+      index: 0,
+      count: 1,
+      clear: saved.view?.clear,
+      layers: job.layers,
+      target: { color: target.color!, depth: target.depth! },
     };
     target.scene!.begin(c);
     c.shader = linearShader(c.shader);
@@ -189,20 +195,18 @@ const graphs = new WeakMap<
  * frame did not draw (WebGPU device being restored).
  */
 export function captureScene(engine: EngineKernel, job: CaptureJob): boolean {
-  // `render({camera})` draws the default scene: swap its graph for the capture's.
+  // A capture belongs to its plugin's scene, including its graph and scene-local meshes.
   const runtime = engineRuntime(engine),
-    frameGraph = runtime.scene.frameGraph,
+    scene = runtime.sceneOf(job.owner as Parameters<typeof runtime.sceneOf>[0]) ?? runtime.scene,
+    frameGraph = scene.frameGraph,
     passes = passArray(frameGraph);
   if (!passes)
     throw new MargoError(
       'unsupported',
-      "Scene capture does not recognise core's frame graph; update @margoengine/core and @margoengine/environment together",
+      'Incompatible frame graph; update @margoengine/core and @margoengine/environment',
     );
   if (active)
-    throw new MargoError(
-      'state',
-      'A scene capture is already rendering; call update() outside frame passes and other captures',
-    );
+    throw new MargoError('state', 'Scene capture already rendering; call update() outside captures and frame passes');
   let cached = graphs.get(frameGraph);
   if (!cached || cached.passes !== passes || cached.revision !== frameGraph.revision || cached.filter !== job.filter) {
     const graph = new FrameGraph();
@@ -214,12 +218,23 @@ export function captureScene(engine: EngineKernel, job: CaptureJob): boolean {
     cached = { passes, revision: frameGraph.revision, filter: job.filter, graph };
     graphs.set(frameGraph, cached);
   }
-  const host = runtime.scene as unknown as { frameGraph: FrameGraph };
+  const host = scene as unknown as { frameGraph: FrameGraph };
   active = job;
   drawn = false;
   host.frameGraph = cached.graph;
   try {
-    withHidden(engine, job.layers, job.exclude, () => engine.render({ camera: job.camera, delta: 0 }));
+    withHidden(
+      engine,
+      job.layers,
+      job.exclude,
+      () =>
+        engine.render(
+          scene === runtime.scene
+            ? { camera: job.camera, delta: 0 }
+            : { views: [{ scene, camera: job.camera, viewport: [0, 0, 1, 1] }], delta: 0 },
+        ),
+      scene.meshes,
+    );
   } finally {
     host.frameGraph = frameGraph;
     active = null;

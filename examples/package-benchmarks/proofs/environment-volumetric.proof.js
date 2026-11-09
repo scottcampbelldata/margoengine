@@ -28,7 +28,15 @@ const [{ Clustered }, { Tonemap }, environment, { VolumetricFog }] = await Promi
 );
 const rootStory = (module) => {
   const gpu = mockGPU(),
-    engine = { backend: 'webgpu', gpu: gpu.device, removePlugin() {}, onError() {} },
+    engine = {
+      backend: 'webgpu',
+      gpu: gpu.device,
+      sceneOf() {
+        return this;
+      },
+      removePlugin() {},
+      onError() {},
+    },
     view = context(gpu, { samples: 4, shader: wgsl, format: 'bgra8unorm' });
   return gpu.record(() => {
     const fog = new module.Fog({ color: '#a0b0c0', density: 0.02, heightFalloff: 0.1 }),
@@ -66,6 +74,9 @@ function story(samples, withFog) {
     plugins: new Map(),
     lighting: { direction: new Float32Array([0.3, 0.8, -0.5, 4]), radiance: new Float32Array([1, 1, 1, 0.1]) },
     hasPlugin: (name) => engine.plugins.has(name),
+    sceneOf() {
+      return this;
+    },
     removePlugin(name) {
       engine.plugins.delete(name);
     },

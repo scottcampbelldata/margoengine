@@ -751,3 +751,16 @@ GPU-only attachments refuse the small WebGL2 preview during setup with `MargoErr
 
 Studio softbox directions are scaled before normalization, so
 `[Number.MAX_VALUE, Number.MAX_VALUE, 0]` matches `[1, 1, 0]`.
+
+Planar surfaces, cube captures and probe baking use the plugin's owning scene. Explicit disposal
+detaches from that scene, including when another scene has a plugin with the same name. Surface,
+colour and image background passes apply each view's viewport and independent scissor. Captures and
+mip filters use their own full local targets. Studio softbox directions are scaled before
+normalization, so `[Number.MAX_VALUE, Number.MAX_VALUE, 0]` matches `[1, 1, 0]`.
+
+The reflection-shapes GPU proof registers each LightProbes shader fixture with
+the real engine and checks owner removal before the next fixture uses its name:
+
+```sh
+npm run test:reflection-shapes:browser --workspace @margoengine/environment
+```

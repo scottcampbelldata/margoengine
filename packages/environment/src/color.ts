@@ -171,7 +171,7 @@ export class ColorBackground {
     if (this.disposed) return;
     this.disposed = true;
     this.release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

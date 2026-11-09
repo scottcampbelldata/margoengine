@@ -55,7 +55,15 @@ const stub = (device) => ({
   restore: () => Promise.resolve(),
 });
 function effects(env, probe, device) {
-  const engine = { backend: 'webgpu', gpu: device, onError() {}, removePlugin() {} },
+  const engine = {
+      backend: 'webgpu',
+      gpu: device,
+      onError() {},
+      sceneOf() {
+        return this;
+      },
+      removePlugin() {},
+    },
     list = {
       ibl: new env.EnvironmentLighting(stub(device)),
       fog: new env.Fog({ color: '#a0b0c0', density: 0.02 }),
@@ -129,7 +137,15 @@ const expectedCalls = await golden('calls', () => calls(pairs[0][0], pairs[0][1]
 assert.deepEqual(gotCalls, expectedCalls, 'environment GPU calls differ without a hemisphere');
 // The candidate's hemisphere does reach both shader kinds once attached.
 const sky = new root.candidate.HemisphereLight({ sky: '#bcd', ground: '#432' });
-sky.setup({ backend: 'webgpu', gpu: mockGPU().device, onError() {}, removePlugin() {} });
+sky.setup({
+  backend: 'webgpu',
+  gpu: mockGPU().device,
+  onError() {},
+  sceneOf() {
+    return this;
+  },
+  removePlugin() {},
+});
 assert.ok(sky.shader(wgsl, 0).includes('*margoSkyLight(n);') && sky.pbr(2).sky, 'a hemisphere patches and hooks');
 console.log(
   JSON.stringify({

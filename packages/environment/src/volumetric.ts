@@ -800,7 +800,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     if (this.disposed) return;
     this.disposed = true;
     for (const release of [...this.models.values(), ...this.effects.values()]) release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;
   }

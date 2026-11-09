@@ -710,7 +710,7 @@ export abstract class PlanarSurface {
         engineRuntime(engine).meshes.get(meshRuntime(this.nodeValue).id) === meshRuntime(this.nodeValue)
       )
         this.nodeValue.dispose();
-      if (engineRuntime(engine).plugins.get(this.name) === (this as unknown)) engine.removePlugin(this.name);
+      engineRuntime(engine).sceneOf(this)?.removePlugin(this.name);
     }
     this.nodeValue = undefined;
   }

@@ -197,8 +197,7 @@ export class ColorOutput {
     this.release();
     const engine = this.engine;
     this.engine = undefined;
-    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this)
-      engine.removePlugin(this.name);
+    if (engine && !engine.disposed) engineRuntime(engine).sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -310,6 +309,7 @@ export class ColorOutput {
     if ((c.descriptor.multisample?.count ?? 1) > 1) {
       this.resolveAttachment.view = c.color;
       this.resolveAttachment.resolveTarget = image.view;
+      // view-state: resolve-only MSAA pass, no raster draw.
       c.encoder.beginRenderPass(this.resolveDescriptor).end();
     }
     const excess = this.used && this.excessTarget?.device === device ? this.excessTarget.view : image.view,

@@ -1057,14 +1057,21 @@ export class LightProbes extends ShaderEffect {
     try {
       const engine = this.engine,
         device = this.gpu;
+      const scene = engineRuntime(engine).sceneOf(this);
+      const render = () =>
+        engine.render(
+          scene
+            ? { views: [{ scene, camera: engine.camera, viewport: [0, 0, 1, 1] }], culling: false }
+            : { culling: false },
+        );
       // One ordinary frame first: shadow maps and other per-frame inputs the capture samples come from the previous frame.
-      engine.render({ culling: false });
+      render();
       if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
       for (let b = 0; b < bounces; b++) {
         this.pending = true;
         device.pushErrorScope('validation');
         try {
-          engine.render({ culling: false });
+          render();
         } catch (error) {
           // A synchronous receiver failure must not leave the device's error-scope stack open.
           try {
@@ -1598,6 +1605,7 @@ export class LightProbes extends ShaderEffect {
         layers: saved.view.layers,
       };
     try {
+      // view-state: clear-only probe face, no raster draw.
       encoder.beginRenderPass(target.passes[face]).end();
       c.encoder = encoder;
       c.color = color;

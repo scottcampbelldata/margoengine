@@ -22,6 +22,9 @@ function rig({ samples = 4, format = 'rgba16float', capture = true, plugins = []
     plugins: new Map(plugins.map((p) => [p.name, p])),
     lighting: { direction: new Float32Array([0, 0.6, -0.8, 3]), radiance: new Float32Array([1, 0.9, 0.8, 0.1]) },
     removed: [],
+    sceneOf() {
+      return this;
+    },
     removePlugin(name) {
       this.removed.push(name);
       this.plugins.get(name)?.dispose();

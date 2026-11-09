@@ -2922,3 +2922,20 @@ targets, but the owning PostStack, Bloom and SSAO initialization paths refuse
 them where their measured outputs exceed the existing parity rule. The shared
 requirement helper carries no renderer dependency. No paper algorithm changed,
 no rival source or companion code was read, and no tolerance was relaxed.
+
+### Batch 56 reflection-shapes fixture contract
+
+The ownership repair exposed a partial browser-test engine stub without sceneOf.
+Research compared Steve Freeman, Nat Pryce, Tim Mackinnon and Joe Walnes,
+[Mock Roles, not Objects (OOPSLA 2004)](https://jmock.org/oopsla2004.pdf),
+with Chandrasekhar Boyapati, Barbara Liskov and Liuba Shrira,
+[Ownership Types for Object Encapsulation (POPL 2003)](https://doi.org/10.1145/604131.604156),
+and David G. Clarke, John Potter and James Noble,
+[Ownership Types for Flexible Alias Protection (OOPSLA 1998)](https://doi.org/10.1145/286936.286947). The first paper
+frames doubles around collaborator responsibilities; the ownership papers
+frame access and cleanup around actual ownership. Our fixture needs the full
+registration lifecycle and already creates a real engine, so it now registers
+through engine.use and checks sceneOf before and after disposal. This is our
+test-design inference from those descriptions. No external implementation was
+read or copied. All 512 rays per blend mode, f32/f16 comparisons, tolerances,
+blend-difference checks and the real room bake remain unchanged.

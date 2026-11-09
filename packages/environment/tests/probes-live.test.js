@@ -45,6 +45,9 @@ function harness(options, { volume = false } = {}) {
     onError(error) {
       throw error;
     },
+    sceneOf() {
+      return this;
+    },
     removePlugin() {},
   };
   const probes = new LightProbes({

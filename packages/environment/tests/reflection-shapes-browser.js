@@ -87,7 +87,8 @@ window.runTests = async () => {
   const outputs = {};
   for (const reflectionBlend of ['order', 'weighted']) {
     const probes = new LightProbes({ reflections, reflectionBlend, resolution: s });
-    probes.setup({ backend: 'webgpu', gpu: device, onError: (e) => errors.push(String(e)), removePlugin() {} });
+    engine.use(probes);
+    assert(runtime.sceneOf(probes) === runtime.scene, `${reflectionBlend}: the real scene owns the shader fixture`);
     const declarations = probes.pbr(0).declarations,
       binding = Number(/@group\(0\) @binding\((\d+)\) var<storage,read> probeData/.exec(declarations)[1]);
     // Its packed header, every probe marked baked, then level 0 of each probe direction-coded: (u, v, (j + 1) / 4).
@@ -172,6 +173,7 @@ window.runTests = async () => {
     );
     report.checks.push(`${reflectionBlend}: probeReflection equals the CPU mirror at ${count} random rays within 1e-3`);
     probes.dispose();
+    assert(runtime.sceneOf(probes) === undefined, `${reflectionBlend}: disposal removes the real registration`);
   }
 
   // Where probes overlap, weighted blending mixes them where the order lets the first one win.

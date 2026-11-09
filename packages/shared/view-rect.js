@@ -75,10 +75,10 @@ export function checkLayers(mask, subject) {
  * Runs `run` with the visible meshes outside layer `mask` and the visible `exclude` meshes hidden, then shows them
  * again, also when `run` throws. For captures that leave out given meshes; plain layer filtering needs no hiding.
  */
-export function withHidden(engine, mask, exclude, run) {
+export function withHidden(engine, mask, exclude, run, meshes = engine.meshes) {
   const registry = layerRegistry(),
     hidden = [],
-    live = (mesh) => engine.meshes.get(mesh.id) === mesh,
+    live = (mesh) => meshes.get(mesh.id) === mesh,
     hide = (mesh) => {
       if (live(mesh) && !engine.store.hidden[mesh.id]) {
         mesh.visible = false;
@@ -87,7 +87,7 @@ export function withHidden(engine, mask, exclude, run) {
     };
   // Every mesh is on layer 0 until a mask is set or a source installed.
   if (mask !== 0xffffffff && (registry?.used || registry?.source || !(mask & 1)))
-    for (const mesh of engine.meshes.values()) if (!(meshLayers(mesh) & mask)) hide(mesh);
+    for (const mesh of meshes.values()) if (!(meshLayers(mesh) & mask)) hide(mesh);
   if (exclude) for (const mesh of exclude) hide(mesh);
   try {
     return run();
