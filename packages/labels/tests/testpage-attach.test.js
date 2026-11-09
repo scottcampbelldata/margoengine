@@ -21,6 +21,7 @@ test('test-page 41: duplicate annotation attachment explains the collision witho
     assert.throws(
       () => LabelRenderer.attach(engine, { layout: { update() {} } }),
       (error) =>
+        error instanceof TypeError &&
         error.code === 'state' &&
         error.message.includes('margoengine-labels') &&
         error.message.includes('name') &&

@@ -11,7 +11,7 @@ import {
   type Vec3,
 } from './projection.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { fault, rangeError } from '../../shared/errors.js';
+import { rangeError } from '../../shared/errors.js';
 import { createScreenPoint, isOrthographic, projectPoint, type ScreenPoint } from '@margoengine/math/mat4';
 
 /** Where a label sits this frame: its screen position, depth, distance from the camera and world anchor. */
@@ -366,16 +366,14 @@ export class LabelRenderer implements EnginePlugin {
 
   /**
    * Same as `engine.use(new LabelRenderer(...))`; returns the LabelRenderer.
-   * @throws MargoError `state` with reuse/name guidance when the plugin name is already registered.
+   * @throws TypeError with code `state` and reuse/name guidance when the plugin name is already registered.
    */
   static attach(engine: EngineKernel, options?: LabelRendererOptions): LabelRenderer {
-    const name = options?.name ?? 'margoengine-labels';
-    if (engineRuntime(engine).plugins.has(name))
-      throw fault(
-        'state',
-        `A plugin named ${JSON.stringify(name)} is already attached; reuse its LabelRenderer or pass an unused name in LabelRenderer.attach(engine, { name: 'annotations' })`,
-      );
     const value = new LabelRenderer(options);
+    if (engineRuntime(engine).plugins.has(value.name))
+      throw Object.assign(TypeError(`${value.name}: reuse/rename; see https://margoengine.com/errors#state`), {
+        code: 'state',
+      });
     engine.use(value);
     return value;
   }

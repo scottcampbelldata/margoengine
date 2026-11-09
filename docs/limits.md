@@ -1893,3 +1893,7 @@ placement jobs. All 46 effect-package and 35 biome README examples execute
 without exceptions. Evidence: whitepaper/results/missing-items-landing-20261109.json.
 The separate 7.4 ms slow-send outlier remains open with its unchanged 3.5 ms
 gate; no performance ratio, busy exemption or new accepted difference.
+
+The test-page 41 duplicate-label diagnostic fits the existing labels root entry
+budget at 5,546 B min+gzip. It reports TypeError with code state and a help link
+before setup creates DOM; duplicate registration never replaces existing labels.

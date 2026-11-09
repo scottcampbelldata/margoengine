@@ -41,7 +41,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 sciviz Axes already attached it, reuse that LabelRenderer from `engine.plugins`,
 or attach your annotations with an unused name, for example
 `LabelRenderer.attach(engine, {name: 'annotations', layout: callouts})`.
-A duplicate name throws linked code `state` and explains these choices before
+A duplicate name throws a TypeError with linked code `state` and explains these choices before
 creating an overlay; the existing renderer, layout and labels are preserved.
 
 ## How it works

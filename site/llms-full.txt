@@ -4481,6 +4481,10 @@ without exceptions. Evidence: whitepaper/results/missing-items-landing-20261109.
 The separate 7.4 ms slow-send outlier remains open with its unchanged 3.5 ms
 gate; no performance ratio, busy exemption or new accepted difference.
 
+The test-page 41 duplicate-label diagnostic fits the existing labels root entry
+budget at 5,546 B min+gzip. It reports TypeError with code state and a help link
+before setup creates DOM; duplicate registration never replaces existing labels.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9386,7 +9390,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 sciviz Axes already attached it, reuse that LabelRenderer from `engine.plugins`,
 or attach your annotations with an unused name, for example
 `LabelRenderer.attach(engine, {name: 'annotations', layout: callouts})`.
-A duplicate name throws linked code `state` and explains these choices before
+A duplicate name throws a TypeError with linked code `state` and explains these choices before
 creating an overlay; the existing renderer, layout and labels are preserved.
 
 ## How it works
@@ -9396,7 +9400,7 @@ creating an overlay; the existing renderer, layout and labels are preserved.
 - **Placement.** `transform: translate(x, y) [scale(s)] translate(-anchorX%, -anchorY%)` with `transform-origin: 0 0`, so the anchor point of the element sits exactly on the projected point, with or without distance scaling.
 - **Depth order.** Visible labels are sorted by distance to the camera every frame and get `z-index` 1..n, nearest on top. `sort: false` leaves a label's z-index alone.
 - **CSS 3D.** A viewer element gets `perspective: (height / 2) / tan(fov / 2)` and a `preserve-3d` camera element gets `translateZ(perspective) matrix3d(view with Y flipped) translate(width / 2, height / 2)`. Each object gets `translate(-50%, -50%) matrix3d(world * scale(pixelScale) with Y flipped)`. The view matrix is rebuilt from `camera.position` and `camera.target` with the same Y-up look-at the core camera uses. CSS cannot clip at the near plane, so the renderer does: an object partly behind it is cut there with a `clip-path` (see [Depth with CSS 3D objects](#depth-with-css-3d-objects)), and one wholly behind it is hidden.
-- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects are cut or hidden at the near plane the same way. 2D labels need nothing special; `distanceScale` uses the distance at which a perspec
+- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects are cut or hidden at the near plane the same way. 2D labels need nothing special; `distanceScale` uses the distance a
 
 [README continues: https://margoengine.com/llms/packages/labels.md]
 

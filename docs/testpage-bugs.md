@@ -270,3 +270,14 @@ This supersedes the historical stop and copy-on-assignment proposal above.
 The coordinator's order remains: land these local follow-ups, then continue the
 approved work and triage the new live entries 42-44. No core edit is included in
 this follow-up landing.
+
+The resumed verify completed its build and proof checks, then failed the labels
+entry size ratchet (5,654 B versus its unchanged 5,546 B budget). The duplicate
+attachment diagnostic now uses a compact coded TypeError, preserving the name,
+reuse/rename guidance and help link. Construction has no DOM side effects; the
+check still runs before engine.use/setup allocates the overlay. The regression
+now additionally requires TypeError. The measured entry is 5,546 B; no budget or
+test was loosened. The failed verify stopped its remaining unit/API chains, so a
+complete verify is still required. The next run uses the original landing's
+MARGO_RESULT_CACHE=off environment: optional shadow recording is disabled, and
+every actual check still runs.
