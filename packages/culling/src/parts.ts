@@ -379,6 +379,7 @@ export class CulledParts extends CulledInstances {
     pass.setVertexBuffer(1, this.buffers.records);
     pass.setVertexBuffer(2, this.buffers.hidden);
     this.batches.forEach((batch, i) => {
+      if (!batch.geometry.indices.length) return;
       const g = this.geometryBuffers.get(batch.geometry)!,
         table = this.table;
       pass.setVertexBuffer(0, g.vertex);

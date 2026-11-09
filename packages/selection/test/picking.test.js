@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Picking } from '../dist/index.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { box } from '../../core/dist/extension.js';
+import { box, Geometry } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 function harness(samples = 4) {
@@ -212,6 +212,18 @@ test('MSAA keeps beauty at 4x and uses single-sample integer micro picking', asy
   assert.equal(await h.effect.onPick(64, 48), h.mesh);
   assert.equal(h.copies.at(-1).source.texture.width, 3);
   assert.equal(h.copies.at(-1).source.texture.sampleCount, 1);
+  h.effect.dispose();
+  h.cleanup();
+});
+
+test('micro picking ignores empty core Geometry without requesting nonexistent GPU buffers', async () => {
+  const h = harness();
+  h.mesh.geometry = new Geometry([], [], []);
+  h.engine.geometryBuffers = () => {
+    throw new Error('empty geometry has no buffers');
+  };
+  assert.equal(await h.effect.onPick(64, 48), null);
+  assert.deepEqual(h.instances, []);
   h.effect.dispose();
   h.cleanup();
 });

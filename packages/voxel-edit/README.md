@@ -6,6 +6,22 @@ Editing voxel models for voxel editors and tools: dense and sparse grids, modeli
 selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only (but `./shaders` and `./gpu`, which run on a GPUDevice), no renderer, no DOM: every
 function is pure and can run in a worker. Optional and tree-shakable; core and the stage never import it.
 
+An empty `meshGrid` result has empty arrays. Core `Geometry` accepts that empty result;
+attach it normally when the last voxel is erased. The node,
+transform and material survive, so the next edit can attach geometry again:
+
+```ts
+import { Geometry, Engine } from '@margoengine/core';
+import { meshGrid } from '@margoengine/voxel-edit/mesh';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const node = engine.createMesh();
+const grid = { size: [1, 1, 1] as const, voxels: new Uint8Array(1) };
+const { mesh } = meshGrid(grid);
+node.setGeometry(new Geometry(mesh.positions, mesh.normals, mesh.indices));
+node.dispose();
+engine.dispose();
+```
+
 ```ts
 import { combineGrids, mergePalettes, rotateGrid, type VoxelGrid } from 'margoengine/voxel-edit';
 import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';

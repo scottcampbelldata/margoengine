@@ -293,7 +293,7 @@ export class CulledInstances implements EnginePlugin {
       buffer('earlyArgs', B * 20, S | GPUBufferUsage.INDIRECT);
       buffer('earlyList', n * 4, S | GPUBufferUsage.VERTEX);
       for (const { geometry: g } of this.batches)
-        if (!this.geometryBuffers.has(g)) {
+        if (g.indices.length && !this.geometryBuffers.has(g)) {
           const vertex = d.createBuffer({
             size: g.vertices.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -508,7 +508,9 @@ export class CulledInstances implements EnginePlugin {
     // sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
     const [width, height] = viewSize(c);
     const pyramid = this.hiz!;
-    if (c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height)
+    if (
+      c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height
+    )
       this.resize(Math.max(width, c.view ? pyramid.width : 0), Math.max(height, c.view ? pyramid.height : 0));
     pyramid.plan(width, height);
     const occlusion = this.culling === 'occlusion' && exactShader(c.shader),
@@ -546,6 +548,7 @@ export class CulledInstances implements EnginePlugin {
         // The target may be larger than this view (shared with a larger one).
         if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
         this.batches.forEach((batch, i) => {
+          if (!batch.geometry.indices.length) return;
           const sided = this.singleSided(i);
           pass.setPipeline(sided ? this.prepass!.sided : this.prepass!.plain);
           pass.setBindGroup(0, sided ? this.groups.sided : this.groups.prepass);
@@ -613,6 +616,7 @@ export class CulledInstances implements EnginePlugin {
     const main = c.encoder.beginRenderPass(this.main);
     let current: GPURenderPipeline | undefined;
     this.batches.forEach((batch, i) => {
+      if (!batch.geometry.indices.length) return;
       // The back faces of a single-sided batch without mirrored parts are exactly what core's discard removes.
       const culled = this.culledPipeline && !this.backFaces(i),
         pipeline = culled ? this.culledPipeline! : this.pipeline!;
@@ -674,6 +678,10 @@ export class CulledInstances implements EnginePlugin {
 
 // The box of 24-byte vertices into `out` from `at`: centre at 0, half size at 4.
 function localBox(vertices: Float32Array, out: Float32Array, at: number): void {
+  if (!vertices.length) {
+    out.fill(0, at, at + 8);
+    return;
+  }
   for (let k = 0; k < 3; k++) {
     let low = Infinity,
       high = -Infinity;

@@ -492,3 +492,9 @@ layouts), no WebGPU errors; occlusion drew as few as 4,770 of 28,672 parts where
   On an open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
 - Occluders are the package's own parts plus what `addOccluder` names; everything else draws but does not occlude.
 - One frame shader variant is cached; changing `PassContext.shader` every frame recompiles.
+
+
+Empty core geometries are valid instance batches. They keep finite zero local
+bounds and their batch/slot indices, but upload no vertex/index buffers and emit
+no geometry draw commands, including depth and part-shadow passes. Refill by
+replacing geometry through the entry's existing update/reconstruction contract.

@@ -812,7 +812,7 @@ export class Picking implements EnginePlugin {
     const batches = new Map<Geometry, number[]>();
     for (const mesh of e.meshes.values())
       if (
-        mesh.geometry &&
+        mesh.geometry?.indices.length &&
         e.store.visible[mesh.id] &&
         inView(scope, mesh) &&
         intersects(matrix, mesh.matrix, mesh.geometry.bounds, this.clip)

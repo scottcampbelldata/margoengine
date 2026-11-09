@@ -342,3 +342,23 @@ Apache-2.0 licensed.
 ## Content Security Policy
 
 Creating the engine compiles core's embedded Rust transform kernel, so restricted pages need `'wasm-unsafe-eval'` in `script-src`. A stage creates that same engine. Every Margo engine page under a strict CSP needs this permission. A blocked compile or instantiate rejects with MargoError code `failed`, its original cause and a link to the CSP docs. Imports alone do not compile Wasm. See [the exact header and package requirements](../../docs/csp.md).
+
+
+`new Geometry([], [], [])` is a valid empty mesh with bounds [0,0,0,0]. It creates
+no renderer buffers or batches and draws nothing, including when several scene
+nodes share it. Replace its geometry normally after refilling an editor model;
+node identity, transform and material survive. All three input arrays must be
+empty together. Partial inputs keep the existing argument errors. An empty
+geometry has no GPU buffers, so extension `geometryBuffers(empty)` returns null.
+
+```ts
+import {Engine, Geometry, box} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(new Geometry([], [], []));
+engine.render();
+mesh.setGeometry(box());
+engine.render();
+mesh.setGeometry(new Geometry([], [], []));
+engine.render();
+mesh.dispose(); engine.dispose();
+```

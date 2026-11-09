@@ -8,6 +8,7 @@
 - Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`; the `./cad` entry was removed on Scott's go, 2026-10-29), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
 - Exception (Scott, 2026-10-29, "do the core add i agree"): core gains ONE option, `EngineOptions.powerPreference` ('low-power' | 'high-performance'), passed to `requestAdapter` at creation and on device restore; unset keeps the old behaviour. The freeze applies again after this change.
 - The combined core + stage gzip size must stay below **25,000 bytes** (Scott, 2026-11-05). The build fails at 25,000 or above; `npm run measure:size` prints the figure. Anything below that is allowed.
+- Exception (Scott, 2026-11-10, 'Yes, allow it'): core accepts an empty Geometry with zero vertices and zero indices. It uploads nothing, draws nothing and supports normal mesh updates/disposal; malformed partial inputs still reject. The freeze applies again after this change.
 - Build future capabilities strictly in separate, optional, tree-shakable packages:
   - `@margoengine/gltf-pro`: glTF 2.0 PBR.
   - `@margoengine/animation`: skeletal animation and morph targets.

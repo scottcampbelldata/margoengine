@@ -44,7 +44,10 @@ export interface Meshlets {
  * Splits a geometry's triangles into clusters of neighbours, each with a bounding sphere and a cone holding its normals.
  * Grows each cluster breadth first from a free triangle over shared vertices.
  */
-export function buildMeshlets(geometry: Geometry, { maxVertices = 64, maxTriangles = 124 }: MeshletOptions = {}): Meshlets {
+export function buildMeshlets(
+  geometry: Geometry,
+  { maxVertices = 64, maxTriangles = 124 }: MeshletOptions = {},
+): Meshlets {
   if (!Number.isInteger(maxVertices) || maxVertices < 3)
     throw new RangeError('Invalid maxVertices; pass a whole number of 3 or more');
   if (!Number.isInteger(maxTriangles) || maxTriangles < 1)
@@ -257,7 +260,10 @@ export class MeshletMesh extends CulledParts {
     return value;
   }
   /** @throws RangeError unless `batches` holds one batch: one mesh, drawn once per part of it. */
-  constructor(batches: readonly CulledPartsBatch[], { maxVertices, maxTriangles, ...options }: MeshletMeshOptions = {}) {
+  constructor(
+    batches: readonly CulledPartsBatch[],
+    { maxVertices, maxTriangles, ...options }: MeshletMeshOptions = {},
+  ) {
     if (batches?.length !== 1) throw new RangeError('Invalid MeshletMesh; pass one batch, one mesh with its parts');
     super(batches, options);
     this.meshlets = buildMeshlets(batches[0].geometry, { maxVertices, maxTriangles });
@@ -471,6 +477,7 @@ export class MeshletMesh extends CulledParts {
     s.cascades = cascades;
   }
   protected override drawParts(pass: GPURenderPassEncoder, cascade?: number): void {
+    if (!this.batches[0].geometry.indices.length) return;
     const s = this.shadowClusters;
     if (cascade === undefined || !s || cascade >= s.cascades) {
       super.drawParts(pass);

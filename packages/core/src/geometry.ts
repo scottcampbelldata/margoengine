@@ -20,7 +20,7 @@ export function finite(values: ArrayLike<number>, size: number, label: string): 
 }
 
 /**
- * Indexed triangle mesh: 3 to 1,000,000 vertices of xyz positions (world units) and normals, and indices in triples.
+ * Indexed triangle mesh: empty, or 3 to 1,000,000 vertices of xyz positions (world units) and normals with triangle indices.
  * Throws TypeError for mismatched array lengths and RangeError for non-finite values or invalid counts or indices.
  */
 export class Geometry {
@@ -30,7 +30,12 @@ export class Geometry {
 
   constructor(positions: ArrayLike<number>, normals: ArrayLike<number>, indices: ArrayLike<number>) {
     const count = positions.length / 3;
-    if (!Number.isInteger(count) || count < 3 || count > 1_000_000 || !indices.length || indices.length % 3)
+    if (
+      !Number.isInteger(count) ||
+      count > 1_000_000 ||
+      (count === 0 ? indices.length !== 0 : count < 3 || !indices.length) ||
+      indices.length % 3
+    )
       throw rangeError('Invalid geometry', 'geometry');
     finite(positions, count * 3, 'Positions');
     finite(normals, count * 3, 'Normals');
@@ -48,7 +53,7 @@ export class Geometry {
         max[a] = Math.max(max[a], positions[i * 3 + a]);
       }
     this.indices = Uint32Array.from(indices);
-    const center = min.map((v, a) => (v + max[a]) / 2);
+    const center = count ? min.map((v, a) => (v + max[a]) / 2) : [0, 0, 0];
     let radius = 0;
     for (let i = 0; i < count; i++)
       radius = Math.max(

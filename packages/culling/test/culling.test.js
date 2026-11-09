@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { box, PbrMaterial } from '@margoengine/core';
+import { box, Geometry, PbrMaterial } from '@margoengine/core';
 import { CulledInstances } from '../dist/index.js';
 import { CulledParts } from '../dist/parts.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -50,6 +50,31 @@ function harness() {
   };
 }
 const _buffer = (h, size, usage) => h.resources.find((r) => r.size === size && r.usage === usage);
+
+test('empty Geometry instance batches have finite box bounds, no geometry uploads and no draw commands', () => {
+  for (const Class of [CulledInstances, CulledParts]) {
+    const h = harness(),
+      parts = new Class(
+        [
+          {
+            geometry: new Geometry([], [], []),
+            material: new PbrMaterial(),
+            transforms: new Float32Array(translate(0, 0, 0)),
+          },
+        ],
+        { culling: 'occlusion', bounds: 'box' },
+      );
+    h.counts.indirect = h.counts.indexed = 0;
+    h.engine.use(parts);
+    h.run();
+    assert.equal(h.counts.indirect, 0);
+    assert.equal(h.counts.indexed, 0);
+    assert.equal(h.resources.filter((r) => r.size === 0).length, 0);
+    assert.ok(parts.shapes.every(Number.isFinite));
+    parts.dispose();
+    h.cleanup();
+  }
+});
 
 test('uploads parts once and draws them with compute culling and indirect draws, in original order, without per-frame allocation', () => {
   const h = harness(),

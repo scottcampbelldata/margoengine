@@ -569,6 +569,7 @@ export class Engine {
   geometryBuffers(geometry: Geometry): GeometryBuffers | null {
     if (this.disposed || this.disposing || this.recovery)
       throw fault('state', 'Geometry unavailable', 'device-restore');
+    if (!geometry.indices.length) return null;
     return this.renderer.geometryBuffers?.(geometry) ?? null;
   }
   hasPlugin(name: string): boolean {
@@ -717,7 +718,8 @@ export class Engine {
   writePoses(ids: ArrayLike<number>, poses: ArrayLike<number>, count = ids.length): void {
     this.live();
     const { transforms: t, active } = this.store;
-    if (!(count >= 0 && count <= ids.length && poses.length >= count * 7)) throw rangeError('Invalid poses', 'transform');
+    if (!(count >= 0 && count <= ids.length && poses.length >= count * 7))
+      throw rangeError('Invalid poses', 'transform');
     for (let k = 0, at = 0; k < count; k++, at += 7) {
       if (active[ids[k]] !== 1) throw fault('disposed', 'Mesh disposed');
       for (let i = at; i < at + 7; i++) {
@@ -742,6 +744,7 @@ export class Engine {
    * throw leaves the engine, the batch and its GPU buffers as they were; a later call can retry.
    */
   retain(geometry: Geometry): void {
+    if (!geometry.indices.length) return;
     const batch = this.batches.get(geometry) ?? {
       geometry,
       instances: new Float32Array(),
@@ -766,6 +769,7 @@ export class Engine {
     }
   }
   release(geometry: Geometry): void {
+    if (!geometry.indices.length) return;
     const batch = this.batches.get(geometry)!;
     if (--batch.references === 0) {
       this.renderer.remove(geometry);
@@ -776,7 +780,7 @@ export class Engine {
   private readonly collect = (mesh: Mesh): void => {
     if (this.layers !== -1 && !(meshLayers(mesh) & this.layers)) return;
     this.unshadowed += +!mesh.receiveShadow;
-    if (mesh.geometry && this.store.visible[mesh.id]) this.place(mesh);
+    if (mesh.geometry?.indices.length && this.store.visible[mesh.id]) this.place(mesh);
   };
   /** Appends a drawn mesh's row to its batch (validating a material first seen since the last full collection). */
   private place(mesh: Mesh): void {
@@ -1046,7 +1050,7 @@ export class Engine {
           const mesh = this.meshes.get(id),
             offset = this.slots[id];
           if (
-            mesh?.geometry &&
+            mesh?.geometry?.indices.length &&
             mesh.scene === scene &&
             (layers === -1 || meshLayers(mesh) & layers) &&
             +(offset >= 0) !== visible[id]
