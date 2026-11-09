@@ -3814,3 +3814,24 @@ equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
 second full verify or timing benchmark is claimed. Current selection: 20,833 B
 gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
 Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
+
+### Section 5 evidence: batch 134 private whole-file adapter
+
+The private queued .basis TypeScript adapter passes 180 frozen payload hashes
+across three primary and three outside-authored CC0 files, including all
+implemented targets/mips. Metadata, video mip history, cancellation and
+disposal have direct tests. A damaged Zstandard-frame regression found a
+missing error boundary in the private KTX2 adapter; it now preserves the
+underlying cause in a coded failure. No shared decoder or package API changed.
+Native Rust tests: 34. Private Node adapter/corpus/packed tests: 15.
+Full worker integration, remaining target encoders, full hostile-input proof,
+GPU and final memory/size acceptance remain pending; timing proof is deferred.
+
+The [bounded whole-container campaign](../whitepaper/results/batch-134-whole-container-fuzz.json)
+covers all 51 primary seeds and 2,856 deterministic mutations, with broken and
+CRC/framing-preserving cases. All 13,507 decode calls returned valid output or
+coded refusals; there were no uncoded exceptions, traps or hard-limit failures.
+The two prebuilt-unserved 3D seeds are checked for coded rejection. Each process
+is bounded at 180 seconds, with a 1,800-second campaign limit. The pinned
+adapter/Wasm hashes are in every seed record. This remains implemented-subset
+validation, not complete fuzz acceptance while target encoders are missing.

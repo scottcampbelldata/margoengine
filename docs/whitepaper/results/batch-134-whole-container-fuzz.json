@@ -1,0 +1,932 @@
+{
+  "status": "pass-bounded-campaign",
+  "scope": "Every primary seed,implemented targets only;deterministic mutations,not complete fuzz acceptance or statistical absence-of-defects proof",
+  "seedCount": 51,
+  "mutations": 2856,
+  "decodeCalls": 13507,
+  "codedRejections": 10951,
+  "successfulMutatedDecodes": 2201,
+  "wasmSha256": "13d0d9609bfd61de90563e7929f8f5024612ca5708d95f325531ce38052044de",
+  "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+  "rows": [
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_2d_etc1s.ktx2",
+      "seedSha256": "e56ddcc757fc73ff06bb0dac2a3533ce79c1e196ad895a3ff7dcc4d9de6b9d5d",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 225,
+      "successfulMutatedDecodes": 55,
+      "controlPayloadHashes": 60,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 19
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_2d_uastc.ktx2",
+      "seedSha256": "21b6912cae1f074ae3eda1b751f43c36eafc7eb83f3af71f85bba2ccbafce125",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 60,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_3d_etc1s.ktx2",
+      "seedSha256": "8b18a2bd4f4ceca8a2e01faa7e38834d4cd1e3c26efc1b14755cf3ceac635660",
+      "mutations": 56,
+      "decodeCalls": 58,
+      "codedRejections": 58,
+      "successfulMutatedDecodes": 0,
+      "controlPayloadHashes": 0,
+      "targets": [],
+      "wasmPages": 17
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_3d_uastc.ktx2",
+      "seedSha256": "40f1a88ece864ed5fef148aee5cf21bdad42175ea88c764fb3e314cd9c259bc9",
+      "mutations": 56,
+      "decodeCalls": 58,
+      "codedRejections": 58,
+      "successfulMutatedDecodes": 0,
+      "controlPayloadHashes": 0,
+      "targets": [],
+      "wasmPages": 17
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_array_etc1s.ktx2",
+      "seedSha256": "65ef9d84188be62d2bbb60914f1041953f977a555acff578ed512435963971dd",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 400,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_array_uastc.ktx2",
+      "seedSha256": "1475d028df6161b78232ea14fa90ebbeb7c73131275f0760470df1da90e8db03",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 400,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_cubemap_etc1s.ktx2",
+      "seedSha256": "cd1a4e36d87bfeede506c152bf700e88dfb5085c6eabdc3f274efacaf86b4754",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 300,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "donmccurdy-ktx2_cubemap_uastc.ktx2",
+      "seedSha256": "d561b0cc1f15d22b691f251644a6b1fbd97d3f4d7a38960d23aba668737fdd8c",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 300,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dash_E.ktx2",
+      "seedSha256": "f9b0811444153459ca28d9211bf8cb6fbe97665071e6257b8c5b56b0edaef525",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 225,
+      "successfulMutatedDecodes": 55,
+      "controlPayloadHashes": 110,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 43
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dot_C.ktx2",
+      "seedSha256": "08968e9d7d9855ae8d201cfaea889e2748fc9049a95838aa18ce689d29c041ca",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 80,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 20
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dot_N.ktx2",
+      "seedSha256": "4a10cfb6134015d6897264fa7e52bc08acb41cd77b64f65726cb6716616b679e",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 80,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 20
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Hex_N.ktx2",
+      "seedSha256": "5b1949805e65f218f4bddd0bcce889f45d195db4f8d33eb77244524d134b9ec1",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 70,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Khronos_C.ktx2",
+      "seedSha256": "627acc26f726e7539967cd27f7b9ca5f84c327e5408b870243b45a49c600e62e",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 100,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 30
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Mechanical_N.ktx2",
+      "seedSha256": "341db23ec51698720db958677c27def788e8a7e297c7eb05d9f9677b3fbfd693",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 240,
+      "successfulMutatedDecodes": 40,
+      "controlPayloadHashes": 100,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 53
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Mechanical_ORM.ktx2",
+      "seedSha256": "e38d981fe93ea6d0d95137a968b141e3919938addf4f1236b1fd6fe0e8b006d6",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 100,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 44
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Occlusion.ktx2",
+      "seedSha256": "905008376f6701af044e11f15cbc35abad7fa92300b3be6e8c9346fa3a4926b0",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 533
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Powdercoat_N.ktx2",
+      "seedSha256": "518dce1ade4f1d354ffd8d804bb01a899054af909eb70fe6655372e4414d4753",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 240,
+      "successfulMutatedDecodes": 40,
+      "controlPayloadHashes": 80,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 20
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Rib_N.ktx2",
+      "seedSha256": "7bbd1d7776a087b48d3f7d50395d24840fd00dc5ab2622f8dce5685995df94d3",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 60,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Thickness.ktx2",
+      "seedSha256": "6cf5fefa01ce9817f207a72536717cc491f0f2534df236f05e92596546d20722",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 100,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 53
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Tireside_C.ktx2",
+      "seedSha256": "d90617659d164fd126d08061cf962aecd43b6f73990ffa3874094a4f3e022935",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 260,
+      "successfulMutatedDecodes": 20,
+      "controlPayloadHashes": 110,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 151
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Tireside_N.ktx2",
+      "seedSha256": "a0379569aef88f88e7b43faf17c93469affbd4bfdd9c923e30136e40b4b451c1",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 110,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 121
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Tiretread_N.ktx2",
+      "seedSha256": "4abedc34a3ecde5d14e232d2b3c8a59c42d55bab60ae854aaf11230dbc981f69",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 100,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 26
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_GlassPlasticMat_BaseColor.ktx2",
+      "seedSha256": "6ed2e12a1f2674bfd0b744feb3581b7527eb711c9e6a03ce6b0ef58431a9668a",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 403
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_GlassPlasticMat_Normal.ktx2",
+      "seedSha256": "0bde000da96cd191c9ac33398898994bb169d2b036e39f29dd1f610d1dd87b7c",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 225,
+      "successfulMutatedDecodes": 55,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_GlassPlasticMat_OcclusionRoughMetal.ktx2",
+      "seedSha256": "78bc3c654262ae22975274a8d8a6758112ef1e4a1c3ebd6675e18948e9967e4f",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 550
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LeatherPartsMat_BaseColor.ktx2",
+      "seedSha256": "a2e9a07e50a86550421cb69efdbae096a0530a491a18d072da96bf14e43991e8",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 250,
+      "successfulMutatedDecodes": 30,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 533
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LeatherPartsMat_Normal.ktx2",
+      "seedSha256": "b8001bbc10520089675aa621cef422b37dce95f3bb905e8514ad8f5141b70c47",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LeatherPartsMat_OcclusionRoughMetal.ktx2",
+      "seedSha256": "afc8dde5b4fc044035b3ea263cae731d54cc53b4af229f790434edfab3d7b043",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_BaseColor.ktx2",
+      "seedSha256": "f9f709a21f50974ec7fb3f3098f0968954822e1cde0d35a375bc23acbcd8e5f7",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 110,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 122
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_Normal.ktx2",
+      "seedSha256": "b240ec01ac1507a1310d765a277055d731ba9cd432cc905715cfba026f6e7fb8",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 110,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 154
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.ktx2",
+      "seedSha256": "7ddf10e67bdf7283fa9cd9bc48871566073d680d4c931742a0805c6735c204c6",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 110,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 154
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_MetalPartsMat_BaseColor.ktx2",
+      "seedSha256": "a449314ab2bb48dee6beb7ab0fff70821b0f60f0c6d7713e94928c84b799c429",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 407
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_MetalPartsMat_Normal.ktx2",
+      "seedSha256": "0bcbb79128829cc24918f0a490bdbb04bddc1b5e377461ae4116c4b1af23cdc0",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 225,
+      "successfulMutatedDecodes": 55,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_MetalPartsMat_OcclusionRoughMetal.ktx2",
+      "seedSha256": "929107fa88ec2d5dda4cca2fda795b8aca782a6c4b19754671748423b466c617",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_RubberWoodMat_BaseColor.ktx2",
+      "seedSha256": "78ec356c80127ae0e0c4d2d518835ee87aacc4433a33916e494ed218333af98b",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 240,
+      "successfulMutatedDecodes": 40,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 406
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_RubberWoodMat_Normal.ktx2",
+      "seedSha256": "a8ddc6f2ef0df6f01fd4d29ae52b3d9f371bb4115437a3238c76558ca6b02465",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 550
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_RubberWoodMat_OcclusionRoughMetal.ktx2",
+      "seedSha256": "8d64c98f1caf8c9e2c09a63e0a87fe73373590ce4a2ca2898081d73477d2d063",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 120,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 421
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-gpu-alpha-etc1s.ktx2",
+      "seedSha256": "a27bd0901f6803d043d0e3e94e7a864937708a6d5b263d58b5dc84baea5a9bc8",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 250,
+      "successfulMutatedDecodes": 30,
+      "controlPayloadHashes": 80,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 24
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-gpu-alpha-uastc-zstd.ktx2",
+      "seedSha256": "12c7e0b39853b83cecaabdce619a6f9130b19cb5260478bf23a9fa1d995e0d6c",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 80,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 20
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-gpu-odd-etc1s.ktx2",
+      "seedSha256": "a7e047c372fbe1615dba1962fb4dba291b05d3d50450d0c7082d9a8daeb0b702",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 230,
+      "successfulMutatedDecodes": 50,
+      "controlPayloadHashes": 90,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 34
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-gpu-odd-uastc-zstd.ktx2",
+      "seedSha256": "9145d6cd127cb44e08524425f9c255284c5d1d9c0c7d1e193f11954efd4cd15d",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 235,
+      "successfulMutatedDecodes": 45,
+      "controlPayloadHashes": 90,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 24
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-hdr-odd-uastc-hdr.ktx2",
+      "seedSha256": "d94e9116d233a173e5dcb9b569c6806a326164219b424a8439203609a650986e",
+      "mutations": 56,
+      "decodeCalls": 232,
+      "codedRejections": 192,
+      "successfulMutatedDecodes": 32,
+      "controlPayloadHashes": 8,
+      "targets": [
+        23,
+        24,
+        25,
+        26
+      ],
+      "wasmPages": 20
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-hdr-this-way-up-uastc-hdr.ktx2",
+      "seedSha256": "24f20e96735b7e2d9cdd2ea9343bfb3065df4d1a25cd219c73171404a1fe98ef",
+      "mutations": 56,
+      "decodeCalls": 232,
+      "codedRejections": 196,
+      "successfulMutatedDecodes": 28,
+      "controlPayloadHashes": 64,
+      "targets": [
+        23,
+        24,
+        25,
+        26
+      ],
+      "wasmPages": 23
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-layers-array-uastc.ktx2",
+      "seedSha256": "0221099b6b2b609040e19f2b59412ee1f913bfb803734033185e0de23020ccb6",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 210,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-layers-cube-array-etc1s.ktx2",
+      "seedSha256": "4bb0117f28eeccee0b4f270711efd4db785e6c0239a9c6158a3946d4e455da8e",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 245,
+      "successfulMutatedDecodes": 35,
+      "controlPayloadHashes": 120,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 22
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-layers-cube-etc1s.ktx2",
+      "seedSha256": "40096eefd0e3d7877765560875c2a16210a5948d65644e7cfa1e8f5964115a03",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 225,
+      "successfulMutatedDecodes": 55,
+      "controlPayloadHashes": 420,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 21
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "Margo-ktx2-layers-cube-uastc-zstd.ktx2",
+      "seedSha256": "7a35044e61499f67379398648ec7911197f067556c28ac9ca880a3898a0db601",
+      "mutations": 56,
+      "decodeCalls": 290,
+      "codedRejections": 220,
+      "successfulMutatedDecodes": 60,
+      "controlPayloadHashes": 420,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 18
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "cc0-flighthelmet-atlas-etc1s.basis",
+      "seedSha256": "4f5c6d8bcd021592be4bc0c1eac9c97bc3c170d721c63d89c5ffa1fe4245625b",
+      "mutations": 56,
+      "decodeCalls": 70,
+      "codedRejections": 89,
+      "successfulMutatedDecodes": 15,
+      "controlPayloadHashes": 10,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 139
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "cc0-flighthelmet-alpha-etc1s.basis",
+      "seedSha256": "f0877cd7952b0b676e38378e9a2bebcbd31f15f584da671a32c41dcda37807b1",
+      "mutations": 56,
+      "decodeCalls": 70,
+      "codedRejections": 84,
+      "successfulMutatedDecodes": 20,
+      "controlPayloadHashes": 10,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 71
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "cc0-flighthelmet-uastc.basis",
+      "seedSha256": "7d0d0ce2d4b39fd540e9bfdde7767dfbcff9873322910016c7f6f6df4f581d35",
+      "mutations": 56,
+      "decodeCalls": 85,
+      "codedRejections": 41,
+      "successfulMutatedDecodes": 75,
+      "controlPayloadHashes": 10,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "wasmPages": 69
+    },
+    {
+      "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed",
+      "file": "cc0-cube-uastc-hdr.ktx2",
+      "seedSha256": "1e63760a51b2e1ad2e4410ec190a80901400acc9282c644faa4513cfed3149cd",
+      "mutations": 56,
+      "decodeCalls": 232,
+      "codedRejections": 188,
+      "successfulMutatedDecodes": 36,
+      "controlPayloadHashes": 336,
+      "targets": [
+        23,
+        24,
+        25,
+        26
+      ],
+      "wasmPages": 21
+    }
+  ],
+  "controlPayloadHashes": 6558,
+  "bounds": {
+    "perSeedHardSeconds": 180,
+    "wholeCampaignHardSeconds": 1800,
+    "hostHeapMiB": 512,
+    "inputMiB": 128,
+    "maxPublishedDecodedAllocationMiB": 512
+  },
+  "countContract": "decodeCalls counts .basis image/target ABI calls and KTX whole-file/target jobs; successfulMutatedDecodes follows that same per-interface granularity. controlPayloadHashes counts individual output image checks. Wasm pages are end-instance pages after the campaign for that seed, not per-target isolated peak memory acceptance.",
+  "regression": {
+    "cause": "Private KTX2 adapter failed to wrap the shared supercompression helper at the owned API boundary. Corrupt Zstd frame magic escaped as RangeError.",
+    "test": "private/batch-134/measure/private-ktx-container.test.mjs: damaged supercompressed levels keep coded draft errors and the original cause",
+    "red": "report11-zstd-red: rejects with raw RangeError, expected coded failure",
+    "green": "report11-private-suite-final:15passed,0failed,0skipped",
+    "fix": "Private level helper preserves the cause and aborted signal reason; shared Zstd was unchanged."
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "status": "pass-implemented-subset",
+  "scope": "Private queued TypeScript .basis adapter over existing checked Rust file ABI;all implemented targets/mips/metadata,not public worker integration or job2/3 completion",
+  "files": 6,
+  "payloadHashes": 180,
+  "rows": [
+    {
+      "file": "cc0-flighthelmet-atlas-etc1s.basis",
+      "supplement": false,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 5
+    },
+    {
+      "file": "cc0-flighthelmet-alpha-etc1s.basis",
+      "supplement": false,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 5
+    },
+    {
+      "file": "cc0-flighthelmet-uastc.basis",
+      "supplement": false,
+      "targets": [
+        10,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 5
+    },
+    {
+      "file": "seaside-rocks01-color.basis",
+      "supplement": true,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 55
+    },
+    {
+      "file": "seaside-rocks01-gloss.basis",
+      "supplement": true,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 55
+    },
+    {
+      "file": "seaside-rocks01-normal.basis",
+      "supplement": true,
+      "targets": [
+        0,
+        13,
+        14,
+        15,
+        16
+      ],
+      "hashes": 55
+    }
+  ],
+  "wasmSha256": "13d0d9609bfd61de90563e7929f8f5024612ca5708d95f325531ce38052044de",
+  "adapterSha256": "790a8e1e46fd99622649538f14186253ba5cf4c624e0918d3f2b524f3e0f44ed"
+}

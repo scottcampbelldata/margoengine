@@ -1930,3 +1930,22 @@ all neighborhoods in one submission. Directed counts and the failing parent
 are covered by packages/selection/test/picking.test.js. Historical 83 vs 67 ms
 is still a loss. Real-GPU point equivalence and command counts pass on all
 captured/MSAA/micro routes; no elapsed-time win is claimed.
+
+## Batch 134 private packed and whole-file adapter evidence
+
+The [packed checkpoint](results/batch-134-packed-ldr.json) proves exact frozen
+payloads for RGB565/BGR565/RGBA4444: 1,845 primary and 99 supplementary image
+hashes. Its block-local output path avoids a full RGBA staging image; this is
+a deterministic allocation/work claim, without a measured old/new speed claim.
+
+A private TypeScript .basis adapter now preserves checked Rust container
+metadata, image/mip order, native video history, cancellation and disposal.
+[Six-file evidence](results/batch-134-basis-adapter.json) records 180 matching
+frozen payloads over the implemented targets. These are private development
+checkpoints, not public integration, complete Basis support or authorization
+to remove the prebuilt decoder. The primary corpus remains 51 files.
+
+[Whole-container mutation evidence](results/batch-134-whole-container-fuzz.json)
+checks 2,856 mutations from all 51 primary seeds with 13,507 coded decode outcomes
+and unchanged strict specification controls, including RGB9E5. This is a
+reproducible bounded correctness result, not a coverage or defect-free claim.

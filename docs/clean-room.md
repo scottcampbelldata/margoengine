@@ -2538,3 +2538,22 @@ transfer mode; nearest rounding differs on zero. Target 13 matches the authored 
 The experiment selects the omitted conversion convention only, never a codec algorithm.
 Evidence: private/batch-134/measure/packed-ldr-probe.json and eight frozen payloads.
 No implementation source, companion code, foreign glue, disassembly or remembered internals used.
+
+## Batch 134 whole-container mutation research (2026-11-09)
+
+Before expanding hostile-input validation, searched research on structured-input
+fuzzing, parser validation and fuzz-evaluation methods. Compared Patrice Godefroid,
+Adam Kiezun and Michael Y. Levin, [Grammar-based Whitebox Fuzzing (2008)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tr-2007-154.pdf),
+abstract and introduction, with George Klees, Andrew Ruef, Benji Cooper, Shiyi Wei
+and Michael Hicks, [Evaluating Fuzz Testing (2018)](https://arxiv.org/html/1808.09700),
+introduction and sections 5-6. Read those portions, not either full paper; no
+companion implementation or fuzzer source was opened. The search also considered
+LangSec parser-validation literature; an attempted paper fetch failed and was not used.
+
+Use reproducible seeds from every primary corpus file, preserve framing/CRC in
+some mutations to reach the decoder, and include broken framing and truncation
+separately. Each seed runs in its own bounded process, with coded-error and
+post-failure recovery checks. This is a deterministic correctness campaign,
+not symbolic execution, coverage-guided fuzzing, a fuzzer-speed comparison or
+a statistical claim that all parser defects have been excluded. No timing-only
+assertion or wall-clock A/B is introduced.

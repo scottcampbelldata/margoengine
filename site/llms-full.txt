@@ -4770,6 +4770,23 @@ subset. [Evidence](whitepaper/results/batch-134-packed-ldr.json) includes the
 Draft Wasm: 107,169 raw / 43,720 gzip bytes, not a completed replacement size.
 No public decoder entry changes or prebuilt removal; jobs 2-5 remain incomplete.
 
+The private whole-file .basis TypeScript adapter covers six files and 180 frozen
+payloads for its implemented targets. It keeps raw flags opaque, retains
+metadata and every mip, and shares queued Wasm ownership, AbortSignal and
+disposal with the private KTX2 draft. No public exports or worker changes.
+Malformed Zstandard levels now retain their original RangeError as the cause
+of the adapter's coded failure; the damaged-magic regression fails before
+that repair. The shared Zstandard implementation was unchanged.
+
+The [bounded whole-container campaign](whitepaper/results/batch-134-whole-container-fuzz.json)
+covers all 51 primary seeds and 2,856 deterministic mutations, with broken and
+CRC/framing-preserving cases. All 13,507 decode calls returned valid output or
+coded refusals; there were no uncoded exceptions, traps or hard-limit failures.
+The two prebuilt-unserved 3D seeds are checked for coded rejection. Each process
+is bounded at 180 seconds, with a 1,800-second campaign limit. The pinned
+adapter/Wasm hashes are in every seed record. This remains implemented-subset
+validation, not complete fuzz acceptance while target encoders are missing.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

@@ -1502,3 +1502,21 @@ the Wasm ABI. `measure/draft-size.mjs` first reproduces the pinned prebuilt
 527,333 raw / 247,535 gzip sizes with Node gzip9, then measures the draft.
 Results: [packed LDR](results/batch-134-packed-ldr.json). Private scripts/assets
 are not a public package or a claim that full replacement acceptance is complete.
+
+`measure/private-basis-adapter-compare.mjs` checks six .basis inputs and all
+180 implemented frozen payloads through the private queued TypeScript API.
+The private Node suite combines `private-ktx-container.test.mjs`,
+`private-basis-adapter.test.mjs`, `packed-ldr.test.mjs` and
+`comparison-corpus.test.mjs`; it includes the failing-before damaged-frame
+regression and synthetic video/cancellation/disposal controls.
+
+`measure/whole-container-fuzz.mjs` runs every primary seed in a separate process
+with a 180-second hard limit and a 512 MiB Node host-heap ceiling; the outer
+`report11-run.mjs` bounds the campaign at 1,800 seconds. Metadata mutations,
+CRC-repaired .basis mutations, payload flips and truncations are deterministic.
+Unmodified controls run before and after mutations; target 26 is compared to
+the independent strict specification reader, all other implemented targets to
+frozen prebuilt payloads. Seed records pin the input, adapter and Wasm hashes.
+[Campaign result](results/batch-134-whole-container-fuzz.json): 51 seeds, 2,856
+mutations and 13,507 decode calls, with no trap, uncoded refusal or hard timeout.
+No timing A/B or fuzzer-speed comparison runs in this campaign.
