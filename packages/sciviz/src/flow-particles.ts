@@ -1,7 +1,7 @@
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
-import type { Bounds } from './layer.js';
+import { toScene, type Bounds } from './layer.js';
 import type { FlowGrid } from './flow.js';
 import { flowSeeds, validateFlowGrid, type FlowSeeding } from './flow-seeds.js';
 import { flowCompute, flowDraw } from './flow-shaders.js';
@@ -184,7 +184,10 @@ export class FlowParticles implements Drawable {
   /** @internal */
   setModel(model: Float32Array): void { this.#values.set(model, 0); }
   /** @internal */
-  center(): readonly [number, number, number] { return [this.#values[12], this.#values[13], this.#values[14]]; }
+  center(): readonly [number, number, number] {
+    const b = this.#bounds;
+    return toScene(this.#values, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2);
+  }
 
   #check(): void {
     if (this.#disposed) throw fault('disposed', 'Create a new flow layer after disposal', 'sciviz');

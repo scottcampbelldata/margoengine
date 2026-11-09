@@ -113,7 +113,7 @@ Actual device replacement replays accepted partitions, bounded by maxSteps; adva
 readback. Explicit readPositions has a 30000 ms default timeout. WebGPU and WebGL2 compatibility pass
 numeric/pixel/lifecycle tests; native WebGL2 flow remains pending with batch 181. NOAA daily means do not
 establish observed tracks or forecast accuracy. The official Moving wind example preserves these limitations.
-The `/flow` JavaScript entry is 8,596 B gzip (raised optional ceiling 8,854 B);
+The `/flow` JavaScript entry is 8,665 B gzip (raised optional ceiling 8,854 B);
 the previous CPU-only size was 2,130 B (ceiling 2,386 B). Root remains 36,916 B, driver 4,476 B, Wasm 7,916 raw /
 3,585 gzip B; their ceilings are unchanged by flow. Keeping one coherent flow entry avoids an artificial loader
 between transport, seed semantics and owned replay state.

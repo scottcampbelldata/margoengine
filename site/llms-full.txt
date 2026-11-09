@@ -2703,7 +2703,7 @@ Actual device replacement replays accepted partitions, bounded by maxSteps; adva
 readback. Explicit readPositions has a 30000 ms default timeout. WebGPU and WebGL2 compatibility pass
 numeric/pixel/lifecycle tests; native WebGL2 flow remains pending with batch 181. NOAA daily means do not
 establish observed tracks or forecast accuracy. The official Moving wind example preserves these limitations.
-The `/flow` JavaScript entry is 8,596 B gzip (raised optional ceiling 8,854 B);
+The `/flow` JavaScript entry is 8,665 B gzip (raised optional ceiling 8,854 B);
 the previous CPU-only size was 2,130 B (ceiling 2,386 B). Root remains 36,916 B, driver 4,476 B, Wasm 7,916 raw /
 3,585 gzip B; their ceilings are unchanged by flow. Keeping one coherent flow entry avoids an artificial loader
 between transport, seed semantics and owned replay state.
@@ -5059,6 +5059,13 @@ Research, normalization proof and minifier evaluation: [size restoration](size-r
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Fixed: moving-flow sort centre on offset grids
+
+The initial moving-flow layer returned its model translation as the transparent sorting centre. That is
+the transformed data origin, not the centre of an offset grid. It now transforms the grid-bound midpoint.
+The offset `[100,108] x [200,208]` browser regression in `entries-cases.js` independently checks all three
+world coordinates, then removes that layer's bounds. The translation-only version fails this assertion.
 
 ### Refreshed: incoherent size-page evidence (2026-11-09)
 

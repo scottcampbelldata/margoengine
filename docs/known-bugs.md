@@ -1,5 +1,12 @@
 # Known bugs and unverified features
 
+### Fixed: moving-flow sort centre on offset grids
+
+The initial moving-flow layer returned its model translation as the transparent sorting centre. That is
+the transformed data origin, not the centre of an offset grid. It now transforms the grid-bound midpoint.
+The offset `[100,108] x [200,208]` browser regression in `entries-cases.js` independently checks all three
+world coordinates, then removes that layer's bounds. The translation-only version fails this assertion.
+
 ### Refreshed: incoherent size-page evidence (2026-11-09)
 
 The full batch 134 verify passed 13,727 tests and failed `sizes-page.test.js`

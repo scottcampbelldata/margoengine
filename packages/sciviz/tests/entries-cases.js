@@ -85,6 +85,10 @@ addCase('flow-motion', async (figure, { assert, pixels, lit }) => {
   await reject(extreme.advance(1e10, { step: 1e10 }), (e) => e instanceof RangeError);
   assert(extreme.steps === 0, 'float32 overflow is rejected before any integration dispatch');
   extreme.dispose();
+  const offset = await flowParticles(figure, { ...field, bounds: [100, 108, 200, 208, 5, 5] }, { count: 1 });
+  const m = figure.model;
+  close(offset.center(), [0, 1, 2].map((row) => m[row] * 104 + m[row + 4] * 204 + m[row + 8] * 5 + m[row + 12]), 1e-12);
+  figure.remove(offset); // Remove its offset bounds as well as its GPU resources.
   const copiedField = { ...field, frames: [{ ...field.frames[0], u: field.frames[0].u.slice() }] };
   const copied = await flowParticles(figure, copiedField, { count: 1, maxSteps: 1, respawn: false,
     seeding: { kind: 'rake', start: [0, 0, 0], end: [0, 0, 0] } });

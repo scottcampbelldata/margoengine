@@ -169,6 +169,9 @@ overlapping advances and invalidates an in-flight caller on replacement/disposal
 
 CPU streaklines reuse one feature-local Wasm instance and copied field for all releases, retaining only endpoints
 at the common observation time. Invalid/unfinished releases are NaN gaps with explicit stop reasons.
+Transparent flow sorting transforms the data-bound midpoint, including offset grids; returning only the model
+translation sorts the transformed data origin instead. The offset-grid browser regression checks all three
+world coordinates against an independent matrix calculation before removing the temporary layer's bounds.
 `flow-seeds.test.js` checks layout semantics, release-time analytics and one-instantiation work counts.
 The `flow-motion` browser case checks 2D/3D steady/unsteady GPU arithmetic against the float64 reference within
 0.0002 distance units on its analytic fields, respawn, missing data, cancellation and exact replay pixels.

@@ -175,6 +175,9 @@ claim to implement their sorting, streaming or adaptive integration algorithms. 
 Alan Baker, Mehmet Oguz Derin and David Neto, *WebGPU Shading Language* (2026),
 https://www.w3.org/TR/WGSL/, defines storage layouts, workgroup dispatch and float32 arithmetic.
 All shaders and seeding/replay logic are written here clean room. No speed claim is made.
+The transparent-layer sort centre transforms the data-bound midpoint with the figure matrix, following
+the WGSL matrix/vector contract; the translation column alone is not the centre of an offset grid.
+The offset-grid browser regression checks this independently before removing that layer's bounds.
 
 ## Native GL loss-event gate ordering (2026-11-10)
 

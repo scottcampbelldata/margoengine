@@ -40,6 +40,11 @@ context-loss/state cases. All 23 README examples pass on the rebased tree. The f
 single rerun remain in `test-results/sciviz-fixes/moving-webgl.log`, `moving-confirmed-reset.json` and
 `moving-reset-closure.json`. No assertion, deadline, workload or GPU scheduling mode changes.
 
+Offset-grid coverage exposed a moving-flow transparent-sort centre that used only the model translation.
+The layer now transforms its data-bound midpoint; a browser regression checks independently transformed
+world coordinates on a positive-offset planar grid at height 5 and fails with the previous implementation. Flow increases
+from 8,596 to 8,665 B gzip (+69), within its existing 8,854 B ceiling. Root/driver/Wasm/core/stage are unchanged.
+
 ## Batch 160: separate browser shutdown prerequisite
 
 The Windows browser wrapper now closes all four owned stdio/CDP pipes after
