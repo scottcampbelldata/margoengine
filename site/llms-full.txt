@@ -3639,6 +3639,10 @@ Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
 
+### Fixed 2026-11-08: creative targets workspace GPU launch
+
+`npm run test:gpu:targets --workspace @margoengine/creative` started its browser server in the package directory and returned HTTP 404 for the repository's test page. The targets harness now resolves its repository root from its module URL before starting the server. `packages/creative/tests/targets-launch.test.js` invokes the harness from the package directory with a browser stand-in that asserts the served root. The real GPU command separately checks all target subresources.
+
 ### Fixed 2026-11-08: meadow phone quality label and stale DPR fixture
 
 `applyQualityTier` intentionally renders phones at DPR 1. The meadow treated every single-sample tier as
