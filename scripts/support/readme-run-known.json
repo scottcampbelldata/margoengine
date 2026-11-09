@@ -12,7 +12,6 @@
   "animator/readme-state-graph-as-data-margoengine-f00e50": "sample: RangeError: Unknown animator clip \"Land\"; use a clip name from animation.clips",
   "animator/readme-sync-groups-margoengine-animator-ced03a": "sample: RangeError: Unknown animator clip \"Sprint\"; use a clip name from animation.clips",
   "animator/readme-triggers-exit-times-any-state-tr-2794f3": "sample: RangeError: Unknown animator clip \"Land\"; use a clip name from animation.clips",
-  "cameras/readme-physical-exposure-margoengine-ca-6d1c49": "example: MargoError: Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source",
   "cutscene/readme-render-to-video-4f9104": "sample: EncodingError: Unable to decode audio data",
   "exporters/readme-render-to-file-80cd28": "example: TypeError: Cannot read properties of undefined (reading '1')",
   "exporters/readme-unity-asset-and-support-bundles-a4fd05": "example: MargoError: Unity import profile requires the explicit Margo Mesh Studio source profile; use general GLB for other generators; change the scene or choose anothe",

@@ -822,3 +822,37 @@ GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
 driver-reset rerun. Its rescheduled result file is current and contains exactly
 that selected test. The remaining 15 shared package scripts and the two README
 requests are still supervised and queued; none is claimed passed.
+
+
+### Unlanded physical-camera README follow-up (2026-11-09)
+
+The physical exposure example attached DOF and Tonemap as independent scene
+capturers, then attempted another PostStack. It now constructs those effects
+unattached and joins one [DOF, MotionBlur, Tonemap] stack; TAA reads its shared
+depth, and engine.start renders the configured picture. The executable regression
+in tests/readme-physical-camera.test.js fails before the repair on the duplicate
+owner and passes after it, including TAA depth/velocity and all physical targets.
+The obsolete example ID is retired (42 to 41 candidate runtime exceptions); the
+complete camera README/GPU runs remain queued, so runtime closure is not claimed.
+No camera runtime, assets, exports, core/stage or held physics source changes.
+
+The new full verify executes 13,535 tests: 13,534 pass, one fails, zero skip
+(450.5 s supervisor). The failure is tests/browser-teardown.test.js:334,
+'a real browser: close ends its main process and everything under it':
+SHUTDOWN_TIMEOUT, still open browser, at the unchanged 30,000 ms close budget
+(31,259 ms including launch/setup). All camera and API/quality/README-type checks
+pass. This is not a passing full verify or a busy-machine exemption. The earlier
+landed group independently passed 13,534/13,534, including this test.
+
+Browser source is unchanged from mainline 6ebbd1aa4 and remains batch 160's owner
+per the brief. The exact pending phase (native termination, pipe close, driver
+cleanup or connected-client close) is not yet isolated. A public-API phase trace
+that reproduces processTree's page/CDP setup is queued in the existing exclusive
+camera job; it does not edit scripts/lib/browser.mjs. Its log/result and the full
+failure stay under test-results/missing-items/physical-*. No second push until
+the failure is resolved or meets the documented timing-only evidence rules.
+
+Physical-camera follow-up CPU validation: lint and hygiene pass; all 82 camera
+package tests and all 14 focused regression/generated-document tests pass, zero
+failures/skips. This does not replace the failed full verification or the queued
+real camera README/GPU checks. No second push is authorized by these results alone.

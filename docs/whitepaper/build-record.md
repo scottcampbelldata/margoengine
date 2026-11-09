@@ -4590,3 +4590,33 @@ tests with zero failures/skips (449.7 s). API reports match 887 entries and
 JSONs are byte-identical to the parked originals after line-ending normalization.
 Every fresh AMD proof, native-volume regression and runtime README gate passes.
 No benchmark, exclusive hold, tolerance increase or skipped test is included.
+
+### Fixed: physical-camera README shares one HDR capture (2026-11-09)
+
+The exposure example attached DOF and Tonemap as independent scene capturers,
+then attempted another PostStack. It now constructs the effects unattached and
+joins one [DOF, MotionBlur, Tonemap] stack. TAA reads its shared depth, and
+engine.start renders the configured picture. tests/readme-physical-camera.test.js
+fails before the repair and verifies the single capture, TAA depth/velocity
+and physical exposure targets after it. The obsolete runtime exception is removed.
+
+Landing checks after GPU queue repairs b7af6646a and d2e8310ef: the sole failed
+verify unit-test step was resumed, with 13,612 of 13,613 tests passing and zero
+skips. Its only failure was an unavailable private-file pointer inherited in the
+GPU lock report. Rewording that pointer passes the existing no-private-paths
+regression; the queue FIFO and bootstrap regressions pass. Earlier lint, hygiene,
+API, quality, types, size and proofs passed. Camera tests pass all 83 cases.
+One shared GPU slot then passed the camera browser suite (10.1 s) and all nine
+executable README examples, zero failures (28.9 s combined supervisor).
+No camera runtime, assets, exports, core/stage or held physics source changes.
+Evidence: test-results/skip-gaps/camera-resume-*.log. Browser teardown and queue
+repairs were inherited from main; no assertion or budget was relaxed.
+
+Research: Paul Haeberli and Kurt Akeley, The Accumulation Buffer: Hardware Support
+for High-Quality Rendering, SIGGRAPH 1990,
+https://graphics.stanford.edu/courses/cs248-06/haeberli-akeley-accumulation-buffer-sig90.pdf;
+Craig Kolb, Don Mitchell and Pat Hanrahan, A Realistic Camera Model for Computer
+Graphics, SIGGRAPH 1995, https://graphics.stanford.edu/papers/camera/; W3C GPU for
+the Web Working Group, WebGPU, 2026, https://www.w3.org/TR/webgpu/.
+Sampling and optical exposure are separate concerns; the attachment/resource
+rules support sharing the existing PostStack capture. No foreign code was read.

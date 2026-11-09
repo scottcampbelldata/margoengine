@@ -259,9 +259,10 @@ import {PhysicalCamera} from 'margoengine/cameras/physical';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
-const dof = DOF.attach(engine), tonemap = Tonemap.attach(engine);
-const taa = TAA.attach(engine), motionBlur = new MotionBlur({velocity: () => taa.velocity});
-PostStack.attach(engine, [motionBlur]);
+const dof = new DOF(), tonemap = new Tonemap();
+const taa = TAA.attach(engine, {depth: () => stack.depthTexture});
+const motionBlur = new MotionBlur({velocity: () => taa.velocity});
+const stack = PostStack.attach(engine, [dof, motionBlur, tonemap]);
 const camera = new PhysicalCamera({focalLength: 85, aperture: 1.8, shutter: 1 / 120, iso: 200, focusDistance: 3});
 camera.apply({dof, motionBlur, exposure: tonemap, camera: engine.camera, aspect: 16 / 9});
 camera.aperture = 5.6;                  // stops down: darker, deeper focus
@@ -269,6 +270,7 @@ camera.apply({dof, motionBlur, exposure: tonemap});
 camera.exposure;                        // stops against the reference: -1 at f/5.6, 1/120 s, ISO 200
 camera.depthOfField();                  // {hyperfocal, near, far} in metres, far is Infinity past the hyperfocal distance
 camera.blurDiameter(10);                // mm of blur on the sensor for a point 10 m away
+engine.start();                         // TAA wraps the shared HDR stack; blur uses its velocity
 ```
 
 - **Exposure**: `ev100 = log2(N² / t) − log2(ISO / 100)` for f-number N, shutter time t seconds. `exposure` is
