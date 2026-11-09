@@ -2046,7 +2046,10 @@ scene-owner suite has 81 cases; eleven direct-secondary cases fail on parent
 40a1548cc. The two constructor-failure cases per scene are passing controls.
 The original 12-case probe independently has three failures and nine controls.
 
-The pending GPU proof extends the complete package browser leaf with twelve
+The accepted GPU proof extends the complete package browser leaf with twelve
 real-GPU owner cases and rendered pixels. Run that and the walk browser leaf
 separately, using the shared GPU lock, wait-max60 and measured time plus margin.
-Builds stay outside the GPU lock. Run the Controls runtime README examples next.
+Builds stay outside the GPU lock. All fourteen Controls runtime README examples
+pass, as do seventeen browser checks and three walk checks. Two additional CAD
+replacement controls bring the fixed owner suite to 83 and package/guard total
+to 304. No second full verify was run.

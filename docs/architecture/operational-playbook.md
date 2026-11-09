@@ -4757,12 +4757,16 @@ rollback. The old viewer and missing-peer diagnostics fail the strengthened
 checks. Sources and measured optional ceilings: [size restoration](../size-restore.md).
 
 
-### Section 5 pending evidence: Controls wrappers
+### Section 5 evidence: Controls wrappers
 
 The shared controls base and the two GPU gizmos now retain their actual wrapper
 objects. Direct cleanup resolves sceneOf(wrapper) rather than the active scene.
 The expanded 81-case real-engine suite has 11 direct-secondary failures on its
-parent and passes after repair; all 302 package/guard checks pass. The class guard
+parent and passes after repair. Two CAD replacement controls bring package/guard
+checks to 304. The class guard
 scans every Controls source and is part of the normal test/check:merge inventory.
 All ten entry sizes remain within their unchanged ceilings. Public API reports
-match all ten entries. GPU/browser and README runtime acceptance remain pending.
+match all ten entries. The complete browser passes 17 checks, including twelve
+owner cases with at least 476 red pixels, exact detachment and listener cleanup.
+Three walk checks and fourteen runtime README examples pass. Only affected
+gates were rerun; the inherited single full verify is retained without repetition.

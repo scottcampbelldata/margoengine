@@ -2949,7 +2949,9 @@ Three optional wrapper registrations retain identity and dispose from their actu
 scene. The 81-case runtime suite covers nine camera classes and two gizmos, both
 scenes, direct/plugin/scene/engine removal, restoration hooks, same-name isolation
 and replacement, plus failed initialization. Package and source-guard checks pass
-302. GPU and runtime README proof remain pending. No speed or formal ownership
+304 after adding two CAD replacement controls. GPU browser checks pass 17,
+including twelve owner pixel cases; three walk checks and all fourteen README
+runtime examples pass. No speed or formal ownership
 claim; no core/stage or export change and no size ceiling raised.
 
 | Controls entry | min+gzip bytes | Unchanged ceiling |

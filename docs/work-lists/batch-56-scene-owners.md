@@ -126,3 +126,13 @@ in the expanded 81-case suite. The optional identity repair passes all 302 packa
 and source-guard checks. The deliberate cadControls replacement of the active
 stage controls is not disposal of its own wrapper; existing profile tests cover
 that operation. GPU/README acceptance remains pending; other groups remain open.
+
+Controls acceptance is complete: 83 owner cases, 304 package/guard checks,
+17 browser checks (twelve owner pixel cases), three walk checks and fourteen
+runtime README examples pass. All ten APIs and entry ceilings remain unchanged.
+Both active-scene CAD replacement cases also pass; that fourth Controls removal
+call is an intentional operation with runtime proof, not a wrapper disposal gap.
+Fresh syntactic inventory: 183 calls, 75 identity, two stored Save calls, three
+core routers and 103 active/delegated candidates. The latter includes the now
+proved CAD replacement; counts remain syntax, not exhaustive lifetime proof.
+No second full verify. [Controls receipt](../whitepaper/results/batch-56-controls-owner-20261109.json).

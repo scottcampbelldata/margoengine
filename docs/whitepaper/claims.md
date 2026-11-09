@@ -2495,10 +2495,13 @@ code and help link. Proof: stage viewer/scene/missing-package regressions and
 tests/modern-wrapper.test.js; research and reproduction: [size restoration](../size-restore.md).
 
 
-### Controls wrapper owner CPU proof
+### Controls wrapper owner CPU and GPU proof
 
 The local optional-package repair passes 81 real-engine owner/lifetime cases
 covering nine camera classes and two gizmos (parent: 70 pass, 11 fail). Complete
-package units plus the class guard pass 302. Same-name default/replacement identity,
-input release and owner/engine cleanup are covered. GPU and README runtime proof
-remain pending. No speed claim. Research: [clean-room record](../clean-room.md).
+package units plus the class guard pass 304 after two CAD replacement controls.
+Same-name default/replacement identity,
+input release and owner/engine cleanup are covered. The complete browser
+passes 17 checks, including twelve owner pixel cases; three walk checks and
+fourteen runtime README examples pass. No speed claim. Research:
+[clean-room record](../clean-room.md).

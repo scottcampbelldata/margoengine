@@ -3679,12 +3679,10 @@ runtime README examples pass. The exact inherited 7 ms speed budget remains
 in the named deferred suite. See the [acceptance receipt](whitepaper/results/batch-56-quality-owner-20261109.json).
 
 
-### Controls secondary wrapper disposal: local repair awaiting acceptance
+### Controls secondary wrapper disposal: resolved
 
-Repro: construct OrbitControls, TransformControls or ArcballGizmo during a
-secondary scene setup, remove the temporary setup scope, then dispose outside
-setup with a same-name default plugin present. The default plugin is removed
-and the actual wrapper remains registered. Cause: only the name was retained.
-The shared base affects all nine camera controls. The local identity repair
-passes all 81 real-engine cases (parent 70 pass, 11 fail), with 302 total package
-and guard checks passing. Package GPU and runtime README acceptance remain open.
+The shared Controls base and two gizmos retain their actual wrappers and detach
+from sceneOf(wrapper). The original expanded parent suite has eleven failures;
+all 83 owner cases and 304 package/guard checks now pass. The complete browser
+proof passes 17 checks including twelve owner pixel cases; all three walk checks
+and fourteen runtime README examples pass. See the [acceptance receipt](whitepaper/results/batch-56-controls-owner-20261109.json).

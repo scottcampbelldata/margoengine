@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL_REPAIR_ACCEPTANCE_PENDING",
+  "status": "ACCEPTED_AFFECTED_CHECKS",
   "base": "40a1548cc",
   "initialProbe": {
     "cases": 12,
@@ -12,12 +12,19 @@
     "fail": 11
   },
   "fixed": {
-    "packageUnits": 301,
+    "ownerCases": 83,
+    "packageUnits": 303,
     "guard": 1,
-    "pass": 302,
-    "fail": 0
+    "pass": 304,
+    "fail": 0,
+    "skipped": 0
   },
-  "api": "10 unchanged selected entries",
+  "api": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 2.1
+  },
   "sizes": [
     {
       "name": "@margoengine/controls",
@@ -72,11 +79,111 @@
   ],
   "coreStageSourceChanged": false,
   "hunterCaptureChanged": false,
-  "pending": [
-    "GPU browser including 12 owner cases",
-    "walk browser",
-    "runtime README",
-    "lint/hygiene/documentation checks",
-    "rebase and push"
+  "pending": [],
+  "fix": "81d8dced0",
+  "gpu": [
+    {
+      "name": "browser",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 229.3
+    },
+    {
+      "name": "walk",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 36.4
+    },
+    {
+      "name": "readme",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 21.3
+    }
+  ],
+  "checks": [
+    {
+      "name": "lint",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.9
+    },
+    {
+      "name": "hygiene",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 15.9
+    },
+    {
+      "name": "links",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1.2
+    },
+    {
+      "name": "readme-types",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.5
+    },
+    {
+      "name": "size",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.9
+    },
+    {
+      "name": "inventory",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.4
+    }
+  ],
+  "quality": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 28.6
+  },
+  "readme": {
+    "pass": 14,
+    "node": 1,
+    "browser": 13
+  },
+  "browser": {
+    "checks": 17,
+    "ownerCases": 12,
+    "minRedPixels": 476,
+    "errors": 0
+  },
+  "walk": {
+    "checks": 3
+  },
+  "verify": {
+    "inherited": "batch-56-save-owner-20261109.json",
+    "fullRunRepeated": false,
+    "reason": "Scott requested affected checks only"
+  },
+  "inventory": {
+    "calls": 183,
+    "identity": 75,
+    "stored": 2,
+    "core": 3,
+    "activeCandidates": 103,
+    "cadReplacementProven": true
+  },
+  "fixtureDiagnostics": [
+    "Initial new-wrapper field type rejected registerPasses; preserved typed structural assignment via a local object, then build passed.",
+    "Parent probe label change introduced a test parse error; corrected and retained failed diagnostic log.",
+    "Expanded parent expected-count assertion assumed 13 failures; actual receipt proves 70 pass/11 fail, including passing initialization controls. No product assertions were changed."
   ]
 }

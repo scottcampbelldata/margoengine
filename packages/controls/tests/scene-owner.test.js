@@ -11,6 +11,7 @@ import {
   PointerLockControls,
   TransformControls,
   ArcballGizmo,
+  cadControls,
 } from '../dist/index.js';
 import { WalkControls } from '../dist/walk.js';
 import { ThirdPersonControls } from '../dist/third-person.js';
@@ -136,3 +137,35 @@ for (const [name, Control] of Object.entries({ OrbitControls, TransformControls 
       assert.equal(engine.canvas.listenerCount, 0);
       assert.equal(engine.canvas.style.touchAction, 'auto');
     });
+
+for (const target of ['default', 'secondary'])
+  test(`CAD replacement intentionally targets the active ${target} scene`, async (t) => {
+    const engine = await fixture(t);
+    const scene = target === 'default' ? engine.scene : engine.createScene('cad-owner');
+    let removed = 0,
+      control;
+    const previous = {
+      name: 'margoengine-controls',
+      setup() {},
+      dispose() {
+        removed++;
+      },
+    };
+    scene.use(previous);
+    const sentinel = { name: previous.name, setup() {} };
+    if (target === 'secondary') engine.use(sentinel);
+    const scope = {
+      name: 'scope',
+      setup() {
+        control = cadControls(engine);
+      },
+    };
+    scene.use(scope);
+    scene.removePlugin(scope.name);
+    assert.equal(removed, 1);
+    assert.equal(scene.plugins.has(previous.name), false);
+    if (target === 'secondary') assert.equal(engine.scene.plugins.get(previous.name), sentinel);
+    control.dispose();
+    assert.equal(scene.plugins.size, 0, 'replacement controls dispose from that same scene');
+    assert.equal(engine.canvas.listenerCount, 0);
+  });

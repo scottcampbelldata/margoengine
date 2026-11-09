@@ -3870,6 +3870,8 @@ scene, potentially removing its same-name plugin while leaving the real wrapper
 registered. The optional package now retains the object and resolves sceneOf
 on that object. The parent passes 70 and fails 11 of the expanded 81 real-engine
 cases; the repair passes all 81. Complete package units plus a source guard pass
-302 checks. The guard scans every Controls source for anonymous/lost registrations
-and active-name cleanup when a source installs a wrapper. GPU/README acceptance
-is pending. No core or stage source changed.
+304 checks after adding two CAD replacement controls. The guard scans every
+Controls source for anonymous/lost registrations
+and active-name cleanup when a source installs a wrapper. The GPU browser
+passes 17 checks including twelve owner pixel cases, all three walk checks pass,
+and all fourteen runtime README examples pass. No core or stage source changed.
