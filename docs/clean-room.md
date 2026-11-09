@@ -1110,6 +1110,8 @@ The batch 168 timing drives `3d-tiles-renderer` 0.4.21 as a black box from its R
 Written clean room from the specifications and papers below. No source code of point-cloud libraries or viewers
 (LAStools, LASzip, laz-perf, PDAL, libLAS, Potree, CloudCompare, Entwine and the like) was read.
 
+The batch 168 timing drives `potree-core` 2.0.17 as a black box from its README (https://github.com/tentone/potree-core) and the types it publishes: `Potree`, `loadPointCloud`, `pointBudget`, `updatePointClouds`, `minNodePixelSize`, `material.size`, `PointSizeType.FIXED`. The library source was not opened. The folder is Potree 2.0 as that README describes a converter 2.1 output (metadata, hierarchy, one point file), written here in the DEFAULT layout our reader already tests. Both budgets are 10,000,000.
+
 | Area | Source |
 | --- | --- |
 | LAS reader and writer | ASPRS LAS Specification 1.2 (2008), 1.3 R11 (2010) and 1.4 R15 (2019): public header block, VLR and EVLR headers, point data record formats 0 to 10, extra bytes descriptors (LASF_Spec record 4), OGC WKT (LASF_Projection 2112) |

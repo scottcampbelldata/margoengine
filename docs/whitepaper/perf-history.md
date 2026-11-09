@@ -2429,6 +2429,19 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.
   Citation in clean-room.md. The Margo set is `packages/tiles/tests/sse-scene.test.js`.
 
+### 105. 10 million points against potree-core (diagnostic, loss)
+
+- **Measurement:** one Potree 2.0 leaf, 10,000,000 points, 200 x 200 x 250 grid, 100 m cube. Both budgets
+  10,000,000. Point size 4, fixed. Camera `[0, 0, 180]`, fov 50, 1080 x 1080. The clock is one settled render
+  plus GPU completion (`onSubmittedWorkDone` on Margo, one-pixel `readPixels` on the rival). Two warmups, then
+  7 paired rounds, fastest round. potree-core 2.0.17. RTX A6000. Busy machine.
+- **Result:** loss. Both sides draw 10,000,000 points. Margo 9.000 ms, potree-core 5.400 ms. The rounds do not
+  overlap (Margo 9.000 to 12.400, potree-core 5.400 to 7.600). The rival's seven frames were 7 draw calls and
+  70,000,000 points. Diagnostic until a quiet rerun. Tracked in known-bugs.md. Publishing the number does not
+  close it.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+  Citation in clean-room.md. The grid is `packages/points/tests/points-10m.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2440,6 +2453,10 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
 - **Truck 7k prefix against GaussianSplats3D 0.4.7 (entry 103).** 10.765 ms against 4.500 ms for one still frame of
   699,050 degree-3 splats. The rounds do not overlap. PSNR against the published photo is 12.226 dB (MAE 52.272).
   Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+
+- **10 million points against potree-core 2.0.17 (entry 105).** 9.000 ms against 5.400 ms for one settled frame.
+  Both draw every point. The rounds do not overlap. Rerun:
+  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
 
 - **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
   83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,
@@ -2518,3 +2535,4 @@ These entries lack a recorded number, a named machine or a quiet run:
 25. volume-64 against VTK.js (entry 102): a quiet paired rerun. The loss stays open.
 26. Truck 7k prefix against GaussianSplats3D (entry 103): a quiet paired rerun. The loss and the picture error stay open.
 27. Quadtree screen-space error against 3DTilesRendererJS (entry 104): a quiet paired rerun of the frame time. The selected sets already match.
+28. 10 million points against potree-core (entry 105): a quiet paired rerun of the frame time. The loss stays open.

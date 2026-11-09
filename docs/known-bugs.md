@@ -834,6 +834,13 @@ Measured but not fixed. Their history, sources and rerun commands are in
   at the same world-to-camera pose is 9.994 dB (MAE 60.646). The principal point is the image centre. The model is
   the 7,000-iteration prefix, not the paper's 30,000-iteration cloud, and it is not the paper's dataset-average
   PSNR. Cause not yet found. Publishing the number does not close it.
+- **10 million points are slower than potree-core 2.0.17** (`@margoengine/points`, perf history entry 105):
+  9.000 ms against 5.400 ms, one settled frame of a single 10,000,000 point leaf, paired turns, per-round minimum,
+  busy machine, diagnostic. The rounds do not overlap (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600).
+  Both sides draw every point. Margo waits with `onSubmittedWorkDone`. The rival waits with a one-pixel
+  `readPixels`, because `fenceSync` returned `WAIT_FAILED`. Repro:
+  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+  Cause not yet found. Publishing the number does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node

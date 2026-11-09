@@ -25,6 +25,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/splats` | same frame against the published photo `000001` | PSNR 12.226 dB, MAE 52.272 | GaussianSplats3D 0.4.7, PSNR 9.994 dB, MAE 60.646 | picture error |
 | `@margoengine/tiles` | quadtree, 5,461 tiles, screen-space error 16, selected set | 1,120 tiles, checksum 121586381 | 3DTilesRendererJS 0.4.21, same 1,120 tiles, same checksum | equal |
 | `@margoengine/tiles` | same view, one settled `update` | 0.300 ms | 3DTilesRendererJS 0.4.21, 2.300 ms | win |
+| `@margoengine/points` | 10,000,000 points, one settled frame | 9.000 ms | potree-core 2.0.17, 5.400 ms | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -111,3 +112,14 @@ select the same 1,120 tiles: 992 at level 5 and 128 at level 6, checksum 1215863
 0.300 to 0.900 ms, 3DTilesRendererJS 2.300 to 3.100). Busy machine, diagnostic. The selected set is locked by
 `packages/tiles/tests/sse-scene.test.js`. Rerun:
 `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.
+
+The points row is one Potree 2.0 folder, a single leaf of 10,000,000 points on a 200 x 200 x 250 grid in a 100 m
+cube centred on the origin. Both budgets are 10,000,000, so a settled frame draws every point. Point size is 4
+pixels and does not shrink with distance. The camera is at `[0, 0, 180]`, looks at the origin, up is +Y, the
+vertical field of view is 50 degrees, and the drawing buffer is 1080 x 1080. The clock is one render plus GPU
+completion: `onSubmittedWorkDone` on Margo, and a one-pixel `readPixels` on the rival (`fenceSync` returned
+`WAIT_FAILED` in this browser). Two warmups, then 7 paired rounds, per-round minimum. The rounds do not overlap
+(Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600). The rival submitted 7 draws of 10,000,000 points. Busy
+machine, diagnostic. The loss stays open. The grid and the file layout round-trip in
+`packages/points/tests/points-10m.test.js`. Rerun:
+`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
