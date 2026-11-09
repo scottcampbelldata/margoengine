@@ -1,10 +1,10 @@
 {
-  "commit": "6d0cb2b18",
+  "commit": "f95793d08",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
-    "gzip": 23797,
+    "gzip": 23782,
     "limit": 25000
   },
   "packages": {
@@ -621,11 +621,11 @@
     "@margoengine/core": {
       ".": {
         "raw": 51562,
-        "gzip": 21449
+        "gzip": 21438
       },
       "./extension": {
-        "raw": 51659,
-        "gzip": 21475
+        "raw": 51660,
+        "gzip": 21501
       }
     },
     "@margoengine/creative": {
@@ -634,8 +634,8 @@
         "gzip": 3073
       },
       ".": {
-        "raw": 62200,
-        "gzip": 19043
+        "raw": 61586,
+        "gzip": 18995
       },
       "./particles": {
         "raw": 1028,
@@ -654,16 +654,16 @@
         "gzip": 7023
       },
       "./grass": {
-        "raw": 16377,
-        "gzip": 5961
+        "raw": 16111,
+        "gzip": 5944
       },
       "./planet": {
-        "raw": 20958,
-        "gzip": 7013
+        "raw": 20730,
+        "gzip": 6996
       },
       "./stars": {
-        "raw": 6153,
-        "gzip": 2665
+        "raw": 6033,
+        "gzip": 2653
       }
     },
     "@margoengine/culling": {
@@ -2868,8 +2868,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7318,
-        "gzip": 2974
+        "raw": 7314,
+        "gzip": 2966
       },
       "./gltf": {
         "raw": 2922,
@@ -3502,12 +3502,12 @@
         "gzip": 8446
       },
       "./server": {
-        "raw": 49606,
-        "gzip": 17649
+        "raw": 50439,
+        "gzip": 17975
       },
       "./bot": {
-        "raw": 26479,
-        "gzip": 9855
+        "raw": 26530,
+        "gzip": 9885
       },
       "./file-store": {
         "raw": 1513,

@@ -3728,3 +3728,42 @@ README examples ran 6/6. Export/API records, parity, size gates, claim uniquenes
 API-quality failure was missing argument help anchors; documented arguments/state anchors and linked WebGL2
 preflight errors are now asserted by regression tests. No failed check remains. The older busy browser-close
 release retest stays recorded honestly; this batch did not change its budget or remove its test.
+
+## Lane F batch 98: voxel-net
+
+Seven jobs for `@margoengine/voxel-net` on the M6 Mac mini, each landed as one commit, each a new optional entry or
+option; core and stage are untouched. Job 5 landed before job 4 on purpose: lag compensation sends its shots as the
+client-to-server app messages job 5 added. This last commit (job 7) also sets row 98 of `docs/work-lists/list-2.md`
+to done.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Entities and mobs | DONE | 7fd13ba7d | `VoxelEntities` in `@margoengine/voxel-net/entities` | LIM-558 |
+| 2 | Sharded worlds | DONE | 45a5dfb85 | `VoxelShard`, `ShardMap` in `@margoengine/voxel-net/shards` | LIM-582 |
+| 3 | WebTransport datagrams | DONE | c57ed3595 | `@margoengine/voxel-net/webtransport` | LIM-598 |
+| 4 | Lag compensation | DONE | d57fdbe22 | `VoxelRewind`, `sendShot` in `@margoengine/voxel-net/rewind` | LIM-611 |
+| 5 | Chat and inventory messages | DONE | 282f9a577 | `VoxelChat`, `VoxelInventories`, `VoxelChatClient` in `@margoengine/voxel-net/chat` | LIM-609 |
+| 6 | Database store | DONE | 3c97c10f4 | `SqlChunkStore` in `@margoengine/voxel-net/sql-store` | LIM-618 |
+| 7 | Built-in TLS | DONE | this commit | `tls` option and `setTls` of `VoxelServer` in `@margoengine/voxel-net/server` | LIM-620 |
+
+- **Built from:** `docs/clean-room.md` rows VX28 to VX34: interest circles with a larger leave circle, square regions
+  with a signed handoff ticket, input datagrams carrying copies of the last few, a token-bucket app channel with
+  prefixed chat and inventory messages, per-tick body boxes checked at the shooter's view tick (Bernier, GDC 2001),
+  one SQL table of encoded chunks with an upsert per save, and the listener as a `node:https` server. Nothing from
+  another engine was read.
+- **Proved:** by package tests over real sockets on loopback (`entities`, `shards` with two servers, `rewind`, `chat`,
+  `app-message`, `sql-store` with a restart, `tls`) and by a lossy in-memory link for WebTransport (a third of the
+  datagrams lost each way, every fifth late; no step lost, client and server within 0.05 blocks). The Postgres SQL of
+  job 6 ran through a `pg`-shaped client over `node:sqlite`, never against a Postgres server; job 7 used a self-signed
+  ECDSA certificate made in the test (`tests/tls-cert.js`), so no key file is in the repository.
+- **Sizes (gzip, B):** `./entities` 2,791, `./shards` 9,956, `./webtransport` 6,511, `./rewind` 2,409, `./chat`
+  4,235, `./sql-store` 1,614; `./server` 17,975 with the `tls` option (17,930 before). Core and stage unchanged.
+- **Bugs fixed:** none found in this batch's code by its tests. Job 7's full verify on this Mac found one outside it:
+  `packages/lightmap/tests/cornell-box.test.js` spawned a bare `python`, which macOS does not have (only `python3`),
+  so verify failed with `spawnSync python ENOENT`. It now starts `findPython()` (`scripts/support/find-python.mjs`), as
+  does the fsm Sismic check; regression test `tests/find-python.test.js` ("no test or check spawns a hard-coded python
+  command") fails on the old file.
+- **Limits and unmeasured:** a row in `docs/limits.md` for each job. Everything ran on one machine; no test over a real
+  lossy or slow network, no browser WebTransport client, no Postgres server, no certificate authority chain.
+- **Not done here:** batch 99 (voxel-pathtracer), the rest of stream F, was claimed by the dev PC on 2026-11-09
+  (0b7009d68), so this lane stops at 98.

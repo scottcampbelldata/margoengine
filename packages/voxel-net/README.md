@@ -67,6 +67,8 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   when near; see [Entities and mobs](#entities-and-mobs-entities).
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
+- **Built-in TLS** (`./server` option `tls`): the server serves `wss://` itself for small hosts with no reverse proxy;
+  see [Built-in TLS](#built-in-tls).
 - **Database store** (`./sql-store`, Node): `new SqlChunkStore(db)` is a `ChunkStore` in one SQLite or Postgres table, a
   row per chunk, for worlds too large for a file per chunk; see [Database store](#database-store-sql-store).
 
@@ -85,6 +87,7 @@ Every limit has a safe default; set them on `new VoxelServer({...})`.
 | `authenticate` | none | `(req, hello) => boolean \| string \| Promise<...>`, called on the upgrade request (`hello` undefined: read a cookie or token header) and again on the hello (`{ name }`). `true` lets the client on, a non-empty string too and becomes `player.identity`, anything else closes it with 1008 `'not authorized'`. A throw, or a call longer than `authTimeout`, closes it with 1011 (reason `auth-failed...` or `auth-timeout...`) and goes to `onError`. |
 | `authTimeout` | 5,000 ms | Time each `authenticate` call may take. |
 | `maxEditedChunks` | 65,536 | Edited chunks held in memory. Past it the least recently edited one is saved to `store` and dropped, and read back when needed. Without a store, a player edit to one more chunk is refused and `onError` gets a MargoError `'failed'` naming the option. |
+| `tls` | none | Serve `wss://` directly, with no reverse proxy: `{ key, cert }` in PEM (plus any `node:tls` secure context option); see [Built-in TLS](#built-in-tls). |
 | `store` | none | Where edited chunks are kept: a `FileChunkStore` (a folder, one file per chunk; `margoengine/voxel-net/file-store`), a `SqlChunkStore` (a SQLite or Postgres table; `margoengine/voxel-net/sql-store`), any `ChunkStore` of `@margoengine/voxel/stream`, or your own `VoxelEditStore` (`save(key, chunk)`, `load(key)`, either may be async) for a database. It is also read when a chunk loads, and `server.close()` saves every edited chunk still in memory to it, so a world persists across restarts. |
 
 Breaking change (2026-10-28): `origins` used to default to any page. A browser client served from another origin (a
@@ -528,6 +531,44 @@ globalThis.addEventListener?.('pointerdown', () => sendShot(client, [0, 0, -1]))
   as four little-endian f64; `encodeShot` and `decodeShot` are exported. A client that sends unreadable shot bytes is
   closed with 4003 `'unreadable-shot'`. A client can claim any view tick, so `maxRewind` is the most a cheat gains.
 
+## Built-in TLS
+
+A small host can serve `wss://` from the server itself, with no reverse proxy in front: pass the PEM key and
+certificate chain as `tls`. Browser pages served over `https://` must connect with `wss://`. `server.setTls(...)` swaps
+in a renewed certificate for new connections without a restart; open connections keep theirs. A wrong key or
+certificate is named when the server is made, not at the first connection. A connection must finish its TLS handshake
+within `helloTimeout` (default 3 s) or it is closed.
+
+```ts
+import { readFileSync, watch } from 'node:fs';
+import { BlockTypes } from 'margoengine/voxel';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+// Serves wss:// from the files a certificate authority such as Let's Encrypt gives, for example
+// await serveWss('/etc/letsencrypt/live/game.example.com'); pages then connect to wss://game.example.com.
+export async function serveWss(dir: string, port = 443): Promise<VoxelServer> {
+  const tls = () => ({ key: readFileSync(`${dir}/privkey.pem`), cert: readFileSync(`${dir}/fullchain.pem`) });
+  const server = new VoxelServer({ blocks, origins: ['https://game.example.com'], tls: tls() });
+  await server.listen(port, '0.0.0.0');
+  // A renewal rewrites the files: take the new certificate for the connections that come next. Mid-write the key and
+  // certificate may not match yet; setTls then throws, the old one stays, and the next change event tries again.
+  watch(dir, () => {
+    try {
+      server.setTls(tls());
+    } catch (error) {
+      server.onError(error);
+    }
+  });
+  return server;
+}
+```
+
+Node clients (`connectWebSocket`, `VoxelBot.connect`) check the certificate against the system's trusted authorities;
+for a self-signed one of your own pass `tls: { ca: certPem }`. A reverse proxy is still the way for many worlds on one
+port, HTTP/2, or a port below 1024 without running Node as root (or grant Node `CAP_NET_BIND_SERVICE` on Linux).
+
 ## Database store (`./sql-store`)
 
 `SqlChunkStore` keeps edited chunks in one table of a database you open: a row per chunk keyed by its chunk
@@ -570,7 +611,7 @@ On Postgres (`npm install pg`), pass a pool shared with the rest of your game:
 
 ## Limits of the prototype
 
-No chat or inventories, no TLS (put `wss://` behind a reverse proxy); one world over several processes is `./shards` above. The server trusts
+Chat and inventories are `./chat` and `wss://` is the `tls` option above; one world over several processes is `./shards` above. The server trusts
 nothing from clients and rate-limits edits and inputs; connections that have not joined are capped as above, but a
 flood at the network level needs a proxy or firewall in front.
 

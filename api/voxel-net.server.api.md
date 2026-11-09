@@ -16,6 +16,10 @@ export interface AcceptWebSocketOptions extends WebSocketOptions {
 
 export interface ConnectWebSocketOptions extends WebSocketOptions {
     headers?: Record<string, string>;
+    tls?: {
+        ca?: string | Uint8Array | readonly (string | Uint8Array)[];
+        servername?: string;
+    };
 }
 
 export type VoxelAuthenticate = (req: IncomingMessage, hello: {
@@ -59,6 +63,8 @@ export class VoxelServer {
     resetMetrics(): void;
     exportEdits(): Promise<Map<string, PackedChunk>>;
     importEdits(edits: ReadonlyMap<string, PackedChunk>): Promise<void>;
+    get secure(): boolean;
+    setTls(tls: VoxelServerTls): void;
     listen(port?: number, host?: string): Promise<AddressInfo>;
     start(): Promise<void>;
     close(): Promise<void>;
@@ -129,6 +135,7 @@ export interface VoxelServerOptions {
     maxPending?: number;
     maxPerAddress?: number;
     helloTimeout?: number;
+    tls?: VoxelServerTls;
     heartbeatInterval?: number;
     clientTimeout?: number;
     resumeTimeout?: number;
@@ -148,6 +155,11 @@ export interface VoxelServerPlayer {
     readonly character: VoxelCharacter;
     readonly spawned: boolean;
     readonly connected: boolean;
+}
+
+export interface VoxelServerTls extends SecureContextOptions {
+    key: NonNullable<SecureContextOptions['key']>;
+    cert: NonNullable<SecureContextOptions['cert']>;
 }
 
 export class WebSocketConnection {

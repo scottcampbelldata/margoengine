@@ -13,7 +13,10 @@ test('on Windows an installed interpreter is taken and the app execution alias i
   try {
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, 'python.exe'), '');
-    assert.equal(findPython({ run: refused, platform: 'win32', env: { LOCALAPPDATA: home } }), join(folder, 'python.exe'));
+    assert.equal(
+      findPython({ run: refused, platform: 'win32', env: { LOCALAPPDATA: home } }),
+      join(folder, 'python.exe'),
+    );
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
@@ -31,4 +34,19 @@ test('no Python is undefined, and the first command that answers is used', () =>
     findPython({ run: (command) => (command === 'python' ? { status: 0 } : missing()), platform: 'linux', env: {} }),
     'python',
   );
+});
+
+// Regression (2026-11-09, M6 Mac mini): packages/lightmap/tests/cornell-box.test.js spawned a bare 'python', which
+// macOS does not have (only python3), so verify failed there with spawnSync python ENOENT. Tests and checks start
+// Python through findPython (or a list of candidates), never a hard-coded 'python'.
+test('no test or check spawns a hard-coded python command', async () => {
+  const { execFileSync } = await import('node:child_process'),
+    { readFileSync } = await import('node:fs'),
+    root = join(import.meta.dirname, '..'),
+    files = execFileSync('git', ['ls-files', '*.js', '*.mjs', '*.ts'], { cwd: root, encoding: 'utf8' })
+      .split('\n')
+      .filter((file) => file && !file.includes('node_modules/')),
+    bare = /(?:spawn|spawnSync|execFile|execFileSync)\(\s*['"`]python['"`]|\?\?\s*['"`]python['"`]\s*,/,
+    found = files.filter((file) => bare.test(readFileSync(join(root, file), 'utf8')));
+  assert.deepEqual(found, [], 'start Python with findPython() from scripts/support/find-python.mjs');
 });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11512998,
+  "total": 11513583,
   "history": [
     {
       "date": "2026-10-24",
@@ -4910,6 +4910,12 @@
       "commit": "bc17c4e35",
       "reason": "Scott-authorized-WebGL-entry-consolidation",
       "grew": 4
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "900a3e833",
+      "reason": "voxel-net/server: tls option (98.7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5727,7 +5733,7 @@
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
     "@margoengine/voxel-net/rewind": 2409,
-    "@margoengine/voxel-net/server": 17930,
+    "@margoengine/voxel-net/server": 18515,
     "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/sql-store": 1614,
     "@margoengine/voxel-net/webtransport": 6511,

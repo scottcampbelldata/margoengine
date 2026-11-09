@@ -75,8 +75,8 @@ Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime depende
   generator's queue. The wait is the server's, so past 256 queued messages later inputs fold into the last one instead of
   closing the player: after the wait the 0.5 s bank moves at most 60 steps, and the rest only count. Sending more than 64
   messages a second during a wait, or 256 in one tick outside one, still closes it (1008 `too many messages`).
-- No compression extension (chunks are already deflated) and no TLS in the prototype: `wss://` goes through a reverse
-  proxy. The Node bots use a small client built on the same frame code; tests also check the server against Node's
+- No compression extension (chunks are already deflated). TLS was left to a reverse proxy in the prototype; since
+  2026-11-09 the `tls` option serves `wss://` from `node:https` itself (see "Built-in TLS" below). The Node bots use a small client built on the same frame code; tests also check the server against Node's
   built-in `WebSocket` so the two halves cannot hide each other's mistakes.
 
 ## Messages
@@ -210,6 +210,15 @@ millions of files. No driver dependency: it takes the `prepare` of a SQLite data
 and writes `?` placeholders that become `$n` for Postgres. Saves are `INSERT ... ON CONFLICT DO UPDATE`, atomic per
 chunk in both. The table name is the one thing written into SQL, so it is checked against a plain identifier.
 
+## Built-in TLS (`tls` option, 2026-11-09)
+
+With `tls` the listener is a `node:https` server instead of `node:http`; the WebSocket upgrade and everything after
+it are unchanged, the bytes just ride TLS. The secure context is built in the constructor (and in `setTls`) so a
+wrong key or certificate fails at the call. `setTls` calls the server's `setSecureContext`: new handshakes get the
+new certificate, open connections keep theirs. The handshake timeout is `helloTimeout`, so a connection that never
+finishes TLS costs no more time than one that never says hello (Node's default would hold it 120 s). `maxPending` and
+`maxPerAddress` count connections from the upgrade on, so a flood of bare handshakes still needs a firewall in front.
+
 ## Interest management (defaults)
 
 | Distance | Default | Meaning |
@@ -266,7 +275,7 @@ Bots: four bots for two seconds with no errors.
 
 ## Not in the prototype
 
-TLS. (Chat and inventories through `./chat`, lag compensation through `./rewind`, a database store through `./sql-store`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
+Nothing left of the first list. (Built-in TLS through the `tls` option, chat and inventories through `./chat`, lag compensation through `./rewind`, a database store through `./sql-store`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
 several server processes for one world through `./shards` and WebTransport datagrams through `./webtransport` have
 since been added; see the README.)
 

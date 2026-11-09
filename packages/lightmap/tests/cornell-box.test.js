@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { findPython } from '../../../scripts/support/find-python.mjs';
 import { bakeGlobalLightmap } from '../dist/global.js';
 import {
   albedoOf,
@@ -22,11 +23,13 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const length = (v) => Math.hypot(v[0], v[1], v[2]);
 
 test('Cycles retains all receivers during every bake', () => {
-  const run = spawnSync(
-    'python',
-    [fileURLToPath(new URL('./cornell-cycles-lifecycle.py', import.meta.url))],
-    { encoding: 'utf8', timeout: 20_000 },
-  );
+  // macOS has python3 and no python: findPython picks what the machine has (a bare 'python' spawn failed with ENOENT).
+  const python = findPython();
+  assert.ok(python, 'no Python found; install Python 3 so python3 or python runs');
+  const run = spawnSync(python, [fileURLToPath(new URL('./cornell-cycles-lifecycle.py', import.meta.url))], {
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
   assert.equal(run.status, 0, run.stderr || String(run.error));
 });
 

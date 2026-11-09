@@ -385,6 +385,12 @@ export function acceptWebSocket(
 export interface ConnectWebSocketOptions extends WebSocketOptions {
   /** Extra request headers, such as `Authorization` or `Cookie` for a server's `authenticate` hook. Default none. */
   headers?: Record<string, string>;
+  /**
+   * For a `wss://` URL, how the server's certificate is checked: `ca` (PEM) trusts a certificate of your own, such as
+   * a self-signed one for a test; `servername` is the name it must hold when the URL has an IP address. Default the
+   * system's trusted certificate authorities and the URL's host. Ignored for `ws://`.
+   */
+  tls?: { ca?: string | Uint8Array | readonly (string | Uint8Array)[]; servername?: string };
 }
 
 /**
@@ -410,6 +416,7 @@ export function connectWebSocket(
       host: target.hostname,
       port: target.port || (secure ? 443 : 80),
       path: target.pathname + target.search,
+      ...(secure && options.tls ? { ca: options.tls.ca as string | string[], servername: options.tls.servername } : {}),
       headers: {
         ...options.headers,
         Connection: 'Upgrade',

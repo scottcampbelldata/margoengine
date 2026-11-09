@@ -301,6 +301,8 @@ class VoxelServer {
     resetMetrics(): void;
     exportEdits(): Promise<Map<string, PackedChunk>>;
     importEdits(edits: ReadonlyMap<string, PackedChunk>): Promise<void>;
+    get secure(): boolean;
+    setTls(tls: VoxelServerTls): void;
     listen(port?: number, host?: string): Promise<AddressInfo>;
     start(): Promise<void>;
     close(): Promise<void>;
@@ -371,6 +373,7 @@ interface VoxelServerOptions {
     maxPending?: number;
     maxPerAddress?: number;
     helloTimeout?: number;
+    tls?: VoxelServerTls;
     heartbeatInterval?: number;
     clientTimeout?: number;
     resumeTimeout?: number;
@@ -390,5 +393,10 @@ interface VoxelServerPlayer {
     readonly character: VoxelCharacter;
     readonly spawned: boolean;
     readonly connected: boolean;
+}
+
+interface VoxelServerTls extends SecureContextOptions {
+    key: NonNullable<SecureContextOptions['key']>;
+    cert: NonNullable<SecureContextOptions['cert']>;
 }
 ```

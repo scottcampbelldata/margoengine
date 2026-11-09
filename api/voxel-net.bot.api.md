@@ -51,6 +51,7 @@ export interface VoxelBotOptions {
     leash?: number;
     travelHome?: boolean;
     headers?: Record<string, string>;
+    tls?: ConnectWebSocketOptions['tls'];
     resume?: VoxelNetClientOptions['resume'];
     random?: () => number;
 }
@@ -58,6 +59,14 @@ export interface VoxelBotOptions {
 export const clock: () => number;
 
 // Not exported from this entry, but used by the exports above:
+
+interface ConnectWebSocketOptions extends WebSocketOptions {
+    headers?: Record<string, string>;
+    tls?: {
+        ca?: string | Uint8Array | readonly (string | Uint8Array)[];
+        servername?: string;
+    };
+}
 
 interface PlayerName {
     id: number;

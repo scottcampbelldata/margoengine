@@ -7,7 +7,7 @@ import { VoxelWorld } from '@margoengine/voxel';
 import { raycastVoxels } from '@margoengine/voxel/query';
 import { ResumeLoop, VoxelNetClient, type VoxelNetClientOptions, type VoxelNetClose } from './client.js';
 import { Keys } from './protocol.js';
-import { connectWebSocket, type WebSocketConnection } from './websocket.js';
+import { type ConnectWebSocketOptions, connectWebSocket, type WebSocketConnection } from './websocket.js';
 
 /** Options of {@link VoxelBot.connect}. */
 export interface VoxelBotOptions {
@@ -33,6 +33,8 @@ export interface VoxelBotOptions {
   travelHome?: boolean;
   /** Extra request headers of the connection, such as the `Origin` a server's `origins` option asks for. Default none. */
   headers?: Record<string, string>;
+  /** For a `wss://` url: the certificate checks, as `connectWebSocket`'s `tls`. Default the system's trusted CAs. */
+  tls?: ConnectWebSocketOptions['tls'];
   /** Taking the bot back after a dropped connection, as in `connectVoxelNet`. Default `{ attempts: 5 }`. */
   resume?: VoxelNetClientOptions['resume'];
   /** Random numbers in [0, 1). Default Math.random. */
@@ -126,7 +128,7 @@ export class VoxelBot {
       options.resume,
       async () => {
         const mine = ++opening,
-          next = await connectWebSocket(options.url, options.headers ? { headers: options.headers } : {});
+          next = await connectWebSocket(options.url, { headers: options.headers, tls: options.tls });
         if (mine !== opening) {
           next.close();
           throw new RangeError('This connection came after its try was over; the next try makes its own');
@@ -186,7 +188,7 @@ export class VoxelBot {
    */
   static async connect(options: VoxelBotOptions): Promise<VoxelBot> {
     const connect = clock(),
-      connection = await connectWebSocket(options.url, options.headers ? { headers: options.headers } : {});
+      connection = await connectWebSocket(options.url, { headers: options.headers, tls: options.tls });
     return new VoxelBot(connection, options, { connect, open: clock() });
   }
   /** Plays `dt` seconds: steers, moves through the client, and edits when its timer runs out. */

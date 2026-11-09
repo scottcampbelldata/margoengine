@@ -4,8 +4,10 @@
 // players' movement steps and edits in arrival order, moves each client's view, and writes corrections, block changes,
 // players and paced chunks to each client in one corked write. This module is also the generator thread's script.
 import { randomBytes } from 'node:crypto';
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer as createTlsServer, type Server as TlsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
+import { createSecureContext, type SecureContextOptions } from 'node:tls';
 import { availableParallelism } from 'node:os';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -99,6 +101,12 @@ export interface VoxelServerOptions {
   maxPerAddress?: number;
   /** Milliseconds a new connection has to send its hello before it is closed with 1008. Default 3,000. */
   helloTimeout?: number;
+  /**
+   * Serve `wss://` directly, without a reverse proxy: the PEM `key` and `cert` (chain included) of the host, plus any
+   * other `node:tls` secure context option. A TLS handshake must finish within `helloTimeout`. Swap the certificate of
+   * a running server with {@link VoxelServer.setTls}. Default none (plain `ws://`).
+   */
+  tls?: VoxelServerTls;
   /**
    * Milliseconds without a message to a client before it gets a `heartbeat` message, and without bytes from one before
    * it gets a WebSocket ping. Players with traffic in that direction get neither. Keep it well below the clients'
@@ -219,6 +227,33 @@ export interface VoxelEditStore {
    */
   delete?(key: string): void | Promise<void>;
 }
+
+/**
+ * The certificate of a server that serves `wss://` itself ({@link VoxelServerOptions.tls}): PEM `key` and `cert`, as
+ * read from the files a certificate authority such as Let's Encrypt gives (`privkey.pem`, `fullchain.pem`).
+ */
+export interface VoxelServerTls extends SecureContextOptions {
+  /** The private key, PEM. */
+  key: NonNullable<SecureContextOptions['key']>;
+  /** The certificate and its chain, PEM. */
+  cert: NonNullable<SecureContextOptions['cert']>;
+}
+
+// Builds the secure context now, so a wrong key or certificate is named at the call, not at the first connection.
+const checkTls = (tls: VoxelServerTls, where: string): VoxelServerTls => {
+  if (typeof tls !== 'object' || tls === null || !tls.key || !tls.cert)
+    throw new TypeError(
+      `${where} needs { key, cert }: read them from your PEM files, such as privkey.pem and fullchain.pem`,
+    );
+  try {
+    createSecureContext(tls);
+  } catch (error) {
+    throw new TypeError(
+      `${where} key and cert are not a usable PEM pair (${(error as Error).message}); pass the key file's text as key and the certificate chain's as cert`,
+    );
+  }
+  return { ...tls };
+};
 
 const isEditStore = (s: unknown): s is VoxelEditStore =>
   typeof (s as VoxelEditStore)?.save === 'function' && typeof (s as VoxelEditStore).load === 'function';
@@ -697,7 +732,8 @@ export class VoxelServer {
   #grid = new Map<string, Client[]>();
   #air: Uint8Array = new Uint8Array(0);
   #nextId = 0;
-  #http: Server | undefined;
+  #http: Server | TlsServer | undefined;
+  #tls: VoxelServerTls | undefined;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #tick = 0;
   #start = 0;
@@ -742,6 +778,7 @@ export class VoxelServer {
     this.#maxPending = integer('maxPending', o.maxPending ?? 64, 1, 1 << 20);
     this.#maxPerAddress = integer('maxPerAddress', o.maxPerAddress ?? 8, 1, 1 << 20);
     this.#helloTimeout = integer('helloTimeout', o.helloTimeout ?? 3000, 1, 600_000);
+    if (o.tls !== undefined) this.#tls = checkTls(o.tls, 'VoxelServer tls');
     const heartbeat = integer('heartbeatInterval', o.heartbeatInterval ?? 5000, 1, 3_600_000),
       silence = integer('clientTimeout', o.clientTimeout ?? 20_000, 1, 86_400_000);
     if (silence <= heartbeat)
@@ -1046,18 +1083,38 @@ export class VoxelServer {
     if (this.#edited.size > this.#maxEdited) this.#evict('');
     await Promise.all(deletes);
   }
+  /** True when the server serves `wss://` itself ({@link VoxelServerOptions.tls}). */
+  get secure(): boolean {
+    return this.#tls !== undefined;
+  }
   /**
-   * Starts accepting WebSocket clients on `port` (0: any free port) and `host`, and starts the tick.
+   * Replaces the certificate for the connections that come next, such as a renewed Let's Encrypt one; open
+   * connections keep theirs. Works before and after {@link VoxelServer.listen}, on a server made with `tls`.
+   * @throws TypeError when `tls` has no key and cert, or they are not a usable PEM pair.
+   * @throws MargoError `'state'` on a server made without `tls`: plain `ws://` cannot turn into `wss://`.
+   */
+  setTls(tls: VoxelServerTls): void {
+    if (!this.#tls)
+      throw new MargoError('state', 'VoxelServer was made without tls; pass tls to new VoxelServer to serve wss://');
+    this.#tls = checkTls(tls, 'VoxelServer.setTls');
+    if (this.#http) (this.#http as TlsServer).setSecureContext(this.#tls);
+  }
+  /**
+   * Starts accepting WebSocket clients on `port` (0: any free port) and `host`, and starts the tick. With `tls` the
+   * clients connect over `wss://`.
    * @throws MargoError `'state'` (rejects) when already listening or closed; the server's error when it cannot listen.
    */
   async listen(port = 0, host = '127.0.0.1'): Promise<AddressInfo> {
     if (this.#http || this.#closed)
       throw new MargoError('state', 'VoxelServer is already listening or closed; create a new VoxelServer');
     await this.start();
-    const http = createServer((_req, res) => {
-      res.writeHead(426, { 'Content-Type': 'text/plain' });
-      res.end('voxel-net: connect with a WebSocket\n');
-    });
+    const refuse = (_req: IncomingMessage, res: ServerResponse) => {
+        res.writeHead(426, { 'Content-Type': 'text/plain' });
+        res.end('voxel-net: connect with a WebSocket\n');
+      },
+      http = this.#tls
+        ? createTlsServer({ ...this.#tls, handshakeTimeout: this.#helloTimeout }, refuse)
+        : createServer(refuse);
     http.on('upgrade', (req, socket, head) => {
       const address = req.socket.remoteAddress ?? '',
         conn = acceptWebSocket(req, socket, head, {
