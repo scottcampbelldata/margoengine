@@ -38,6 +38,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   rmdirSync,
   statSync,
@@ -190,6 +191,13 @@ export function resolveMode(requested) {
 /** The default longest hold, in minutes: 20 for a shared slot, 60 exclusive on the GPU lock, 30 for any other lock. */
 export const defaultMaxMinutes = (mode) => (isGpuLock ? (mode === 'shared' ? 20 : 60) : 30);
 
+/** Remove a mutex from its reusable name before deleting it (Windows may keep a deleted name pending). */
+export function retireMutex(path, { rename = renameSync, remove = rmSync } = {}) {
+  const retired = join(dirname(path), `mutex-released-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  rename(path, retired);
+  remove(retired, { recursive: true, force: true });
+}
+
 // Runs `fn` (synchronous, short) while holding the lock's mutex. A mutex older than 10 s belongs to a crashed process.
 // `fn` gets {fresh}: true when the folder was made by someone else less than freshMs() ago (an old client mid-acquire
 // when nothing is in it; see Compatibility). A folder `fn` leaves empty is removed again unless it is fresh: an empty
@@ -215,7 +223,7 @@ async function locked(fn) {
       if (error.code === 'ENOENT') continue; // a release just tidied the folder away
       if (error.code !== 'EEXIST') throw error;
       try {
-        if (Date.now() - statSync(mutexDir).mtimeMs > 10_000) rmSync(mutexDir, { recursive: true, force: true });
+        if (Date.now() - statSync(mutexDir).mtimeMs > 10_000) retireMutex(mutexDir);
       } catch {}
       await sleep(10);
     }
@@ -223,7 +231,7 @@ async function locked(fn) {
   try {
     return fn({ fresh });
   } finally {
-    rmSync(mutexDir, { recursive: true, force: true });
+    retireMutex(mutexDir);
     if (!fresh)
       try {
         rmdirSync(lockDir);
@@ -302,10 +310,14 @@ function tidy() {
   } catch {
     return;
   }
-  for (const dir of [sharedDir, waitingDir, mutexDir, lockDir])
+  for (const dir of [sharedDir, waitingDir])
     try {
       rmdirSync(dir);
     } catch {}
+  retireMutex(mutexDir);
+  try {
+    rmdirSync(lockDir);
+  } catch {}
 }
 
 /**
