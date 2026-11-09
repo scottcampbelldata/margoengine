@@ -1240,3 +1240,6 @@ Each is described with its cause and guard in
 
 Automatic sidechain has no known open defect in the tested generated-signal paths. Real-speech,
 other-browser and latency acceptance remain unmeasured design/coverage limits in [limits.md](limits.md#mixer-automatic-sidechain-batch-111).
+
+Snapshots have no known open defect in tested layouts. Unsupported topology/state coverage and
+unmeasured browser/recording paths are documented in the snapshots limits section.

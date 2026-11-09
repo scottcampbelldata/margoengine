@@ -1429,3 +1429,8 @@ Written from the W3C [Web Audio Recommendation, AudioWorklet and channel configu
 using its two-input render callback, module registration and explicit speaker channel rules.
 Gain smoothing is the directly derived discrete one-pole recurrence g = target + exp(-1/(rate*time)) * (g-target).
 No other engine/library source was read or copied. All test signals are generated stand-ins; no downloaded assets.
+
+## Mixer snapshots (batch 111)
+
+Written from the W3C [Web Audio Recommendation, AudioParam automation](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioParam).
+Snapshots compose Margo's existing bus/effect API; interpolation and schema are written here. No external source or assets.

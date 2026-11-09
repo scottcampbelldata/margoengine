@@ -1558,3 +1558,10 @@ contexts in Edge. Node processor stand-ins additionally prove hold across blocks
 zero times, shared registration, cancellation and idempotent disposal. Module loading is abortable
 and CSP/unsupported failures are coded. Real speech, other browsers and timing remain unmeasured.
 LIM-583 and the committed sidechain result identify the present evidence.
+
+### Mixer snapshots (batch 111): section 5 evidence
+
+Snapshots reuse existing bus ramps and native effect AudioParams, entirely in the optional entry.
+Generated audio checks underwater filtering, fades and restoration beside both rendering backends;
+Node tests check JSON silence, endpoint blending, matching layouts and atomic refusal of malformed
+states, unsafe feedback and changed chains. No core/stage or GPU maths change. LIM-586.

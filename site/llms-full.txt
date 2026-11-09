@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-585). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-586). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3315,6 +3315,19 @@ renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. 
 check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
 Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
 Sidechain entry: 1,559 B gzip, budget 1,815 B; core plus stage remains 23,626 B.
+
+## Mixer snapshots (batch 111)
+
+Optional mixer/snapshots saves fader targets, mute/solo and current numeric effect AudioParams.
+Null represents silent faders in JSON. Recall fades with existing mixer exponential smoothing,
+about 98% settled in seconds (default 0.25, range 0..3600); at defaults to now and cannot be past.
+Pure blends use linear amplitude and numeric parameter interpolation, endpoint-nearest booleans.
+All payloads/layouts are validated before scheduling, including feedback safety and float32 fader range.
+Effect order/kinds/parameter names must match; subset bus recalls are allowed. No routing, sends,
+filter types, delay times, impulses, external worklets or active duck envelopes are captured.
+Generated OfflineAudioContext and Node graph stand-ins prove the paths; real WebGPU/WebGL2 contexts
+in Edge coexist with the audio. Other browsers, real recordings and timing remain unmeasured. LIM-586.
+Snapshots entry: 1,700 B gzip, budget 1,983 B.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -4560,6 +4573,9 @@ Each is described with its cause and guard in
 
 Automatic sidechain has no known open defect in the tested generated-signal paths. Real-speech,
 other-browser and latency acceptance remain unmeasured design/coverage limits in [limits.md](limits.md#mixer-automatic-sidechain-batch-111).
+
+Snapshots have no known open defect in tested layouts. Unsupported topology/state coverage and
+unmeasured browser/recording paths are documented in the snapshots limits section.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

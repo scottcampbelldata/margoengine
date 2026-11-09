@@ -122,3 +122,44 @@ Requires secure-context AudioWorklet and `blob:` in CSP `script-src`. Unsupporte
 throw `MargoError` code `unsupported`; a registration failure throws `failed` with cause and a help
 link. `signal` cancels waiting promptly; shared context registration can finish in the background.
 Other browsers, real speech and latency/performance are unmeasured; tests use generated signals.
+
+## Mixer snapshots
+
+Capture bus fader targets, mute/solo flags and current numeric effect AudioParams with
+`captureSnapshot(mixer)` from `margoengine/mixer/snapshots` (or `@margoengine/mixer/snapshots`).
+The value is independent of the mixer and JSON serializable; silent faders use `gain: null`.
+Recall a saved pause or underwater state on the audio clock:
+
+```ts
+import { Mixer } from 'margoengine/mixer';
+import { captureSnapshot, recallSnapshot, blendSnapshots } from 'margoengine/mixer/snapshots';
+const context = new OfflineAudioContext(2, 48000, 48000);
+using mixer = new Mixer(context, { buses: {
+  music: { effects: [{ type: 'filter', filter: 'lowpass', frequency: 20000 }] }
+} });
+const clear = captureSnapshot(mixer);
+mixer.bus('music').setGain(-12, { seconds: 0 });
+mixer.bus('music').effects[0].params.frequency.value = 400;
+const underwater = JSON.parse(JSON.stringify(captureSnapshot(mixer)));
+recallSnapshot(mixer, clear, { seconds: 0 });
+recallSnapshot(mixer, underwater, { at: 0.2, seconds: 0.1 });
+recallSnapshot(mixer, clear, { at: 0.7, seconds: 0.1 });
+const halfway = blendSnapshots(clear, underwater, 0.5);
+console.log(halfway.buses.length);
+await context.startRendering();
+```
+
+`recallSnapshot` options: `at` defaults to `mixer.now` (must be finite and not in the past),
+`seconds` defaults to 0.25 (0..3600). Fades follow the existing mixer exponential smoothing:
+about 98% settled in `seconds`, never a promise of an exact-duration linear ramp. Zero jumps.
+Capturing during a fade saves fader/mute/solo targets and the effects' current AudioParam values.
+`blendSnapshots(a,b,t)` is a pure value blend for t 0..1: faders in linear amplitude, effect
+parameters linearly, mute/solo from the nearer endpoint (b at 0.5). Both snapshots need the same
+bus names and effect parameter layouts. Recall permits a subset of existing buses.
+
+The entire payload and layout are checked before scheduling. Existing effects must match in order,
+kind and parameter names. Routing, sends, filter types, delay times, convolution buffers, effect
+creation/removal, active manual ducks and external worklets are not captured or replaced.
+Native effect parameters keep their existing valid ranges, including the delay's 0.95 feedback cap.
+WebGPU and WebGL2 use the same Web Audio path, tested beside both in Edge. Other browsers and real
+recordings unmeasured. No timer, async wait or engine attachment is involved.

@@ -12,6 +12,7 @@ import {
   renderOffline,
 } from '@margoengine/mixer';
 import { createSidechain } from '@margoengine/mixer/sidechain';
+import { captureSnapshot, recallSnapshot } from '@margoengine/mixer/snapshots';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -281,6 +282,26 @@ export async function runChecks() {
     near(level(out, 0.9, 1), 0.5, 1e-5, 'released without a scheduling call');
     near(out.getChannelData(0)[Math.round(0.21 * rate)], 0.5 * (0.1 + 0.9 * Math.exp(-((0.01 * rate + 1) / (rate * 0.01)))), 2e-5, 'attack time constant');
     assert(out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]), 'stereo gain is linked');
+  });
+  await check('snapshots fade music and underwater filter on the audio clock and restore them', async () => {
+    const context = new OfflineAudioContext(2, rate, rate);
+    using mixer = new Mixer(context, { buses: { music: { effects: [{ type: 'filter', filter: 'lowpass', frequency: 10000 }] } } });
+    const music = mixer.bus('music');
+    const clear = captureSnapshot(mixer);
+    music.setGain(-20, { seconds: 0 });
+    music.effects[0].params.frequency.value = 400;
+    const underwater = JSON.parse(JSON.stringify(captureSnapshot(mixer)));
+    recallSnapshot(mixer, clear, { seconds: 0 });
+    recallSnapshot(mixer, underwater, { at: 0.2, seconds: 0.05 });
+    recallSnapshot(mixer, clear, { at: 0.7, seconds: 0.05 });
+    play(context, sine(1000, 1)).connect(music.input);
+    const out = await context.startRendering();
+    const data = out.getChannelData(0);
+    const rms = (a, b) => measure(data, Math.round(a * rate), Math.round(b * rate)).rms;
+    assert(rms(0.4, 0.6) < rms(0.05, 0.15) * 0.025, 'underwater snapshot lowers and lowpasses');
+    near(rms(0.9, 1), rms(0.05, 0.15), 1e-4, 'clear snapshot restores sound');
+    const mid = rms(0.21, 0.22);
+    assert(mid > rms(0.4, 0.6) && mid < rms(0.05, 0.15), 'intermediate mix is a fade');
   });
   device?.destroy();
   return { checks, backend };

@@ -34,6 +34,10 @@
     "./sidechain": {
       "types": "./dist/sidechain.d.ts",
       "import": "./dist/sidechain.js"
+    },
+    "./snapshots": {
+      "types": "./dist/snapshots.d.ts",
+      "import": "./dist/snapshots.js"
     }
   },
   "files": [

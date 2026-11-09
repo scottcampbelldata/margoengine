@@ -1746,6 +1746,10 @@
       "types": "./dist/mixer/sidechain.d.ts",
       "import": "./dist/mixer/sidechain.js"
     },
+    "./mixer/snapshots": {
+      "types": "./dist/mixer/snapshots.d.ts",
+      "import": "./dist/mixer/snapshots.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
