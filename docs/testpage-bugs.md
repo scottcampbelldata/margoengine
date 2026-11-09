@@ -90,3 +90,20 @@ fails on the second call. This is a deterministic work-count fix, with no timing
 claim or raised deadline. The browser runner's original 20 s timeout stays intact.
 Verify also caught missing TSDoc on the new BakedTexture union; its documentation
 is now present. The failed gate is retained in testpage-resume-verify.log.
+
+## Final gate integration
+
+All 13 GPU package scripts pass, including core erase/refill after device
+replacement, all culling cases, native texture parity, roads, selection, voxel
+edits, water and WFC. `test-results/testpage-resume-gpu.json` retains the results.
+The corrected README run passes: 98/112 examples ran, 14 unchanged known failures
+and zero new failures. No known list, tolerance or deadline was changed.
+The full unit run completed 13,490 tests: 13,483 passed and seven failed. Causes:
+box-only geometry retained an unused lattice class method (fixed by a private
+standalone helper, same output); generated umbrella/tree exports, umbrella size
+and site LLM docs were stale (regenerated); the new merge step lacked STEP_AFTER
+(now depends on verify's build); catalog teardown exceeded its unchanged 30 s
+close budget by 13.1942 ms on the loaded host (recorded for quiet release retest).
+Geometry tests and merge scheduler regressions now pass together, 70 tests.
+The box consumer's existing 1,550 B budget remains unchanged. Core has no further
+change beyond the approved empty-Geometry exception.

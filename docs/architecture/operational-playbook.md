@@ -2866,3 +2866,11 @@ suite. Actual RobotExpressive and RiggedFigure contracts cover disconnected IK,
 precise morph diagnostics and name lookup, unnamed clips and native-preview rejection. RiggedFigure proves an intermediate leg joint is carried without local rewrites. Culling instance batches skip empty vertex/index uploads and all geometry draw commands, keeping finite zero box bounds. Core accepts empty Geometry under Scott's 2026-11-10 exception;
 stage and physics remain untouched; hardware breadth beyond the tested machine
 and a quiet-machine speed study are not claimed.
+
+Test-page contract checks depend on verify's built declarations and runtime
+entries in the parallel merge schedule (`STEP_AFTER`). The scheduler regression
+checks this dependency. The core empty-Geometry GPU proof also covers device
+replacement while empty; all changed-package GPU scripts passed on 2026-11-09.
+The required README gate found a repeated whole-grid shader-brush reference
+inside a per-cell predicate; its work-count regression now requires one CPU
+reference with identical output. No timeout or size threshold was relaxed.
