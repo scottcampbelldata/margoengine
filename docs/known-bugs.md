@@ -31,7 +31,8 @@ The saved CPU foundation copied `flow.wasm` into dist without registering it in 
 The existing sizes-page bidirectional asset regression fails before the registry correction, naming the
 unlisted flow binary (`test-results/sciviz-fixes/flow-lazy-before.log`). Flow now has its own measured file
 row and explicit load condition; the required-asset list also pins both sciviz Wasm files. Paired entry/network
-records must be regenerated from one coherent build before this piece lands. No provenance flag, lazy asset,
+records from a coherent clean build pass all eight sizes-page tests, including the previously failing asset
+check (`flow-current-records.json`). No provenance flag, lazy asset,
 pixel bound or time budget is waived. Earlier full verify failures for preview GL mocks and literal error help
 are already repaired and retain their passing regressions. Only the failed size prerequisite is rerun.
 

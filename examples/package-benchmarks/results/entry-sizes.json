@@ -1,5 +1,5 @@
 {
-  "commit": "9ee35ab5a",
+  "commit": "100aeb06b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2662,6 +2662,10 @@
       "./webgl2": {
         "raw": 12089,
         "gzip": 4476
+      },
+      "./flow": {
+        "raw": 4491,
+        "gzip": 2130
       }
     },
     "@margoengine/selection": {
@@ -3810,6 +3814,11 @@
     }
   },
   "lazyFiles": {
+    "packages/sciviz/dist/flow.wasm": {
+      "raw": 7916,
+      "gzip": 3585,
+      "brotli": 3032
+    },
     "packages/sciviz/dist/fallback.wasm": {
       "raw": 21851,
       "gzip": 9384,

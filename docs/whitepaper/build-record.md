@@ -1,5 +1,21 @@
 # Build record
 
+## Batch 171: CPU temporal flow reference continuation
+
+Recovered the saved `/flow` foundation onto main's native sciviz corrections without changing core/stage.
+Physical-time RK4, spatial/temporal interpolation, exact cancellation and bounded memory use a feature-local
+Rust/Wasm module. Both feature crates and 19 focused CPU/kernel-runner tests pass. The new README example
+runs in Node. The real-browser `flow-pathline` case fetches Wasm, checks every analytic sample, draws with
+the existing line layer and preserves every pixel after device replacement on WebGPU and WebGL2 compatibility.
+Its unchanged all-pixel parity bounds pass with 1,517 lit pixels. This is not GPU particle advection.
+Lint, hygiene and the five API/test/duplicate/clean-room/size quality gates pass. The missing flow.wasm
+registry entry fails the existing bidirectional sizes-page test before correction; coherent paired
+entry/network records now pass all eight size-page tests. Only failed or changed-dependent checks are rerun;
+earlier full verify and unaffected package GPU/README successes are retained. The JavaScript entry is 2,130 B
+gzip under 2,386 B; Wasm is 7,916 B raw, 3,585 B gzip. Root/driver remain 36,916/4,476 B; core + stage 23,924 B.
+GPU particles, trails, seeding/respawn, streaklines, an official moving-flow demo and jobs 2 to 6 remain pending.
+No benchmark, exclusive GPU hold, speed claim, relaxed tolerance or raised README budget is part of this piece.
+
 ## Batch 160: separate browser shutdown prerequisite
 
 The Windows browser wrapper now closes all four owned stdio/CDP pipes after
