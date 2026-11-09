@@ -3306,6 +3306,10 @@
       "types": "./dist/voxel-net/chat.d.ts",
       "import": "./dist/voxel-net/chat.js"
     },
+    "./voxel-net/rewind": {
+      "types": "./dist/voxel-net/rewind.d.ts",
+      "import": "./dist/voxel-net/rewind.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

@@ -192,6 +192,15 @@ own and the shard handoffs (`MSH`). The server owns everything: a client says a 
 own slots, and the server cleans, rate-limits and filters lines and checks each move, answering with the slots as they
 are so a client that guessed shows the truth. A client that sends unreadable chat bytes is closed with 4002.
 
+## Lag compensation (`./rewind`, 2026-11-09)
+
+After Y. W. Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and Optimization" (GDC
+2001): the server keeps each player's body box for the last `maxRewind` seconds (netcode `HitboxRewind`, blended
+between ticks as the client's snapshot buffer blends them) and checks a shot against the boxes at the fractional tick
+the shooter drew, `(now - clock offset - interpolationDelay) * tickRate`. Shots go as app messages, so they reach the
+server in order with the shooter's inputs, and the shooter's own eye is where the server has it. Blocks are not
+rewound: a block placed since the view tick stops the shot.
+
 ## Interest management (defaults)
 
 | Distance | Default | Meaning |
@@ -248,7 +257,7 @@ Bots: four bots for two seconds with no errors.
 
 ## Not in the prototype
 
-TLS. (Chat and inventories through `./chat`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
+TLS. (Chat and inventories through `./chat`, lag compensation through `./rewind`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
 several server processes for one world through `./shards` and WebTransport datagrams through `./webtransport` have
 since been added; see the README.)
 

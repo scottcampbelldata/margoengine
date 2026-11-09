@@ -838,6 +838,10 @@ export class VoxelServer {
     for (const c of this.#clients) if (this.#queueApp(c, message)) n++;
     return n;
   }
+  /** Ticks per second (the `tickRate` option). */
+  get tickRate(): number {
+    return this.#tickRate;
+  }
   /**
    * Calls `listener(tick, dt)` once per tick, after the players moved and before the tick's messages go out, so what it
    * sends goes with them. `dt` is the tick length in seconds. A throw goes to {@link VoxelServer.onError}. Returns an

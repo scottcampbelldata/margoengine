@@ -1,5 +1,5 @@
 {
-  "commit": "25d9f425b",
+  "commit": "4d6e9dd4b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -124,6 +124,10 @@
       "./zones": {
         "raw": 2332,
         "gzip": 1139
+      },
+      "./ambisonics": {
+        "raw": 4568,
+        "gzip": 1919
       }
     },
     "@margoengine/behavior": {
@@ -2074,24 +2078,24 @@
     },
     "@margoengine/pixel": {
       ".": {
-        "raw": 11905,
-        "gzip": 4408
+        "raw": 11920,
+        "gzip": 4416
       },
       "./palette": {
-        "raw": 10320,
-        "gzip": 4604
+        "raw": 10470,
+        "gzip": 4656
       },
       "./render3d": {
         "raw": 8891,
         "gzip": 3610
       },
       "./scale": {
-        "raw": 6764,
-        "gzip": 3111
+        "raw": 6837,
+        "gzip": 3152
       },
       "./crt": {
-        "raw": 6090,
-        "gzip": 2816
+        "raw": 6379,
+        "gzip": 2972
       }
     },
     "@margoengine/points": {
@@ -3486,16 +3490,16 @@
     },
     "@margoengine/voxel-net": {
       ".": {
-        "raw": 23579,
-        "gzip": 8410
+        "raw": 23714,
+        "gzip": 8446
       },
       "./server": {
-        "raw": 49576,
-        "gzip": 17643
+        "raw": 49606,
+        "gzip": 17649
       },
       "./bot": {
-        "raw": 26344,
-        "gzip": 9817
+        "raw": 26479,
+        "gzip": 9855
       },
       "./file-store": {
         "raw": 1513,
@@ -3506,16 +3510,20 @@
         "gzip": 2535
       },
       "./shards": {
-        "raw": 26162,
-        "gzip": 9631
+        "raw": 26297,
+        "gzip": 9666
       },
       "./webtransport": {
-        "raw": 17242,
-        "gzip": 6319
+        "raw": 17377,
+        "gzip": 6354
       },
       "./chat": {
         "raw": 11105,
         "gzip": 3979
+      },
+      "./rewind": {
+        "raw": 5238,
+        "gzip": 2153
       }
     },
     "@margoengine/voxel-pathtracer": {

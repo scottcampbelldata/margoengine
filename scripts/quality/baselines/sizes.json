@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11488736,
+  "total": 11491446,
   "history": [
     {
       "date": "2026-10-24",
@@ -4844,6 +4844,12 @@
       "commit": "540e5cb3a",
       "reason": "New optional audio/ambisonics entry, documented in limits, core and stage unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "4d6e9dd4b",
+      "reason": "voxel-net gains the ./rewind entry, client viewTick and server tickRate",
+      "grew": 2
     }
   ],
   "items": {
@@ -5658,8 +5664,9 @@
     "@margoengine/voxel-net/chat": 4235,
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
+    "@margoengine/voxel-net/rewind": 2409,
     "@margoengine/voxel-net/server": 17930,
-    "@margoengine/voxel-net/shards": 9655,
+    "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/webtransport": 6511,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1303,

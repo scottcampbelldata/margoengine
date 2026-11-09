@@ -446,6 +446,16 @@ export class VoxelNetClient {
     if (Number.isFinite(time)) for (const other of this.players.values()) other.buffer.sample(time, other.snapshot);
     return this.players;
   }
+  /**
+   * The fractional server tick whose players {@link VoxelNetClient.samplePlayers} draws at local time `now` (seconds,
+   * `performance.now() / 1000` by default): what the player sees, for lag compensation
+   * (`@margoengine/voxel-net/rewind`). Undefined before the first players message.
+   */
+  viewTick(now: number = performance.now() / 1000): number | undefined {
+    const rate = this.welcome?.tickRate;
+    if (!rate || !Number.isFinite(this.#offset)) return undefined;
+    return Math.max(0, (now - this.#offset - this.#delay) * rate);
+  }
   /** True from {@link VoxelNetClient.detach} until the server has the player again. */
   get detached(): boolean {
     return this.#detachedAt >= 0;

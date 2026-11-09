@@ -482,6 +482,50 @@ client.onSpawn = () => {
   A client that sends unreadable chat bytes is closed with 4002 `'unreadable-chat'`. Show lines as text, never as
   HTML: angle brackets stay.
 
+## Lag compensation (`./rewind`)
+
+A client draws other players `interpolationDelay` (default 0.1 s) behind the newest snapshot, plus the network delay,
+so a player aims at where the others were. `VoxelRewind` keeps every spawned player's body box on the server for the
+last `maxRewind` seconds (default 0.5) and checks each shot against the boxes at the tick the shooter saw, so a shot
+that was on target on the shooter's screen hits. The shot leaves the shooter's eye (`eyeHeight`, default 1.62 above
+the feet) where the server has it: a shot arrives in order with the shooter's inputs, so that is where the client was
+when it fired. The first solid block of the world in the way stops it; blocks are not rewound.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet } from 'margoengine/voxel-net';
+import { sendShot, VoxelRewind } from 'margoengine/voxel-net/rewind';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+
+// Server: check each shot against the players as the shooter saw them, at most 0.5 s back.
+const server = new VoxelServer({ blocks });
+await server.listen(8787, '0.0.0.0');
+const rewind = new VoxelRewind(server, { maxRewind: 0.5, maxDistance: 64 });
+rewind.onShot = (shooter, hit) => {
+  if (hit.player) console.log(`${shooter.name} hit ${hit.player.name} at ${hit.distance.toFixed(1)} blocks`);
+  else if (hit.block) console.log(`${shooter.name} hit the block at ${hit.block.cell}`);
+};
+
+// Client: on a click, shoot where the camera looks (here straight ahead along -z).
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
+globalThis.addEventListener?.('pointerdown', () => sendShot(client, [0, 0, -1]));
+```
+
+- **Server.** `shoot(shooter, { viewTick, direction }, maxDistance?)` checks a shot from your own code and returns
+  `{ player, block, distance, point, tick, origin }`: `player` for a hit, `block` when a block stopped it first,
+  `tick` the tick it was checked at (`viewTick` clamped to `maxRewind` behind now and to now). `onShot(shooter, hit,
+  shot)` gets each shot a client sent. `hitbox(player, feet)` gives your own shape (a box `{ position, halfExtents,
+  rotation? }`, a sphere `{ position, radius }` or a capsule with `halfHeight`); default the body box
+  (`character.size`). `at(tick)` returns the shapes by player id. Dispose to stop.
+- **Client.** `sendShot(client, direction, now?)` sends the aim with `client.viewTick(now)`, the fractional server
+  tick `samplePlayers(now)` draws; false before the first players message or when the client cannot send.
+- **Wire.** A shot is an app message starting with `SHOT_PREFIX` (`MRW` and 1), then the view tick and the direction
+  as four little-endian f64; `encodeShot` and `decodeShot` are exported. A client that sends unreadable shot bytes is
+  closed with 4003 `'unreadable-shot'`. A client can claim any view tick, so `maxRewind` is the most a cheat gains.
+
 ## Limits of the prototype
 
 No chat or inventories, no TLS (put `wss://` behind a reverse proxy); one world over several processes is `./shards` above. The server trusts

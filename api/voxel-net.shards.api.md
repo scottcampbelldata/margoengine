@@ -206,6 +206,7 @@ class VoxelNetClient {
     sendApp(data: Uint8Array): boolean;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
+    viewTick(now?: number): number | undefined;
     get detached(): boolean;
     detach(): void;
     attach(transport: VoxelNetTransport): void;
@@ -278,6 +279,7 @@ class VoxelServer {
     get players(): VoxelServerPlayer[];
     send(player: VoxelServerPlayer, data: Uint8Array): boolean;
     broadcast(data: Uint8Array): number;
+    get tickRate(): number;
     onTick(listener: (tick: number, dt: number) => void): () => void;
     onApp(listener: (player: VoxelServerPlayer, data: Uint8Array) => void): () => void;
     sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;

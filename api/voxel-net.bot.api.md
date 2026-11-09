@@ -169,6 +169,7 @@ class VoxelNetClient {
     sendApp(data: Uint8Array): boolean;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
+    viewTick(now?: number): number | undefined;
     get detached(): boolean;
     detach(): void;
     attach(transport: VoxelNetTransport): void;
