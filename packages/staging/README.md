@@ -94,6 +94,44 @@ cardinal and two sloped orientations for contact and accumulation, asserts visib
 and backside rejection, replaces the real device, clears removed geometry and disposes twice.
 The rectangle is a generated geometry oracle, not a real product quality claim. No speed claim.
 
+## Blurred glossy product floor
+
+The existing `@margoengine/environment/reflector` supplies this floor; staging adds no duplicate entry.
+Its local XY rectangle faces +Z. Rotate it by -PI/2 about X to face +Y, then choose `roughness`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Reflector} from 'margoengine/environment/reflector';
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install();
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0.4, 0.9], target: [0, 0.2, 0]},
+});
+engine.scene.background = '#cccccc';
+await loadGLTF(engine, '/product.glb', {signal: AbortSignal.timeout(30_000)});
+const floor = Reflector.attach(engine, {width: 2, height: 2, roughness: 0.4, color: [0.6, 0.6, 0.6]});
+floor.node.setRotation([-Math.PI / 2, 0, 0]);
+floor.node.setPosition([0, -0.0001, 0]); // for a product whose lowest world Y is zero
+engine.start();
+// Later: engine.dispose(). For a manual render loop: floor.update(); engine.render().
+```
+
+The floor renders the scene through a camera mirrored in its plane, clips geometry behind it and
+samples a box-filtered mip chain. Defaults: width/height 1, white tint, roughness 0 (sharp), resolution 1
+(fraction of the canvas, over 0 through 2), clipBias 0, autoUpdate true, order 1. `roughness` in 0..1
+selects the mip level; 1 uses the coarsest of at most eight mips. This is a tinted opaque planar
+reflection with image blur. It has no Fresnel term, distance-dependent roughness cone or GGX floor
+BRDF. Other mirrors show their previous capture, so there is one bounce per frame. A capture costs
+another scene render; no speed claim. See the environment README for exclusions and custom captures.
+
+`test/floor-browser.mjs` and its `--compat` variant use the real licensed 20,734-triangle FlightHelmet,
+assert visible reflections below the full product silhouette, check every mip component against
+independent 2x2 means, cover exact half-rounding boundaries, and require identical displayed pixels
+after actual device replacement. Resize, maximum roughness, invalid values, a uniform empty capture
+and double disposal also pass. WebGPU and installed WebGL2 compatibility draw; native preview throws
+linked `unsupported`. The viewport and rounding repairs live in environment, the owning package.
+
 ## Ray-traced reference
 
 After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.

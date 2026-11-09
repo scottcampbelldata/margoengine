@@ -1,0 +1,26 @@
+{
+  "batch": 56,
+  "job": 7,
+  "status": "SKIPPED",
+  "reason": "Reuse existing environment/reflector capture and roughness blur, composed as a product floor. Owning defects repaired separately.",
+  "entry": "@margoengine/environment/reflector",
+  "sizes": {
+    "reflector": {
+      "raw": 30478,
+      "gzip": 11104
+    },
+    "refractor": {
+      "raw": 30343,
+      "gzip": 11065
+    },
+    "cube-camera": {
+      "raw": 16958,
+      "gzip": 5680
+    }
+  },
+  "proof": [
+    "examples/package-benchmarks/results/batch-56-floor.json",
+    "examples/package-benchmarks/results/batch-56-floor-compat.json"
+  ],
+  "limits": "Tinted opaque finite planar image reflection, box mip blur, no GGX/Fresnel/distance-dependent cone, one bounce per frame, native preview unsupported with help link, no speed claim."
+}

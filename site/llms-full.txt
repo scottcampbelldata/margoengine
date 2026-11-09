@@ -4359,6 +4359,10 @@ Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B 
 
 Environment scene captures own their target viewport, including MSAA depth copies, and restore the outer background view. Planar blur uses explicit clamped 2x2 texels and nearest-half storage rounding. The unchanged mip test bound is half a binary16 ULP plus 5e-7 for arithmetic; exact boundary probes cover even/odd ties, subnormals and maximum finite half radiance. These prove the tested real FlightHelmet and numeric cases, not arbitrary HDR cancellation accuracy or photographic material transport. Native preview refusal is linked; WebGL2 compatibility runs the same capture/blur path. Reflector11104 B gzip (ceiling11438), refractor11065 (ceiling11397), cube-camera5680 (unchanged ceiling5691); core plus stage23797 B <25000.
 
+### Reflective-floor reuse (batch 56, job 7)
+
+No staging/floor alias or duplicate renderer is added. Environment/reflector gives a finite tinted opaque mirror, transformed from local XY, with roughness 0..1 selecting a box-filtered mip among at most eight levels. Defaults: sharp roughness 0, width/height 1, resolution 1, autoUpdate true. It costs another scene capture, uses one bounce per frame for other mirrors and has no Fresnel, GGX or distance-dependent cone. Real FlightHelmet reflected pixels, all mip values, numeric boundaries and restored-frame equality are proved on WebGPU and WebGL2 compatibility; native preview returns linked unsupported. No speed claim. Gzip sizes: staging 8,520 B, accumulate 9,655 B, pathtrace 1,213 B, reused reflector 11,104 B; core plus stage 23,797 B remains below 25,000.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
