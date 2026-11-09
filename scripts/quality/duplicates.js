@@ -134,7 +134,12 @@ export function duplicatesGate({ root, files, packages }) {
       const { program } = parseSync(entry.src, readFileSync(join(root, entry.src), 'utf8'));
       for (const node of program.body) {
         const spec = node.source?.value;
-        if (!spec || !(spec === 'margoengine' || spec.startsWith('@margoengine/')) || spec.startsWith(pkg.name))
+        if (
+          !spec ||
+          !(spec === 'margoengine' || spec.startsWith('@margoengine/')) ||
+          spec === pkg.name ||
+          spec.startsWith(pkg.name + '/')
+        )
           continue;
         if (node.exportKind === 'type') continue;
         if (node.type === 'ExportAllDeclaration') reexports.push(`reexport ${entry.src} * from ${spec}`);

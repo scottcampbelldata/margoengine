@@ -69,11 +69,15 @@
     "@margoengine/lightmap": "lightmap baking with no GPU or DOM",
     "@margoengine/animator": {
       "reason": "blend trees, IK and constraints with no GPU or DOM; its tests live in the root tests folder",
-      "tests": ["tests/modern-animator*.test.js"]
+      "tests": [
+        "tests/modern-animator*.test.js"
+      ]
     },
     "@margoengine/gltf": {
       "reason": "margo-convert parses glTF with it in Node; its own tests are a section of tests/modern.test.js (core, run on 24), so the margo-convert tests cover its Node path here",
-      "tests": ["tests/margo-convert-pipeline.test.js"]
+      "tests": [
+        "tests/margo-convert-pipeline.test.js"
+      ]
     },
     "@margoengine/blender": "compressMargo (@margoengine/blender/ktx2) re-encodes .margo textures in Node; decodeMargo checks files with no GPU"
   },
@@ -129,7 +133,6 @@
     "@margoengine/voxel-pathtracer": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/water": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/weather": "renders hail with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
-    "@margoengine/webgl": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/xr": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser"
   }
 }

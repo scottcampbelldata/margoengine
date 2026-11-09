@@ -72,7 +72,7 @@ test('no other package imports the compatibility layer', () => {
     .split('\n')
     .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file));
   const offenders = files.filter((file) => {
-    if (file.startsWith('packages/webgl2-compat/') || file.startsWith('packages/webgl/src/') || UMBRELLA.includes(file))
+    if (file.startsWith('packages/webgl2-compat/') || UMBRELLA.includes(file))
       return false;
     return moduleImports(readFileSync(join(root, file), 'utf8'), file).some((specifier) =>
       /(?:^|\/)webgl2-compat(?:\/|$)/.test(specifier),
@@ -85,7 +85,7 @@ test('only the umbrella depends on it', () => {
   const out = execFileSync('git', ['ls-files', 'packages/*/package.json'], { cwd: root, encoding: 'utf8' });
   for (const file of out.split('\n').filter(Boolean)) {
     const m = JSON.parse(readFileSync(join(root, file), 'utf8'));
-    if (m.name === NAME || m.name === 'margoengine' || m.name === '@margoengine/webgl') continue;
+    if (m.name === NAME || m.name === 'margoengine') continue;
     const all = { ...m.dependencies, ...m.peerDependencies, ...m.optionalDependencies, ...m.devDependencies };
     assert.ok(!(NAME in all), `${m.name} must not depend on ${NAME}`);
   }

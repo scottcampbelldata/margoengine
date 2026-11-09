@@ -58,7 +58,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
         <div>
           <h3>Install from npm, once published</h3>
           <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
-          <p>npm publication is pending. The release includes 99 packages under <code>@margoengine</code> and <code>margoengine</code>, the one install that holds them all. <a href="./catalog/">Browse all packages and runnable examples</a></p>
+          <p>npm publication is pending. The release includes 98 packages under <code>@margoengine</code> and <code>margoengine</code>, the one install that holds them all. <a href="./catalog/">Browse all packages and runnable examples</a></p>
         </div>
       </div>
     </section>
@@ -66,10 +66,10 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
     <section class="core">
       <h2>What the core gives you</h2>
       <dl>
-        <div><dt>About 22 kB gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 25,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. The WebGL2 fallback is the optional <code>@margoengine/webgl2-compat/preview</code> (3.0 kB gzip).</dd></div>
+        <div><dt>23,797 B gzip</dt><dd>Core plus the stage facade, with the embedded Wasm kernel and the WebGPU backend. The build fails at 25,000 bytes gzip or above; <code>npm run measure:size</code> prints the current figure. WebGL2 lives in the optional <code>@margoengine/webgl2-compat</code> package; its lower-tier <code>/preview</code> entry is 3,443 B gzip.</dd></div>
         <div><dt>Transforms in Wasm memory</dt><dd>Hierarchy, culling and world matrices run in a Rust kernel over flat typed arrays. An engine starts with 1,024 entity slots and doubles them on demand, up to 8,388,608.</dd></div>
         <div><dt>Instancing by default</dt><dd>Visible meshes sharing a geometry instance render in one instanced draw call per scene pass, with per-instance material values.</dd></div>
-        <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Basic scenes (core meshes, flat PBR, one light) also render on WebGL2 with the optional <code>@margoengine/webgl2-compat/preview</code> package.</dd></div>
+        <div><dt>WebGPU first, WebGL2 fallback</dt><dd>Reversed float depth, GPU picking and automatic device-loss recovery on WebGPU. Without WebGPU, install <code>@margoengine/webgl2-compat</code> to run the real renderer on WebGL2. Its optional <code>/preview</code> entry draws basic scenes on lower-tier WebGL2.</dd></div>
         <div><dt>Plugins, not a monolith</dt><dd>Frame-graph passes and shader hooks let optional packs add features without growing the base bundle.</dd></div>
       </dl>
     </section>

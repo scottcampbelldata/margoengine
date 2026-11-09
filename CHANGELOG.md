@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Removed
+
+- Removed the unreleased `@margoengine/webgl` workspace and `margoengine/webgl`
+  aliases. Use `@margoengine/webgl2-compat/preview` for `webglRenderer` and
+  `GLRenderer`, or its `/pick`, `/restore` and `/auto` entries for `webglPicking`,
+  `webglRestore` and `autoEngine`. Matching `margoengine/webgl2-compat` aliases
+  expose every entry. The full-device `install()` entry remains the default
+  route for browsers without WebGPU; preview retains the lower WebGL2 tier.
+  No deprecation shim remains. See `docs/webgl-consolidation.md` for tests and sizes.
+
 ### Networking
 
 - `@margoengine/netcode/hitboxes`: `HitboxRewind` rewinds boxes and capsules that turn, as `LagCompensation` does spheres.
@@ -44,7 +54,7 @@
 ### Failed allocations
 
 - `mesh.setGeometry()` that throws now changes nothing. A geometry over the GPU buffer limit used to leave a half-made batch: the retry returned without buffers and the next frame threw a `TypeError`. A failed growth destroyed the buffers of meshes already drawing, so they stopped too. Now the error reaches you, the mesh keeps drawing its old geometry and a retry works. While a batch grows it holds its old and new buffers for a moment.
-- `Renderer.add` on a geometry it already holds now replaces its storage, new first, and a throw keeps the old one; `engine.retain` no longer calls `remove` first. Core's renderer and `@margoengine/webgl` do this, and a custom `fallback` renderer must too.
+- `Renderer.add` on a geometry it already holds now replaces its storage, new first, and a throw keeps the old one; `engine.retain` no longer calls `remove` first. Core's renderer and `@margoengine/webgl2-compat/preview` do this, and a custom `fallback` renderer must too.
 - `engine.retain` growing a batch no longer blanks the instances already drawn.
 - Geometry set during a device restore reaches the right renderer: inside `onDeviceRestored` it used to get no buffers, or too small a buffer, and the next frame failed.
 - One plugin throwing in `onDeviceRestored` no longer leaves the plugins after it on the lost device, and one throwing in `dispose` no longer stops `scene.dispose()`, which left the other plugins and the scene's meshes behind. The first error still reaches you.

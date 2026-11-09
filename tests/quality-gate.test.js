@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanRoomGate, ENGINES } from '../scripts/quality/clean-room.js';
-import { FAMILIES, normalise } from '../scripts/quality/duplicates.js';
+import { FAMILIES, normalise, duplicatesGate } from '../scripts/quality/duplicates.js';
 import { BASELINES, compare, readBaseline, staleTotal, updateBaseline } from '../scripts/quality/ratchet.js';
 import { headroom } from '../scripts/quality/sizes.js';
 
@@ -158,4 +158,34 @@ test('family signatures match the known copies', () => {
   );
   assert.ok(FAMILIES['hex-colour'].test('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i'));
   assert.ok(FAMILIES['partial-view'].test('r[0] !== 0 || r[1] !== 0 || r[2] !== c.width'));
+});
+
+test('reexports distinguish package boundaries from shared name prefixes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'quality-prefix-'));
+  assert.ok(root.startsWith(join(tmpdir(), 'quality-prefix-')));
+  const src = 'packages/webgl/src/index.ts';
+  try {
+    mkdirSync(join(root, 'packages/webgl/src'), { recursive: true });
+    writeFileSync(
+      join(root, src),
+      [
+        "export { webglRenderer } from '@margoengine/webgl2-compat/preview';",
+        "export * from '@margoengine/webgl2-compat/pick';",
+        "export type { PreviewOptions } from '@margoengine/webgl2-compat/preview';",
+        "export { local } from '@margoengine/webgl/local';",
+        "export * from '@margoengine/webgl';",
+      ].join('\n'),
+    );
+    const { items } = duplicatesGate({
+      root,
+      files: [src],
+      packages: [{ name: '@margoengine/webgl', entries: [{ src }] }],
+    });
+    assert.deepEqual(items, {
+      [`reexport ${src} webglRenderer from @margoengine/webgl2-compat/preview`]: 1,
+      [`reexport ${src} * from @margoengine/webgl2-compat/pick`]: 1,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

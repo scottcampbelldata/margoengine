@@ -1203,7 +1203,9 @@ replacement are read back. RGB tolerance is one UNORM code for f32/store roundin
 The preview implementation and its picking, restore and auto entries now belong
 to `@margoengine/webgl2-compat` as `/preview`, `/pick`, `/restore` and `/auto`.
 The full-device float-target requirement and preview limitations are unchanged.
-The old workspace is a temporary internal bridge during the three-step merge.
+The unreleased `@margoengine/webgl` workspace and `margoengine/webgl` aliases
+are removed, with no deprecation shim. Every former feature remains an optional
+entry of the combined package.
 See [feature mapping and inventory](webgl-consolidation.md).
 
 Consolidation measurement (min+gzip, `entry-sizes.json`): full root 102,192 B

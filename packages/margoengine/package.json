@@ -3382,22 +3382,6 @@
       "types": "./dist/weather/data.d.ts",
       "import": "./dist/weather/data.js"
     },
-    "./webgl": {
-      "types": "./dist/webgl.d.ts",
-      "import": "./dist/webgl.js"
-    },
-    "./webgl/pick": {
-      "types": "./dist/webgl/pick.d.ts",
-      "import": "./dist/webgl/pick.js"
-    },
-    "./webgl/restore": {
-      "types": "./dist/webgl/restore.d.ts",
-      "import": "./dist/webgl/restore.js"
-    },
-    "./webgl/auto": {
-      "types": "./dist/webgl/auto.d.ts",
-      "import": "./dist/webgl/auto.js"
-    },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"
@@ -3605,7 +3589,6 @@
     "@margoengine/voxel-pathtracer": "^1.0.0",
     "@margoengine/water": "^1.0.0",
     "@margoengine/weather": "^1.0.0",
-    "@margoengine/webgl": "^1.0.0",
     "@margoengine/webgl2-compat": "^1.0.0",
     "@margoengine/wfc": "^1.0.0",
     "@margoengine/worker": "^1.0.0",

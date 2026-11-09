@@ -2182,3 +2182,15 @@ not outside image or speed comparisons. A plain AMF control also passes.
 
 The pinned optional Windows FFmpeg installer preserves the GPL archive outside the repository. MARGO_README_FFMPEG
 enters only the relevant README child PATH; tests/readme-assets.test.js verifies the parent environment is unchanged.
+
+### Single WebGL2 package: section 5 evidence
+
+The preview's renderer, picking, restoration and automatic escalation live in
+webgl2-compat feature entries. The former workspace and umbrella paths are gone.
+Core implementation, hardware tiers and the strict 25,000 B combined core/stage
+gate are unchanged. Real-browser preview tests retain picking, loss/recovery,
+retained geometry, canvas replacement and native-WebGPU download isolation bars.
+The full compat GPU suite remains the proof for the translated device. Source
+and built-root isolation now inspect AST import edges; a regression distinguishes
+actual imports/exports from comments and loader advice. The duplicate-gate TEMP
+fixture detects cross-package exports when package names share a prefix.

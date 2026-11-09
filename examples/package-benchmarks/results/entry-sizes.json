@@ -1,6 +1,6 @@
 {
-  "commit": "e2ae27d9c",
-  "dirty": false,
+  "commit": "5e423a305",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -3598,24 +3598,6 @@
       "./data": {
         "raw": 5499,
         "gzip": 2532
-      }
-    },
-    "@margoengine/webgl": {
-      ".": {
-        "raw": 48,
-        "gzip": 68
-      },
-      "./pick": {
-        "raw": 45,
-        "gzip": 65
-      },
-      "./restore": {
-        "raw": 48,
-        "gzip": 68
-      },
-      "./auto": {
-        "raw": 45,
-        "gzip": 65
       }
     },
     "@margoengine/webgl2-compat": {

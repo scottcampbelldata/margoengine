@@ -1745,7 +1745,7 @@ Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real e
 Scott asked for a static report to be proved or disproved: `Engine.retain` changed a batch before the allocation that can throw. It was true.
 
 - **Old code:** 14 of 15 tests in `tests/deep-core-allocation-failure.test.js` failed. After a failed first registration the batch stayed with 1 reference; the retry returned, reached 2 references with no GPU buffers, and the next frame threw `TypeError`. After a failed growth two healthy meshes lost their buffers and the frame threw the same. The one test that passed proves a restore that cannot rebuild a batch was already safe.
-- **Bugs fixed:** the eight in the 2026-11-07 table of `docs/known-bugs.md`, in `packages/core`, `packages/webgl` and `packages/culling`.
+- **Bugs fixed:** the eight in the 2026-11-07 table of `docs/known-bugs.md`, in `packages/core`, the preview now in `packages/webgl2-compat`, and `packages/culling`.
 - **Proved:** the real `Engine` and `GPURenderer` on a fake device, failing through the `GPU buffer limit` check and through `createBuffer`; each WebGL and culling test fails without its fix. On a real device, the lifecycle scenario sets geometry on a destroyed device and in `onDeviceRestored`.
 - **Limits:** a real GPU out-of-memory does not throw, so it is not rolled back (LIM-330). One defect stays open in `docs/known-bugs.md`: a failed manual restore on a healthy device.
 - **Size:** core 21,487 to 21,541 B gzip, core plus stage 22,878 to 22,930 B. The core cap is now 21,542 B on Scott's ruling; it was documented at 21,504 B and enforced at 22,016 B.

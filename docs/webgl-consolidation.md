@@ -28,7 +28,10 @@ applications use dynamic loaders. The umbrella exposes each new entry under
    selection advice, examples and browser fixtures now use the combined entries;
    physics2d changes only its test import, as approved. Isolation checks parse real
    module edges, so comments and loader advice cannot produce false dependencies.
-3. Remove the old workspace and umbrella paths. There is no released deprecation shim.
+3. Removed the old workspace and umbrella paths. There is no deprecation shim.
+   The duplicate gate now requires a package slash boundary; its TEMP fixture
+   proves runtime re-exports between packages with shared prefixes are detected.
+   The compat isolation test has no bridge exceptions.
 
 The core and stage feature freeze and the 25,000 B combined gzip ceiling remain unchanged.
 
@@ -138,3 +141,18 @@ the migration. Historical evidence is retained with its original measurement con
 - `tests/public-engine-types.test.js`
 - `tests/support/core-draw-gpu.js`
 - `tests/webgl-preview.test.js`
+
+
+## Final state and evidence
+
+One workspace owns WebGL2: `@margoengine/webgl2-compat`. React loader examples,
+selection advice, all browser fixtures and umbrella entries use it. Physics2d
+changed only its browser fixture import; physics implementation remains on hold.
+The removal is recorded in CHANGELOG.md and limits.md. The inventory above is
+historical; it deliberately records the original names for review.
+
+Per-step lint, hygiene, verify, affected package unit and real-GPU suites, runtime
+README examples and generated API reports validate the three small pushes. The
+consumer step also checks the bundled React loader and the no-WebGPU and scene
+helper pages. The preview browser suite proves picking, restore, native isolation
+and auto escalation on real WebGL2; existing compat suites prove the full device.
