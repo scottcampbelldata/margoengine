@@ -2782,6 +2782,10 @@
       "types": "./dist/text/animate.d.ts",
       "import": "./dist/text/animate.js"
     },
+    "./text/extrude": {
+      "types": "./dist/text/extrude.d.ts",
+      "import": "./dist/text/extrude.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"

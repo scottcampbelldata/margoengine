@@ -149,13 +149,42 @@ animated.typewriter(0.5);
 animated.wave(1.0, { amplitude: 0.2, speed: 4 });
 ```
 
+## Extruded 3D text: `extrudeText`
+
+`@margoengine/text/extrude` parses OpenType font outlines (TrueType `glyf`/`loca` and PostScript `CFF ` tables) directly,
+triangulates the 2D glyph paths with hole bridging, and extrudes them into 3D solid geometry with front/back caps, side walls,
+and optional bevels. The resulting vertex attributes can be converted to a core `Geometry` and rendered on both WebGPU and WebGL2.
+
+```ts
+import { extrudeText } from 'margoengine/text/extrude';
+
+// Procedural glyphs, or an OpenType font binary parsed with parseFontOutlines(buffer):
+const font = {
+  unitsPerEm: 1000,
+  glyphIndex: () => 1,
+  glyphAdvance: () => 600,
+  getGlyphContours: () => [[[50, 0], [300, 750], [550, 0], [450, 0], [300, 500], [150, 0]]],
+};
+
+const geometry = extrudeText('A', {
+  font,
+  size: 2,
+  depth: 0.5,
+  bevelEnabled: true,
+  bevelThickness: 0.05,
+  bevelSize: 0.05,
+});
+
+console.log(geometry.positions.length, geometry.indices.length);
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
 - Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. Shaped runs size dynamically without clipping, and letter spacing applies between clusters within shaped runs.
 - Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
-- No extruded 3D glyph geometry; that needs vector outlines a browser canvas does not expose.
+- Extruded 3D glyph geometry is available via `@margoengine/text/extrude` (reads TrueType and PostScript OpenType font binaries directly).
 - A FontFace that is still loading delays its text; text drawn with a CSS web font before it loads uses the fallback, so call `await font.load(sample)` first.
 - Atlas eviction: once `maxPages` is reached, pages no longer referenced by any active visible `Text` block are evicted and reused. If all pages contain active glyphs, `place` throws.
 

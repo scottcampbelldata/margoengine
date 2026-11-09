@@ -3363,3 +3363,24 @@ Five optional video entries, built clean room on the dev PC (RTX A6000, Edge). E
 - **Docs:** every job updates the video README with a runnable example, limits, claims, clean-room record, operational-playbook evidence and API/umbrella/generated LLM docs. No new open engine bug required a known-bugs entry; no speed claim required perf-history/perf-vs/reproduce edits.
 - **Gates:** lint, hygiene, full verify, video's package tests and GPU suite through gpu-lock, and check:readme-run --packages=video before each push. API update committed for every new export; early API conventions, quality API, parity and lock sync checks pass. Rebase follow-up rebuilds/regenerates records and checks package tests, claims and quality. This push marks list-3 row 112 done and closes the batch.
 - **Main README blocker resolved separately:** `fix(splats)` commit e165bfedf documents Picking hit versus engine mesh return types, with `Regression: scripts/check-readme-types.mjs`. Main concurrently corrected the call during rebase; the separate fix preserves it and clarifies its result. All README examples type-check; check:readme-run --packages=splats exits 0 with the corrected picking example running and four pre-existing known sample-input cases unchanged. No new exception or known-list entry.
+
+## Lane C batch 103: text
+
+Five jobs for `@margoengine/text`, on this PC (RTX A6000, Chromium/Edge), as new entries or additions to the text
+package; core and stage are untouched (23,626 B gzip together after the batch). The aim is production-quality text
+rendering: atlas eviction for long sessions, shaped Arabic/Indic runs with kerning and letter spacing, per-glyph
+motion, and clean-room extruded 3D vector text meshes from OpenType font files.
+
+| # | Job | Status | Commit | Entry | Gzip | Claim |
+| --- | --- | --- | --- | --- | --- | --- |
+| 5 | Character hit testing | SKIPPED | | already present in `packages/text/src/layout.ts:573+` (`hitTest`, `caretRect`) | | |
+| 2 | Glyph atlas eviction | DONE | `8c2e3599f` | root (`TextRenderer.evictUnused`, `GlyphAtlas.evict`) | 8293 B | LIM-572 |
+| 4 | Long runs & letter spacing | DONE | `2c25b4629` | root (`layoutText`, shaped runs) | 8293 B | |
+| 3 | Per-glyph animation | DONE | `c752dd701` | `/animate` (`AnimatedText`) | 3244 B | LIM-577 |
+| 1 | Extruded 3D text | DONE | this commit | `/extrude` (`extrudeText`, `parseFontOutlines`) | 7018 B | LIM-587 |
+
+- **Bugs fixed:** caught during verify: the upstream splats README example was calling `engine.pick(128, 96)` for hit properties rather than `picking.pick(128, 96)`; fixed and landed in `c752dd701`.
+- **Proved:** each job's Node tests (all 67 unit tests pass in `npm test -w @margoengine/text`) and real-GPU browser checks on the RTX A6000 (`packages/text/tests/text-browser.js`, 19 checks across 1x and 4x MSAA including gallery render).
+- **Sources:** `docs/clean-room.md` rows TX1 to TX3: ISO/IEC 14496-22 / OpenType specification for TrueType (`glyf`/`loca`) and PostScript (`CFF ` / Type 2 charstrings); Adobe Technical Notes #5176 and #5177; Held (2001) and Eberly (2002) for ear clipping triangulation with hole bridging seams.
+- **Limits:** rows in `docs/limits.md` for text atlas eviction (LIM-572), per-glyph animation (LIM-577), and extruded 3D text (LIM-587).
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=text`, API surface check, quality size baseline, LLMS check, and text browser GPU test suite.

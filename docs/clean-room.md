@@ -800,6 +800,16 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | W12 | spray seeding and ballistics | water/src/spray.ts | Teschner et al. 2003 (spatial-hash primes), uncited |
 | W13 | fog tail on water (Neutral + fog mix + sRGB) | water/src/index.ts | Khronos PBR Neutral; IEC 61966-2-1 |
 
+## Extruded 3D text: `@margoengine/text/extrude`
+
+Written clean room in November 2026 from the specifications and papers below; no source code of other engines or font libraries (opentype.js, three.js TextGeometry, Troika, FreeType, HarfBuzz) was read.
+
+| Area | Source |
+| --- | --- |
+| OpenType SFNT, TrueType `glyf`/`loca`, and PostScript `CFF ` | ISO/IEC 14496-22 (OpenType specification) / Microsoft OpenType specification: table directory, `head`, `maxp`, `hhea`, `hmtx`, `cmap` (formats 4 and 12), `loca`, `glyf` simple and composite glyph outlines with flags and delta coordinates; Adobe Technical Note #5176 "The Compact Font Format Specification" and Adobe Technical Note #5177 "The Type 2 Charstring Format" (`CFF ` table, charstrings). |
+| 2D Polygon Triangulation with Holes | Held, M. (2001), "FIST: Fast Industrial-Strength Triangulation of Polygons", Algorithmica, 30(4), 563-596; Eberly, D. (2002), "Triangulation by Ear Clipping", Geometric Tools (hole-bridging by mutual visibility ray cast and ear clipping). |
+| Bevel and Wall Extrusion | Linear sweep along normal profile with rounded/flat corner interpolation and planar/perimeter UV generation. |
+
 ## GPU pass timing: `@margoengine/stats` (`GPUProfiler`)
 
 Written from the specification and API documentation below; no other profiler's code was read.

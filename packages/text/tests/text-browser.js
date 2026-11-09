@@ -1,8 +1,9 @@
-import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
 import { AnimatedText } from '@margoengine/text/animate';
+import { parseFontOutlines, extrudeText } from '@margoengine/text/extrude';
 import { webglRenderer } from '@margoengine/webgl';
 import { buildColorFont, COLOR_FONT_FAMILY } from './color-font.js';
 
@@ -372,6 +373,29 @@ window.runTextTests = async () => {
   report.depth = { hidden, onTop, inFront };
   report.checks.push('Text behind a mesh is hidden (greater-equal), onTop and text in front show');
 
+  // 3c. Extruded 3D text rendered as core Geometry mesh.
+  label.visible = false;
+  const extrudedFont = parseFontOutlines(buildColorFont());
+  const geomData = extrudeText('\u{1F600}', {
+    font: extrudedFont,
+    size: 2.5,
+    depth: 0.6,
+    bevelEnabled: true,
+    bevelThickness: 0.05,
+    bevelSize: 0.05,
+  });
+  const extrudedMesh = engine
+    .createMesh()
+    .setGeometry(new Geometry(geomData.positions, geomData.normals, geomData.indices))
+    .setMaterial(new PbrMaterial({ color: '#ff8800', roughness: 0.4 }));
+  extrudedMesh.setPosition([-1.2, -1.2, 0]);
+  image = await frame();
+  const extrudedInk = ink(image, ([r, g, b]) => r > 180 && g > 80 && b < 50).count;
+  assert(extrudedInk > 50, `Extruded 3D text mesh did not draw: ${extrudedInk}`);
+  extrudedMesh.visible = false;
+  label.visible = true;
+  report.checks.push('Extruded 3D text generates valid 3D geometry rendered by core WebGPU pipeline');
+
   // 4. Billboard text faces the camera after orbiting; world-oriented text turns edge-on.
   label.set({ text: 'Hello', fontSize: 1.2, anchorX: 'left', anchorY: 'middle' });
   const frontal = ink(await frame());
@@ -651,6 +675,10 @@ window.runTextTests = async () => {
     gl.use(new TextRenderer({ name: 'gl-text-2' }));
     gl.render();
     assert(gl.backend === 'webgl2' && glText.stats.drawCalls === 0, 'WebGL2 text should not draw');
+    const glMesh = gl
+      .createMesh()
+      .setGeometry(new Geometry(geomData.positions, geomData.normals, geomData.indices));
+    gl.render();
     gl.dispose();
   } finally {
     console.warn = warn;

@@ -31,7 +31,7 @@ For the second account. Start now.
 | F | voxels, then 2D | 100 | sprites | 6 | done |
 | F | voxels, then 2D | 101 | tilemap | 4 | done |
 | F | voxels, then 2D | 102 | pixel | 4 | done |
-| F | voxels, then 2D | 103 | text | 5 | list 1 (dev PC) |
+| F | voxels, then 2D | 103 | text | 5 | done |
 
 Split, Scott 2026-11-08: batches 78, 79 (vfx) and 100 to 103 (sprites, tilemap, pixel, text) move to list 1 on the dev PC, which marks them `done` here when they land. The Mac skips them; stream E ends at 77 and stream F at 99.
 
