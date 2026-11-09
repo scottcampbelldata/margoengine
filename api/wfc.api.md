@@ -8,6 +8,10 @@ export interface Pin {
     tile: number;
 }
 
+export interface SolveOptions {
+    signal?: AbortSignal;
+}
+
 export interface Tile {
     weight?: number;
     neighbors: readonly (readonly number[])[];
@@ -18,6 +22,6 @@ export class WFC {
     readonly cells: Uint32Array;
     readonly dimensions: readonly [number, number, number];
     constructor(dimensions: readonly [number, number, number], tiles: readonly Tile[]);
-    solve(seed?: number, pins?: readonly Pin[], attempts?: number): Uint8Array;
+    solve(seed?: number, pins?: readonly Pin[], attempts?: number, { signal }?: SolveOptions): Uint8Array;
 }
 ```

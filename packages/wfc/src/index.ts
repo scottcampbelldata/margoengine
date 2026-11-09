@@ -16,6 +16,11 @@ export interface Pin {
   /** Tile id, an index into `tiles`. */
   tile: number;
 }
+/** Cancellation checkpoints for the synchronous adjacency solver. */
+export interface SolveOptions {
+  /** Checked before mutation and during propagation/observation. Default absent. Use /worker for event-driven cancellation. */
+  signal?: AbortSignal;
+}
 const directions = [
   [1, 0, 0],
   [-1, 0, 0],
@@ -121,7 +126,7 @@ export class WFC {
       this.queue[this.pending++] = index;
     }
   }
-  private propagate(): boolean {
+  private propagate(signal?: AbortSignal): boolean {
     const [width, height, depth] = this.dimensions,
       cells = this.cells,
       queue = this.queue,
@@ -129,6 +134,7 @@ export class WFC {
       table = this.allowed,
       union = this.union;
     while (this.pending) {
+      signal?.throwIfAborted();
       const index = queue[--this.pending];
       queued[index] = 0;
       const x = index % width,
@@ -169,7 +175,8 @@ export class WFC {
    * @throws RangeError for an invalid seed, attempt count or pin.
    * @throws MargoError `'failed'` when every attempt hits a contradiction.
    */
-  solve(seed = 1, pins: readonly Pin[] = [], attempts = 16): Uint8Array {
+  solve(seed = 1, pins: readonly Pin[] = [], attempts = 16, { signal }: SolveOptions = {}): Uint8Array {
+    signal?.throwIfAborted();
     if (!Number.isInteger(seed) || !Number.isInteger(attempts) || attempts < 1 || attempts > 1024)
       throw new RangeError('Invalid WFC seed or retry budget; use an integer seed and attempts from 1 to 1024');
     const [w, h] = this.dimensions,
@@ -190,6 +197,7 @@ export class WFC {
         throw new RangeError('Invalid WFC pin; pass a cell inside the grid and a tile index below the tile count');
     this.randomState = seed >>> 0 || 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
+      signal?.throwIfAborted();
       this.cells.fill(this.full);
       this.queued.fill(0);
       this.pending = 0;
@@ -211,7 +219,8 @@ export class WFC {
         undecided[i] = i;
       }
       let undecidedCount = cells.length;
-      while (this.propagate()) {
+      while (this.propagate(signal)) {
+        signal?.throwIfAborted();
         let selected = -1,
           entropy = Infinity;
         // Cells never regain tiles within an attempt, so decided cells drop out of the ascending scan list for good.

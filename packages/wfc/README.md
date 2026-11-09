@@ -10,7 +10,21 @@ const generator = new WFC([4,4,4], [{neighbors: [[0],[0],[0],[0],[0],[0]]}]);
 const cells = generator.solve(123);
 ```
 
-Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
+Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, then Z. Directions are +X, -X, +Y, -Y, +Z, -Z. Adjacency must be reciprocal. solve(seed, pins, attempts, {signal}?) retries contradictions deterministically and throws when the bounded budget is exhausted. This is local WFC propagation with restart, not an exhaustive backtracking solver or a guaranteed connected-dungeon generator; use the optional constraints entry for connected layouts, required paths and count limits. Tile weights must have finite sums and weighted logarithms; overflowing arithmetic is rejected.
+
+`signal` defaults to absent. Pre-abort throws the caller's exact reason before
+changing `cells`; propagation and observation also check it. This method is
+synchronous, so main-thread events cannot fire during solving. For responsive
+cancellation use the existing `WFCWorkerSolve` from `/worker`, which terminates
+active work on abort and supports the TypeScript and feature-local SIMD backends.
+
+```ts
+import {WFC} from '@margoengine/wfc';
+const solver = new WFC([4, 4, 4], [{neighbors: Array.from({length: 6}, () => [0])}]);
+const controller = new AbortController();
+const cells = solver.solve(123, [], 16, {signal: controller.signal});
+console.log(cells.length);
+```
 
 ## Overlapping model (`@margoengine/wfc/overlapping`, 2,457 B min+gzip)
 
