@@ -71,5 +71,17 @@
   "retainedFailures": [
     "initial GPU fixture lacked required viewport; original assertions passed; corrected fixture passed",
     "initial expanded CPU graph fixture used unsupported observer; corrected fixture passed"
-  ]
+  ],
+  "integration": {
+    "onto": "8b0ac32d41076be6e444e7a52f17f0b114e8006a",
+    "saveSourceAndTestsIdenticalToAcceptedCommit": true,
+    "coreStageMathSaveUpstreamChanges": false,
+    "affectedUnitChecks": 122,
+    "lintPassed": true,
+    "existingLintWarnings": 120,
+    "hygienePassed": true,
+    "docLinksPassed": true,
+    "generatedCorpusRegenerated": true,
+    "fullVerifyRepeated": false
+  }
 }
