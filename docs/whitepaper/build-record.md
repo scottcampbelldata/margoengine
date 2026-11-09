@@ -4073,3 +4073,28 @@ The fresh complete-scene repeats still fail exactly: 2 IOR and 4 volume hashes
 in 24 frames each, with unchanged original error ranges. Their reports are
 recorded under currentMainRepeats in the evidence JSON. No package README or
 public export changed, so package README execution/API regeneration do not apply.
+
+## Batch 65: roads
+
+Six optional road authoring and navigation jobs are complete. Core and stage are unchanged; held physics packages were not edited.
+
+| Job | Status | Commit | Optional entry |
+| --- | --- | --- | --- |
+| 1. Junctions | DONE | 9562e4a30 | road/junctions |
+| 2. Banking | DONE | 07c2f0538 | road/banking |
+| 3. Terrain fit | DONE | 8bd084d36 | road/terrain |
+| 4. Self intersection repair | DONE | 59c305404 | road/repair |
+| 5. Lane markings | DONE | bfa1aabc6 | road/markings |
+| 6. Road network graph | DONE | 42925dcf00d733ba4a6358ba32ed494709be9f87 | road/graph |
+
+All proof geometry and networks are generated stand-ins, not surveyed roads or traffic observations. Existing polygon union/triangulation, normals, BVH, decals and compute graph solvers hold the heavy work; no duplicate solver, foreign source or new CPU-heavy kernel was added. There is no speed claim or measured Wasm gain.
+
+The junction adapter rounds boundaries to renderer float32 before triangulation, fixing reversed ears in a local 8 m hairpin. junction-bends.test.js fails before that root-cause fix; original precision-rejection tests are unchanged. banking.test.js rejects bounds exceeded only after banking. markings.test.js rejects zero/subnormal final projector half-extents, including a tiny final dash, while accepting representable 1e-30 m dimensions. Every input, face, tolerance and original test remains intact.
+
+Evidence: the road unit suite proves analytic extents, positive one-coverage faces, holes, banks/grades, cut/fill, ownership, hostile/extreme inputs and abort boundaries. graph.test.js proves traffic rerouting, directions, parallel minimum arcs, isolation, empty and maximum topology, normal f32 extremes and ownership. browser-check.mjs runs all six entries on native WebGPU and real WebGL2 compatibility: road/clear pixels, white line/arrow pixels, graph distance/predecessor/reachability values, abort, exact geometry pixels after engine reboot and double disposal. Device-bound graph contexts are explicitly recreated after reboot; they do not restore automatically. All seven README examples execute. Lint, hygiene, full verify, package tests, executable README, API reports and quality gates passed before the job 6 push. See [reproduction](reproduce.md#batch-65-roads) and [result record](results/batch-65-road-20261109.json).
+
+Limits: explicit topology for navigation; split roads and share junction IDs deliberately. No automatic road/bridge connectivity, lane/turn routing or traffic simulation. Float32 travel costs, minimum-cost parallel arcs and existing solver limits apply. Geometry uses bounded local coordinates and polygon snapping. Repair/junctions are flat at one elevation without banked curbs; terrain fitting has no bridge-layer classification. Markings are three-stroke stand-in arrows projected in a downward box, without regulatory artwork, physical paint or retroreflection. Other hardware, surveyed-data accuracy, automatic civil-design transitions and performance are unmeasured. Full option and resource limits remain in the README and limits.md.
+
+Entry min+gzip bytes (bare package imports external, dependencies additional): index 1027, junctions 1114, banking 1041, terrain 887, repair 605, markings 887, graph 665. Core plus stage: 23797 B, below 25000 B.
+
+Docs for every job: package README and runnable example, operational playbook evidence, clean-room research, claims and limits, known-bugs audit; public API, umbrella and generated llms records were kept current. Perf-history and rival comparison files do not change because no speed result is claimed.

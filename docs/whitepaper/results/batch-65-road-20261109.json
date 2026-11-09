@@ -1,0 +1,85 @@
+{
+  "batch": 65,
+  "date": "2026-11-09",
+  "machine": "SCOTT-DEV",
+  "standIn": true,
+  "jobs": [
+    {
+      "number": 1,
+      "name": "Junctions",
+      "status": "DONE",
+      "commit": "9562e4a30",
+      "entry": "@margoengine/road/junctions"
+    },
+    {
+      "number": 2,
+      "name": "Banking",
+      "status": "DONE",
+      "commit": "07c2f0538",
+      "entry": "@margoengine/road/banking"
+    },
+    {
+      "number": 3,
+      "name": "Terrain fit",
+      "status": "DONE",
+      "commit": "8bd084d36",
+      "entry": "@margoengine/road/terrain"
+    },
+    {
+      "number": 4,
+      "name": "Self intersection repair",
+      "status": "DONE",
+      "commit": "59c305404",
+      "entry": "@margoengine/road/repair"
+    },
+    {
+      "number": 5,
+      "name": "Lane markings",
+      "status": "DONE",
+      "commit": "bfa1aabc6",
+      "entry": "@margoengine/road/markings"
+    },
+    {
+      "number": 6,
+      "name": "Road network graph",
+      "status": "DONE",
+      "commit": "42925dcf00d733ba4a6358ba32ed494709be9f87",
+      "entry": "@margoengine/road/graph"
+    }
+  ],
+  "entryGzipBytes": {
+    "index": 1027,
+    "junctions": 1114,
+    "banking": 1041,
+    "terrain": 887,
+    "repair": 605,
+    "markings": 887,
+    "graph": 665
+  },
+  "coreStageGzipBytes": 23797,
+  "checks": {
+    "static": {
+      "code": 0
+    },
+    "gates": {
+      "code": 0
+    },
+    "gpu": {
+      "code": 0
+    },
+    "rebased": {
+      "code": 0
+    }
+  },
+  "tests": [
+    "packages/road/test/*.test.js",
+    "packages/road/test/browser-check.mjs",
+    "all seven packages/road/README.md examples"
+  ],
+  "backends": [
+    "native WebGPU",
+    "real WebGL2 compatibility",
+    "compute CPU"
+  ],
+  "limits": "Generated geometry/networks only; no speed, surveyed-data, traffic-simulation or other-hardware claim. Device-bound graphs rebuild explicitly after reboot."
+}

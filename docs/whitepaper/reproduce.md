@@ -1074,3 +1074,17 @@ and budgets. Volume full-Cycles absolute error still spans 13,792,000..13,792,00
 against 13,792,000; native IOR spans 2,423,418..2,423,421 against 2,423,418. AMD repeats
 are stable but its IOR absolute error is 2,424,918, so changing adapter does not
 satisfy the original gate. Both jobs remain parked until repaired.
+
+## Batch 65 roads
+
+Generated stand-in geometry and networks; no external asset is needed. In a built checkout run:
+
+```sh
+npm run build:packages
+node --test --test-timeout=180000 packages/road/test/*.test.js
+node scripts/gpu-lock.mjs run --owner=road-proof --max=8 --wait-max=10 -- npm run test:gpu --workspace @margoengine/road
+npm run check:readme-run -- --packages=road
+npm run measure:size
+```
+
+The browser proof uses native WebGPU and forced real WebGL2 compatibility. It checks pixels and navigation values, exact rendered geometry after reboot, explicit graph/context reconstruction and disposal. CPU graph tests force createCompute({backend:'cpu'}). All generated outputs are stand-ins. No surveyed-road, traffic-model, highway compliance, other-hardware or speed claim follows from these checks.
