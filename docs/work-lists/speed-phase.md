@@ -310,3 +310,26 @@ Its optional latency loop requires `--time` and an exclusive outer GPU lock;
 it is not run during this build phase. Reproduction in the later speed phase:
 `node scripts/gpu-lock.mjs run --exclusive --owner=codex-skipgaps --wait-max=60 -- node packages/selection/test/models.browser.mjs --time`.
 
+
+## Batch 273 job 4: WebGL2 layer against the rival WebGL2 renderer
+
+Deferred by Scott's build-phase instruction. No speed run, paired wall-clock A/B,
+timing assertion or exclusive GPU hold is authorized during this phase. This is
+pending speed evidence, not a passing benchmark or a claim of parity in speed.
+
+Retain `bench/scenes/catalog.js` and `bench/scenes/parity.js` as the scene sources:
+`STANDARD.render` (10,000 boxes, materials, lights, shadows, post),
+`STANDARD.instanced` (1,000/10,000/50,000 static boxes and 10,000 moving boxes,
+instanced and culled), `STANDARD.dynamic` (10,000/100,000/250,000 moving boxes,
+all existing matrix, row, instanced, mesh and static controls), and the existing
+renderable `parityCases` rows. Preserve geometry, textures, lights, shadow work,
+camera paths, seeds, resolution and samples. Never reduce work to match a rival.
+
+The quiet phase still owes an optional compatibility-layer bench runner, outside
+core/stage, and like-for-like rows against `three-webgl-parity` run in its own
+external repository. Identify actual native/layer/rival backends in every result;
+default CLI settings remain 5 runs, 1 warmup, 300 frames, 0.1 noise and 0.05
+regression threshold. Publish CPU/GPU/frame, memory, download bytes, draw/pass and
+allocation counts with output comparisons. Include every loss and accepted work
+difference, plus a like-for-like row, in the whitepaper perf files and reproduce.md.
+Only Scott can end deferral; no new speed number or rival-performance claim exists.

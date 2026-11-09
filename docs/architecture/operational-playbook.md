@@ -1961,6 +1961,27 @@ D3D11 route needs a size budget per compiled program (one traversal, one copy
 of precise camera maths), not only a split. Evidence still missing: the split
 itself, GPU output parity and a disposal-during-compilation regression.
 
+### Batch 273: lower WebGL2 device tiers
+
+The optional tiers entry selects physical colour formats inside the existing
+device: half-float or UNORM8 for render/storage targets, with logical WebGPU
+formats and upload/copy layouts retained. Integer and depth/stencil targets and
+sample-only float precision are unchanged. Float readback on a lower-tier device
+uses integer framebuffer bit encoding, including the CPU compute readback path.
+Unblended LDR stores use explicit nearest rounding; blending retains physical GL
+conversion after the operation. Highp fragment precision is still required.
+
+The device probes cover seven formats, exact bytes, mip/layer views, four-sample
+resolve, blending and fragment/CPU compute on extension-masked real hardware.
+The raw-GL blend control and existing native-WebGPU comparison are retained.
+Physical-format cross-usage copies and sample-only cube views now pass, using
+one counted synchronous readback per copied slice when GL cannot blit. Lower-tier
+device creation loads that helper; full-tier loading stays lazy. Outstanding: every package's lower-tier
+picture/refusal requirements, the requested real Safari/iOS/Firefox/Android
+matrix, the brief's full-tier package failures, and all landing gates. No full
+parity, speed or release-readiness claim follows from these scoped probes.
+Research and scope are recorded in clean-room.md; core and stage are unchanged.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for
@@ -4211,3 +4232,25 @@ confirmed driver-reset interruption and failed/remaining-only GPU completion
 are recorded in size-restore.md. Fresh combined entry/network records preserve
 current-main sciviz/BVH/shadow work; merged size, API/record and documentation
 checks pass. Core plus stage remains 23924 B, with no timing claim.
+
+### Lower-tier package precision evidence (Batch 273)
+
+The layer's seven package scenes compare full, half-float and LDR under masked
+extensions on the same real GPU. Core, shadows, virtual shadows, material meshes
+and instances, and culling are identical on both lower tiers. Bloom/Tonemap is
+identical on half-float; LDR's clamped HDR scene capture exceeds the unchanged
+pixel rule (5.322265625 percent over 2, mean 2.09423828125, maximum 6). PostStack
+requires half-float for HDR/display stages before attaching effects or allocating
+resources, and rechecks after releasing resources on device restore. LDR-only
+stacks remain usable. The layer and package share one structural requirement
+helper; post imports no compatibility-layer runtime. CPU tests cover refusal,
+resource ownership and continued supported tiers. Other package entries, standalone
+HDR effects and physical lower-tier/browser measurements remain outstanding.
+
+Standalone Bloom and SSAO were then measured on the same fixture. Both miss the
+LDR rule (Bloom mean 1.685546875, maximum 7; SSAO mean 8.579345703125, maximum
+108), while half-float passes and LDR-only FXAA remains identical. Their resource
+initializers use the shared requirement before allocation, with restoration
+cleanup tested, including SSAO's GTAO subclass. Bloom's image encoding path is
+covered by the same initializer. Only the measured scope is claimed; other
+standalone effects and package features still need equivalent evidence.

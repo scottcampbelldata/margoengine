@@ -38,6 +38,20 @@ unattached `Bloom`, `rgba16float` views of the image size, and submit before dis
 
 ## Combining effects: `PostStack`
 
+On the WebGL2 compatibility layer, a stack with HDR or display effects requires
+the half-float or full device tier. LDR clamps linear scene radiance and fails the
+layer's existing pixel rule, so these stacks throw linked `unsupported` at setup,
+before attaching effects or allocating their GPU resources. A device restore to
+LDR releases the old capture and refuses the same requirement. Stacks containing
+only LDR effects remain available on LDR devices. The example below runs unchanged
+on native WebGPU, full WebGL2 and half-float WebGL2.
+Standalone Bloom and SSAO have the same minimum tier, including Bloom's image
+encoding path. Their initialization refuses LDR before allocating; restoration
+releases old resources before rechecking. SSAO's geometry buffers need signed
+values, while Bloom needs linear radiance above one. GTAO inherits SSAO's check
+inside its required PostStack. No effect silently replaces these values with
+clamped eight-bit data.
+
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
 (`@margoengine/post/stack`) captures the scene once in linear HDR and runs its effects on that
 capture in array order:

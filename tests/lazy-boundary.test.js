@@ -100,7 +100,7 @@ test('texture read-back is reached only through the import() in device/device.ts
   assert.deepEqual(importers, [{ file: 'packages/webgl2-compat/src/device/device.ts', dynamic: true }]);
 });
 
-test('the only import() calls in the layer are index.ts to device.ts and device.ts to compute, read-back and the xr entry', () => {
+test('the layer pins its device, compute, read-back, XR and optional tier loading edges', () => {
   // scripts/lazy-files.js picks the lazy chunk by its built file name (split.chunk); any other dynamic import could
   // add or rename a chunk that pattern misses or wrongly catches, so the set of lazy edges is pinned here.
   const edges = [];
@@ -110,11 +110,24 @@ test('the only import() calls in the layer are index.ts to device.ts and device.
     'packages/webgl2-compat/src/compute/runtime.ts -> packages/webgl2-compat/src/compute/interpret.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/compute/runtime.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/device/readback.ts',
+    'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/tiers.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/xr.ts',
     'packages/webgl2-compat/src/index.ts -> packages/webgl2-compat/src/device.ts',
+    'packages/webgl2-compat/src/tiers.ts -> packages/webgl2-compat/src/device.ts',
   ]);
   assert.ok(split.chunk.test('runtime-AbC123.js') && !split.chunk.test('device-AbC123.js'));
   assert.ok(split.chunk.test('readback-AbC123.js'));
   // CompatGPU.xrRoute loads a public entry, built under its own name, so it adds no chunk and stays outside the pattern.
   assert.ok(!split.chunk.test('xr.js'));
+  assert.ok(!split.chunk.test('tiers.js') && !split.chunk.test('tiers-AbC123.js'));
+});
+
+test('importing the optional tier entry does not eagerly import the device or compute runtime', () => {
+  const modules = reach(join(src, 'tiers.ts'), new Set([join(src, 'device.ts')]));
+  assert.ok(!modules.has(join(src, 'device/device.ts')));
+  assert.ok(!modules.has(lazyRuntime));
+  assert.deepEqual(
+    importsOf(join(src, 'tiers.ts')).filter((next) => next.file === join(src, 'device.ts')),
+    [{ file: join(src, 'device.ts'), dynamic: true }],
+  );
 });

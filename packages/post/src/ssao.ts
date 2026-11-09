@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
+import { requireCompatTier } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -234,6 +235,7 @@ export class SSAO implements EnginePlugin {
     if (this.disposed) throw margoError('disposed', `${this.label} is disposed; create a new ${this.label}`);
     if (!engine.gpu)
       throw margoError('unsupported', `${this.label} requires WebGPU; see https://margoengine.com/errors#webgpu`);
+    requireCompatTier(engine.gpu, `${this.label} geometry/HDR processing`, 'half-float');
     if (!this.host && (engine.hasPlugin('post-processing') || engine.hasPlugin('bloom')))
       throw margoError('state', 'SSAO owns the output target; remove the other post effect first');
     this.engine = engine;

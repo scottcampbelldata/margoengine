@@ -3534,6 +3534,10 @@
       "types": "./dist/webgl2-compat/auto.d.ts",
       "import": "./dist/webgl2-compat/auto.js"
     },
+    "./webgl2-compat/tiers": {
+      "types": "./dist/webgl2-compat/tiers.d.ts",
+      "import": "./dist/webgl2-compat/tiers.js"
+    },
     "./wfc": {
       "types": "./dist/wfc.d.ts",
       "import": "./dist/wfc.js"

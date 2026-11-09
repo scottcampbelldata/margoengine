@@ -14,6 +14,8 @@ export type CompatLimit = (typeof COMPAT_LIMITS)[number];
 export type CompatTier = 'full' | 'half-float' | 'ldr';
 
 export interface InstallOptions {
+    readonly signal?: AbortSignal;
+    readonly minimumTier?: CompatTier;
     readonly force?: boolean;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
     readonly cpuWorkBudget?: number;
@@ -66,6 +68,8 @@ export function install(options?: InstallOptions): Promise<InstallResult>;
 export function probeWebGL2(options?: ProbeOptions): WebGL2Capabilities | null;
 
 export function uninstall(): boolean;
+
+export function waitFor<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T>;
 
 export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities;
 ```

@@ -1,0 +1,2386 @@
+{
+  "status": "passed",
+  "tiers": [
+    {
+      "tier": "full",
+      "renderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+      "formats": {
+        "r32float": {
+          "physical": "r32float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192
+          ]
+        },
+        "rg32float": {
+          "physical": "rg32float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62
+          ]
+        },
+        "rgba32float": {
+          "physical": "rgba32float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64
+          ]
+        },
+        "r16float": {
+          "physical": "r16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            192,
+            0,
+            192,
+            0,
+            192
+          ]
+        },
+        "rg16float": {
+          "physical": "rg16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52
+          ]
+        },
+        "rgba16float": {
+          "physical": "rgba16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68
+          ]
+        },
+        "rg11b10ufloat": {
+          "physical": "rg11b10ufloat",
+          "bytes": [
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112
+          ]
+        }
+      },
+      "errors": [],
+      "upload": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "copy": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "crossUsage": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "sample": [
+        0.12345679104328156,
+        -123456,
+        987654,
+        1.234567861274627e-7
+      ],
+      "samplePhysical": "rgba32float",
+      "cube": [
+        [
+          -2,
+          2,
+          0.0625,
+          0.5,
+          -2,
+          2,
+          0.125,
+          0.5,
+          -2,
+          2,
+          0.1875,
+          0.5,
+          -2,
+          2,
+          0.25,
+          0.5
+        ],
+        [
+          -3,
+          3,
+          0.0625,
+          0.5,
+          -3,
+          3,
+          0.125,
+          0.5,
+          -3,
+          3,
+          0.1875,
+          0.5,
+          -3,
+          3,
+          0.25,
+          0.5
+        ],
+        [
+          -4,
+          4,
+          0.0625,
+          0.5,
+          -4,
+          4,
+          0.125,
+          0.5,
+          -4,
+          4,
+          0.1875,
+          0.5,
+          -4,
+          4,
+          0.25,
+          0.5
+        ],
+        [
+          -5,
+          5,
+          0.0625,
+          0.5,
+          -5,
+          5,
+          0.125,
+          0.5,
+          -5,
+          5,
+          0.1875,
+          0.5,
+          -5,
+          5,
+          0.25,
+          0.5
+        ],
+        [
+          -6,
+          6,
+          0.0625,
+          0.5,
+          -6,
+          6,
+          0.125,
+          0.5,
+          -6,
+          6,
+          0.1875,
+          0.5,
+          -6,
+          6,
+          0.25,
+          0.5
+        ],
+        [
+          -7,
+          7,
+          0.0625,
+          0.5,
+          -7,
+          7,
+          0.125,
+          0.5,
+          -7,
+          7,
+          0.1875,
+          0.5,
+          -7,
+          7,
+          0.25,
+          0.5
+        ]
+      ],
+      "cubeView": [
+        -5,
+        5,
+        0.0625,
+        0.5,
+        -5,
+        5,
+        0.125,
+        0.5,
+        -5,
+        5,
+        0.1875,
+        0.5,
+        -5,
+        5,
+        0.25,
+        0.5
+      ],
+      "array": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "view": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "msaa": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "blended": [
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "blendOracle": [
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127
+      ],
+      "fragment": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "cpu": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "dispatches": {
+        "fragment": 1,
+        "scatter": 0,
+        "cpu": 1
+      },
+      "dither": false,
+      "gl": 0,
+      "allocations": [
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 33326
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 33328
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 33325
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 33327
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 35898
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage3D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "renderbufferStorageMultisample",
+          "internal": 34842
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "full",
+          "name": "texStorage2D",
+          "internal": 33321
+        }
+      ]
+    },
+    {
+      "tier": "half-float",
+      "renderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+      "formats": {
+        "r32float": {
+          "physical": "r16float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            0,
+            192
+          ]
+        },
+        "rg32float": {
+          "physical": "rg16float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62
+          ]
+        },
+        "rgba32float": {
+          "physical": "rgba16float",
+          "bytes": [
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64,
+            0,
+            0,
+            0,
+            192,
+            0,
+            0,
+            128,
+            62,
+            0,
+            0,
+            0,
+            63,
+            0,
+            0,
+            128,
+            64
+          ]
+        },
+        "r16float": {
+          "physical": "r16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            192,
+            0,
+            192,
+            0,
+            192
+          ]
+        },
+        "rg16float": {
+          "physical": "rg16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52,
+            0,
+            192,
+            0,
+            52
+          ]
+        },
+        "rgba16float": {
+          "physical": "rgba16float",
+          "bytes": [
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68,
+            0,
+            192,
+            0,
+            52,
+            0,
+            56,
+            0,
+            68
+          ]
+        },
+        "rg11b10ufloat": {
+          "physical": "rgba16float",
+          "bytes": [
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112
+          ]
+        }
+      },
+      "errors": [],
+      "upload": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "copy": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "crossUsage": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "sample": [
+        0.12345679104328156,
+        -123456,
+        987654,
+        1.234567861274627e-7
+      ],
+      "samplePhysical": "rgba32float",
+      "cube": [
+        [
+          -2,
+          2,
+          0.0625,
+          0.5,
+          -2,
+          2,
+          0.125,
+          0.5,
+          -2,
+          2,
+          0.1875,
+          0.5,
+          -2,
+          2,
+          0.25,
+          0.5
+        ],
+        [
+          -3,
+          3,
+          0.0625,
+          0.5,
+          -3,
+          3,
+          0.125,
+          0.5,
+          -3,
+          3,
+          0.1875,
+          0.5,
+          -3,
+          3,
+          0.25,
+          0.5
+        ],
+        [
+          -4,
+          4,
+          0.0625,
+          0.5,
+          -4,
+          4,
+          0.125,
+          0.5,
+          -4,
+          4,
+          0.1875,
+          0.5,
+          -4,
+          4,
+          0.25,
+          0.5
+        ],
+        [
+          -5,
+          5,
+          0.0625,
+          0.5,
+          -5,
+          5,
+          0.125,
+          0.5,
+          -5,
+          5,
+          0.1875,
+          0.5,
+          -5,
+          5,
+          0.25,
+          0.5
+        ],
+        [
+          -6,
+          6,
+          0.0625,
+          0.5,
+          -6,
+          6,
+          0.125,
+          0.5,
+          -6,
+          6,
+          0.1875,
+          0.5,
+          -6,
+          6,
+          0.25,
+          0.5
+        ],
+        [
+          -7,
+          7,
+          0.0625,
+          0.5,
+          -7,
+          7,
+          0.125,
+          0.5,
+          -7,
+          7,
+          0.1875,
+          0.5,
+          -7,
+          7,
+          0.25,
+          0.5
+        ]
+      ],
+      "cubeView": [
+        -5,
+        5,
+        0.0625,
+        0.5,
+        -5,
+        5,
+        0.125,
+        0.5,
+        -5,
+        5,
+        0.1875,
+        0.5,
+        -5,
+        5,
+        0.25,
+        0.5
+      ],
+      "array": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "view": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "msaa": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "blended": [
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "blendOracle": [
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127
+      ],
+      "fragment": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "cpu": [
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4,
+        -2,
+        0.25,
+        0.5,
+        4
+      ],
+      "dispatches": {
+        "fragment": 1,
+        "scatter": 0,
+        "cpu": 1
+      },
+      "dither": false,
+      "gl": 0,
+      "allocations": [
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 33325
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 33327
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 33325
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 33327
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage3D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "renderbufferStorageMultisample",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34842
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 33321
+        },
+        {
+          "tier": "half-float",
+          "name": "texStorage2D",
+          "internal": 36208
+        }
+      ]
+    },
+    {
+      "tier": "ldr",
+      "renderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+      "formats": {
+        "r32float": {
+          "physical": "r8unorm",
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rg32float": {
+          "physical": "rg8unorm",
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62
+          ]
+        },
+        "rgba32float": {
+          "physical": "rgba8unorm",
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            129,
+            128,
+            0,
+            63,
+            0,
+            0,
+            128,
+            63,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            129,
+            128,
+            0,
+            63,
+            0,
+            0,
+            128,
+            63,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            129,
+            128,
+            0,
+            63,
+            0,
+            0,
+            128,
+            63,
+            0,
+            0,
+            0,
+            0,
+            129,
+            128,
+            128,
+            62,
+            129,
+            128,
+            0,
+            63,
+            0,
+            0,
+            128,
+            63
+          ]
+        },
+        "r16float": {
+          "physical": "r8unorm",
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rg16float": {
+          "physical": "rg8unorm",
+          "bytes": [
+            0,
+            0,
+            4,
+            52,
+            0,
+            0,
+            4,
+            52,
+            0,
+            0,
+            4,
+            52,
+            0,
+            0,
+            4,
+            52
+          ]
+        },
+        "rgba16float": {
+          "physical": "rgba8unorm",
+          "bytes": [
+            0,
+            0,
+            4,
+            52,
+            4,
+            56,
+            0,
+            60,
+            0,
+            0,
+            4,
+            52,
+            4,
+            56,
+            0,
+            60,
+            0,
+            0,
+            4,
+            52,
+            4,
+            56,
+            0,
+            60,
+            0,
+            0,
+            4,
+            52,
+            4,
+            56,
+            0,
+            60
+          ]
+        },
+        "rg11b10ufloat": {
+          "physical": "rgba8unorm",
+          "bytes": [
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112,
+            0,
+            0,
+            26,
+            112
+          ]
+        }
+      },
+      "errors": [],
+      "upload": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "copy": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "crossUsage": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "sample": [
+        0.12345679104328156,
+        -123456,
+        987654,
+        1.234567861274627e-7
+      ],
+      "samplePhysical": "rgba32float",
+      "cube": [
+        [
+          -2,
+          2,
+          0.0625,
+          0.5,
+          -2,
+          2,
+          0.125,
+          0.5,
+          -2,
+          2,
+          0.1875,
+          0.5,
+          -2,
+          2,
+          0.25,
+          0.5
+        ],
+        [
+          -3,
+          3,
+          0.0625,
+          0.5,
+          -3,
+          3,
+          0.125,
+          0.5,
+          -3,
+          3,
+          0.1875,
+          0.5,
+          -3,
+          3,
+          0.25,
+          0.5
+        ],
+        [
+          -4,
+          4,
+          0.0625,
+          0.5,
+          -4,
+          4,
+          0.125,
+          0.5,
+          -4,
+          4,
+          0.1875,
+          0.5,
+          -4,
+          4,
+          0.25,
+          0.5
+        ],
+        [
+          -5,
+          5,
+          0.0625,
+          0.5,
+          -5,
+          5,
+          0.125,
+          0.5,
+          -5,
+          5,
+          0.1875,
+          0.5,
+          -5,
+          5,
+          0.25,
+          0.5
+        ],
+        [
+          -6,
+          6,
+          0.0625,
+          0.5,
+          -6,
+          6,
+          0.125,
+          0.5,
+          -6,
+          6,
+          0.1875,
+          0.5,
+          -6,
+          6,
+          0.25,
+          0.5
+        ],
+        [
+          -7,
+          7,
+          0.0625,
+          0.5,
+          -7,
+          7,
+          0.125,
+          0.5,
+          -7,
+          7,
+          0.1875,
+          0.5,
+          -7,
+          7,
+          0.25,
+          0.5
+        ]
+      ],
+      "cubeView": [
+        0,
+        1,
+        0.062745101749897,
+        0.501960813999176,
+        0,
+        1,
+        0.125490203499794,
+        0.501960813999176,
+        0,
+        1,
+        0.1882352977991104,
+        0.501960813999176,
+        0,
+        1,
+        0.250980406999588,
+        0.501960813999176
+      ],
+      "array": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "view": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "msaa": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "blended": [
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636,
+        0.49803921580314636
+      ],
+      "blendOracle": [
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127,
+        127
+      ],
+      "fragment": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "cpu": [
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1,
+        0,
+        0.250980406999588,
+        0.501960813999176,
+        1
+      ],
+      "dispatches": {
+        "fragment": 1,
+        "scatter": 0,
+        "cpu": 1
+      },
+      "dither": false,
+      "gl": 0,
+      "allocations": [
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 33321
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 33323
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 33321
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 33323
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage3D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "renderbufferStorageMultisample",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 32856
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 34836
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 33321
+        },
+        {
+          "tier": "ldr",
+          "name": "texStorage2D",
+          "internal": 36208
+        }
+      ]
+    }
+  ]
+}

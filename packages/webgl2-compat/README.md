@@ -142,6 +142,75 @@ What it does:
   page's owner. Source bytes are still stored once. The corpus regression test checks
   this across a write/read/add cycle.
 
+### Lower device tiers (`margoengine/webgl2-compat/tiers`)
+
+The optional `installTiers()` permits half-float and LDR devices while retaining the
+same WGSL renderer. `install()` still defaults to the full tier. The device entry
+and the scoped package scenes below are validated. Remaining package coverage is
+tracked as batch 273 follow-up T273-COVERAGE in [limits.md](../../docs/limits.md);
+this release piece makes no package-wide parity claim.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { installTiers } from 'margoengine/webgl2-compat/tiers';
+
+await installTiers(); // Native WebGPU stays preferred; otherwise permits WebGL2 down to LDR.
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+engine.createMesh().setGeometry(box());
+engine.render();
+window.addEventListener('pagehide', () => engine.dispose(), { once: true });
+```
+
+`minimumTier` defaults to `'ldr'` here, versus `'full'` in `install()` and
+`createCompatGPU()`. Set it to `'half-float'` to forbid LDR. All other installation
+options retain their defaults. The adapter's `capabilities.tier` and description
+report the actual tier. Missing highp fragment precision still refuses all tiers.
+The probe's `supported` property continues to mean the default full-tier minimum;
+it does not mean an explicitly permitted lower tier cannot make a device.
+
+`await createTieredGPU(options)` makes the GPU without changing globals. The device
+module stays behind a dynamic import, including when importing this entry.
+Both creation helpers accept `signal` (default none). Aborting rejects with the
+signal's reason, stops that caller's module/native-adapter wait and prevents later
+installation side effects. A shared module load continues for other callers.
+Cancellation never uninstalls an existing owner, and a creation signal does not
+cancel adapter requests made later on the returned GPU. Root `install` accepts the
+same installation signal.
+`tierTextureFormat(format, tier, usage = 16)` and `tierSubstitutions(tier)` describe
+the physical target choice. Half-float maps float targets to R16F, RG16F or RGBA16F;
+LDR maps them to R8, RG8 or RGBA8. The packed three-channel HDR target expands to
+four channels. Integer, depth/stencil and sample-only formats retain their storage.
+Public texture formats, upload layouts and returned copy bytes keep the requested
+WebGPU format. Physical target precision/range is an explicit difference: half
+float rounds to binary16; LDR clamps to [0, 1] and stores eight bits per channel.
+Unblended LDR stores use nearest rounding with upward ties. Blending uses GL's
+physical fixed-point conversion after the blend, without rounding its input first.
+
+Feature authors can call `requireCompatTier(device, featureName, minimum = 'full')`
+before allocation to refuse a tier with coded `unsupported` when their measured
+picture requirements need more range or precision. Native devices pass unchanged.
+The measured package scenes for core, shadows, virtual shadows, materials and
+culling are pixel-identical at the half-float and LDR tiers. The Bloom/Tonemap
+stack is pixel-identical at half-float; its HDR capture fails the existing image
+rule on LDR, so PostStack refuses HDR/display stages at setup on that tier.
+LDR-only stacks stay available. Standalone Bloom and SSAO also refuse LDR before
+allocation; both pass half-float (SSAO maximum channel difference 1). Standalone
+FXAA is identical on both lower tiers. These ten scenes are the proven scope.
+
+Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,
+TAA, DOF, transitions, glTF/glTF-pro, selection, sciviz, lines, points, text,
+environment, VFX, scatter, LOD, terrain, sky, scenery, OIT, splats, voxel,
+React and XR still need feature-by-feature half-float/LDR images and measured
+attach-time refusals. Other optional rendering entries are uncovered until added
+to that matrix. Full-tier compat failures are tracked separately in known-bugs.md
+and are repaired before this follow-up. Physical lower-tier hardware and the
+cross-browser matrix remain unmeasured.
+The device probes cover all seven float targets, exact logical readback bytes,
+uploads, same-format copies, sample-only float32 precision, mip/array views, MSAA,
+blending and fragment/CPU texture-store compute. They mask extensions on a real GL
+device; they do not constitute measurements on physical lower-tier hardware.
+
 ### Native WebGPU on older GPUs (`margoengine/webgl2-compat/adapter`)
 
 Before falling to WebGL2, a browser can offer WebGPU at compatibility level on OpenGL ES and Direct3D 11 class devices.

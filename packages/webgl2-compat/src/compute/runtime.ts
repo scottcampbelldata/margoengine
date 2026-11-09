@@ -538,7 +538,8 @@ class Runtime implements ComputeRuntime {
             h,
           );
           const slice = data.subarray(z * w * h * 4, (z + 1) * w * h * 4);
-          gl.readPixels(0, 0, w, h, source.format, source.type, slice);
+          const pixels = source.floatBits ? new Uint32Array(slice.buffer, slice.byteOffset, slice.length) : slice;
+          gl.readPixels(0, 0, w, h, source.format, source.type, pixels);
           source.free?.();
           device.stalls++;
         }
@@ -558,9 +559,11 @@ class Runtime implements ComputeRuntime {
       t = view.texture,
       { w, h } = level;
     const kind = level.data instanceof Uint32Array ? 'u' : level.data instanceof Int32Array ? 'i' : '';
+    const load = 'texelFetch(t, p, 0)';
+    const stored = this.device.adapter.tierFormats?.store(load, view.format) ?? load;
     const helper = r.helper(
-      `masked:${kind}`,
-      `uniform highp ${kind}sampler2D t;\nuniform highp sampler2D m;\nout highp ${kind}vec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); if (texelFetch(m, p, 0).r < 0.5) discard; c = texelFetch(t, p, 0); }`,
+      `masked:${kind}:${stored}`,
+      `uniform highp ${kind}sampler2D t;\nuniform highp sampler2D m;\nout highp ${kind}vec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); if (texelFetch(m, p, 0).r < 0.5) discard; c = ${stored}; }`,
     );
     const values = gl.createTexture() as WebGLTexture,
       mask = gl.createTexture() as WebGLTexture;

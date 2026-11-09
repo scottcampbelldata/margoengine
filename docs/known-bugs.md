@@ -3143,3 +3143,53 @@ could compile rigging while gltf-pro replaced declarations, causing unknown/any
 model-node errors. package-order now retains paths through unselected packages.
 The regression lists the consumer before the provider at one and three jobs:
 tests/package-order.test.js. No retries or declaration/type relaxations.
+
+### Batch 273 lower-tier validation remains open
+
+The new optional tiers policy is not yet a completed parity row. Repro for the repaired
+copy class: on an LDR device, create two rgba32float textures, one
+sample-only (COPY_SRC | COPY_DST | TEXTURE_BINDING) and one additionally used as
+RENDER_ATTACHMENT, then copy between them. Their logical formats match but their
+physical formats differ. The existing copy path compares logical format internals
+and previously attempted an invalid framebuffer blit or attached unrenderable float storage.
+The owner is webgl2-compat/src/device/render.ts copyTextureToTexture and its
+format-view synchronization. The repair uses a counted synchronous bit-fetch and upload for incompatible physical
+storage, including view synchronization. Exact GPU regressions pass both copy
+directions and all six sample-only cube faces plus a 2D face view on all three tiers.
+No sample-only precision is lost and no GL error is suppressed.
+Package-wide lower-tier image comparisons and tested attach-time requirements are
+still pending beyond the seven new package scenes. The LDR Bloom/Tonemap stack's
+HDR capture was clamped before display conversion, exceeding the existing parity
+rule (5.322265625 percent over 2, mean 2.09423828125, maximum 6). The owning
+PostStack now refuses HDR/display stages on LDR at setup and after device restore;
+its CPU regressions verify no partial attachment/allocation, resource release,
+and continued half-float and LDR-only support. Standalone Bloom and SSAO now have
+the same measured refusal: their LDR images exceed the rule by 5.322265625 percent
+over 2 / mean 1.685546875 / maximum 7, and 14.1357421875 percent over 2 /
+mean 8.579345703125 / maximum 108 respectively. Half-float passes (SSAO maximum 1,
+mean 0.008544921875); LDR-only FXAA is pixel-identical. Their resource-owning
+initializers now refuse LDR before allocation and after releasing old resources
+on restore; tests include SSAO's GTAO subclass in its real PostStack.
+Other standalone HDR effects and other
+package entries still need their measured requirement checks.
+The brief's separate full-tier compatibility failures remain in scope;
+the voxel-pathtracer D3D11 hang has a separate owner and was not investigated here.
+
+### Batch 273 tooling observation: verify import from eval
+
+Repro: node --input-type=module -e "import('./scripts/verify.mjs')".
+The exported verify plan cannot be imported from an eval entry: its final CLI
+guard passes undefined process.argv[1] to pathToFileURL. The same import from a
+normal .mjs file works. Root cause is scripts/verify.mjs's unguarded CLI-entry
+comparison, outside this package lane's edit scope. The batch resumes verify's
+exported unit-test command from an owned .mjs runner with the same work and bounds.
+The tooling owner should guard the missing argument and add an eval-import
+regression; no exception is suppressed here.
+
+New-tier creation now accepts AbortSignal with tested pre-abort, pending-wait,
+listener cleanup and concurrent ownership semantics. A cancelled native-adapter
+probe cannot install when its native request eventually settles. A second probe
+also preserves an installation completed by another caller while it waited; the
+old implementation could overwrite that owner's restore chain. CPU regressions
+cover both interleavings. The selected-minimum refusal diagnostic names the missing
+half-float extension rather than the full-tier extension and changes no globals.

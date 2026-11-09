@@ -2846,3 +2846,79 @@ by that density. A chromatic lens requires this selection at the sensor; glass m
 This is a deferred single-hero estimator, not Wilkie's full multi-wavelength spectral MIS, and claims
 no packet convergence advantage. It removes three identical nondispersive replays deterministically;
 there is no timing experiment. Existing eta-squared factors and alpha's geometric integral are kept.
+
+### Batch 273: lower WebGL2 device tiers
+
+Research preceded implementation. Compared these primary specifications and papers:
+- Mark Callow and the Khronos WebGL Working Group, EXT_color_buffer_half_float
+  (2022 revision), https://registry.khronos.org/webgl/extensions/EXT_color_buffer_half_float/ .
+  WebGL2 half-float colour attachments include R16F, RG16F and RGBA16F, not RGB16F.
+- Mark Callow and the Khronos WebGL Working Group, EXT_color_buffer_float (2017),
+  https://registry.khronos.org/webgl/extensions/EXT_color_buffer_float/ .
+  The full extension adds 32-bit float and packed HDR targets; its FLOAT readback
+  rule cannot be used for a physical UNORM target.
+- Jon Leech and Benj Lipchak (editors), OpenGL ES 3.0.6 (2019),
+  https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf , sections 2.1.2
+  through 2.1.6, 3.8, 4.1.7 and 4.3.2: storage encodings, upload types, blending
+  and readback conversions. Fixed-point conversion permits adjacent integers;
+  the LDR blend oracle therefore uses independent raw GL on the same hardware.
+- Kelsey Gilbert (editor), WebGL 2.0 (2026 editor draft),
+  https://registry.khronos.org/webgl/specs/latest/2.0/ ; and the W3C GPU for the Web
+  Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/ , texture formats
+  and copies. Logical copy layouts remain separate from physical GL storage.
+- Erik Reinhard, Michael Stark, Peter Shirley and James Ferwerda, Photographic Tone
+  Reproduction for Digital Images (2002), abstract/introduction,
+  https://pages.cs.wisc.edu/~lizhang/courses/cs766-2007f/projects/hdr/Reinhard2002PTR.pdf .
+  Tone reproduction is an image operation, not a replacement for arbitrary data
+  texture values. The tier substitution does not add an implicit tone mapper.
+- Greg Ward, High Dynamic Range Imaging (2001), abstract,
+  https://library.imaging.org/cic/articles/9/1/art00003 ; Peter Kornerup,
+  Jean-Michel Muller and Adrien Panhaleux, Floating-Point Arithmetic on
+  Round-to-Nearest Representations (2012), abstract,
+  https://arxiv.org/abs/1201.3914 . Compared range preservation and explicit rounding;
+  no alternate number representation or paper algorithm was implemented.
+
+Synthesis: change render/storage targets in one device policy, preserve sample-only
+float data, convert uploads using the requested byte layout, and carry float readback
+bits through core GL integer targets rather than depending on renderable RGBA32F.
+Only owned WGSL/GLSL emitter outputs receive LDR store quantization; blend inputs
+are left unrounded. A raw GL control of the 0.5 additive blend returns byte 127 on
+this machine, exactly matching the layer; the initial analytic upper-neighbour
+assumption (128) was invalid. No legacy assertion, tolerance or workload changed.
+The current device checks use original analytic fixtures, not a new asset demo.
+No rival implementation, paper companion code or external repository file was read.
+No speed measurement or Wasm gain is claimed. Package-wide and physical-browser
+parity remain outstanding; these device checks do not establish full job completion.
+
+Creation cancellation follow-up (2026-11-09): compared the WHATWG contributors,
+DOM Standard (2026 living standard), https://dom.spec.whatwg.org/#aborting-ongoing-activities,
+with the W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/#dom-gpu-requestadapter. DOM requires an abortable
+promise API to reject with the caller's abort reason. Native requestAdapter has
+no cancellation parameter, so the caller's wait is cancelled without changing
+that native operation. Compared the existing range/precision approach against
+Paul E. Debevec and Jitendra Malik, Recovering High Dynamic Range Radiance Maps
+from Photographs (SIGGRAPH 1997), https://www.pauldebevec.com/Research/HDR/debevec-siggraph97.pdf:
+scene radiance is not interchangeable with a clamped display value. No implicit
+tone mapping is added. The cancellation helper retains no global operation owner;
+installation checks the current owner again after awaiting the native probe.
+Controlled promises test late native completion, two simultaneous installers,
+per-caller cancellation and listener release without wall-clock assertions. No
+companion code, rival implementation or external repository file was read.
+
+Lower-tier post precision follow-up (2026-11-09): compared Louis Bavoil, Miguel
+Sainz and Rouslan Dimitrov, Image-Space Horizon-Based Ambient Occlusion (2008),
+https://rdimitrov.twistedsanity.net/HBAO_SIGGRAPH08.pdf (author-hosted paper),
+and Louis Bavoil and Miguel Sainz, Image-Space Horizon-Based Ambient Occlusion
+(SIGGRAPH 2008 presentation),
+https://developer.download.nvidia.com/presentations/2008/SIGGRAPH/HBAO_SIG08b.pdf,
+with Erik Reinhard, Michael Stark, Peter Shirley and James Ferwerda,
+Photographic Tone Reproduction for Digital Images (2002),
+https://www-old.cs.utah.edu/docs/techreports/2002/pdf/UUCS-02-001.pdf.
+Screen-space occlusion depends on geometric depth and orientation; HDR display
+mapping depends on radiance before mapping. UNORM substitution cannot preserve
+signed geometry buffers or radiance above one. The device still offers LDR
+targets, but the owning PostStack, Bloom and SSAO initialization paths refuse
+them where their measured outputs exceed the existing parity rule. The shared
+requirement helper carries no renderer dependency. No paper algorithm changed,
+no rival source or companion code was read, and no tolerance was relaxed.

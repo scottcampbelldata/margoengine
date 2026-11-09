@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { ditherShader } from '../../shared/dither.js';
 import { SceneTarget } from '../../shared/msaa.js';
-import { compatibilityLevel } from '../../shared/compat.js';
+import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -259,6 +259,7 @@ export class Bloom implements EnginePlugin {
     this.initialize(engine.gpu);
   }
   private initialize(device: GPUDevice): void {
+    requireCompatTier(device, 'Bloom HDR processing', 'half-float');
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
     const module = device.createShaderModule({ code: chain });

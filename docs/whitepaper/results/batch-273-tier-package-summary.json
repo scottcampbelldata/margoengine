@@ -1,0 +1,228 @@
+{
+  "status": "passed scoped scenes",
+  "fullPackageMatrixComplete": false,
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "method": "Retained passing rows plus failed-scene-only repairs; fixed parity rule share<=0.001 and mean<=0.25; tested, linked setup refusals for measured misses. No failed row is counted as a passing image.",
+  "sources": [
+    "batch-273-tier-packages-initial.json",
+    "batch-273-tier-packages-standalone-initial.json",
+    "batch-273-tier-packages-post.json",
+    "batch-273-tier-packages-standalone.json"
+  ],
+  "rows": [
+    {
+      "name": "core alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "core alone",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "shadows",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "shadows",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "virtual shadows soft",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "virtual shadows soft",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createMesh",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createMesh",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createInstancedMesh",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createInstancedMesh",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "culling",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "culling",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom and tonemap",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom and tonemap",
+      "tier": "ldr",
+      "refusal": {
+        "name": "MargoError",
+        "code": "unsupported",
+        "message": "PostStack HDR/display effects requires the half-float compatibility tier; this device is ldr; see https://margoengine.com/errors#compatibility-layer"
+      }
+    },
+    {
+      "name": "post bloom alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom alone",
+      "tier": "ldr",
+      "refusal": {
+        "name": "MargoError",
+        "code": "unsupported",
+        "message": "Bloom HDR processing requires the half-float compatibility tier; this device is ldr; see https://margoengine.com/errors#compatibility-layer"
+      }
+    },
+    {
+      "name": "post ssao alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0.008544921875,
+      "max": 1,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post ssao alone",
+      "tier": "ldr",
+      "refusal": {
+        "name": "MargoError",
+        "code": "unsupported",
+        "message": "SSAO geometry/HDR processing requires the half-float compatibility tier; this device is ldr; see https://margoengine.com/errors#compatibility-layer"
+      }
+    },
+    {
+      "name": "post LDR FXAA",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 428,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post LDR FXAA",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 428,
+      "errors": [],
+      "gl": 0
+    }
+  ]
+}

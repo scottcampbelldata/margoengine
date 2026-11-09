@@ -168,7 +168,7 @@ const sampleCopy = async (device) => {
 };
 
 /** Each one sets up a scene on the engine; the check draws three frames and looks for an error or a blank canvas. */
-const PACKAGES = {
+export const PACKAGES = {
   'core alone': (engine) => scene(engine),
   shadows(engine) {
     const shadows = Shadows.attach(engine, { resolution: 256, distance: 20 });

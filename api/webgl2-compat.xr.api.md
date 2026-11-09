@@ -112,6 +112,7 @@ interface ColorAttachment {
 class CompatAdapter {
     readonly capabilities: WebGL2Capabilities;
     readonly cpuWorkBudget: number;
+    readonly tierFormats?: TierFormats | undefined;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -122,7 +123,8 @@ class CompatAdapter {
     };
     readonly isFallbackAdapter = false;
     constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
-    cpuWorkBudget?: number);
+    cpuWorkBudget?: number,
+    tierFormats?: TierFormats | undefined);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 
@@ -468,6 +470,7 @@ class CompatTexture {
     readonly format: GPUTextureFormat;
     readonly usage: number;
     readonly info: FormatInfo;
+    readonly storageInfo: FormatInfo;
     readonly target: number;
     readonly texture: WebGLTexture | null;
     readonly primary: TextureStorage | null;
@@ -1115,6 +1118,18 @@ interface TextureType {
     readonly sampled?: ScalarType;
     readonly format?: string;
     readonly access?: AccessMode;
+}
+
+interface TierFormats {
+    target(info: FormatInfo, usage: number): FormatInfo;
+    upload(logical: FormatInfo, physical: FormatInfo, bytes: Uint8Array<ArrayBuffer>): {
+        info: FormatInfo;
+        bytes: Uint8Array<ArrayBuffer>;
+    };
+    fragment(source: string, targets: readonly (GPUColorTargetState | null)[], outputs: readonly {
+        readonly location: number;
+    }[]): string;
+    store(expression: string, format: GPUTextureFormat): string;
 }
 
 type Type = ScalarType | VectorType | MatrixType | ArrayType | StructType | AtomicType | PointerType | SamplerType | TextureType | VoidType;

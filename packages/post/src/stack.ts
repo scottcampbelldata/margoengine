@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
-import { compatibilityLevel } from '../../shared/compat.js';
+import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -30,7 +30,8 @@ const captureFormat = (d: GPUDevice, samples: number): GPUTextureFormat =>
  * display effect the last HDR effect tonemaps as it does alone. The stack attaches, restores and disposes its effects.
  * @throws TypeError when `effects` is empty, repeats a name, holds an effect that cannot join or holds both SMAA and
  * FXAA; RangeError when they are out of order (HDR, display, LDR); MargoError `'attached'` when an effect is already
- * attached or a capture owner is attached alone, `'unsupported'` on a WebGL engine or when another plugin replaced
+ * attached or a capture owner is attached alone, `'unsupported'` on a WebGL engine, for HDR/display effects on the
+ * LDR compatibility tier, or when another plugin replaced
  * core's lighting shader, `'disposed'` after `dispose()`. */
 export class PostStack implements EnginePlugin {
   readonly name = 'post:stack';
@@ -93,6 +94,7 @@ export class PostStack implements EnginePlugin {
         this.disposed ? 'disposed' : 'unsupported',
         'Attach a new PostStack on WebGPU; see https://margoengine.com/errors#webgpu',
       );
+    this.requireTier(engine.gpu);
     for (const name of owners)
       if (engine.hasPlugin(name))
         throw margoError('attached', `Add ${name} to the PostStack instead of attaching it alone`);
@@ -101,6 +103,10 @@ export class PostStack implements EnginePlugin {
       engine.use(effect);
       this.attached++;
     }
+  }
+  private requireTier(device: GPUDevice): void {
+    if (this.stages.some((stage) => stage.kind !== 'ldr'))
+      requireCompatTier(device, 'PostStack HDR/display effects', 'half-float');
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -217,6 +223,7 @@ export class PostStack implements EnginePlugin {
   }
   onDeviceRestored(): void {
     this.release();
+    if (this.engine?.gpu) this.requireTier(this.engine.gpu);
   }
   dispose(): void {
     if (this.disposed) return;

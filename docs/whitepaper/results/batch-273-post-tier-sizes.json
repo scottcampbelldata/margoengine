@@ -1,0 +1,316 @@
+{
+  "method": "Vite es2022 minified source, bare imports external; before from HEAD archive, after from worktree; gzip. distBefore: the same multi-entry Vite es2022/compactOutput build followed by the canonical size bundler; distAfter: current package build, same method. Core quality dependency uses the unchanged built core in both.",
+  "rows": [
+    {
+      "entry": ".",
+      "before": 41266,
+      "after": 41564,
+      "delta": 298,
+      "distBefore": 41718,
+      "distAfter": 41984,
+      "distDelta": 266
+    },
+    {
+      "entry": "./bloom",
+      "before": 6747,
+      "after": 6968,
+      "delta": 221,
+      "distBefore": 6749,
+      "distAfter": 6967,
+      "distDelta": 218
+    },
+    {
+      "entry": "./ssao",
+      "before": 9225,
+      "after": 9437,
+      "delta": 212,
+      "distBefore": 9579,
+      "distAfter": 9789,
+      "distDelta": 210
+    },
+    {
+      "entry": "./scene-fade",
+      "before": 2852,
+      "after": 2852,
+      "delta": 0,
+      "distBefore": 2849,
+      "distAfter": 2849,
+      "distDelta": 0
+    },
+    {
+      "entry": "./stack",
+      "before": 4002,
+      "after": 4245,
+      "delta": 243,
+      "distBefore": 3996,
+      "distAfter": 4239,
+      "distDelta": 243
+    },
+    {
+      "entry": "./fxaa",
+      "before": 4642,
+      "after": 4642,
+      "delta": 0,
+      "distBefore": 4633,
+      "distAfter": 4633,
+      "distDelta": 0
+    },
+    {
+      "entry": "./decals",
+      "before": 4809,
+      "after": 4809,
+      "delta": 0,
+      "distBefore": 5243,
+      "distAfter": 5243,
+      "distDelta": 0
+    },
+    {
+      "entry": "./ssr",
+      "before": 12528,
+      "after": 12774,
+      "delta": 246,
+      "distBefore": 12892,
+      "distAfter": 13137,
+      "distDelta": 245
+    },
+    {
+      "entry": "./gtao",
+      "before": 11556,
+      "after": 11830,
+      "delta": 274,
+      "distBefore": 11917,
+      "distAfter": 12183,
+      "distDelta": 266
+    },
+    {
+      "entry": "./ssgi",
+      "before": 12303,
+      "after": 12545,
+      "delta": 242,
+      "distBefore": 12671,
+      "distAfter": 12905,
+      "distDelta": 234
+    },
+    {
+      "entry": "./motion-blur",
+      "before": 7405,
+      "after": 7656,
+      "delta": 251,
+      "distBefore": 7757,
+      "distAfter": 8001,
+      "distDelta": 244
+    },
+    {
+      "entry": "./lens-flare",
+      "before": 6533,
+      "after": 6782,
+      "delta": 249,
+      "distBefore": 6528,
+      "distAfter": 6774,
+      "distDelta": 246
+    },
+    {
+      "entry": "./image",
+      "before": 11825,
+      "after": 12095,
+      "delta": 270,
+      "distBefore": 11876,
+      "distAfter": 12137,
+      "distDelta": 261
+    },
+    {
+      "entry": "./smaa",
+      "before": 6178,
+      "after": 6178,
+      "delta": 0,
+      "distBefore": 6173,
+      "distAfter": 6173,
+      "distDelta": 0
+    },
+    {
+      "entry": "./glitch",
+      "before": 6189,
+      "after": 6440,
+      "delta": 251,
+      "distBefore": 6186,
+      "distAfter": 6429,
+      "distDelta": 243
+    },
+    {
+      "entry": "./afterimage",
+      "before": 5600,
+      "after": 5844,
+      "delta": 244,
+      "distBefore": 5596,
+      "distAfter": 5839,
+      "distDelta": 243
+    },
+    {
+      "entry": "./outline",
+      "before": 6031,
+      "after": 6277,
+      "delta": 246,
+      "distBefore": 6026,
+      "distAfter": 6270,
+      "distDelta": 244
+    },
+    {
+      "entry": "./mrt",
+      "before": 3618,
+      "after": 3618,
+      "delta": 0,
+      "distBefore": 3608,
+      "distAfter": 3608,
+      "distDelta": 0
+    },
+    {
+      "entry": "./depth",
+      "before": 3750,
+      "after": 3750,
+      "delta": 0,
+      "distBefore": 3739,
+      "distAfter": 3739,
+      "distDelta": 0
+    },
+    {
+      "entry": "./contact-shadows",
+      "before": 5945,
+      "after": 6192,
+      "delta": 247,
+      "distBefore": 6363,
+      "distAfter": 6609,
+      "distDelta": 246
+    },
+    {
+      "entry": "./sss",
+      "before": 6553,
+      "after": 6801,
+      "delta": 248,
+      "distBefore": 6974,
+      "distAfter": 7221,
+      "distDelta": 247
+    },
+    {
+      "entry": "./anamorphic",
+      "before": 6294,
+      "after": 6544,
+      "delta": 250,
+      "distBefore": 6295,
+      "distAfter": 6543,
+      "distDelta": 248
+    },
+    {
+      "entry": "./blur",
+      "before": 5954,
+      "after": 6202,
+      "delta": 248,
+      "distBefore": 5947,
+      "distAfter": 6197,
+      "distDelta": 250
+    },
+    {
+      "entry": "./lens",
+      "before": 6628,
+      "after": 6879,
+      "delta": 251,
+      "distBefore": 6631,
+      "distAfter": 6879,
+      "distDelta": 248
+    },
+    {
+      "entry": "./material-decals",
+      "before": 7840,
+      "after": 8092,
+      "delta": 252,
+      "distBefore": 8325,
+      "distAfter": 8577,
+      "distDelta": 252
+    }
+  ],
+  "changes": [
+    {
+      "key": "@margoengine/post/ssao",
+      "previousCeiling": 9601,
+      "before": 9579,
+      "after": 9789,
+      "ceiling": 10083
+    },
+    {
+      "key": "@margoengine/post/stack",
+      "previousCeiling": 4001,
+      "before": 3996,
+      "after": 4239,
+      "ceiling": 4495
+    },
+    {
+      "key": "@margoengine/post/gtao",
+      "previousCeiling": 11961,
+      "before": 11917,
+      "after": 12183,
+      "ceiling": 12549
+    },
+    {
+      "key": "@margoengine/post/motion-blur",
+      "previousCeiling": 7762,
+      "before": 7757,
+      "after": 8001,
+      "ceiling": 8257
+    },
+    {
+      "key": "@margoengine/post/lens-flare",
+      "previousCeiling": 6549,
+      "before": 6528,
+      "after": 6774,
+      "ceiling": 7030
+    },
+    {
+      "key": "@margoengine/post/image",
+      "previousCeiling": 11882,
+      "before": 11876,
+      "after": 12137,
+      "ceiling": 12502
+    },
+    {
+      "key": "@margoengine/post/glitch",
+      "previousCeiling": 6211,
+      "before": 6186,
+      "after": 6429,
+      "ceiling": 6685
+    },
+    {
+      "key": "@margoengine/post/afterimage",
+      "previousCeiling": 5619,
+      "before": 5596,
+      "after": 5839,
+      "ceiling": 6095
+    },
+    {
+      "key": "@margoengine/post/outline",
+      "previousCeiling": 6054,
+      "before": 6026,
+      "after": 6270,
+      "ceiling": 6526
+    },
+    {
+      "key": "@margoengine/post/contact-shadows",
+      "previousCeiling": 6389,
+      "before": 6363,
+      "after": 6609,
+      "ceiling": 6865
+    },
+    {
+      "key": "@margoengine/post/sss",
+      "previousCeiling": 7201,
+      "before": 6974,
+      "after": 7221,
+      "ceiling": 7477
+    },
+    {
+      "key": "@margoengine/post/material-decals",
+      "previousCeiling": 8550,
+      "before": 8325,
+      "after": 8577,
+      "ceiling": 8835
+    }
+  ]
+}

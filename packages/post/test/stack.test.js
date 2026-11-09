@@ -71,6 +71,55 @@ const restored = (h, before) => {
   for (const key of ['color', 'depth', 'format', 'descriptor'])
     assert.equal(h.view.c[key], before[key], key + ' not restored');
 };
+
+test('HDR and display stacks refuse LDR before attaching effects or allocating GPU resources; LDR effects still work', () => {
+  for (const kind of ['hdr', 'display']) {
+    const h = harness();
+    h.engine.gpu.adapter = { capabilities: { tier: 'ldr' } };
+    const effect = fake('precision requirement', kind, []);
+    assert.throws(
+      () => h.engine.use(new PostStack([effect])),
+      (error) =>
+        error.name === 'MargoError' &&
+        error.code === 'unsupported' &&
+        /PostStack HDR\/display effects.*half-float.*ldr.*https:\/\//.test(error.message),
+    );
+    assert.equal(h.plugins.size, 0);
+    assert.equal(h.resources.length, 0);
+  }
+  for (const tier of ['full', 'half-float']) {
+    const h = harness();
+    h.engine.gpu.adapter = { capabilities: { tier } };
+    h.engine.use(new PostStack([fake('HDR', 'hdr', [])]));
+    h.frame();
+    assert.ok(h.resources.length > 0);
+    h.engine.removePlugin('post:stack');
+    assert.equal(h.live().length, 0);
+  }
+  const ldr = harness();
+  ldr.engine.gpu.adapter = { capabilities: { tier: 'ldr' } };
+  ldr.engine.use(new PostStack([fake('LDR', 'ldr', [])]));
+  ldr.frame();
+  assert.ok(ldr.resources.length > 0);
+  ldr.engine.removePlugin('post:stack');
+  assert.equal(ldr.live().length, 0);
+});
+
+test('restoring an HDR stack onto LDR releases its old resources and refuses before another capture', () => {
+  const h = harness();
+  h.engine.use(new PostStack([fake('HDR', 'hdr', [])]));
+  h.frame();
+  assert.ok(h.live().length > 0);
+  const allocations = h.resources.length;
+  h.engine.gpu.adapter = { capabilities: { tier: 'ldr' } };
+  assert.throws(
+    () => h.engine.restore(),
+    (error) => error.code === 'unsupported',
+  );
+  assert.equal(h.live().length, 0);
+  assert.equal(h.resources.length, allocations);
+  h.engine.removePlugin('post:stack');
+});
 /** A stackable test double that logs what the stack hands it. */
 function fake(name, kind, log, own) {
   return {

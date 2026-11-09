@@ -1,0 +1,140 @@
+{
+  "status": "validation checkpoint, job 1 not complete",
+  "baseCommit": "5b7877b3b2fb04eb4ba0f3e9fd02d0588c53bca0",
+  "uncommitted": true,
+  "sourceMethod": "Vite minified es2022 source entries, bare package imports external, all dynamic chunks included, gzip",
+  "sourceRows": [
+    {
+      "entry": "index",
+      "before": 103015,
+      "after": 104994,
+      "delta": 1979,
+      "distAfter": 105094
+    },
+    {
+      "entry": "device",
+      "before": 103405,
+      "after": 105541,
+      "delta": 2136,
+      "distAfter": 105137
+    },
+    {
+      "entry": "compute",
+      "before": 48328,
+      "after": 48328,
+      "delta": 0,
+      "distAfter": 48353
+    },
+    {
+      "entry": "glsl",
+      "before": 42827,
+      "after": 42827,
+      "delta": 0,
+      "distAfter": 42827
+    },
+    {
+      "entry": "wgsl",
+      "before": 26476,
+      "after": 26476,
+      "delta": 0,
+      "distAfter": 26476
+    },
+    {
+      "entry": "xr",
+      "before": 101068,
+      "after": 105397,
+      "delta": 4329,
+      "distAfter": 104943
+    },
+    {
+      "entry": "preview",
+      "before": 3532,
+      "after": 3532,
+      "delta": 0,
+      "distAfter": 3533
+    },
+    {
+      "entry": "pick",
+      "before": 4883,
+      "after": 4883,
+      "delta": 0,
+      "distAfter": 4886
+    },
+    {
+      "entry": "restore",
+      "before": 850,
+      "after": 850,
+      "delta": 0,
+      "distAfter": 850
+    },
+    {
+      "entry": "auto",
+      "before": 3809,
+      "after": 3809,
+      "delta": 0,
+      "distAfter": 3810
+    },
+    {
+      "entry": "tiers",
+      "before": 0,
+      "after": 105500,
+      "delta": 105500,
+      "distAfter": 104830
+    }
+  ],
+  "coreStage": {
+    "raw": 59077,
+    "gzip": 23924
+  },
+  "priorCeilingChanges": [
+    {
+      "key": "@margoengine/webgl2-compat",
+      "previousCeiling": 102814,
+      "measured": 104800,
+      "ceiling": 107944
+    },
+    {
+      "key": "@margoengine/webgl2-compat/device",
+      "previousCeiling": 102935,
+      "measured": 104910,
+      "ceiling": 108058
+    },
+    {
+      "key": "@margoengine/webgl2-compat/xr",
+      "previousCeiling": 103981,
+      "measured": 104675,
+      "ceiling": 107816
+    },
+    {
+      "key": "@margoengine/webgl2-compat/tiers",
+      "previousCeiling": 0,
+      "measured": 104542,
+      "ceiling": 107679
+    },
+    {
+      "key": "@margoengine/webgl2-compat base (without compute runtime and read-back)",
+      "previousCeiling": 72383,
+      "measured": 73665,
+      "ceiling": 75875
+    }
+  ],
+  "builtMethod": "Vite minify es2022 dist entries, bare package imports external, all chunks included, gzip default",
+  "builtRows": {
+    "index": 105094,
+    "device": 105137,
+    "compute": 48353,
+    "glsl": 42827,
+    "wgsl": 26476,
+    "xr": 104943,
+    "preview": 3533,
+    "pick": 4886,
+    "restore": 850,
+    "auto": 3810,
+    "tiers": 104830
+  },
+  "limitations": [
+    "Extension masks on NVIDIA RTX A6000 D3D11, not physical lower-tier hardware",
+    "Full package image/refusal and real browser matrix not complete",
+    "No speed measurements or rival performance claims"
+  ]
+}

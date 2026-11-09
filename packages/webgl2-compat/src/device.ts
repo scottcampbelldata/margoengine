@@ -2,7 +2,7 @@
 // the root entry's install(). Written clean room from the W3C WebGPU and WGSL specifications and the Khronos WebGL 2.0,
 // OpenGL ES 3.0 and GLSL ES 3.00 specifications. Nothing runs at import time: globals change only in installCompat().
 import { fault } from '../../shared/errors.js';
-import { probeWebGL2, type InstallOptions, type InstallResult } from './index.js';
+import { waitFor, probeWebGL2, type InstallOptions, type InstallResult } from './index.js';
 import { CompatCanvasContext } from './device/canvas.js';
 import {
   COMPAT_VENDOR,
@@ -134,32 +134,57 @@ const INTERFACES: Record<string, unknown> = {
 type Restore = () => void;
 let installed: { gpu: CompatGPU; restore: Restore[] } | null = null;
 
+function alreadyInstalled(): InstallResult | null {
+  return installed ? { installed: true, reason: 'already', gpu: installed.gpu } : null;
+}
+
 /** @internal The root entry's install(): see its documentation. */
 export async function installCompat(options: InstallOptions = {}): Promise<InstallResult> {
-  if (installed) return { installed: true, reason: 'already', gpu: installed.gpu };
+  options.signal?.throwIfAborted();
+  const ranks = { ldr: 0, 'half-float': 1, full: 2 };
+  const minimum = options.minimumTier ?? 'full';
+  if (!Object.hasOwn(ranks, minimum)) throw new TypeError('minimumTier must be full, half-float or ldr');
+  const initial = alreadyInstalled();
+  if (initial) return initial;
   const nav = (globalThis as { navigator?: Navigator & { gpu?: GPU } }).navigator;
   if (!nav) throw new TypeError('install() needs navigator');
   if (!options.force && nav.gpu) {
-    const adapter = await nav.gpu.requestAdapter().catch(() => null);
+    const adapter = await waitFor(
+      nav.gpu.requestAdapter().catch(() => null),
+      options.signal,
+    );
+    options.signal?.throwIfAborted();
+    // Another installation can finish while this caller awaits the native adapter.
+    const concurrent = alreadyInstalled();
+    if (concurrent) return concurrent;
     if (adapter) {
-      console.warn(
-        fault(
-          'state',
-          "WebGPU kept; use force: true, backend 'webgpu'",
-          'compatibility-layer',
-        ),
-      );
+      console.warn(fault('state', "WebGPU kept; use force: true, backend 'webgpu'", 'compatibility-layer'));
       return { installed: false, reason: 'webgpu' };
     }
   }
-  const caps = probeWebGL2();
-  if (!caps) throw fault('unsupported', 'WebGPU and WebGL2 unavailable', 'compatibility-layer');
-  if (!caps.supported)
+  const caps = probeWebGL2(
+    options.createContext
+      ? { canvas: { getContext: (_type, attributes) => options.createContext?.(attributes ?? {}) } }
+      : {},
+  );
+  options.signal?.throwIfAborted();
+  if (!caps) throw fault('unsupported', 'This browser has neither WebGPU nor WebGL2', 'compatibility-layer');
+  if (!caps.highpFragment || ranks[caps.tier] < ranks[minimum]) {
+    const missing: string[] = [];
+    if (!caps.highpFragment) missing.push('highp-fragment');
+    if (minimum === 'full' && !caps.extensions.EXT_color_buffer_float) missing.push('EXT_color_buffer_float');
+    if (
+      minimum === 'half-float' &&
+      !caps.extensions.EXT_color_buffer_float &&
+      !caps.extensions.EXT_color_buffer_half_float
+    )
+      missing.push('EXT_color_buffer_half_float');
     throw fault(
       'unsupported',
-      `WebGL2 lacks ${caps.missing.join(', ')}`,
+      `This browser's WebGL2 is below the ${minimum} compatibility minimum: missing ${missing.join(', ')}`,
       'compatibility-layer',
     );
+  }
   const gpu = new CompatGPU(options);
   const restore: Restore[] = [];
   const own = Object.getOwnPropertyDescriptor(nav, 'gpu');

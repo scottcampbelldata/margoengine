@@ -2127,3 +2127,24 @@ recomposition, caller tolerance behavior and rejection of non-finite column
 lengths/determinants. This restores usability and the documented failure contract;
 it makes no speed or general affine/polar-decomposition claim. Sources and
 limits are in docs/size-restore.md and docs/limits.md.
+
+### Batch 273: scoped lower-tier device evidence
+
+The lower-tier device probes cover seven requested float target formats, exact
+logical readback bytes, uploads, same-storage and cross-usage copies, sample-only float32 range and
+precision, mip/array views, four-sample resolve, additive blending and fragment/CPU
+compute stores. Extensions are masked on a real GPU; this does not establish a
+physical-browser matrix or arbitrary package parity. The independent physical
+UNORM blend control matches exactly, including the driver-selected 127/255 tie.
+The retained core compatibility test reports zero pixel differences against native
+WebGPU, identical picking and device restoration, and 32 bit-identical WGSL semantic
+cases. Scoped raw device evidence is retained in results/batch-273-tier-device.json.
+No benchmark, speed claim, rival win or completed parity batch is claimed.
+
+The package scene evidence now includes ten original scenes (20 lower-tier rows)
+in results/batch-273-tier-package-summary.json. Seventeen rows meet the unchanged
+image rule; three LDR rows have measured, tested linked setup refusals: the
+Bloom/Tonemap stack, standalone Bloom and standalone SSAO. LDR-only FXAA remains
+pixel-identical. Half-float SSAO has mean 0.008544921875 and maximum 1; the other
+accepted scoped rows are identical. Original failures and failed-scene-only
+repairs are retained separately. This is not an all-package parity claim.

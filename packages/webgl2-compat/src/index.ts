@@ -2,13 +2,29 @@
 // (docs/webgl2-compat-roadmap.md, "Minimum tier"). Nothing runs at import time; the WGSL front end is a separate entry
 // so an app that only probes never loads it. Written from the WebGL 2.0 and OpenGL ES 3.0 specifications.
 
+/** @internal Stops one caller's wait without cancelling a module load or native adapter request owned by others. */
+export async function waitFor<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
+  if (!signal) return pending;
+  let stop: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    stop = () => reject(signal.reason);
+    signal.addEventListener('abort', stop, { once: true });
+  });
+  try {
+    return await Promise.race([pending, aborted]);
+  } finally {
+    signal.removeEventListener('abort', stop!);
+  }
+}
+
 /**
  * The tier a WebGL2 context reaches.
  * - `full`: renderable float colour targets (`EXT_color_buffer_float`) and high precision in fragment shaders. The
- *   only tier the compatibility layer renders on.
- * - `half-float`: half-float targets only (`EXT_color_buffer_half_float`). Below the minimum: use the
- *   `@margoengine/webgl2-compat/preview` preview on these devices.
- * - `ldr`: 8-bit targets only, or no high precision in fragment shaders. Below the minimum, as above.
+ *   default minimum for `install()`.
+ * - `half-float`: half-float targets only (`EXT_color_buffer_half_float`). The optional `/tiers` entry permits these.
+ * - `ldr`: 8-bit targets only, or no high precision in fragment shaders. `/tiers` permits 8-bit targets; a context
+ *   without highp fragment precision is still refused, since the layer runs WGSL f32 and integer arithmetic.
  */
 export type CompatTier = 'full' | 'half-float' | 'ldr';
 
@@ -156,6 +172,10 @@ export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities {
 
 /** Options for {@link install}. */
 export interface InstallOptions {
+  /** Cancels this installation's waits before global changes. Default none; rejects with the signal's reason. */
+  readonly signal?: AbortSignal;
+  /** Lowest permitted device tier. Default `full`; `/tiers` opts into `ldr` and reports target substitutions. */
+  readonly minimumTier?: CompatTier;
   /** Install even where WebGPU works (for testing the layer on a WebGPU browser). Default false. */
   readonly force?: boolean;
   /**
@@ -193,11 +213,13 @@ let device: typeof import('./device.js') | undefined;
  * never downloads them.
  * @param options See {@link InstallOptions}.
  * @returns What was done; see {@link InstallResult}.
- * @throws MargoError code `unsupported` when the browser has no WebGL2 at the `full` tier (the message names what is
- *   missing); keep the `@margoengine/webgl2-compat/preview` preview for those browsers.
+ * @throws MargoError code `unsupported` when WebGL2 is below `minimumTier` (default `full`) or lacks highp fragment
+ *   precision. The optional `/tiers` entry opts into lower tiers and documents their target precision.
  */
 export async function install(options: InstallOptions = {}): Promise<InstallResult> {
-  device ??= await import('./device.js');
+  options.signal?.throwIfAborted();
+  device ??= await waitFor(import('./device.js'), options.signal);
+  options.signal?.throwIfAborted();
   return device.installCompat(options);
 }
 

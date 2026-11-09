@@ -250,6 +250,20 @@ export class CompatRenderPipeline {
       device.validationError(this.failure);
       return;
     }
+    if (device.adapter.tierFormats) {
+      const fragment = this.glsl.fragment;
+      this.glsl = {
+        ...this.glsl,
+        fragment: {
+          ...fragment,
+          source: device.adapter.tierFormats.fragment(
+            fragment.source,
+            [...(descriptor.fragment?.targets ?? [])],
+            fragment.outputs,
+          ),
+        },
+      };
+    }
     if (!explicit) this.layouts = autoLayouts(this.glsl);
     for (const [slot, layout] of [...(descriptor.vertex.buffers ?? [])].entries()) {
       if (!layout) continue;
@@ -943,7 +957,7 @@ export class Replayer {
       return {
         key: `r${t.id}`,
         owner: t,
-        info: t.info,
+        info: t.storageInfo,
         level: 0,
         attach: (point) => gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, point, gl.RENDERBUFFER, t.renderbuffer),
       };
@@ -1091,11 +1105,35 @@ export class Replayer {
     const slices = from.target === gl.TEXTURE_3D ? depth : 1;
     for (let z = 0; z < slices; z++) {
       const a = from.target === gl.TEXTURE_3D ? z : layer;
-      if (from.info.internal === to.info.internal) this.blit(this.sub(from, level, a), this.sub(to, level, a));
+      if (this.tierCopy(from, to)) {
+        (this.device.readback as NonNullable<CompatDevice['readback']>).copyTierStorage(
+          this,
+          from,
+          to,
+          level,
+          level,
+          [0, 0, a],
+          [0, 0, a],
+          [w, h, 1],
+          true,
+        );
+      } else if (from.info.internal === to.info.internal) this.blit(this.sub(from, level, a), this.sub(to, level, a));
       else this.rawCopy(this.sub(from, level, a), to, level, a, [0, 0, w, h], [0, 0]);
     }
     this.rebind();
   };
+
+  private tierCopy(from: TextureStorage, to: TextureStorage): boolean {
+    const policy = this.device.adapter.tierFormats;
+    return (
+      !!policy &&
+      from.texture.info.kind === 'float' &&
+      from.texture.info.name.includes('float') &&
+      (from.info.internal !== to.info.internal ||
+        policy.target(from.info, 16) !== from.info ||
+        policy.target(to.info, 16) !== to.info)
+    );
+  }
 
   /** Binds the running pass's framebuffer again after a copy or resolve bound another. */
   rebind(): void {
@@ -1114,7 +1152,7 @@ export class Replayer {
     const to: Sub = {
       key: `q${t.id}`,
       owner: t,
-      info: t.info,
+      info: t.storageInfo,
       level: 0,
       attach: (point) => gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, resolved, 0),
     };
@@ -1886,6 +1924,19 @@ export class Replayer {
       b3 = b.dimension === '3d';
     a.read(from, fromLevel, 1, a3 ? 0 : sz, a3 ? 1 : depth, this.sync);
     b.read(to, toLevel, 1, b3 ? 0 : dz, b3 ? 1 : depth, this.sync);
+    if (this.tierCopy(from, to)) {
+      (this.device.readback as NonNullable<CompatDevice['readback']>).copyTierStorage(
+        this,
+        from,
+        to,
+        fromLevel,
+        toLevel,
+        [sx, sy, sz],
+        [dx, dy, dz],
+        [w, h, depth],
+      );
+      return;
+    }
     for (let i = 0; i < depth; i++) {
       const src = this.sub(from, fromLevel, sz + i);
       if (a.info.internal === b.info.internal) this.blit(src, this.sub(to, toLevel, dz + i), sx, sy, w, h, dx, dy);
@@ -1931,6 +1982,7 @@ export function writeTexture(
   data: Uint8Array,
   layout: GPUTexelCopyBufferLayout,
   size: GPUExtent3D,
+  storage?: TextureStorage,
 ): void {
   const gl = device.gl,
     t = destination.texture as CompatTexture,
@@ -1944,12 +1996,12 @@ export function writeTexture(
   const [w, h, depth] = extent(size),
     [x, y, z] = origin(destination.origin);
   const level = destination.mipLevel ?? 0;
-  const rowBytes = w * info.bytes,
-    bytesPerRow = layout.bytesPerRow ?? rowBytes,
+  let rowBytes = w * info.bytes;
+  const bytesPerRow = layout.bytesPerRow ?? rowBytes,
     rowsPerImage = layout.rowsPerImage ?? h,
     offset = layout.offset ?? 0;
   // Tight rows in GL's order: WebGPU's bytesPerRow need not be a whole number of texels, and bgra swaps channels.
-  const tight = new Uint8Array(rowBytes * h * depth);
+  let tight = new Uint8Array(rowBytes * h * depth);
   for (let layer = 0; layer < depth; layer++)
     for (let row = 0; row < h; row++) {
       const from = offset + layer * bytesPerRow * rowsPerImage + row * bytesPerRow;
@@ -1961,16 +2013,24 @@ export function writeTexture(
       tight[i] = tight[i + 2];
       tight[i + 2] = r;
     }
-  beforeUpload(device, t, level, z, depth);
-  device.state.scratch(t.target, t.texture);
-  const format = device.enum(info.format),
-    type = device.enum(info.type);
-  const pixels = TYPED[info.type](tight.buffer, 0, tight.byteLength);
-  if (t.target === gl.TEXTURE_2D) gl.texSubImage2D(gl.TEXTURE_2D, level, x, y, w, h, format, type, pixels);
-  else if (t.target === gl.TEXTURE_CUBE_MAP)
+  const upload = device.adapter.tierFormats?.upload(info, storage?.info ?? t.storageInfo, tight) ?? {
+    info,
+    bytes: tight,
+  };
+  tight = upload.bytes;
+  const stored = upload.info;
+  rowBytes = w * stored.bytes;
+  if (!storage) beforeUpload(device, t, level, z, depth);
+  const target = storage?.target ?? t.target;
+  device.state.scratch(target, storage?.gl ?? t.texture);
+  const format = device.enum(stored.format),
+    type = device.enum(stored.type);
+  const pixels = TYPED[stored.type](tight.buffer, 0, tight.byteLength);
+  if (target === gl.TEXTURE_2D) gl.texSubImage2D(gl.TEXTURE_2D, level, x, y, w, h, format, type, pixels);
+  else if (target === gl.TEXTURE_CUBE_MAP)
     for (let layer = 0; layer < depth; layer++)
       gl.texSubImage2D(
-        gl.TEXTURE_CUBE_MAP_POSITIVE_X + z + layer,
+        gl.TEXTURE_CUBE_MAP_POSITIVE_X + z + layer - (storage?.layer ?? 0),
         level,
         x,
         y,
@@ -1978,10 +2038,10 @@ export function writeTexture(
         h,
         format,
         type,
-        TYPED[info.type](tight.buffer, layer * rowBytes * h, rowBytes * h),
+        TYPED[stored.type](tight.buffer, layer * rowBytes * h, rowBytes * h),
       );
-  else gl.texSubImage3D(t.target, level, x, y, z, w, h, depth, format, type, pixels);
-  afterUpload(t, level, z, depth);
+  else gl.texSubImage3D(target, level, x, y, z - (storage?.layer ?? 0), w, h, depth, format, type, pixels);
+  if (!storage) afterUpload(t, level, z, depth);
 }
 
 /** writeTexture into a block-compressed texture: whole blocks, uploaded as they are (compressedTexSubImage). */
@@ -2044,7 +2104,7 @@ export function copyExternalImage(
 ): void {
   const gl = device.gl,
     t = destination.texture as CompatTexture,
-    info = t.info;
+    info = t.storageInfo;
   if (!t.texture || info.kind !== 'float' || !info.renderable)
     throw device.unsupported(`copying an image into a ${info.name} texture`);
   const [w, h] = extent(size),

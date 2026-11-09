@@ -1,0 +1,163 @@
+{
+  "status": "differs",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "rows": [
+    {
+      "name": "core alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "core alone",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "shadows",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "shadows",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "virtual shadows soft",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "virtual shadows soft",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createMesh",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createMesh",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createInstancedMesh",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "materials createInstancedMesh",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "culling",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "culling",
+      "tier": "ldr",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 484,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom and tonemap",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom and tonemap",
+      "tier": "ldr",
+      "share": 0.05322265625,
+      "mean": 2.09423828125,
+      "max": 6,
+      "lit": 579,
+      "errors": [],
+      "gl": 0
+    }
+  ]
+}

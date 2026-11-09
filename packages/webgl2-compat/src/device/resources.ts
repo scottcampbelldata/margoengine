@@ -382,6 +382,8 @@ export class CompatTexture {
   readonly format: GPUTextureFormat;
   readonly usage: number;
   readonly info: FormatInfo;
+  /** Physical storage format; the public info and upload/copy layouts retain the logical format. */
+  readonly storageInfo: FormatInfo;
   /** GL texture target of the primary storage; 0 for a renderbuffer. */
   readonly target: number;
   /** The primary storage's GL texture (uploads, copies and render attachments of the texture's own format). */
@@ -408,13 +410,15 @@ export class CompatTexture {
     readonly device: CompatDevice,
     descriptor: GPUTextureDescriptor,
   ) {
-    const info = FORMATS.get(descriptor.format);
-    if (!info) throw device.unsupported(`texture format '${descriptor.format}'`);
+    const logical = FORMATS.get(descriptor.format);
+    if (!logical) throw device.unsupported(`texture format '${descriptor.format}'`);
+    const info = device.adapter.tierFormats?.target(logical, descriptor.usage) ?? logical;
     if (info.block && !device.features.has(info.block.feature))
       throw new TypeError(
         `A ${descriptor.format} texture needs the '${info.block.feature}' feature; request it in requestDevice({ requiredFeatures })`,
       );
-    this.info = info;
+    this.info = logical;
+    this.storageInfo = info;
     const size = descriptor.size as number[] | GPUExtent3DDict;
     const [w, h, d] = Array.isArray(size)
       ? [size[0], size[1] ?? 1, size[2] ?? 1]
@@ -551,7 +555,8 @@ export class CompatTexture {
     const key = `${format}:${target}:${layer}:${alias}`;
     let s = this.copies?.get(key);
     if (s) return s;
-    const info = FORMATS.get(format) as FormatInfo;
+    const logical = FORMATS.get(format) as FormatInfo;
+    const info = this.device.adapter.tierFormats?.target(logical, this.usage) ?? logical;
     if (!info.renderable || !this.info.renderable || this.info.kind === 'stencil')
       throw this.device.unsupported(
         `a ${format} ${target === p.target ? '' : 'layer or cube '}view of a ${this.format} texture, which WebGL2 would copy (${this.format} is not renderable there)`,

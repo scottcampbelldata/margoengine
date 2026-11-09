@@ -66,6 +66,7 @@ export interface CallStmt extends Span {
 export class CompatAdapter {
     readonly capabilities: WebGL2Capabilities;
     readonly cpuWorkBudget: number;
+    readonly tierFormats?: TierFormats | undefined;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -76,7 +77,8 @@ export class CompatAdapter {
     };
     readonly isFallbackAdapter = false;
     constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
-    cpuWorkBudget?: number);
+    cpuWorkBudget?: number,
+    tierFormats?: TierFormats | undefined);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 
@@ -269,6 +271,7 @@ export class CompatGPU {
 }
 
 export interface CompatGPUOptions {
+    readonly minimumTier?: CompatTier;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
     readonly cpuWorkBudget?: number;
 }
@@ -412,6 +415,7 @@ export class CompatTexture {
     readonly format: GPUTextureFormat;
     readonly usage: number;
     readonly info: FormatInfo;
+    readonly storageInfo: FormatInfo;
     readonly target: number;
     readonly texture: WebGLTexture | null;
     readonly primary: TextureStorage | null;
@@ -1231,6 +1235,8 @@ interface Helper {
 }
 
 interface InstallOptions {
+    readonly signal?: AbortSignal;
+    readonly minimumTier?: CompatTier;
     readonly force?: boolean;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
     readonly cpuWorkBudget?: number;
@@ -1387,6 +1393,18 @@ interface TextureStorage {
     readonly layers: number;
     have: Uint32Array | null;
     levels: string;
+}
+
+interface TierFormats {
+    target(info: FormatInfo, usage: number): FormatInfo;
+    upload(logical: FormatInfo, physical: FormatInfo, bytes: Uint8Array<ArrayBuffer>): {
+        info: FormatInfo;
+        bytes: Uint8Array<ArrayBuffer>;
+    };
+    fragment(source: string, targets: readonly (GPUColorTargetState | null)[], outputs: readonly {
+        readonly location: number;
+    }[]): string;
+    store(expression: string, format: GPUTextureFormat): string;
 }
 
 interface UniformSlot {

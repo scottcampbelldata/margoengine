@@ -2523,3 +2523,57 @@ No finite-input calculations or caller shear tolerances are changed. The caller
 still supplies an affine matrix; Infinity tolerance permits approximate rotation
 on sheared matrices, not an exact affine decomposition. No timing claim.
 Research, migration and regression evidence: [size restoration](size-restore.md).
+
+### Batch 273 lower compatibility tiers (device entry and proven packages)
+
+The optional webgl2-compat/tiers entry permits half-float and LDR devices explicitly;
+root install keeps its full-tier default. Highp fragment floats/ints remain required.
+Only render/storage colour targets are substituted. Half-float uses R16F/RG16F/
+RGBA16F, LDR uses R8/RG8/RGBA8, with three-channel packed HDR expanded to RGBA.
+The requested texture format and copy layout remain public; stored range/precision
+are those of the physical target. Sample-only float32 data is preserved, including
+negative and HDR values, and read back through integer framebuffer bit encodings.
+Unblended LDR stores round nearest with upward ties; blended outputs retain the
+hardware's permitted fixed-point conversion. No implicit tone mapping is performed.
+
+Device checks pass with masked extensions on the available GPU. This is not a
+physical half-float/LDR hardware result or a full package/browser matrix. Cross-usage float copies and view synchronization use one synchronous GPU readback
+stall per copied slice when GL cannot blit the physical storage. Lower-tier device
+creation loads the readback helper for those ordinary-render view copies. The full
+tier retains lazy readback loading. Exact cube-face and cross-usage copy probes pass.
+Remaining package picture gates and attach-time refusal wiring are tracked below. Core plus stage
+measures 23,924 B gzip, unchanged and below 25,000 B. Built and source entry measurements are recorded in
+whitepaper/results/batch-273-tier-sizes.json with the two methods distinguished.
+Only the optional entries and their base split raise ceilings; the shared device
+policy and correct float view copies avoid duplicating renderer resource ownership.
+
+The seven tier package scenes now measure core, shadows, virtual shadows, material
+meshes/instances, culling and a Bloom/Tonemap stack. All half-float images and the
+first six LDR images are pixel-identical to the full layer. The LDR HDR-stack
+capture differs at 5.322265625 percent of pixels by more than 2 channel units,
+mean maximum RGB difference 2.09423828125 and maximum 6. This exceeds the existing
+0.1 percent / 0.25 parity rule. PostStack therefore requires at least half-float
+for HDR/display stages at setup and after device restore, before new GPU resource
+allocation. LDR-only stacks remain allowed. This measured refusal does not cover
+standalone HDR effects or the rest of the package matrix. Original difference:
+whitepaper/results/batch-273-tier-packages-initial.json.
+
+Standalone Bloom and SSAO also require at least half-float before GPU allocation
+(Bloom includes encodeImage). Their original LDR errors are, respectively,
+5.322265625 percent over 2 / mean 1.685546875 / maximum 7, and
+14.1357421875 percent over 2 / mean 8.579345703125 / maximum 108. Half-float
+passes: Bloom is identical, SSAO has mean 0.008544921875 and maximum 1. LDR-only
+FXAA is identical on both lower tiers. The same checks apply on device restore
+after releasing old resources, including SSAO's GTAO subclass. Repaired refusal
+receipts and original failing images' metrics are retained under
+whitepaper/results/batch-273-tier-packages-standalone*.json.
+
+Tracked follow-up **T273-COVERAGE** (batch 273, after the 26 full-tier compat
+failures): remaining post effects and standalone Tonemap, TAA, DOF, transitions,
+glTF/glTF-pro, selection, sciviz, lines, points, text, environment, VFX, scatter,
+LOD, terrain, sky, scenery, OIT, splats, voxel, React and XR require per-feature
+half-float/LDR images and measured attach-time refusals. Other optional rendering
+entries remain uncovered until included. The landed scope is the device entry
+plus ten scenes (17 accepted lower-tier images and three measured LDR refusals),
+not complete package parity. Physical lower-tier hardware and cross-browser
+measurements remain separate outstanding evidence.

@@ -4,7 +4,8 @@
 // WebGPU; what the layer cannot do throws MargoError code `unsupported`.
 import type { CompatXR, CompatXROptions } from '../xr.js';
 import { fault } from '../../../shared/errors.js';
-import { webgl2Capabilities, type WebGL2Capabilities } from '../index.js';
+import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '../index.js';
+import type { TierFormats } from '../tiers.js';
 import { extensions, type Extensions, GLState } from './gl.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
@@ -33,6 +34,8 @@ export const COMPAT_VENDOR = 'margo-webgl2';
 
 /** Options for {@link CompatGPU}. */
 export interface CompatGPUOptions {
+  /** Lowest permitted device tier. Default `full`; use the `/tiers` entry to allow lower tiers. */
+  readonly minimumTier?: CompatTier;
   /**
    * Makes the WebGL2 context a device renders with. Default: a new `OffscreenCanvas` (or a detached `<canvas>`)
    * with `antialias: false`, so exact-pixel rendering stays exact; the layer multisamples itself when a pipeline
@@ -156,7 +159,13 @@ export class CompatGPU {
   }
 
   /** A WebGL2-backed adapter, or null when the browser has no WebGL2 at the `full` tier. */
-  requestAdapter(options: GPURequestAdapterOptions = {}): Promise<CompatAdapter | null> {
+  async requestAdapter(options: GPURequestAdapterOptions = {}): Promise<CompatAdapter | null> {
+    const ranks = { ldr: 0, 'half-float': 1, full: 2 };
+    const minimum = this.options.minimumTier ?? 'full';
+    if (!Object.hasOwn(ranks, minimum)) throw new TypeError('minimumTier must be full, half-float or ldr');
+    const budget = this.options.cpuWorkBudget ?? CPU_WORK_BUDGET;
+    if (!(budget > 0))
+      throw new RangeError('Invalid cpuWorkBudget; pass a positive number of invocations and loop iterations');
     if (options.forceFallbackAdapter) return Promise.resolve(null);
     const gl = (this.options.createContext ?? defaultContext)({
       ...ATTRIBUTES,
@@ -165,14 +174,12 @@ export class CompatGPU {
     });
     if (!gl) return Promise.resolve(null);
     const caps = webgl2Capabilities(gl);
-    if (!caps.supported) {
+    if (!caps.highpFragment || ranks[caps.tier] < ranks[minimum]) {
       gl.getExtension('WEBGL_lose_context')?.loseContext();
       return Promise.resolve(null);
     }
-    const budget = this.options.cpuWorkBudget ?? CPU_WORK_BUDGET;
-    if (!(budget > 0))
-      throw new RangeError('Invalid cpuWorkBudget; pass a positive number of invocations and loop iterations');
-    return Promise.resolve(new CompatAdapter(gl, caps, budget));
+    const formats = caps.tier === 'full' ? undefined : (await import('../tiers.js')).tierFormats(caps.tier);
+    return new CompatAdapter(gl, caps, budget, formats);
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -194,6 +201,8 @@ export class CompatAdapter {
     readonly capabilities: WebGL2Capabilities,
     /** See {@link CompatGPUOptions.cpuWorkBudget}. */
     readonly cpuWorkBudget = CPU_WORK_BUDGET,
+    /** @internal Lower-tier target selection, loaded only for a lower-tier adapter. */
+    readonly tierFormats?: TierFormats,
   ) {
     this.features = featuresOf(capabilities);
     this.limits = Object.freeze(limitsOf(capabilities));
@@ -201,11 +210,11 @@ export class CompatAdapter {
       vendor: COMPAT_VENDOR,
       architecture: 'webgl2',
       device: capabilities.renderer,
-      description: `WebGL2 compatibility layer on ${capabilities.renderer}`,
+      description: `WebGL2 compatibility layer (${capabilities.tier}) on ${capabilities.renderer}`,
     });
   }
 
-  requestDevice(descriptor: GPUDeviceDescriptor = {}): Promise<CompatDevice> {
+  async requestDevice(descriptor: GPUDeviceDescriptor = {}): Promise<CompatDevice> {
     if (this.used)
       return Promise.reject(
         new DOMException('This adapter already made its device; request a new adapter', 'OperationError'),
@@ -220,7 +229,11 @@ export class CompatAdapter {
       if (better) return Promise.reject(new DOMException(`The WebGL2 adapter's ${name} is ${have}`, 'OperationError'));
     }
     this.used = true;
-    return Promise.resolve(new CompatDevice(this.gl, this, new Set(descriptor.requiredFeatures ?? [])));
+    const device = new CompatDevice(this.gl, this, new Set(descriptor.requiredFeatures ?? []));
+    // Lower tiers cannot blit sample-only float textures. View synchronization can need the readback helper in
+    // an ordinary render command, so make it available before exposing a device with these copy semantics.
+    if (this.tierFormats) await device.loadReadback();
+    return device;
   }
 }
 
@@ -305,6 +318,8 @@ export class CompatDevice extends EventTarget {
     // WebGPU's conventions: clip z in [0, w], the first vertex provokes flat values, tight pixel rows.
     this.ext.clipControl?.clipControlEXT(this.ext.clipControl.LOWER_LEFT_EXT, this.ext.clipControl.ZERO_TO_ONE_EXT);
     this.ext.provoking?.provokingVertexWEBGL(this.ext.provoking.FIRST_VERTEX_CONVENTION_WEBGL);
+    // WebGPU has no implicit colour dithering. GL enables it by default, including UNORM tier targets.
+    this.state.enable(gl.DITHER, false);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
     gl.enable(gl.SCISSOR_TEST);

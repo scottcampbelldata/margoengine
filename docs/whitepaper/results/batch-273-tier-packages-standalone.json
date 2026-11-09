@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "rows": [
+    {
+      "name": "post bloom alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0,
+      "max": 0,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post bloom alone",
+      "tier": "ldr",
+      "refusal": {
+        "name": "MargoError",
+        "code": "unsupported",
+        "message": "Bloom HDR processing requires the half-float compatibility tier; this device is ldr; see https://margoengine.com/errors#compatibility-layer"
+      }
+    },
+    {
+      "name": "post ssao alone",
+      "tier": "half-float",
+      "share": 0,
+      "mean": 0.008544921875,
+      "max": 1,
+      "lit": 413,
+      "errors": [],
+      "gl": 0
+    },
+    {
+      "name": "post ssao alone",
+      "tier": "ldr",
+      "refusal": {
+        "name": "MargoError",
+        "code": "unsupported",
+        "message": "SSAO geometry/HDR processing requires the half-float compatibility tier; this device is ldr; see https://margoengine.com/errors#compatibility-layer"
+      }
+    }
+  ]
+}

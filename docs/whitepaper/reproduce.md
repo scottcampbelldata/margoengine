@@ -1691,3 +1691,39 @@ with scripts/support/gltf-production-assets.js cachedProductionAssets(), then ru
 `node scripts/gltf-production-assets-tests.js` in one shared slot. This generic
 filename needs an explicit `--gpu=Renders production models and texture pixels`
 classification when invoking gpu-lock directly. No companion implementation is used.
+
+### Batch 273 tier device checkpoint
+
+Build with npm run build --workspace @margoengine/webgl2-compat. Run the CPU tests
+with npm test --workspace @margoengine/webgl2-compat (hard limit 5 minutes). Run
+node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node
+packages/webgl2-compat/test/tiers-browser.mjs for all three extension-masked tiers.
+For the retained native comparison, run the same shared lock command with --max=5
+and packages/webgl2-compat/test/compat-browser-check.mjs. Each command renders
+under one shared slot and releases on completion. The tier test compares exact
+logical copy bytes and uses an independently compiled raw-GL physical-format
+oracle for blending. No timings are asserted or published. The complete package
+GPU/browser suites and full lower-tier package refusal/image matrix remain required
+before landing. Scoped README execution passes 16/16 examples and API checks pass.
+The first verify stops at a stale global API aggregate; regeneration repairs it.
+The resumed full unit run passes 13,669/13,671 with no skips: its strict lazy-edge
+inventory needs the two new optional edges, and the generated llms files need
+refreshing after the new API/docs. Targeted repair checks are recorded separately;
+no canceled or failed full run is presented as an unconditional verification pass.
+
+Additional completed browser steps: adapter, destroy-frame, compute, package
+routes, XR, preview, capability probe, GLSL corpus (558 linked pipelines / 1,238
+entry points) and corpus draws (733 render pipelines / 478 compute pipelines).
+The canonical corpus continues to exclude the 20 independently owned tracer
+pipelines exactly as before; this batch does not claim their check. Receipts:
+test-results/batch-273-remaining-gpu.json and its per-step logs.
+
+For the ten scoped tier package scenes, use the same shared lock with --max=2
+and packages/webgl2-compat/test/tier-packages-browser.mjs. Failed-only selections
+use --only=<URI-encoded scene name>, comma separated. The three original LDR
+misses are retained in results/batch-273-tier-packages*-initial.json; repaired
+setup refusals and the retained passing rows are combined with explicit scope
+in results/batch-273-tier-package-summary.json. PostStack, Bloom and SSAO CPU
+regressions check allocation/refusal/restore ownership and supported tiers.
+The native post GPU suite and all 25 post README examples pass. Full optional
+package/tier coverage remains outstanding; no package-wide completion is claimed.

@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Lower-tier package images</title>
+<style>body{margin:0}canvas{display:block;width:64px;height:64px}</style>
+<script type="module">
+import { Engine } from '/packages/core/dist/index.js';
+import { engineRuntime } from '/packages/core/dist/extension.js';
+import { installTiers } from '/packages/webgl2-compat/dist/tiers.js';
+import { uninstall } from '/packages/webgl2-compat/dist/index.js';
+import { CompatDevice } from '/packages/webgl2-compat/dist/device.js';
+import { PACKAGES as ADAPTER_PACKAGES } from './adapter-browser.js';
+import { Bloom, SSAO, FXAA, PostStack } from '/packages/post/dist/index.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+
+const standalone = Effect => engine => {
+  ADAPTER_PACKAGES['core alone'](engine);
+  engine.use(new Effect());
+};
+const PACKAGES = {
+  ...ADAPTER_PACKAGES,
+  'post bloom alone': standalone(Bloom),
+  'post ssao alone': standalone(SSAO),
+  'post LDR FXAA': engine => {
+    ADAPTER_PACKAGES['core alone'](engine);
+    PostStack.attach(engine, [new FXAA()]);
+  },
+};
+
+// Count the installed device's async compilation rather than the browser's native GPUDevice.
+const state = globalThis.__margoPipelines ??= { pending: 0, created: 0 };
+for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
+  const original = CompatDevice.prototype[name];
+  CompatDevice.prototype[name] = function(...args) {
+    const promise = original.apply(this, args);
+    state.pending++; state.created++;
+    const settle = () => state.pending--;
+    promise.then(settle, settle);
+    return promise;
+  };
+}
+
+async function capture(tier, name) {
+  await installTiers({ force: true, createContext(attributes) {
+    const gl = new OffscreenCanvas(1, 1).getContext('webgl2', attributes);
+    if (!gl) throw new Error('WebGL2 required for tier package images');
+    const get = gl.getExtension.bind(gl);
+    gl.getExtension = extension => {
+      if (tier !== 'full' && extension === 'EXT_color_buffer_float') return null;
+      if (tier === 'ldr' && extension === 'EXT_color_buffer_half_float') return null;
+      return get(extension);
+    };
+    return gl;
+  }});
+  const canvas = document.createElement('canvas');
+  document.body.append(canvas);
+  let kernel;
+  try {
+    kernel = await Engine.create(canvas, { backend: 'webgpu', exactSize: [64, 64], camera: { position: [0, 0, 3], target: [0, 0, 0] } });
+    const engine = engineRuntime(kernel), device = engine.gpu, errors = [];
+    device.addEventListener('uncapturederror', event => { errors.push(event.error.message); event.preventDefault(); });
+    try {
+      await PACKAGES[name](engine);
+    } catch (error) {
+      return { tier: device.adapter.capabilities.tier, name, refusal: { name: error.name, code: error.code, message: error.message }, errors, gl: device.gl.getError() };
+    }
+    await waitForPipelines(async () => { kernel.render({delta:0}); await device.queue.onSubmittedWorkDone(); }, {timeoutMs:60000});
+    const image = new Image();
+    image.src = canvas.toDataURL('image/png');
+    await image.decode();
+    const flat = new OffscreenCanvas(64,64).getContext('2d');
+    flat.drawImage(image,0,0);
+    return { tier: device.adapter.capabilities.tier, name, bytes: [...flat.getImageData(0,0,64,64).data], errors, gl: device.gl.getError() };
+  } finally {
+    kernel?.dispose();
+    canvas.remove();
+    uninstall();
+  }
+}
+window.check = {capture, names:Object.keys(PACKAGES)};
+window.ready = true;
+</script>

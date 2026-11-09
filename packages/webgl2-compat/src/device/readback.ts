@@ -2,13 +2,15 @@
 // compute, downloads it (queue.submit and device.loadReadback load it first). The format conversions are the larger part
 // of it: every WebGPU layout a texture can be read in, from WebGL2's few readPixels formats.
 import { type FormatInfo, toHalf } from './formats.js';
-import { origin, type Replayer } from './render.js';
+import { origin, type Replayer, writeTexture } from './render.js';
 import type { CompatBuffer, CompatTexture, TextureStorage } from './resources.js';
 
 /** Where readPixels reads a copy from: the bound read framebuffer, in this format and type; free() deletes it. */
 interface ReadSource {
   readonly format: number;
   readonly type: number;
+  /** Float texels carried bit-for-bit in an integer framebuffer on a device without float targets. */
+  readonly floatBits?: boolean;
   readonly free?: () => void;
 }
 
@@ -29,21 +31,39 @@ export function fetchInto(
   const gl = r.gl,
     state = r.device.state,
     kind = s.info.kind === 'uint' ? 'u' : s.info.kind === 'sint' ? 'i' : '';
-  if (s.target === gl.TEXTURE_CUBE_MAP) {
+  const floatBits = !kind && !!r.device.adapter.tierFormats;
+  const outputKind = floatBits ? 'u' : kind;
+  const cube = s.target === gl.TEXTURE_CUBE_MAP && !!r.device.adapter.tierFormats;
+  if (s.target === gl.TEXTURE_CUBE_MAP && !cube) {
     // GLSL ES 3.00 cannot fetch from a cube map: read the face's 2D copy.
     const t = s.texture,
       flat = t.sampled(t.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }));
     t.read(flat, level, 1, layer, 1, r.sync);
     return fetchInto(r, flat, level, layer, x, y, w, h);
   }
-  const sampler =
-    s.target === gl.TEXTURE_3D ? 'sampler3D' : s.target === gl.TEXTURE_2D_ARRAY ? 'sampler2DArray' : 'sampler2D';
+  const sampler = cube
+    ? 'samplerCube'
+    : s.target === gl.TEXTURE_3D
+      ? 'sampler3D'
+      : s.target === gl.TEXTURE_2D_ARRAY
+        ? 'sampler2DArray'
+        : 'sampler2D';
   const coord = s.target === gl.TEXTURE_2D ? 'p' : 'ivec3(p, o.z)';
+  const cubeDirection = `vec3 face(ivec2 p) {
+    vec2 q = (vec2(p) + 0.5) / vec2(textureSize(t, o.w)) * 2.0 - 1.0;
+    if (o.z == 0) return vec3(1.0, -q.y, -q.x);
+    if (o.z == 1) return vec3(-1.0, -q.y, q.x);
+    if (o.z == 2) return vec3(q.x, 1.0, q.y);
+    if (o.z == 3) return vec3(q.x, -1.0, -q.y);
+    if (o.z == 4) return vec3(q.x, -q.y, 1.0);
+    return vec3(-q.x, -q.y, -1.0);
+  }`;
+  const value = cube ? 'textureLod(t, face(p), float(o.w))' : `texelFetch(t, ${coord}, o.w)`;
   const h_ = r.helper(
-    `fetch:${kind}${sampler}`,
-    `uniform highp ${kind}${sampler} t;\nuniform ivec4 o;\nout highp ${kind}vec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy) + o.xy; c = ${kind}vec4(texelFetch(t, ${coord}, o.w)); }`,
+    `fetch:${kind}${sampler}:${floatBits}`,
+    `uniform highp ${kind}${sampler} t;\nuniform ivec4 o;\nout highp ${outputKind}vec4 c;\n${cube ? cubeDirection : ''}\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy) + o.xy; c = ${floatBits ? 'floatBitsToUint' : `${kind}vec4`}(${value}); }`,
   );
-  const internal = kind === 'u' ? gl.RGBA32UI : kind === 'i' ? gl.RGBA32I : gl.RGBA32F;
+  const internal = outputKind === 'u' ? gl.RGBA32UI : outputKind === 'i' ? gl.RGBA32I : gl.RGBA32F;
   const target = gl.createTexture() as WebGLTexture;
   state.scratch(gl.TEXTURE_2D, target);
   gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
@@ -72,8 +92,9 @@ export function fetchInto(
   state.bindReadFramebuffer(fbo);
   gl.readBuffer(gl.COLOR_ATTACHMENT0);
   return {
-    format: kind ? gl.RGBA_INTEGER : gl.RGBA,
-    type: kind === 'u' ? gl.UNSIGNED_INT : kind === 'i' ? gl.INT : gl.FLOAT,
+    format: outputKind ? gl.RGBA_INTEGER : gl.RGBA,
+    type: outputKind === 'u' ? gl.UNSIGNED_INT : outputKind === 'i' ? gl.INT : gl.FLOAT,
+    floatBits,
     free: () => {
       state.bindReadFramebuffer(null);
       gl.deleteFramebuffer(fbo);
@@ -81,6 +102,44 @@ export function fetchInto(
       gl.deleteTexture(target);
     },
   };
+}
+
+/**
+ * Lower-tier copies involving float storage which GL cannot attach, or different physical formats. A synchronous
+ * bit-exact float fetch preserves sample-only precision and command order; one counted stall per slice.
+ */
+export function copyTierStorage(
+  r: Replayer,
+  from: TextureStorage,
+  to: TextureStorage,
+  fromLevel: number,
+  toLevel: number,
+  [sx, sy, sz]: readonly number[],
+  [dx, dy, dz]: readonly number[],
+  [w, h, depth]: readonly number[],
+  viewCopy = false,
+): void {
+  const gl = r.gl,
+    plan = readPlan(from.texture.info, 'all');
+  if (!plan || plan.type !== 'FLOAT') throw r.device.unsupported(`a lower-tier copy of ${from.format}`);
+  for (let z = 0; z < depth; z++) {
+    const source = fetchInto(r, from, fromLevel, sz + z, sx, sy, w, h);
+    const raw = new Uint8Array(w * h * 16);
+    gl.readPixels(0, 0, w, h, source.format, source.type, new Uint32Array(raw.buffer));
+    source.free?.();
+    r.device.stalls++;
+    const bytesPerRow = w * plan.bytes;
+    const bytes = convertRows(raw, from.texture.info, plan, w, h, bytesPerRow);
+    writeTexture(
+      r.device,
+      { texture: to.texture, mipLevel: toLevel, origin: [dx, dy, dz + z] },
+      bytes,
+      { bytesPerRow },
+      [w, h],
+      viewCopy ? to : undefined,
+    );
+  }
+  r.rebind();
 }
 
 /**
@@ -165,7 +224,7 @@ export function copyTextureToBuffer(
     let rx = x,
       ry = y;
     if (plan.via === 'stencil') read = stencilInto(r, p, level, layer);
-    else if (plan.via === 'fetch') {
+    else if (plan.via === 'fetch' || (r.device.adapter.tierFormats && t.info.name.includes('float'))) {
       read = fetchInto(r, p, level, layer, x, y, w, h);
       rx = ry = 0;
     } else {

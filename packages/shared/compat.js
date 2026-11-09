@@ -1,6 +1,20 @@
 // Which GPU a package runs on, so it can take its compatibility route on the WebGL2 layer (the roadmap
 // docs, "Package plan"). Never browser sniffing: the layer's adapters, and so its devices'
 // `adapterInfo`, report the vendor 'margo-webgl2'. Core never imports this file.
+import { fault } from './errors.js';
+
+/** Refuses a measured lower-tier precision requirement before a package allocates resources. Native devices pass. */
+export function requireCompatTier(device, feature, minimum = 'full') {
+  const ranks = { ldr: 0, 'half-float': 1, full: 2 };
+  if (!Object.hasOwn(ranks, minimum)) throw new TypeError('minimum must be full, half-float or ldr');
+  const tier = device?.adapter?.capabilities?.tier;
+  if (tier && ranks[tier] < ranks[minimum])
+    throw fault(
+      'unsupported',
+      `${feature} requires the ${minimum} compatibility tier; this device is ${tier}`,
+      'compatibility-layer',
+    );
+}
 
 /** The vendor the WebGL2 compatibility layer's adapters report (`COMPAT_VENDOR` of the layer's device entry). */
 export const COMPAT_VENDOR = 'margo-webgl2';
