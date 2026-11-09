@@ -3265,3 +3265,26 @@ The snapshot precision correction was preceded by comparing David Goldberg,
 <https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html>, with W3C
 WGSL (2026) binary32/host-shareable rules. The documented decimal-height
 regression proves actual uploaded values are reported; tolerances are unchanged.
+### Batch 273 compatibility failure 1: culling shadow investigation
+
+Research before any repair: Robert J. Simpson (editor), The OpenGL ES Shading
+Language 3.00, revision 6 (2016), section 4.6 invariance,
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf;
+Sanjif Shanmugavelu, Mathieu Taillefumier, Christopher Culver, Oscar Hernandez,
+Mark Coletti and Ada Sedova, Impacts of floating-point non-associativity on
+reproducibility for HPC and deep learning applications (2024),
+https://arxiv.org/abs/2408.05148; Microsoft, Precise (2019),
+https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/precise; and W3C
+GPU for the Web Working Group, WebGPU Shading Language (2026),
+https://www.w3.org/TR/WGSL/#floating-point-evaluation.
+
+Compared expression/order constraints, arithmetic refactoring and observable
+reproducibility. They motivate inspecting actual caster and receiver state,
+not accepting a channel tolerance. On landed tier code b30aaa010, the unchanged
+full compatibility dynamic-check reproduces exactly seven differing pixels at
+the shadowed move step, each by one channel unit. A diagnostic adding invariant
+position outputs to both shadow caster shaders still produces the same seven
+differences in the full sequence, so invariance alone is rejected as a repair.
+The shorter three-step isolated diagnostic passes even without that change and
+cannot establish causality or readiness. No runtime or assertion was changed,
+and no rival source, companion code or prepared culling-causes script was used.
