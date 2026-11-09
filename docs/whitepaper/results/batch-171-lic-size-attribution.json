@@ -1,5 +1,5 @@
 {
-  "source": "c333a73900a6a53887dbd33482f11424238a56a9",
+  "source": "da96932cb2604d7827e4eb4fda42087c14216657",
   "method": "Unchanged canonical Vite ES2022 + compactOutput, bare imports external, zlib gzip default",
   "lic": {
     "raw": 53632,
@@ -71,5 +71,11 @@
       }
     ],
     "delta": 13032
+  },
+  "sourceHashes": {
+    "lic.ts": "c88b3d3acebf458b854a788c8e8fb8cb25d1b071e6707a73e59298fb24bc6e75",
+    "lic-shaders.ts": "96102e06bc9e7a15e4b7dc8de07721059b433a4825ea86a836746a558eb38d64",
+    "colormaps.ts": "6ff28692ae11f66db8f9b2cc48be8968cee6ce38300f29eefe715b8cbd894309",
+    "tables.ts": "2aa8c677792dd51efa295f2dfeff9c48bc9cfe892be5f07ae7ae1250c13284ee"
   }
 }

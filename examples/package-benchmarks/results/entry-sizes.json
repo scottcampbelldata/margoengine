@@ -1,5 +1,5 @@
 {
-  "commit": "0f509ea6c",
+  "commit": "da96932cb",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -456,12 +456,12 @@
     },
     "@margoengine/cinematic": {
       ".": {
-        "raw": 5623,
-        "gzip": 1947
+        "raw": 5638,
+        "gzip": 1956
       },
       "./brain": {
-        "raw": 7856,
-        "gzip": 3006
+        "raw": 7871,
+        "gzip": 3015
       },
       "./composer": {
         "raw": 4097,
@@ -586,28 +586,28 @@
     },
     "@margoengine/controls": {
       ".": {
-        "raw": 88190,
-        "gzip": 27266
+        "raw": 88084,
+        "gzip": 27268
       },
       "./orbit": {
-        "raw": 17235,
-        "gzip": 6156
+        "raw": 17171,
+        "gzip": 6151
       },
       "./fly": {
-        "raw": 7086,
-        "gzip": 2795
+        "raw": 7022,
+        "gzip": 2791
       },
       "./trackball": {
-        "raw": 11012,
-        "gzip": 4013
+        "raw": 10948,
+        "gzip": 4006
       },
       "./arcball": {
-        "raw": 22511,
-        "gzip": 8381
+        "raw": 22428,
+        "gzip": 8395
       },
       "./transform": {
-        "raw": 32919,
-        "gzip": 11874
+        "raw": 32896,
+        "gzip": 11877
       },
       "./drag": {
         "raw": 9222,
@@ -618,12 +618,12 @@
         "gzip": 704
       },
       "./third-person": {
-        "raw": 8098,
-        "gzip": 3122
+        "raw": 8034,
+        "gzip": 3118
       },
       "./walk": {
-        "raw": 37725,
-        "gzip": 13931
+        "raw": 37661,
+        "gzip": 13930
       }
     },
     "@margoengine/core": {
@@ -2628,8 +2628,8 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 138099,
-        "gzip": 50303
+        "raw": 138841,
+        "gzip": 50599
       },
       "./bricks": {
         "raw": 64855,
@@ -2652,12 +2652,12 @@
         "gzip": 22444
       },
       "./grids": {
-        "raw": 53816,
-        "gzip": 23599
+        "raw": 54079,
+        "gzip": 23735
       },
       "./maths": {
-        "raw": 12305,
-        "gzip": 5389
+        "raw": 13046,
+        "gzip": 5703
       },
       "./nrrd": {
         "raw": 1846,
@@ -2678,6 +2678,10 @@
       "./lic": {
         "raw": 53632,
         "gzip": 23461
+      },
+      "./tubes": {
+        "raw": 6076,
+        "gzip": 2533
       }
     },
     "@margoengine/selection": {

@@ -1,5 +1,16 @@
 # Clean room
 
+Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
+The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
+to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four
+NOAA wind-path layouts/backends and all 25 README runtime examples pass on the combined build. API,
+lint, hygiene and size gates pass. Sizes remain tubes 2533, grids 23735, maths 5703, root 50599, LIC
+23461 and core/stage 23924 B gzip. The single full verify remains 14012 tests, 14010 passed, with both
+metadata failures corrected and all seven affected checks passing; it was not repeated. The exact LIC
++13032 B required-colormap attribution is reproduced again on this source. Earlier checkpoints below
+retain their historical scope. See the batch-171-tubes-validation.json receipt in whitepaper/results.
+
+
 ## Batch 134 corpus, uploads and memory continuation
 
 Research before instrumentation compared the retained fuzz papers: Patrice

@@ -89,7 +89,7 @@
     "flow": 8665
   },
   "pairedRecordSource": {
-    "commit": "c333a7390",
+    "commit": "da96932cb",
     "packagesDirty": false
   },
   "licAttribution": {
@@ -228,5 +228,99 @@
       }
     ]
   },
-  "status": "accepted"
+  "status": "accepted",
+  "previousPairedRecordSource": {
+    "commit": "c333a7390",
+    "packagesDirty": false
+  },
+  "integration": {
+    "mainBase": "234f94fdbe82b51d4fcbba84ff3cfcfab2cf7c01",
+    "unchangedSources": [
+      "sciviz",
+      "geometry",
+      "compute",
+      "math",
+      "core"
+    ],
+    "cpu": {
+      "tests": 203,
+      "pass": 203,
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 11.5
+    },
+    "gpu": [
+      {
+        "name": "root",
+        "max": 0.75,
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 12.5
+      },
+      {
+        "name": "entries",
+        "max": 1,
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 38.4
+      },
+      {
+        "name": "noaa",
+        "max": 1,
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 51
+      },
+      {
+        "name": "readme",
+        "max": 1.5,
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 67.4
+      }
+    ],
+    "network": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.6
+    },
+    "gates": {
+      "build": {
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 25.3
+      },
+      "api": {
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 95.1
+      },
+      "lint": {
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 6.5
+      },
+      "hygiene": {
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 41.5
+      },
+      "size-quality": {
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 31.9
+      }
+    }
+  }
 }

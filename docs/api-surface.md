@@ -22,10 +22,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7, `./lines` 6, `./gpu` 14, `./scene` 3, `./points` 5, `./sdf` 6, `./inside` 6, `./gpu-build` 4, `./alpha` 11, `./alpha-triangles` 3 | 147 | 2 | 23,362 |
 | @margoengine/cache | `.` 8, `./manager` 5, `./hashed` 2, `./ranges` 4, `./vary` 3, `./eviction` 1, `./bundles` 7, `./prefetch` 7 | 17 |  | 3,005 |
 | @margoengine/cameras | `.` 9, `./origin` 3, `./layers` 8, `./offaxis` 7, `./physical` 5, `./panini` 4, `./wide-cube` 5 | 1 |  | 2,770 |
-| @margoengine/cinematic | `.` 3, `./brain` 13, `./composer` 3, `./dolly` 3, `./group` 4, `./noise` 7, `./confine` 4, `./lens` 5 | 11 |  | 1,947 |
+| @margoengine/cinematic | `.` 3, `./brain` 13, `./composer` 3, `./dolly` 3, `./group` 4, `./noise` 7, `./confine` 4, `./lens` 5 | 11 |  | 1,956 |
 | @margoengine/clustered | `.` 19, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./physical-lobes` 1, `./units` 12, `./flicker` 5, `./budget` 2 | 106 |  | 13,718 |
 | @margoengine/compute | `.` 36, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3, `./subgroups` 5, `./nn` 38, `./graph` 9, `./autotune` 9 | 422 | 26 | 39,072 |
-| @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 10, `./transform` 7, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 98 |  | 27,266 |
+| @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 10, `./transform` 7, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 98 |  | 27,268 |
 | @margoengine/core | `.` 16, `./extension` 27 | 19 |  | 21,553 |
 | @margoengine/creative | `./paint` 3, `.` 15, `./particles` 4, `./targets` 4, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,109 |
 | @margoengine/culling | `.` 12, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 57 |  | 13,760 |
