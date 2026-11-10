@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14494240,
+  "total": 14498952,
   "history": [
     {
       "date": "2026-10-24",
@@ -7685,6 +7685,12 @@
       "commit": "f539b6456",
       "reason": "landed with push-anyway: feat(clustered): soft point and spot shadows from a light's shadow.radius (PCSS in LocalShadows)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "032ec8480",
+      "reason": "landed with push-anyway: feat(inspector): live WGSL editing for WgslMaterial meshes (new entry @margoengine/inspector/shaders)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8131,6 +8137,7 @@
     "@margoengine/inspector/history": 1101,
     "@margoengine/inspector/packages": 4990,
     "@margoengine/inspector/resources": 902,
+    "@margoengine/inspector/shaders": 4712,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/inspector/textures": 4964,
     "@margoengine/inspector/tools": 3440,

@@ -1783,6 +1783,10 @@
       "types": "./dist/inspector/tools.d.ts",
       "import": "./dist/inspector/tools.js"
     },
+    "./inspector/shaders": {
+      "types": "./dist/inspector/shaders.d.ts",
+      "import": "./dist/inspector/shaders.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

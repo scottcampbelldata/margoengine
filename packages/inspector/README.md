@@ -124,6 +124,16 @@ With engine views, the debug helpers show in each view for the meshes that view 
 toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
 registered passes; engine disposal also performs this cleanup.
 
+## Live shader editing
+
+`margoengine/inspector/shaders` edits the WGSL of a mesh drawing a `WgslMaterial` from `margoengine/materials` and
+recompiles it in place. `ShaderEditor.attach(engine, {meshes})` shows a panel with the mesh list and its WGSL; typing
+applies after a short pause. Each edit is compiled on the device first, inside the module text the engine drew, so a
+broken edit is never drawn: its errors are listed with their line and column, and the mesh keeps its last good shader.
+A good edit swaps in a new material with the same uniforms, textures and other values, and undo puts the old one
+back. `recompileShader(mesh, wgsl, {device: engine.gpu})` does the same without a panel and returns the compiler's
+messages. Diagnostics need WebGPU; generated shaders of other materials stay read only in the Inspector.
+
 ## Plugin and pass view
 
 `margoengine/inspector/frame` records one frame. Its report lists every attached plugin in attach order with the

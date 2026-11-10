@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Live shader editing</title>
+<canvas width="320" height="240" style="width:320px;height:240px"></canvas><main></main>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {boxGeometry} from '@margoengine/geometry';
+import {WgslMaterial,createMesh} from '@margoengine/materials';
+import {ShaderEditor,recompileShader} from '@margoengine/inspector/shaders';
+window.good='fn shade(i: Out, s: Surface) -> Surface {\n  var o = s;\n  o.base = vec4f(uniforms.tint, 1.0);\n  return o;\n}';
+window.setup=async()=>{
+  const engine=window.engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[2,2,3],target:[0,0,0]}});
+  window.errors=[];engine.gpu.addEventListener('uncapturederror',(e)=>window.errors.push(e.error.message));
+  window.material=new WgslMaterial({wgsl:window.good,uniforms:{tint:[0.2,0.6,0.9]}});
+  window.mesh=createMesh(engine,boxGeometry(1,1,1),window.material);window.mesh.name='Box';
+  window.panel=ShaderEditor.attach(engine,{meshes:[window.mesh],parent:document.querySelector('main'),live:false});
+  engine.start();return engine.backend;
+};
+window.edit=async(wgsl)=>{const r=await recompileShader(window.mesh,wgsl,{device:window.engine.gpu,history:window.panel.history});return {...r,drawn:window.mesh.material.wgsl};};
+</script>

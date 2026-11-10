@@ -73,6 +73,10 @@
     "./tools": {
       "types": "./dist/tools.d.ts",
       "import": "./dist/tools.js"
+    },
+    "./shaders": {
+      "types": "./dist/shaders.d.ts",
+      "import": "./dist/shaders.js"
     }
   },
   "files": [
@@ -124,6 +128,7 @@
     "test:browser:gl": "node test/gl-browser.mjs",
     "test:browser:gl:compat": "node test/gl-browser.mjs --compat",
     "test:browser:tools": "node test/tools-browser.mjs",
-    "test:browser:tools:compat": "node test/tools-browser.mjs --compat"
+    "test:browser:tools:compat": "node test/tools-browser.mjs --compat",
+    "test:browser:shaders": "node test/shaders-browser.mjs"
   }
 }
