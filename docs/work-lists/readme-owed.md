@@ -1379,3 +1379,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/web (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
 - @margoengine/viz (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
 - @margoengine/react-kit (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
+
+
+- @margoengine/decoders (AVIF review M1): document the final sample OBU size exception and strict av1C configuration sizes after the build phase.
+- @margoengine/navmesh (AVIF review gate): no runtime/API change; duplicate test import repair needs no new example.

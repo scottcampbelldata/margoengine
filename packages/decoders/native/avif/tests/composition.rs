@@ -16,10 +16,18 @@ fn full(kind: &[u8; 4], version: u8, bytes: &[u8]) -> Vec<u8> {
     bx(kind, &out)
 }
 fn derived(grid: bool, cycle: bool, bad_pixi: bool) -> Vec<u8> {
+    derived_obus(grid, cycle, bad_pixi, |_, _| {})
+}
+fn derived_obus(
+    grid: bool,
+    cycle: bool,
+    bad_pixi: bool,
+    rewrite: impl FnOnce(&mut Vec<u8>, &mut Vec<u8>),
+) -> Vec<u8> {
     let original = include_bytes!("fixtures/white_1x1.avif");
     let file = File::parse(original).unwrap();
-    let coded = file.item_data(file.primary, original.len()).unwrap();
-    let config = file
+    let mut coded = file.item_data(file.primary, original.len()).unwrap();
+    let mut config = file
         .item_properties(file.primary)
         .unwrap()
         .iter()
@@ -31,6 +39,7 @@ fn derived(grid: bool, cycle: bool, bad_pixi: bool) -> Vec<u8> {
             }
         })
         .unwrap();
+    rewrite(&mut coded, &mut config);
     let mut children = full(
         b"hdlr",
         0,
@@ -112,6 +121,61 @@ const LIMITS: Limits = Limits {
     pixels: 1 << 26,
     memory: 512 << 20,
 };
+#[test]
+fn final_item_obu_may_omit_size_but_config_obus_must_keep_it() {
+    use margoengine_avif::{bits::leb128, obu::Obus};
+    let expected = decode(&derived(false, false, false), LIMITS).unwrap();
+    for extension in [false, true] {
+        let bytes = derived_obus(false, false, false, |coded, _| {
+            let mut at = 0;
+            let mut last = 0;
+            let mut size_at = 0;
+            let mut payload_at = 0;
+            while at < coded.len() {
+                last = at;
+                at += 1 + usize::from(coded[at] & 4 != 0);
+                size_at = at;
+                let size = leb128(coded, &mut at).unwrap() as usize;
+                payload_at = at;
+                at += size;
+            }
+            assert_eq!(at, coded.len());
+            assert!(matches!((coded[last] >> 3) & 15, 4 | 6));
+            coded.drain(size_at..payload_at);
+            coded[last] &= !2;
+            if extension {
+                coded[last] |= 4;
+                coded.insert(last + 1, 0);
+            }
+        });
+        let actual = decode(&bytes, LIMITS).unwrap();
+        assert_eq!(
+            (actual.width, actual.height),
+            (expected.width, expected.height)
+        );
+        assert_eq!(actual.rgba, expected.rgba);
+    }
+    for sized in [true, false] {
+        let bytes = derived_obus(false, false, false, |coded, config| {
+            let obus = Obus::new(coded)
+                .collect::<margoengine_avif::Result<Vec<_>>>()
+                .unwrap();
+            let sequence = obus.iter().find(|obu| obu.kind == 1).unwrap();
+            config.truncate(4);
+            config.push(if sized { 0x0a } else { 0x08 });
+            assert!(sequence.payload.len() < 128);
+            if sized {
+                config.push(sequence.payload.len() as u8);
+            }
+            config.extend(sequence.payload);
+        });
+        if sized {
+            assert_eq!(decode(&bytes, LIMITS).unwrap().rgba, expected.rgba);
+        } else {
+            assert_eq!(decode(&bytes, LIMITS).err(), Some(Error::Invalid));
+        }
+    }
+}
 #[test]
 fn payloadless_identity_and_shared_grid_items_compose() {
     let image = decode(&derived(false, false, false), LIMITS).unwrap();

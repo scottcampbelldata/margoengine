@@ -14,6 +14,7 @@ pub struct Obus<'a> {
     data: &'a [u8],
     position: usize,
     failed: bool,
+    sample: bool,
 }
 impl<'a> Obus<'a> {
     pub fn new(data: &'a [u8]) -> Self {
@@ -21,12 +22,20 @@ impl<'a> Obus<'a> {
             data,
             position: 0,
             failed: false,
+            sample: false,
+        }
+    }
+    /// ISOBMFF samples may omit the final OBU size; configOBUs may not.
+    pub fn sample(data: &'a [u8]) -> Self {
+        Self {
+            sample: true,
+            ..Self::new(data)
         }
     }
     fn read(&mut self) -> Result<Obu<'a>> {
         let header = self.data[self.position];
         self.position += 1;
-        if header & 0x81 != 0 || header & 2 == 0 {
+        if header & 0x81 != 0 || (header & 2 == 0 && !self.sample) {
             return Err(Error::Invalid);
         }
         let mut temporal_id = 0;
@@ -40,7 +49,11 @@ impl<'a> Obus<'a> {
             temporal_id = extension >> 5;
             spatial_id = (extension >> 3) & 3;
         }
-        let size = leb128(self.data, &mut self.position)? as usize;
+        let size = if header & 2 != 0 {
+            leb128(self.data, &mut self.position)? as usize
+        } else {
+            self.data.len() - self.position
+        };
         let end = self.position.checked_add(size).ok_or(Error::Limit)?;
         let payload = self.data.get(self.position..end).ok_or(Error::Truncated)?;
         self.position = end;
@@ -67,6 +80,27 @@ impl<'a> Iterator for Obus<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unsized_sample_obu_consumes_the_remainder_once() {
+        for bytes in [
+            &[0x12, 0, 0x78, 0x12, 0][..],
+            &[0x12, 0, 0x7c, 0x48, 0x12, 0],
+        ] {
+            let all = Obus::sample(bytes).collect::<Result<Vec<_>>>().unwrap();
+            assert_eq!(all.len(), 2);
+            assert_eq!(all[1].kind, 15);
+            assert_eq!(all[1].payload, &[0x12, 0]);
+        }
+        assert_eq!(Obus::sample(&[0x10]).next().unwrap().unwrap().payload, &[]);
+        assert!(matches!(
+            Obus::sample(&[0x7c]).next().unwrap(),
+            Err(Error::Truncated)
+        ));
+        assert!(matches!(
+            Obus::sample(&[0x7a, 3, 0]).next().unwrap(),
+            Err(Error::Truncated)
+        ));
+    }
     #[test]
     fn payload_and_extension_boundaries() {
         let bytes = [0x12, 0, 0x2e, 0x48, 2, 0x11, 0x80];

@@ -8,9 +8,7 @@ import { TiledNavMesh } from '../dist/tiles.js';
 import { encodeNavMesh, encodeTiledNavMesh } from '../dist/codec.js';
 import { fileURLToPath } from 'node:url';
 import { bundleBytes } from '../../../scripts/measure-size.js';
-import { fileURLToPath } from 'node:url';
 import binaryen from 'binaryen';
-import { fileURLToPath } from 'node:url';
 
 const previous = globalThis.Worker;
 let active = 0,

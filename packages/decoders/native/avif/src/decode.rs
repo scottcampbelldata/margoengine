@@ -25,7 +25,7 @@ pub fn bounded_obus(bytes: &[u8], max_pixels: u64, memory: usize) -> Result<Deco
     let mut next_tile = 0;
     let mut complete = false;
     let mut header_payload = None;
-    for obu in Obus::new(bytes) {
+    for obu in Obus::sample(bytes) {
         let obu = obu?;
         match obu.kind {
             1 => {
