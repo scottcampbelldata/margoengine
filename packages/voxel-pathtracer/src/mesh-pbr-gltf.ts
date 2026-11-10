@@ -33,13 +33,20 @@ export interface TraceLoadedGLTF {
   image(index: number): unknown;
 }
 interface TextureInfo {index:number;texCoord?:number;extensions?:unknown}
+interface MaterialExtensions {
+ KHR_materials_emissive_strength?:{emissiveStrength?:number};
+ KHR_materials_clearcoat?:{clearcoatFactor?:number;clearcoatRoughnessFactor?:number;clearcoatTexture?:TextureInfo;clearcoatRoughnessTexture?:TextureInfo;clearcoatNormalTexture?:TextureInfo&{scale?:number}};
+ KHR_materials_sheen?:{sheenColorFactor?:readonly number[];sheenRoughnessFactor?:number;sheenColorTexture?:TextureInfo;sheenRoughnessTexture?:TextureInfo};
+ KHR_materials_specular?:{specularFactor?:number;specularColorFactor?:readonly number[];specularTexture?:TextureInfo;specularColorTexture?:TextureInfo};
+ KHR_materials_iridescence?:{iridescenceFactor?:number;iridescenceIor?:number;iridescenceThicknessMinimum?:number;iridescenceThicknessMaximum?:number;iridescenceTexture?:TextureInfo;iridescenceThicknessTexture?:TextureInfo};
+}
 interface GLTFDocumentSnapshot {
   materials?: readonly {
     pbrMetallicRoughness?: {baseColorFactor?:readonly number[];metallicFactor?:number;roughnessFactor?:number;baseColorTexture?:TextureInfo;metallicRoughnessTexture?:TextureInfo};
     normalTexture?: TextureInfo & {scale?:number};
     emissiveTexture?:TextureInfo;emissiveFactor?:readonly number[];
     alphaMode?:string;alphaCutoff?:number;doubleSided?:boolean;
-    extensions?:{KHR_materials_emissive_strength?:unknown};
+    extensions?:MaterialExtensions;
   }[];
   textures?: readonly {source?:number;sampler?:number;extensions?:{
     KHR_texture_basisu?:{source:number};EXT_texture_webp?:{source:number};EXT_texture_avif?:{source:number};
@@ -125,6 +132,9 @@ export async function traceSceneFromGLTF(model: TraceLoadedGLTF, options: TraceG
       const def = primitive.definition.material === undefined ? undefined : definitions[primitive.definition.material];
       if (def?.alphaMode === 'BLEND') throw new MargoError('unsupported', 'Mesh PBR supports OPAQUE and MASK; use transmission for volume transparency: https://margoengine.com/errors#voxel-pathtracer');
       const pbr = def?.pbrMetallicRoughness;
+      const cc=def?.extensions?.KHR_materials_clearcoat,sh=def?.extensions?.KHR_materials_sheen,
+        sp=def?.extensions?.KHR_materials_specular,ir=def?.extensions?.KHR_materials_iridescence;
+
       materials.push({id, baseColorFactor: (pbr?.baseColorFactor ?? [1,1,1,1]) as [number,number,number,number],
         metallicFactor: pbr?.metallicFactor ?? 1, roughnessFactor: pbr?.roughnessFactor ?? 1,
         emissiveFactor: (def?.emissiveFactor ?? [0,0,0]) as [number,number,number],
@@ -132,7 +142,15 @@ export async function traceSceneFromGLTF(model: TraceLoadedGLTF, options: TraceG
         normalScale: def?.normalTexture?.scale ?? 1, doubleSided: def?.doubleSided ?? false,
         alphaMode: def?.alphaMode === 'MASK' ? 'MASK' : 'OPAQUE', alphaCutoff: def?.alphaCutoff ?? .5,
         baseColorTexture: await image(pbr?.baseColorTexture), metallicRoughnessTexture: await image(pbr?.metallicRoughnessTexture),
-        normalTexture: await image(def?.normalTexture), emissiveTexture: await image(def?.emissiveTexture)});
+        normalTexture: await image(def?.normalTexture), emissiveTexture: await image(def?.emissiveTexture),
+        clearcoatFactor:cc?.clearcoatFactor,clearcoatRoughnessFactor:cc?.clearcoatRoughnessFactor,clearcoatNormalScale:cc?.clearcoatNormalTexture?.scale,
+        clearcoatTexture:await image(cc?.clearcoatTexture),clearcoatRoughnessTexture:await image(cc?.clearcoatRoughnessTexture),clearcoatNormalTexture:await image(cc?.clearcoatNormalTexture),
+        sheenColorFactor:sh?.sheenColorFactor as TracePBRMaterial['sheenColorFactor'],sheenRoughnessFactor:sh?.sheenRoughnessFactor,
+        sheenColorTexture:await image(sh?.sheenColorTexture),sheenRoughnessTexture:await image(sh?.sheenRoughnessTexture),
+        specularFactor:sp?.specularFactor,specularColorFactor:sp?.specularColorFactor as TracePBRMaterial['specularColorFactor'],
+        specularTexture:await image(sp?.specularTexture),specularColorTexture:await image(sp?.specularColorTexture),
+        iridescenceFactor:ir?.iridescenceFactor,iridescenceIor:ir?.iridescenceIor,iridescenceThicknessMinimum:ir?.iridescenceThicknessMinimum,iridescenceThicknessMaximum:ir?.iridescenceThicknessMaximum,
+        iridescenceTexture:await image(ir?.iridescenceTexture),iridescenceThicknessTexture:await image(ir?.iridescenceThicknessTexture)});
     }
     const count = part.vertices.length / 20, positions = new Float32Array(count*3), normals = new Float32Array(count*3),
       tangents = new Float32Array(count*4), colors = new Float32Array(count*4), uvSets = Array.from({length: 4}, () => new Float32Array(count*2));

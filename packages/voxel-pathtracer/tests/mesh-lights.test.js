@@ -24,6 +24,31 @@ function probe(ctx,body){
  buffers:new Map([['0:3',ctx.packed],['0:1',new Float32Array(8192)],['0:4',new Float32Array(4)],['3:0',out]])});return out;
 }
 const header='1 100 2 3 2 1 2 0 0 0 1 1 10\n0 45 90\n0 180\n1 2 3 4 5 6\n';
+test('emissive geometry at the inclusive world limit keeps conservative acceleration bounds',async()=>{
+ const s=scene();s.meshes[0].positions=new Float32Array([-1e8,-1e8,0,1e8,-1e8,0,0,1e8,0]);
+ const c=await prepare(s);
+ try{
+  assert.equal(c.t.stats.meshTriangles,1);
+  const w=c.words,f=new Float32Array(w.buffer),header=w[12],record=w[header+1];
+  assert.equal(w[header],1);assert.equal(f[record+7],Math.fround(2e16));
+  assert.ok(f[16]<-1e8&&f[20]>1e8,'published acceleration bounds retain their outward padding');
+ }finally{c.t.dispose();}
+});
+test('runtime-bounded proposal schedule retains all legacy, emitter, spot and PBR families',async()=>{
+ for(const mode of ['legacy','emitter','spot','pbr']){
+  const s=scene();s.meshInstances=[{id:'instance',mesh:'tri'}];
+  if(mode!=='emitter'){s.materials[0].type='diffuse';s.materials[0].color=[.5,.5,.5];}
+  if(mode==='spot')s.spotLights=[{position:[0,0,2],direction:[0,0,-1]}];
+  if(mode==='pbr')s.pbrMaterials=[{id:1,metallicFactor:0}];
+  const c=await prepare(s,mode==='pbr');
+  try{
+   const expected=mode==='legacy'?5:7;
+   const out=probe(c,'probe[0]=vec4f(f32(meshProposalCount()),0,0,0);');
+   assert.equal(out[0],expected,mode);
+   if(expected===7)assert.equal(c.words[c.words[12]+4],7,`${mode} packet carries all seven proposals`);
+  }finally{c.t.dispose();}
+ }
+});
 test('LM-63 uses declared counts, multiplier, plane order and owned tilt tables',()=>{
  const plain=parseTraceIES('IESNA:LM-63-2002\nTILT=NONE\n'+header);
  assert.deepEqual([...plain.candela],[2,4,6,8,10,12]);

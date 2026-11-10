@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13514384,
+  "total": 13517432,
   "history": [
     {
       "date": "2026-10-24",
@@ -8079,7 +8079,7 @@
     "@margoengine/voxel-pathtracer/guiding": 2791,
     "@margoengine/voxel-pathtracer/media": 2210,
     "@margoengine/voxel-pathtracer/mesh": 41562,
-    "@margoengine/voxel-pathtracer/mesh-pbr": 44857,
+    "@margoengine/voxel-pathtracer/mesh-pbr": 47905,
     "@margoengine/voxel-pathtracer/restir": 2190,
     "@margoengine/voxel-pathtracer/sky": 468,
     "@margoengine/voxel-pathtracer/spectral": 1471,

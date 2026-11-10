@@ -5,6 +5,7 @@ var<private> meshLightBary:vec2f;
 fn meshLights()->u32 {
  let g=scene[2];if(g==0u||scene[g+1u]!=0u||scene[g+12u]==0u){return 0u;}return g+scene[g+12u];
 }
+fn meshProposalCount()->u32 {let header=meshLights();if(header==0u){return 5u;}return scene[header+4u];}
 fn meshEmitterRadiance(h:Hit,p:vec3f,wo:vec3f)->vec3f {return material(h.value).emission;}
 fn meshEmitterWeight(h:Hit,d:vec3f,lastPdf:f32)->f32 {
  if(lastPdf<=0.0||h.mesh==0u){return 1.0;}
@@ -71,7 +72,7 @@ export function meshLightingSource(input:string):string {
  let source=input;
  const edit=(from:string,to:string)=>{if(!source.includes(from))throw new MargoError('state','Mesh light kernel mismatch; rebuild: https://margoengine.com/errors#voxel-pathtracer');source=source.replace(from,to);};
  edit('fn direct(',LIGHTS+'\nfn direct(');
- edit('q<5u','q<7u');
+ edit('q<5u','q<meshProposalCount()');
  edit('} else if(q<3u){','} else if(q<3u||q==5u){');
  edit('if(q==1u){ls=sampleEmitter();}else{ls=sampleArea();}',
       'if(q==1u){ls=sampleEmitter();}else if(q==2u){ls=sampleArea();}else{ls=sampleMeshEmitter();}');

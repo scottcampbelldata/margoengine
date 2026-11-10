@@ -4,7 +4,7 @@ import type { TraceGeometryBuilder } from './compose-types.js';
 import type { PBRMeshTraceScene, TracePBRMesh, TracePBRMaterial, TracePBRTexture } from './mesh-pbr-types.js';
 
 const LIMIT = (128 << 20) / 4;
-const MAPS = ['baseColorTexture', 'metallicRoughnessTexture', 'normalTexture', 'emissiveTexture'] as const;
+const MAPS = ['baseColorTexture', 'metallicRoughnessTexture', 'normalTexture', 'emissiveTexture', 'clearcoatTexture', 'clearcoatRoughnessTexture', 'clearcoatNormalTexture', 'sheenColorTexture', 'sheenRoughnessTexture', 'specularTexture', 'specularColorTexture', 'iridescenceTexture', 'iridescenceThicknessTexture'] as const;
 const wraps = ['repeat', 'mirror', 'clamp'];
 function finite(value: number, name: string, low = 0, high = 1): number {
   if (!Number.isFinite(value) || value < low || value > high)
@@ -41,11 +41,11 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
     const materials = new Map<number, TracePBRMaterial>();
     const materialOffsets = new Map<number, number>();
     const textures = new Map<TracePBRTexture, number>();
-    let size = s.pbrMaterials.length * 32;
+    let size = s.pbrMaterials.length * 64;
     for (const m of s.pbrMaterials) {
       if (!m || !Number.isSafeInteger(m.id) || m.id < 1 || materials.has(m.id))
         throw new TypeError('Mesh PBR material ids must be unique positive safe integers');
-      materialOffsets.set(m.id, materials.size * 32);
+      materialOffsets.set(m.id, materials.size * 64);
       vector(m.baseColorFactor ?? [1, 1, 1, 1], 4, 'baseColorFactor');
       vector(m.emissiveFactor ?? [0, 0, 0], 3, 'emissiveFactor', 1e8);
       finite(m.emissiveStrength ?? 1, 'emissiveStrength', 0, 1e8);
@@ -53,6 +53,15 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       finite(m.metallicFactor ?? 1, 'metallicFactor');
       finite(m.normalScale ?? 1, 'normalScale', -1e8, 1e8);
       finite(m.alphaCutoff ?? 0.5, 'alphaCutoff');
+      for(const name of ['clearcoatFactor','clearcoatRoughnessFactor','sheenRoughnessFactor','specularFactor','iridescenceFactor'] as const)
+        finite(m[name]??(name==='specularFactor'?1:0),name);
+      vector(m.sheenColorFactor??[0,0,0],3,'sheenColorFactor');
+      vector(m.specularColorFactor??[1,1,1],3,'specularColorFactor',1e8);
+      finite(m.clearcoatNormalScale??1,'clearcoatNormalScale',-1e8,1e8);
+      finite(m.iridescenceIor??1.3,'iridescenceIor',1,10);
+      finite(m.iridescenceThicknessMinimum??100,'iridescenceThicknessMinimum',0,1e8);
+      finite(m.iridescenceThicknessMaximum??400,'iridescenceThicknessMaximum',m.iridescenceThicknessMinimum??100,1e8);
+
       if (!['OPAQUE', 'MASK'].includes(m.alphaMode ?? 'OPAQUE') ||
           (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean'))
         throw new TypeError('Mesh PBR requires OPAQUE or MASK and a boolean doubleSided');
@@ -116,6 +125,11 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       f.set([m.metallicFactor ?? 1, m.roughnessFactor ?? 1, m.normalScale ?? 1, m.alphaCutoff ?? .5], at + 12);
       out[at + 1] = m.alphaMode === 'MASK' ? 1 : 0;
       out[at + 2] = m.doubleSided ? 1 : 0;
+      f.set([m.clearcoatFactor??0,m.clearcoatRoughnessFactor??0,m.clearcoatNormalScale??1,m.sheenRoughnessFactor??0],at+32);
+      f.set(m.sheenColorFactor??[0,0,0],at+36);f[at+39]=m.specularFactor??1;
+      f.set(m.specularColorFactor??[1,1,1],at+40);f[at+43]=m.iridescenceFactor??0;
+      f.set([m.iridescenceIor??1.3,m.iridescenceThicknessMinimum??100,m.iridescenceThicknessMaximum??400],at+44);
+
       MAPS.forEach((key, i) => out[at + 16 + i] = m[key] ? base + textures.get(m[key]!)! : 0);
     }
     for (const [t, offset] of textures) {

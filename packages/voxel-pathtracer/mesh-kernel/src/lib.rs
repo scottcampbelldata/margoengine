@@ -445,6 +445,7 @@ fn build(input: &[u32]) -> Result<Vec<u32>, u32> {
 
 // Two-level instancing: transform bounds once, leave shared triangles untouched.
 // Input records: object bounds (8), column-major affine matrix (16), metadata (4).
+// Metadata flags: bit 0 is empty; bit 1 identifies branch()'s one-ULP BLAS padding.
 // Output records: world/local row-major 3x4 (24), metadata (4), padding (4).
 fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
     if input.len() % 28 != 0 || input.len() / 28 > 1_000_000 { return Err(1); }
@@ -466,18 +467,32 @@ fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
         }
         if local.iter().flatten().any(|v| !v.is_finite() || v.abs() > 1e8) { return Err(1); }
         // Empty definitions have no TLAS leaf, but must still validate their placement.
-        if record[27] != 0 { continue; }
+        if record[27] & !3 != 0 { return Err(1); }
+        if record[27] & 1 != 0 { continue; }
         let object_lo: [f64; 3] = std::array::from_fn(|a| f32::from_bits(record[a]) as f64);
         let object_hi: [f64; 3] = std::array::from_fn(|a| f32::from_bits(record[4+a]) as f64);
         if (0..3).any(|a| !object_lo[a].is_finite() || !object_hi[a].is_finite() || object_lo[a] > object_hi[a]) { return Err(1); }
+        // The public coordinate limit applies to geometry, not the conservative
+        // padding stored by branch(). Undo that exact, tagged padding only for
+        // validation; traversal below still transforms the full outward box.
+        let geometric_lo: [f64; 3] = std::array::from_fn(|a| if record[27] & 2 != 0 {
+            f32::from_bits(record[a]).next_up() as f64
+        } else { object_lo[a] });
+        let geometric_hi: [f64; 3] = std::array::from_fn(|a| if record[27] & 2 != 0 {
+            f32::from_bits(record[4+a]).next_down() as f64
+        } else { object_hi[a] });
+        if (0..3).any(|a| geometric_lo[a] > geometric_hi[a]) { return Err(1); }
         let mut lo = [f64::INFINITY; 3]; let mut hi = [f64::NEG_INFINITY; 3];
         for corner in 0..8 {
             let p: [f64; 3] = std::array::from_fn(|a| if corner & (1 << a) == 0 { object_lo[a] } else { object_hi[a] });
+            let geometric: [f64; 3] = std::array::from_fn(|a| if corner & (1 << a) == 0 { geometric_lo[a] } else { geometric_hi[a] });
             for r in 0..3 {
+                let actual = world[r][3] + (0..3).map(|c| world[r][c] * geometric[c]).sum::<f64>();
+                if !actual.is_finite() || actual.abs() > 1e8 { return Err(1); }
                 let v = world[r][3] + (0..3).map(|c| world[r][c] * p[c]).sum::<f64>();
                 // Conservative gamma(7) arithmetic interval, then outward f32 rounding.
                 let error = 4.172327e-7 * (world[r][3].abs() + (0..3).map(|c| (world[r][c] * p[c]).abs()).sum::<f64>());
-                if !v.is_finite() || v.abs() > 1e8 { return Err(1); }
+                if !v.is_finite() { return Err(1); }
                 lo[r] = lo[r].min(v-error); hi[r] = hi[r].max(v+error);
             }
         }
@@ -487,7 +502,7 @@ fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
             center: std::array::from_fn(|a| (lo[a]+hi[a])*0.5),
         });
         for rows in [world, local] { records.extend(rows.into_iter().flatten().map(|v| (v as f32).to_bits())); }
-        records.extend_from_slice(&record[24..28]); records.extend([0;4]);
+        records.extend_from_slice(&record[24..27]); records.push(0); records.extend([0;4]);
     }
     let mut nodes = Vec::new();
     if !bounds.is_empty() { branch(&bounds, &mut (0..bounds.len()).collect::<Vec<_>>(), &mut nodes, 0); }
@@ -568,6 +583,35 @@ mod tests {
             assert_eq!(build_instance_packet(&invalid).err(),Some(1));
         }
         assert_eq!(build_instance_packet(&[]).unwrap(),vec![0,4,0,0]);
+    }
+    fn padded_limit_record() -> Vec<u32> {
+        let mut packet=vec![0u32;28];
+        packet[..3].fill((-1f32).next_down().to_bits());
+        packet[4..7].fill(1f32.next_up().to_bits());
+        let matrix:[f32;16]=[1e8,0.,0.,0.,0.,1e8,0.,0.,0.,0.,1e8,0.,0.,0.,0.,1.];
+        packet[8..24].copy_from_slice(&matrix.map(f32::to_bits));
+        packet[24..28].copy_from_slice(&[100,20,9,2]);packet
+    }
+    #[test]
+    fn instance_geometry_limit_excludes_only_tagged_acceleration_padding() {
+        let out=build_instance_packet(&padded_limit_record()).unwrap();
+        assert_eq!(out[0],1);
+        for a in 0..3 {
+            assert!(f32::from_bits(out[4+a]) < -1e8);
+            assert!(f32::from_bits(out[8+a]) > 1e8);
+        }
+        assert_eq!(out[39],0,"input padding provenance is not an output instance flag");
+    }
+    #[test]
+    fn instance_limit_still_rejects_one_geometry_ulp_beyond_either_boundary() {
+        for a in 0..3 {
+            for negative in [false,true] {
+                let mut packet=padded_limit_record();
+                if negative {packet[a]=(-1f32).next_down().next_down().to_bits();}
+                else {packet[4+a]=1f32.next_up().next_up().to_bits();}
+                assert_eq!(build_instance_packet(&packet).err(),Some(1));
+            }
+        }
     }
     fn input() -> Vec<u32> {
         let mut v = vec![1, 3, 3, 1];

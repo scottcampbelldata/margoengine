@@ -27,6 +27,8 @@ export class MeshLightingBuilder implements TraceGeometryBuilder {
       const code=k.build_lights(p,size);if(code)throw new RangeError(`Mesh emitter packet is invalid or exceeds 128 MiB (${code}); check meshes and pass fewer instances`);
       lights=new Uint32Array(k.memory.buffer,k.output_ptr(),k.output_len()).slice();
     }finally{k.release(p,size);}
+    // Retain the complete proposal schedule in the feature-local light header.
+    lights[lights[12]!+4]=7;
     signal?.throwIfAborted();return appendSpots(lights,spots);
   }
   dispose():void{this.#base.dispose();}

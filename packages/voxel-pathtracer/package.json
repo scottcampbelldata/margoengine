@@ -111,7 +111,8 @@
     "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs",
     "test:gpu:mesh-pbr": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs",
     "test:gpu:denoise-ml": "cd ../.. && node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs",
-    "test:gpu:mesh-lights": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs"
+    "test:gpu:mesh-lights": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs",
+    "test:gpu:mesh-pbr-lobes": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -134,7 +135,8 @@
       "test:gpu:mesh-instances": 7,
       "test:gpu:mesh-pbr": 5,
       "test:gpu:denoise-ml": 3,
-      "test:gpu:mesh-lights": 5
+      "test:gpu:mesh-lights": 5,
+      "test:gpu:mesh-pbr-lobes": 7
     }
   },
   "peerDependenciesMeta": {

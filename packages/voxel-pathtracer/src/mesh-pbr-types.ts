@@ -45,6 +45,46 @@ export interface TracePBRMaterial {
   normalScale?: number;
   /** sRGB emissive colour. */
   emissiveTexture?: TracePBRTexture;
+  /** Clearcoat layer intensity. Default 0. */
+  clearcoatFactor?: number;
+  /** Clearcoat perceptual roughness. Default 0. */
+  clearcoatRoughnessFactor?: number;
+  /** Linear clearcoat intensity in red. */
+  clearcoatTexture?: TracePBRTexture;
+  /** Linear clearcoat roughness in green. */
+  clearcoatRoughnessTexture?: TracePBRTexture;
+  /** Independent tangent-space clearcoat normal. */
+  clearcoatNormalTexture?: TracePBRTexture;
+  /** Clearcoat tangent-space XY scale. Default 1. */
+  clearcoatNormalScale?: number;
+  /** Linear sheen RGB. Default [0,0,0]. */
+  sheenColorFactor?: TraceVec3;
+  /** Sheen perceptual roughness. Default 0. */
+  sheenRoughnessFactor?: number;
+  /** sRGB sheen color. */
+  sheenColorTexture?: TracePBRTexture;
+  /** Linear sheen roughness in alpha. */
+  sheenRoughnessTexture?: TracePBRTexture;
+  /** Dielectric specular strength. Default 1. */
+  specularFactor?: number;
+  /** Linear dielectric F0 multiplier, clamped after multiplying 0.04. Default [1,1,1]. */
+  specularColorFactor?: TraceVec3;
+  /** Linear dielectric specular strength in alpha. */
+  specularTexture?: TracePBRTexture;
+  /** sRGB dielectric F0 multiplier. */
+  specularColorTexture?: TracePBRTexture;
+  /** Thin-film Fresnel blend. Default 0. */
+  iridescenceFactor?: number;
+  /** Thin-film index of refraction. Default 1.3. */
+  iridescenceIor?: number;
+  /** Minimum film thickness in nanometers. Default 100. */
+  iridescenceThicknessMinimum?: number;
+  /** Maximum film thickness in nanometers. Default 400. */
+  iridescenceThicknessMaximum?: number;
+  /** Linear thin-film blend in red. */
+  iridescenceTexture?: TracePBRTexture;
+  /** Linear thickness interpolation in green; without a texture maximum is used. */
+  iridescenceThicknessTexture?: TracePBRTexture;
   /** OPAQUE or binary MASK coverage. Default OPAQUE. */
   alphaMode?: 'OPAQUE' | 'MASK';
   /** MASK coverage threshold. Default 0.5. */

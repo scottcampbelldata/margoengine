@@ -1,0 +1,1830 @@
+{
+  "status": "canonical native and compatibility acceptance passed; extra cold-cache defect tracked",
+  "date": "2026-11-10",
+  "finalGPU": {
+    "mesh": {
+      "ticket": "001794291668961-68336-carhwrna",
+      "status": {
+        "ticket": "001794291668961-68336-carhwrna",
+        "state": "passed",
+        "queuedMs": 150,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 29
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "coverage": [
+              {
+                "name": "shared edges and flat bounds",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                },
+                "maximumError": 0,
+                "ids": [
+                  -4,
+                  -5
+                ]
+              },
+              {
+                "name": "degenerates skipped with original triangle IDs",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 2,
+                  "nodes": 3
+                },
+                "ids": [
+                  -5,
+                  -6
+                ],
+                "expectedIds": [
+                  -5,
+                  -6
+                ],
+                "expectedGeometry": {
+                  "triangles": 2,
+                  "skipped": 2,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "all-degenerate geometry is an empty scene",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 2,
+                  "nodes": 0
+                },
+                "expectedGeometry": {
+                  "triangles": 0,
+                  "skipped": 2,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "double sided emission",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel before triangles",
+                "actual": [
+                  1.5,
+                  0.75,
+                  1.125
+                ],
+                "expected": [
+                  1.5,
+                  0.75,
+                  1.125
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "triangles before voxel",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "diffuse analytic sun",
+                "actual": [
+                  0.20000000298023224,
+                  0.4000000059604645,
+                  0.800000011920929
+                ],
+                "expected": [
+                  0.2,
+                  0.4,
+                  0.8
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel shadow on mesh",
+                "actual": [
+                  0.15000000223517418,
+                  0.30000000447034836,
+                  0.6000000089406967
+                ],
+                "expected": [
+                  0.15,
+                  0.3,
+                  0.6
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "mesh shadow on voxel",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "mesh reflects voxel emitter",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel reflects triangle emitter",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "closed glass white furnace",
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 4,
+                  "skipped": 0,
+                  "nodes": 7
+                }
+              },
+              {
+                "name": "65 layers nearest traversal",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 130,
+                  "skipped": 0,
+                  "nodes": 195
+                }
+              },
+              {
+                "name": "huge finite geometry",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "exact cancellation predicates",
+                "finite": true,
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "cases": 4096
+              },
+              {
+                "name": "empty",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "zero triangles",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "empty mesh baseline parity",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                },
+                "differing": 0
+              }
+            ],
+            "furnaces": [
+              {
+                "name": "diffuse inside mesh glass ior 1",
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse behind mesh glass ior 1",
+                "actual": [
+                  0.9967486849054694,
+                  0.9967486849054694,
+                  0.9967486849054694
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse inside mesh glass ior 1.5",
+                "actual": [
+                  0.9999809265136719,
+                  0.9999809265136719,
+                  0.9999809265136719
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse behind mesh glass ior 1.5",
+                "actual": [
+                  0.9992528599686921,
+                  0.9992528599686921,
+                  0.9992528599686921
+                ],
+                "finite": true
+              }
+            ],
+            "lifecycle": {
+              "newDevice": true,
+              "traced": 12288,
+              "disabled": 0,
+              "restored": 0,
+              "disposed": 0
+            },
+            "refusal": {
+              "code": "unsupported",
+              "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+            },
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "coverage": [
+              {
+                "name": "shared edges and flat bounds",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                },
+                "maximumError": 0,
+                "ids": [
+                  -4,
+                  -5
+                ]
+              },
+              {
+                "name": "degenerates skipped with original triangle IDs",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 2,
+                  "nodes": 3
+                },
+                "ids": [
+                  -5,
+                  -6
+                ],
+                "expectedIds": [
+                  -5,
+                  -6
+                ],
+                "expectedGeometry": {
+                  "triangles": 2,
+                  "skipped": 2,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "all-degenerate geometry is an empty scene",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 2,
+                  "nodes": 0
+                },
+                "expectedGeometry": {
+                  "triangles": 0,
+                  "skipped": 2,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "double sided emission",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel before triangles",
+                "actual": [
+                  1.5,
+                  0.75,
+                  1.125
+                ],
+                "expected": [
+                  1.5,
+                  0.75,
+                  1.125
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "triangles before voxel",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "diffuse analytic sun",
+                "actual": [
+                  0.20000000298023224,
+                  0.4000000059604645,
+                  0.800000011920929
+                ],
+                "expected": [
+                  0.2,
+                  0.4,
+                  0.8
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel shadow on mesh",
+                "actual": [
+                  0.15000000223517418,
+                  0.30000000447034836,
+                  0.6000000089406967
+                ],
+                "expected": [
+                  0.15,
+                  0.3,
+                  0.6
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "mesh shadow on voxel",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "mesh reflects voxel emitter",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "voxel reflects triangle emitter",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "closed glass white furnace",
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 4,
+                  "skipped": 0,
+                  "nodes": 7
+                }
+              },
+              {
+                "name": "65 layers nearest traversal",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 130,
+                  "skipped": 0,
+                  "nodes": 195
+                }
+              },
+              {
+                "name": "huge finite geometry",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 2,
+                  "skipped": 0,
+                  "nodes": 3
+                }
+              },
+              {
+                "name": "exact cancellation predicates",
+                "finite": true,
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "cases": 4096
+              },
+              {
+                "name": "empty",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "zero triangles",
+                "actual": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                }
+              },
+              {
+                "name": "empty mesh baseline parity",
+                "actual": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "expected": [
+                  2,
+                  1,
+                  0.5
+                ],
+                "finite": true,
+                "geometry": {
+                  "triangles": 0,
+                  "skipped": 0,
+                  "nodes": 0
+                },
+                "differing": 0
+              }
+            ],
+            "furnaces": [
+              {
+                "name": "diffuse inside mesh glass ior 1",
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse behind mesh glass ior 1",
+                "actual": [
+                  0.9967486867681146,
+                  0.9967486867681146,
+                  0.9967486867681146
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse inside mesh glass ior 1.5",
+                "actual": [
+                  0.9999809265136719,
+                  0.9999809265136719,
+                  0.9999809265136719
+                ],
+                "finite": true
+              },
+              {
+                "name": "diffuse behind mesh glass ior 1.5",
+                "actual": [
+                  0.9992528604343534,
+                  0.9992528604343534,
+                  0.9992528604343534
+                ],
+                "finite": true
+              }
+            ],
+            "lifecycle": {
+              "newDevice": true,
+              "traced": 12288,
+              "disabled": 0,
+              "restored": 0,
+              "disposed": 0
+            },
+            "refusal": {
+              "code": "unsupported",
+              "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+            },
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    },
+    "instances": {
+      "ticket": "001794291669226-93232-sxdk3qoq",
+      "status": {
+        "ticket": "001794291669226-93232-sxdk3qoq",
+        "state": "passed",
+        "queuedMs": 29111,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 23.6
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "translation",
+                "composed": false,
+                "maximumError": 0,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "rotation and nonuniform scale",
+                "composed": false,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 1.430511474609375e-06,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "shear",
+                "composed": false,
+                "maximumError": 1.1920928955078125e-07,
+                "maximumDepthError": 7.152557373046875e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "reflection and scale",
+                "composed": false,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 4.76837158203125e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "atomic invalid transform",
+                "composed": false,
+                "rejected": true,
+                "unchanged": true
+              },
+              {
+                "name": "translation",
+                "composed": true,
+                "maximumError": 0,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "rotation and nonuniform scale",
+                "composed": true,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 1.430511474609375e-06,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "shear",
+                "composed": true,
+                "maximumError": 1.1920928955078125e-07,
+                "maximumDepthError": 7.152557373046875e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "reflection and scale",
+                "composed": true,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 4.76837158203125e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "atomic invalid transform",
+                "composed": true,
+                "rejected": true,
+                "unchanged": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "translation",
+                "composed": false,
+                "maximumError": 0,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "rotation and nonuniform scale",
+                "composed": false,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 1.430511474609375e-06,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "shear",
+                "composed": false,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 7.152557373046875e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "reflection and scale",
+                "composed": false,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "atomic invalid transform",
+                "composed": false,
+                "rejected": true,
+                "unchanged": true
+              },
+              {
+                "name": "translation",
+                "composed": true,
+                "maximumError": 0,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "rotation and nonuniform scale",
+                "composed": true,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 1.430511474609375e-06,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "shear",
+                "composed": true,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 7.152557373046875e-07,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "reflection and scale",
+                "composed": true,
+                "maximumError": 5.960464477539063e-08,
+                "maximumDepthError": 0,
+                "aovMismatch": 0,
+                "finite": true,
+                "triangles": 2,
+                "instances": 2
+              },
+              {
+                "name": "atomic invalid transform",
+                "composed": true,
+                "rejected": true,
+                "unchanged": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    },
+    "attributes": {
+      "ticket": "001794291669483-110564-uj2agb3m",
+      "status": {
+        "ticket": "001794291669483-110564-uj2agb3m",
+        "state": "passed",
+        "queuedMs": 52775,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 29.5
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "barycentric normals under analytic sun",
+                "composed": false,
+                "maximumError": 1.9708664611428617e-07,
+                "finite": true
+              },
+              {
+                "name": "interpolated UV texels and shared edge",
+                "composed": false,
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "barycentric normals under analytic sun",
+                "composed": true,
+                "maximumError": 1.9708664611428617e-07,
+                "finite": true
+              },
+              {
+                "name": "interpolated UV texels and shared edge",
+                "composed": true,
+                "maximumError": 0,
+                "finite": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "barycentric normals under analytic sun",
+                "composed": false,
+                "maximumError": 1.9708664611428617e-07,
+                "finite": true
+              },
+              {
+                "name": "interpolated UV texels and shared edge",
+                "composed": false,
+                "maximumError": 4.76837158203125e-07,
+                "finite": true
+              },
+              {
+                "name": "barycentric normals under analytic sun",
+                "composed": true,
+                "maximumError": 1.9708664611428617e-07,
+                "finite": true
+              },
+              {
+                "name": "interpolated UV texels and shared edge",
+                "composed": true,
+                "maximumError": 4.76837158203125e-07,
+                "finite": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    },
+    "lobes": {
+      "ticket": "001794291669735-102420-8rieu2ij",
+      "status": {
+        "ticket": "001794291669735-102420-8rieu2ij",
+        "state": "passed",
+        "queuedMs": 83003,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 30.6
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "clearcoat red intensity and green roughness match flat factors",
+                "maximumError": 2.384185791015625e-06,
+                "finite": true
+              },
+              {
+                "name": "sheen sRGB color and alpha roughness match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "specular alpha strength and sRGB F0 color match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "iridescence red blend and green thickness match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "clearcoat attenuates emission with the independently known normal-incidence Fresnel",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "licensed Khronos Box snapshot traces all four extension records",
+                "finite": true,
+                "triangles": 12,
+                "drawn": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "clearcoat red intensity and green roughness match flat factors",
+                "maximumError": 2.384185791015625e-06,
+                "finite": true
+              },
+              {
+                "name": "sheen sRGB color and alpha roughness match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "specular alpha strength and sRGB F0 color match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "iridescence red blend and green thickness match flat factors",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "clearcoat attenuates emission with the independently known normal-incidence Fresnel",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "licensed Khronos Box snapshot traces all four extension records",
+                "finite": true,
+                "triangles": 12,
+                "drawn": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    },
+    "pbr": {
+      "ticket": "001794291669993-110048-2tfjab1b",
+      "status": {
+        "ticket": "001794291669993-110048-2tfjab1b",
+        "state": "passed",
+        "queuedMs": 113920,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 36.2
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "base texture equals independently decoded linear factors",
+                "maximumError": 5.960464477539063e-08,
+                "finite": true
+              },
+              {
+                "name": "roughness green and metallic blue equal scalar factors",
+                "maximumError": 4.291534423828125e-06,
+                "finite": true
+              },
+              {
+                "name": "emissive texture equals independent radiance factors",
+                "maximumError": 5.960464477539062e-07,
+                "finite": true
+              },
+              {
+                "name": "alpha cutout equals empty geometry",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "normal texture equals independent vertex normals",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "licensed Khronos metadata Box snapshot survives model disposal",
+                "finite": true,
+                "triangles": 12,
+                "drawn": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "base texture equals independently decoded linear factors",
+                "maximumError": 5.960464477539063e-08,
+                "finite": true
+              },
+              {
+                "name": "roughness green and metallic blue equal scalar factors",
+                "maximumError": 3.814697265625e-06,
+                "finite": true
+              },
+              {
+                "name": "emissive texture equals independent radiance factors",
+                "maximumError": 1.9073486328125e-06,
+                "finite": true
+              },
+              {
+                "name": "alpha cutout equals empty geometry",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "normal texture equals independent vertex normals",
+                "maximumError": 0,
+                "finite": true
+              },
+              {
+                "name": "licensed Khronos metadata Box snapshot survives model disposal",
+                "finite": true,
+                "triangles": 12,
+                "drawn": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    },
+    "lights": {
+      "ticket": "001794291670240-104396-9f0e9x0i",
+      "status": {
+        "ticket": "001794291670240-104396-9f0e9x0i",
+        "state": "passed",
+        "queuedMs": 150620,
+        "result": {
+          "ok": true,
+          "timedOut": false,
+          "aborted": false,
+          "seconds": 38.9
+        }
+      },
+      "backends": [
+        {
+          "compat": false,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "webgpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "fallback": false
+            },
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "spot matches independent Lambert cosine inverse-square cone and finite-range irradiance",
+                "maximumError": 1.1650789509709547e-05,
+                "meanError": 4.813091545258132e-06,
+                "bound": 0.0001,
+                "samples": 1,
+                "first": [
+                  0.895080029964447,
+                  0.22377000749111176,
+                  0.05594250187277794
+                ],
+                "expected": [
+                  0.8950690180590807,
+                  0.22376725451477017,
+                  0.05594181362869254
+                ],
+                "finite": true
+              },
+              {
+                "name": "absolute IES candela matches independently specified spot intensity",
+                "maximumError": 1.154344544629371e-05,
+                "meanError": 4.944480614704934e-06,
+                "bound": 0.0001,
+                "samples": 1,
+                "first": [
+                  0.895197331905365,
+                  0.22379933297634125,
+                  0.05594983324408531
+                ],
+                "expected": [
+                  0.8951860120138363,
+                  0.22379650300345907,
+                  0.05594912575086477
+                ],
+                "finite": true
+              },
+              {
+                "name": "mesh blocks spot and IES paths",
+                "maximumError": 0,
+                "meanError": 0,
+                "bound": 1e-07,
+                "samples": 1,
+                "first": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true
+              },
+              {
+                "name": "two emissive triangles agree with independent rectangular area integral including reciprocal MIS",
+                "maximumError": 2.76440661716032e-05,
+                "meanError": -1.3441688990225185e-07,
+                "bound": 0.0002,
+                "samples": 4096,
+                "first": [
+                  0.10050182789564133,
+                  0.02512545697391033,
+                  0.00502508832141757
+                ],
+                "expected": [
+                  0.10051233616598275,
+                  0.025128084041495687,
+                  0.005025616808299138
+                ],
+                "finite": true
+              },
+              {
+                "name": "PBR alpha holes contribute no mesh-emitter radiance",
+                "maximumError": 0,
+                "meanError": 0,
+                "bound": 1e-07,
+                "samples": 16,
+                "first": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true
+              },
+              {
+                "name": "textured PBR mesh emitter matches independently decoded flat radiance",
+                "maximumError": 1.1175870895385742e-08,
+                "meanError": 2.3768128206332526e-09,
+                "bound": 1e-05,
+                "samples": 16,
+                "first": [
+                  0.021032512187957764,
+                  0.02467263489961624,
+                  0
+                ],
+                "expected": [
+                  0.021032506600022316,
+                  0.02467263489961624,
+                  0
+                ],
+                "finite": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        },
+        {
+          "compat": true,
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "rows": [
+              {
+                "name": "spot matches independent Lambert cosine inverse-square cone and finite-range irradiance",
+                "maximumError": 1.1650789509709547e-05,
+                "meanError": 4.799645575587121e-06,
+                "bound": 0.0001,
+                "samples": 1,
+                "first": [
+                  0.895080029964447,
+                  0.22377000749111176,
+                  0.05594250187277794
+                ],
+                "expected": [
+                  0.8950690180590807,
+                  0.22376725451477017,
+                  0.05594181362869254
+                ],
+                "finite": true
+              },
+              {
+                "name": "absolute IES candela matches independently specified spot intensity",
+                "maximumError": 1.154344544629371e-05,
+                "meanError": 4.92125575800046e-06,
+                "bound": 0.0001,
+                "samples": 1,
+                "first": [
+                  0.895197331905365,
+                  0.22379933297634125,
+                  0.05594983324408531
+                ],
+                "expected": [
+                  0.8951860120138363,
+                  0.22379650300345907,
+                  0.05594912575086477
+                ],
+                "finite": true
+              },
+              {
+                "name": "mesh blocks spot and IES paths",
+                "maximumError": 0,
+                "meanError": 0,
+                "bound": 1e-07,
+                "samples": 1,
+                "first": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true
+              },
+              {
+                "name": "two emissive triangles agree with independent rectangular area integral including reciprocal MIS",
+                "maximumError": 2.762916501040935e-05,
+                "meanError": -1.3481949289023665e-07,
+                "bound": 0.0002,
+                "samples": 4096,
+                "first": [
+                  0.10050182789564133,
+                  0.02512545697391033,
+                  0.00502508832141757
+                ],
+                "expected": [
+                  0.10051233616598275,
+                  0.025128084041495687,
+                  0.005025616808299138
+                ],
+                "finite": true
+              },
+              {
+                "name": "PBR alpha holes contribute no mesh-emitter radiance",
+                "maximumError": 0,
+                "meanError": 0,
+                "bound": 1e-07,
+                "samples": 16,
+                "first": [
+                  0,
+                  0,
+                  0
+                ],
+                "expected": [
+                  0,
+                  0,
+                  0
+                ],
+                "finite": true
+              },
+              {
+                "name": "textured PBR mesh emitter matches independently decoded flat radiance",
+                "maximumError": 1.6763806343078613e-08,
+                "meanError": 6.44164780775706e-09,
+                "bound": 1e-05,
+                "samples": 16,
+                "first": [
+                  0.021032510325312614,
+                  0.024672646075487137,
+                  0
+                ],
+                "expected": [
+                  0.021032504737377167,
+                  0.02467263489961624,
+                  0
+                ],
+                "finite": true
+              }
+            ],
+            "errors": [],
+            "messages": []
+          }
+        }
+      ]
+    }
+  },
+  "sizes": {
+    "sizes": {
+      "mesh": 41299,
+      "mesh-pbr": 47760,
+      "denoise-ml": 6768
+    },
+    "coreAndStage": 24209,
+    "gltfThinFilmUnchanged": true,
+    "gltfThinFilmSHA256": "6bf710de88813ee1a948311267eae67faa0c8429e3e32ffeb6db813502973b97"
+  },
+  "deterministicWork": {
+    "emitterTextureEvaluations": {
+      "before": 14,
+      "after": 4
+    },
+    "sampleFresnelEvaluations": {
+      "before": 3,
+      "after": 2
+    }
+  },
+  "regressions": {
+    "rustTests": 10,
+    "lobeTests": 10,
+    "geometryDomain": "inclusive +/-1e8; tagged acceleration padding retained; real one-ULP excess rejects",
+    "dependentCPU": "five graph batches completed; stale material source-location assertion updated to actual shader export; existing skip retained"
+  },
+  "unresolved": {
+    "extraLaunchArgument": "--disable-gpu-shader-disk-cache",
+    "lastElapsedSeconds": 231.9,
+    "perImageSignalMs": 120000,
+    "phase": "after ready, GL link and first draw submission",
+    "cause": "deferred driver compilation/resource pressure inferred; exact cause unisolated",
+    "disposition": "known-bugs and private finish-later, rules 3/21/22; no timeout waiver"
+  }
+}

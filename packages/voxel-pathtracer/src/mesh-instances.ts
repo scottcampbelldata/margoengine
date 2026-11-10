@@ -153,7 +153,7 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
         words = next.get(i.mesh.id)!.words;
       if (words[0] !== 0) request.set(words.subarray(4, 12), at);
       f.set(i.matrix, at + 8);
-      request.set([offsets.get(i.mesh.id)!, i.base, i.index, words[0] === 0 ? 1 : 0], at + 24);
+      request.set([offsets.get(i.mesh.id)!, i.base, i.index, words[0] === 0 ? 1 : 2], at + 24);
     });
     const p = k.allocate(request.length);
     let top: Uint32Array;

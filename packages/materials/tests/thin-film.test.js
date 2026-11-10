@@ -75,8 +75,7 @@ test('a real film colours the reflection and its colour depends on thickness', (
 test('the film phase compares the base IOR per channel', async () => {
   assert.match(iridescenceWGSL, /filmBase<vec3f\(filmEta\)/);
   assert.doesNotMatch(iridescenceWGSL, /filmBase<filmEta\b/);
-  const { readFile } = await import('node:fs/promises');
-  const pro = await readFile(new URL('../../gltf-pro/src/shader.ts', import.meta.url), 'utf8');
+  const { iridescenceWgsl: pro } = await import('../../gltf-pro/src/shader.ts');
   assert.match(pro, /base<vec3f\(film\)/);
   assert.doesNotMatch(pro, /base<film\b/);
 });

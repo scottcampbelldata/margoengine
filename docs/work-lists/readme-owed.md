@@ -733,3 +733,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 212 dynamics): document generated mixer/dynamics alias.
 - @margoengine/sciviz (batch 173 job 1): document /transfer physical units, rectangle/triangle/Gaussian widgets, modality presets, histogram, editor/binding lifetimes, existing-volume LUT updates, preintegration and its step/density assumptions; examples deferred.
 - margoengine (batch 173 job 1): document optional sciviz/transfer alias after build phase.
+
+
+
+- @margoengine/voxel-pathtracer (batch 243 job 3): document clearcoat, sheen, iridescence and specular factors/maps, independent coat normal, energy layering and loaded glTF snapshots; defer examples by rule 20.
+- @margoengine/gltf-pro (batch 243 job 3): thin-film text now shares the same internal implementation with mesh-pbr; public raster behavior is unchanged and README work is deferred by rule 20.
+
+- @margoengine/materials (batch 243 job 3): thin-film verification now reads the actual unchanged shared shader export; README review remains deferred by rule 20.
