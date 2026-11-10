@@ -2663,3 +2663,5 @@ packages/inspector/test/gizmo-browser.mjs as one command; repeat with --compat
 appended. All three modes use real pointer drags, rendered colour checks and
 exact local pose comparisons after undo/redo. Package test:browser:gizmo and
 test:browser:gizmo:compat expose both routes to check:gpu-packages.
+
+Batch 254 pan: build packages, run node --test --test-timeout=60000 packages/audio/tests/pan.test.js, then node scripts/gpu-lock.mjs run --owner=audio-pan --max=4 --wait-max=60 -- node packages/audio/scripts/test-browser.js. pan-browser.js compares PCM to W3C mono/stereo equations; test-results/audio-browser.json stores the browser report.

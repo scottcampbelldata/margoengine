@@ -3853,3 +3853,6 @@ within its existing ceiling. Core plus stage remains 23,950 B. Gizmo limits are
 those of controls/transform (including parent shear handling); the bridge adds no
 new transform math. One drag is one undo command. Disposed entities are not
 resurrected by transform history and recycled slots are never targeted.
+
+### Batch 254 stereo pan
+Optional @margoengine/audio/pan: 677 B minified gzip (new entry, previous 0 B). StereoAudio inherits Audio playback/filter/loop/seek features and routes volume through native StereoPannerNode. pan defaults to 0, finite -1..1, smoothed by listener.smoothing. No 3D positioning. The native panner is available for explicit automation. Browser PCM covers mono equal power and stereo balance at -1, 0 and 1. Other browsers and listening tests unmeasured. Core/stage unchanged.

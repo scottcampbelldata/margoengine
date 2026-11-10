@@ -5670,3 +5670,6 @@ sceneOf contract, cleanup now resolves the owner by plugin identity before
 removing its name. No ownership type system is claimed or implemented. The
 regression keeps a default inspector alive while disposing another scene's
 inspector and both gizmo plugins.
+
+### Batch 254 stereo pan (2026-11-10)
+Clean-room implementation from Web Audio API 1.1, W3C Audio Working Group (2026), https://www.w3.org/TR/webaudio-1.1/#stereopannernode and https://www.w3.org/TR/webaudio-1.1/#stereopanner-algorithm. Compared the mono equal-power and stereo balance equations with the existing sound graph; native StereoPannerNode preserves both cases and native AudioParam automation without a custom DSP loop. No rival source read. Browser PCM tests use generated constant signals as analytic stimuli, not demo recordings. Existing rain fixture remains CC BY 4.0.

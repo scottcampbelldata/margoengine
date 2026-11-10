@@ -3153,3 +3153,5 @@ not become inspector canvas picks. Browser proof drags actual handles, checks
 rendered axis pixels and exact transform undo/redo on native WebGPU, WebGL2
 preview and forced WebGL2 compatibility. CPU regressions cover cancellation,
 recycled slots, abort, toolbar and owner-scene disposal. No speed claim is made.
+
+Batch 254 stereo pan: @margoengine/audio/pan uses native StereoPannerNode for non-positional mono/stereo sounds. CPU graph/lifecycle tests and real browser Web Audio offline rendering check the six endpoint/centre cases against W3C equations. Device output and listening quality unmeasured.

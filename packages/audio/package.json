@@ -58,6 +58,10 @@
     "./ambisonics": {
       "types": "./dist/ambisonics.d.ts",
       "import": "./dist/ambisonics.js"
+    },
+    "./pan": {
+      "types": "./dist/pan.d.ts",
+      "import": "./dist/pan.js"
     }
   },
   "files": [

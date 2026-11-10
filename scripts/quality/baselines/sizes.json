@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12245462,
+  "total": 12246395,
   "history": [
     {
       "date": "2026-10-24",
@@ -5552,6 +5552,11 @@
       "commit": "batch-262-job2",
       "reason": "New optional inspector/gizmo: absent to 1887 B, explicitly imports existing controls/transform (11877 B). This chosen subpath owns move, rotate and scale; splitting its controls would complicate the API and lifecycle. Root inspector ownership fix: 9071 to 9073 B, within its existing ceiling. Core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-254",
+      "reason": "New optional stereo pan entry 0 -> 677 B; native panner and inherited Audio playback avoid duplicating source lifecycle."
     }
   ],
   "items": {
@@ -6601,6 +6606,7 @@
     "@margoengine/netcode/migrate": 8607,
     "@margoengine/input/xr": 1931,
     "@margoengine/inspector/gizmo": 2143,
-    "leak @margoengine/inspector/gizmo -> @margoengine/controls/transform": 1
+    "leak @margoengine/inspector/gizmo -> @margoengine/controls/transform": 1,
+    "@margoengine/audio/pan": 933
   }
 }

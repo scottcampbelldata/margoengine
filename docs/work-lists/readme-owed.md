@@ -103,3 +103,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated input/xr alias | batch-253 job 2 |
 | @margoengine/inspector | Selection gizmos, camera arbitration, toolbar and whole-drag undo. | Batch 262 job 2 |
 | margoengine | Optional inspector/gizmo import. | Batch 262 job 2 |
+
+
+
+- @margoengine/audio/pan: StereoAudio pan -1..1, native AudioParam automation, non-positional mono/stereo input and disposal.

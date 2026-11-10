@@ -48,6 +48,7 @@ try {
   report.music = await page.evaluate(() => window.runMusicTests());
   report.zones = await page.evaluate(() => window.runZoneTests());
   report.ambisonics = await page.evaluate(() => window.runAmbisonicTests());
+  report.pan = await page.evaluate(() => window.runPanTests());
   assert.equal(await page.evaluate(() => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
   assert.equal(await page.evaluate(() => window.checkGesture()), 'running');
