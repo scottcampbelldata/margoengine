@@ -3234,6 +3234,10 @@
       "types": "./dist/tween/async.d.ts",
       "import": "./dist/tween/async.js"
     },
+    "./tween/props": {
+      "types": "./dist/tween/props.d.ts",
+      "import": "./dist/tween/props.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

@@ -3774,3 +3774,7 @@ proven Wasm gain for the default-size contact checks. Core + stage remains
 ### Tween async entry (batch 215)
 
 Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stage source unchanged. Tween root is 5513 B gzip after adding cancellation checks inside repeat/update callbacks. Each operation owns a driver and a promise allocated on creation. No automatic clock; cancelled values remain where last written. Group waits snapshot active work; retain a task to await its removed result. Timeline replay creates a new promise. Rejections must be observed by callers.
+
+### Tween property entry (batch 215 job 2)
+
+New tween/props entry: 3223 B gzip from 0 B. Numeric writable object/vector properties only; destination lists are explicit starts and evenly spaced keys. Frame lists support ordered offsets and segment easing; missing properties hold the preceding key. Relative +=, -=, *= and /= values resolve against preceding endpoints. from/fromTo and explicit keys render their first values immediately. Caller supplies update deltas; local speed defaults to 1. Rejections must be observed. Core/stage unchanged.

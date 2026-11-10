@@ -80,3 +80,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/tween: awaitable AsyncTween tasks and AsyncTimeline, AbortSignal cancellation, replay and caller-owned clocks (batch 215 job 1).
 - margoengine: optional tween/async re-export and the same await/cancel lifecycle (batch 215 job 1).
+- @margoengine/tween: props to/from/fromTo, relative arithmetic, Vector3, keyframe values/offsets, immediate starts, pause/speed and AbortSignal (batch 215 job 2).
+- margoengine: tween/props alias (batch 215 job 2).

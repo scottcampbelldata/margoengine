@@ -3090,3 +3090,7 @@ adds transition memory; no continuous-motion or production-scale speed claim.
 ### Tween completion and cancellation (batch 215)
 
 The optional tween/async entry offers awaitable scalar, array, path and custom operations and timelines; AbortSignal cancels future writes and preserves its reason. Evidence: packages/tween/test/async.test.js, including replacement, repeat/yoyo, pause/replay, disposal and propagated errors. Public behaviour comparison: GSAP Timeline.then and Motion animate completion controls, linked in clean-room.md. New entry 3431 B gzip; no core/stage source change.
+
+### Object and vector tween channels (batch 215 job 2)
+
+Optional tween/props supplies to, from, fromTo, relative arithmetic and property/keyframe lists, matching the requested GSAP-style numeric-object row. Analytic results for actual Vector3, mixed channels, offsets, easing and repeat/yoyo are asserted in packages/tween/test/props.test.js. Atomic invalid-input and exact cancellation tests cover lifecycle behaviour. Entry: 3223 B gzip.

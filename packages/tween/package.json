@@ -45,6 +45,10 @@
     "./async": {
       "types": "./dist/async.d.ts",
       "import": "./dist/async.js"
+    },
+    "./props": {
+      "types": "./dist/props.d.ts",
+      "import": "./dist/props.js"
     }
   },
   "files": [

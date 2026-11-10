@@ -2613,3 +2613,7 @@ after it. All region and lifecycle fixtures are generated and need no GPU.
 ### Tween async (batch 215)
 
 Run npm test --workspace @margoengine/tween. async.test.js uses deterministic caller-supplied deltas, never timing assertions. Measure the optional entry with scripts/measure-size.js bundleBytes over packages/tween/dist/async.js, gzipSync length, bare imports external. No speed measurement is claimed.
+
+### Tween property sampling (batch 215 job 2)
+
+Build packages and run node --test --test-timeout=120000 packages/tween/test/props.test.js. Samples use explicit deltas and analytic expected values, not wall-clock timing. Measure packages/tween/dist/props.js with bundleBytes and gzipSync from scripts/measure-size.js, leaving bare imports external.
