@@ -35,6 +35,9 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}tests/labels.html`);
   await page.waitForFunction(() => typeof window.runLabelTests === 'function');
   const report = await page.evaluate(() => window.runLabelTests());
+  await page.goto(`${server.resolvedUrls.local[0]}tests/gpu.html`);
+  await page.waitForFunction(() => typeof window.runGPULabelTests === 'function');
+  report.gpu = await page.evaluate(() => window.runGPULabelTests());
   report.browser = browser.version();
   assert.deepEqual(errors, []);
   await writeFile(resolve(results, 'labels-browser.json'), JSON.stringify(report, null, 2));

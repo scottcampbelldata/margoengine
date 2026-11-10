@@ -3165,3 +3165,6 @@ After build:packages run `node --test --test-timeout=60000 packages/tilemap/test
 Build packages; run node --test packages/animator/test/layers.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch211 --wait-max=60 --max=4 -- npm.cmd run test:gpu --workspace @margoengine/animator; repeat with MARGO_COMPAT=1. Layers use the existing Khronos Fox CC0 file, and synthetic CPU poses supply exact independent numerical oracles.
 ### Batch 233 job 4: road structures
 After build: node --test --test-timeout=120000 packages/road/test/structures.test.js; run the changed-package shared-lock road browser command above. Oblique fixtures check bridge decks/green piers and tunnel shell/green portal pixels on native WebGPU and WebGL2 compatibility, then exact reboot/disposal. CPU volume and clearance equations are independent oracles; no benchmark or timing assertion.
+
+### Batch 261 GPU label layer
+Build packages, then run node --test --test-timeout=120000 packages/labels/tests/*.test.js. Run node scripts/gpu-lock.mjs run --owner=labels-gpu --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js. The labels-browser.json report contains three rendering paths, near/far pixel extents, 100,000 glyphs/one draw and coincident grid work counts. No timing assertions or benchmarks.

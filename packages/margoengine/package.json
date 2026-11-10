@@ -1638,6 +1638,10 @@
       "types": "./dist/labels/callouts.d.ts",
       "import": "./dist/labels/callouts.js"
     },
+    "./labels/gpu": {
+      "types": "./dist/labels/gpu.d.ts",
+      "import": "./dist/labels/gpu.js"
+    },
     "./lighting2d": {
       "types": "./dist/lighting2d.d.ts",
       "import": "./dist/lighting2d.js"

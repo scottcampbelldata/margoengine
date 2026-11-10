@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13077807,
+  "total": 13089875,
   "history": [
     {
       "date": "2026-10-24",
@@ -6567,6 +6567,12 @@
       "commit": "b28e4c047",
       "reason": "Batch 233 job 4: new optional road/structures entry 0 to 3652 B gzip, ceiling 3908 B. Terrain/road classification, slab and open shell profiles share arc frames, metadata and pier exclusion. Splitting would duplicate those correctness boundaries.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-261",
+      "reason": "New optional labels/gpu entry, absent (0 B) before, 5778 B gzip after; one instanced SDF/color batch, priority-grid layout and native WebGL2 support. Split backend entries would complicate one portable plugin and lose the single entry contract. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7765,6 +7771,8 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/animator/layers": 10436,
-    "@margoengine/road/structures": 3908
+    "@margoengine/road/structures": 3908,
+    "@margoengine/labels/gpu": 6034,
+    "margoengine/labels/gpu": 6034
   }
 }

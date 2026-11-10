@@ -23,11 +23,12 @@ await build({
         index: resolve(root, 'src/index.ts'),
         declutter: resolve(root, 'src/declutter.ts'),
         callouts: resolve(root, 'src/callouts.ts'),
+        gpu: resolve(root, 'src/gpu.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/math/mat4'] },
+    rollupOptions: { external: (id) => id.startsWith('@margoengine/') },
   },
 });
 execFileSync(

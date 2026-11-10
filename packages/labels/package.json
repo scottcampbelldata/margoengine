@@ -42,6 +42,10 @@
     "./callouts": {
       "types": "./dist/callouts.d.ts",
       "import": "./dist/callouts.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [
@@ -49,7 +53,8 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/text": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"

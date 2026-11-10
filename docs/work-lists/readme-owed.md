@@ -520,3 +520,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/road (batch 233 job 4): structures automatic/authored spans, bridge supports, tunnel profiles/open portals, terrain entrance integration, crossing clearance, bounds and runnable example after build phase.
 - margoengine (batch 233 job 4): road/structures forwarding entry after build phase.
+
+- @margoengine/labels (batch 261 job 1): document optional GPU layer creation, collections, CSS sizing, grid priorities, atlas limits, cancellation and disposal; README examples deferred.
+- margoengine (batch 261 job 1): document labels/gpu alias; README examples deferred.

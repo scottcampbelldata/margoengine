@@ -2217,6 +2217,8 @@ Batch 209 GIF: shared exporter palette/codec CPU correctness includes LZW dictio
 
 Batch 207 meshopt: section-exact round trips cover seven file variants, plus bounded corrupt-stream and expansion-bomb rejection. Both backends compare all pixels of original and compressed static/animated draws. Existing codecs and GPU layouts are unchanged; no throughput/latency proof is claimed during the speed deferral.
 
+Batch 261 labels/gpu owns screen-space glyph expansion, SDF coverage and a single instanced draw, with priority-grid layout on CPU. Real WebGPU, native WebGL2 and compatibility WebGL2 evidence covers 100k labels, constant 87 by 30 pixel text at 5 and 50 units, behind-camera culling, cleanup and zero WebGPU validation errors. Atlas and buffer bounds are explicit; terrain occlusion and incremental upload are outside this entry. Core/stage stay unchanged.
+
 Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU slot.
 Batch 205 large: input/decoded/array/scene/geometry/texture/output budgets are per import and remain
 cumulative before allocation. CPU proof covers 200 MiB input and 2,500,002 complete expanded vertices.
