@@ -329,3 +329,23 @@ test('HoverHighlight outlines the picked mesh, keeps one pick in flight and clea
   assert.equal(canvas.listenerCount, 0);
   engine.dispose();
 });
+
+test('marquee bounds hold the whole perspective image of an off-axis bounding sphere', async () => {
+  const canvas = new FakeElement(),
+    store = await TransformStore.create(8),
+    renderer = { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
+    engine = new Runtime(canvas, store, renderer, { position: [0, 0, 10], target: [0, 0, 0] }, null),
+    mesh = engine.createMesh().setGeometry(box()).setPosition([2.4, 0, 7]);
+  engine.render();
+  // Sampled independently (fov 60, 800 x 600): the unit box's bounding sphere (radius sqrt(3) / 2) images to x 649.3 to
+  // 1057.6, while a radius offset beside the centre reaches only 665.7. A strip at x 652 to 662 meets the image.
+  assert.deepEqual(selectInRect(engine, { x: 652, y: 250, width: 10, height: 100 }, { mode: 'overlap' }), [mesh]);
+  // Nearer the axis, at (1.2, 0.8, 7): image x 456.9 to 796.5 and y -13.8 to 311.5, so this window does not hold it,
+  // though the circle of a radius offset (x 457.8 to 757.8, y 11.4 to 311.4) would fit inside.
+  mesh.setPosition([1.2, 0.8, 7]);
+  engine.render();
+  const window = { x: 450, y: 5, width: 330, height: 315 };
+  assert.deepEqual(selectInRect(engine, window, { mode: 'contain' }), []);
+  assert.deepEqual(selectInRect(engine, { x: 450, y: -20, width: 350, height: 340 }, { mode: 'contain' }), [mesh]);
+  engine.dispose();
+});

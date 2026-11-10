@@ -12,7 +12,7 @@ export interface ScreenRect {
   width: number;
   height: number;
 }
-/** How a mesh's projected bounding circle must meet the shape to be selected. */
+/** How a mesh's projected bounding sphere must meet the shape to be selected. */
 export type SelectMode =
   /** Its centre is inside (the default; fast and predictable for dense scenes). */
   | 'center'
@@ -34,8 +34,15 @@ export interface ScreenSelectOptions {
 
 interface Projected {
   mesh: Mesh;
+  /** The projected centre. */
   x: number;
   y: number;
+  /** Screen box of the projected bounding sphere (infinite when the sphere reaches the camera plane). */
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  /** Distance from the projected centre to the farthest corner of that box. */
   radius: number;
 }
 
@@ -66,12 +73,35 @@ function toPixel(m: ArrayLike<number>, p: ArrayLike<number>, width: number, heig
   return { x: ((x / w + 1) / 2) * width, y: ((1 - y / w) / 2) * height, w, z };
 }
 
-/** The visible geometry meshes of the engine with their projected bounding circles; those behind the camera are left out. */
+/**
+ * NDC bounds [x0, x1, y0, y1] of a world sphere under a view-projection matrix (column-major), or undefined when the
+ * sphere reaches the camera plane (w = 0) and its projection is unbounded. A clip plane x = s w is the world plane
+ * row0 - s row3; it touches the sphere where its distance from the centre equals the radius, which is a quadratic in s
+ * (the plane (n, d) touches the sphere (c, r) when (n . c + d)^2 = r^2 |n|^2, the dual quadric of the sphere).
+ */
+function sphereBounds(m: ArrayLike<number>, c: V3, r: number): [number, number, number, number] | undefined {
+  const row = (i: number) => [m[i], m[4 + i], m[8 + i], m[12 + i]];
+  // Plane pair form of the dual quadric: (n_a . c + d_a)(n_b . c + d_b) - r^2 (n_a . n_b).
+  const dual = (a: number[], b: number[]) =>
+    (a[0] * c[0] + a[1] * c[1] + a[2] * c[2] + a[3]) * (b[0] * c[0] + b[1] * c[1] + b[2] * c[2] + b[3]) -
+    r * r * (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
+  const w = row(3),
+    a = dual(w, w);
+  if (!(a > 0)) return undefined;
+  const out: number[] = [];
+  for (const k of [0, 1]) {
+    const q = row(k),
+      b = dual(q, w),
+      root = Math.sqrt(Math.max(0, b * b - a * dual(q, q)));
+    out.push((b - root) / a, (b + root) / a);
+  }
+  return out as [number, number, number, number];
+}
+
+/** The visible geometry meshes of the engine with their projected bounding spheres; those behind the camera are left out. */
 function project(engine: EngineKernel, options: ScreenSelectOptions): Projected[] {
   const runtime = engineRuntime(engine),
-    { camera, matrix, width, height } = frame(engine, options),
-    forward = unit(sub(camera.target, camera.position)),
-    right = unit(cross(forward, (camera.up as V3) ?? [0, 1, 0]));
+    { matrix, width, height } = frame(engine, options);
   const meshes = options.meshes ?? runtime.meshes.values();
   const out: Projected[] = [];
   for (const mesh of meshes) {
@@ -90,13 +120,15 @@ function project(engine: EngineKernel, options: ScreenSelectOptions): Projected[
       world = b[3] * scale;
     const c = toPixel(matrix, centre, width, height);
     if (!(c.w > 0)) continue;
-    const edge = toPixel(
-      matrix,
-      [centre[0] + right[0] * world, centre[1] + right[1] * world, centre[2] + right[2] * world],
-      width,
-      height,
-    );
-    out.push({ mesh, x: c.x, y: c.y, radius: Math.hypot(edge.x - c.x, edge.y - c.y) });
+    // The perspective image of a sphere is an ellipse stretched away from the view axis, wider than the image of a
+    // radius offset beside the centre (up to 2.4 times at a 60 degree field of view), so bound it exactly.
+    const ndc = sphereBounds(matrix, centre, world);
+    const left = ndc ? ((ndc[0] + 1) / 2) * width : -Infinity,
+      right = ndc ? ((ndc[1] + 1) / 2) * width : Infinity,
+      top = ndc ? ((1 - ndc[3]) / 2) * height : -Infinity,
+      bottom = ndc ? ((1 - ndc[2]) / 2) * height : Infinity;
+    const radius = Math.hypot(Math.max(c.x - left, right - c.x), Math.max(c.y - top, bottom - c.y));
+    out.push({ mesh, x: c.x, y: c.y, left, right, top, bottom, radius });
   }
   return out;
 }
@@ -115,11 +147,9 @@ export function selectInRect(engine: EngineKernel, rect: ScreenRect, options: Sc
   return project(engine, options)
     .filter((p) => {
       if (mode === 'center') return p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
-      if (mode === 'contain')
-        return p.x - p.radius >= x0 && p.x + p.radius <= x1 && p.y - p.radius >= y0 && p.y + p.radius <= y1;
-      const dx = Math.max(x0 - p.x, 0, p.x - x1),
-        dy = Math.max(y0 - p.y, 0, p.y - y1);
-      return dx * dx + dy * dy <= p.radius * p.radius;
+      // The box of the projected sphere is inside the rectangle exactly when the sphere's image is.
+      if (mode === 'contain') return p.left >= x0 && p.right <= x1 && p.top >= y0 && p.bottom <= y1;
+      return p.left <= x1 && p.right >= x0 && p.top <= y1 && p.bottom >= y0;
     })
     .map((p) => p.mesh);
 }
