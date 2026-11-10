@@ -4060,3 +4060,8 @@ Batch 251 job 1: no open defect found in reference expansion; missing registrati
 cycles and bounded expansion reject during construction (subtrees.test.js).
 
 Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+
+## tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
+
+- **Repro:** `node --test --test-reporter=tap tests/gpu-lock.test.js` on origin/main 896ebf844 while other lanes hold the shared GPU lock: five tests pass, then the file exits 1 with no failing subtest named (about 78 s). Selected tests (`--test-name-pattern`) pass.
+- **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).

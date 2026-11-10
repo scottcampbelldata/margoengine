@@ -216,16 +216,16 @@ test('shared FIFO tickets preserve arrival order when timestamps tie and owner n
 
 test('shared holders share: up to the slot count at once, the next waits for a free slot', () =>
   withLock(async (gpu) => {
-    const held = [await take(gpu, 'a'), await take(gpu, 'b'), await take(gpu, 'c')];
-    assert.equal(gpu.status().holders.length, 3);
-    const fourth = take(gpu, 'd');
-    assert.equal(await settled(fourth), 'waiting');
+    const held = [];
+    for (const owner of ['a', 'b', 'c', 'd', 'e']) held.push(await take(gpu, owner));
+    assert.equal(gpu.status().holders.length, 5);
+    const sixth = take(gpu, 'f');
+    assert.equal(await settled(sixth), 'waiting');
     held[1]();
-    assert.equal(await settled(fourth), 'got');
-    assert.equal(gpu.status().holders.length, 3);
-    (await fourth)();
-    held[0]();
-    held[2]();
+    assert.equal(await settled(sixth), 'got');
+    assert.equal(gpu.status().holders.length, 5);
+    (await sixth)();
+    for (const i of [0, 2, 3, 4]) held[i]();
     assert.equal(gpu.status().mode, 'idle');
   }));
 

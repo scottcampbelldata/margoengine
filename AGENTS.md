@@ -115,6 +115,6 @@ Scott's rule (2026-11-05): nothing lands undocumented. A change is not done unti
 - Never skip, weaken or shrink work to match another engine's speed. A speed fix does the same work with the same output. If a rival is faster because it does less, keep the work, publish the number as an accepted difference with its cause, what Margo does extra and the trade-off, and add a like-for-like row. Never change a benchmark scene so Margo does less.
 - Being slower than three.js is acceptable only with a measured, documented reason. A row with no valid reason is a loss to fix.
 - Model and effort: choose both for the job. Chores: Haiku or Sonnet, low or medium. Normal feature work: Sonnet or Opus, medium. Hard work: Opus high. Switch a stuck job to a stronger model.
-- Run at most 3 GPU jobs at once; benchmarks take the GPU alone.
+- Run at most 5 GPU jobs at once (Scott, 2026-11-10: "make 4 or 5 if the gpu can handle it"; measured at 3 slots: 5.8 of 48 GB, 36% load, 104 of 300 W, no driver resets in 3 days). If the driver resets (Windows event 4101) or a device is lost under load, go back to 3. Benchmarks take the GPU alone.
 - Pictures over 3,932,160 bytes are re-encoded with a reduced palette when read by an agent, which shows false bands. Run `scripts/review-png.mjs` first, or compare numbers.
 - New features come from the missing-features list (kept outside the repository) or from Scott's request. Each is a new optional entry of a package, never core.

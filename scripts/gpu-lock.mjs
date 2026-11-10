@@ -1,5 +1,5 @@
 // GPU access across agents and worktrees, as a reader/writer lock in test-results/gpu.lock of the MAIN checkout.
-//   shared     correctness tests: up to MARGO_GPU_SLOTS (default 3) holders at once. The default for `gpu.lock`.
+//   shared     correctness tests: up to MARGO_GPU_SLOTS (default 5) holders at once. The default for `gpu.lock`.
 //   exclusive  only commands that measure speed: `--exclusive` / acquire({mode: 'exclusive'}), and automatically every
 //              `bench*` npm script and every script under bench/, benchmarks/ or *-benchmarks/ (or named bench*.mjs).
 //              It waits until no holder is left and, while it waits, new shared holders queue behind it, so it cannot
@@ -28,7 +28,7 @@
 // owner.json, so it is waited for too. Old clients therefore take turns with new ones as with each other.
 // CLI: node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<agent id> -- <command...>
 //      node scripts/gpu-lock.mjs status
-// Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 requests exclusive but still needs speed
+// Env: MARGO_GPU_SLOTS=<n> shared slots (default 5); MARGO_GPU_EXCLUSIVE=1 requests exclusive but still needs speed
 // classification or a timing reason. MARGO_GPU_LOCK=<folder> uses another lock. Refusals are logged beside the lock.
 // MARGO_GPU_IDLE_MIN sizes the idle window for a measured compile (default 3), capped by the hard --max hold.
 // Scripts that take the lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it excuses only that
@@ -290,10 +290,10 @@ export function measuresSpeed(words, lifecycle = process.env.npm_lifecycle_event
   );
 }
 
-/** The number of shared slots: MARGO_GPU_SLOTS, default 3. */
+/** The number of shared slots: MARGO_GPU_SLOTS, default 5 (Scott 2026-11-10: at 3 slots the RTX A6000 used 5.8 of 48 GB, 36% load, 104 of 300 W). */
 export function slots() {
   const raw = process.env.MARGO_GPU_SLOTS;
-  if (raw === undefined || raw === '') return 3;
+  if (raw === undefined || raw === '') return 5;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1)
     throw new RangeError(`MARGO_GPU_SLOTS must be a whole number of 1 or more, got "${raw}"`);
