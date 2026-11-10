@@ -586,3 +586,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: document /glyph input/selection, defaults, six sources, ownership, warp contracts and NOAA/SEACAS demo; examples deferred during build phase.
 
 - margoengine: document sciviz/glyph optional alias after build phase.
+
+- @margoengine/fbx (batch 205 job 4): document surfaces extension, loaders/nurbs dependency, NURBS forms/weights/orders, patch bases, closure/caps, Step/budgets, page/worker and legacy composition, polygon-bake remedy for control-net deformation.

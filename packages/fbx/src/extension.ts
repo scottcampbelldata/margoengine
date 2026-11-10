@@ -43,6 +43,8 @@ export interface ExtensionHooks extends FBXExtension {
   document?(roots: FBXNode[], version: number, budget: ParseBudget): void;
   /** Lowest binary version this entry can normalize. Default 7100. */
   minimumVersion?: number;
+  /** Normalize parametric geometry after every document-generation migration. */
+  geometry?(roots: FBXNode[], budget: ParseBudget): void;
   /** After the node tree is built. True when it added something worth a file with no mesh. */
   scene?(ctx: SceneContext): boolean | void;
   /** Takes the skins and clusters the base reader refuses, and records what glTF has no place for. */

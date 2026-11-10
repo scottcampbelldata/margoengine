@@ -109,6 +109,7 @@ export async function parseDocument(
   if (!Number.isInteger(version) || version < minimumVersion || version > 7700)
     invalid(`unsupported version ${version}`);
   for (const extension of extensions) extension.document?.(roots, version, budget);
+  for (const extension of extensions) extension.geometry?.(roots, budget);
   const objects = new Map<bigint, FBXNode>(),
     connections: FBXConnection[] = [];
   for (const root of roots) {

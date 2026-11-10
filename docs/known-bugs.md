@@ -4545,3 +4545,5 @@ Batch 266 portal ownership regressions: explicit RenderView replaces the implici
 ### Batch 231 surface scatter
 
 No open defect in the new placement entry. Its CPU and real-data GPU comparisons cover world area, painted density, source attributes and normal alignment. It explicitly refuses nonfinite sampled attributes rather than returning unusable matrices or colours. Existing geometry/sample accepts nonfinite UV/colour values and can return NaNs (repro: a triangle with all UV.x = NaN or colors[0] = NaN); its constructor checks attribute lengths but not these values. That separate sampler validation gap remains for its owning package in the fix phase; the new surface entry rejects it before returning.
+
+- FBX surface control-net animation (batch 205 follow-up): connect a Skin or BlendShape to NURBS/Patch geometry, as in surfaces.test.js. Generated surface vertices have different rational support from source control points and general bone transforms cannot be represented exactly by a single glTF vertex bind position. Import explicitly refuses with a polygon-bake remedy; exact animated control-net baking remains follow-up work.

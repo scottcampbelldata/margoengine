@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13236555,
+  "total": 13246243,
   "history": [
     {
       "date": "2026-10-24",
@@ -6700,6 +6700,12 @@
       "date": "2026-11-10",
       "commit": "batch-172-job6",
       "reason": "New optional sciviz/glyph: 0 to 4388 B, ceiling 4644 B. Full point/cell/table/image selection, shapes, warp and ownership stay together; splitting would fragment one placement/warp contract and preserve the same shared validation cost. Core/stage unchanged at 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-205-job4",
+      "reason": "Optional surfaces entry absent to 3177 B min+gzip, ceiling 3433 B. FBX classic worker 100787 to 105877 B, ceiling 103811 to 109054 B, for the shared NURBS evaluator, all five patch bases, net closure and caps. A split adds a second worker asset/evaluator protocol without reducing the complete import. Core plus stage 24209 B unchanged. The page worker entry grows 23094 to 23102 B, ceiling 23098 to 23796 B, for the shared geometry normalization dispatch; separating it would duplicate the fallback converter.",
+      "grew": 4
     }
   ],
   "items": {
@@ -7010,7 +7016,7 @@
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 22144,
-    "@margoengine/fbx dist/workers/fbx.js": 103811,
+    "@margoengine/fbx dist/workers/fbx.js": 109054,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
@@ -7020,7 +7026,7 @@
     "@margoengine/fbx/pbr": 3843,
     "@margoengine/fbx/scene-extras": 2735,
     "@margoengine/fbx/textures": 751,
-    "@margoengine/fbx/worker": 23098,
+    "@margoengine/fbx/worker": 23796,
     "@margoengine/fsm": 1852,
     "@margoengine/fsm/document": 4414,
     "@margoengine/fsm/events": 2618,
@@ -7920,6 +7926,8 @@
     "@margoengine/react/portals": 4235,
     "@margoengine/lines/texture": 6617,
     "@margoengine/scatter/surface": 1515,
-    "@margoengine/sciviz/glyph": 4644
+    "@margoengine/sciviz/glyph": 4644,
+    "@margoengine/fbx/surfaces": 3433,
+    "margoengine/fbx/surfaces": 314
   }
 }

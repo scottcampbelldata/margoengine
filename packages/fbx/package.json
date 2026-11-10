@@ -65,6 +65,10 @@
     "./legacy": {
       "types": "./dist/legacy.d.ts",
       "import": "./dist/legacy.js"
+    },
+    "./surfaces": {
+      "types": "./dist/surfaces.d.ts",
+      "import": "./dist/surfaces.js"
     }
   },
   "files": [
@@ -79,7 +83,8 @@
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0"
   },
   "devDependencies": {
     "@margoengine/animation": "^1.0.0",
@@ -93,6 +98,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "node test/textures-browser.mjs",
-    "test:gpu:legacy": "node test/legacy-browser.mjs"
+    "test:gpu:legacy": "node test/legacy-browser.mjs",
+    "test:gpu:surfaces": "node test/surfaces-browser.mjs"
   }
 }

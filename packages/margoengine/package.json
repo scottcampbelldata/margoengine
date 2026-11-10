@@ -1278,6 +1278,10 @@
       "types": "./dist/fbx/legacy.d.ts",
       "import": "./dist/fbx/legacy.js"
     },
+    "./fbx/surfaces": {
+      "types": "./dist/fbx/surfaces.d.ts",
+      "import": "./dist/fbx/surfaces.js"
+    },
     "./fsm": {
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"
@@ -1745,6 +1749,10 @@
     "./lines/stroke": {
       "types": "./dist/lines/stroke.d.ts",
       "import": "./dist/lines/stroke.js"
+    },
+    "./lines/texture": {
+      "types": "./dist/lines/texture.d.ts",
+      "import": "./dist/lines/texture.js"
     },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
@@ -4433,10 +4441,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./lines/texture": {
-      "types": "./dist/lines/texture.d.ts",
-      "import": "./dist/lines/texture.js"
     }
   },
   "dependencies": {

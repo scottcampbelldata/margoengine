@@ -56,3 +56,11 @@ Standard FBX sample assets from Samuli Raivio, ufbx test-data collection, MIT or
 - `maya_blend_shape_cube_6100_binary.fbx`: Git blob `26d6fa865ea4113dc1ae2b29d3c3bb8eda740c03`, SHA-256 `2ab5c26eabbc804294a003555af4723ef9815c21100ffca2ad9ac04924943f86`.
 - `maya_interpolation_modes_6100_ascii.fbx`: Git blob `b0143e0c8e6cdd2a1bf81ab62a1b4aa16f3e431a`, SHA-256 `d75f612e4d893a6ef658478cfeb316c50de5265dd963044aa43d07a3400d2ef8`.
 - `maya_interpolation_modes_6100_binary.fbx`: Git blob `1e2e76836065cf6afa011fbf92ad9278dcf19443`, SHA-256 `474d94c864a64310d0dc0b1a7b33d1a99e0c1805e2a20eb2e88a5a7b708120e5`.
+
+- `maya_nurbs_surface_plane_6100_ascii.fbx`: same ufbx data licence (MIT or Unlicense), Git blob `c1daefacd82f83e8eb65ae1239a6c361c005df4d`, SHA-256 `6df4d4d753f301c86bdc206ee77f1796b8bb0ccd394757d7fbaa9e985c551a8c`.
+
+- `maya_nurbs_surface_plane_7500_ascii.fbx`: same ufbx data licence (MIT or Unlicense), Git blob `190b909390b9605028140ef31a1601ae7456299f`, SHA-256 `b16e288264429aa6e9397e5661485c3aeee1b7885fa1c6ba42315b9973b88b48`.
+
+- `maya_nurbs_surface_plane_7500_binary.fbx`: same ufbx data licence (MIT or Unlicense), Git blob `2514bd7e0725989e6f2a71f47599fda9ff525d97`, SHA-256 `cd33eb144983aaac39fa3c2f94350b7778c632d10dabb082adaddf9c0fec0737`.
+
+- `maya_nurbs_surface_sphere_7500_ascii.fbx`: same ufbx data licence (MIT or Unlicense), Git blob `2c3702ed322944fda29146111cfca6cfdfc7ef53`, SHA-256 `7a59a140b7fb229d46b66fe8adbd68ba18ef72612ee5ba3b3732114a32604776`.

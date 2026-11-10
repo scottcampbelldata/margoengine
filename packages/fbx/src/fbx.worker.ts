@@ -10,12 +10,14 @@ import { animationLayers } from './layers.js';
 import { nurbsCurves } from './curves.js';
 import { deformers } from './deformers.js';
 import { pbrMaterials } from './pbr.js';
+import { surfaces } from './surfaces.js';
 import { legacyFBX } from './legacy.js';
 import { textures } from './textures.js';
 import { sceneExtras } from './scene-extras.js';
 
 // Functions cannot cross to a worker, so the page sends names and the worker holds every entry.
 const known: readonly FBXExtension[] = [
+  surfaces,
   legacyFBX,
   sceneExtras,
   animationLayers,
