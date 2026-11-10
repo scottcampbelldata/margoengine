@@ -6937,3 +6937,12 @@ The initial executable set covers post/FXAA, TAA, DOF and Tonemap (six positive 
 
 ## Section 5 evidence: batch 176 tensor fields
 The optional tensor entry owns a scaled CPU/GPU symmetric eigensolver, an instanced glyph pipeline, deterministic Euler/FACT tracking, hyperstreamline meshes and a shared-factorization ordinary least-squares DWI fit. Core and stage are unchanged. Packed GPU eigenvalues/FA and eigenvectors feed one vertex-stage instanced draw without a full eigen readback; the status buffer alone is read for convergence. On replacement devices the layer rebuilds from its owned CPU snapshot. CPU tests compare the complete native OpenNeuro crop to independent NumPy lstsq/eigh results, reconstruct signed/repeated spectra, conserve straight fibre lengths and transverse ellipse radii, and inject allocation failures. Browser tests exercise real DWI glyphs and fibres on both GPU backends, verify eigen residual bounds, measure one instanced draw, preserve exact sharp-glyph pole symmetry, compare signed/absolute spectra, check bit-identical restoration and unit-scale lighting invariance. Remaining evidence is the quiet speed suite and further anatomical validation, neither a present claim.
+### Section 5 evidence: disposable React consumers and quality inventory
+
+React subpath tests create then remove tests/.subpaths-* Vite consumers. Git's
+standard ignore list now excludes those generated consumers before quality takes
+its file inventory. tests/quality-inventory.test.js removes the temporary module
+between inventory and detector reads, fails with ENOENT before the change, and
+passes while preserving a new untracked authored test. The gate still propagates
+all source read failures; no detector or baseline is relaxed. Research is in
+clean-room.md, Lane A source inventory and bitmap investigation.

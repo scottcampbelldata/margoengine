@@ -15,6 +15,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 Whole untransformed straight-alpha bitmap uploads now preserve every channel. A cropped, flipped or explicitly premultiplied ImageBitmap still passes through Canvas2D in webgl2-compat/device/render.ts and can quantize low-alpha RGB. Repro: crop the 61x23 diagnostic WebP from splats/test/gpu/check.mjs before copying it and compare straight RGB at alpha 0 or 1. Cause: Canvas2D stores premultiplied colour; a GPU transform path is needed to retain straight RGB through these operations. This existing transformed-copy gap is outside the progressive-loading job; unchanged-bitmap regression and existing transform semantics both pass.
 
+Lane A sweep, 2026-11-10: reproduced on f4f7f43ad with a 7x5 ImageData bitmap,
+alpha 0/1/128/255, whole/cropped, flipped/unflipped and straight/premultiplied
+copies into 1/2/6-layer textures. Native and compatibility differ in 13 of 48
+cases. Two bounded investigation rounds rejected a VideoFrame substitution:
+whole straight uploads preserve RGB, but visibleRect cropping loses low-alpha
+RGB and alpha conversions differ by one byte in some channels (36/48 cases).
+No draft or weaker assertion shipped. Next: direct bitmap upload plus a GPU
+crop/flip path, with explicit handling of the source's alpha representation.
+Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
+1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
+WebCodecs section 9.4 (2026); sources in clean-room.md.
+
 ### Fixed: umbrella indexes after the caustics rebase
 
 The merged workspace exports included optional entries absent from the
@@ -36,10 +48,12 @@ Fixed within the image job: four-value slice arrays previously remained aliased 
 
 ### Batch 258 text fields
 
-Tooling follow-up: running quality concurrently with React subpath CPU tests
-can fail reading a deleted tests/.subpaths-*/hooks.mjs after its file snapshot;
-repro: start both commands together. Run quality after those tests until the
-fix phase adds a stable inventory of source files. No product source changed.
+Fixed by the lane A sweep, 2026-11-10: the disposable Vite consumers under
+React tests/.subpaths-*/ were unignored, so quality's Git inventory included
+them and failed with ENOENT when the test removed them. The producer's temporary
+directory is now ignored. tests/quality-inventory.test.js deterministically
+removes the generated hooks.mjs between inventory and detector reads and
+retains real untracked source coverage; it fails with ENOENT before the fix.
 
 The former shared Chromium shutdown failure is fixed upstream at 919fdc09e.
 This branch is rebased onto that fix; both native and compatibility input

@@ -24,6 +24,8 @@ benchmarks/validation-*/
 !.env.example
 
 # Editor and OS files
+# Disposable Vite consumers created and removed by React's subpath tests.
+/packages/react/tests/.subpaths-*/
 .DS_Store
 Thumbs.db
 .vscode/

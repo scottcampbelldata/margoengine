@@ -1,5 +1,7 @@
 # README work owed
 
+- @margoengine/react (lane A known-bugs sweep): document that subpath test consumers are disposable generated files, excluded from source inventories.
+
 - @margoengine/sciviz (review L2): document incremental circular spreading, neighbour-presence density, clipped edges and unchanged numerical bins.
 
 - @margoengine/sciviz (review M3): document reversible contrast and reduced-motion suspension, retained playback cancellation, and preservation of stopped engines.

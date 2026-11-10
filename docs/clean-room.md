@@ -8302,3 +8302,27 @@ Research compared McCormick and Elliott, ITK-Wasm: Universal spatial analysis an
 Written clean room from papers and public numerical-library APIs, never companion code. James Demmel and Kresimir Veselic (1992), *Jacobi's Method is More Accurate than QR*, https://doi.org/10.1137/0613074 ; Joachim Kopp (2008), *Efficient numerical diagonalization of hermitian 3x3 matrices*, https://arxiv.org/abs/physics/0610206 . Comparing iterative rotations with analytic roots favoured scaled largest-pivot Jacobi for stability. Gordon Kindlmann (2004), *Superquadric Tensor Glyphs*, https://doi.org/10.2312/VisSym/VisSym04/147-154 and https://cgl.ethz.ch/teaching/scivis_common/Literature/kindlmann04.pdf (equations 2 and 7) supply trace-normalized linear/planar shape metrics, axis selection and sharpness. The implementation retains exact analytic quarter-turn zeros before signed fractional powers; this preserves sharp glyph symmetry despite finite-precision trigonometry. Signed tensors use their absolute spectral geometry while retaining signed eigenvalues in the result.
 Peter J. Basser, James Mattiello and Denis Le Bihan (1994), *Estimation of the effective self-diffusion tensor from the NMR spin echo*, https://doi.org/10.1006/jmrb.1994.1037 supplies ordinary log-linear least squares; the implementation fits all seven parameters including baseline using one shared, twice-reorthogonalized QR decomposition. Susumu Mori, Barbara J. Crain, Vadappuram P. Chacko and Peter C. M. van Zijl (1999), *Three-dimensional tracking of axonal projections in the brain by magnetic resonance imaging*, https://pubmed.ncbi.nlm.nih.gov/9989633/ and Mori et al. (1999), *3D Reconstruction of Axonal Fibers from Diffusion Tensor Imaging using Fiber Assignment by Continuous Tracking (FACT)*, https://archive.ismrm.org/1999/0320.html motivate deterministic voxel-boundary traversal. Thierry Delmarcelle and Lambertus Hesselink (1993), *Visualizing Second-Order Tensor Fields with Hyperstreamlines*, https://doi.org/10.1109/38.219447 (public predecessor: https://ntrs.nasa.gov/citations/19930068626) supplies transverse-eigenvalue elliptical sections. Euler interpolates tensor coefficients before decomposition, not signed eigenvectors.
 The real OpenNeuro ds000030 native DWI crop uses 65 measured volumes and CC0 data. Independent reference values use only NumPy's public lstsq/eigh APIs; nibabel writes a lossless float32 crop of the original integer-valued signals. No outside library implementation was read or included.
+
+## Lane A source inventory and bitmap investigation (2026-11-10)
+
+Compared Git maintainers, git-ls-files (2026), https://git-scm.com/docs/git-ls-files,
+with Git maintainers, gitignore (2026), https://git-scm.com/docs/gitignore, and Node.js
+contributors, File system (2026), https://nodejs.org/api/fs.html. Git's cached and
+untracked inventory correctly honours standard ignores; a file existence check
+cannot prevent later cleanup. The fix registers the React test producer's
+.subpaths-* output as generated, retaining both tracked and new authored files.
+The regression deletes hooks.mjs after the inventory and before the detector.
+No errors are caught or suppressed and no gate baseline changes.
+
+For the rejected bitmap draft, compared WHATWG contributors, HTML Living Standard:
+canvas and ImageBitmap (2026), https://html.spec.whatwg.org/multipage/canvas.html
+and https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html;
+Kelsey Gilbert and Khronos contributors, WebGL 1.0 specification section 5.14.8
+(2026), https://registry.khronos.org/webgl/specs/latest/1.0/;
+Kai Ninomiya, Brandon Jones and Jim Blandy, WebGPU sections 3.11 and 19.2 (2026),
+https://gpuweb.github.io/gpuweb/; and W3C WebCodecs contributors, WebCodecs section
+9.4 (2026), https://www.w3.org/TR/webcodecs/.
+Canvas2D's mandatory premultiplied storage loses transparent RGB; WebGL ignores
+bitmap alpha and flip unpack flags. A VideoFrame bridge preserved whole straight
+RGB but failed cropped and converted-alpha comparisons and was rejected.
+No rival implementation source or companion code was read or copied.
