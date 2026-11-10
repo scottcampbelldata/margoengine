@@ -90,6 +90,26 @@ test('a request without the token is refused; a target that does not answer time
   assert.throws(() => new RemoteInspector({ transport: desk, parent: null, timeoutMs: 5 }), /100 to 120000/);
 });
 
+test('two viewers on one relay each get the answer to their own request (R5)', async (t) => {
+  // The relay sends every target reply to every viewer, and each viewer numbers its requests from 1: viewer B's
+  // 'scene' resolved with viewer A's 'hello' reply.
+  const relay = await createRemoteRelay();
+  t.after(() => relay.close());
+  const { engine } = await scene();
+  const phone = relayTransport({ url: relay.url, token: relay.token, role: 'target' }),
+    deskA = relayTransport({ url: relay.url, token: relay.token, role: 'viewer' }),
+    deskB = relayTransport({ url: relay.url, token: relay.token, role: 'viewer' });
+  const target = RemoteTarget.attach(engine, { transport: phone, statsIntervalMs: 0 });
+  const a = new RemoteInspector({ transport: deskA, parent: null }),
+    b = new RemoteInspector({ transport: deskB, parent: null });
+  t.after(() => (a.dispose(), b.dispose(), target.dispose(), phone.close(), deskA.close(), deskB.close()));
+  await until(() => relay.streams('target') === 1 && relay.streams('viewer') === 2);
+  const [hello, objects] = await Promise.all([a.request('hello'), b.request('scene')]);
+  assert.equal(hello.backend, 'webgl2');
+  assert.ok(Array.isArray(objects), `viewer B got ${JSON.stringify(objects)}`);
+  assert.equal(objects.length, hello.objects);
+});
+
 test('through the HTTP relay: a target and a viewer edit by token, a wrong token is refused', async (t) => {
   const relay = await createRemoteRelay();
   t.after(() => relay.close());

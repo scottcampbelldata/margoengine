@@ -77,10 +77,14 @@ interface Request {
   op: RemoteOperation;
   args?: Record<string, unknown>;
   token?: string;
+  /** The asking viewer's own random id: a relay sends every reply to every viewer, whose request ids overlap. */
+  viewer?: string;
 }
 interface Reply {
   [tag]: number;
   id?: number;
+  /** The `viewer` of the request answered. */
+  viewer?: string;
   ok?: boolean;
   result?: unknown;
   error?: string;
@@ -337,6 +341,7 @@ export class RemoteTarget implements EnginePlugin, Disposable {
     } catch (error) {
       reply = { [tag]: version, id: m.id, ok: false, error: (error as Error)?.message ?? String(error) };
     }
+    if (typeof m.viewer === 'string') reply.viewer = m.viewer;
     this.post(reply);
   }
   private post(message: Reply): void {
@@ -399,6 +404,8 @@ export class RemoteInspector implements Disposable {
   /** The target's hello, once connected. */
   target?: RemoteHello;
   private next = 1;
+  /** Tells this viewer's replies from another viewer's on the same relay. */
+  private readonly viewer = Math.random().toString(36).slice(2) + Date.now().toString(36);
   private readonly waiting = new Map<
     number,
     { resolve(v: unknown): void; reject(e: Error): void; timer: ReturnType<typeof setTimeout> }
@@ -462,7 +469,7 @@ export class RemoteInspector implements Disposable {
         );
       }, this.timeout);
       this.waiting.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
-      this.options.transport.send(JSON.stringify({ [tag]: version, id, op, args, token: this.options.token }));
+      this.options.transport.send(JSON.stringify({ [tag]: version, id, op, args, token: this.options.token, viewer: this.viewer }));
     });
   }
   /** Says hello and lists the scene. */
@@ -508,6 +515,8 @@ export class RemoteInspector implements Disposable {
       this.line();
       return;
     }
+    // Another viewer's reply (or a target that predates the field, which answers no viewer by name).
+    if (m.viewer !== undefined && m.viewer !== this.viewer) return;
     const wait = typeof m.id === 'number' ? this.waiting.get(m.id) : undefined;
     if (!wait || m.op !== undefined) return;
     this.waiting.delete(m.id!);
