@@ -96,6 +96,10 @@ function fixture(t, options = {}, limits = {}) {
       }
     },
     hasPlugin: (name) => plugins.has(name),
+    // As core: the scene a registered plugin belongs to (this fake has one scene, itself).
+    sceneOf(plugin) {
+      return plugins.get(plugin.name) === plugin ? this : undefined;
+    },
     removePlugin(name) {
       const plugin = plugins.get(name);
       graph.removeOwner(name);

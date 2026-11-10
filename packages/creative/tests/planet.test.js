@@ -99,6 +99,10 @@ function fixture(t) {
     hasPlugin(name) {
       return this.plugins.has(name);
     },
+    // As core: the scene a registered plugin belongs to (this fake has one scene, itself).
+    sceneOf(plugin) {
+      return this.plugins.get(plugin.name) === plugin ? this : undefined;
+    },
     use(plugin) {
       if (this.disposed) throw new Error('Engine is disposed');
       if (this.plugins.has(plugin.name)) throw new TypeError('Duplicate plugin');

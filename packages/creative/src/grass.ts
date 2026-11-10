@@ -472,8 +472,10 @@ export class GrassField implements EnginePlugin {
     this.dispose();
   }
   dispose(): void {
-    if (this.engine?.hasPlugin(this.name)) {
-      this.engine.removePlugin(this.name);
+    // The scene this field was attached to, not whichever scene is active now.
+    const scene = this.engine?.sceneOf(this);
+    if (scene) {
+      scene.removePlugin(this.name);
       return;
     }
     this.release();

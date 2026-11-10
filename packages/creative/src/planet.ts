@@ -369,7 +369,8 @@ export class Planet implements EnginePlugin {
     this.disposed = true;
     this.controller.abort(new DOMException('Planet disposed', 'AbortError'));
     const engine = this.engine;
-    if (engine?.hasPlugin(this.name)) engine.removePlugin(this.name);
+    // The scene this planet was attached to, not whichever scene is active now.
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.pass?.dispose();
     this.pass = undefined;
     for (const image of new Set(Object.values(this.images))) image?.close();
