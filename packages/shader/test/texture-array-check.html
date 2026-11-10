@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Texture array node layers</title><style>body{margin:0}#host{width:96px;height:96px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {Texture,createMesh} from '/packages/materials/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {PostStack} from '/packages/post/dist/index.js';
+import {NodeMaterial,NodePass,uniform,storage,vec2,vec3,positionLocal,uint,texture} from '/packages/shader/dist/index.js';
+import {textureArray} from '/packages/shader/dist/texture-array.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}}),engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const colors=Array.from({length:32},(_,i)=>[(i*7)%256,(i*13)%256,(i*23)%256,255]),data=new Uint8Array(colors.flatMap(c=>[...c,...c,...c,...c])),t=new Texture({data,width:2,height:2,depth:32},{dimension:'2d-array',colorSpace:'srgb',mipmaps:false,minFilter:'nearest',magFilter:'nearest'}),layer=uniform(0,{type:'i32'});
+const control=new Texture({data:new Uint8Array(colors.flat()),width:32,height:1},{colorSpace:'srgb',mipmaps:false,minFilter:'nearest',magFilter:'nearest'});
+const material=new NodeMaterial({shading:'basic',colorNode:textureArray(t,layer).rgb,positionNode:positionLocal.add(vec3(0,0,textureArray(t,layer,vec2(.5)).r.mul(.01)))}),mesh=createMesh(engine,planeGeometry(2,2),material);
+let stack;
+window.check={colors,
+  async render(i){layer.value=i;engine.render();await device.queue.onSubmittedWorkDone();return errors.splice(0);},
+  async post(i){stack?.dispose();stack=PostStack.attach(engine,[new NodePass(textureArray(t,i,vec2(.5),0))]);engine.render();await device.queue.onSubmittedWorkDone();return errors.splice(0);},
+  async compute(){const out=storage(32,'vec4f'),{data}=await computeReadback(device,32,i=>out.store(i,textureArray(t,i,vec2(.5))),out),reference=await computeReadback(device,32,i=>out.store(i,texture(control,vec2(i.toFloat().add(.5).div(32),.5))),out);out.dispose();return {data:[...data],reference:[...reference.data],errors:errors.splice(0)};},
+  async boundaries(){const out=storage(2,'vec4f'),{data}=await computeReadback(device,2,i=>{out.store(0,textureArray(t,-1,vec2(.5)));out.store(1,textureArray(t,uint(4294967295),vec2(.5)));},out);out.dispose();return {data:[...data],errors:errors.splice(0)};},
+  async placeholder(){stack?.dispose();stack=PostStack.attach(engine,[new NodePass(textureArray({dimension:'2d-array',bind:()=>undefined},10,vec2(.5),0))]);engine.render();await device.queue.onSubmittedWorkDone();return errors.splice(0);},
+  close(){stack?.dispose();mesh.destroy();t.dispose();control.dispose();stage.dispose();}
+};window.ready=true;
+</script></body></html>

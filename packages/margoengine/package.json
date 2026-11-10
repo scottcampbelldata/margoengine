@@ -3422,6 +3422,10 @@
       "types": "./dist/shader/editor-pass.d.ts",
       "import": "./dist/shader/editor-pass.js"
     },
+    "./shader/texture-array": {
+      "types": "./dist/shader/texture-array.d.ts",
+      "import": "./dist/shader/texture-array.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

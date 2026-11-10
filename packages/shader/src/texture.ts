@@ -5,7 +5,7 @@ export interface BindableTexture {
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
 const resources = new WeakMap<BindableTexture, Resource & { id: number }>();
-type Dimension = '2d' | 'cube' | '3d';
+type Dimension = '2d' | 'cube' | '3d' | '2d-array';
 /** Samples a texture (sRGB by default; `new Texture(source, {colorSpace: 'linear'})` for data). Vertex and compute stages, or an explicit
  * `level`, use textureSampleLevel. */
 export function texture(
@@ -24,19 +24,17 @@ export function textureCube(
   return sampled('textureCube', 'cube', source, cast(direction, 'vec3f', 'textureCube direction'), level);
 }
 /** Samples a 3D texture (`dimension: '3d'`) at `coord`, each axis 0-1; `level` as in {@link texture}. */
-export function texture3D(
-  source: BindableTexture,
-  coord: NodeInput<'vec3f'>,
-  level?: NodeInput<'f32'>,
-): Node<'vec4f'> {
+export function texture3D(source: BindableTexture, coord: NodeInput<'vec3f'>, level?: NodeInput<'f32'>): Node<'vec4f'> {
   return sampled('texture3D', '3d', source, cast(coord, 'vec3f', 'texture3D coordinate'), level);
 }
-function sampled(
+/** @internal Shared sampled resource, including the optional array-layer argument. */
+export function sampled(
   name: string,
   dimension: Dimension,
   source: BindableTexture,
   coord: Node,
   level: NodeInput<'f32'> | undefined,
+  layer?: Node<'i32' | 'u32'>,
 ): Node<'vec4f'> {
   if (typeof source?.bind !== 'function') throw new TypeError(`${name}() needs a Texture from @margoengine/materials`);
   const own = (source as { dimension?: string }).dimension ?? '2d';
@@ -49,17 +47,19 @@ function sampled(
       prefix: 'ndt',
       bindings: 2,
       declare: (name, group, binding) =>
-        `@group(${group}) @binding(${binding}) var ${name}:texture_${dimension}<f32>;\n@group(${group}) @binding(${binding + 1}) var ${name}s:sampler;`,
+        `@group(${group}) @binding(${binding}) var ${name}:texture_${dimension.replace('-', '_')}<f32>;\n@group(${group}) @binding(${binding + 1}) var ${name}s:sampler;`,
       entries: (device) => source.bind(device, true) ?? whiteTexture(device, dimension),
     };
     resources.set(source, r);
   }
   const resource = r,
     args: Node[] = [coord];
+  if (layer) args.push(layer);
   if (level !== undefined) args.push(cast(level, 'f32', 'texture level'));
   return new Node('vec4f', 't' + r.id, args, (b, n) => {
     const name = b.resource(resource),
-      [c, l] = n.args.map((a) => b.expr(a)),
+      c = b.expr(n.args[0]) + (layer ? `, ${b.expr(n.args[1])}` : ''),
+      l = n.args[layer ? 2 : 1] ? b.expr(n.args[layer ? 2 : 1]) : undefined,
       implicit = l === undefined && (b.stage.kind === 'fragment' || b.stage.kind === 'post');
     return implicit
       ? `textureSample(${name}, ${name}s, ${c})`

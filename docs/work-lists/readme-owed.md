@@ -891,3 +891,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-edit (batch 241 job 3): document formats-extra KV6/CUB/VMAX readers, basis/pivots, VMAX hierarchy/gridToWorld, palette/material preservation, all defaults and bounded loading; add examples in the README phase.
 - @margoengine/decoders (batch 241 job 3): document optional lzfse decodeLZFSE, all block kinds, maxBytes and AbortSignal; add examples in the README phase.
 - margoengine (batch 241 job 3): document generated voxel-edit/formats-extra and decoders/lzfse aliases during the README phase.
+- @margoengine/shader (batch 185 job 4): textureArray source/layer/UV/level, all hosts, one binding pair, native/compatibility paths and codec restoration.
+- margoengine (batch 185 job 4): generated shader/texture-array alias.

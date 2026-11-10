@@ -86,6 +86,10 @@
     "./editor-pass": {
       "types": "./dist/editor-pass.d.ts",
       "import": "./dist/editor-pass.js"
+    },
+    "./texture-array": {
+      "types": "./dist/texture-array.d.ts",
+      "import": "./dist/texture-array.js"
     }
   },
   "files": [
@@ -108,9 +112,10 @@
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs && node packages/shader/test/subgroups-check.mjs && node packages/shader/test/scene-owner-browser.mjs && node packages/shader/test/scene-owner-browser.mjs --compat && node packages/shader/test/compute-volume-check.mjs && node packages/shader/test/editor-pass-check.mjs",
+    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs && node packages/shader/test/subgroups-check.mjs && node packages/shader/test/scene-owner-browser.mjs && node packages/shader/test/scene-owner-browser.mjs --compat && node packages/shader/test/compute-volume-check.mjs && node packages/shader/test/editor-pass-check.mjs && node packages/shader/test/texture-array-check.mjs",
     "test:gpu:raw": "cd ../.. && node scripts/shader-raw-gpu-check.js",
     "test:gpu:volume": "cd ../.. && node packages/shader/test/compute-volume-check.mjs",
-    "test:gpu:editor-pass": "cd ../.. && node packages/shader/test/editor-pass-check.mjs"
+    "test:gpu:editor-pass": "cd ../.. && node packages/shader/test/editor-pass-check.mjs",
+    "test:gpu:texture-array": "cd ../.. && node packages/shader/test/texture-array-check.mjs"
   }
 }

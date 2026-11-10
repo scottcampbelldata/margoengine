@@ -5,6 +5,7 @@ import {
 } from '@margoengine/materials/serialization';
 import { Program, UniformNode, vec2, vec3, type Resource } from './node.js';
 import { texture, textureCube, texture3D, type BindableTexture } from './texture.js';
+import { textureArray } from './texture-array.js';
 import { StorageBuffer } from './compute.js';
 import { NodeMaterial } from './material.js';
 import { LightingMaterial } from './lighting.js';
@@ -66,14 +67,19 @@ export const shaderMaterialCodecs: readonly MaterialValueCodec[] = [
   {
     type: 'shader-texture-resource',
     test: (v) => (v as Resource).prefix === 'ndt' && !!(v as Resource).source,
-    capture: (value: Resource) => ({ source: value.source, dimension: Reflect.get(value.source as object, 'dimension') ?? '2d' }),
+    capture: (value: Resource) => ({
+      source: value.source,
+      dimension: Reflect.get(value.source as object, 'dimension') ?? '2d',
+    }),
     restore: (data: { source: BindableTexture; dimension: string }) => {
       const node =
         data.dimension === 'cube'
           ? textureCube(data.source, vec3(1, 0, 0))
           : data.dimension === '3d'
             ? texture3D(data.source, vec3(0))
-            : texture(data.source, vec2(0));
+            : data.dimension === '2d-array'
+              ? textureArray(data.source, 0, vec2(0))
+              : texture(data.source, vec2(0));
       const program = new Program();
       program.stage({ kind: 'fragment', builtins: {} }, [node]);
       return program.resources[0].resource;
