@@ -712,20 +712,37 @@ const SPHERE = new Float64Array(4);
  * the absolute row-sum bound of M^T M also covers hierarchy shear. Written to `out`.
  */
 export function worldSphere(m: ArrayLike<number>, o: number, b: ArrayLike<number>, out: Float64Array): Float64Array {
-  const xy = Math.abs(m[o] * m[o + 4] + m[o + 1] * m[o + 5] + m[o + 2] * m[o + 6]);
-  const xz = Math.abs(m[o] * m[o + 8] + m[o + 1] * m[o + 9] + m[o + 2] * m[o + 10]);
-  const yz = Math.abs(m[o + 4] * m[o + 8] + m[o + 5] * m[o + 9] + m[o + 6] * m[o + 10]);
+  // The 12 matrix and 4 sphere values are read once; every expression below keeps the parent's operand order.
+  const m0 = m[o],
+    m1 = m[o + 1],
+    m2 = m[o + 2],
+    m4 = m[o + 4],
+    m5 = m[o + 5],
+    m6 = m[o + 6],
+    m8 = m[o + 8],
+    m9 = m[o + 9],
+    m10 = m[o + 10],
+    m12 = m[o + 12],
+    m13 = m[o + 13],
+    m14 = m[o + 14],
+    bx = b[0],
+    by = b[1],
+    bz = b[2],
+    radius = b[3];
+  const xy = Math.abs(m0 * m4 + m1 * m5 + m2 * m6);
+  const xz = Math.abs(m0 * m8 + m1 * m9 + m2 * m10);
+  const yz = Math.abs(m4 * m8 + m5 * m9 + m6 * m10);
   const scale = Math.sqrt(
     Math.max(
-      m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2 + xy + xz,
-      m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2 + xy + yz,
-      m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2 + xz + yz,
+      m0 ** 2 + m1 ** 2 + m2 ** 2 + xy + xz,
+      m4 ** 2 + m5 ** 2 + m6 ** 2 + xy + yz,
+      m8 ** 2 + m9 ** 2 + m10 ** 2 + xz + yz,
     ),
   );
-  out[0] = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12];
-  out[1] = m[o + 1] * b[0] + m[o + 5] * b[1] + m[o + 9] * b[2] + m[o + 13];
-  out[2] = m[o + 2] * b[0] + m[o + 6] * b[1] + m[o + 10] * b[2] + m[o + 14];
-  out[3] = b[3] * scale * (1 + 1e-5) + 1e-6;
+  out[0] = m0 * bx + m4 * by + m8 * bz + m12;
+  out[1] = m1 * bx + m5 * by + m9 * bz + m13;
+  out[2] = m2 * bx + m6 * by + m10 * bz + m14;
+  out[3] = radius * scale * (1 + 1e-5) + 1e-6;
   return out;
 }
 

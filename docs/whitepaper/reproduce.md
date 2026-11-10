@@ -3988,6 +3988,10 @@ or add timings to the historical ledger.
 
 ### Batch 162 geometry, math and raycast work counts
 
+For raycast world-sphere reads, after the package build run
+`node --test --test-timeout=120000 packages/bvh/tests/world-sphere-workcount.test.js`.
+This checks parent-identical spheres and the exact read count.
+
 For Euler conversion, after the package build run
 `node --test --test-timeout=120000 packages/math/test/euler-workcount.test.js`.
 This checks bit-exact output against the parent formula and exact angle reads.

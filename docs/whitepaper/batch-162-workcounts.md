@@ -109,6 +109,20 @@ Considered and not landed: `Matrix4.multiplyMatrices` reads the left matrix once
 Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/math/test/euler-workcount.test.js`. The read-count assertion fails on the parent (x, y and z read twice). Bit comparisons against the parent formula cover 2,011 angle triples in all six orders (signed zero, subnormal, plus and minus 1e300, infinity, NaN); every double compares byte for byte except NaN, whose payload ECMAScript leaves to the engine.
 Research: Knoop, Ruething and Steffen, *Lazy Code Motion* (1992), [paper](https://rsim.cs.uiuc.edu/arch/qual_papers/compilers/knoop92.pdf), on removing partially redundant computations without changing evaluation results; Higham (1990), [level-3 BLAS stability](https://eprints.maths.manchester.ac.uk/365/), which rules out fast (Strassen-style) multiplication for the matrix product, so its dot products would keep their order.
 
+## Row 16.1: world sphere reads
+
+Cause: `worldSphere`, the conservative world bounding sphere the Raycaster tests before casting into a mesh's local BVH, indexed the world matrix 39 times and the local sphere 10 times per mesh per ray although it uses 12 and 4 distinct values. They are now read once into locals; every expression keeps its operand order, so the sphere is bit-identical. Fixed in `perf(bvh): read each world-sphere input once per ray` (Batch 162 job 7).
+
+| Per mesh, per ray | Parent | Current |
+|---|---:|---:|
+| matrix reads | 39 | 12 |
+| sphere reads | 10 | 4 |
+
+The p-raycast boxes case tests up to 1,000 rays against every live candidate. Candidate gathering, `localRay` and BVH traversal are unchanged; a persistent per-mesh world-sphere cache would need invalidation on every transform and was not added. No caller passes the output array as the input sphere, so reading the sphere before writing changes no result. This is an operation count, not a runtime or rival speed claim. Timing pending the quiet rerun.
+
+Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/bvh/tests/world-sphere-workcount.test.js`. The read-count assertion fails on the parent (49 reads). 500 rounds compare against the parent formula on Float32 stores at offsets 0, 16 and 32 and on Float64 copies, with mirrors, shear terms, large scales, infinity, 3.4e38, -0 and NaN. Every double compares byte for byte except NaN, whose payload ECMAScript leaves to the engine.
+Research: Majercik et al. (2018) and Ylitie et al. (2017) treat ray/bound tests as memory-traffic bound; the same arithmetic from fewer loads is the conservative step here.
+
 ## Research consulted
 
 - Steve Marschner, Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.

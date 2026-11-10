@@ -3336,6 +3336,10 @@ Native API counts and task outputs are retained without timing samples or ledger
 updates. Six initial calls passed on Margo and both black-box reference backends.
 No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).
 
+### Batch 162 job 7: raycast world-sphere reads (2026-11-10)
+
+`perf(bvh): read each world-sphere input once per ray` cuts the per-mesh, per-ray sphere rejection from 49 to 16 element reads with identical output (world-sphere-workcount.test.js compares 500 rounds with the parent formula). [Methods](batch-162-workcounts.md#row-161-world-sphere-reads). Timing pending the quiet rerun; no runtime speed ratio claimed.
+
 ### Batch 162 job 6: Euler conversion (2026-11-10)
 
 `perf(math): read Euler angles once and share pair products` (6 to 3 angle reads, 16 to 12 multiplies) keeps every output bit; euler-workcount.test.js compares against the parent formula. A read-once matrix product was built and rejected for its size cost. [Methods](batch-162-workcounts.md#row-19-euler-conversion). Timing pending the quiet rerun; no runtime speed ratio claimed.
