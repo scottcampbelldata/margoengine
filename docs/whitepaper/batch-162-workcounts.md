@@ -92,6 +92,23 @@ The rounded box is unchanged. Trade-off: two numbers per hull face. This is an o
 Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/geometry/tests/convex-workcount.test.js packages/geometry/tests/parametric-workcount.test.js`.
 Both count assertions fail on the parent. Five hull digests (a ball, a sphere surface, a duplicated 5 x 5 x 5 grid with coplanar faces, equal-distance ties and an offset, anisotropic cloud) cover `convexGeometry` streams and `convexHullTriangles` indices; four parametric digests cover array, target and Float32Array results, poles and the scene's Klein bottle.
 
+## Row 1.9: Euler conversion
+
+Cause: `setFromEuler` evaluated `euler.x / 2` (and y, z) separately for sin and cos, and its eight triple products repeated four pair products (`sx * cy` in a and d, `cx * sy` in b and c, `cx * cy` in e and g, `sx * sy` in f and h). Each half angle is now read and halved once and each pair product formed once; the triple products keep their left-to-right grouping, so every bit of the result is unchanged. The six sin/cos calls stay.
+Fixed in `perf(math): read Euler angles once and share pair products` (Batch 162 job 6).
+
+| `setFromEuler` | Parent | Current |
+|---|---:|---:|
+| angle reads | 6 | 3 |
+| multiplies | 16 | 12 |
+
+Trade-off: +13 B gzip on `@margoengine/math/quaternion` and +17 B on `/affine` (size baseline recorded with the reason). This is an operation count, not a runtime or rival speed claim. Timing pending the quiet rerun.
+
+Considered and not landed: `Matrix4.multiplyMatrices` reads the left matrix once per output column (64 reads), the right once (16) and copies a 16-element scratch. Reading all 32 inputs once and writing the 16 sums straight into `elements` is bit-identical (it was built and tested, aliasing and a Float32 view overlapping the destination included), but it needs the product fully unrolled: +128 B gzip on `/matrix4`, +369 B on `/affine` and +91 B on `/compat`. Fewer reads without a measured runtime gain do not justify bytes every Matrix4 user pays, so the parent loop stays; the quiet rerun decides whether the matrix product is a measured loss.
+
+Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/math/test/euler-workcount.test.js`. The read-count assertion fails on the parent (x, y and z read twice). Bit comparisons against the parent formula cover 2,011 angle triples in all six orders (signed zero, subnormal, plus and minus 1e300, infinity, NaN); every double compares byte for byte except NaN, whose payload ECMAScript leaves to the engine.
+Research: Knoop, Ruething and Steffen, *Lazy Code Motion* (1992), [paper](https://rsim.cs.uiuc.edu/arch/qual_papers/compilers/knoop92.pdf), on removing partially redundant computations without changing evaluation results; Higham (1990), [level-3 BLAS stability](https://eprints.maths.manchester.ac.uk/365/), which rules out fast (Strassen-style) multiplication for the matrix product, so its dot products would keep their order.
+
 ## Research consulted
 
 - Steve Marschner, Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.

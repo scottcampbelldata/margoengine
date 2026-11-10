@@ -219,3 +219,5 @@ const euler = new Euler(),
   quaternion = new Quaternion();
 for (let i = 0; i < 10000; i++) quaternion.setFromEuler(euler.set(0.3, i * 0.01, 0.2));
 ```
+
+`setFromEuler` reads each angle once and forms the four shared pair products once: 12 multiplies instead of 16, with the same grouping and the same bits.

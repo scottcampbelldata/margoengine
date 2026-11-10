@@ -10,7 +10,8 @@ const random = (seed) => () => {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-const bits = (values) => [...new Uint8Array(Float64Array.from(values).buffer)];
+// Object.is equality is bit equality for every double except NaN, whose payload bits ECMAScript leaves to the engine.
+const bits = (values) => [...values].map((x) => (Number.isNaN(x) ? 'NaN' : [...new Uint8Array(Float64Array.of(x).buffer)].join()));
 const orders = ['XYZ', 'YXZ', 'ZXY', 'ZYX', 'YZX', 'XZY'];
 
 // The parent setFromEuler, unchanged.
