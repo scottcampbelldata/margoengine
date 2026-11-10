@@ -3957,6 +3957,14 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Audio listener direct disposal (2026-11-10)
+Disposing an attached AudioListener unregisters its owning scene's plugin name
+and frame passes before resource teardown, allowing same-name replacement. A
+stale handle cannot detach the replacement or a listener in another scene.
+Detaching a lazy listener creates no audio context. Existing owned-context close
+and caller-owned context behavior are unchanged. Regressions: audio.test.js and
+listener-disposal-browser.mjs in packages/audio/tests.
+
 ## Figure legend visibility (2026-11-10)
 Legends retain their native hidden-state rendering and three-pixel row/title
 separation. The default Figure hides the legend below two named layers; adding a

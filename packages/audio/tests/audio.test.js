@@ -29,6 +29,57 @@ test('importing and constructing creates no AudioContext; first use creates one 
   listener.dispose();
 });
 
+function registeredEngine() {
+  const engine = fakeEngine(),
+    scenes = [0, 1].map(() => ({
+      plugins: new Map(),
+      removePlugin(name) {
+        engine.removePlugin(name, this);
+      },
+    }));
+  engine.sceneOf = (plugin) => scenes.find((scene) => scene.plugins.get(plugin.name) === plugin);
+  engine.use = (plugin, scene = scenes[0]) => {
+    if (scene.plugins.has(plugin.name)) throw new TypeError('Duplicate plugin');
+    scene.plugins.set(plugin.name, plugin);
+    plugin.setup(engine);
+    return engine;
+  };
+  engine.removePlugin = (name, scene = scenes[0]) => {
+    const plugin = scene.plugins.get(name);
+    if (!plugin) return;
+    scene.plugins.delete(name);
+    plugin.dispose();
+  };
+  return { engine, scenes };
+}
+
+test('direct listener disposal releases its plugin registration for a same-name replacement', () => {
+  const { engine } = registeredEngine();
+  const listener = AudioListener.attach(engine, { autoResume: false });
+  const context = listener.context;
+  listener.dispose();
+  assert.equal(engine.sceneOf(listener), undefined);
+  assert.equal(listener.attachedEngine, null);
+  assert.equal(context.state, 'closed');
+  const replacement = AudioListener.attach(engine, { autoResume: false });
+  listener[Symbol.dispose]();
+  assert.ok(engine.sceneOf(replacement), 'stale listener disposal must retain replacement ownership');
+  replacement.dispose();
+});
+
+test('direct listener disposal removes only its owning scene even when another listener has the same name', () => {
+  const { engine, scenes } = registeredEngine();
+  const active = AudioListener.attach(engine, { autoResume: false });
+  const foreign = new AudioListener({ autoResume: false });
+  engine.use(foreign, scenes[1]);
+  foreign.dispose();
+  assert.equal(engine.sceneOf(foreign), undefined);
+  assert.equal(engine.sceneOf(active), scenes[0]);
+  assert.equal(foreign.hasContext, false);
+  active.dispose();
+  assert.equal(active.hasContext, false);
+});
+
 test('replaying during a delayed stop or fade releases the previous buffer source', () => {
   for (const method of ['stop', 'fadeOut']) {
     const context = new FakeAudioContext({ state: 'running' }),

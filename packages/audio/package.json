@@ -27,6 +27,7 @@
     "build": "node ../../scripts/build-optional.js audio",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:browser:listener-disposal": "node tests/listener-disposal-browser.mjs",
     "prepack": "npm run build"
   },
   "sideEffects": false,

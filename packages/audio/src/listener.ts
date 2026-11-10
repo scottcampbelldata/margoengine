@@ -319,6 +319,11 @@ export class AudioListener implements EnginePlugin {
 
   /** Stops and disposes every sound, disconnects the master gain and closes a context this listener created. */
   dispose(): void {
+    const scene = this.engine?.sceneOf(this);
+    if (scene) {
+      scene.removePlugin(this.name);
+      return;
+    }
     this.removeGestureListeners();
     for (const source of [...this.sources]) source.dispose();
     this.sources.clear();

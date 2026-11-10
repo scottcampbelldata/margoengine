@@ -1383,6 +1383,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mcp: document direct/stdio rejection of duplicate active tool IDs and preserved cancellation ownership; completed-ID handling is unchanged.
 
+- @margoengine/audio: document direct listener disposal detaching its owning scene, same-name replacement and isolated/idempotent cleanup without creating a lazy context.
 - @margoengine/sciviz: document default legend visibility after named-layer removal and reappearance, retaining native hidden semantics and spacing.
 - @margoengine/loaders: document that all vector parsers reject pre-aborted signals before input conversion or decoding, preserving LoaderError code aborted.
 - @margoengine/points: document maxConcurrentLoads as a positive safe integer, default four, with constructor TypeError/RangeError validation.

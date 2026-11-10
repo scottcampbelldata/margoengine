@@ -235,6 +235,9 @@ export function fakeEngine({ capacity = 8 } = {}) {
     },
     passes,
     view,
+    sceneOf() {
+      return undefined;
+    },
     frame() {
       for (const pass of passes) pass.execute({});
     },
