@@ -293,3 +293,15 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/ecs (batch 249 job 4): WorldSerializer snapshots/restores, remote id maps, chosen component semantics, createDelta/applyDelta/undo, limits/cancellation/native API requirements, codecs and World reserve/entities.
 - margoengine (batch 249 job 4): generated ecs/serialize alias.
+
+
+
+- @margoengine/mcp: document assets library/search/variant/download/wire tools, manifests, provider limits, assets-page installer, public URL/material targets and disposal (batch 267 job 2).
+- margoengine: document generated mcp/assets and mcp/assets-page aliases (batch 267 job 2).
+=======
+
+- @margoengine/mcp: document optional http createHttpTransport/serveHttp, server factory, JSON response mode, session/version headers, tokens, authorizer/TLS mounting and all default limits (batch 267 job 3).
+- margoengine: document generated mcp/http alias (batch 267 job 3).
+
+- @margoengine/mcp: cover both HTTP protocol eras, modern per-request metadata, discovery, encoded/custom headers and distinct disconnect cancellation semantics.
+>>>>>>> 9dfc52fc4 (feat(mcp): serve current and legacy Streamable HTTP clients)

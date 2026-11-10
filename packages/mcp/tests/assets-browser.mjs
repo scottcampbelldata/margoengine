@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { relative } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { createLiveHost } from '../dist/live-host.js';
 
-const fixtures = JSON.parse(await readFile('test-results/mcp-assets-proof/fixtures.json', 'utf8'));
+const fixtures = JSON.parse(await readFile(new URL('./fixtures/index.json', import.meta.url), 'utf8'));
 for (const backend of ['webgpu', 'webgl2']) {
   const context = await openBrowser({
     startPath: '/packages/mcp/tests/assets-browser.html',
@@ -33,7 +33,10 @@ for (const backend of ['webgpu', 'webgl2']) {
             window.assetFixture.surface.root.visible = false;
           });
         }
-        const path = relative(process.cwd(), fixture.directory).replaceAll('\\', '/');
+        const path = relative(process.cwd(), resolve(import.meta.dirname, 'fixtures', fixture.directory)).replaceAll(
+          '\\',
+          '/',
+        );
         const url = `${origin}/${path}/${fixture.entry}`;
         const before = await host.request('capture', {});
         const result = await host.request('asset', { kind: fixture.asset.kind, url, target: 'surface' });

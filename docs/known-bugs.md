@@ -4329,3 +4329,10 @@ separator boundaries. Future local landing commands check child status before
 commit/push; no repository hook or landing queue is introduced.
 
 The same incoming metadata merge reset28 approved size ceilings while leaving their runtime fixes present. Restore the exact approvals from10bf82909 and recompute the total; quality sizes is the regression for the resulting mismatch. No runtime change or newly raised allowance.
+
+
+Batch 267 job 3: no open HTTP transport defect found in the real-network correctness suite; supported revisions, JSON reply mode and deployment ownership are stated in docs/limits.md.
+
+Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
+
+Outside batch 267: node scripts/gpu-package-tests.mjs --no-build planning rejects packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs as browser-driving files absent from registered scripts. Cause: the browser-file registry has no matching commands/helper classification for those two files. MCP leaves are registered; this pre-existing registry issue is deferred to its owners under lane rule 21.

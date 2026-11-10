@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12582796,
+  "total": 12587924,
   "history": [
     {
       "date": "2026-10-24",
@@ -6127,6 +6127,18 @@
       "commit": "f95b2ba16",
       "reason": "Batch 249 serialize: ECS allocation/entity enumeration and supplied object defaults; root 4538 -> 4559 B gzip, ceiling 4554 -> 4815 B. Native serializer needs safe reservation and complete empty-entity capture; splitting allocator state would duplicate world internals. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "cf1af5958",
+      "reason": "batch267-current-and-legacy-http-transport",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "939a3d109",
+      "reason": "Repair two inherited optional ceilings after the combined build; unchanged upstream runtime bytes are retained, without splitting code or reducing work. @margoengine/water: measured 20210 B before and after this metadata repair, ceiling 20185 to 20817 B; @margoengine/webgl2-compat lazy compute runtime and read-back: measured 31756 B before and after this metadata repair, ceiling 31741 to 32709 B",
+      "grew": 2
     }
   ],
   "items": {
@@ -7246,6 +7258,7 @@
     "@margoengine/exporters/materials": 18507,
     "@margoengine/bvh/parallel": 11405,
     "margoengine/bvh/parallel": 11405,
-    "@margoengine/ecs/serialize": 4260
+    "@margoengine/ecs/serialize": 4260,
+    "@margoengine/mcp/http": 5128
   }
 }

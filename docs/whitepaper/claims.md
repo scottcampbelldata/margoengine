@@ -3361,6 +3361,8 @@ assembleWFC converts solved IDs and source/orientation metadata into shared-geom
 
 
 
+
+
 Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
 
 
@@ -3382,3 +3384,7 @@ Batch 225 job 3: signed point offsets maintain normal distance, cubic offsets ve
 bvh/parallel distributes one mesh's SAH subtrees across a bounded pool, with planning/packing off the page thread and a shared-position or cloned-input path. packages/bvh/tests/parallel.test.js compares every packed word, index and original face id with MeshBVH.build, including one million triangles over four real leaf workers, SAH/center strategies, global depth caps, coincident centroids, float64 and interleaved vertices. It also compares queries/refits/restores and checks abort, deadline and worker failure cleanup. The production Vite consumer checks serial parity and emits both nested module-worker assets; bvh's existing browser suite runs the unchanged WebGPU/WebGL2 query and compute coverage. This proves correctness and worker distribution, not a wall-clock speedup or whole-package superiority. packages/bvh/tests/index-order.test.js proves the existing index-preserving default already covers batch221 job 2's indirect requirement, without allocating or assigning an index buffer on the caller.
 
 Batch 249 job 4: ecs/serialize provides binary world snapshots and baseline-checked deltas of selected components, independent of save. Proof: packages/ecs/test/serialize.test.js. A sparse change fixture transfers fewer bytes than its full incompressible snapshot and reconstructs identical bytes; no timing or compression-optimality claim.
+
+=======
+Batch 267 job 3: optional mcp/http serves unchanged MCP tools, resources, prompts and image content over JSON reply mode of current 2026-07-28 and legacy 2025 Streamable HTTP. Current metadata, discovery, encoded/name/parameter header validation, stateless request lifecycle, result envelopes and disconnect cancellation are proved by packages/mcp/tests/http-modern.test.js. Real HTTP proof: packages/mcp/tests/http.test.js covers negotiation, media/framing/status codes, CORS/Host/auth/version checks, principal/session isolation, repeated duplicate ids, explicit versus disconnect cancellation, deadlines, capacity, idle expiry with a controlled clock, late factory disposal, response bounds and split/malformed UTF-8. Legacy standalone SSE is explicitly declined and current GET/DELETE returns 405; no subscription capability is advertised. No remote identity-provider or performance claim.
+>>>>>>> 9dfc52fc4 (feat(mcp): serve current and legacy Streamable HTTP clients)

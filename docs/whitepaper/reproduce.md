@@ -2809,6 +2809,8 @@ Build packages, then run node --test --test-timeout=60000 packages/wfc/test/asse
 
 
 
+
+
 Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
 
 
@@ -2882,3 +2884,9 @@ Batch 225 job 3: npm run build --workspace @margoengine/splines, then node --tes
 After npm run build:packages, run node --test --test-timeout=120000 packages/bvh/tests/parallel.test.js packages/bvh/tests/index-order.test.js. The test adapter uses real Node worker threads, including a coordinator and nested leaf workers; it also disables SharedArrayBuffer inside workers to exercise cloning. For production browser assets and both graphics backends run node scripts/gpu-lock.mjs run --owner=bvh-parallel-repro --wait-max=60 --max=5 -- node packages/bvh/scripts/test-browser.js. The production consumer builds one mesh with three workers and compares all packed buffers to serial construction; the existing suite exercises WebGPU and WebGL2. No timing threshold or benchmark is required in the build phase. Reproduce initial entry/worker sizes with bundleBytes from scripts/measure-size.js and gzipSync from node:zlib for packages/bvh/dist/parallel.js, parallel.worker.js and parallel-leaf.worker.js. npm run measure:size measures the unchanged core plus stage budget.
 
 Batch 249 job 4: build packages and run node --test --test-timeout=120000 packages/ecs/test/serialize.test.js. Synthetic identity, lifecycle, corruption and deterministic byte-count fixtures. Requires native CompressionStream/DecompressionStream, Uint8Array base64 and Web Crypto; no GPU or assets.
+
+=======
+Batch 267 job 3: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/http*.test.js. The suites start OS-assigned loopback listeners and drives real HTTP requests with the same docs tools/resources/prompts, and image content. All network waits are bounded; idle expiry uses a controlled clock. This transport-only test needs no GPU slot.
+
+Final batch 267 CI wiring: test:browser:live, test:browser:live:compat and test:browser:assets are discoverable package GPU leaves. assets-browser uses committed CC0 fixtures with exact hash tests, so it performs no downloads while holding a GPU slot. assets-prepare.mjs remains the separate CPU/network reproduction of full catalogue downloads.
+>>>>>>> 9dfc52fc4 (feat(mcp): serve current and legacy Streamable HTTP clients)

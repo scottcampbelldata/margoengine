@@ -1,0 +1,317 @@
+[
+  {
+    "asset": {
+      "provider": "khronos",
+      "id": "Triangle",
+      "kind": "model",
+      "title": "Triangle",
+      "source": "https://github.khronos.org/glTF-Assets/Models/Triangle/",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "Marco Hutter (https://github.com/javagl/) (2017)"
+    },
+    "entry": "Triangle.gltf",
+    "directory": "khronos-Triangle",
+    "files": [
+      {
+        "path": "Triangle.gltf",
+        "sha256": "6f4a8a1fbefbac2d0adde0800864279fd98c3f119077380e6840810ed62b6cfc",
+        "bytes": 1037
+      },
+      {
+        "path": "Triangle.bin",
+        "sha256": "898ed7f560dca9907a80c98be57fbbc0f3a092d2e3683b964ffcfa75c549ac62",
+        "bytes": 44
+      }
+    ],
+    "download": {
+      "asset": {
+        "provider": "khronos",
+        "id": "Triangle",
+        "kind": "model",
+        "title": "Triangle",
+        "source": "https://github.khronos.org/glTF-Assets/Models/Triangle/",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "credit": "Marco Hutter (https://github.com/javagl/) (2017)"
+      },
+      "variant": "glTF",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Triangle/glTF/Triangle.gltf",
+      "files": [
+        {
+          "path": "Triangle.gltf",
+          "sha256": "6f4a8a1fbefbac2d0adde0800864279fd98c3f119077380e6840810ed62b6cfc",
+          "bytes": 1037
+        },
+        {
+          "path": "Triangle.bin",
+          "sha256": "898ed7f560dca9907a80c98be57fbbc0f3a092d2e3683b964ffcfa75c549ac62",
+          "bytes": 44
+        }
+      ]
+    }
+  },
+  {
+    "asset": {
+      "provider": "polyhaven",
+      "id": "WoodenTable_02",
+      "kind": "model",
+      "title": "Wooden Table 02",
+      "source": "https://polyhaven.com/a/WoodenTable_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "Poly Haven; Fran Calvente"
+    },
+    "entry": "WoodenTable_02_1k.gltf",
+    "directory": "polyhaven-WoodenTable_02",
+    "files": [
+      {
+        "path": "WoodenTable_02_1k.gltf",
+        "sha256": "3a54261d3757fd78561f1f4bedb7304e0f7b98dae433998e280bc2843cf3fb24",
+        "bytes": 2692
+      },
+      {
+        "path": "textures/WoodenTable_02_arm_1k.jpg",
+        "sha256": "232a482ff423c5c214c8a892b378b56995f53058f9c4ee5fb5c1798c9afa2adf",
+        "bytes": 157036
+      },
+      {
+        "path": "textures/WoodenTable_02_nor_gl_1k.jpg",
+        "sha256": "9ceabc356fb177af63e118c1ea24245fcec627a027c0e5503fb5d2165e0f5aa3",
+        "bytes": 149799
+      },
+      {
+        "path": "WoodenTable_02.bin",
+        "sha256": "740bca56c0c6eff1209bb046825f5a8467badef1aebe38aab80d309884d4352e",
+        "bytes": 49564
+      },
+      {
+        "path": "textures/WoodenTable_02_diff_1k.jpg",
+        "sha256": "559a27ea7d127010c5557213020b7d4e43d57289ca041291665dfe1213f5fe6c",
+        "bytes": 144218
+      }
+    ],
+    "download": {
+      "asset": {
+        "provider": "polyhaven",
+        "id": "WoodenTable_02",
+        "kind": "model",
+        "title": "Wooden Table 02",
+        "source": "https://polyhaven.com/a/WoodenTable_02",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "credit": "Poly Haven; Fran Calvente"
+      },
+      "variant": "gltf/1k/gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/WoodenTable_02/WoodenTable_02_1k.gltf",
+      "files": [
+        {
+          "path": "WoodenTable_02_1k.gltf",
+          "sha256": "3a54261d3757fd78561f1f4bedb7304e0f7b98dae433998e280bc2843cf3fb24",
+          "bytes": 2692
+        },
+        {
+          "path": "textures/WoodenTable_02_arm_1k.jpg",
+          "sha256": "232a482ff423c5c214c8a892b378b56995f53058f9c4ee5fb5c1798c9afa2adf",
+          "bytes": 157036
+        },
+        {
+          "path": "textures/WoodenTable_02_nor_gl_1k.jpg",
+          "sha256": "9ceabc356fb177af63e118c1ea24245fcec627a027c0e5503fb5d2165e0f5aa3",
+          "bytes": 149799
+        },
+        {
+          "path": "WoodenTable_02.bin",
+          "sha256": "740bca56c0c6eff1209bb046825f5a8467badef1aebe38aab80d309884d4352e",
+          "bytes": 49564
+        },
+        {
+          "path": "textures/WoodenTable_02_diff_1k.jpg",
+          "sha256": "559a27ea7d127010c5557213020b7d4e43d57289ca041291665dfe1213f5fe6c",
+          "bytes": 144218
+        }
+      ]
+    }
+  },
+  {
+    "asset": {
+      "provider": "polyhaven",
+      "id": "venice_sunset",
+      "kind": "hdri",
+      "title": "Venice Sunset",
+      "source": "https://polyhaven.com/a/venice_sunset",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "Poly Haven; Greg Zaal"
+    },
+    "entry": "venice_sunset_1k.hdr",
+    "directory": "polyhaven-venice_sunset",
+    "files": [
+      {
+        "path": "venice_sunset_1k.hdr",
+        "sha256": "92fe2b29b1957828fb8925a57633540bbba5bf380d9285ed553443e834249352",
+        "bytes": 1440400
+      }
+    ],
+    "download": {
+      "asset": {
+        "provider": "polyhaven",
+        "id": "venice_sunset",
+        "kind": "hdri",
+        "title": "Venice Sunset",
+        "source": "https://polyhaven.com/a/venice_sunset",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "credit": "Poly Haven; Greg Zaal"
+      },
+      "variant": "hdri/1k/hdr",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/venice_sunset_1k.hdr",
+      "files": [
+        {
+          "path": "venice_sunset_1k.hdr",
+          "sha256": "92fe2b29b1957828fb8925a57633540bbba5bf380d9285ed553443e834249352",
+          "bytes": 1440400
+        }
+      ]
+    }
+  },
+  {
+    "asset": {
+      "provider": "polyhaven",
+      "id": "aerial_rocks_04",
+      "kind": "texture",
+      "title": "Aerial Rocks 04",
+      "source": "https://polyhaven.com/a/aerial_rocks_04",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "Poly Haven; Rob Tuytel"
+    },
+    "entry": "aerial_rocks_04_diff_1k.jpg",
+    "directory": "polyhaven-aerial_rocks_04",
+    "files": [
+      {
+        "path": "aerial_rocks_04_diff_1k.jpg",
+        "sha256": "5ac472016a6740bd3c62b1d719bf128e0659022fb35853f4e847737522337ffa",
+        "bytes": 841479
+      }
+    ],
+    "download": {
+      "asset": {
+        "provider": "polyhaven",
+        "id": "aerial_rocks_04",
+        "kind": "texture",
+        "title": "Aerial Rocks 04",
+        "source": "https://polyhaven.com/a/aerial_rocks_04",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "credit": "Poly Haven; Rob Tuytel"
+      },
+      "variant": "Diffuse/1k/jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_rocks_04/aerial_rocks_04_diff_1k.jpg",
+      "files": [
+        {
+          "path": "aerial_rocks_04_diff_1k.jpg",
+          "sha256": "5ac472016a6740bd3c62b1d719bf128e0659022fb35853f4e847737522337ffa",
+          "bytes": 841479
+        }
+      ]
+    }
+  },
+  {
+    "asset": {
+      "provider": "ambientcg",
+      "id": "Bricks113A",
+      "kind": "texture",
+      "title": "Bricks 113 A",
+      "source": "https://ambientcg.com/a/Bricks113A",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "ambientCG"
+    },
+    "entry": "Bricks113A_1K-JPG_Color.jpg",
+    "directory": "ambientcg-Bricks113A",
+    "files": [
+      {
+        "path": "Bricks113A_1K-JPG_Color.jpg",
+        "sha256": "3dc1e3fad693c5b3b052da99ecd642bcde988ff9bba24a78987905c0e0785ab7",
+        "bytes": 1101164
+      }
+    ],
+    "download": {
+      "asset": {
+        "provider": "ambientcg",
+        "id": "Bricks113A",
+        "kind": "texture",
+        "title": "Bricks 113 A",
+        "source": "https://ambientcg.com/a/Bricks113A",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "credit": "ambientCG"
+      },
+      "variant": "1K-JPG",
+      "url": "https://ambientcg.com/get?file=Bricks113A_1K-JPG.zip",
+      "files": [
+        {
+          "path": "Bricks113A_1K-JPG.zip",
+          "sha256": "71e8ea2e38b0f8cc688701511d64ffd81bcf3ede88eac52b82ebd282194ab854",
+          "bytes": 7839867
+        },
+        {
+          "path": "Bricks113A_1K-JPG.usdc",
+          "sha256": "818aa5810248402072827561efb8206983ab0105dabf34fd26df823e2d8309e4",
+          "bytes": 2996
+        },
+        {
+          "path": "Bricks113A_1K-JPG_AmbientOcclusion.jpg",
+          "sha256": "122aa0dfc8c214901135d91066e9bba7a61c8f270a9f4a8fec199f97e9a8d387",
+          "bytes": 703714
+        },
+        {
+          "path": "Bricks113A_1K-JPG_Color.jpg",
+          "sha256": "3dc1e3fad693c5b3b052da99ecd642bcde988ff9bba24a78987905c0e0785ab7",
+          "bytes": 1101164
+        },
+        {
+          "path": "Bricks113A_1K-JPG_Displacement.jpg",
+          "sha256": "a6e5440b39b9bc8d923d83e8d08f61abc15bbf8822fa58ac3df366cf4d233514",
+          "bytes": 454123
+        },
+        {
+          "path": "Bricks113A_1K-JPG_NormalDX.jpg",
+          "sha256": "b402b3900cc670efb2bf6a004ac2e1969a48fbecebb5aef0a5816975a987a717",
+          "bytes": 1603570
+        },
+        {
+          "path": "Bricks113A_1K-JPG_NormalGL.jpg",
+          "sha256": "362150e48d1000d2fd749717a75667cb6a3eed6df12dbfa39222b31121cabbe8",
+          "bytes": 1603238
+        },
+        {
+          "path": "Bricks113A_1K-JPG_Roughness.jpg",
+          "sha256": "fbae455fe87c581e04e9f6107638ad6707f4ee8c0b84bd920c034aaca07622bf",
+          "bytes": 680635
+        },
+        {
+          "path": "Bricks113A_1K-JPG.blend",
+          "sha256": "2f156c729cf55c95bbb856bf7ab0290924498fcd545a55d15b386a419611028a",
+          "bytes": 1322497
+        },
+        {
+          "path": "Bricks113A_1K-JPG.mtlx",
+          "sha256": "ae7fee220278e682a0b37c1b8e9497fb35e74a78a8e3d8e25ac46a928e22550b",
+          "bytes": 2287
+        },
+        {
+          "path": "Bricks113A_1K-JPG.tres",
+          "sha256": "697fc8337651d76f900cab3c3bdef3e82a15fe1fa0356753305df33d6a9c3bcb",
+          "bytes": 1025
+        },
+        {
+          "path": "Bricks113A.png",
+          "sha256": "5ebfcd3b8fc32c2dc38beb45a21eb6a83e5c427784e51ccdbe8a5a5127a57c18",
+          "bytes": 362726
+        }
+      ]
+    }
+  }
+]

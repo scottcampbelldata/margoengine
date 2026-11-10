@@ -89,6 +89,10 @@
     "./assets-page": {
       "types": "./dist/assets-page.d.ts",
       "import": "./dist/assets-page.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
     }
   },
   "files": [
@@ -107,6 +111,9 @@
     "build": "node ../../scripts/build-optional.js mcp && node scripts/build-corpus.mjs",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/mcp/tests/render-gpu-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:live": "cd ../.. && node packages/mcp/tests/live-browser.mjs",
+    "test:browser:live:compat": "cd ../.. && node packages/mcp/tests/live-browser.mjs --compat",
+    "test:browser:assets": "cd ../.. && node packages/mcp/tests/assets-browser.mjs"
   }
 }
