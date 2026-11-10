@@ -324,8 +324,8 @@ class ColorSquare extends Widget {
         list.rect(r.x + (x * r.width) / 64, r.y + (y * r.height) / 64, r.width / 64 + 0.5, r.height / 64 + 0.5, {
           fill: [...rgb(this.picker.hue, (x + 0.5) / 64, 1 - (y + 0.5) / 64), 1],
         });
-    const color = parseRgba(this.picker.value),
-      [, s, v] = hsv(color);
+    const [, , v] = hsv(parseRgba(this.picker.value)),
+      s = this.picker.saturation;
     list.rect(r.x + s * r.width - 4, r.y + (1 - v) * r.height - 4, 8, 8, { border: [0, 0, 0, 1], borderWidth: 2 });
     list.rect(r.x + s * r.width - 2, r.y + (1 - v) * r.height - 2, 4, 4, { border: [1, 1, 1, 1], borderWidth: 1 });
   }
@@ -334,12 +334,14 @@ class ColorSquare extends Widget {
 export class ColorPicker extends Panel {
   private rgba: Rgba = [1, 1, 1, 1];
   private hueValue = 0;
+  // Kept apart from the colour: black has no saturation, so Value 0 must not lose it (as grey must not lose hue).
+  private saturationValue = 0;
   private readonly channels: Slider[] = [];
   readonly hexInput: TextInput;
   constructor({ value = '#ffffff', onChange, ...rest }: ColorPickerOptions = {}) {
     super({ label: 'Colour', width: 280, gap: 6, ...rest });
     this.rgba = parseRgba(value);
-    this.hueValue = hsv(this.rgba)[0];
+    [this.hueValue, this.saturationValue] = hsv(this.rgba);
     this.add(new ColorSquare(this));
     for (const name of ['Hue', 'Saturation', 'Value', 'Red', 'Green', 'Blue', 'Alpha']) {
       const i = this.channels.length,
@@ -350,7 +352,7 @@ export class ColorPicker extends Panel {
           step: 1 / 255,
           onChange: (e) => {
             const n = Number(e.value),
-              current: [number, number, number] = [this.hue, ...(hsv(this.rgba).slice(1) as [number, number])];
+              current: [number, number, number] = [this.hue, this.saturation, hsv(this.rgba)[2]];
             if (i < 3) {
               current[i] = n;
               this.setHSV(...current);
@@ -383,32 +385,41 @@ export class ColorPicker extends Panel {
   }
   set value(v: string) {
     this.rgba = parseRgba(v);
-    const [h, s] = hsv(this.rgba);
-    if (s > 0) this.hueValue = h;
+    this.keep();
     this.refresh();
   }
   /** Current hue in [0,1]. */
   get hue(): number {
     return this.hueValue;
   }
+  /** Current saturation in [0,1], kept while Value is 0. */
+  get saturation(): number {
+    return this.saturationValue;
+  }
   /** Set HSV from a pointer or application, emitting a change. */
   setHSV(h: number, s: number, v: number): void {
     if (![h, s, v].every((n) => Number.isFinite(n) && n >= 0 && n <= 1))
       throw rangeError('HSV channels must be in [0,1]', 'ui');
+    if (!this.active) return;
     this.hueValue = h;
+    this.saturationValue = s;
     this.change([...rgb(h, s, v), this.rgba[3]]);
   }
   private change(v: Rgba, syncHex = true): void {
     if (!this.active) return;
     const before = this.value;
     this.rgba = v;
-    const [h, s] = hsv(v);
-    if (s > 0) this.hueValue = h;
+    this.keep();
     this.refresh(syncHex);
     if (this.value !== before) this.emit('change', { value: this.value });
   }
+  private keep(): void {
+    const [h, s, v] = hsv(this.rgba);
+    if (s > 0) this.hueValue = h;
+    if (v > 0) this.saturationValue = s;
+  }
   private refresh(syncHex = true): void {
-    const values = [this.hue, ...hsv(this.rgba).slice(1), ...this.rgba];
+    const values = [this.hue, this.saturation, hsv(this.rgba)[2], ...this.rgba];
     this.channels.forEach((s, i) => {
       s.value = values[i];
     });

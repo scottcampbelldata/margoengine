@@ -22,6 +22,7 @@ export class ColorPicker extends Panel {
     get value(): string;
     set value(v: string);
     get hue(): number;
+    get saturation(): number;
     setHSV(h: number, s: number, v: number): void;
 }
 

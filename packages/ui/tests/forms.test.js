@@ -105,6 +105,20 @@ test('ColorPicker retains hue at zero saturation and keeps HSV, RGB, hex and alp
   assert.ok(parseRgba(picker.value)[0] > 0.2);
   ui.dispose();
 });
+test('ColorPicker retains saturation at zero value, as it retains hue at zero saturation (review 5)', () => {
+  // Black has no saturation of its own: raising Value from 0 must give back the red, not a grey.
+  const picker = new ColorPicker(),
+    ui = makeUi();
+  ui.add(picker);
+  picker.setHSV(0, 1, 0);
+  const saturation = picker.children.find((w) => w.text === 'Saturation'),
+    value = picker.children.find((w) => w.text === 'Value');
+  assert.equal(saturation.value, 1);
+  ui.focus(value, 'gamepad');
+  ui.execute('right', 'gamepad');
+  assert.equal(picker.value, '#010000ff');
+  ui.dispose();
+});
 test('Form mirror exposes roles, selection and panel relationships without duplicates', async () => {
   const dom = new JSDOM('<div><canvas tabindex="0"></canvas></div>'),
     canvas = dom.window.document.querySelector('canvas'),
