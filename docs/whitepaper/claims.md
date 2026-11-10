@@ -3463,3 +3463,8 @@ PLY face RGB/RGBA and scalar/list properties survive fan triangulation in ASCII 
 
 ### Pulsing x-ray selection (batch 199 job 2)
 The optional xray entry adds deterministic pulsing brightness to visible and hidden outlines, reusing Selection's existing occlusion, current-pose and multisample paths. Proof: packages/selection/test/pulse.test.js and pulse.browser.mjs, with native/compatibility pixel comparisons for both outline algorithms. No throughput claim.
+
+
+### Batch 265 frame ordering and render ownership
+
+React callbacks run by ascending finite priority, with stable ties. A positive subscriber owns rendering until removed, including demand and immersive XR frames. Evidence: packages/react/tests/frame-priority.test.js, packages/xr/tests/xr.test.js and packages/react/scripts/test-priority-browser.mjs. This is a functional contract, with no frame-rate or throughput claim.

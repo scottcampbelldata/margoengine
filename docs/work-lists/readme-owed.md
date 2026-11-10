@@ -373,3 +373,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Restore the exporters/sparse alias for the export already on main | batch-245 landing mirror repair |
 
 - @margoengine/selection: document xray XRaySelection styling, default cosine pulse, manual time/play, multiview advancement, ownership and disposal (batch 199 job 2).
+
+
+| @margoengine/react | useFrame numeric priorities, positive takeover, demand restoration and XR manual draws | batch 265 job 4 |
+| @margoengine/xr | onFrame returning false and frame-local renderFrame for both eyes | batch 265 job 4 |
+| margoengine | React frame priorities through the umbrella alias | batch 265 job 4 |
+
+- margoengine (batch 265 landing): generated exporters/sparse alias, owed with its owning package examples.

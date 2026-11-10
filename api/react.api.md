@@ -225,7 +225,7 @@ export function useCamera(): EngineKernel['camera'];
 
 export function useEngine(): EngineKernel;
 
-export function useFrame(callback: FrameCallback): void;
+export function useFrame(callback: FrameCallback, priority?: number): void;
 
 export function useLoader<T>(load: Loader<T>, url: string): T;
 

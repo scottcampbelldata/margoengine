@@ -3980,7 +3980,7 @@ New html/texture-gl entry: 0 to 6,238 B min+gzip, ceiling 0 to 6,494 B. It inclu
 
 - XR locomotion: smooth translation defaults to 2 m/s, yaw to pi/2 rad/s, radial dead zone 0.15, thumbstick axes 2/3, delta cap 0.1 s. Comfort defaults to a 90-degree angular opening, 0.2 rad feather, 0.15 s exponential response. Reattach after each immersive session. This does not establish clinical sickness reduction; physical-device proof remains blocked by unavailable Quest/Android hardware.
 
-- xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains 23950 B.
+- xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains at the current main baseline of 24209 B; this job changes neither package.
 
 | Optional entry | Limits (batch 267 job 1) |
 | --- | --- |
@@ -4423,3 +4423,10 @@ schema, attachment maps and constraint/pose state. Core plus stage remains
 `@margoengine/selection/xray` exports XRaySelection, XRaySelectionOptions and OutlinePulse. It supports the Selection mesh/model/source protocol, current-pose hidden and visible outlines, dashed or solid hidden lines, both distance algorithms and existing multisample support. Pulse defaults on, with two-second period and minimum 0.25; false disables it. The bounded cosine modulates linear outline brightness. `time = seconds` selects manual deterministic time; `play()` resumes frame-delta time, advanced once across multiple views. Options are mutable per frame. The helper owns its outline targets only; source buffers and meshes remain caller-owned. No new GPU passes beyond the existing Selection pipeline; one CPU style pass precedes it. Core and stage remain unchanged.
 
 Batch 199 job 2: new xray entry 12322 B min+gzip, ceiling 12692 B. The entry retains the existing Selection pipeline and its model/mask providers; splitting it would duplicate lifecycle and masks. Core plus stage remains 24209 B.
+
+
+## Batch 265 useFrame priorities
+
+`useFrame(callback, priority = 0)` orders finite priorities ascending; equal values retain subscription order. Negative values only order work. Any positive live subscription owns rendering, even when it draws nothing; removing the last restores automatic rendering. Demand mode still advances only on invalidate. Callback additions start next frame and removals apply immediately. The optional XR manager accepts `onFrame` returning false and `renderFrame()` inside that callback; React manual full-scene draws use the tracked eyes, while inline sessions retain the desktop loop. Core and stage are unchanged.
+
+Frame priority bytes: React root 10243 B gzip (ceiling 9852 -> 10551 B); React XR 4159 B (ceiling 3818 -> 4415 B). The bytes keep stable callback order, explicit render ownership, native callback behavior and tracked XR eye rendering together. Splitting the scheduler from the Canvas would require a second clock or a new core hook. Core + stage remains 23950 B.

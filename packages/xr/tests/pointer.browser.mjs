@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const browser = await openBrowser({ startPath: '/tests/modern-extension.html' });
+const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 'free' });
 const errors = [];
 browser.page.on('pageerror', (e) => errors.push(e.message));
 browser.page.on('console', (m) => {

@@ -5811,3 +5811,11 @@ path polish remains private. No speed gate or timing benchmark was added.
 
 ### Section 5 evidence: optional pulsing x-ray selection
 Batch 199 job 2 reuses the existing whole-selection and equal-depth masks, without new rendering maths or a second mask renderer. Pulse time advances once per frame, including multiple views. selection/test/pulse.test.js covers validation and time ownership; pulse.browser.mjs compares actual hidden/visible outline pixels at bright and dim phases using both morphology and JFA on an attributed real Box fixture. Existing xray browser evidence continues to prove hidden dash runs and PBR/core depth behaviour. No new hardware or speed claim.
+
+
+
+### 5. Batch 265 frame ownership
+
+The React Canvas keeps native engine clocks and callbacks while ordering React subscriptions. Positive priorities suppress the native loop's trailing automatic render and leave explicit draws available inside all native callbacks. A subscription snapshot is reused until membership changes. Demand dispatch returns the render decision without starting a loop. XR renderFrame remains inside the active tracked frame and the React adapter routes manual full-scene rendering to it. CPU evidence covers the native Engine loop and XR two-eye draw counts; the browser fixture covers exact automatic/manual pixels, empty takeover, multiple draws, removal and demand mode. Hardware evidence is required on both backends before landing.
+
+The registered bindings, instances and priority browser scripts establish the repository working directory before starting their server. Running them as package commands previously rooted Vite in packages/react while requesting repository-relative page paths. The unchanged bindings and instances GPU assertions now pass from the package runner. Automatic and manual XR eye output is also compared byte-for-byte in tests/modern-xr-passes.ts on both backends.

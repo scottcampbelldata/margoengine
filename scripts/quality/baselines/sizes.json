@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12752607,
+  "total": 12753903,
   "history": [
     {
       "date": "2026-10-24",
@@ -6947,7 +6947,7 @@
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
-    "@margoengine/react": 9852,
+    "@margoengine/react": 10551,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/controls": 4346,
@@ -6978,7 +6978,7 @@
     "@margoengine/react/ui": 2992,
     "@margoengine/react/viewcube": 1288,
     "@margoengine/react/voxel": 2200,
-    "@margoengine/react/xr": 3818,
+    "@margoengine/react/xr": 4415,
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/rigging": 7870,
     "@margoengine/rigging/autorig": 10627,

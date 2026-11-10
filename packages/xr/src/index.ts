@@ -66,8 +66,8 @@ export interface XRSessionOptions {
   framebufferScale?: number;
   /** Abort while the browser negotiates the session or the layer is set up: the session is ended and the request rejects with the reason. */
   signal?: AbortSignal;
-  /** Called once per XR frame with reused state; copy anything you keep. */
-  onFrame?: (state: XRFrameState) => void;
+  /** Called once per XR frame with reused state; copy anything you keep. Return false to own rendering with renderFrame(). */
+  onFrame?: (state: XRFrameState) => unknown;
 }
 const platform = () =>
   globalThis as typeof globalThis & {
@@ -144,6 +144,7 @@ export class XR implements EnginePlugin {
   readonly controllers: XRController[] = [];
   private readonly state: XRFrameState = { time: 0, delta: 0, frame: null!, viewer: null, inputs: this.controllers };
   private readonly renderOptions = { culling: false, delta: 0 };
+  private insideFrame = false;
   private resume = false;
   /** True while composition layers sit below the scene, so the scene keeps alpha where it draws nothing. */
   private seeThrough = false;
@@ -419,6 +420,7 @@ export class XR implements EnginePlugin {
     this.handle = null;
     if (this.disposed || frame.session !== this.session) return;
     try {
+      this.insideFrame = true;
       const delta = this.last === null ? 0 : Math.max(0, Math.min((time - this.last) / 1000, 0.1));
       this.last = time;
       const viewer = frame.getViewerPose(this.space!);
@@ -428,31 +430,30 @@ export class XR implements EnginePlugin {
       this.state.frame = frame;
       this.state.viewer = viewer;
       for (const listener of this.listeners) listener(this.state);
-      this.callback?.(this.state);
+      const automatic = this.callback?.(this.state) !== false;
       if (this.disposed || frame.session !== this.session) return;
-      // shortcut: keep the canvas mirror and duplicate GPU buffers, upgrade when shared XR device hooks are available.
-      if (this.mode !== 'inline' && this.eyes) {
-        if (viewer)
-          this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
-      } else if (this.mode !== 'inline') {
-        this.renderOptions.delta = delta;
-        this.engine.render(this.renderOptions);
-        if (viewer)
-          this.renderer!.render(
-            this.engine,
-            this.binding!,
-            this.layer!,
-            viewer,
-            this.mode === 'immersive-ar' || this.seeThrough,
-            this.drawEye,
-          );
-      }
+      if (automatic) this.renderFrame();
       if (this.session === frame.session && !this.disposed)
         this.handle = frame.session.requestAnimationFrame(this.frame);
     } catch (error) {
       this.fail(error);
+    } finally {
+      this.insideFrame = false;
     }
   };
+  /** Render the current tracked eyes (or mirror) from onFrame. Return false there to suppress the automatic draw. */
+  renderFrame(): void {
+    if (!this.insideFrame || this.disposed || !this.session)
+      throw new MargoError('state', 'renderFrame requires an active XR frame; call it inside the session onFrame callback.');
+    const { viewer, delta } = this.state;
+    if (this.mode !== 'inline' && this.eyes) {
+      if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
+    } else if (this.mode !== 'inline') {
+      this.renderOptions.delta = delta;
+      this.engine.render(this.renderOptions);
+      if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
+    }
+  }
   private readonly sourcesChanged = (): void => {
     const sources = this.session?.inputSources ?? [];
     for (let i = this.controllers.length - 1; i >= 0; i--)

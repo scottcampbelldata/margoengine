@@ -220,9 +220,12 @@ function camera(view: XRView, near: number, far: number): Camera {
   eye.project = (out) => out.set(projection);
   return eye;
 }
-async function frames(xr: XR, mode: 'immersive-vr' | 'immersive-ar', n = 4): Promise<void> {
+async function frames(xr: XR, mode: 'immersive-vr' | 'immersive-ar', n = 4, manual = false): Promise<void> {
   let seen = 0;
-  await xr.requestSession(mode, { onFrame: () => void seen++ });
+  await xr.requestSession(mode, { onFrame: () => {
+    seen++;
+    if (manual) { xr.renderFrame(); return false; }
+  } });
   while (seen < n) {
     if (gpuErrors.length || errors.length) throw new Error([...errors, ...gpuErrors].join('\n'));
     await new Promise(requestAnimationFrame);
@@ -274,6 +277,13 @@ async function run() {
     format = engine.renderTarget!.format,
     farPixels = [await far(gpu, 0), await far(gpu, 1)];
   const eyePixels = [await read(gpu, color, 0), await read(gpu, color, 1)];
+  await xr.end();
+  await frames(xr, 'immersive-vr', 4, true);
+  const manualEyes = [await read(gpu, color, 0), await read(gpu, color, 1)];
+  for (let eye = 0; eye < 2; eye++)
+    if (manualEyes[eye].some((value, i) => value !== eyePixels[eye][i]))
+      throw new Error(`Manual renderFrame differs from automatic XR output in eye ${eye}`);
+  result.manualEyesExact = true;
   await xr.end();
   const reference = gpu.createTexture({ size: [SIZE, SIZE], format, usage: 0x10 | 1 });
   // One reference render per eye, each compared with what XR drew for that eye.

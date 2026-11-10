@@ -32,7 +32,8 @@
     "test:browser:extras": "node scripts/test-extras-browser.js",
     "test:browser:tags": "node scripts/test-tags-browser.js",
     "test:browser:bindings": "cd ../.. && node packages/react/scripts/test-bindings-browser.mjs",
-    "test:browser:instances": "cd ../.. && node packages/react/scripts/test-instances-browser.mjs"
+    "test:browser:instances": "cd ../.. && node packages/react/scripts/test-instances-browser.mjs",
+    "test:browser:priority": "node scripts/test-priority-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

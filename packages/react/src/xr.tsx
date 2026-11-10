@@ -14,6 +14,7 @@ import { splitPointerHandlers } from './events.js';
 import { useScene, useResourceEffect } from './internal.js';
 import { setWorldPose } from './scene-transform.js';
 import { MargoError } from '@margoengine/math/errors';
+import { advanceFrames, frameTakeover, xrFrameScope } from './frame-priority.js';
 
 /** The xrcontext value component. */
 export interface XRContextValue {
@@ -106,13 +107,19 @@ export function XR({ children, ...props }: XRProps) {
           .requestSession(sessionMode, {
             ...requested,
             onFrame(state) {
-              if (sessionMode !== 'inline') {
-                sceneFrames.elapsed += state.delta;
-                for (const callback of sceneFrames.callbacks) callback(engine as unknown as EngineKernel, state.delta);
+              if (sessionMode === 'inline') {
+                for (const update of frames) update(state);
+                const external: unknown = onFrame?.(state);
+                latest.current.onFrame?.(state);
+                return external;
               }
-              for (const update of frames) update(state);
-              onFrame?.(state);
-              latest.current.onFrame?.(state);
+              return xrFrameScope(sceneFrames, () => instance.renderFrame(), () => {
+                advanceFrames(sceneFrames, engine, state.delta);
+                for (const update of frames) update(state);
+                const external: unknown = onFrame?.(state);
+                latest.current.onFrame?.(state);
+                return frameTakeover(sceneFrames) ? false : external;
+              });
             },
           })
           .then((value) => {

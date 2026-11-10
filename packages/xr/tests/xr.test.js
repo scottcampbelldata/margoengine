@@ -269,6 +269,32 @@ async function fixture(t) {
     },
   };
 }
+
+test('manual XR frame rendering keeps both tracked eyes and suppresses only the automatic draw', async (t) => {
+  const f = await fixture(t), xr = await XR.create(f.engine);
+  assert.throws(() => xr.renderFrame(), (error) => error.code === 'state');
+  let mode = 'auto';
+  await xr.requestSession('immersive-vr', { onFrame() {
+    if (mode === 'manual') xr.renderFrame();
+    if (mode !== 'auto') return false;
+  } });
+  const viewer = { ...pose(0), views: [
+    { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
+    { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
+  ] };
+  f.passes.length = 0; f.session.tick(100, viewer);
+  assert.equal(f.passes.length, 6, 'automatic two-eye output');
+  mode = 'manual'; f.passes.length = 0; f.session.tick(116, viewer);
+  assert.equal(f.passes.length, 6, 'explicit two-eye output, no duplicate');
+  mode = 'empty'; f.passes.length = 0; f.session.tick(132, viewer);
+  assert.equal(f.passes.length, 0, 'a render owner may choose to draw nothing');
+  assert.equal(f.session.handles.size, 1, 'takeover does not stop the XR clock');
+  mode = 'auto'; f.session.tick(148, viewer);
+  assert.equal(f.passes.length, 6, 'automatic output resumes');
+  assert.throws(() => xr.renderFrame(), (error) => error.code === 'state');
+  assert.deepEqual(f.errors, []);
+  await xr.end();
+});
 test('XR negotiates webgpu and reference space, reads input poses, and renders distinct eye buffers', async (t) => {
   const f = await fixture(t);
   assert.equal(await XR.isSupported(), true);

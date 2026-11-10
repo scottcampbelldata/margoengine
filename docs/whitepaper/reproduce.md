@@ -2959,3 +2959,8 @@ Build loaders, then run `node --test --test-timeout=60000 packages/loaders/tests
 
 ### Batch 199 pulse outlines
 After a package build, run `node scripts/gpu-lock.mjs run --owner=selection-pulse --wait-max=60 --max=2 -- node packages/selection/test/pulse.browser.mjs`, then the same leaf with `--compat`. The test loads the existing attributed Khronos Box, compares peak/trough magenta energy, and requires hidden edges to add actual pixels over visible-only outlines, in JFA and morphological modes. CPU time/validation proof: packages/selection/test/pulse.test.js.
+
+
+### Batch 265 frame priorities
+
+After building packages, run `node --test --test-timeout=120000 packages/react/tests/frame-priority.test.js packages/xr/tests/xr.test.js`. Run `node scripts/gpu-lock.mjs run --owner=react-priority --wait-max=60 --max=4 -- node packages/react/scripts/test-priority-browser.mjs` and the same command with `--compat` appended. The fixture checks actual render-pass counts and exact manual/automatic output from the real Cesium Box. No timing assertion or benchmark is used.

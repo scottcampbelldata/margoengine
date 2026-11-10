@@ -239,7 +239,7 @@ interface XRSessionOptions {
     init?: Record<string, unknown>;
     framebufferScale?: number;
     signal?: AbortSignal;
-    onFrame?: (state: XRFrameState) => void;
+    onFrame?: (state: XRFrameState) => unknown;
 }
 
 type XRSpace = object;

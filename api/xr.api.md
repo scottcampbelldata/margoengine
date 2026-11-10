@@ -66,6 +66,7 @@ export class XR implements EnginePlugin {
     setLayers(below: readonly object[], above: readonly object[]): void;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
+    renderFrame(): void;
     end(): Promise<void>;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -175,6 +176,7 @@ class XR implements EnginePlugin {
     setLayers(below: readonly object[], above: readonly object[]): void;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
+    renderFrame(): void;
     end(): Promise<void>;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -267,7 +269,7 @@ export interface XRSessionOptions {
     init?: Record<string, unknown>;
     framebufferScale?: number;
     signal?: AbortSignal;
-    onFrame?: (state: XRFrameState) => void;
+    onFrame?: (state: XRFrameState) => unknown;
 }
 
 export type XRSpace = object;

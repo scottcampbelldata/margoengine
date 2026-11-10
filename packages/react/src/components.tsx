@@ -52,6 +52,7 @@ import { warnLowercaseTags, warnPickingWithoutWebGPU } from './dev-warnings.js';
 import { ownerHook } from './dev-names.js';
 import { capPixelRatio } from './pixel-ratio.js';
 import { envReadable } from './dev-mode.js';
+import { advanceFrames, bridgeFrames, FrameCallbacks, subscribeFrame } from './frame-priority.js';
 // Bundlers replace process.env.NODE_ENV, usually with no global `process` on the page: see dev-mode.ts.
 declare const process: { env: { NODE_ENV?: string } };
 
@@ -234,7 +235,7 @@ export function MargoCanvas({
     watch.observe(parent, { childList: true, subtree: true });
     return () => watch.disconnect();
   }, [engine]);
-  const frames = useMemo<Frames>(() => ({ elapsed: 0, last: null, mode: frameloop, callbacks: new Set() }), [engine]);
+  const frames = useMemo<Frames>(() => ({ elapsed: 0, last: null, mode: frameloop, callbacks: new FrameCallbacks() }), []);
   frames.mode = frameloop;
   const assetCache = useMemo(() => createAssetCache(engine as unknown as EngineKernel | null), [engine]);
   const resources = useMemo<Resources>(() => ({ models: new Set(), lighting: new Map() }), [engine]);
@@ -256,10 +257,7 @@ export function MargoCanvas({
   powerOption.current = powerPreference;
   frameloopOptions.current = frameloop;
   const advance = useMemo(
-    () => (delta: number) => {
-      frames.elapsed += delta;
-      for (const callback of frames.callbacks) callback(engine as unknown as EngineKernel, delta);
-    },
+    () => (delta: number, desktop = false) => advanceFrames(frames, engine!, delta, desktop),
     [engine, frames],
   );
   const invalidate = useMemo(
@@ -269,8 +267,8 @@ export function MargoCanvas({
         delta = frames.last === null ? 0 : Math.max(0, Math.min((now - frames.last) / 1000, engine.maxDelta));
       frames.last = now;
       try {
-        advance(delta);
-        if (!engine.disposed) engine.render({ delta });
+        const automatic = advance(delta);
+        if (automatic && !engine.disposed) engine.render({ delta });
       } catch (error) {
         engine.onError(error);
       }
@@ -303,7 +301,7 @@ export function MargoCanvas({
         errorHandler.current?.(error);
       }
     };
-    let releasePixelRatio = () => {};
+    let releasePixelRatio = () => {}, releaseFrames = () => {};
     queue.current = queue.current
       .catch(() => {})
       .then(async () => {
@@ -341,6 +339,9 @@ export function MargoCanvas({
           return;
         }
         current = instance;
+        frames.elapsed = 0;
+        frames.last = null;
+        releaseFrames = bridgeFrames(instance, frames);
         instance.onError = report;
         try {
           // The engine sizes the canvas itself on every render (whole device pixels, its own pixel-ratio cap). Sizing
@@ -371,11 +372,12 @@ export function MargoCanvas({
       abort.abort();
       observer?.disconnect();
       current?.dispose();
+      releaseFrames();
       releasePixelRatio();
     };
   }, [capacity, backend, fallback, maxDpr]);
   useCommit(() => {
-    if (engine) return engine.onFrame((_, delta) => advance(delta));
+    if (engine) return engine.onFrame((_, delta) => advance(delta, true));
   }, [engine, advance]);
   useCommit(() => {
     if (!engine || engine.disposed || engineMode.current === frameloop) return;
@@ -768,8 +770,8 @@ export function PbrMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 
 /** Props of the Group component; every prop is optional unless noted. */
 export type GroupProps = MeshProps;
 export { Mesh as mesh, Mesh as Group, Mesh as group, BoxGeometry as boxGeometry, PbrMaterial as meshStandardMaterial };
-/** Calls `callback` every frame with the frame time; unsubscribes on unmount. */
-export function useFrame(callback: FrameCallback): void {
+/** Calls in ascending priority (default 0), ties in mount order. Positive priorities own rendering until removed. */
+export function useFrame(callback: FrameCallback, priority = 0): void {
   const { frames } = useScene(),
     latest = useRef(callback);
   useCommit(() => {
@@ -777,9 +779,6 @@ export function useFrame(callback: FrameCallback): void {
   });
   useCommit(() => {
     const frame: FrameCallback = (state, delta) => latest.current(state, delta);
-    frames.callbacks.add(frame);
-    return () => {
-      frames.callbacks.delete(frame);
-    };
-  }, [frames]);
+    return subscribeFrame(frames, frame, priority);
+  }, [frames, priority]);
 }
