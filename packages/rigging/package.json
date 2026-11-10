@@ -72,6 +72,10 @@
     "./face": {
       "types": "./dist/face.d.ts",
       "import": "./dist/face.js"
+    },
+    "./vrm0": {
+      "types": "./dist/vrm0.d.ts",
+      "import": "./dist/vrm0.js"
     }
   },
   "files": [
@@ -90,7 +94,8 @@
   "peerDependencies": {
     "@margoengine/animator": "^1.0.0",
     "@margoengine/core": "^1.0.0",
-    "@margoengine/kinematics-constraints": "^1.0.0"
+    "@margoengine/kinematics-constraints": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {
@@ -100,6 +105,9 @@
       "optional": true
     },
     "@margoengine/kinematics-constraints": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
       "optional": true
     }
   },

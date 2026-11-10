@@ -69,11 +69,20 @@ try {
   check('back at neutral the picture returns', v.restored <= 2, v);
   check('its spring bones swing the drawn hair', v.swung > 10, v);
 
+  const legacy = await run('vrm0');
+  check('the real legacy avatar draws with every humanoid bone', legacy.drawn > 2000 && legacy.bones >= 50, legacy);
+  check('converted skin and geometry equal the turned original picture', legacy.maxError === 0, legacy);
+  check('legacy expressions change the drawn face', legacy.face > 20, legacy);
+  check('legacy neutral restores the original picture', legacy.restored <= 2, legacy);
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(`${checks.length} rigging browser checks passed (bone heat ${results.weights.solveMs.toFixed(1)} ms)`);
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/rigging-browser.json', JSON.stringify({ hardware, results, checks }, null, 2));
+  await writeFile(
+    `test-results/rigging-browser${hardware.compat ? '-compat' : ''}.json`,
+    JSON.stringify({ hardware, results, checks }, null, 2),
+  );
 } finally {
   await context.close();
   release();

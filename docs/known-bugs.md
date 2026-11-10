@@ -82,6 +82,28 @@ the unchanged 0.005 bar; independent dry/above-water projector checks remain
 exact zero. Full package and visual acceptance now pass. See the
 [caustics record](water-caustics.md) for optics and retained failures.
 
+### PARKED: batch 234 job 3 underwater reflection artifact
+
+The underwater implementation is retained on `batch-234` and
+`batch-234-checkpoint-6e16c0d72`, not accepted or landed. Repro in that retained
+branch: build water, then run `packages/water/test/underwater-preview.browser.mjs`
+through the shared GPU lock. The NOAA-driven FFT scene's `underwater-below.png`
+and `underwater-split.png` show fine bands in the underside reflection. The
+independent analytic trace suite passes 75 cases on native WebGPU and full
+WebGL2 compatibility; it does not close the real-scene failure.
+
+Ruled out as a complete cause: the former hit threshold growing with march
+step, and losing the last in-view ray interval. Refined depth crossings, fixed
+physical thickness and clipped endpoints fix those classes, but the FFT bands
+remain. Disabling both screen traces removes the fine bands while leaving
+medium transport and Fresnel active, so absorption/fog and Fresnel alone do
+not explain them. Bright seabed under total internal reflection is physically
+valid and must remain. Remaining cause is not isolated: distinguish reflection
+from transmission, then measure bad-pixel inputs, hit coverage, depth residual
+and sampled radiance. No fourth speculative tracing round or acceptance claim.
+The independent caustics job landed as `3369f2e4f`; the retained underwater
+branches above must not be deleted. This note accompanies batch 213 job 1.
+
 ### Fixed: batch 133 lazy asset package grouping
 
 The new decoder records were separated from its existing records, so grouping
@@ -4275,4 +4297,6 @@ Dependent audio GPU validation is incomplete for the version-guard landing: the 
 WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
 
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
-- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+- Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
+
+- Existing VRM scene ownership: without an Animator, `addVRM` in packages/rigging/src/vrm.ts registers/removes its plugin through the engine active scene rather than the model scene; reproduce loading into an inactive secondary scene. Waits for the fix phase.

@@ -239,3 +239,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/sprites | BlendLayer/addBlend, mutable per-sprite modes, ordered batches, transparent multiply targets and smooth filtering | batch-245 job 5 |
 
 | margoengine | Generated /sprites/blend alias and the missing /xr/performance alias already exported by XR on main | batch-245 job 5 |
+- @margoengine/rigging (batch 213 job 1): VRM 0.x loading, coordinate conversion, metadata retention, expression/spring mapping, migration differences and cancellation.
+- margoengine (batch 213 job 1): rigging/vrm0 optional alias.

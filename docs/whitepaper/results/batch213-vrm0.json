@@ -1,0 +1,86 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "results": {
+    "weights": {
+      "solveMs": 69.60000002384186,
+      "report": {
+        "ok": true,
+        "vertexCount": 402,
+        "issues": []
+      },
+      "straightTip": true,
+      "straightSide": false,
+      "bentTip": false,
+      "bentSide": true,
+      "base": true,
+      "inside": 192,
+      "total": 192
+    },
+    "ik": {
+      "reached": true,
+      "tip": [
+        0.9000619904557454,
+        -0.4000270460687903,
+        0
+      ],
+      "elbow": [
+        -0.01650075624468822,
+        -0.00013614674629158774,
+        0
+      ],
+      "drawnNearTarget": true,
+      "straightTipDrawn": false,
+      "inside": 192,
+      "total": 192
+    },
+    "vrm": {
+      "drawn": 76661,
+      "face": 42,
+      "restored": 0,
+      "swung": 33
+    },
+    "vrm0": {
+      "drawn": 3266,
+      "maxError": 0,
+      "face": 32,
+      "restored": 0,
+      "bones": 55
+    }
+  },
+  "checks": [
+    "bone heat weights pass the export checks",
+    "the straight tube is drawn upright",
+    "GPU skinning with the solved weights bends the upper half to the side",
+    "the lower half stays put",
+    "the drawn bend matches the CPU pose (97% of centroids)",
+    "solveSkeletonIK puts the tip on the target",
+    "the elbow bends toward the pole (-x side)",
+    "the GPU-skinned tip is drawn at the target, not upright",
+    "the drawn IK pose matches the CPU pose (97% of centroids)",
+    "the real VRM is drawn",
+    "its expressions reach the picture: morphs and the moved face texture",
+    "back at neutral the picture returns",
+    "its spring bones swing the drawn hair",
+    "the real legacy avatar draws with every humanoid bone",
+    "converted skin and geometry equal the turned original picture",
+    "legacy expressions change the drawn face",
+    "legacy neutral restores the original picture"
+  ]
+}

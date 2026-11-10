@@ -67,6 +67,19 @@ and DevTools Input.imeSetComposition/Input.insertText. No timing bars or
 performance numbers are collected. Read the package README for the runnable
 integration example; run it through check:readme-run -- --packages=ui.
 
+## Batch 213 job 1: legacy VRM reading
+
+After `npm run build:packages`, run
+`node --test --test-timeout=120000 packages/rigging/tests/vrm0.test.js`.
+Then run `node scripts/gpu-lock.mjs run --owner=vrm0-review --max=3 --wait-max=60 -- node packages/rigging/tests/rigging-browser.mjs`
+and repeat with `--compat` on the browser command. The harness checks the real
+0.51 model's turned-original picture against the converted picture, expression
+changes, neutral restoration, and the existing weight/IK/1.0 checks. Receipts:
+`test-results/rigging-browser.json` and `rigging-browser-compat.json`.
+`node scripts/measure-size.js` checks core + stage; bundle the optional entry
+with `bundleBytes` from that script and gzip it to reproduce 6,488 B.
+Original asset licence/source and conversion choices: [VRM 0.x](../rigging-vrm0.md).
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

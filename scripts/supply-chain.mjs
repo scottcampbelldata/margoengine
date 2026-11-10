@@ -192,6 +192,14 @@ const ASSETS = [
     'sample avatars for the VRM tests: Seed-san and VRM1_Constraint_Twist_Sample (VRM Consortium samples, VRM Public License 1.0; Seed-san model by VirtualCast, Inc.; (c) 2022 pixiv Inc.)',
   ],
   [
+    'examples/assets/vrm/AliciaSolid_vrm-0.51.vrm',
+    'DWANGO Co., Ltd., Alicia Solid; standard VRM 0.51 test asset from VRM Consortium UniVRM (https://github.com/vrm-c/UniVRM/blob/master/Tests/Models/Alicia_vrm-0.51/AliciaSolid_vrm-0.51.vrm), under the author model licence https://3d.nicovideo.jp/alicia/rule.html. Original meta and author permissions remain authoritative. Test data only, no engine code imported.',
+  ],
+  [
+    'packages/xr/tests/fixtures/hands/LICENSE',
+    'standard WebXR generic-hand test assets: left.glb and right.glb from https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0.20/dist/profiles/generic-hand/; MIT, Copyright (c) 2019 Amazon, full licence beside the models. Upstream licence https://github.com/immersive-web/webxr-input-profiles/blob/main/packages/assets/LICENSE.md. SHA256 left bc67783144944ea1cda54d9247885825ea5fb9d4651469fe7d00be517a5c2b87; right 291790c14f7f88a7f9bd35330c47392ed8e8d395ae6728f4bb7089f1bc1f2b96. Standard test data only, no external implementation code included or read.',
+  ],
+  [
     'packages/cutscene/tests/fixtures/arctic/NOTICE.md',
     'test speech for @margoengine/cutscene/lipsync: two sentences of the CMU ARCTIC voice cmu_us_slt_arctic with their phoneme labels (Carnegie Mellon University, 2003; free for any purpose under the notice in the fixture COPYING file; never shipped)',
   ],

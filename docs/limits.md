@@ -121,6 +121,13 @@ single refractive-interface raster model with opaque depth receivers. Depthless
 transparent receivers and overturning volumes are outside it. These receiver, shadow, attenuation, extreme-focus, lifecycle and visual bars
 now pass; the following record preserves the earlier checkpoint status. [Research and current evidence](water-caustics.md).
 
+Batch 213 job 1: optional `rigging/vrm0` is 6,543 B min+gzip (previously absent;
+6,744 B ceiling). Core + stage remains 24,209 B. Runtime conversion preserves
+binary buffers and original author permissions; it does not relicense a file
+for 1.0 redistribution. Legacy gaze curves become linear ranges, with the
+originals retained and reported. Legacy materials keep the glTF fallback until
+the separate MToon renderer is attached. [Details](rigging-vrm0.md).
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four
@@ -4161,3 +4168,4 @@ Blending uses premultiplied colour in the target's blend space. Add sums colour 
 Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8464 B), sprites root 7480 to 7613 B, slice 8614 to 8760 B; existing root/slice ceilings hold. The blend entry retains the shared renderer rather than copying it or splitting a cohesive operator API. Skeletal is 7436 B after the upstream guard; pick remains 1933 B. Core plus stage is 24209 B, including the guard already on main. This job does not change their source.
 
 Batch 245 skeleton JSON import is not shipped: full current Spine runtime parity includes physics constraints, while physics remains on hold. Scott must resolve the required import/runtime scope or resume that work; no partial importer is advertised.
+Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.

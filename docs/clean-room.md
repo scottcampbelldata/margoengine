@@ -299,6 +299,17 @@ cases require RangeError plus the sciviz help link for BigInt/Symbol, null optio
 and the earlier malformed numeric inputs, on both CPU and GPU entry paths before allocation.
 
 
+## Batch 213: VRM 0.x adapter
+
+The adapter was written from the VRM Consortium's legacy and 1.0 specifications,
+their migration/coordinate guidance, the spring specification by Shindo Tatsuro,
+Su Po-Chang and Obuchi Yutaka, the Consortium's 2019 SIGGRAPH Asia presentation
+and Khronos' glTF 2.0.1 specification. The [source comparison](rigging-vrm0.md#sources-compared)
+records titles, authors, years, links and which decisions combine them. Only
+pixiv's public API/migration documentation was consulted for rival behaviour;
+no rival implementation, companion code or dependency was used. DWANGO's
+Alicia Solid is a standard test asset, with source/licence in the notices.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

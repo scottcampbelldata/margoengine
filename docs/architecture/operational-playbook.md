@@ -2257,6 +2257,14 @@ NOAA preview shows opaque raised receivers and its explicit finite field edge.
 Main's browser-host repair 919fdc09e closes the old teardown blocker; this job
 changes no lifecycle files. README work is deferred. [Evidence and limits](../water-caustics.md).
 
+Batch 213 job 1 adds VRM 0.x runtime normalization outside core/stage. The
+existing rigging GPU harness now compares the real Alicia Solid 0.51 converted
+skin/geometry picture with the original turned to +Z, with zero HDR component
+error, and requires expression changes and neutral restoration on both
+backends. Original binary buffers stay unchanged; separate synthetic checks
+cover extension vector spaces and branch ownership. This does not claim MToon
+shader parity. [Migration decisions and limits](../rigging-vrm0.md).
+
 Batch 134's private ETC2/EAC draft has exact independent alpha and EAC
 parameter oracles, edge-padding and coded-error checks. EAC interval masks
 preserve error and header ties while reducing full palette constructions on

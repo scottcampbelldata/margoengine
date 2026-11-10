@@ -88,6 +88,17 @@ the caustic compatibility cases passing again on the final main rebase.
 Explicit finite-field and opaque-receiver limits and the [acceptance record](../water-caustics.md)
 qualify this feature claim. No speed or untested backend claim.
 
+## Batch 213 job 1: legacy VRM reading
+
+`rigging/vrm0` reads the real DWANGO Alicia Solid 0.51 avatar into the existing
+1.0 runtime (55 humanoid bones, 48 simulated spring joints). Its browser check
+requires the converted geometry/skin image to equal the turned original at
+every HDR component, and requires expression changes and neutral restoration.
+This is a reading/normalization claim; MToon shading is a separate job.
+Original licences remain original, and gaze-curve linearization is explicit.
+See [mapping and sources](../rigging-vrm0.md), package unit tests and
+`packages/rigging/tests/rigging-browser.mjs` on both backends. No speed claim.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

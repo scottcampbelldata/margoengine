@@ -12,6 +12,7 @@ import { solveSkeletonIK } from '../dist/ik.js';
 import { loadGLTF } from '../../gltf-pro/dist/index.js';
 import { Animation as ModelAnimation } from '../../animation/dist/index.js';
 import { addVRM, readVRM } from '../dist/vrm.js';
+import { loadVRM0 } from '../dist/vrm0.js';
 import { tube } from './fixtures.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
@@ -106,6 +107,67 @@ const skeletonOf = (joints: readonly RigJoint[]) =>
   );
 
 const fixture = {
+  /** Real legacy model: converted buffers draw the same as its original geometry turned to +Z. */
+  async vrm0() {
+    const blank = await read();
+    const url = '/examples/assets/vrm/AliciaSolid_vrm-0.51.vrm',
+      original = await loadGLTF(engine, url);
+    const originalAnimation = new ModelAnimation(original);
+    engine.use(originalAnimation);
+    original.root.setPosition([0, -0.8, 0]);
+    original.root.setQuaternion([0, 1, 0, 0]);
+    engine.store.tick(false);
+    const reference = await read();
+    originalAnimation.dispose();
+    original.dispose();
+    const model = await loadVRM0(engine, url, { signal: AbortSignal.timeout(90_000) }),
+      animation = new ModelAnimation(model),
+      avatar = readVRM(model.asset.doc),
+      vrm = addVRM(animation, avatar, { springs: false });
+    engine.use(animation);
+    model.root.setPosition([0, -0.8, 0]);
+    disposers.push(
+      () => model.dispose(),
+      () => animation.dispose(),
+      () => vrm.dispose(),
+    );
+    vrm.update(0);
+    const neutral = await read();
+    let drawn = 0,
+      maxError = 0;
+    for (let i = 0; i < neutral.length; i++) {
+      maxError = Math.max(maxError, Math.abs(reference[i] - neutral[i]));
+      if (
+        i % 4 === 0 &&
+        Math.abs(neutral[i] - blank[i]) +
+          Math.abs(neutral[i + 1] - blank[i + 1]) +
+          Math.abs(neutral[i + 2] - blank[i + 2]) >
+          0.05
+      )
+        drawn++;
+    }
+    const changed = (a: Float32Array, b: Float32Array): number => {
+      let count = 0;
+      for (let i = 0; i < a.length; i += 4)
+        if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 0.05) count++;
+      return count;
+    };
+    vrm.expressions.set('happy', 1).set('aa', 1);
+    vrm.update(0);
+    const smile = await read();
+    vrm.expressions.set('happy', 0).set('aa', 0);
+    vrm.update(0);
+    const back = await read();
+    const result = {
+      drawn,
+      maxError,
+      face: changed(neutral, smile),
+      restored: changed(neutral, back),
+      bones: Object.keys(avatar.humanoid.humanBones).length,
+    };
+    clear();
+    return result;
+  },
   /**
    * A tube weighted by bone heat, bent 90 degrees at its middle joint by GPU skinning: the drawn silhouette matches
    * the CPU pose of the same weights, and the weights pass the export checks.
@@ -256,7 +318,12 @@ const fixture = {
       vrm.update(1 / 60);
     }
     const swung = await read(),
-      result = { drawn, face: changed(neutral, smiling), restored: changed(neutral, back), swung: changed(neutral, swung) };
+      result = {
+        drawn,
+        face: changed(neutral, smiling),
+        restored: changed(neutral, back),
+        swung: changed(neutral, swung),
+      };
     clear();
     return result;
   },

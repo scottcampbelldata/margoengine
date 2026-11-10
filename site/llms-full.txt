@@ -2711,6 +2711,13 @@ single refractive-interface raster model with opaque depth receivers. Depthless
 transparent receivers and overturning volumes are outside it. These receiver, shadow, attenuation, extreme-focus, lifecycle and visual bars
 now pass; the following record preserves the earlier checkpoint status. [Research and current evidence](water-caustics.md).
 
+Batch 213 job 1: optional `rigging/vrm0` is 6,543 B min+gzip (previously absent;
+6,744 B ceiling). Core + stage remains 24,209 B. Runtime conversion preserves
+binary buffers and original author permissions; it does not relicense a file
+for 1.0 redistribution. Legacy gaze curves become linear ranges, with the
+originals retained and reported. Legacy materials keep the glTF fallback until
+the separate MToon renderer is attached. [Details](rigging-vrm0.md).
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four
@@ -6734,6 +6741,25 @@ Version-guard final rebase: XR measures 8965 B without emitter declarations and 
 
 `@margoengine/stats/panels` provides StatsPanels, attach/sample/refresh/toJSON/dispose, with four chronological fixed Float64Array histories and a named GPU list. Defaults: samples 120 (2..4096), refreshMilliseconds 150 (16..60000), parent document.body; owned panel width 360 CSS pixels within the viewport. Options.stats borrows an already attached Stats without transferring its ownership. CPU milliseconds come from FramePhases work in the frame task, FPS from the rolling Stats interval, GPU from the latest completed asynchronous sample. GPU history therefore holds the latest valid result between readbacks, rather than pretending each frame has a fresh query. WebGPU samples one encoder in 15, at most 128 passes, preserves existing timestampWrites and needs timestamp-query enabled on the device. Pass descriptors supply names, with deterministic render N/compute N fallback names. WebGL2 uses the gl entry's limits and early-registration naming rules. Memory defaults to tracked WebGPU descriptor bytes created after attachment; without WebGPU, performance.memory.usedJSHeapSize is used only where exposed. Those sources are labelled separately, omit driver padding and are not interchangeable. A custom memory callback can supply another byte measurement, or null. Unsupported readings appear as gaps and unavailable text, never zero. Custom loops may supply PanelSample values directly. Sampling does not write DOM; refresh draws and labels the graphs. Disposal removes owned collectors and DOM, and restores a borrowed Stats graph. New entry: 9,895 B gzip, ceiling 10,192 B. Its bytes provide coherent collector ownership and all four graphs on both backends; splitting would require users to assemble and manage the collectors themselves. Root and core/stage are unchanged.
 
+Batch 257 job 4, browser matrix evidence, not native Safari certification: Firefox 157.0 on Windows/headless has transferControlToOffscreen, worker OffscreenCanvas, RAF and WebGL2; worker WebGPU adapter is unavailable with the default test profile. The unchanged shared WebGL2 scene selected worker mode, transferred its buffer, displayed centre RGBA [213,26,1,255] and disposed successfully. Windows Playwright WebKit 27.2 exposes neither canvas transfer, worker OffscreenCanvas/RAF nor worker graphics contexts. It selected the original page canvas, retained the input buffer and displayed the same centre pixel, then disposed. Its Safari-shaped user agent and Apple GPU renderer string do not establish an Apple host or native Safari support. Both page hardware probes report no WebGPU adapter. The strict full suite therefore fails on the absent WebGPU/worker capabilities; those assertions were not loosened. Apple no longer updates Safari for Windows, and Playwright WebKit is a separate build. Native Safari/macOS hardware proof remains owed in private/handoffs/finish-later.md; job 4 is DONE under Scott's 95% rule.
+- Inspector animation (batch 263): the optional `/animation` panel owns added players until removal. Nonnegative weights normalize per model; zero total weight restores the pose at attachment. TRS uses shortest-arc sequential quaternion interpolation in clip-index order; morph weights blend linearly. The SVG skeleton is on top of the primary canvas view on either backend. Pointer-extension properties retain the last sampled active clip value; weighted pointer-property editing and per-view SVG skeletons remain finish-phase work. No core or stage bytes added.
+- Inspector animation entry: 2,891 B min+gzip, new 3,147 B ceiling; the intentional Lines helper import is optional with this panel. Core plus stage stays 23,950 B.
+
+## WFC tilesets (batch 237)
+Optional wfc/tileset expands X, I, backslash, L, T and F into 1, 2, 2, 4, 4 and 8 distinct variants. XML set/tiles/neighbors/subsets, named references with action 0..7, positive weights, comments, declarations, named and numeric character references are supported in browsers and Node. Input limit 4,194,304 UTF-16 code units; depth 8; up to 4096 variants. DTDs, custom/external entities and text bodies are rejected. Image/model fetching is separate; XML unique/size attributes do not alter authored geometry. Positive weights apply per variant, matching Gumin frequency semantics. The XZ plane uses +Y quarter turns then X reflection for actions 4..7; Y neighbors are unrestricted. Subsets retain authored source indices for assembly. O(variant squared) vertical adjacency storage; no large-tileset speed claim.
+Entry size: wfc/tileset 1,886 B min+gzip, previously 0 B; ceiling 2,142 B. Core + stage root remains 23,950 B.
+
+### Batch 245 per-sprite blend modes
+
+The optional `@margoengine/sprites/blend` entry exports BlendLayer, BlendSprite, blendBatches and their types. Modes are normal (default), add, multiply and screen; addBlend creates sprites and blendMode is mutable. Ordinary add sprites use normal. Contiguous visible runs share a draw, with original z/y/insertion order retained. Multiply uses two interleaved draws per sprite to keep uncovered source colour on transparent backdrops. No core or stage change. Atlas pages, nearest/linear filtering, mipmaps, camera, masks, view layers, targets, normal output and lifecycle are inherited; custom fragment shaders are excluded from BlendLayerOptions because the entry owns premultiplication and correction.
+
+Blending uses premultiplied colour in the target's blend space. Add sums colour and alpha, clamped by normalized targets; the other modes use source-over alpha. Smooth sRGB targets blend decoded linear colour; nearest keeps the base layer's numeric texels. Render targets contain premultiplied colour. Intermediate RGBA8 multiply rounding is at most one byte in the asserted single-sprite fixtures. No universal accumulation error bound or speed claim is made. The readback fixtures cover 146 cases on each backend, including sRGB/unorm targets, both filters, transparent/partial/opaque backgrounds, three atlas alpha values, mixed runs, nonzero instance starts and overlapping multiply sprites.
+
+Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8464 B), sprites root 7480 to 7613 B, slice 8614 to 8760 B; existing root/slice ceilings hold. The blend entry retains the shared renderer rather than copying it or splitting a cohesive operator API. Skeletal is 7436 B after the upstream guard; pick remains 1933 B. Core plus stage is 24209 B, including the guard already on main. This job does not change their source.
+
+Batch 245 skeleton JSON import is not shipped: full current Spine runtime parity includes physics constraints, while physics remains on hold. Scott must resolve the required import/runtime scope or resume that work; no partial importer is advertised.
+Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6819,6 +6845,28 @@ regression. Both backends now pass with 0.000137425 relative flux error under
 the unchanged 0.005 bar; independent dry/above-water projector checks remain
 exact zero. Full package and visual acceptance now pass. See the
 [caustics record](water-caustics.md) for optics and retained failures.
+
+### PARKED: batch 234 job 3 underwater reflection artifact
+
+The underwater implementation is retained on `batch-234` and
+`batch-234-checkpoint-6e16c0d72`, not accepted or landed. Repro in that retained
+branch: build water, then run `packages/water/test/underwater-preview.browser.mjs`
+through the shared GPU lock. The NOAA-driven FFT scene's `underwater-below.png`
+and `underwater-split.png` show fine bands in the underside reflection. The
+independent analytic trace suite passes 75 cases on native WebGPU and full
+WebGL2 compatibility; it does not close the real-scene failure.
+
+Ruled out as a complete cause: the former hit threshold growing with march
+step, and losing the last in-view ray interval. Refined depth crossings, fixed
+physical thickness and clipped endpoints fix those classes, but the FFT bands
+remain. Disabling both screen traces removes the fine bands while leaving
+medium transport and Fresnel active, so absorption/fog and Fresnel alone do
+not explain them. Bright seabed under total internal reflection is physically
+valid and must remain. Remaining cause is not isolated: distinguish reflection
+from transmission, then measure bad-pixel inputs, hit coverage, depth residual
+and sampled radiance. No fourth speculative tracing round or acceptance claim.
+The independent caustics job landed as `3369f2e4f`; the retained underwater
+branches above must not be deleted. This note accompanies batch 213 job 1.
 
 ### Fixed: batch 133 lazy asset package grouping
 
@@ -11013,7 +11061,9 @@ Dependent audio GPU validation is incomplete for the version-guard landing: the 
 WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
 
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
-- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+- Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
+
+- Existing VRM scene ownership: without an Animator, `addVRM` in packages/rigging/src/vrm.ts registers/removes its plugin through the engine active scene rather than the model scene; reproduce loading into an inactive secondary scene. Waits for the fix phase.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

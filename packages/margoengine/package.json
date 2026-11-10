@@ -2594,6 +2594,10 @@
       "types": "./dist/rigging/face.d.ts",
       "import": "./dist/rigging/face.js"
     },
+    "./rigging/vrm0": {
+      "types": "./dist/rigging/vrm0.d.ts",
+      "import": "./dist/rigging/vrm0.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

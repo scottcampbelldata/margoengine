@@ -2,8 +2,8 @@
 
 The optional `@margoengine/water/caustics` entry provides refracted surface
 flux, world-space receiver projection, RGB absorption and entry/receiver shadows.
-It measures 8961 B min+gzip, with a 9230 B ceiling. Core plus stage remains
-23950 B. No underwater renderer is included.
+The final full rebuild with main version guard measures 9004 B min+gzip,
+with a 9230 B ceiling. Core plus stage measures 24209 B. No underwater renderer is included.
 
 The fast gate passes: lint, hygiene, banned terms, package builds, API check,
 quality, 520 water/Biomes/wrapper units and 41 export/corpus checks. All 46

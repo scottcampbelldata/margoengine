@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12474183,
+  "total": 12481031,
   "history": [
     {
       "date": "2026-10-24",
@@ -5730,9 +5730,9 @@
       "grew": 1
     },
     {
-      "date": "2026-11-10",
-      "commit": "batch-245-job5",
-      "reason": "New optional sprites/blend: 0 to 8208 B gzip, ceiling 8464 B after the upstream version guard (initial pre-guard measure 8119 B). Ordered runs and transparent multiply correction retain all layer options without duplicating the renderer. Root 7480 to 7613 B, slice 8614 to 8760 B and skeletal 7369 to 7436 B stay within existing ceilings. Splitting operators duplicates pipeline/lifetime code. Core/stage 24209 B includes the guard already on main; this job changes neither source.",
+      "date": "2026-11-09",
+      "commit": "batch-234-caustics-range",
+      "reason": "Independent caustics: absent -> initial checkpoint 8122 -> range repair 8828 -> continuous field and linked recovery 8961 B min+gzip; ceiling 8378 -> 9230 B. GPU flux reduction prevents half-float overflow, virtual slices preserve near-interface light and attachment errors link to real recovery guidance. No clipping or feature loss; splitting would duplicate source/capture state. Water root 20106 B, FFT 7498 B, query 4463 B; core plus stage 23950 B unchanged from current main. Landing gates pass after main browser-host repair 919fdc09e. No speed claim.",
       "grew": 1
     },
     {
@@ -5997,15 +5997,21 @@
       "grew": 1
     },
     {
-      "date": "2026-11-09",
-      "commit": "batch-234-caustics-range",
-      "reason": "Independent caustics: absent -> initial checkpoint 8122 -> range repair 8828 -> continuous field and linked recovery 8961 B min+gzip; ceiling 8378 -> 9230 B. GPU flux reduction prevents half-float overflow, virtual slices preserve near-interface light and attachment errors link to real recovery guidance. No clipping or feature loss; splitting would duplicate source/capture state. Water root 20106 B, FFT 7498 B, query 4463 B; core plus stage 23950 B unchanged from current main. Landing gates pass after main browser-host repair 919fdc09e. No speed claim.",
+      "date": "2026-11-10",
+      "commit": "batch-264",
+      "reason": "@margoengine/stats/panels: optional Stats parity entry, 0 to 9895 B gzip; full collector ownership and native graphs, separate from root and core/stage.",
       "grew": 1
     },
     {
       "date": "2026-11-10",
-      "commit": "batch-264",
-      "reason": "@margoengine/stats/panels: optional Stats parity entry, 0 to 9895 B gzip; full collector ownership and native graphs, separate from root and core/stage.",
+      "commit": "batch-213-job1",
+      "reason": "Fresh full build with main version-compatibility guard: water 20106 -> 20210 B gzip; optional ceiling 20185 -> 20289 B, exactly the 104 B integration growth and no extra headroom. Keep mandatory registration validation with the surface owner; splitting it would duplicate the package attachment contract. VRM0 new entry measures 6543 B under 6744 B. Core plus stage 24209 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-245-job5",
+      "reason": "New optional sprites/blend: 0 to 8208 B gzip, ceiling 8464 B after the upstream version guard (initial pre-guard measure 8119 B). Ordered runs and transparent multiply correction retain all layer options without duplicating the renderer. Root 7480 to 7613 B, slice 8614 to 8760 B and skeletal 7369 to 7436 B stay within existing ceilings. Splitting operators duplicates pipeline/lifetime code. Core/stage 24209 B includes the guard already on main; this job changes neither source.",
       "grew": 1
     },
     {
@@ -6976,7 +6982,7 @@
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
-    "@margoengine/water": 20185,
+    "@margoengine/water": 20289,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/query": 4719,
     "@margoengine/weather": 5230,
@@ -7110,13 +7116,14 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/xr/ar-extra": 3289,
-    "@margoengine/sprites/blend": 8464,
+    "@margoengine/water/caustics": 9230,
     "@margoengine/splines/kinds": 3058,
     "@margoengine/html/inline": 2744,
     "@margoengine/wfc/assemble": 1721,
     "@margoengine/xr/performance": 1582,
-    "@margoengine/water/caustics": 9230,
     "@margoengine/stats/panels": 10192,
+    "@margoengine/rigging/vrm0": 6744,
+    "@margoengine/sprites/blend": 8464,
     "@margoengine/inspector/animation": 3147,
     "leak @margoengine/inspector/animation -> @margoengine/lines": 1,
     "@margoengine/wfc/tileset": 2142
