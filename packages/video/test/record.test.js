@@ -149,3 +149,27 @@ test('empty automatic stop and startup failure reject with help links and releas
     restore();
   }
 });
+
+test('mp4 asks for H.264, with AAC when there is audio, and leaves the codec to the browser without them', async () => {
+  // Chrome's own MP4 choice is VP9, which AVFoundation (QuickTime Player, Quick Look) cannot decode: batch 121 opened a
+  // Chrome recording on macOS 27.2 and got "Cannot Decode". Safari's own choice was already H.264.
+  const { canvas, restore } = setup();
+  const supported = Recorder.isTypeSupported;
+  try {
+    let offered = () => true;
+    Recorder.isTypeSupported = (type) => offered(type);
+    const stopped = async (recording) => (await recording.stop()).type;
+    assert.equal(await stopped(recordCanvas(canvas, { format: 'mp4' })), 'video/mp4;codecs=avc1');
+    const audio = { getAudioTracks: () => [new Track()] };
+    assert.equal(await stopped(recordCanvas(canvas, { format: 'mp4', audio })), 'video/mp4;codecs=avc1,mp4a.40.2');
+    offered = (type) => !type.includes('mp4a');
+    assert.equal(await stopped(recordCanvas(canvas, { format: 'mp4', audio })), 'video/mp4;codecs=avc1');
+    offered = (type) => !type.includes('avc1');
+    assert.equal(await stopped(recordCanvas(canvas, { format: 'mp4' })), 'video/mp4');
+    offered = () => true;
+    assert.equal(await stopped(recordCanvas(canvas, { format: 'webm' })), 'video/webm');
+  } finally {
+    Recorder.isTypeSupported = supported;
+    restore();
+  }
+});

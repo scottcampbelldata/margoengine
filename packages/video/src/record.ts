@@ -3,7 +3,10 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Real-time page recording options. */
 export interface CanvasRecordingOptions {
-  /** Container, with codecs chosen by the browser. Default 'webm'. Unsupported containers throw. */
+  /**
+   * Container. Default 'webm', with codecs chosen by the browser. 'mp4' asks for H.264, and AAC with audio, where the
+   * browser offers them, so QuickTime can play the file; otherwise the browser chooses. Unsupported containers throw.
+   */
   format?: 'webm' | 'mp4';
   /** Maximum capture rate in frames per second, finite and positive. Default 30. */
   fps?: number;
@@ -44,9 +47,15 @@ export function recordCanvas(canvas: HTMLCanvasElement, options: CanvasRecording
       throw rangeError('Recording bitrate is invalid; pass a positive safe integer', 'arguments');
   if (typeof MediaRecorder !== 'function' || typeof canvas?.captureStream !== 'function')
     throw fault('unsupported', 'Canvas recording needs a page with captureStream and MediaRecorder');
-  const mimeType = 'video/' + format;
-  if (!MediaRecorder.isTypeSupported(mimeType))
-    throw fault('unsupported', `This browser cannot record ${mimeType}; choose a supported container`);
+  const container = 'video/' + format;
+  if (!MediaRecorder.isTypeSupported(container))
+    throw fault('unsupported', `This browser cannot record ${container}; choose a supported container`);
+  // An MP4 is asked for to open in other programs. Chrome's own choice is VP9 in MP4, which AVFoundation, and so
+  // QuickTime Player and Quick Look, cannot decode (macOS 27.2, 2026-11-10); H.264 with AAC plays everywhere.
+  const mp4 = options.audio?.getAudioTracks().length
+      ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1']
+      : ['video/mp4;codecs=avc1'],
+    mimeType = (format === 'mp4' && mp4.find((type) => MediaRecorder.isTypeSupported(type))) || container;
   const tracks: MediaStreamTrack[] = [],
     chunks: Blob[] = [];
   let recorder: MediaRecorder | undefined,
