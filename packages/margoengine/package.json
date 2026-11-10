@@ -4458,6 +4458,10 @@
       "types": "./dist/voxel-net/replay.d.ts",
       "import": "./dist/voxel-net/replay.js"
     },
+    "./voxel-net/webrtc": {
+      "types": "./dist/voxel-net/webrtc.d.ts",
+      "import": "./dist/voxel-net/webrtc.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

@@ -3464,3 +3464,6 @@ See [toon parity](../toon-parity.md) for the CPU and shared-lock GPU commands, r
 # Batch 185 volume storage
 
 After build:packages, run `node --test packages/shader/test/compute-volume.test.js`. Under a shared GPU lock, run `node packages/shader/test/compute-volume-check.mjs`, then the same command with `--compat`. Both compare all voxels for 16 storage formats in 3D and arrays, feedback steps and volume sampling; no benchmark or timing assertion runs. Job 1's pre-existing GLSL backend proof is `node packages/shader/test/browser-check.mjs --compat` under the same shared lock.
+
+
+- Batch 242 WebRTC: after building, node --test --test-timeout=30000 packages/voxel-net/tests/webrtc.test.js and node packages/voxel-net/tests/webrtc-browser.mjs. The latter uses two real peers in a GPU-disabled browser, a 60-second suite limit and the existing bounded shutdown helper. No GPU lock or external asset.

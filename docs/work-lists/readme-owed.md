@@ -828,3 +828,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 194 job 2): document generated toon/screen-outline alias; README examples deferred.
 - @margoengine/shader (batch 185 job 2): compute-volume 3D/array load/store, coordinates, formats, ping-pong, device limits and lifecycle; document existing full WebGL2 graph support.
 - margoengine (batch 185 job 2): generated shader/compute-volume alias.
+
+
+- @margoengine/voxel-net: document /webrtc accept/connect, two-channel configuration, setup before SDP/ICE, server RTC provider, timeout/abort, reliable/datagram routing and peer disposal.
+
+- margoengine: document generated voxel-net/webrtc alias.

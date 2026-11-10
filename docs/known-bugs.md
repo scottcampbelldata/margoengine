@@ -4745,3 +4745,6 @@ Dual-phase flow shading is optional and stays out of geometric wave captures, so
 # Batch 185 job 2
 
 The previously missing volume and array storage forms are built in shader/compute-volume. No open defect was found in the new dimension, typed load/store, restoration and ping-pong contract; limits are recorded in limits.md. The small WebGL2 preview still requires escalation to the full compatibility backend.
+
+
+- Fixed in batch 242 WebRTC test setup: the browser driver passed an array to closeAll, whose contract is an object, so successful assertions left handles open until the 90-second process-tree hard limit. The driver now supplies { browser, servers }; real RTC assertions and natural process exit both pass. Shared browser/shutdown code was untouched.

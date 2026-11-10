@@ -4013,3 +4013,6 @@ Optional toon/screen-outline keeps core and model hull widths in drawing-buffer 
 # Batch 185 job 2: typed volume and layer writes
 
 Claim: shader/compute-volume writes and loads 3D voxels and array layers using all 16 storage formats, with optional ping-pong state, on native WebGPU and the full WebGL2 layer. Proof: compute-volume-check.mjs compares all 24 voxels in every format/dimension to independent CPU coordinates, checks three feedback steps and normalized 3D sampling. CPU lifecycle and validation proof: compute-volume.test.js. No performance or hardware-portability claim beyond the tested RTX A6000 backends. Exact constraints are in docs/limits.md.
+
+
+- Batch 242 job 3: voxel-net/webrtc carries the same authoritative codec over reliable and unordered zero-retransmit RTC channels without WebTransport. Proof: tests/webrtc.test.js for real server/chunks/routing and tests/webrtc-browser.mjs for native browser RTC welcome/app/input bytes. No GPU rendering, hosted signalling or server RTC-stack claim.

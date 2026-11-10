@@ -70,6 +70,10 @@
     "./replay": {
       "types": "./dist/replay.d.ts",
       "import": "./dist/replay.js"
+    },
+    "./webrtc": {
+      "types": "./dist/webrtc.d.ts",
+      "import": "./dist/webrtc.js"
     }
   },
   "files": [
@@ -90,6 +94,7 @@
     "build": "node ../../scripts/build-optional.js voxel-net",
     "test": "npm run build && node --test tests/*.test.js",
     "bench": "node bench/run.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser": "node tests/webrtc-browser.mjs"
   }
 }
