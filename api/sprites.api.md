@@ -64,6 +64,9 @@ export class SpriteLayer implements EnginePlugin {
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    protected pipelineVariant(): string;
+    protected configurePipeline(descriptor: GPURenderPipelineDescriptor): GPURenderPipelineDescriptor;
+    protected drawInstances(pass: GPURenderPassEncoder, device: GPUDevice, format: GPUTextureFormat, samples: number, normal: GPUTextureFormat | undefined, count: number, first?: number): void;
 }
 
 export interface SpriteLayerOptions {

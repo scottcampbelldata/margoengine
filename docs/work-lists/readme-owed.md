@@ -236,4 +236,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/wfc: document /tileset buildTileset/parseTilesetXML, six symmetry classes, orientation actions, subset selection, frequency weights, XML vocabulary and source-index assembly integration (batch 237 job 2).
 - margoengine: document generated wfc/tileset alias (batch 237 job 2).
->>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)
+| @margoengine/sprites | BlendLayer/addBlend, mutable per-sprite modes, ordered batches, transparent multiply targets and smooth filtering | batch-245 job 5 |
+
+| margoengine | Generated /sprites/blend alias and the missing /xr/performance alias already exported by XR on main | batch-245 job 5 |

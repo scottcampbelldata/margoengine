@@ -2813,4 +2813,5 @@ Batch 257 job 4 branch-only reproduction: install browsers with node node_module
 
 ## Batch 237 tilesets
 Run node --test --test-timeout=60000 packages/wfc/test/tileset.test.js after building packages. The wfc test:gpu script runs the existing solver browser suite and assemble-browser.mjs, which also parses XML, expands F symmetry and solves on both native WebGPU and WebGL2 compatibility routes. Use the shared GPU lock as for batch 237 assembly.
->>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)
+
+Batch 245 blending: after build:packages, run node --test packages/sprites/tests/blend.test.js. Under the shared GPU lock, run node packages/sprites/tests/blend-check.mjs, then the same command with --compat. The browser returns cases=146, maximumError<=1, validation=null and empty error arrays. Synthetic atlas texels are regression fixtures, not downloaded art or a demo.

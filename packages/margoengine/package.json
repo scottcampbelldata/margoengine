@@ -3074,6 +3074,10 @@
       "types": "./dist/sprites/pick.d.ts",
       "import": "./dist/sprites/pick.js"
     },
+    "./sprites/blend": {
+      "types": "./dist/sprites/blend.d.ts",
+      "import": "./dist/sprites/blend.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

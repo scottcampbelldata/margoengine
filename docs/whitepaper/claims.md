@@ -3311,4 +3311,5 @@ Batch 257 job 4 is DONE under Scott's 95% rule, with native Safari proof owed in
 
 ## Batch 237: tileset classes
 All six Gumin symmetry classes, oriented neighbor references and tileset XML are implemented in wfc/tileset. Tests assert cardinalities, exact oriented adjacency, reciprocal closure, reflection transforms, subsets, encoded names, invalid XML and a real ConstrainedWFC solve. Browser checks solve XML-derived variants beside WebGPU and WebGL2 compatibility rendering. No rival source was used and no timing result is claimed.
->>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)
+
+- Batch 245 per-sprite blending: normal/add/multiply/screen preserve visible z/y/insertion order in one layer. Adjacent equal operators group, with two interleaved draws per multiply sprite for correct uncovered source colour. Proof: packages/sprites/tests/blend.test.js and blend-check.mjs (146 cases per backend, 1-byte maximum error against independent equations on asserted RGBA8 fixtures). This is an equation and ordering claim, not a speed claim or arbitrary-depth rounding guarantee.

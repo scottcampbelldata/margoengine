@@ -606,7 +606,7 @@ export class SpriteLayer implements EnginePlugin {
     return { texture, owned: true };
   }
   private pipeline(device: GPUDevice, format: GPUTextureFormat, samples: number, normal?: GPUTextureFormat) {
-    const key = `${format}/${samples}/${normal ?? ''}`;
+    const key = `${format}/${samples}/${normal ?? ''}/${this.pipelineVariant()}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       // The filtered path writes premultiplied colour.
@@ -614,21 +614,44 @@ export class SpriteLayer implements EnginePlugin {
         color: { srcFactor: this.smooth ? 'one' : 'src-alpha', dstFactor: 'one-minus-src-alpha' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
       };
-      pipeline = device.createRenderPipeline({
-        label: 'sprites',
-        layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
-        vertex: { module: this.module!, entryPoint: 'vertexMain' },
-        fragment: {
-          module: this.module!,
-          entryPoint: 'fragmentMain',
-          targets: normal ? [{ format, blend }, { format: normal }] : [{ format, blend }],
-        },
-        primitive: { topology: 'triangle-strip' },
-        multisample: { count: samples },
-      });
+      pipeline = device.createRenderPipeline(
+        this.configurePipeline({
+          label: 'sprites',
+          layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
+          vertex: { module: this.module!, entryPoint: 'vertexMain' },
+          fragment: {
+            module: this.module!,
+            entryPoint: 'fragmentMain',
+            targets: normal ? [{ format, blend }, { format: normal }] : [{ format, blend }],
+          },
+          primitive: { topology: 'triangle-strip' },
+          multisample: { count: samples },
+        }),
+      );
       this.pipelines.set(key, pipeline);
     }
     return pipeline;
+  }
+  /** Extension hook for optional entries with pipeline variants. Default the ordinary sprite pipeline. */
+  protected pipelineVariant(): string {
+    return '';
+  }
+  /** Extension hook for optional entries; default preserves the complete descriptor. */
+  protected configurePipeline(descriptor: GPURenderPipelineDescriptor): GPURenderPipelineDescriptor {
+    return descriptor;
+  }
+  /** Draws a contiguous range of packed sprite instances. Optional entries may partition it into ordered batches. */
+  protected drawInstances(
+    pass: GPURenderPassEncoder,
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    samples: number,
+    normal: GPUTextureFormat | undefined,
+    count: number,
+    first = 0,
+  ): void {
+    pass.setPipeline(this.pipeline(device, format, samples, normal));
+    pass.draw(4, count, 0, first);
   }
   /** Sorts, packs and uploads; returns how many sprites to draw. Several views in a frame upload once. */
   private upload(device: GPUDevice): number {
@@ -723,8 +746,7 @@ export class SpriteLayer implements EnginePlugin {
         storeOp: 'store',
       });
     }
-    const pipeline = this.pipeline(device, format, samples, normalFormat),
-      state = this.states.get(c);
+    const state = this.states.get(c);
     // Targets that store linear light (sRGB and float formats) take the filtered colour as it is; 8-bit ones encoded.
     const linear = format.endsWith('-srgb') || format.includes('float') ? 1 : 0;
     const time = this.effect ? this.time : 0,
@@ -756,9 +778,8 @@ export class SpriteLayer implements EnginePlugin {
     const pass = c.encoder.beginRenderPass({ colorAttachments: this.attachments });
     if (!own) applyView(pass, c);
     if (count) {
-      pass.setPipeline(pipeline);
       pass.setBindGroup(0, state.group!);
-      pass.draw(4, count);
+      this.drawInstances(pass, device, format, samples, normalFormat, count);
     }
     pass.end();
   }
