@@ -62,6 +62,10 @@
     "./instancer": {
       "types": "./dist/instancer.d.ts",
       "import": "./dist/instancer.js"
+    },
+    "./shapes": {
+      "types": "./dist/shapes.d.ts",
+      "import": "./dist/shapes.js"
     }
   },
   "scripts": {

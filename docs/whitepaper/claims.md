@@ -3654,3 +3654,4 @@ The optional mesh hull retains original double positions, including a unit cube 
 ### Batch 265 texture integration
 
 The optional React textures entry uses native image, KTX2 and video Texture values on native Material classes. Normal, roughness and emissive map inputs preserve Scene ownership and core remains unchanged. Evidence: packages/react/tests/textures.test.js, packages/materials/tests/shared-pass.test.js and packages/react/scripts/test-textures-browser.mjs. Reproduction and exact supported inputs are in docs/limits.md and reproduce.md; this is a functionality claim, not a speed result.
+Batch 206 implicit shapes: optional USD Cube, Sphere, Cylinder, Capsule and Cone conversion preserves dimensions, cardinal axes, hierarchy and materials. Proof: shapes.test.js against 22 OpenUSD 26.11 extent results, normal/winding checks and modern-usdz-tests.js actual rendering. Curved geometry is tessellated; no speed or exact analytic-surface claim.

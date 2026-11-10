@@ -54,6 +54,20 @@ def PointInstancer "Scatter" {
     }
   });
   assert.deepEqual(scatter, { sharedMeshes: 1, instances: 2, changed: true });
+  const shapes = await page.evaluate(async () => {
+    const { Engine } = await import('/packages/core/dist/index.js');
+    const { parseUSDA } = await import('/packages/usdz/dist/index.js');
+    const { implicitShapes } = await import('/packages/usdz/dist/shapes.js');
+    const canvas = document.createElement('canvas');canvas.width=canvas.height=128;document.body.append(canvas);
+    const engine = await Engine.create(canvas,{backend:'webgpu',camera:{position:[7,5,10],target:[0,0,0]}});
+    try {
+      const body = ['Cube','Sphere','Cylinder','Capsule','Cone'].map((type,i)=>`def ${type} "S${i}" { double3 xformOp:translate = (${(i-2)*2.5},0,0) uniform token[] xformOpOrder = ["xformOp:translate"] }`).join('\n');
+      const asset = parseUSDA('#usda 1.0\n(metersPerUnit=1 upAxis="Y")\n'+body,{extensions:[implicitShapes()]});
+      const model=await asset.create(engine);engine.render({culling:false});const image=canvas.toDataURL();model.destroy();engine.render({culling:false});
+      return {count:asset.meshes.length,changed:image!==canvas.toDataURL()};
+    } finally {engine.dispose();canvas.remove();}
+  });
+  assert.deepEqual(shapes,{count:5,changed:true});
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Sample loaded'));
   const result = await page.evaluate(async (data) => {
     const { Engine } = await import('/packages/core/dist/index.js'),

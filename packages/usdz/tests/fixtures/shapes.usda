@@ -1,0 +1,128 @@
+#usda 1.0
+
+def Cube "CubeZ0"
+{
+}
+
+def Cube "CubeZ1"
+{
+    double size = 3
+}
+
+def Sphere "SphereZ0"
+{
+}
+
+def Sphere "SphereZ1"
+{
+    double radius = 1.25
+}
+
+def Cylinder "CylinderX0"
+{
+    uniform token axis = "X"
+}
+
+def Cylinder "CylinderX1"
+{
+    uniform token axis = "X"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Cylinder "CylinderY0"
+{
+    uniform token axis = "Y"
+}
+
+def Cylinder "CylinderY1"
+{
+    uniform token axis = "Y"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Cylinder "CylinderZ0"
+{
+    uniform token axis = "Z"
+}
+
+def Cylinder "CylinderZ1"
+{
+    uniform token axis = "Z"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Capsule "CapsuleX0"
+{
+    uniform token axis = "X"
+}
+
+def Capsule "CapsuleX1"
+{
+    uniform token axis = "X"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Capsule "CapsuleY0"
+{
+    uniform token axis = "Y"
+}
+
+def Capsule "CapsuleY1"
+{
+    uniform token axis = "Y"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Capsule "CapsuleZ0"
+{
+    uniform token axis = "Z"
+}
+
+def Capsule "CapsuleZ1"
+{
+    uniform token axis = "Z"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Cone "ConeX0"
+{
+    uniform token axis = "X"
+}
+
+def Cone "ConeX1"
+{
+    uniform token axis = "X"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Cone "ConeY0"
+{
+    uniform token axis = "Y"
+}
+
+def Cone "ConeY1"
+{
+    uniform token axis = "Y"
+    double height = 3.5
+    double radius = 1.25
+}
+
+def Cone "ConeZ0"
+{
+    uniform token axis = "Z"
+}
+
+def Cone "ConeZ1"
+{
+    uniform token axis = "Z"
+    double height = 3.5
+    double radius = 1.25
+}
+

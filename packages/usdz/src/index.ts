@@ -451,6 +451,7 @@ function asset(
   options: USDOptions,
   issues: USDIssue[],
 ): USDAsset {
+  for (const hook of hooks(options)) hook.prepare?.({ specs, ...budget(options), signal: options.signal });
   const limits = budget(options),
     buffers: ArrayBufferView[] = [],
     meshes: USDMesh[] = [],

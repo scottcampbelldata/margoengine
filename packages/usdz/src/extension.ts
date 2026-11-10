@@ -141,6 +141,8 @@ export interface USDSurface {
 }
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
+  /** Prepares optional prim schemas before the mesh walk, within the reader's geometry budgets. */
+  prepare?(read: { specs: Specs; maxVertices: number; maxTriangles: number; signal?: AbortSignal }): void;
   /** Turns the root layer into one flat spec map, in place of reading it as a single static layer. */
   compose?(read: LayerRead): Specs;
   /** The specs of a file that is not a USD layer, or nothing when it is not this extension's. */

@@ -3758,6 +3758,10 @@
       "types": "./dist/usdz/instancer.d.ts",
       "import": "./dist/usdz/instancer.js"
     },
+    "./usdz/shapes": {
+      "types": "./dist/usdz/shapes.d.ts",
+      "import": "./dist/usdz/shapes.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

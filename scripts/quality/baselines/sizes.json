@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13028254,
+  "total": 13034207,
   "history": [
     {
       "date": "2026-10-24",
@@ -6509,6 +6509,12 @@
       "commit": "batch-265-textures-final",
       "reason": "Final optional React mapping entries: textures draft 4067 to 4684 B gzip; geometry draft 4806 to 5402; materials draft 6114 to 6705. React root on landed job 5 is 10259, now 10570. Per-Canvas loader lifetime, separate green roughness with preserved borrowed blue metalness, UV geometry and Scene-owned models remain together. Splitting would duplicate ownership and cleanup. Core/stage stays 24209 B. JSX runtimes are 2731 and 2736 B gzip, above recorded 2522 B ceilings; ceilings 2987 and 2992 preserve mapped intrinsic props.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206-shapes",
+      "reason": "USD shapes optional entry 0 -> 1201 B; worker 117288 B ceiling -> 118236 B measured; schema adapter reuses Margo geometry, a separate worker would duplicate parsing and transfer lifecycle",
+      "grew": 2
     }
   ],
   "items": {
@@ -7394,7 +7400,7 @@
     "@margoengine/ui/react": 33009,
     "@margoengine/ui/world": 9836,
     "@margoengine/usdz": 12708,
-    "@margoengine/usdz dist/workers/usdz.js": 117288,
+    "@margoengine/usdz dist/workers/usdz.js": 121784,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 19101,
     "@margoengine/usdz/lux": 2221,
@@ -7714,6 +7720,7 @@
     "@margoengine/exporters/palette": 2853,
     "@margoengine/mesh-edit/hull": 12352,
     "@margoengine/geometry/hull": 2327,
-    "@margoengine/react/textures": 4940
+    "@margoengine/react/textures": 4940,
+    "@margoengine/usdz/shapes": 1457
   }
 }

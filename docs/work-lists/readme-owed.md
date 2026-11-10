@@ -498,3 +498,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | New react/textures alias and separate decoder-bearing import | batch 265 job 3 |
 
 | @margoengine/shader | sceneColor shares the owning Scene capture; keep recorder fixtures aligned with Engine frameGraph and sceneOf | batch 265 job 3 |
+- @margoengine/usdz and margoengine: implicitShapes() optional /shapes entry, schema defaults, axes, radialSegments/latitudeSegments, budgets, worker and instancer combination.
