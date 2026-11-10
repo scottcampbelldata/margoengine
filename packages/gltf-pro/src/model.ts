@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { markedClipDistances } from '../../shared/section.js';
+import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
 import type { GLTFPrimitive, GLTFMesh, GLTFNode, GLTFMaterial, GLTFTextureInfo } from '../../shared/gltf.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -45,7 +46,7 @@ import { laterUVLayout, laterUVShader, laterUVSlot, vertexInputs } from './verte
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
-import { margoError } from '../../shared/errors.js';
+import { margoError, typeError } from '../../shared/errors.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -3041,11 +3042,14 @@ export class PBRModel implements EnginePlugin {
     }
     await Promise.all(compiling.values());
   }
-  /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
-  image(index: number): Exclude<GLTFImage, undefined> {
+  /** Borrow a decoded image; optional lookup returns undefined for an unavailable alternative texture source. */
+  image(index: number): Exclude<GLTFImage, undefined>;
+  image(index: number, optional: true): GLTFImage;
+  image(index: number, optional = false): GLTFImage {
     if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
+    if (typeof optional !== 'boolean') throw typeError('Optional image lookup must be boolean; pass true or omit it', 'material');
     const image = this.images[integer(index, 'image')];
-    if (!image) throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
+    if (!image && !optional) throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
     return image;
   }
   /** Upload a retained image; the caller owns and destroys the returned texture. */
@@ -3408,6 +3412,12 @@ export class PBRModel implements EnginePlugin {
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
     carry?: PBRDrawRun,
   ): void {
+    const materialAdapter = currentMaterialDraw(this);
+    if (materialAdapter) {
+      const parameters: Parameters<PBRModel['draw']> = [c, mode, color, depth, phase, external, carry];
+      runMaterialDraw(this, materialAdapter, parameters, () => this.draw(...parameters));
+      return;
+    }
     // A run's later draws of a one-primitive model that joins an instanced batch skip the set-up below (joinRun).
     if (carry && !external && mode === 'beauty' && carry.pass && carry.view.at && carry.view.format === c.format) {
       const quick = carry.quickFor(c);
@@ -5125,12 +5135,14 @@ export class PBRModel implements EnginePlugin {
             );
           deformation?.prepare(context);
         },
-        (context, pass, view) =>
+        (context, pass, view) => {
+          inheritMaterialDraw(this, replica);
           replica.draw(context, 'beauty', context.color, context.depth, 'all', {
             pass,
             view,
             depthCompare: 'less-equal',
-          }),
+          });
+        },
         release,
         (callback) => this.onDispose(callback),
       );

@@ -982,6 +982,7 @@ class PBRModel implements EnginePlugin {
     rebindStreamed(image: GLTFStreamedImage): void;
     compile(): Promise<void>;
     image(index: number): Exclude<GLTFImage, undefined>;
+    image(index: number, optional: true): GLTFImage;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
     addLighting(effect: LightingEffect): () => void;
     drawTransparent(c: Context, hook: PBRTransparency): void;

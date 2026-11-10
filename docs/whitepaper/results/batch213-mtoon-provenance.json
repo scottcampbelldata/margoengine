@@ -1,0 +1,12 @@
+{
+  "kind": "public runtime observations, not implementation source",
+  "date": "2026-11-10",
+  "rivalVersion": "3.5.5",
+  "rivalModule": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js",
+  "threeVersion": "0.186.1",
+  "runtimeDirectory": "external engine-bench, no rival files placed in Margo",
+  "sourceAsset": "examples/assets/vrm/AliciaSolid_vrm-0.51.vrm",
+  "sha256": "237bb02efadf8c13a114af91dd8e860173081457dee87017e51011c448d05dc2",
+  "observation": "Read documented material properties after public VRMLoaderPlugin and render. Harness executed from memory, implementation source never inspected. Public outputs only.",
+  "controlled": "First material: outline mode 2, width .123, scroll .2/.3, rotation .75, shade shift -.6, toony .4, indirect .37, rim power 2.7, lift -.1, colour [.2,.5,.8,1]. Base probe changes _Color to [.2,.5,.8,.7] and _EmissionColor to [2,.5,.25,1]. Expression probe assigns those targets to a new margoColor custom group and applies weight 1."
+}

@@ -76,6 +76,10 @@
     "./vrm0": {
       "types": "./dist/vrm0.d.ts",
       "import": "./dist/vrm0.js"
+    },
+    "./mtoon": {
+      "types": "./dist/mtoon.d.ts",
+      "import": "./dist/mtoon.js"
     }
   },
   "files": [
@@ -115,6 +119,7 @@
     "build": "node ../../scripts/build-optional.js rigging",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/rigging-browser.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:mtoon:browser": "node tests/mtoon-browser.mjs"
   }
 }

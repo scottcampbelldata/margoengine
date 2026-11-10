@@ -1462,6 +1462,10 @@
       "types": "./dist/gltf-pro/worker.d.ts",
       "import": "./dist/gltf-pro/worker.js"
     },
+    "./gltf-pro/material-draw": {
+      "types": "./dist/gltf-pro/material-draw.d.ts",
+      "import": "./dist/gltf-pro/material-draw.js"
+    },
     "./headless": {
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
@@ -2809,6 +2813,10 @@
     "./rigging/vrm0": {
       "types": "./dist/rigging/vrm0.d.ts",
       "import": "./dist/rigging/vrm0.js"
+    },
+    "./rigging/mtoon": {
+      "types": "./dist/rigging/mtoon.d.ts",
+      "import": "./dist/rigging/mtoon.js"
     },
     "./road": {
       "types": "./dist/road.d.ts",

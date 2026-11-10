@@ -5,6 +5,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF } from '../dist/index.js';
 import { PBRInstances, instancing } from '../dist/instancing.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
+import { setMaterialDraw } from '../dist/material-draw.js';
 
 async function scene({ mode = 4, variants = false } = {}) {
   const gpu = mockGPU(),
@@ -78,6 +79,123 @@ function eye(model) {
     },
   };
 }
+
+test('material layers reach an already-created isolated renderer and keep its external pass', async () => {
+  const { engine, model } = await scene();
+  const target = eye(model),
+    seen = [];
+  try {
+    target.draw();
+    const count = target.draws.length;
+    const remove = setMaterialDraw(model, (call) => {
+      seen.push(call);
+      call.draw();
+      call.draw();
+    });
+    target.draw();
+    assert.equal(seen.length, 1, 'Nested layer draws do not reenter the adapter');
+    assert.notEqual(seen[0].model, model, 'The adapter selects the isolated primitive records');
+    assert.equal(seen[0].mode, 'beauty');
+    assert.equal(seen[0].phase, 'all');
+    assert.equal(target.draws.length, count * 2, 'Both layers use the caller-owned pass');
+    remove();
+    remove();
+    target.draw();
+    assert.equal(target.draws.length, count);
+    assert.equal(seen.length, 1);
+  } finally {
+    target.renderer.dispose();
+    engine.dispose();
+  }
+});
+
+test('material adapter errors restore the reentry guard and a replacement reaches live replicas', async () => {
+  const { engine, model } = await scene();
+  const target = eye(model),
+    reason = new Error('authored layer failure');
+  try {
+    const remove = setMaterialDraw(model, () => {
+      throw reason;
+    });
+    assert.throws(
+      () => target.draw(),
+      (error) => error === reason,
+    );
+    assert.throws(
+      () => setMaterialDraw(model, () => {}),
+      (error) => error.code === 'attached',
+    );
+    remove();
+    let calls = 0;
+    setMaterialDraw(model, (call) => {
+      calls++;
+      call.draw();
+    });
+    target.draw();
+    assert.equal(calls, 1);
+    assert.ok(target.draws.length > 0);
+    model.dispose();
+    assert.throws(
+      () => setMaterialDraw(model, () => {}),
+      (error) => error.code === 'disposed',
+    );
+  } finally {
+    target.renderer.dispose();
+    engine.dispose();
+  }
+});
+
+test('a nested view inside an adapter receives its own material invocation', async () => {
+  const { engine, model } = await scene();
+  const target = eye(model),
+    modes = [];
+  try {
+    setMaterialDraw(model, (call) => {
+      modes.push(call.mode);
+      if (call.mode === 'beauty') call.model.draw(call.context, 'transparent', call.context.color, call.context.depth);
+      call.draw();
+    });
+    target.draw();
+    assert.deepEqual(modes, ['beauty', 'transparent']);
+    assert.ok(target.draws.length > 0);
+  } finally {
+    target.renderer.dispose();
+    engine.dispose();
+  }
+});
+
+test('optional decoded-image lookup supports alternatives without weakening required lookup', async () => {
+  const { engine, model, images } = await scene({ variants: true });
+  try {
+    assert.equal(model.image(0, true), images[0]);
+    assert.equal(model.image(2, true), undefined);
+    assert.throws(() => model.image(2), /Missing decoded glTF image/);
+    assert.throws(() => model.image(-1, true));
+    assert.throws(() => model.image(2, 'optional'), /must be boolean/);
+    model.dispose();
+    assert.throws(
+      () => model.image(0, true),
+      (error) => error.code === 'disposed',
+    );
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('material adapters reject asynchronous work before a later frame can consume it', async () => {
+  const { engine, model } = await scene();
+  const target = eye(model);
+  try {
+    const remove = setMaterialDraw(model, () => Promise.resolve());
+    assert.throws(() => target.draw(), /must complete synchronously/);
+    remove();
+    target.draw();
+    assert.ok(target.draws.length > 0);
+  } finally {
+    target.renderer.dispose();
+    engine.dispose();
+  }
+});
 
 test('disposing an unused or drawn eye renderer never destroys the main instance buffer', async () => {
   const { gpu, engine, model, primitives } = await scene(),

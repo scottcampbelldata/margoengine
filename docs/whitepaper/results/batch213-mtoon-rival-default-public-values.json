@@ -1,0 +1,26 @@
+{
+  "shadeColorFactor": [
+    0,
+    0,
+    0
+  ],
+  "shadingShiftFactor": 0,
+  "shadingToonyFactor": 0.9,
+  "giEqualizationFactor": 0.9,
+  "outlineWidthFactor": 0,
+  "outlineWidthMode": "none",
+  "outlineColorFactor": [
+    0,
+    0,
+    0
+  ],
+  "outlineLightingMixFactor": 1,
+  "parametricRimColorFactor": [
+    0,
+    0,
+    0
+  ],
+  "parametricRimLiftFactor": 0,
+  "parametricRimFresnelPowerFactor": 5,
+  "rimLightingMixFactor": 1
+}

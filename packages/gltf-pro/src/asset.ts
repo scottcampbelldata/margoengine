@@ -193,6 +193,8 @@ const supported = new Set([
   'EXT_texture_webp',
   'EXT_texture_avif',
   'EXT_mesh_gpu_instancing',
+  // Retained until @margoengine/rigging/mtoon installs its authored material rendering.
+  'VRMC_materials_mtoon',
   // Data until @margoengine/gltf-pro/lights applies them.
   'EXT_lights_ies',
   'EXT_lights_image_based',

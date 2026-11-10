@@ -173,8 +173,8 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 9 entry points
 - [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 13 entry points
 - [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 7 entry points
-- [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 15 entry points
-- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 34 entry points
+- [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 16 entry points
+- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 35 entry points
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 27 entry points
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 10 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 10 entry points
@@ -201,7 +201,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/text API](https://margoengine.com/llms/api/text.md): 5 entry points
 - [@margoengine/pixel API](https://margoengine.com/llms/api/pixel.md): 5 entry points
 - [@margoengine/lighting2d API](https://margoengine.com/llms/api/lighting2d.md): 6 entry points
-- [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 3 entry points
+- [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 4 entry points
 - [@margoengine/html API](https://margoengine.com/llms/api/html.md): 5 entry points
 - [@margoengine/video API](https://margoengine.com/llms/api/video.md): 6 entry points
 - [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 11 entry points
@@ -218,9 +218,9 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 11 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 18 entry points
 - [@margoengine/water API](https://margoengine.com/llms/api/water.md): 4 entry points
-- [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 6 entry points
+- [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 7 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 6 entry points
-- [@margoengine/road API](https://margoengine.com/llms/api/road.md): 10 entry points
+- [@margoengine/road API](https://margoengine.com/llms/api/road.md): 11 entry points
 - [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 9 entry points
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 20 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 9 entry points
@@ -228,9 +228,9 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 10 entry points
 - [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 9 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 16 entry points
-- [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 9 entry points
+- [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 10 entry points
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 3 entry points
-- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 12 entry points
+- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 13 entry points
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 11 entry points
 - [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 8 entry points
 - [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 7 entry points
@@ -296,6 +296,7 @@ One page per package: every exported name with its declaration, generated from t
 - [React: build the scene from a document](https://margoengine.com/llms/docs/guides/react-scene-document.md): You will build a tiny scene editor whose whole state is one plain JSON document. Adding, deleting, undo, redo, saving and loading all fall…
 - [React: state or the frame loop?](https://margoengine.com/llms/docs/guides/react-state-vs-frame-loop.md): You will spin a cube two ways, count how often React re-renders for each, and learn the rule for what goes in React state and what does…
 - [Textures and materials](https://margoengine.com/llms/docs/guides/textures-and-materials.md): You will put a brick texture with a bumpy surface on a box, then change how shiny and how repeated it is. This takes about five minutes.
+- [GPU labels](https://margoengine.com/llms/docs/labels-gpu.md): `@margoengine/labels/gpu` exports `GPULabelLayer`, `GPULabel`, and `GPULabelOptions`. Call `await GPULabelLayer.create(options)`, attach…
 - [Large coordinates: precision far from the origin](https://margoengine.com/llms/docs/large-coordinates.md): Plant layouts, BIM and GIS scenes put parts kilometres (or, in Earth-centred coordinates, 6,000 km) from the world origin. Core and its…
 - [Clearcoat, transmission, volume, and node materials](https://margoengine.com/llms/docs/materials-extensions.md): Add the four material features that the Three.js comparison asks for. Core and the stage facade stay frozen. None of this enters the…
 - [Mutation testing of @margoengine/biomes](https://margoengine.com/llms/docs/mutation.md): `scripts/mutation.mjs` is a hand-rolled runner with no dependency. It parses a source file, lists small changes (a comparison or…
@@ -311,6 +312,7 @@ One page per package: every exported name with its declaration, generated from t
 - [A complete Margo React scene layer](https://margoengine.com/llms/docs/react-scene.md): This is Margo's own version of the React Three Fiber surface: the canvas, the helpers, post, physics, and XR. It does not wrap Fiber, and…
 - [README live-link fixture](https://margoengine.com/llms/docs/readme-live.md): The README runner executes Blender's live-link example unchanged. Its top-level async loop intentionally waits for pagehide, so module…
 - [Releasing to npm](https://margoengine.com/llms/docs/releasing.md): Nothing is published without the maintainer's go-ahead for that release. The only publish path is the manual…
+- [MToon materials](https://margoengine.com/llms/docs/rigging-mtoon.md): Batch 213 job 2 adds `@margoengine/rigging/mtoon`. `MToon.attach(model)` installs VRMC_materials_mtoon 1.0 materials on a loaded PBRModel…
 - [VRM 0.x runtime conversion](https://margoengine.com/llms/docs/rigging-vrm0.md): Batch 213 job 1 adds only `@margoengine/rigging/vrm0` and its umbrella alias. `readVRM` remains a 1.x reader. `loadVRM0` converts before…
 - [Road design entries (batch 233)](https://margoengine.com/llms/docs/road-design.md): `@margoengine/road/intersections` exports `intersections(roads, options)`, an async CPU builder. Each input uses the existing JunctionRoad…
 - [Scientific analysis filters, batch 172](https://margoengine.com/llms/docs/sciviz-analysis.md): The optional `@margoengine/sciviz/pipeline` entry exports `FilterPipeline`. It imports no renderer and starts no work on construction. A…

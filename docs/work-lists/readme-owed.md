@@ -531,3 +531,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/loaders (batch 202 job 4): document /threemf-lattice, native construction versus source preview, object/build transforms and units, balls/sets/clipping references, inline/external slice data and precedence, material row defaults/linear blend/opacity, limits and cancellation; examples deferred.
 - margoengine (batch 202 job 4): document loaders/threemf-lattice and regenerated selection/highlight alias.
 - @margoengine/loaders (batch 202 job 5): correct stale Limits statements about VTK XML, 3MF textures and newly built optional readers when README work resumes; deferred under lane rule 20, with no README edits or execution in this batch.
+
+- @margoengine/rigging (batch 213 job 2): MToon attachment, VRM 0.x migration, authored lighting/UV/outline controls, expressions, lifecycle and accepted integration limits.
+- @margoengine/gltf-pro (batch 213 job 2): /material-draw synchronous source/replica adapters and optional decoded-image lookup.
+- margoengine (batch 213 job 2): rigging/mtoon and gltf-pro/material-draw aliases.

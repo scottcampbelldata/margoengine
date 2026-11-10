@@ -94,6 +94,10 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
+    },
+    "./material-draw": {
+      "types": "./dist/material-draw.d.ts",
+      "import": "./dist/material-draw.js"
     }
   },
   "files": [

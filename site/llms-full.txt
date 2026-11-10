@@ -7400,6 +7400,54 @@ New blender/meshopt is 8304 gzip bytes (before 0, ceiling 8560), including optio
 compressMargoMeshopt losslessly encodes packed 24/80-byte vertices and 16/32-bit indices with existing meshopt version-0 attribute streams. Indices are encoded as raw four-byte groups (zero padding is discarded), preserving every index and provoking vertex rather than rotating triangles. Small/uncompressible sections remain native; the entire original file is returned if it is smaller. expandMargoMeshopt supports static, animated, shapes and KTX2 containers without changing metadata/image/animation bytes; decodeMargoMeshopt is the static prepared reader. parse/load default to parseMargo; use options.parse for compatible PBRModel parsers such as parseAnimatedMargo, parseMargoKTX2 or parseMargoLightmap. Shapes can use the expanded bytes with the curves loader. AbortSignal is checked between sections, before allocation and before load; a single existing synchronous codec call cannot be interrupted.
 Expanded file and aggregate section allocation are bounded at 256 MiB before decode; vertex count per section at 1 million, original table/manifest limits retained. PNG/KTX2/animation sections stay uncompressed. No lossy quantization, triangle reordering or geometry simplification. Seven own fixtures keep every section byte and manifest value; anim 28924 to 19516 B, objects 13940 to 12348 B, lightmap 1396 to 1276 B, curves 18180 to 17988 B. Native/compat frames are identical for original and compressed static/animated models, with zero validation errors. These are deterministic byte counts, not timing benchmarks.
 
+### Batch 246 job 2: Tiled semantic import
+parseTiled accepts JSON and XML maps, external JSON/XML tilesets and JSON/XML object templates. resolve receives paths relative to baseUrl (default empty), including template/tileset-relative resources; image paths are retained relative to the map destination. Repeated template files load once per import, cycles and nesting beyond 32 reject, pending resolver waits honour AbortSignal. Instance fields, false/zero values, text styles and custom-property overrides win over template data. Template tile ids remap to existing or newly added map tilesets with flip bits intact. Sparse collection ids retain their full gid span. Image layers keep dimensions/repeat and inherited visibility/offset/opacity/parallax/tint; text retains content and every Tiled style field as data, not rasterized text. Imported corner/edge/mixed Wang sets expose executable resolveWang rules, weights and colour metadata. Shared lattices use -1 as wildcard; unmatched cells are zero and zero-weight variants never draw. Existing compression/orientation limits still apply, including unsupported zstd and oblique maps. fromTMX remains a converter for the loaders result; parseTiled reads source XML directly to preserve the richer data. Tiled entry grows 4,264 to 7,227 B min+gzip, ceiling 4540 to 7483 B. Autotile grows 1,349 to 1,831 B; ceiling 2087 B. Core plus stage stays 24,209 B.
+### Animator state graph layers (batch 211 job 1)
+
+Optional animator/layers: addStateLayer(owner, {graph, weight?, mask?, blend?}) returns StateLayer with graph, live weight/mask/blend and dispose/Symbol.dispose. Weight defaults to 1, blend to override and mask to nodes animated by the graph's clips. Masks are unique glTF node indices, not subtree names. Empty masks affect nothing. Each layer has its own typed graph parameters, triggers, events and clock; shared game parameters can be set on each graph. Ordered additive deltas use the owner's loaded pose, with identity scale delta for a zero reference axis. Owner pause/speed apply once; layer playing can pause independently. Layer graphs evaluate poses without committing nodes, creating a skinning pass or owning Animation playback; owner disposal removes them. Install procedural solvers on the owner after the composed pose. Layer graphs are not included in Animator.captureState: capture each graph's Animator state separately. Entry gzip 10,132 B, ceiling 10,436 B; no core/stage changes.
+### Batch 233 job 4: bridges and tunnels
+road/structures generates closed bridge decks, terrain-founded paired piers, double-wall arch/box tunnels and open portal faces. Terrain and road crossings classify spans; authored spans are supported. Ground excavation remains in the consuming terrain application using returned portal rings. Sampling, obstruction/clearance rejection, bounds and all defaults: [road-design.md](road-design.md). No engineering capacity or speed claim.
+
+### Batch 261 GPU labels
+Optional labels/gpu: one overlay draw for all visible SDF/color glyphs; 80 B of instance data per glyph. Default 1024-square RGBA atlas pages, at most 32 pages, also bounded by device texture and buffer limits. Full pages reject explicitly. Distance-independent CSS sizing, priority grid decluttering, viewport/scissor and restoration work on WebGPU, native WebGL2 and compatibility WebGL2. CPU packing/upload happens each frame; no terrain depth occlusion or speed claim. See [GPU labels](labels-gpu.md).
+
+Batch 261 job 1 entry size: labels/gpu 0 B (absent) -> 5778 B min+gzip, dependencies external. The new optional entry ceiling is 6034 B; one portable plugin retains both backend paths. Core plus stage is 24,209 B after the full package build.
+
+
+
+### Batch 232 textured moon
+
+`@margoengine/scenery/moon` requires a north-first, east-right, longitude-zero-centred
+RGBA8 sRGB equirectangular map. Default radius 0.2725 degrees; range (0, 30].
+Intensity 0 to 1000, default 1; full-Earth earthshine 0 to 1, default 0.001,
+scaled by Earth's complementary Lambert phase. Libration is deliberately zero.
+World direction defaults -Z, lunar north +Y, Sun +X; north must not parallel the
+Moon direction. Supply astronomical directions for a particular place/time.
+No elevation, eclipses, lunar BRDF calibration or atmospheric attenuation.
+Map bytes are retained for device restoration; replace the map object to upload
+changes. The map is owned by the caller; uploaded GPU textures are owned/disposed
+by the plugin. Native WebGPU and full WebGL2 compatibility are supported; the small
+preview refuses setup. The data download helper requires browser image APIs.
+
+Batch 232 entry sizes (min+gzip, bare dependencies external): new /moon 3,975 B
+(previously absent), /stars 4,744 B, /aurora 5,773 B. The new lunar ceiling is
+4,231 B including the standard 256 B headroom. One entry keeps loading, texture
+ownership, orientation and lighting together without another loading boundary.
+Core plus stage root is unchanged at 24,209 B.
+
+### Native 3MF lattice and slice data (batch 202)
+`@margoengine/loaders/threemf-lattice` exposes async parse3MFLattice. It returns the existing textured/material preview mesh plus source objects, exact native lattice parameters, source-double xyz, triangle topology, per-build affine instances, slice stacks and property resources. Radii and contours remain in file units; instances retain the composed row-vector affine transform and unitScale (meters by default, 1 for units:file). This preserves nonuniformly scaled spheres/frusta without replacing their radii with an inaccurate scalar. Clipping mode/volume and representation meshes remain explicit references to validated earlier source meshes; consumers choose their native construction or the file's preview representation. The returned triangle stream is the file's mesh representation, whose lowres/fullres label is retained. It is not a new manufactured union of beams or slices.
+Caps are sphere/hemisphere/butt, default sphere. ballMode defaults to none; mixed/all require ballRadius. Source beam indices remain stable; activeBeams applies minlength before transform, and effectiveBalls applies mode and active beam-end membership. Native-only valid beam builds can have empty triangle arrays. Default maxBeams is 1,000,000 for beams and explicit balls each, with at most twice that many set references. Default maxSlices is 100,000 source layers/references and separately expanded referenced layers. Source/slice vertices share maxVertices; segments are bounded by 3*maxTriangles, source objects by 100,000 and the existing model-part/instance/ZIP caps remain active.
+External slices require their model-part OPC relationship and a single reference level. Tops strictly increase, void layers remain, model/solidsupport contours close explicitly, and composed slice transforms preserve the slicing plane without an epsilon tolerance. Component stacks override descendant stacks. lowres requires the slice namespace in requiredextensions. Slice properties retain endpoint gradients and object defaults. Materials keep raw entries plus normalized composite weights and defaulted multi rows/blendMethods. The shared materials reader now mixes in linear RGB, supports multiply, treats all-zero weights uniformly and retains opacity in attributes.opacity. Existing byte, count and AbortSignal options propagate through all part reads.
+Entry sizes: /threemf-lattice is new, 0 to 12,275 B min+gzip (ceiling 12,644 B). /threemf-materials is 7,661 to 8,082 B; its ceiling rises from 7,917 to 8,338 B for linear mix/multiply, normative defaults, alpha and shared format hooks. Splitting those hooks or equations would duplicate the material reader or separate one cohesive API. Loader root is 53,022 to 53,087 B; core plus stage stays 24,209 B.
+
+
+## Batch 213 MToon materials
+
+The optional rigging/mtoon entry adds 9,540 B min+gzip (previously 0 B), ceiling 9,827 B. It keeps authored shading, legacy migration, textures, expressions and outline layers together; splitting jointly required controls would duplicate state and complicate attachment. The optional gltf-pro/material-draw entry adds 432 B (previously 0 B), ceiling 683 B. Core plus stage remains 24,209 B, below 25,000 B; neither source was changed.
+
+MToon accepts VRMC_materials_mtoon 1.0 and the retained VRM 0.x material records. Full parameter defaults, texture channels, migration calibration and validation scope are in rigging-mtoon.md. World outlines use metres and screen outlines use view height; tests cover perspective distances 2 and 4. Material queue offsets order primitives within a model; separate models retain native scene order. Spatially masked UV animation is applied to beauty, normal, emission and outline paths, but not yet the optional shadow-caster alpha shader. Custom material resources have the existing same-device isolated-renderer restriction. Evidence is native WebGPU and complete WebGL2 compatibility on RTX A6000, not cross-vendor or speed certification. README examples remain owed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -11896,6 +11944,25 @@ Batch 206 implicit shapes: no open defect in 22 OpenUSD extent cases, analytic n
 Batch 205 large: existing default byte-budget errors retain their exact wording, while enabled custom caps report the configured range. packages/fbx/test/errors.test.js and worker.test.js retain page/worker error identity; large.test.js covers caps without reducing imported geometry.
 
 Batch 207 meshopt: no open defect found in the requested compression row. Existing synchronous codec calls only observe cancellation between sections; files need the optional reader, with bounds/stream regressions in meshopt.test.js.
+
+Batch 246 job 2 closes the importer gaps for skipped image layers, text and templates, plus sparse image-collection gid spans. Reproductions and root-cause checks are in tiled-full.test.js. Existing unregistered browser-inventory drivers remain owned by their lanes.
+
+### Batch 261 GPU labels
+No open correctness defect identified in this entry. Browser evidence includes shader validation, 100k batching, constant pixel extents, culling and disposal on WebGPU, native WebGL2 and compatibility WebGL2. Incremental upload work is recorded privately for the finish phase.
+### Batch 206 API summary repair
+The post-push full API check caught an incorrect merge of the generated summary: the aggregate omitted the unscoped margoengine row (97 instead of 98 packages) and retained upstream stale table cells. The initial corrected snapshot has 98 packages, 1073 entries and 9741 names; current totals are generated in api-surface.md. tests/api-report-scope.test.js now checks table totals including the umbrella; the existing full API check remains authoritative for each row. This is a fix forward for the generated index, with no runtime or API implementation change.
+
+
+Batch 232 moon: no open defect found in the new lunar layer. CPU regression covers
+texture replacement/restoration/disposal, malformed inputs and aborted fetch;
+`packages/scenery/test/moon-gpu.mjs` proves phase, earthshine, map orientation and
+depth masking. The visual approximations are listed in docs/limits.md.
+`loaders/geo` (batch 202 fix-phase follow-up): a pre-aborted signal reaches `buildGeo` only after binary decoding in `parseShapefile` and `parseMVT`. Repro: call either parser with `signal: AbortSignal.abort()` and truncated bytes (empty SHP or MVT byte 128); both report code truncated before aborted. Cause: the binary entry functions lack the initial throwIfAborted check already present in the text path. Decoding/cancellation quality gap under lane rules 21/22; add entry checks and a regression in the fix phase.
+- Batch 213 MToon integration: two independently loaded blended models with crossing renderQueueOffsetNumber values retain scene model order; the material adapter orders primitives only inside one model. Global model queue scheduling is a fix-phase follow-up.
+- Batch 213 MToon integration: an alpha-cutout shadow caster with a spatially varying UV animation mask uses the static alpha UV while beauty moves; optional shadow sampling does not receive the material's mask/time bindings. Beauty, normals, emission and hull animation are built; shadow integration is a fix-phase follow-up.
+
+- Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
+- Existing physical-material compatibility limit: scripts/gltf-pro-materials-gpu-check.js rejects the two 16-texture worst-case composed pipelines on RTX A6000 with MAX_TEXTURE_IMAGE_UNITS(16); all 160 BRDF numeric cases match and native pipelines pass. The direct shader fixture never attaches MToon; its shader/composition inputs are identical to parent 0d80e463b (hash proof in whitepaper/results/batch213-physical-compat-existing-failure.json). WebGL2 sampler-layout integration waits for the fix phase; no assertion or tolerance changed.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

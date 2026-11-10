@@ -1,0 +1,404 @@
+{
+  "rival": "@pixiv/three-vrm 3.5.5",
+  "three": "186",
+  "draws": 35,
+  "drawnPixels": 2165,
+  "rows": [
+    {
+      "name": "Alicia_body",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        1,
+        0.7299189551144398,
+        0.681419357803237
+      ],
+      "shadingShiftFactor": 0.12,
+      "shadingToonyFactor": 0.52,
+      "giEqualizationFactor": 0.63,
+      "outlineWidthFactor": 0.00123,
+      "outlineWidthMode": "screenCoordinates",
+      "outlineColorFactor": [
+        0.41570911236880864,
+        0.2760106056455641,
+        0.252346766539891
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0.028991186547107816,
+        0.217637640824031,
+        0.6120655998656237
+      ],
+      "parametricRimLiftFactor": -0.1,
+      "parametricRimFresnelPowerFactor": 2.7,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0.2,
+      "uvAnimationScrollYSpeedFactor": -0.3,
+      "uvAnimationRotationSpeedFactor": 0.75
+    },
+    {
+      "name": "Alicia_body_wear",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        0.2888159158307609,
+        0.5731589932337846,
+        0.8433698585414904
+      ],
+      "shadingShiftFactor": -0.050000000000000044,
+      "shadingToonyFactor": 0.95,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.17187238878967853,
+        0.21278083371906792,
+        0.23932210167217854
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_wear",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        0.2888159158307609,
+        0.5731589932337846,
+        0.8433698585414904
+      ],
+      "shadingShiftFactor": -0.050000000000000044,
+      "shadingToonyFactor": 0.95,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.17187238878967853,
+        0.21278083371906792,
+        0.23932210167217854
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_eye",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        0.7567405364306354,
+        0.8928687021246231,
+        1
+      ],
+      "shadingShiftFactor": 0.42500000000000004,
+      "shadingToonyFactor": 0.925,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.00601,
+      "outlineWidthMode": "none",
+      "outlineColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "outlineLightingMixFactor": 0,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_face",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        1,
+        0.7299189551144398,
+        0.681419357803237
+      ],
+      "shadingShiftFactor": 0.42500000000000004,
+      "shadingToonyFactor": 0.925,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.41570911236880864,
+        0.2760106056455641,
+        0.252346766539891
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_eye_white",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        0.7567405364306354,
+        0.8928687021246231,
+        1
+      ],
+      "shadingShiftFactor": 0.42500000000000004,
+      "shadingToonyFactor": 0.925,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.00601,
+      "outlineWidthMode": "none",
+      "outlineColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "outlineLightingMixFactor": 0,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_face_mastuge",
+      "renderOrder": 0,
+      "depthWrite": true,
+      "transparent": true,
+      "shadeColorFactor": [
+        1,
+        0.7299189551144398,
+        0.681419357803237
+      ],
+      "shadingShiftFactor": 0.42500000000000004,
+      "shadingToonyFactor": 0.925,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.00601,
+      "outlineWidthMode": "none",
+      "outlineColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "outlineLightingMixFactor": 0,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_hair",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        1,
+        0.5772745439809804,
+        0.5499216420177102
+      ],
+      "shadingShiftFactor": -0.5,
+      "shadingToonyFactor": 0.5,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.6186857806152141,
+        0.5830571220440275,
+        0.519934276327589
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_hair_trans_zwrite",
+      "renderOrder": 1,
+      "depthWrite": true,
+      "transparent": true,
+      "shadeColorFactor": [
+        1,
+        0.5772745439809804,
+        0.5499216420177102
+      ],
+      "shadingShiftFactor": -0.5,
+      "shadingToonyFactor": 0.5,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.6186857806152141,
+        0.5830571220440275,
+        0.519934276327589
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_hair_wear",
+      "renderOrder": 19,
+      "depthWrite": true,
+      "transparent": false,
+      "shadeColorFactor": [
+        0.2888159158307609,
+        0.5731589932337846,
+        0.8433698585414904
+      ],
+      "shadingShiftFactor": -0.050000000000000044,
+      "shadingToonyFactor": 0.95,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.17187238878967853,
+        0.21278083371906792,
+        0.23932210167217854
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_hair_trans",
+      "renderOrder": 0,
+      "depthWrite": true,
+      "transparent": true,
+      "shadeColorFactor": [
+        1,
+        0.5772745439809804,
+        0.5499216420177102
+      ],
+      "shadingShiftFactor": -0.5,
+      "shadingToonyFactor": 0.5,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.0005,
+      "outlineWidthMode": "worldCoordinates",
+      "outlineColorFactor": [
+        0.6186857806152141,
+        0.5830571220440275,
+        0.519934276327589
+      ],
+      "outlineLightingMixFactor": 1,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    },
+    {
+      "name": "Alicia_other_zwrite",
+      "renderOrder": 0,
+      "depthWrite": true,
+      "transparent": true,
+      "shadeColorFactor": [
+        1,
+        0.7299189551144398,
+        0.681419357803237
+      ],
+      "shadingShiftFactor": 0.42500000000000004,
+      "shadingToonyFactor": 0.925,
+      "giEqualizationFactor": 0.9,
+      "outlineWidthFactor": 0.00601,
+      "outlineWidthMode": "none",
+      "outlineColorFactor": [
+        0.17187238878967853,
+        0.21278083371906792,
+        0.23932210167217854
+      ],
+      "outlineLightingMixFactor": 0,
+      "parametricRimColorFactor": [
+        0,
+        0,
+        0
+      ],
+      "parametricRimLiftFactor": 0,
+      "parametricRimFresnelPowerFactor": 1,
+      "rimLightingMixFactor": 0,
+      "uvAnimationScrollXSpeedFactor": 0,
+      "uvAnimationScrollYSpeedFactor": 0,
+      "uvAnimationRotationSpeedFactor": 0
+    }
+  ]
+}
