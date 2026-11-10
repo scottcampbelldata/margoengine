@@ -88,6 +88,10 @@
     "./vrma": {
       "types": "./dist/vrma.d.ts",
       "import": "./dist/vrma.js"
+    },
+    "./pose-tracking": {
+      "types": "./dist/pose-tracking.d.ts",
+      "import": "./dist/pose-tracking.js"
     }
   },
   "files": [
@@ -134,6 +138,7 @@
     "prepack": "npm run build",
     "test:mtoon:browser": "node tests/mtoon-light.browser.mjs && node tests/mtoon-replica.browser.mjs && node tests/mtoon-matcap.browser.mjs && node tests/mtoon-uv.browser.mjs && node tests/mtoon-uv-animation.browser.mjs && node tests/mtoon-expressions.browser.mjs && node tests/mtoon-local-rim.browser.mjs && node tests/mtoon-gbuffer.browser.mjs && node tests/mtoon-outline.browser.mjs && node tests/mtoon-avatar.browser.mjs && node tests/mtoon-avatar.browser.mjs --vrm1",
     "test:constraints:browser": "node tests/vrm-constraints.browser.mjs",
-    "test:vrma:browser": "node tests/vrma.browser.mjs"
+    "test:vrma:browser": "node tests/vrma.browser.mjs",
+    "test:pose-tracking:browser": "node tests/pose-tracking.browser.mjs"
   }
 }

@@ -1,0 +1,98 @@
+{
+  "Seed-san webgpu": {
+    "filename": "Seed-san",
+    "extremeChanged": 2307,
+    "extremeFinger": [
+      0,
+      0,
+      -0.7071067811865475,
+      0.7071067811865476
+    ],
+    "extremeBones": 50,
+    "width": 256,
+    "height": 256,
+    "drawn": 4783,
+    "changed": 1617,
+    "neutral": 0,
+    "restored": 0,
+    "finger": [
+      0,
+      0,
+      -0.3826834323650898,
+      0.9238795325112867
+    ],
+    "bones": 50
+  },
+  "Seed-san compat": {
+    "filename": "Seed-san",
+    "extremeChanged": 2307,
+    "extremeFinger": [
+      0,
+      0,
+      -0.7071067811865475,
+      0.7071067811865476
+    ],
+    "extremeBones": 50,
+    "width": 256,
+    "height": 256,
+    "drawn": 4786,
+    "changed": 1617,
+    "neutral": 0,
+    "restored": 0,
+    "finger": [
+      0,
+      0,
+      -0.3826834323650898,
+      0.9238795325112867
+    ],
+    "bones": 50
+  },
+  "VRM1_Constraint_Twist_Sample webgpu": {
+    "filename": "VRM1_Constraint_Twist_Sample",
+    "extremeChanged": 1323,
+    "extremeFinger": [
+      0,
+      0,
+      -0.7071067811865475,
+      0.7071067811865476
+    ],
+    "extremeBones": 50,
+    "width": 256,
+    "height": 256,
+    "drawn": 3705,
+    "changed": 839,
+    "neutral": 0,
+    "restored": 0,
+    "finger": [
+      0,
+      0,
+      -0.3826834323650898,
+      0.9238795325112867
+    ],
+    "bones": 50
+  },
+  "VRM1_Constraint_Twist_Sample compat": {
+    "filename": "VRM1_Constraint_Twist_Sample",
+    "extremeChanged": 1323,
+    "extremeFinger": [
+      0,
+      0,
+      -0.7071067811865475,
+      0.7071067811865476
+    ],
+    "extremeBones": 50,
+    "width": 256,
+    "height": 256,
+    "drawn": 3705,
+    "changed": 839,
+    "neutral": 0,
+    "restored": 0,
+    "finger": [
+      0,
+      0,
+      -0.3826834323650898,
+      0.9238795325112867
+    ],
+    "bones": 50
+  }
+}

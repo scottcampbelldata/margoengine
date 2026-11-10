@@ -774,3 +774,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/text (batch 248 job 5): replace old CFF2/variation/shaping exclusion; document variations, axes, withVariations, shapedRuns em normalization/UTF-16 clusters/line order, FontLike providers, parser limits and dependency-free frozen oracle tests. No README examples written in build phase.
 - @margoengine/voxel (batch 240 job 1): document /models definition, 24 orientations, face UVs/textures, renderer ordering and optional materials peer, exact queries/physics and lighting coverage; runnable examples owed in the README phase.
 - margoengine (batch 240 job 1): document the voxel/models umbrella entry alongside the optional package in the README phase.
+- `@margoengine/rigging` (batch 213 job 5): document pose-tracking body/hand solvers, Tasks/Holistic frames, coordinate/mirror/aspect conventions, confidence/calibration/smoothing/loss, native VRM binding/cancellation/disposal and root-motion limits; runnable README examples wait for README phase.
+- `margoengine` (batch 213 job 5): document the generated rigging/pose-tracking alias in README phase.

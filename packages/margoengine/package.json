@@ -3002,6 +3002,10 @@
       "types": "./dist/rigging/vrma.d.ts",
       "import": "./dist/rigging/vrma.js"
     },
+    "./rigging/pose-tracking": {
+      "types": "./dist/rigging/pose-tracking.d.ts",
+      "import": "./dist/rigging/pose-tracking.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

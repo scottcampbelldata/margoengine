@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13594966,
+  "total": 13600094,
   "history": [
     {
       "date": "2026-10-24",
@@ -7062,6 +7062,12 @@
       "commit": "bd07d2924",
       "reason": "Batch 240 exact custom box queries and collision plus optional lazy model renderer; keep features together",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-213-pose-tracking",
+      "reason": "New optional pose-tracking entry: 0 B before, 4872 B gzip after, 5128 B ceiling. Full body and fifteen finger joints per hand, Tasks adapter, calibrated filtering and native VRM lifecycle; extra splits would fragment one small solver without reducing core/stage cost.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8341,6 +8347,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/rigging/pose-tracking": 5128
   }
 }
