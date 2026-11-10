@@ -79,7 +79,7 @@ export interface ShadowOptions {
   resolution?: number | readonly [number, number];
   /**
    * Farthest shadowed distance from the camera, world units, > 0. Default 500; when unset and every caster is a core
-   * mesh, or a node that draws nothing, the cascades also tighten to the casters' bounds.
+   * mesh, a static non-instanced PBR mesh, or a node that draws nothing, cascades tighten to the casters' bounds.
    */
   distance?: number;
   /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
@@ -904,11 +904,23 @@ export class Shadows implements EnginePlugin {
     for (let i = 0; core && i < this.sources.length; i++) {
       const source = this.sources[i].source;
       // A node with no geometry and no model behind it (a glTF group) draws nothing, so it changes no bounds.
-      core = 'id' in source && (!!source.geometry || !meshTriangles(source));
+      if (!('id' in source)) core = false;
+      else {
+        const triangles = meshTriangles(source);
+        core =
+          !triangles ||
+          triangles.kind === 'core' ||
+          (!triangles.source.skinned &&
+            !triangles.source.morphed &&
+            triangles.source.primitives.every(
+              (p) =>
+                !p.deformed && !('instances' in p && p.instances) && !p.material.displacement && !p.material.shading,
+            ));
+      }
     }
     if (!core) return fit;
     // ponytail: one pass over every core mesh per frame; cache on store revisions if 100k-part scenes leave distance unset.
-    // World bounding spheres from core's per-mesh local spheres; their box centre, then the sphere around them all.
+    // World spheres from core bounds or static PBR local boxes; then one sphere enclosing all of them.
     const box = this.rangeBox,
       center = this.rangeCenter;
     box.fill(Infinity, 0, 3).fill(-Infinity, 3);
@@ -938,20 +950,25 @@ export class Shadows implements EnginePlugin {
       s = store.bounds,
       w = this.sphere,
       o = id * 16,
-      b = id * 4;
-    for (let k = 0; k < 3; k++)
-      w[k] = m[o + k] * s[b] + m[o + 4 + k] * s[b + 1] + m[o + 8 + k] * s[b + 2] + m[o + 12 + k];
+      b = id * 4,
+      triangles = meshTriangles(this.engine!.meshes.get(id)),
+      bounds = triangles?.kind === 'pbr' ? triangles.source.bounds : undefined;
+    const x = bounds ? (bounds[0] + bounds[3]) / 2 : s[b],
+      y = bounds ? (bounds[1] + bounds[4]) / 2 : s[b + 1],
+      z = bounds ? (bounds[2] + bounds[5]) / 2 : s[b + 2],
+      radius = bounds ? Math.hypot(bounds[3] - x, bounds[4] - y, bounds[5] - z) : s[b + 3];
+    for (let k = 0; k < 3; k++) w[k] = m[o + k] * x + m[o + 4 + k] * y + m[o + 8 + k] * z + m[o + 12 + k];
     // The largest squared axis length; sums of squares are never NaN or -0, so compares match Math.max.
     const a = m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
       c = m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
       e = m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
       ac = a > c ? a : c;
-    w[3] = s[b + 3] * Math.sqrt(ac > e ? ac : e);
+    w[3] = radius * Math.sqrt(ac > e ? ac : e);
     return w;
   }
   // range()'s two passes over the engine's meshes, made once (Map.forEach callbacks).
   private readonly extendBox = (mesh: Mesh, id: number): void => {
-    if (!mesh.geometry) return;
+    if (!mesh.geometry && meshTriangles(mesh)?.kind !== 'pbr') return;
     const w = this.worldSphere(id),
       box = this.rangeBox;
     // Math.min and Math.max exactly, NaN and the sign of zero included.
@@ -965,7 +982,7 @@ export class Shadows implements EnginePlugin {
     }
   };
   private readonly extendRadius = (mesh: Mesh, id: number): void => {
-    if (!mesh.geometry) return;
+    if (!mesh.geometry && meshTriangles(mesh)?.kind !== 'pbr') return;
     const w = this.worldSphere(id),
       c = this.rangeCenter;
     const h = hypotTerms;

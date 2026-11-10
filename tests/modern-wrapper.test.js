@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Stage, sphere } from '../packages/stage/dist/index.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { addGLTF } from '@margoengine/stage/gltf';
+import { loadedPBREngine } from './support/loaded-pbr-fixtures.js';
 
 async function scene(capacity = 16) {
   const store = await TransformStore.create(capacity),
@@ -123,7 +124,8 @@ function triangleGLTF(positions) {
 
 test('model loading fits imports, rolls back failures and aborts on disposal', async () => {
   const originalFetch = globalThis.fetch,
-    { app, engine } = await scene();
+    engine = await loadedPBREngine(),
+    app = new Stage(engine);
   const offset = triangleGLTF([9, -1, 0, 11, -1, 0, 10, 1, 0]);
   globalThis.fetch = async () => new Response(offset);
   try {
@@ -140,7 +142,9 @@ test('model loading fits imports, rolls back failures and aborts on disposal', a
     model.visible = false;
     assert.equal(model.root.visible, false);
     assert.equal(model.bounds[0], 11);
-    assert.equal(model.raw, null);
+    assert.equal(model.raw.length, 1);
+    assert.ok(model.pbr.primitives.length === 1);
+    assert.equal(model.animation, null);
     model.visible = true;
     assert.throws(() => {
       model.visible = 'yes';

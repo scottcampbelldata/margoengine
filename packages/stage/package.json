@@ -28,7 +28,8 @@
     "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js ../../tests/deep-ingestion-camera-controls-initialization.test.js tests/*.test.js",
     "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node packages/stage/test/gpu/scene-check.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js"
+    "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js",
+    "test:gpu:gltf": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-gltf --wait-max=60 --max=5 --gpu=stage-gltf-shadow-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs"
   },
   "sideEffects": false,
   "exports": {

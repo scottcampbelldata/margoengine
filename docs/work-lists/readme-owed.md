@@ -1078,3 +1078,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 176 job 2): document /hdf5 lazy lifetime/hyperslabs, /cgns and /xdmf resource and solution selection, /exodus time/results/entity sets, /openfoam mesh/field/patch loading, /ensight parts/times, source formats and explicit limits; runnable examples deferred to the README phase.
 - margoengine (batch 176 job 2): document generated sciviz engineering entry forwarding; examples deferred.
+- @margoengine/stage (batch 183 job 1): document the PBR addGLTF path, optional pbr/animation handles, paused clips, deformation, WebGL2 compatibility device, cleanup and bind-pose fitting; replace the basic-loader description in the README phase.
+- @margoengine/shadows (batch 183 job 1): document automatic cascade distance for static PBR meshes and conservative bounds fallback for deformation, custom shading, displacement and instances.

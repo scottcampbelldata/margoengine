@@ -1,4 +1,6 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { PBRModel } from '@margoengine/gltf-pro';
+import type { Animation } from '@margoengine/animation';
 import type { Engine as RuntimeEngine, Mesh as RuntimeMesh, GeometryBuffers } from '@margoengine/core/extension';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { fault, typeError } from '../../shared/errors.js';
@@ -16,6 +18,10 @@ type RawBuffers = Omit<GeometryBuffers, 'instance'> &
 
 /** What `addGLTF(stage, url)` returns: the imported meshes under one root, moved, rotated and scaled as one. */
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {
+  /** Full glTF material, texture and variant model, supplied by the glTF feature entry. */
+  readonly pbr?: PBRModel;
+  /** Clip player and skin/morph deformer; null for a static glTF. */
+  readonly animation?: Animation | null;
   readonly root: Mesh;
   readonly meshes: readonly Mesh[];
   visible: boolean;
