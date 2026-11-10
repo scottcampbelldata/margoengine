@@ -3,6 +3,7 @@ import { Engine, box } from '@margoengine/core';
 import { Lines, Line, ArrowHelper, PlaneHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
 import { TexturedLine, LineTexture, loadLineTexture } from '@margoengine/lines/texture';
+import { DebugLines, ArcLine } from '@margoengine/lines/debug';
 import { Stroke } from '@margoengine/lines/stroke';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
@@ -572,9 +573,81 @@ async function textured() {
   return 'Textured strokes: world-length repeat, alpha colour/depth/picks, live UV, draw-on, mip restore and image loading';
 }
 
+async function debugLines() {
+  const { lines, engine, frame, done } = await rig();
+  try {
+    const debug = DebugLines.attach(engine);
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8 });
+    let image = await frame();
+    assert(isRed(image.at(100, 128)), 'Immediate line renders this frame');
+    image = await frame();
+    assert(!isRed(image.at(100, 128)), 'Next zero-delta frame clears the queue');
+    // Frame preparation for picking cannot consume pending immediate commands.
+    const picker = Picking.attach(engine, { capture: false });
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8 });
+    await picker.pick(100, 128);
+    image = await frame();
+    assert(isRed(image.at(100, 128)), 'Picking leaves pending debug work intact');
+    const mesh = engine.createMesh().setGeometry(box(2, 2, 2));
+    mesh.setPosition([0, 0, 2]);
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8 });
+    image = await frame();
+    assert(!isRed(image.at(128, 128)), 'Debug lines test scene depth');
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8, depthTest: false });
+    image = await frame();
+    assert(isRed(image.at(128, 128)), 'depthTest false draws over scene');
+    mesh.dispose();
+    debug.drawArc([-3, 0, 0], [3, 0, 0], { height: 2, segments: 64, width: 8, color: RED });
+    image = await frame();
+    const apex = pixel(0, 2, 0);
+    assert(isRed(image.at(Math.round(apex[0]), Math.round(apex[1]))), 'Immediate arc renders at its midpoint height');
+    const arc = lines.add(new ArcLine([-3, -2, 0], [3, -2, 0], { height: 1, segments: 64, width: 8, color: GREEN }));
+    image = await frame();
+    const top = pixel(0, -1, 0);
+    assert(isGreen(image.at(Math.round(top[0]), Math.round(top[1]))), 'Persistent arc renders');
+    image = await frame();
+    assert(isGreen(image.at(Math.round(top[0]), Math.round(top[1]))), 'Persistent arc survives the next frame');
+    const linePicking = LinePicking.attach(picker, lines);
+    assert((await picker.pick(...top))?.line === arc, 'Persistent arc picks');
+    linePicking.dispose();
+    // Consume once for the whole frame, retaining the batch in every view.
+    const camera = engine.camera;
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8 });
+    engine.render({
+      views: [
+        { camera, viewport: [0, 0, 128, 256], pixels: true },
+        { camera, viewport: [128, 0, 128, 256], pixels: true },
+      ],
+    });
+    assert(debug.stats.segments === 1, 'Every view retains the same immediate batch');
+    image = await frame();
+    assert(!isRed(image.at(100, 128)), 'A multi-view frame also clears on the next render');
+    await engine.rebootDevice?.();
+    debug.drawLine([-3, 0, 0], [3, 0, 0], { color: RED, width: 8 });
+    image = await frame();
+    assert(isRed(image.at(100, 128)), 'Debug queue renders after device restore');
+  } finally {
+    done();
+  }
+  return 'Immediate debug queue: zero-delta clear, depth, picks, arcs, multi-view and device restore; persistent arcs pick';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps, stroke, textured])
+  for (const check of [
+    depthWrite,
+    picking,
+    trail,
+    ribbon,
+    batch,
+    hidden,
+    coverage,
+    filled,
+    dashCaps,
+    stroke,
+    textured,
+    debugLines,
+  ])
     checks.push(await check());
   return checks;
 };

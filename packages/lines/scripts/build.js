@@ -28,6 +28,7 @@ await build({
         hidden: resolve(root, 'src/hidden.ts'),
         stroke: resolve(root, 'src/stroke.ts'),
         texture: resolve(root, 'src/texture.ts'),
+        debug: resolve(root, 'src/debug.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

@@ -617,3 +617,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/labels (batch 261 job 4): document RoutedCallouts, angled elbow/port reordering, side and overflow settings, pure routeCalloutLeaders preconditions, exact predicates, complexity and disposal.
 - margoengine (batch 261 job 4): document labels/callouts-route alias.
+
+- @margoengine/lines (batch 227 job 3): document /debug immediate lifetime, depth/width/colour grouping, limits, persistent ArcLine, planar tilt and spherical arc defaults and degeneracies; examples deferred.
+- margoengine (batch 227 job 3): document lines/debug forwarding; generator also restores the missing clustered/shapes forwarding file required by umbrella consistency tests.

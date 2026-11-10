@@ -6208,3 +6208,7 @@ The optional stage owns only physical parameter conversion; existing DOF owns al
 
 ### 5. Batch 261 routed callout evidence
 The optional labels/callouts-route owns CPU planar assignment and exact orientation fallback, with SVG output through the existing label layout context. An explicit stack handles balanced angular subproblems; horizontal terminals occupy the opposite half-plane from the matched source segments. Independent exact binary-rational tests cover crossings, contacts, overlaps and degeneracy; the browser gate checks actual reordered DOM ports. No core/stage or GPU shader change. Finite nonzero measured boxes and column preconditions are explicit; no length-optimal or obstacle-routing claim.
+
+### Immediate debug and arc evidence (batch 227 job 3)
+DebugLines batches queued commands by style and consumes them once in a frame pass after onPreUpdate marks a new frame. Picks prepare without consuming, and every destination/view shares active data. A following frame releases unused groups. Rendering remains in LineBatches; persistent ArcLine stays in Lines. CPU evidence covers deterministic draw counts, reuse and robust spherical frames; GPU evidence covers expiration, depth, views, arc picking and restoration at 1x/4x on both backends. No core/stage changes or speed claims.
+

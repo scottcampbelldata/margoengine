@@ -4477,6 +4477,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./lines/debug": {
+      "types": "./dist/lines/debug.d.ts",
+      "import": "./dist/lines/debug.js"
     }
   },
   "dependencies": {

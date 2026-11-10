@@ -3804,3 +3804,6 @@ The optional Blender nodes entry keeps common Mix, Color Ramp, Noise and Math gr
 
 ### Batch 261 crossing-free angled leaders
 Balanced planar matching assigns projected anchors to separated column ports, then extends them horizontally to reordered label boxes. Independent exact binary-rational intersection checks support the crossing-free claim for fractional and extreme-scale inputs; seeded integer checks also reject touches and overlapping segments. Coincident anchors share their origin only. The layout produces nonoverlapping boxes and zero SVG geometry writes on an unchanged frame. The geometric construction and limits are in docs/labels-callouts-route.md; no optimum-length or speed claim.
+
+### Immediate debug and endpoint arcs (batch 227 job 3)
+Immediate lines batch by style and expire on the next rendered frame while all views share the current frame; picking preparation preserves queued commands. Persistent arcs expose ordinary Line picking and materials. Planar and spherical arc sampling keeps exact endpoints and finite coincident/antipodal cases. Proof: packages/lines/tests/debug.test.js and debugLines in packages/lines/tests/features-browser.js, run on both backends at 1x/4x MSAA. Tests prove draw counts, not timing; speed measurements remain deferred.

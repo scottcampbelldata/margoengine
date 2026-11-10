@@ -3270,3 +3270,6 @@ Build packages, then node --test --test-timeout=120000 packages/blender/tests/no
 
 ### Batch 261 elbow routing
 After build, run node --test --test-timeout=120000 packages/labels/tests/callouts-route.test.js for pure planar matching, independent exact reference predicates, box placement, removal and unchanged-frame caching. Run node scripts/gpu-lock.mjs run --owner=labels-routes --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for actual SVG endpoint-to-label checks within 1 px on native WebGPU/WebGL2. Synthetic numeric fixtures are correctness controls, not an asset-backed demo.
+
+### Immediate debug and arc correctness (batch 227 job 3)
+After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Under a shared GPU lock run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13299347,
+  "total": 13309183,
   "history": [
     {
       "date": "2026-10-24",
@@ -6769,6 +6769,12 @@
       "commit": "batch-261-job4",
       "reason": "New optional routed callouts 0 B (absent) -> 2450 B gzip; planar assignment, exact predicate fallback, SVG layout and cleanup form one feature. Splitting the predicate or layout would complicate the synchronous routing API. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-227-job3",
+      "reason": "New optional debug/arc entry 9549 B gzip with 9836 B ceiling. Uses existing batched renderer and Line picking; root, stroke, texture, core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8002,6 +8008,7 @@
     "@margoengine/blender/nodes": 10406,
     "leak @margoengine/blender/nodes -> @margoengine/gltf-pro/model": 1,
     "@margoengine/labels/callouts-route": 2706,
-    "margoengine/labels/callouts-route": 2706
+    "margoengine/labels/callouts-route": 2706,
+    "@margoengine/lines/debug": 9836
   }
 }

@@ -62,6 +62,10 @@
     "./texture": {
       "types": "./dist/texture.d.ts",
       "import": "./dist/texture.js"
+    },
+    "./debug": {
+      "types": "./dist/debug.d.ts",
+      "import": "./dist/debug.js"
     }
   },
   "files": [
