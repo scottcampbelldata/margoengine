@@ -474,3 +474,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/blender (batch 207 job 2): document lightmap_size (0 off, 16..4096), UV1 generation/preservation, Cycles diffuse passes, HDR scale, scene restoration and lightmap decoder/loaders.
 - @margoengine/lightmap (batch 207 job 2): document imported readLightmap/applyLightmap, physical irradiance, UV1, plugin lifetime/device restore, replace-lighting semantics and material-extension ownership.
 - margoengine (batch 207 job 2): document blender/lightmap and lightmap/imported aliases.
+- @margoengine/geometry (batch 219 job 3): teapot size/resolution, part and proportion options, patch UVs/material groups, model attribution and geometric/numerical limits; examples deferred.
+- margoengine (batch 219 job 3): generated geometry/teapot optional alias; examples deferred.

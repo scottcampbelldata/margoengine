@@ -33,6 +33,11 @@ try {
   await run('clear');
   console.log('ok optional primitive uploads and Goldberg picture');
 
+  assert.deepEqual(await run('teapot'),{wrong:0,triangles:9120},'standard Utah Teapot uploads with outward analytic normals');
+  const teapotImage=await decodePNG(await page.locator('canvas').screenshot()),teapotMiddle=[...teapotImage.data.slice((200*400+200)*4,(200*400+200)*4+3)];
+  assert.ok(teapotMiddle[0]>60 && teapotMiddle[0]>teapotMiddle[2]*2,`Utah Teapot drawn: ${teapotMiddle}`);
+  await run('clear');console.log('ok standard Utah Teapot upload and picture');
+
   const sphere = await run('sphere');
   assert.ok(sphere.worstRadius < 1e-5, `sphere radius off by ${sphere.worstRadius}`);
   assert.ok(sphere.worstNormal < 2e-3, `sphere normals off by ${sphere.worstNormal}`);

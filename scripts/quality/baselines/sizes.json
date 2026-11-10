@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12989636,
+  "total": 12992231,
   "history": [
     {
       "date": "2026-10-24",
@@ -6480,6 +6480,12 @@
       "date": "2026-11-10",
       "commit": "batch-207-job2",
       "reason": "New blender/lightmap 0 to 4636 B (4892 ceiling), lightmap/imported 0 to 1279 B (1535 ceiling); explicit PBR/image/managed-texture dependencies avoid reimplementing renderer and PNG decode. Core plus stage unchanged 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-219-job3",
+      "reason": "New optional geometry/teapot: 0 -> 2339 B min+gzip, ceiling 2595 B. Historic model data and a shared derivative patch evaluator support independent parts/proportions; splitting parts would duplicate the same evaluator. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7678,6 +7684,7 @@
     "leak @margoengine/blender/lightmap -> @margoengine/decoders/image": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/materials": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/gltf-pro/model": 1,
-    "leak @margoengine/blender/lightmap -> @margoengine/materials": 1
+    "leak @margoengine/blender/lightmap -> @margoengine/materials": 1,
+    "@margoengine/geometry/teapot": 2595
   }
 }
