@@ -7618,6 +7618,18 @@
       "commit": "batch-174-job3",
       "reason": "New optional sciviz/parcoords: 0 to 8860 B min+gzip, ceiling 9126 B. GPU column instancing, linked matrix/brushes and integer pixel density share one snapshot; splitting would complicate row/scale identity. Figure root 56484 B stays within its existing ceiling; core/stage source unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "5aebffc58",
+      "reason": "Batch 181 job 2: new optional sciviz/monitor is 2458 B gzip (ceiling 2714); points/octree 9128 -> 9271 B (ceiling 9267 -> 9549). The 143 B buys live cloud allocation inventory through its owner, including lazy draw, release and replacement. Splitting this owner hook would require caller-supplied private allocation bookkeeping and lose correctness. Sciviz root 56255 -> 56387, points root 24451 -> 24676, lines root 19876 -> 20042 remain inside their ceilings. Core plus stage 24209 B unchanged.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-181-job2",
+      "grew": 1,
+      "reason": "Batch 181 job 2 after rebase: sciviz root 56553 -> 56668 B gzip, ceiling 56635 -> 58369. The 115 B supplies owner inventory access and waits for submitted work before PNG usage promotion expires a compatibility canvas target. Splitting these owner hooks and the existing export lifecycle would expose private bookkeeping and leave unsafe capture ordering. Monitor final 2534 B stays inside 2714; core plus stage remains 24209 B unchanged."
     }
   ],
   "items": {
@@ -8437,7 +8449,7 @@
     "@margoengine/scenery/scenes": 19404,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
-    "@margoengine/sciviz": 56635,
+    "@margoengine/sciviz": 58369,
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/calc": 6978,
@@ -9005,7 +9017,8 @@
     "@margoengine/sciviz/format": 7562,
     "@margoengine/sciviz/categorical": 22371,
     "@margoengine/sciviz/tetvolume": 6578,
-    "@margoengine/sciviz/parcoords": 9126
+    "@margoengine/sciviz/parcoords": 9126,
+    "@margoengine/sciviz/monitor": 2714
   },
-  "total": 14495121
+  "total": 14499569
 }

@@ -143,6 +143,15 @@ const linearHex = (hex: string): [number, number, number] => {
 
 /** An isosurface layer. Create it with `await figure.isosurface(data, level, options)`; change the level with `update`. */
 export class IsosurfaceLayer implements Drawable {
+  /** @internal Inventory after extraction; temporary compute work is not retained. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return {
+      cpu: [this.#cpu, this.#model, this.#values],
+      gpu: this.#disposed
+        ? []
+        : [this.#field.buffer, this.#tables.counts.buffer, this.#tables.edges.buffer, this.#vertices, this.#uniform],
+    };
+  }
   /** False hides the layer. */
   visible = true;
   /** Opaque, writes depth. */
@@ -306,7 +315,7 @@ export class IsosurfaceLayer implements Drawable {
       throw fault('state', 'Device replaced; request the isosurface again', 'sciviz');
     if (this.#renderer.cpuIsosurface) {
       const device = this.#renderer.device!;
-      const data = this.#cpu ?? await this.#field.read({ signal });
+      const data = this.#cpu ?? (await this.#field.read({ signal }));
       const result = await this.#renderer.cpuIsosurface(data, level, {
         dims: this.dims,
         maxTriangles: Math.floor(device.limits.maxStorageBufferBindingSize / 96),
@@ -315,16 +324,22 @@ export class IsosurfaceLayer implements Drawable {
       signal.throwIfAborted();
       let vertices: GPUBuffer | undefined;
       try {
-        vertices = result.triangles ? device.createBuffer({
-          size: result.vertices.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        }) : undefined;
+        vertices = result.triangles
+          ? device.createBuffer({
+              size: result.vertices.byteLength,
+              usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            })
+          : undefined;
         if (vertices) device.queue.writeBuffer(vertices, 0, result.vertices as Float32Array<ArrayBuffer>);
-        const group = vertices ? device.createBindGroup({
-          layout: this.#layout!, entries: [
-            { binding: 0, resource: { buffer: this.#uniform! } },
-            { binding: 1, resource: { buffer: vertices } },
-          ],
-        }) : undefined;
+        const group = vertices
+          ? device.createBindGroup({
+              layout: this.#layout!,
+              entries: [
+                { binding: 0, resource: { buffer: this.#uniform! } },
+                { binding: 1, resource: { buffer: vertices } },
+              ],
+            })
+          : undefined;
         signal.throwIfAborted();
         this.#vertices?.destroy();
         this.#vertices = vertices;
@@ -334,7 +349,9 @@ export class IsosurfaceLayer implements Drawable {
         this.#level = level;
         this.#committed = true;
         return result.triangles;
-      } finally { vertices?.destroy(); }
+      } finally {
+        vertices?.destroy();
+      }
     }
     const gpu = this.#gpu,
       [nx, ny, nz] = this.dims,

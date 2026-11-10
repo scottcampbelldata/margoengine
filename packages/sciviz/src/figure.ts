@@ -1431,6 +1431,12 @@ export class Figure extends EventTarget {
     layer: L,
   ): L {
     this.#styles.set(layer, style);
+    Object.defineProperty(layer, 'memoryResources', {
+      get: () => {
+        const resources = (layer.kind === 'scatter' ? layer.cloud : layer.line).memoryResources;
+        return { cpu: [...resources.cpu, layer.positions, layer.values, style.colors], gpu: resources.gpu };
+      },
+    });
     return this.#add(layer);
   }
 

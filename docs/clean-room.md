@@ -7769,3 +7769,39 @@ The implementation combines instanced vertex reads, independent column normalisa
 GPU proof: 2,000,000 physical rows repeat the real observations. One 24,000,000-byte column snapshot drives 4,000,003 line instances (all row segments plus axes), with no endpoint expansion or sampling. Every pixel of a 6,000,000-vote density raster equals the independently computed weighted base-observation reference. Native density uses GPU atomics; compatibility geometry uses the GPU, while its density kernel uses the existing CPU compute tier in 245 bounded chunks. Timing is deferred.
 
 The package-script fixture-root repair follows Node.js contributors, *Process: process.chdir* and *ECMAScript modules: URLs* (2026), https://nodejs.org/api/process.html#processchdirdirectory and https://nodejs.org/api/esm.html#urls . These published API descriptions distinguish the server working directory from module-URL resolution. The existing independent browser-root.test.js probe caught raw fallback/table/new parcoords script commands; each now uses the existing package-local wrapper, with no browser/shutdown helper edits.
+
+## Batch 181 job 2: allocation inventories and limit sweep protocol (2026-11-10)
+
+Research compared Tamara Munzner, "A Nested Model for Visualization Design and Validation",
+IEEE TVCG 15(6), 2009, https://www.cs.ubc.ca/labs/imager/tr/2009/NestedModel/ ;
+W3C GPU for the Web Working Group, "WebGPU", Candidate Recommendation Draft, 2026,
+https://www.w3.org/TR/webgpu/ ; Ulan Degenbaev (editor), "Measure Memory API", WICG draft,
+2021, https://wicg.github.io/performance-measure-memory/ ; and vis.gl contributors,
+"Performance Optimization", deck.gl public documentation, read 2026-11-10,
+https://deck.gl/docs/developer-guide/performance . No external implementation was read.
+Munzner motivates separate algorithm/resource validation from interaction claims. WebGPU
+supplies exact buffer sizes and texture descriptors. The WICG document describes agent-level
+memory with implementation-specific attribution, so it cannot provide exact per-layer heap
+bytes: Margo instead inventories numeric backing stores and separately labels array estimates.
+The deck.gl documentation distinguishes hardware-dependent scale from universal limits;
+Margo records tested sizes, failures and censored ceilings with environment provenance.
+The clean-room monitor combines these constraints with identity deduplication and explicit
+unknown inventories. It never wraps or patches the device allocator. Existing rendering,
+numerical algorithms and engine code are unchanged. Timed measurements are built but deferred;
+deterministic fake-clock tests prove crossing/continuation without speed assertions. Standard
+data sources are reused; the new NYC TLC numeric table and its public-use terms are recorded
+in examples/assets/sciviz/limits/source.json. No rival code, paper companion code or other
+repository implementation file was read or copied.
+
+The same gate exposed capture lifecycle ordering. WebGPU (GPU for the Web Working Group,
+2026, https://www.w3.org/TR/webgpu/#canvas-context) specifies that configure expires the
+current texture and image copies complete submitted writes. W3C CSS Working Group,
+"Compositing and Blending Level 1", 2024, https://www.w3.org/TR/compositing-1/ , and
+Thomas Porter/Tom Duff, "Compositing Digital Images", SIGGRAPH 1984,
+https://keithp.com/~keithp/porterduff/p253-porter.pdf , establish zero-alpha background
+invariance. No cloud opacity, compositing rule or tolerance was changed. Before adding
+COPY_SRC, PNG capture now drains submitted work before reconfiguring and expiring the
+target retained by compatibility replay. capture-order.test.js pins that ordering with
+a blocked queue; atmosphere-browser.mjs passes unchanged on both backends afterward.
+After rebasing, the monitor uses the shared ColumnarTable/CSV APIs through a type-only
+adapter, including BigInt64 and validity backing stores; no parallel table parser remains.

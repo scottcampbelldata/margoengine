@@ -209,6 +209,7 @@ class SciRenderer implements EnginePlugin {
 }
 
 class SliceLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly axis: 'x' | 'y' | 'z';
     position: number;
@@ -234,6 +235,7 @@ interface VolumeClassification {
 }
 
 class VolumeLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = true;
     readonly needsSceneDepth = true;

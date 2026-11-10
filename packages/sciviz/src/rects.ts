@@ -35,6 +35,13 @@ export const packColour = (r: number, g: number, b: number): number =>
 
 /** A layer of filled rectangles: a bar chart, histogram or heatmap. Create it with `figure.bar()`, `figure.histogram()` or `figure.heatmap()`. */
 export class RectsLayer implements Drawable {
+  /** @internal Inventory for the optional monitor entry. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return {
+      cpu: [this.rects, this.values, this.#colours, this.#uniform, this.#model],
+      gpu: this.#disposed ? [] : this.#buffers,
+    };
+  }
   /** False hides the layer. */
   visible = true;
   /** Rectangles are opaque. */

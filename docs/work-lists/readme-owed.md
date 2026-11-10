@@ -1130,3 +1130,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated /sciviz/tetvolume alias in the scientific-volume section.
 
 - @margoengine/sciviz (batch 174 job 3): parcoords/matrix creation, shared row keys/scales, reorder/flip/axis and cell brushes, exact pixel density and its CPU/compatibility route, limits, disposal and the 2d CustomLayer declaration.
+
+
+
+- @margoengine/sciviz (batch 181 job 2): document /monitor, installFigureStats/fig.stats, live allocation semantics, custom/table adapters, cancellation, versioned JSON sweeps and deferred timings; README examples deferred.
+- @margoengine/points (batch 181 job 2): explain the internal per-cloud inventory used by sciviz/monitor, lazy GPU allocation and release; README examples deferred.
+- @margoengine/lines (batch 181 job 2): explain the internal per-line inventory used by sciviz/monitor, retained capacity and release; README examples deferred.

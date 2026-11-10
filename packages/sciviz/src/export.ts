@@ -17,8 +17,12 @@ export async function captureGPU(
     format = configuration.format;
   // Capture commands are encoded during the canvas texture's lifetime. Copying to
   // an owned buffer before awaiting avoids stale and automatically expired images.
-  if (!((configuration.usage ?? 0x10) & 0x01))
+  if (!((configuration.usage ?? 0x10) & 0x01)) {
+    // Reconfiguration expires the old canvas texture. Finish already submitted
+    // compatibility replay before destroying the target those commands reference.
+    await device.queue.onSubmittedWorkDone();
     context.configure({ ...configuration, usage: (configuration.usage ?? 0x10) | 0x01 });
+  }
   const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
   const buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 });
   try {

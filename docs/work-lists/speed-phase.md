@@ -431,3 +431,5 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 
 
 - Batch 174 job 3: quiet-machine 2M parallel-row/matrix and density timing plus web-library comparison still owed. Deterministic proofs: 24MB column storage, 4,000,003 line instances, 24-byte three-axis order writes and 6M density votes. Compatibility atomic density currently uses 245 CPU chunks; investigate a GPU route during speed/fix work without changing count semantics.
+
+- Batch 181 job 2, sciviz/monitor: run quiet scale plans for points, voxels, cells, edges and TLC/GBIF table rows past median frame latency 16.7 ms and through first allocation/driver failure, plus full format/size loads. Preserve pixels, data, work and all failed/slow observations. Use sweepLimits timed mode after Scott ends deferral, with 3 warmups/9 samples and queue completion. Publish every sample/minimum/median, load time, environment, counts and memory in the versioned JSON for batch 182. Current evidence is allocation counts only; default finite ceilings are not hardware limits. No timing claim exists.

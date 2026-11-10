@@ -61,3 +61,5 @@ busy-time exception. The separate compatibility capture value failure remains
 an open correctness gate in known-bugs.md.
 
 | Batch 136 clean-room Draco encoder cold/warm Node/browser timing | batch-136 replacement commit | Windows dev PC, RTX A6000 | Not run: Scott's deferred speed phase; no time number or budget change | Not sampled because no timing run occurred | 2026-11-10 | Owed on a quiet machine before release; scenes/settings retained in speed-phase.md |
+
+- Batch 181 job 2: sciviz timed scale/failure and format/size sweeps are not run during the deferred build phase. No measured miss or timing regression is claimed. Quiet-machine 16.7 ms crossings and failure-scale observations remain owed in speed-phase.md; preserve the original default real-data fixtures and extend the scale plans. Allocation JSON records host, CPU utilization and source digest.

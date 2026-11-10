@@ -34,6 +34,10 @@ export function gradientColors(positions: ArrayLike<number>, colors: readonly Co
 // Not exported from this entry, but used by the exports above:
 
 class Line {
+    get memoryResources(): {
+        cpu: readonly (ArrayLike<number> | null)[];
+        gpu: readonly GPUBuffer[];
+    };
     protected extension?: LineExtension;
     readonly material: LineMaterial;
     mode: LineMode;
@@ -148,5 +152,9 @@ interface LineOptions extends LineMaterialOptions {
 
 interface LineOwner {
     remove(line: Line): void;
+    memoryFor?(line: Line): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
 }
 ```

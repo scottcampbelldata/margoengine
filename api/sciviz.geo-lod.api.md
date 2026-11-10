@@ -401,6 +401,7 @@ interface HistogramLayerOptions extends BinOptions {
 }
 
 class IsosurfaceLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = false;
     readonly dims: readonly [number, number, number];
@@ -516,6 +517,7 @@ interface QuiverLayerOptions extends FieldStyleOptions {
 }
 
 class RectsLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = false;
     readonly kind: 'bar' | 'histogram' | 'heatmap';
@@ -636,6 +638,7 @@ type SelectRegion = {
 };
 
 class SliceLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly axis: 'x' | 'y' | 'z';
     position: number;
@@ -663,6 +666,7 @@ interface StreamlinesLayerOptions extends FieldStyleOptions, StreamlineOptions {
 }
 
 class SurfaceLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly nx: number;
     readonly ny: number;
@@ -755,6 +759,7 @@ interface VolumeClassification {
 }
 
 class VolumeLayer implements Drawable {
+    get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = true;
     readonly needsSceneDepth = true;

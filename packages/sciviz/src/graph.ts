@@ -512,6 +512,21 @@ struct NodeOut { @builtin(position) clip: vec4f, @location(0) corner: vec2f, @lo
  * Create it with {@link graphLayer}; `setPositions(layout.positions)` after each layout step moves it.
  */
 export class GraphLayer implements Drawable {
+  /** @internal Inventory for the optional monitor entry. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return {
+      cpu: [this.#positions, this.#edges, this.#nodeValues, this.#model, this.#values],
+      gpu: this.#disposed
+        ? []
+        : [
+            this.#nodeBuffer,
+            this.#edgeBuffer,
+            this.#valueBuffer,
+            this.#uniform,
+            { texture: this.#texture, bytesPerTexel: 4 },
+          ],
+    };
+  }
   visible = true;
   /** Nodes draw opaque after the blended edges are sorted in; the layer counts as blended. */
   readonly transparent = true;

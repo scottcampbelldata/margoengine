@@ -299,6 +299,27 @@ export function transferTable(map: Colormap, opacity: VolumeLayerOptions['opacit
 
 /** A volume layer. Create it with `figure.volume(data, options)`. */
 export class VolumeLayer implements Drawable {
+  /** @internal Inventory for the optional monitor entry. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return {
+      children: this.#disposed ? [] : [...this.#slices],
+      cpu: [
+        isGpuArray(this.#data) ? undefined : this.#data,
+        this.#values,
+        this.#table,
+        this.#classification?.rgba,
+        this.#model,
+        this.#figure,
+      ],
+      gpu: this.#disposed
+        ? []
+        : [
+            this.#uniform,
+            ...(this.#texture ? [{ texture: this.#texture, bytesPerTexel: 2 }] : []),
+            ...(this.#transfer ? [{ texture: this.#transfer, bytesPerTexel: 4 }] : []),
+          ],
+    };
+  }
   /** False hides the layer. */
   visible = true;
   /** Blended over opaque layers. */
@@ -720,6 +741,10 @@ export class VolumeLayer implements Drawable {
 
 /** A plane through a volume. Create it with `volume.slice(axis, position)`. */
 export class SliceLayer implements Drawable {
+  /** @internal Shared volume textures are attributed to the volume, never duplicated on each slice. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return { cpu: [this.#values, this.#model], gpu: this.#disposed ? [] : [this.#uniform] };
+  }
   /** False hides the slice. */
   visible = true;
   /** The axis the plane is perpendicular to. */

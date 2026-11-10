@@ -3739,3 +3739,16 @@ Run python scripts/prepare-sciviz-tetvolume.py to rebuild the attributed NASA su
 ## Batch 174 job 3: multivariate plots
 
 After building packages, run node --test --test-timeout=60000 packages/sciviz/tests/parcoords.test.js. Run the shared GPU proof with node scripts/gpu-lock.mjs run --owner=parcoords-proof --max=3 --wait-max=60 -- node packages/sciviz/tests/parcoords-browser.mjs. It tests native and compatibility devices, counts actual submitted line instances, compares every density pixel against the repeated-observation reference, checks linked selection/undo, reorder/flip writes and resource restoration. Open /examples/sciviz-parcoords.html through the normal Vite server for the real-observation demo. Snapshot source, query reduction, licence and hashes remain in examples/assets/sciviz/stats/source.json. No timing-only check runs.
+
+## Batch 181 job 2: allocation reporting
+
+Build packages, then run packages/sciviz/tests/monitor.test.js with Node's test runner
+and --test-timeout=120000. Under the shared GPU lock, run monitor-browser.mjs, then
+packages/sciviz/tests/limits-browser.mjs once normally and once with --backend=webgl2 and a
+separate --output path. Each render command has a three-minute active hard limit and
+--wait-max=60; an outer process-tree limit covers teardown. The suite JSON is documented
+in ../sciviz-monitor.md. It includes source commit and source digest, raw per-layer counts
+and bytes, browser, GPU and CPU utilization. Original asset hashes/provenance stay beside
+the assets; NYC TLC source.json includes its exact query and terms. Default scene ceilings
+are censored correctness observations. Timed mode is refused until speed-phase.json ends
+deferral; the exact outstanding scale and format matrix is in work-lists/speed-phase.md.

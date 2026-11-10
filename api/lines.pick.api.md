@@ -60,6 +60,10 @@ interface FogLike {
 }
 
 class Line {
+    get memoryResources(): {
+        cpu: readonly (ArrayLike<number> | null)[];
+        gpu: readonly GPUBuffer[];
+    };
     protected extension?: LineExtension;
     readonly material: LineMaterial;
     mode: LineMode;
@@ -174,9 +178,17 @@ interface LineOptions extends LineMaterialOptions {
 
 interface LineOwner {
     remove(line: Line): void;
+    memoryFor?(line: Line): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
 }
 
 class Lines implements EnginePlugin {
+    memoryFor(line: Line): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
     readonly name: string;
     readonly order: number;
     readonly stats: {

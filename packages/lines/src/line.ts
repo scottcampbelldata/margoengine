@@ -193,12 +193,21 @@ export interface LineOptions extends LineMaterialOptions {
 
 interface LineOwner {
   remove(line: Line): void;
+  memoryFor?(line: Line): { cpu: readonly ArrayLike<number>[]; gpu: readonly GPUBuffer[] };
 }
 
 /**
  * A fat line: segments or a polyline drawn as screen-space quads with joins, caps, dashes and antialiasing.
  */
 export class Line {
+  /** @internal Allocation inventory consumed by optional diagnostic entries. */
+  get memoryResources(): { cpu: readonly (ArrayLike<number> | null)[]; gpu: readonly GPUBuffer[] } {
+    const live = this.owner?.memoryFor?.(this);
+    return {
+      cpu: [this.points, this.colors, this.fill, this.matrix, this.distancesFor, ...(live?.cpu ?? [])],
+      gpu: live?.gpu ?? [],
+    };
+  }
   /** Optional entry's shader and resources, consumed by Lines and LinePicking. */
   protected extension?: LineExtension;
   readonly material: LineMaterial;

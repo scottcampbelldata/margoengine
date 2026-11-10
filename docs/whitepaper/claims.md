@@ -4324,3 +4324,16 @@ sciviz/tetvolume directly integrates point- or cell-associated scalar tetrahedra
 ## Batch 174 job 3: linked multivariate GPU plots
 
 Claim: optional sciviz/parcoords renders all 2M row segments through GPU instancing, axis reorder/flip reuse the column snapshot, a one-canvas scatter matrix shares column scales/row selection, and integer pixel density matches its reference exactly. Proof: packages/sciviz/tests/parcoords.test.js and parcoords-browser.mjs; real NASA snapshot in examples/assets/sciviz/stats/. Browser evidence on native and compatibility devices: 4,000,003 line instances, 24,000,000 column bytes, 6,000,000 exact votes, 24-byte reorder/flip writes and nine matrix cells. The stress rows repeat the observed snapshot. Compatibility density uses its CPU compute tier; no GPU-density or timing claim is made for that route. Research and raster/precision limits are in clean-room.md and limits.md.
+
+
+## Batch 181 job 2: inspectable allocation and sweep records
+
+Claim: sciviz/monitor reports retained numeric backing-store bytes and live GPU payload
+bytes per standard figure layer, with deduplicated totals and explicit custom-layer gaps.
+Proof: packages/sciviz/tests/monitor.test.js and monitor-browser.mjs cover shared data,
+texture mips, slices, live point/line resources, disposal and real device replacement on
+WebGPU and full WebGL2. The default real-data suite tests five scene dimensions and eight
+format loads; observations, environment and source digest are in
+sciviz-limits-allocations.json. Semantic limits and reproduction: ../sciviz-monitor.md.
+This is allocation evidence, not physical VRAM, total JS heap, a frame-rate limit, a
+maximum dataset-size claim or a speed win over any rival. Quiet timing evidence is owed.

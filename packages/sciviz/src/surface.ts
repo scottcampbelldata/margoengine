@@ -116,6 +116,19 @@ fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
 
 /** A surface plot layer. Create it with `figure.surface(z, options)`. */
 export class SurfaceLayer implements Drawable {
+  /** @internal Inventory for the optional monitor entry. Borrowed GPU input is included by identity. */
+  get memoryResources(): import('./resources.js').LayerResources {
+    return {
+      cpu: [isGpuArray(this.#data) ? undefined : this.#data, this.#cpu, this.#values, this.#model],
+      gpu: this.#disposed
+        ? []
+        : [
+            this.#heights?.buffer,
+            this.#uniform,
+            ...(this.#texture ? [{ texture: this.#texture, bytesPerTexel: 4 }] : []),
+          ],
+    };
+  }
   /** False hides the layer. */
   visible = true;
   /** Grid size. */

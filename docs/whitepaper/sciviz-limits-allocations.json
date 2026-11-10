@@ -1,0 +1,1853 @@
+{
+  "schema": "margo-sciviz-limit-evidence/1",
+  "observations": [
+    {
+      "schema": "margo-sciviz-limit-suite/1",
+      "metadata": {
+        "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+        "machine": "SCOTT-DEV",
+        "cpuLoad": 1,
+        "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "diagnostic": true,
+        "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+        "workingTree": true,
+        "gpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "driver": "not exposed by browser"
+        }
+      },
+      "backend": "webgpu",
+      "status": "allocation-proof",
+      "timingOwed": true,
+      "scenes": [
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "points",
+          "format": "2MASS columnar f32 (tiled above 1M)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 4320,
+                "jsDataBytes": 5728,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 4320,
+                    "jsDataBytes": 5728,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 65760,
+                "jsDataBytes": 82528,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 65760,
+                    "jsDataBytes": 82528,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 65536,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 1048800,
+                "jsDataBytes": 1311424,
+                "jsArrayBytesEstimate": 64,
+                "counts": {
+                  "points": 65536
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 1048800,
+                    "jsDataBytes": 1311424,
+                    "jsArrayBytesEstimate": 64,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 65536
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "voxels",
+          "format": "NRRD head (nearest resampled)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 512,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 2368,
+                "jsDataBytes": 3520,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 512,
+                  "cells": 343
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 2368,
+                    "jsDataBytes": 3520,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 512,
+                      "cells": 343
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 9536,
+                "jsDataBytes": 17856,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 4096,
+                  "cells": 3375
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 9536,
+                    "jsDataBytes": 17856,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 4096,
+                      "cells": 3375
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 13824,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 28992,
+                "jsDataBytes": 56768,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 13824,
+                  "cells": 12167
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 28992,
+                    "jsDataBytes": 56768,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 13824,
+                      "cells": 12167
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "cells",
+          "format": "NOAA wind (tiled heatmap)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 5200,
+                "jsDataBytes": 6288,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 5200,
+                    "jsDataBytes": 6288,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 1024,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 20560,
+                "jsDataBytes": 24720,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 1024
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 20560,
+                    "jsDataBytes": 24720,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 1024
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 82000,
+                "jsDataBytes": 98448,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 82000,
+                    "jsDataBytes": 98448,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "edges",
+          "format": "2MASS positions, consecutive source-index edges",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 7312,
+                "jsDataBytes": 6336,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 257,
+                  "edges": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 7312,
+                    "jsDataBytes": 6336,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 257,
+                      "edges": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 99472,
+                "jsDataBytes": 98496,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 4097,
+                  "edges": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 99472,
+                    "jsDataBytes": 98496,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 4097,
+                      "edges": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 32768,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 787600,
+                "jsDataBytes": 786624,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 32769,
+                  "edges": 32768
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 787600,
+                    "jsDataBytes": 786624,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 32769,
+                      "edges": 32768
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "rows",
+          "format": "NYC TLC CSV columns (tiled above 1024)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 5344,
+                "jsDataBytes": 13920,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 256,
+                  "rows": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 5344,
+                    "jsDataBytes": 10848,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 256
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 4096,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 1024,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 20704,
+                "jsDataBytes": 53856,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 1024,
+                  "rows": 1024
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 20704,
+                    "jsDataBytes": 41568,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 1024
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 16384,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 1024
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 82144,
+                "jsDataBytes": 213600,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 4096,
+                  "rows": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 82144,
+                    "jsDataBytes": 164448,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 4096
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 65536,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        }
+      ],
+      "formats": [
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NRRD: head.nrrd",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1210539,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 2883584,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NetCDF: wind-classic.nc",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1380,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NetCDF: wind-offset.nc",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1396,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vti",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1321,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vts",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1919,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 6400,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vtu",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 3927,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 15360,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "legacy VTK: wind.vtk",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 12040,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 4800,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "CSV: limits/taxi.csv",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 1,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 58035,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 32768,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "margo-sciviz-limit-suite/1",
+      "metadata": {
+        "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+        "machine": "SCOTT-DEV",
+        "cpuLoad": 0.992103185048697,
+        "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "diagnostic": true,
+        "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+        "workingTree": true,
+        "gpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "driver": "not exposed by browser"
+        }
+      },
+      "backend": "webgl2",
+      "status": "allocation-proof",
+      "timingOwed": true,
+      "scenes": [
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "points",
+          "format": "2MASS columnar f32 (tiled above 1M)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 4320,
+                "jsDataBytes": 5728,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 4320,
+                    "jsDataBytes": 5728,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 65760,
+                "jsDataBytes": 82528,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 65760,
+                    "jsDataBytes": 82528,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 65536,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 1048800,
+                "jsDataBytes": 1311424,
+                "jsArrayBytesEstimate": 64,
+                "counts": {
+                  "points": 65536
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 1048800,
+                    "jsDataBytes": 1311424,
+                    "jsArrayBytesEstimate": 64,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 65536
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "voxels",
+          "format": "NRRD head (nearest resampled)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 512,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 2368,
+                "jsDataBytes": 3520,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 512,
+                  "cells": 343
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 2368,
+                    "jsDataBytes": 3520,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 512,
+                      "cells": 343
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 9536,
+                "jsDataBytes": 17856,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 4096,
+                  "cells": 3375
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 9536,
+                    "jsDataBytes": 17856,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 4096,
+                      "cells": 3375
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 13824,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 28992,
+                "jsDataBytes": 56768,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "voxels": 13824,
+                  "cells": 12167
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 28992,
+                    "jsDataBytes": 56768,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "y",
+                    "counts": {
+                      "voxels": 13824,
+                      "cells": 12167
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "cells",
+          "format": "NOAA wind (tiled heatmap)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 5200,
+                "jsDataBytes": 6288,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 5200,
+                    "jsDataBytes": 6288,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 1024,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 20560,
+                "jsDataBytes": 24720,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 1024
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 20560,
+                    "jsDataBytes": 24720,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 1024
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 82000,
+                "jsDataBytes": 98448,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "cells": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 82000,
+                    "jsDataBytes": 98448,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "heatmap",
+                    "counts": {
+                      "cells": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "edges",
+          "format": "2MASS positions, consecutive source-index edges",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 7312,
+                "jsDataBytes": 6336,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 257,
+                  "edges": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 7312,
+                    "jsDataBytes": 6336,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 257,
+                      "edges": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 99472,
+                "jsDataBytes": 98496,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 4097,
+                  "edges": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 99472,
+                    "jsDataBytes": 98496,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 4097,
+                      "edges": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 32768,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 787600,
+                "jsDataBytes": 786624,
+                "jsArrayBytesEstimate": 0,
+                "counts": {
+                  "points": 32769,
+                  "edges": 32768
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 787600,
+                    "jsDataBytes": 786624,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 1,
+                    "name": "u",
+                    "counts": {
+                      "points": 32769,
+                      "edges": 32768
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "rows",
+          "format": "NYC TLC CSV columns (tiled above 1024)",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 256,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 5344,
+                "jsDataBytes": 13920,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 256,
+                  "rows": 256
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 5344,
+                    "jsDataBytes": 10848,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 256
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 4096,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 256
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 1024,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 20704,
+                "jsDataBytes": 53856,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 1024,
+                  "rows": 1024
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 20704,
+                    "jsDataBytes": 41568,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 1024
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 16384,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 1024
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            },
+            {
+              "size": 4096,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 82144,
+                "jsDataBytes": 213600,
+                "jsArrayBytesEstimate": 16,
+                "counts": {
+                  "points": 4096,
+                  "rows": 4096
+                },
+                "layers": [
+                  {
+                    "gpuBytes": 82144,
+                    "jsDataBytes": 164448,
+                    "jsArrayBytesEstimate": 16,
+                    "id": 1,
+                    "name": "scatter",
+                    "counts": {
+                      "points": 4096
+                    },
+                    "inventoryAvailable": true
+                  },
+                  {
+                    "gpuBytes": 0,
+                    "jsDataBytes": 65536,
+                    "jsArrayBytesEstimate": 0,
+                    "id": 2,
+                    "name": "NYC TLC table",
+                    "counts": {
+                      "rows": 4096
+                    },
+                    "inventoryAvailable": true
+                  }
+                ],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        }
+      ],
+      "formats": [
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NRRD: head.nrrd",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1210539,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 2883584,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NetCDF: wind-classic.nc",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1380,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "NetCDF: wind-offset.nc",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1396,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vti",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1321,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 1600,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vts",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 1919,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 6400,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "VTK XML: wind.vtu",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 3927,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 15360,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "legacy VTK: wind.vtk",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 12040,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 4800,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        },
+        {
+          "schema": "margo-sciviz-limits/1",
+          "mode": "allocation",
+          "kind": "load",
+          "format": "CSV: limits/taxi.csv",
+          "metadata": {
+            "commit": "0d9d1e10179a4527ac09b0bbb97273decd0752a4",
+            "machine": "SCOTT-DEV",
+            "cpuLoad": 0.992103185048697,
+            "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "diagnostic": true,
+            "sourceDigest": "be233b4787bd2fa0216aed450404279a022a1e1a7c5b3bee10316da000cf0fe4",
+            "workingTree": true,
+            "gpu": {
+              "vendor": "nvidia",
+              "architecture": "ampere",
+              "device": "",
+              "description": "",
+              "driver": "not exposed by browser"
+            }
+          },
+          "frameBudgetMs": 16.7,
+          "firstOverBudget": null,
+          "firstFailure": null,
+          "stop": "size-ceiling",
+          "rows": [
+            {
+              "size": 58035,
+              "status": "passed",
+              "memory": {
+                "gpuBytes": 0,
+                "jsDataBytes": 32768,
+                "jsArrayBytesEstimate": 0,
+                "counts": {},
+                "layers": [],
+                "unreportedLayers": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -389,3 +389,9 @@ Only standard model/sample assets are included under packages/sciviz/tests/fixtu
 
 
 Batch 175 job 2: `examples/assets/sciviz/pointcloud/` contains nine unchanged standard LAZ data tiles from USGS 3DEP Iowa statewide EPT, https://s3-us-west-2.amazonaws.com/usgs-lidar-public/IA_FullState/ . US Government Public Domain, as recorded at https://registry.opendata.aws/usgs-lidar/ . `manifest.json` retains source metadata, selected root/first-level hierarchy counts, exact compressed SHA-256 and independent complete decoded-record SHA-256 (laspy 2.7.0, lazrs 0.8.2). Downloaded 2026-11-10; 2,990,646 bytes total compressed data, 188,887 points. Standard scientific data exception only; no external implementation source read or copied; excluded from package tarballs.
+
+Batch 181 monitor fixtures: examples/assets/sciviz/limits/taxi.csv contains 1024 numerical
+2015 NYC TLC yellow-taxi rows obtained from NYC Open Data on 2026-11-10 under its public
+Terms of Use (https://data.cityofnewyork.us/stories/s/Terms-of-Use/k9k7-3cje), not asserted
+CC0. Exact source query, SHA-256 and selection are in limits/source.json. Standard-data
+exception only; no external software implementation or other repository file is included.

@@ -113,6 +113,10 @@ interface PointBlocks {
 type PointChannel = 'positions' | 'colors' | 'sizes';
 
 class PointCloud {
+    get memoryResources(): {
+        cpu: readonly (ArrayLike<number> | null)[];
+        gpu: readonly GPUBuffer[];
+    };
     name: string;
     visible: boolean;
     readonly matrix: Float32Array;
@@ -177,6 +181,10 @@ interface PointCloudOptions extends PointCloudData {
 
 interface PointOwner {
     remove(item: unknown): void;
+    memoryFor?(cloud: PointCloud): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
 }
 
 type PointShading = 'flat' | 'sphere';

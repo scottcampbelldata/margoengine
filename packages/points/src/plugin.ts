@@ -165,6 +165,16 @@ const isGpuTexture = (value: PointsTextureSource): value is GPUTexture =>
  * On the WebGL2 backend it warns once and draws nothing.
  */
 export class PointsPlugin implements EnginePlugin {
+  /** @internal Live per-cloud inventory, empty before first draw and after release. */
+  memoryFor(cloud: PointCloud): { cpu: readonly ArrayLike<number>[]; gpu: readonly GPUBuffer[] } {
+    const r = this.cloudGpu.get(cloud);
+    return r
+      ? {
+          cpu: [r.floats, r.uints, r.written, r.model, r.drawn],
+          gpu: [r.uniform, r.positions, r.colors, r.sizes, r.order].filter((b): b is GPUBuffer => b !== null),
+        }
+      : { cpu: [], gpu: [] };
+  }
   readonly name: string;
   readonly order: number;
   pointBudget: number;

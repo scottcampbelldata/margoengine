@@ -62,6 +62,8 @@ export type PointChannel = 'positions' | 'colors' | 'sizes';
 /** Owner interface the plugin implements, so `dispose()` can detach the cloud. */
 export interface PointOwner {
   remove(item: unknown): void;
+  /** @internal Retained per-cloud allocation inventory, without shared renderer state. */
+  memoryFor?(cloud: PointCloud): { cpu: readonly ArrayLike<number>[]; gpu: readonly GPUBuffer[] };
 }
 
 /**
@@ -69,6 +71,27 @@ export interface PointOwner {
  * Add it to a `PointsPlugin` to draw it.
  */
 export class PointCloud {
+  /** @internal Allocation inventory consumed by optional diagnostic entries. */
+  get memoryResources(): { cpu: readonly (ArrayLike<number> | null)[]; gpu: readonly GPUBuffer[] } {
+    const live = this.owner?.memoryFor?.(this);
+    return {
+      cpu: [
+        this.positions,
+        this.colors,
+        this.sizes,
+        this.normals,
+        this.matrix,
+        this.sourceIndex,
+        this.blocks.order,
+        this.blocks.starts,
+        this.blocks.counts,
+        this.blocks.bounds,
+        this.blocks.blockOf,
+        ...(live?.cpu ?? []),
+      ],
+      gpu: live?.gpu ?? [],
+    };
+  }
   name: string;
   /** Hidden clouds are skipped entirely. */
   visible = true;

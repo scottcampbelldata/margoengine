@@ -83,6 +83,16 @@ export interface LinesOptions {
  * WebGPU only; on the WebGL2 backend it warns once and draws nothing.
  */
 export class Lines implements EnginePlugin {
+  /** @internal Live per-line inventory; shared frame and pipeline resources are excluded. */
+  memoryFor(line: Line): { cpu: readonly ArrayLike<number>[]; gpu: readonly GPUBuffer[] } {
+    const r = this.resources.get(line);
+    return r
+      ? {
+          cpu: [r.floats, r.uints, r.written],
+          gpu: [r.uniform, r.points, r.colors, ...(r.fill ? [r.fill.buffer] : [])],
+        }
+      : { cpu: [], gpu: [] };
+  }
   readonly name: string;
   readonly order: number;
   /** Lines and draw calls of the latest frame. */

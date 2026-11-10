@@ -6681,3 +6681,22 @@ Batch 173 job 6 rebase integration: new tetrahedral and upstream engineering/poi
 Optional sciviz/parcoords draws rows directly from column storage: vertex instance arithmetic chooses row, adjacent axes or matrix cell. Reorder and flip write only the axis-order buffer (24 bytes for the three-axis demo). A CustomLayer may now explicitly declare dimensions='2d'; its existing default remains 3d. This owning-package hook lets optional flat charts join Figure bounds, export and disposal without core/stage changes. Browser creation of both new 2D layers is the regression for that hook.
 
 Pixel density quantises axis endpoints to integer raster rows, then casts exactly one vote per valid selected row at each horizontal pixel using integer interpolation. Dimensions are bounded so products cannot overflow u32. Native GPU atomics and the CPU reference give identical counts; the WebGL2 compatibility planner uses its existing bounded CPU tier for these atomics. The 2M-row proof checks all 24 density pixels against a repeated-observation reference (6M votes), all 4,000,003 line instances, 24MB of column storage, nine matrix cells, shared brushes/undo, small buffer writes, changed pixels and restoration. CPU regressions cover null segments, constant/log/extreme axes, fixed-domain exclusion and exact crossings. No timing assertions. Remaining presentation/history polish is tracked in the private finish-later list and known-bugs.md.
+
+
+### 5. Batch 181 job 2 allocation evidence
+
+The optional sciviz/monitor inventories live standard layers, parent-owned volume slices,
+and per-cloud/per-line owner resources on both full backends. Identity-deduplicated backing
+stores and GPU payload descriptors replace guessed driver/GC memory. Custom inventories
+are explicit adapters; absent inventories are flagged. Native and full-WebGL2 tests prove
+surface/volume/slice byte counts, GPU allocation after rendering, removal and real device
+replacement. Sweep tests use deterministic counts and a fake clock to prove budget crossing,
+failure continuation, cancellation and deadlines. Real-data JSON and semantics are linked
+from docs/sciviz-monitor.md. Timed throughput, physical device memory and full JS heap
+attribution remain unclaimed; the speed phase owns timing evidence. No core/stage changes.
+
+Batch 181 capture regression: PNG usage promotion waits for submitted work before
+reconfiguring the canvas and expiring the old target. The fresh render and copy still
+occur together before mapping the owned readback buffer. capture-order.test.js proves
+the queue/reconfigure/render/copy/map order; the original atmosphere invariance and
+restore assertions pass on both backends. No rendering or alpha work was weakened.

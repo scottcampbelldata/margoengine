@@ -1,0 +1,12 @@
+{
+  "title": "NYC TLC 2015 yellow taxi trips, first 1024 geographically valid rows in pickup order",
+  "publisher": "New York City Taxi and Limousine Commission, NYC Open Data",
+  "downloaded": "2026-11-10",
+  "source": "https://data.cityofnewyork.us/resource/2yzn-sicd.csv?$limit=1024&$select=pickup_longitude,pickup_latitude,trip_distance,total_amount&$where=pickup_latitude%20%3E%2040%20AND%20pickup_latitude%20%3C%2042%20AND%20pickup_longitude%20%3E%20-75%20AND%20pickup_longitude%20%3C%20-72&$order=pickup_datetime,pickup_longitude,pickup_latitude",
+  "license": "Public NYC Open Data, subject to NYC Open Data and NYC.gov Terms of Use; no CC0 claim",
+  "terms": "https://data.cityofnewyork.us/stories/s/Terms-of-Use/k9k7-3cje",
+  "sha256": "5c1f3e8fe444aa5e8388cc1078e888ec27126242b6783e4aeed480aa7e6a849c",
+  "file": "taxi.csv",
+  "rows": 1024,
+  "transforms": "Four numeric columns selected by the source API. Original returned CSV bytes retained. Sweeps beyond 1024 rows tile these same rows and say so; no claim of independent additional trips."
+}

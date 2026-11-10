@@ -139,6 +139,10 @@ export class LightsHelper extends Line {
 }
 
 export class Line {
+    get memoryResources(): {
+        cpu: readonly (ArrayLike<number> | null)[];
+        gpu: readonly GPUBuffer[];
+    };
     protected extension?: LineExtension;
     readonly material: LineMaterial;
     mode: LineMode;
@@ -241,6 +245,10 @@ export interface LineOptions extends LineMaterialOptions {
 }
 
 export class Lines implements EnginePlugin {
+    memoryFor(line: Line): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
     readonly name: string;
     readonly order: number;
     readonly stats: {
@@ -399,6 +407,10 @@ interface LineExtension {
 
 interface LineOwner {
     remove(line: Line): void;
+    memoryFor?(line: Line): {
+        cpu: readonly ArrayLike<number>[];
+        gpu: readonly GPUBuffer[];
+    };
 }
 
 class OneLightHelper<T extends LightShape> extends LightsHelper {

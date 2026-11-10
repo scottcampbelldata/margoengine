@@ -5975,3 +5975,50 @@ sciviz/parcoords is optional: 0 to 8,860 B min+gzip, ceiling 9,126 B. The sciviz
 Reorder and flip reuse column buffers; each writes 8 bytes per axis. Shared selection uses one f32 row mask. Inclusive axis brushes intersect, and matrix brushes operate in physical coordinates. Diagonal histograms show selected rows. Header/control panels support drag reorder, keyboard Left/Flip buttons and numeric range brushes; canvas gestures brush axes/cells. Density shades log(1+count), with exact Uint32 counts returned separately. Width defaults to 256, height to 128; width >= axis count, height >= 2, dimensions <= 8192 and <= 16,777,216 pixels. One vote per valid segment/row at each pixel column, with endpoint quantisation and integer interpolation, is the raster definition; it is not alpha density or the hardware line antialiasing rule. CPU/GPU parity is exact. Native WebGPU density uses atomics; WebGL2 compatibility density uses the CPU compute tier (245 bounded chunks at 2M rows), while line/matrix rendering uses the GPU. Native legacy WebGL2 Figure fallback is not this entry's GPU device: use WebGPU or webgl2-compat.
 
 The proof repeats 80 real NASA observations to 2,000,000 physical rows, not 2M unique planets: 24MB of normalised columns, 4,000,003 line instances, 6,000,000 exact density votes and nine matrix cells. Timing comparisons remain owed in the speed phase. Brush-handle/history and in-plot label layout polish are tracked for the fix phase.
+
+
+
+## Batch 181 job 2: figure allocation observations
+
+Optional sciviz/monitor installs fig.stats. Live standard-layer inventories count GPU buffer
+descriptor bytes and uncompressed texture payload, JS numeric backing stores, and separately
+labelled eight-byte numeric-array estimates. They exclude shared engine targets, driver
+padding, pipelines, GC object/DOM overhead, and transient extraction scratch. Per-layer
+values can overlap; figure totals deduplicate resources. Custom optional layers and tables
+provide explicit track adapters, with unknown inventories flagged rather than hidden.
+Semantics, defaults, cancellation and schema: [sciviz-monitor.md](sciviz-monitor.md).
+
+Native WebGPU and full WebGL2 pass the 320x240 allocation fixtures for points up to 65536,
+voxels up to 13824, heatmap cells up to 4096, graph edges up to 32768 and table rows up to
+4096 (a 1024-row TLC sample, explicitly tiled). These are tested finite ceilings, not maximum
+dataset sizes or speed limits. Eight full format loads retain actual source byte sizes.
+Largest default scene observations (GPU payload and JS backing stores, bytes):
+
+| Dimension | Tested size | GPU bytes | JS backing-store bytes |
+| --- | ---: | ---: | ---: |
+| Points | 65536 | 1048800 | 1311424 |
+| Voxels | 13824 | 28992 | 56768 |
+| Heatmap cells | 4096 | 82000 | 98448 |
+| Graph edges | 32768 | 787600 | 786624 |
+| Table rows | 4096 | 82144 | 213600 |
+
+Array estimates are separate in the JSON. These observations have no unreported layers.
+All observations and machine/source provenance are in
+[sciviz-limits-allocations.json](whitepaper/sciviz-limits-allocations.json). Timing fields are
+absent; firstOverBudget/firstFailure null means not observed. Quiet 16.7 ms crossings,
+failure-scale sweeps and the wider format/size matrix remain owed in speed-phase.md and
+busy-retests.md. No busy-machine benchmark or rival timing was run.
+
+Final gzip entry sizes after rebase: sciviz root 56553 -> 56668 B; new monitor 2534 B; points root
+24451 -> 24676 B; points/octree after the point-cloud merge 9323 -> 9465 B; lines root 19876 -> 20042 B.
+The inherited points/octree ceiling remains 9654 B. The sciviz root ceiling rises 56635 -> 58369 B; the new monitor ceiling is
+2714 B. The final 142 B octree growth buys correct owner allocation inventory; separating the
+hook would require exposing allocator internals and extra caller bookkeeping. Core plus
+stage remains 24209 B, under 25000 B. No rendering work, accuracy or quality was reduced.
+
+The final root growth is 115 B after rebasing. It buys the live owner hook and the PNG
+queue barrier before usage promotion reconfigures an active canvas. Keeping that lifecycle
+inside the existing optional exporter avoids a separate caller synchronization protocol.
+capture-order.test.js fails without the ordering barrier; no test tolerance was changed.
+The suite records preserve the pre-squash lane commit plus the digest of the actual source
+tree and its working-tree flag; they do not assert that an uncommitted build was clean main.
