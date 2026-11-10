@@ -4910,3 +4910,27 @@ Bug fixed: WaterFlow replaced the exact ripple line, so attaching WaterRain firs
 Proof: each job has CPU tests (validation, copies, dispose) and a GPU test run by land.sh on this Mac (Metal): bodies against exact signed distances and levels; scatter's WGSL term against an independent JavaScript evaluation within 1e-5; rain's WGSL ring slope against a JavaScript evaluation with the same PCG hash within 2e-4 over 578 points. Each GPU test also checks the effect off matches the plain frame and disposing restores it exactly.
 
 Limits and unmeasured: bodies have no holes or islands and no per-body foam or flow; scatter uses a thickness proxy and directional lights only; rain splash radius is checked by Ripples only when the frame renders. GPU time is not measured for any of the three. Details are in docs/limits.md and docs/work-lists/finish-later.md.
+
+## List 4 on the Mac: batches 121, R5 and 132 (2026-11-10)
+
+Run on the M6 Mac mini (Metal through WebGPU, ANGLE on Metal for the WebGL2 layer, Safari and WebKit 27.2). Every
+commit landed with `push-anyway` (no repository gates at push time; each job ran its own package's CPU tests and its
+GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
+[perf-history.md](perf-history.md#what-our-checks-caught-and-what-we-got-wrong-2026-11-10-the-mac).
+
+- **Batch 121, proof audit:** [proof-audit.md](proof-audit.md) lists each claim proved only by a validator, our own
+  reader or a built file, and what would prove it. Real Apple runs: Safari 27.2 drew all 5 models, 64 of 64 USDZ files
+  passed `usdchecker --arkit`, RealityKit read the set heights, Quick Look drew 6 of 6 thumbnails. Fixes: AAC MP4 from
+  WebKit's encoder (`ba89faa5a`), H.264 for `recordCanvas` MP4 (`34463ac6d`). Claims corrected in `5f1f3cb81`. The
+  tests only Scott can run on a phone or headset are listed there; they have not been run yet.
+- **Review 5:** all 22 list 2 and 3 packages; findings, inputs and fix hashes in
+  [review-5.md](../work-lists/review-5.md).
+- **Batch 132, research and quality audit:** [package-audit.md](package-audit.md), one row per package with sources
+  read in full, what was checked, found, fixed and still open. 94 of 102 packages audited; 47 rows are partial and say
+  which files are owed; sciviz, physics, physics2d, ragdoll and the four generated install kits are listed with the
+  reason they were not audited.
+- **Mac bug sweep**, folded into batch 132: every audited package's CPU, GPU and browser tests ran on Metal under
+  WebGPU and the WebGL2 layer. The Mac-only bugs and their fixes are in the perf-history table above; the Mac-only
+  failures still open (WebKit VP8 colour, Chromium pointer lock under the harness, sky's 2 px on ANGLE Metal, the
+  `implicitFootprint` oblique-gradient case, ANGLE's dropped draw after a texture upload, which is worked around in
+  `60552800e` but not reported upstream) are in [known-bugs.md](../known-bugs.md).
