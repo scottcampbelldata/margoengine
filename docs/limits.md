@@ -5925,3 +5925,8 @@ Review 4 LTC size evidence (current-main parent, 2026-11-10): clustered/area 105
 
 
 Review 3 C1: CurveEditor reconciles selected numeric channels against the current timeline document before graph evaluation. Removing the selected channel falls back to the first remaining channel and refits its values; an empty document clears selection and redo restores an available channel. JSDOM regression covers the real editor and shared undo history. No public API change.
+
+## Review 2: optimization keeps off-scene animation dependencies (2026-11-10)
+
+The optional exporters/optimize-extra pruning pass retains animation targets, their transform ancestors, skins reached from those nodes and the complete joint dependency closure before compacting indices. This also retains marked roots outside scene node lists. Regression inputs and outputs pass the Khronos glTF validator. Public API, numerical interpolation and rendering paths are unchanged; no timing claim is made. Proof: packages/exporters/tests/optimize-extra.test.js.
+Optional optimize-extra entry gzip measured 6,242 B after the correction, within its 6,470 B ceiling.

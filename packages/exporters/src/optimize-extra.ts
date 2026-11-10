@@ -175,9 +175,9 @@ function opaque(json: JSONObject): boolean {
 
 function prune(json: JSONObject, stats: OptimizeExtraStats): void {
   if (opaque(json)) return;
-  const compact = (name: string, refs: [JSONObject, string][]): void => {
+  const compact = (name: string, refs: [JSONObject, string][], retained: Iterable<number> = []): void => {
       const list: JSONObject[] = json[name] ?? [],
-        used = new Set(refs.map(([holder, key]) => holder[key])),
+        used = new Set([...refs.map(([holder, key]) => holder[key]), ...retained]),
         indices = new Map<number, number>(),
         kept = list.filter((_, i) => {
           if (!used.has(i)) return false;
@@ -199,22 +199,24 @@ function prune(json: JSONObject, stats: OptimizeExtraStats): void {
     for (const child of nodes[i].children ?? []) mark(child);
   };
   for (const scene of json.scenes ?? []) for (const i of scene.nodes ?? []) mark(i);
-  // Skin joints and their transform ancestry remain live, even outside the scene's visible forest.
-  const usedSkins = new Set([...live].map((i) => nodes[i].skin));
-  for (const [index, skin] of (json.skins ?? []).entries())
-    if (usedSkins.has(index))
-      for (const i of [...(skin.joints ?? []), ...(skin.skeleton === undefined ? [] : [skin.skeleton])]) mark(i);
   for (const animation of json.animations ?? [])
     for (const c of animation.channels ?? []) if (c.target.node !== undefined) mark(c.target.node);
+  // Animation targets, skin joints and transform ancestors can each expose another skin.
+  // Finish the dependency closure before compacting any of their node references.
+  const usedSkins = new Set<number>();
   let changed = true;
   while (changed) {
-    changed = false;
+    const before = live.size;
+    for (const i of live) {
+      const index = nodes[i].skin, skin = json.skins?.[index];
+      if (!skin || usedSkins.has(index)) continue;
+      usedSkins.add(index);
+      for (const joint of [...skin.joints, ...(skin.skeleton === undefined ? [] : [skin.skeleton])]) mark(joint);
+    }
     nodes.forEach((n, i) => {
-      if (!live.has(i) && n.children?.some((c: number) => live.has(c))) {
-        live.add(i);
-        changed = true;
-      }
+      if (!live.has(i) && n.children?.some((c: number) => live.has(c))) live.add(i);
     });
+    changed = live.size !== before;
   }
   const protectedNodes = new Set<number>();
   for (const animation of json.animations ?? [])
@@ -257,7 +259,7 @@ function prune(json: JSONObject, stats: OptimizeExtraStats): void {
     }
   for (const animation of json.animations ?? [])
     for (const c of animation.channels ?? []) nodeRefs.push(...refs('node', [c.target]));
-  compact('nodes', nodeRefs);
+  compact('nodes', nodeRefs, live);
   const keptNodes = json.nodes ?? [];
   compact('meshes', refs('mesh', keptNodes));
   compact('skins', refs('skin', keptNodes));

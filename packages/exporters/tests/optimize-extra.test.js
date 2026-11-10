@@ -179,3 +179,40 @@ test('abort and invalid batch options fail before doing work', async () => {
   assert.throws(() => optimizeExtraGLB(bytes, { minInstances: 1 }), /MARGO_EXPORT_OPTIMIZE_MIN/);
   assert.throws(() => optimizeExtraGLB(bytes, { signal: AbortSignal.abort() }), { name: 'AbortError' });
 });
+
+test('prune retains skins reached through animation targets and their ancestors', async () => {
+  for (const targetIsAncestor of [false, true]) {
+    const parts = await fixture(), j = parts.json;
+    const attributes = j.meshes[0].primitives[0].attributes, count = j.accessors[attributes.POSITION].count;
+    for (const [name, data, componentType] of [
+      ['JOINTS_0', new Uint8Array(count * 4), 5121],
+      ['WEIGHTS_0', Float32Array.from({ length: count * 4 }, (_, i) => i % 4 === 0 ? 1 : 0), 5126],
+    ]) {
+      const offset = parts.bin.length, bin = new Uint8Array(offset + data.byteLength);
+      bin.set(parts.bin); bin.set(new Uint8Array(data.buffer), offset); parts.bin = bin;
+      const bufferView = j.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: data.byteLength }) - 1;
+      attributes[name] = j.accessors.push({ bufferView, componentType, count, type: 'VEC4' }) - 1;
+    }
+    const root = j.nodes.push({ name: 'joint-root', children: [j.nodes.length + 1] }) - 1;
+    const joint = j.nodes.push({ name: 'joint' }) - 1;
+    const skinned = j.nodes.push({ name: 'animated-skin', mesh: 0, skin: 0, translation: [2, 3, 4] }) - 1;
+    const target = targetIsAncestor ? j.nodes.push({ name: 'animated-child' }) - 1 : skinned;
+    if (targetIsAncestor) j.nodes[skinned].children = [target];
+    j.skins = [{ joints: [joint], skeleton: root }];
+    track(parts, [[0, 0, 0], [1, 0, 0]]);
+    j.animations[0].channels[0].target.node = target;
+    const source = joinGLB(parts), before = await validate(source);
+    assert.equal(before.errors, 0, JSON.stringify(before.messages));
+    const result = optimizeExtraGLB(source, { instance: false });
+    const out = splitGLB(result.glb).json;
+    const owner = out.nodes.find(n => n.name === 'animated-skin');
+    assert.deepEqual(owner.translation, [2, 3, 4]);
+    const skin = out.skins[owner.skin];
+    assert.equal(out.nodes[skin.joints[0]]?.name, 'joint');
+    assert.equal(out.nodes[skin.skeleton]?.name, 'joint-root');
+    assert.deepEqual(out.nodes[skin.skeleton].children, skin.joints);
+    assert.equal(out.nodes[out.animations[0].channels[0].target.node].name, targetIsAncestor ? 'animated-child' : 'animated-skin');
+    const after = await validate(result.glb);
+    assert.equal(after.errors, 0, JSON.stringify(after.messages));
+  }
+});
