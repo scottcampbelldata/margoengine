@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14724065,
+  "total": 14726807,
   "history": [
     {
       "date": "2026-10-24",
@@ -8177,6 +8177,12 @@
       "commit": "e55962ae0",
       "reason": "terrain batch 132 audit",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "750fed14f",
+      "reason": "scatter batch 132 audit",
+      "grew": 3
     }
   ],
   "items": {
@@ -8570,8 +8576,8 @@
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7210,
     "@margoengine/gltf-pro": 82056,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 35732,
-    "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 36850,
+    "@margoengine/gltf-pro dist/workers/progressive.js": 16713,
     "@margoengine/gltf-pro/asset": 5754,
     "@margoengine/gltf-pro/audio": 4973,
     "@margoengine/gltf-pro/coordinates": 755,
@@ -8584,7 +8590,7 @@
     "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/model": 62383,
     "@margoengine/gltf-pro/physics": 8977,
-    "@margoengine/gltf-pro/prepare": 31610,
+    "@margoengine/gltf-pro/prepare": 32692,
     "@margoengine/gltf-pro/progressive": 90997,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 10477,
@@ -9065,7 +9071,7 @@
     "@margoengine/sciviz/fallback": 2258,
     "@margoengine/sciviz/fits": 5164,
     "@margoengine/sciviz/flow": 9392,
-    "@margoengine/sciviz/format": 8415,
+    "@margoengine/sciviz/format": 8414,
     "@margoengine/sciviz/formats": 21089,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
