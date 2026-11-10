@@ -4864,3 +4864,8 @@ Batch 186 job 2: no open correctness defect found in shared atlas packing/filter
 
 No new open correctness defect in the implemented encoder is known from its current fixtures. Normal quantization at one bit is not a representable octahedral format and returns RangeError; the new encoder's 30-bit path is covered without invoking the upstream build that aborts on that option. Universal compression dominance and end-to-end timing are not established by finite corpus tests; the remaining proof and deferred speed rows are recorded in limits.md and the work lists.
 - Batch 191 optional normal-provider reconfiguration: attach Pixelate or Curvature with {normal: () => texture}, then delete effect.options.normal and render. The default normal capture is not registered, so normal highlights/curvature disappear; setup selected the external path and frame does not activate the owned SceneTargets. Nonblocking fix-phase item; constructor defaults and stable providers work.
+
+
+## Batch 178 vector publication
+No known depth-order, clipping, committed-readback or cancellation defect remains in the tested contract. Appearance refinements (lighting, procedural contour/grid ink and non-pixel series styles) are explicit accepted limits in docs/sciviz-vector-export.md and are tracked in the private finish-phase handoff.
+Batch 178 gate discovery finding: node scripts/gpu-package-tests.mjs --no-build --only=sciviz --list fails before filtering because packages/water/package.json test:gpu contains an interior npm run build after three GPU leaves. Cause: global plan validation rejects builds after a GPU step. The lane executes the sciviz GPU leaves directly under shared locks; the water manifest repair belongs to its owner/fix phase.

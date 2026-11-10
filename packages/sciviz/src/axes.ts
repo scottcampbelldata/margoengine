@@ -43,6 +43,11 @@ export class Axes {
   drawnTicks: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] };
   #disposed = false;
 
+  /** @internal Current data-coordinate frame/grid lines for optional publication exporters. */
+  publicationLines(): readonly Line[] {
+    return this.#drawn;
+  }
+
   /** @param lines The figure's lines plugin (shared: one per engine under its default name). */
   constructor(
     readonly engine: EngineKernel,

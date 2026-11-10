@@ -1367,6 +1367,11 @@ export class Figure extends EventTarget {
   }
 
   // The elements whose text export paints: tick labels, titles and colour bars.
+  /** @internal Current frame/grid lines for optional publication exporters. */
+  vectorAxes(): readonly Line[] {
+    return this.#axes?.publicationLines() ?? [];
+  }
+
   #overlayRoots(): Element[] {
     return [
       ...(this.#axes?.elements() ?? []),

@@ -11,7 +11,7 @@ import { cubeTables } from './cubes.js';
 import { isGpuArray, resolveColormap, sizeOf, type Bounds, type ColormapSource, type DataSource } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 /** Options for an isosurface. */
@@ -332,7 +332,7 @@ export class IsosurfaceLayer implements Drawable {
       if (triangles) {
         vertices = this.#renderer.device!.createBuffer({
           size: triangles * 3 * 32,
-          usage: GPUBufferUsage.STORAGE,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
         });
       }
       const group = vertices
@@ -371,6 +371,24 @@ export class IsosurfaceLayer implements Drawable {
       vertices?.destroy();
       for (const a of [counts, cases, offsets, total]) a.dispose();
     }
+  }
+
+  /** Owned data-coordinate snapshot of the last committed isosurface for publication output. */
+  async vectorGeometry(
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<import('./vector-types.js').VectorGeometry> {
+    options.signal?.throwIfAborted();
+    if (this.#disposed) throw fault('disposed', 'Isosurface is disposed; create a new layer before export', 'sciviz');
+    const { isoSnapshot } = await import('./vector-snapshot.js');
+    options.signal?.throwIfAborted();
+    return isoSnapshot(
+      this.#renderer.device!,
+      this.#vertices,
+      this.#triangles,
+      this.bounds,
+      this.#colour,
+      options.signal,
+    );
   }
 
   /** @internal The figure's data-to-scene transform. */

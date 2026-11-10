@@ -630,6 +630,10 @@
       "types": "./dist/clustered/area-shapes.d.ts",
       "import": "./dist/clustered/area-shapes.js"
     },
+    "./clustered/shadow-atlas": {
+      "types": "./dist/clustered/shadow-atlas.d.ts",
+      "import": "./dist/clustered/shadow-atlas.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
@@ -2774,6 +2778,10 @@
       "types": "./dist/post/stylize.d.ts",
       "import": "./dist/post/stylize.js"
     },
+    "./post/curvature": {
+      "types": "./dist/post/curvature.d.ts",
+      "import": "./dist/post/curvature.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
@@ -3409,6 +3417,10 @@
     "./sciviz/link": {
       "types": "./dist/sciviz/link.d.ts",
       "import": "./dist/sciviz/link.js"
+    },
+    "./sciviz/export-vector": {
+      "types": "./dist/sciviz/export-vector.d.ts",
+      "import": "./dist/sciviz/export-vector.js"
     },
     "./selection": {
       "types": "./dist/selection.d.ts",
@@ -4925,10 +4937,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./clustered/shadow-atlas": {
-      "types": "./dist/clustered/shadow-atlas.d.ts",
-      "import": "./dist/clustered/shadow-atlas.js"
     }
   },
   "dependencies": {

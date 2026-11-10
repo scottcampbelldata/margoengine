@@ -7,8 +7,8 @@
 // through a colour map by the interpolated value, flat-lit. parseVtk reads legacy VTK files (versions to 5.1) into
 // this layout.
 import { invertMatrix } from '@margoengine/math/mat4';
-import { hexColor, SRGBToLinear } from '@margoengine/math/color';
-import { rangeError, typeError } from '../../shared/errors.js';
+import { hexColor, SRGBToLinear, LinearToSRGB } from '@margoengine/math/color';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { colormapTexture, resolveColormap, type Bounds, type ColormapSource } from './layer.js';
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Colormap } from './colormaps.js';
@@ -684,6 +684,29 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
  * triangles (a new slice position).
  */
 export class MeshLayer implements Drawable {
+  /** Whether the optional publication exporter can express this material without a raster. */
+  get vectorSupported(): boolean {
+    return !this.#appearance && !this.#scalarOpacity;
+  }
+  /** Owned data-coordinate mesh and current scalar colours for publication output. */
+  async vectorGeometry(
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<import('./vector-types.js').VectorGeometry> {
+    options.signal?.throwIfAborted();
+    if (this.#disposed) throw fault('disposed', 'Mesh is disposed; create a new layer before export', 'sciviz');
+    if (this.#appearance || this.#scalarOpacity)
+      throw fault('unsupported', 'Use raster export for custom transport or scalar-opacity meshes', 'sciviz');
+    const { scalarMesh } = await import('./vector-snapshot.js');
+    options.signal?.throwIfAborted();
+    return scalarMesh(
+      this.#set.positions,
+      this.#set.values,
+      this.colormap,
+      this.#range,
+      this.#opacity,
+      this.#missing.map(LinearToSRGB),
+    );
+  }
   readonly #appearance: LayerAppearance | undefined;
   readonly #scalarOpacity: boolean;
   /** False hides the layer. */
@@ -871,32 +894,50 @@ export class MeshLayer implements Drawable {
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#count || !this.#group) return;
     const blend = this.transparent;
-    const pipeline = renderer.pipeline(`${blend ? 'mesh-blend' : 'mesh'}:${this.#appearance?.key ?? ''}`, context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: this.#appearance ? meshShader.replace('shade(albedo, normalize(n), normalize(frame.eye.xyz - in.world))', this.#appearance.surface ? 'planetSurface(in.world, albedo)' : 'planetAerial(in.world, albedo)') + this.#appearance.shader : meshShader, label: 'sciviz mesh' });
-      return {
-        label: 'sciviz mesh',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            blend
-              ? {
-                  format: target.format,
-                  blend: {
-                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                  },
-                }
-              : { format: target.format },
-          ],
-        },
-        primitive: { topology: 'triangle-list', cullMode: 'none' },
-        multisample: target.multisample,
-        depthStencil: { format: target.depth, depthWriteEnabled: !blend, depthCompare: 'greater-equal' },
-      };
-    });
+    const pipeline = renderer.pipeline(
+      `${blend ? 'mesh-blend' : 'mesh'}:${this.#appearance?.key ?? ''}`,
+      context,
+      (target) => {
+        const module = renderer.device!.createShaderModule({
+          code: this.#appearance
+            ? meshShader.replace(
+                'shade(albedo, normalize(n), normalize(frame.eye.xyz - in.world))',
+                this.#appearance.surface ? 'planetSurface(in.world, albedo)' : 'planetAerial(in.world, albedo)',
+              ) + this.#appearance.shader
+            : meshShader,
+          label: 'sciviz mesh',
+        });
+        return {
+          label: 'sciviz mesh',
+          layout: renderer.device!.createPipelineLayout({
+            bindGroupLayouts: [
+              renderer.frameLayout!,
+              this.#layout!,
+              ...(this.#appearance ? [this.#appearance.layout] : []),
+            ],
+          }),
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [
+              blend
+                ? {
+                    format: target.format,
+                    blend: {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                    },
+                  }
+                : { format: target.format },
+            ],
+          },
+          primitive: { topology: 'triangle-list', cullMode: 'none' },
+          multisample: target.multisample,
+          depthStencil: { format: target.depth, depthWriteEnabled: !blend, depthCompare: 'greater-equal' },
+        };
+      },
+    );
     pass.setPipeline(pipeline);
     if (this.#appearance) pass.setBindGroup(2, this.#appearance.group);
     pass.setBindGroup(1, this.#group);

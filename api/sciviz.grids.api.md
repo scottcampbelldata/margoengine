@@ -25,6 +25,10 @@ export interface GridLayerOptions extends MeshLayerOptions {
 export type GridValues = 'point' | 'cell';
 
 export class MeshLayer implements Drawable {
+    get vectorSupported(): boolean;
+    vectorGeometry(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<import('./vector-types.js').VectorGeometry>;
     visible: boolean;
     readonly colormap: Colormap;
     constructor(renderer: SciRenderer, set: TriangleSet, options?: MeshLayerOptions);
@@ -276,6 +280,7 @@ class Figure extends EventTarget {
     }, options?: BarLayerOptions): Promise<RectsLayer>;
     histogram(values: DataSource, options?: HistogramLayerOptions): Promise<RectsLayer>;
     heatmap(values: DataSource, options?: HeatmapLayerOptions): Promise<RectsLayer>;
+    vectorAxes(): readonly Line[];
     toPNG(options?: PNGOptions): Promise<Blob>;
     toSVG(options?: SVGOptions): Promise<string>;
     timeline(times: ArrayLike<number>, frame: TimelineFrame, options?: TimelineOptions): Timeline;
@@ -345,6 +350,9 @@ class IsosurfaceLayer implements Drawable {
     update(level: number, options?: {
         readonly signal?: AbortSignal;
     }): Promise<number>;
+    vectorGeometry(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<import('./vector-types.js').VectorGeometry>;
     setModel(figure: Float32Array): void;
     center(): readonly [number, number, number];
     prepare(): void;
@@ -595,6 +603,9 @@ class SurfaceLayer implements Drawable {
     constructor(renderer: SciRenderer, z: DataSource, options?: SurfaceLayerOptions);
     restore(): void;
     get transparent(): boolean;
+    vectorGeometry(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<import('./vector-types.js').VectorGeometry>;
     get range(): readonly [number, number];
     set range(value: readonly [number, number]);
     get bounds(): [number, number, number, number, number, number];

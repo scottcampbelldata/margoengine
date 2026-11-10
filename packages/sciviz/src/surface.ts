@@ -234,6 +234,38 @@ export class SurfaceLayer implements Drawable {
     return this.#opacity < 1;
   }
 
+  /** Owned current height-field triangles and colours for publication output. */
+  async vectorGeometry(
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<import('./vector-types.js').VectorGeometry> {
+    options.signal?.throwIfAborted();
+    if (this.#disposed) throw fault('disposed', 'Surface is disposed; create a new layer before export', 'sciviz');
+    const z = this.#cpu ?? (isGpuArray(this.#data) ? await this.#data.read({ signal: options.signal }) : this.#data);
+    options.signal?.throwIfAborted();
+    const positions: number[] = [],
+      values: number[] = [];
+    for (let j = 0; j < this.ny - 1; j++)
+      for (let i = 0; i < this.nx - 1; i++) {
+        const a = j * this.nx + i;
+        for (const ids of [
+          [a, a + 1, a + this.nx + 1],
+          [a, a + this.nx + 1, a + this.nx],
+        ]) {
+          if (ids.some((k) => !Number.isFinite(z[k]))) continue;
+          for (const k of ids) {
+            positions.push(
+              this.x[0] + ((k % this.nx) / (this.nx - 1)) * (this.x[1] - this.x[0]),
+              this.y[0] + (Math.floor(k / this.nx) / (this.ny - 1)) * (this.y[1] - this.y[0]),
+              z[k],
+            );
+            values.push(z[k]);
+          }
+        }
+      }
+    const { scalarMesh } = await import('./vector-snapshot.js');
+    return scalarMesh(positions, values, this.colormap, this.#range, this.#opacity);
+  }
+
   /** The height range the colour map spans. */
   get range(): readonly [number, number] {
     return this.#range;

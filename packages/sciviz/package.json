@@ -143,6 +143,10 @@
     "./link": {
       "types": "./dist/link.d.ts",
       "import": "./dist/link.js"
+    },
+    "./export-vector": {
+      "types": "./dist/export-vector.d.ts",
+      "import": "./dist/export-vector.js"
     }
   },
   "files": [
@@ -179,6 +183,7 @@
     "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
     "test:webgl2": "npm run build && node tests/webgl2-browser.mjs",
     "test:browser:atmosphere": "node tests/atmosphere-browser.mjs",
-    "test:browser:contour2d": "node tests/contour2d-browser.mjs"
+    "test:browser:contour2d": "node tests/contour2d-browser.mjs",
+    "test:browser:export-vector": "node tests/export-vector-browser.mjs"
   }
 }

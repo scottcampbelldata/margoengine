@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14150784,
+  "total": 14155959,
   "history": [
     {
       "date": "2026-10-24",
@@ -7477,6 +7477,12 @@
       "commit": "batch-191-job-6",
       "reason": "New optional post/curvature: 0 to 8940 B gzip. Keep normal capture, view-basis conversion and depth-aware ridge/valley shading in one owner; splitting duplicates capture lifecycle and configuration. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "439e938ec",
+      "reason": "Batch 178 job 1: new optional sciviz/export-vector 0 to 3957 B min+gzip, ceiling 4213 B. Grids 24193 to 24533 B, ceiling 24307 to 25269 B, for owned publication geometry snapshots and explicit custom-transport fallback. Splitting would separate mesh data ownership from export and duplicate validation. Keep existing optional entry boundaries and 3 percent headroom. Root 52876 B stays under its 53607 B ceiling; core+stage unchanged 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8310,7 +8316,7 @@
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 23118,
-    "@margoengine/sciviz/grids": 24307,
+    "@margoengine/sciviz/grids": 25269,
     "@margoengine/sciviz/labels": 6548,
     "@margoengine/sciviz/lic": 24165,
     "@margoengine/sciviz/maths": 5959,
@@ -8832,6 +8838,7 @@
     "@margoengine/staging/caustics": 5703,
     "@margoengine/sciviz/link": 4800,
     "@margoengine/clustered/shadow-atlas": 14448,
-    "@margoengine/post/curvature": 9209
+    "@margoengine/post/curvature": 9209,
+    "@margoengine/sciviz/export-vector": 4213
   }
 }
