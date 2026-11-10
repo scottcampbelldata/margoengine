@@ -72,10 +72,15 @@ try {
             gpuErrors.push(event.error.message);
             event.preventDefault();
           });
-          for (let i = 0; i < 3; i++) {
-            kernel.render({ delta: 0 });
-            await engine.gpu.queue.onSubmittedWorkDone();
-          }
+          // Render on the restored device until every pipeline it builds has compiled and two frames ran calm, so any GPU
+          // error from the refused restore has been raised before the row is read.
+          await waitForPipelines(
+            async () => {
+              kernel.render({ delta: 0 });
+              await engine.gpu.queue.onSubmittedWorkDone();
+            },
+            { timeoutMs: 60000 },
+          );
           rows.push({
             start,
             name,
@@ -104,7 +109,7 @@ try {
     assert.match(row.faults[0].message, /half-float.*ldr.*https:\/\//);
     assert.deepEqual(row.gpuErrors, []);
     assert.equal(row.gl, 0);
-    console.log(`${row.start} -> LDR ${row.name}: detached, one coded error, three clean frames`);
+    console.log(`${row.start} -> LDR ${row.name}: detached, one coded error, clean frames until pipelines settled`);
   }
   assert.deepEqual(errors, []);
 } finally {

@@ -82,6 +82,7 @@ await postBrowser(
               return { changed, max };
             };
             const controls = [];
+            // fixed-wait: three repeat samples of the unchanged path, printed after a mismatch to show its spread
             for (let i = 0; i < 3; i++) {
               await page.evaluate(() => window.resolveTest.frame(true, false));
               controls.push((await shot()).data);
