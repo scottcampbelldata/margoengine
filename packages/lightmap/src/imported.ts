@@ -96,7 +96,8 @@ export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
     this.unsubscribe = undefined;
     for (const [p, previous] of this.previous) if (p.extension === this.extensions.get(p)) p.extension = previous;
     this.texture.dispose();
-    this.model.root.engine.removePlugin(this.name);
+    // removePlugin on the engine acts on the active scene; remove this plugin from the scene that holds it.
+    this.model.root.engine.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

@@ -20,10 +20,18 @@ test('invalid external irradiance fails before GPU work', () => {
 
 test('attach applies a bake through the model engine and restores it on disposal', () => {
   const primitive = { material: {}, definition: { attributes: { TEXCOORD_1: 1 } }, nodeIndex: 0 };
-  const plugins = new Map(), engine = {
-    use(plugin) { plugins.set(plugin.name, plugin); },
-    removePlugin(name) { plugins.delete(name); },
-  };
+  const plugins = new Map(),
+    engine = {
+      use(plugin) {
+        plugins.set(plugin.name, plugin);
+      },
+      removePlugin(name) {
+        plugins.delete(name);
+      },
+      sceneOf(plugin) {
+        return plugins.get(plugin.name) === plugin ? this : undefined;
+      },
+    };
   const model = { root: { engine }, primitives: [primitive], nodes: [{}] };
   const lightmap = { width: 1, height: 1, data: new Uint8Array([10, 20, 30, 255]), scale: 1 };
   const installation = ImportedLightmapInstallation.attach(model, lightmap, [0]);
@@ -33,6 +41,32 @@ test('attach applies a bake through the model engine and restores it on disposal
   assert.equal(plugins.size, 0);
   assert.equal(primitive.extension, undefined);
   const failure = new Error('registration failed');
-  engine.use = () => { throw failure; };
-  assert.throws(() => ImportedLightmapInstallation.attach(model, lightmap), (e) => e === failure);
+  engine.use = () => {
+    throw failure;
+  };
+  assert.throws(
+    () => ImportedLightmapInstallation.attach(model, lightmap),
+    (e) => e === failure,
+  );
+});
+
+// Batch 132 audit: the engine's removePlugin acts on the active scene. An installation attached while another scene
+// was active must leave its own scene, and must not remove the active scene's same-name plugin.
+test('dispose removes the installation from its own scene, not the active scene', () => {
+  const primitive = { material: {}, definition: { attributes: { TEXCOORD_1: 1 } }, nodeIndex: 0 };
+  const calls = [];
+  let installed;
+  const own = { removePlugin: (name) => calls.push(['own scene', name]) };
+  const engine = {
+    use(plugin) {
+      installed = plugin;
+    },
+    removePlugin: (name) => calls.push(['active scene', name]),
+    sceneOf: (plugin) => (plugin === installed ? own : undefined),
+  };
+  const model = { root: { engine }, primitives: [primitive], nodes: [{}] };
+  const lightmap = { width: 1, height: 1, data: new Uint8Array([10, 20, 30, 255]), scale: 1 };
+  const installation = ImportedLightmapInstallation.attach(model, lightmap, [0]);
+  installation.dispose();
+  assert.deepEqual(calls, [['own scene', installation.name]]);
 });
