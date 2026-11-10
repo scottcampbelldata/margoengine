@@ -31,6 +31,24 @@ parity run, set `MARGO_GPU_IDLE_MIN=4` in that command's environment and retain
 The idle window is 240 seconds, covering the measured 194.050-second reclamation
 interval plus 45.950 seconds of margin. Test and wrapper deadlines remain intact.
 
+## Batch 258 input entry
+
+After `npm run build:packages`, run the deterministic state and draw-list
+checks with `node --test --test-timeout=120000 packages/ui/tests/text-input.test.js`.
+Run each browser command sequentially (one slot for this lane):
+
+```sh
+node scripts/gpu-lock.mjs run --owner=codex-batch258 --max=3 --wait-max=60 -- node packages/ui/tests/text-input-browser.mjs
+node scripts/gpu-lock.mjs run --owner=codex-batch258 --max=3 --wait-max=60 -- node packages/ui/tests/text-input-browser.mjs --compat
+```
+
+Reports and captures are test-results/ui-text-input-{native,compat}.{json,png}.
+They contain actual rendered text pixels and input-operation checks. The
+drivers use real canvas pointer events, native clipboard shortcuts, native undo
+and DevTools Input.imeSetComposition/Input.insertText. No timing bars or
+performance numbers are collected. Read the package README for the runnable
+integration example; run it through check:readme-run -- --packages=ui.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

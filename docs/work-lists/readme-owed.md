@@ -31,3 +31,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Cover the sciviz/netcdf and sciviz/vtk aliases in the README phase. | Batch 171 job 5 |
 | @margoengine/behavior | inspect: mount TreeInspector, trace:true, automatic/manual refresh, pause/resume, abort and disposal, idle vs last tick | batch-251 job 2 |
 | margoengine | Generated behavior/inspect alias | batch-251 job 2 |
+
+
+
+| @margoengine/ui | Optional input: TextInput/TextArea/password, native bridge, selection, clipboard, IME, accessibility, defaults and disposal. | batch-258 job 1 |
+| margoengine | ui/input umbrella entry and native-editing attachment. | batch-258 job 1 |

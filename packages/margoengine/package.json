@@ -3182,6 +3182,10 @@
       "types": "./dist/ui/world.d.ts",
       "import": "./dist/ui/world.js"
     },
+    "./ui/input": {
+      "types": "./dist/ui/input.d.ts",
+      "import": "./dist/ui/input.js"
+    },
     "./ui/markup": {
       "types": "./dist/ui/markup.d.ts",
       "import": "./dist/ui/markup.js"

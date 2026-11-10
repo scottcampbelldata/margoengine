@@ -3544,3 +3544,23 @@ shows the last tick, not historical status of unvisited nodes; paused display
 never pauses the simulation. Hierarchy uses native collapsible details and text
 labels as well as colors. All nodes are mounted; no virtual scrolling or history
 replay. Source document topology is fixed for the life of the panel. No GPU code.
+
+
+
+## Batch 258 text input scope
+
+The optional `@margoengine/ui/input` fields render on the existing screen and
+world UI draw lists. Browser editing requires `attachTextInputs(ui, canvas)`;
+headless applications use value, selection and insertText directly. Clipboard,
+undo and IME use native controls, not a custom key-to-character mapping.
+The bridge is screen-aligned; XR software keyboard entry is a separate job.
+Programmatic value assignment follows HTML and does not enforce maxLength or
+emit change. Password masking hides canvas text, not the input value from
+application JavaScript. Text shaping/bidi retains the text package's documented
+limits. No speed or assistive-technology product certification is claimed.
+
+Input entry: 4,600 B gzip, ceiling 4,606 B (new optional entry; no previous
+entry). UI root remains 31,885 B gzip and core + stage remains 23,950 B,
+below 25,000 B. The bytes keep native editing, selection and its mirror in one
+entry; splitting would require additional coordination without reducing the
+work a text-field consumer needs.

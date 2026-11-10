@@ -51,6 +51,19 @@ worktree declarations). A read-only inventory of the live shared store reports
 59,914 archives and zero per-file stat calls on the native path. Cache counts
 can change as other lanes write; deterministic fixtures supply the comparison.
 
+## Batch 258 input evidence (section 5 supplement)
+
+TextInput and TextArea use the existing Ui draw commands for background,
+selection, text and caret. They introduce no GPU pipeline, math, core or stage
+change. Their optional DOM bridge keeps native editing controls and only
+mirrors state into those draw commands; imports of the UI root do not load it.
+The registered ui/test:browser:input gate exercises actual rendered pixels,
+canvas pointer focus, selection/undo, clipboard, Tab, multiline and browser
+IME through DevTools Input. Run it natively and with --compat under one shared
+GPU slot. CPU tests cover deterministic state, password masking, composition
+and cleanup. Pixel evidence is correctness evidence, not a speed measurement;
+human screen-reader and mobile OS input-method testing remains unmeasured.
+
 ### Batch 133 land-only validation
 
 The optional native decoder retains the default prebuilts and its existing

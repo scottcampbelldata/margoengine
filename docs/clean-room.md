@@ -78,6 +78,69 @@ and recreated keys can otherwise change the result. Deterministic fixtures for
 1,548 versus zero at cap, identical bytes/retention and zero archive-content
 reads by eviction. No elapsed speed result is claimed. All code is original.
 
+## Batch 258 job 1: native-backed canvas text editing
+
+Acceptance review also compared *Unicode Bidirectional Algorithm*, UAX 9 rev 52
+(Manish Goregaokar and Robin Leroy, editors, 2026,
+<https://www.unicode.org/reports/tr9/>) and *WCAG 2.2*, contrast minimum
+(Alastair Campbell, Chuck Adams, Rachael Bradley Montgomery, Michael Cooper
+and Andrew Kirkpatrick, editors, 2024, <https://www.w3.org/TR/WCAG22/#contrast-minimum>).
+The field aligns RTL content to its reading edge and repaints selected glyphs
+with onPrimary. The draft's text-on-primary contrast was 2.09:1 dark, 3.53:1
+light and 1.07:1 high contrast. Regression tests require at least 4.5:1 for
+selected text, verify the RTL caret edge and count one repaint per glyph rather
+than a whole-layout repaint per line. No wall-clock speed claim is made.
+The native bridge also clears transient IME state on blur, removal and detach;
+the lifecycle regression covers all three so a canceled native session cannot
+leave a remounted field permanently composing.
+Native key events also invalidate a reset caret blink when text and selection
+are unchanged; the regression advances UI time into the off phase and proves
+the next native edit redraws the visible caret without changing the value.
+
+Research started with a broad search of text-entry papers, Unicode standards,
+HTML editing/selection and accessible widget semantics. Sources compared:
+
+- I. Scott MacKenzie and R. William Soukoreff, *Text Entry for Mobile Computing:
+  Models and Methods, Theory and Practice*, 2002,
+  <https://www.yorku.ca/mack/hci3.html>. Its distinction between final text and
+  the editing task motivates testing corrections, selections and multiple input
+  modalities instead of only setting a value.
+- R. William Soukoreff and I. Scott MacKenzie, *Input-based Language Modelling
+  in the Design of High Performance Text Input Techniques*, 2003,
+  <https://www.yorku.ca/mack/gi03.html>. Modifier keys and correction sequences
+  matter; keep native undo, word navigation and clipboard editing rather than
+  reimplementing text insertion from keydown. No companion software was read.
+- Johannes Wilm, *Input Events Level 2*, W3C working draft, 2026,
+  <https://www.w3.org/TR/input-events-2/>. Preserve native composition sessions
+  and observe input rather than canceling composing key events.
+- WHATWG contributors, *HTML Living Standard*, text control selection, 2026,
+  <https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#textFieldSelection>.
+  Use native UTF-16 selections, direction and editable controls for clipboard,
+  undo and IME. Do not reassign unchanged values or selections.
+- Josh Hadley (editor), Mark Davis (original author), *Unicode Text Segmentation*,
+  UAX 29 revision 49, 2026, <https://www.unicode.org/reports/tr29/>. Reuse the
+  existing text package's graphemes for masking and constrained insertion;
+  Intl.Segmenter supplies word selection.
+- Joanmarie Diggs, James Nurthen, Michael Cooper and Carolyn MacLeod (editors),
+  *WAI-ARIA 1.2*, 2023, <https://www.w3.org/TR/wai-aria-1.2/#textbox>.
+  Native input/textarea elements provide editing semantics and names, required,
+  invalid and read-only states without duplicate canvas text in the mirror.
+
+Combined design: a new optional input entry extends the public Widget and uses
+the existing text hitTest/caretRect and draw list, plus a native DOM bridge.
+No core, stage, UI-root code, external engine files or companion code changed.
+Rival feature inventories were read as documentation only:
+[Babylon GUI](https://doc.babylonjs.com/features/featuresDeepDive/gui/gui) and
+[uikit Components and Properties](https://pmndrs.github.io/uikit/docs/getting-started/components-and-properties).
+The row requires single-line/multiline/password, caret, selection, clipboard and
+IME; each maps to tests/text-input.test.js and text-input-browser.mjs. Browser
+editing is also the platform reference underlying DOM-backed rival behavior;
+no claim of an executed rival-engine comparison is made.
+
+The test page uses the opening sentence from Lewis Carroll's *Alice's Adventures
+in Wonderland* (1865), public domain, <https://www.gutenberg.org/ebooks/11>.
+Other short strings are original test controls. No downloaded code or art.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

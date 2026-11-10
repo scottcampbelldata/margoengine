@@ -38,6 +38,10 @@
       "types": "./dist/world.d.ts",
       "import": "./dist/world.js"
     },
+    "./input": {
+      "types": "./dist/input.d.ts",
+      "import": "./dist/input.js"
+    },
     "./markup": {
       "types": "./dist/markup.d.ts",
       "import": "./dist/markup.js"
@@ -70,6 +74,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/ui-browser.mjs",
     "prepack": "npm run build",
-    "test:browser:world": "npm run build && node tests/world-browser.mjs"
+    "test:browser:world": "npm run build && node tests/world-browser.mjs",
+    "test:browser:input": "npm run build && node tests/text-input-browser.mjs"
   }
 }

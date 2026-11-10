@@ -1,5 +1,24 @@
 # Known bugs and unverified features
 
+### Batch 258 text fields
+
+Tooling follow-up: running quality concurrently with React subpath CPU tests
+can fail reading a deleted tests/.subpaths-*/hooks.mjs after its file snapshot;
+repro: start both commands together. Run quality after those tests until the
+fix phase adds a stable inventory of source files. No product source changed.
+
+The former shared Chromium shutdown failure is fixed upstream at 919fdc09e.
+This branch is rebased onto that fix; both native and compatibility input
+checks now pass all 14 checks and complete teardown.
+
+The input entry supplies the previously missing single-line, multiline and
+password widgets. `tests/text-input.test.js` covers native mirror state,
+composition, selection, masking and cleanup; `tests/text-input-browser.mjs`
+checks canvas focus, real editing, undo, clipboard and browser IME on both
+complete backends. Human screen-reader and mobile OS keyboard certification
+has not been performed. Image, forms and preview world-panel parity are
+separate batch 258 jobs and remain open until their own acceptance.
+
 ### Fixed: batch 133 lazy asset package grouping
 
 The new decoder records were separated from its existing records, so grouping

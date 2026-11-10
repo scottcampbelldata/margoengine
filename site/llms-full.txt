@@ -6124,10 +6124,59 @@ Job 5 gzip entry sizes: sciviz/netcdf absent -> 3418 B (ceiling 3674); sciviz/vt
 (ceiling 6201); loaders/vtk-xml recorded 6788 -> 7492 B (ceiling 7748). The added optional bytes preserve
 one authoritative decoder, lazy intact topology and bounded ranges. Splitting again would complicate ownership
 and duplicate decoding. Core plus stage measures 23950 B, below 25000, unchanged by this job.
+## Behavior inspector (batch 251)
+
+New optional behavior/inspect: 1,602 B min+gzip, previously absent; generated
+umbrella alias 63 B external. No existing ceiling raised. Requires a DOM container;
+automatic refresh uses its window requestAnimationFrame. With autoRefresh:false,
+call refresh after simulation ticks. Build the source with trace:true. The panel
+shows the last tick, not historical status of unvisited nodes; paused display
+never pauses the simulation. Hierarchy uses native collapsible details and text
+labels as well as colors. All nodes are mounted; no virtual scrolling or history
+replay. Source document topology is fixed for the life of the panel. No GPU code.
+
+
+
+## Batch 258 text input scope
+
+The optional `@margoengine/ui/input` fields render on the existing screen and
+world UI draw lists. Browser editing requires `attachTextInputs(ui, canvas)`;
+headless applications use value, selection and insertText directly. Clipboard,
+undo and IME use native controls, not a custom key-to-character mapping.
+The bridge is screen-aligned; XR software keyboard entry is a separate job.
+Programmatic value assignment follows HTML and does not enforce maxLength or
+emit change. Password masking hides canvas text, not the input value from
+application JavaScript. Text shaping/bidi retains the text package's documented
+limits. No speed or assistive-technology product certification is claimed.
+
+Input entry: 4,600 B gzip, ceiling 4,606 B (new optional entry; no previous
+entry). UI root remains 31,885 B gzip and core + stage remains 23,950 B,
+below 25,000 B. The bytes keep native editing, selection and its mirror in one
+entry; splitting would require additional coordination without reducing the
+work a text-field consumer needs.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Batch 258 text fields
+
+Tooling follow-up: running quality concurrently with React subpath CPU tests
+can fail reading a deleted tests/.subpaths-*/hooks.mjs after its file snapshot;
+repro: start both commands together. Run quality after those tests until the
+fix phase adds a stable inventory of source files. No product source changed.
+
+The former shared Chromium shutdown failure is fixed upstream at 919fdc09e.
+This branch is rebased onto that fix; both native and compatibility input
+checks now pass all 14 checks and complete teardown.
+
+The input entry supplies the previously missing single-line, multiline and
+password widgets. `tests/text-input.test.js` covers native mirror state,
+composition, selection, masking and cleanup; `tests/text-input-browser.mjs`
+checks canvas focus, real editing, undo, clipboard and browser IME on both
+complete backends. Human screen-reader and mobile OS keyboard certification
+has not been performed. Image, forms and preview world-panel parity are
+separate batch 258 jobs and remain open until their own acceptance.
 
 ### Fixed: batch 133 lazy asset package grouping
 
@@ -10189,6 +10238,13 @@ Batch 251 job 1: no open defect found in reference expansion; missing registrati
 cycles and bounded expansion reject during construction (subtrees.test.js).
 
 Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+
+## tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
+
+- **Repro:** `node --test --test-reporter=tap tests/gpu-lock.test.js` on origin/main 896ebf844 while other lanes hold the shared GPU lock: five tests pass, then the file exits 1 with no failing subtest named (about 78 s). Selected tests (`--test-name-pattern`) pass.
+- **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).
+Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
+text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Native text editing on the canvas</title>
+<link rel="icon" href="data:,">
+<style>body{margin:0}#host{position:relative;width:640px;height:420px}canvas{width:100%;height:100%;display:block}</style>
+<div id="host"><canvas width="640" height="420" aria-label="Text field tests"></canvas></div>
+<button id="after">After the canvas</button>
+<script type="module">
+import { Engine } from '@margoengine/core';
+import { Ui, UiRenderer, Button, themes } from '@margoengine/ui';
+import { TextInput, TextArea, attachTextInputs } from '@margoengine/ui/input';
+const canvas = document.querySelector('canvas');
+const engine = await Engine.create(canvas);
+const ui = new Ui({ reducedMotion: true, safeArea: [0,0,0,0] });
+let submitted = 0;
+const name = new TextInput({ id:'name', label:'Name', value:'Alice', width:300, anchor:'top-left', margin:20, onSubmit:()=>submitted++ });
+const password = new TextInput({ id:'password', label:'Password', type:'password', width:300, anchor:'top-left', margin:[80,0,0,20] });
+// Lewis Carroll, Alice's Adventures in Wonderland (1865), public domain.
+// Source: https://www.gutenberg.org/ebooks/11 . No code or third-party UI asset.
+const area = new TextArea({ id:'message', label:'Message', value:'Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do.', width:300, height:140, anchor:'top-left', margin:[140,0,0,20] });
+const done = new Button({ id:'done', text:'Done', anchor:'top-left', margin:[300,0,0,20] });
+ui.add(name,password,area,done);
+UiRenderer.attach(engine,ui);
+const detach = attachTextInputs(ui, canvas);
+await ui.ready;
+engine.render(0);
+window.textTest = {
+ ui,name,password,area,done,engine,themes,
+ state:()=>({value:name.value, start:name.selectionStart,end:name.selectionEnd,focused:ui.focused?.id,submitted}),
+ async frame(){
+  engine.render(0);
+  const image = await createImageBitmap(canvas), copy = new OffscreenCanvas(image.width,image.height), ctx=copy.getContext('2d');
+  ctx.drawImage(image,0,0);image.close();
+  const bytes=ctx.getImageData(0,0,copy.width,copy.height).data;
+  let bright=0; for(let y=28;y<56;y++)for(let x=30;x<150;x++){const i=(y*copy.width+x)*4;if(bytes[i]>160 && bytes[i+1]>160 && bytes[i+2]>160)bright++;}
+  const commands=ui.draw().commands;
+  const selection=commands.find(c=>c.type==='rect' && c.fill[0]===1 && c.fill[1]===1 && c.fill[2]===0);
+  let selectedBlack=0,selectedYellow=0;
+  if(selection)for(let y=selection.y+1;y<selection.y+selection.height-1;y++)for(let x=selection.x+1;x<selection.x+selection.width-1;x++){
+   const i=(y*copy.width+x)*4;
+   if(bytes[i]<40 && bytes[i+1]<40 && bytes[i+2]<40)selectedBlack++;
+   if(bytes[i]>220 && bytes[i+1]>220 && bytes[i+2]<40)selectedYellow++;
+  }
+  return {bright,selectedBlack,selectedYellow,commands:commands.map(c=>c.type), backend:globalThis.__margoCompat?'compat':'native'};
+ },
+ close(){detach();engine.dispose();ui.dispose();}
+};
+</script>
+</html>

@@ -37,6 +37,18 @@ reclaim point, reclaim at four minutes, and check defaults and invalid limits;
 `tests/gpu-lock.test.js` proves acquisition publishes the window. This is a
 scheduler correctness claim, not a renderer, timing or full D3D11 parity claim.
 
+## Batch 258 input entry
+
+`@margoengine/ui/input` supplies single-line, multiline and password widgets,
+canvas selection/caret drawing and native clipboard/IME editing through
+attachTextInputs. The public row is tested by packages/ui/tests/text-input.test.js
+and text-input-browser.mjs, including a real browser composition session and
+native undo. It adds no core/stage feature or root UI import. The evidence
+scope is automated Chromium plus the complete WebGL2 compatibility route;
+no human assistive-technology certification or measured rival speed claim.
+Research, rival inventories and the public-domain text source are recorded
+in clean-room.md. Reproduction commands are in reproduce.md.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

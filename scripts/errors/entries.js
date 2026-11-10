@@ -875,6 +875,13 @@ export const entries = [
     title: '@margoengine/ui: widgets, layout, themes and input',
     kind: 'family',
     messages: [
+      'TextInput value, placeholder and autocomplete must be strings',
+      "TextInput type is 'text' or 'password'",
+      'maxLength is -1 or a non-negative integer',
+      'TextInput value must be a string',
+      'Selection offsets must be finite',
+      'Invalid selection direction',
+      'insertText needs a string',
       'Label text is a string',
       'List items are an array of strings or { label } entries',
       'A list entry is a string or has a string label',
