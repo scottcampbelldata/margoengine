@@ -479,7 +479,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Some shadowed point or spot light has a `shadow.radius`: the WGSL and the frame carry its PCSS data. */
   private softShadows = false;
   /** Each light's `shadow.radius` as `setLights` took it (light objects are the caller's), and the list it came from. */
-  private readonly radii = new Float32Array(1024);
+  // Sized to the light count (Clustered takes up to 65,536); a fixed 1,024 dropped the radius of every later light.
+  private radii = new Float32Array(1024);
   private radiusList?: readonly unknown[];
   /** Layers the depth-pass camera buffer holds; it grows past the point and spot layers only for directional and area maps. */
   private cameraLayers = 0;
@@ -552,12 +553,14 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     const r: Source = { source: runtime, dynamic };
     this.sources.push(r);
     // The atlas finds the faces an added or removed caster reaches from its bounds; the array re-renders every layer.
+    // A drawLocalShadow hook has no bounds: removing it re-renders every face in the atlas too.
+    const unbounded = !('id' in runtime) && typeof runtime.drawLocalShadow === 'function';
     if (!this.atlasMode) this.invalidate();
     return () => {
       const index = this.sources.indexOf(r);
       if (index >= 0) {
         this.sources.splice(index, 1);
-        if (!this.atlasMode) this.invalidate();
+        if (!this.atlasMode || unbounded) this.invalidate();
       }
     };
   }
@@ -727,8 +730,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       layers = 0,
       soft = false;
     const bases = this.bases.fill(0),
-      lightList = this.lights.list,
-      radii = this.radii;
+      lightList = this.lights.list;
+    if (count > this.radii.length) {
+      this.radii = new Float32Array(this.lights.maxLights);
+      this.radiusList = undefined;
+    }
+    const radii = this.radii;
     if (lightList !== this.radiusList) {
       this.radiusList = lightList;
       for (let j = 0; j < count; j++) radii[j] = shadowRadius(lightList[j]);
@@ -876,6 +883,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       ) {
         this.sources.splice(i, 1);
         casters = true;
+        // A disposed hook source has no bounds: every atlas face may hold its depth.
+        if (!('id' in r.source) && typeof r.source.drawLocalShadow === 'function') everything = true;
       }
     }
     for (const r of this.sources) {
@@ -896,7 +905,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         if (typeof r.source.drawLocalShadow === 'function') {
           hooks.push(r.source);
           // Terrain rings follow the camera: without a version a hook source re-renders every frame.
-          if (r.source.shadowVersion === undefined) casters = true;
+          // Hooks are not culled by bounds, so in atlas mode too they dirty every face.
+          if (r.source.shadowVersion === undefined) casters = everything = true;
         }
         if (r.version !== r.source.shadowVersion) {
           r.version = r.source.shadowVersion;
@@ -1187,6 +1197,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     let records = this.draws.get(p.node);
     if (!records) this.draws.set(p.node, (records = new Map()));
     let d = records.get(identity);
+    const old = d;
     if (
       !d ||
       d.vertex !== p.vertex ||
@@ -1234,6 +1245,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         };
         records.set(identity, d);
         this.changed = true;
+        // New buffers under the same identity (a geometry swap): the faces the old bounds reached hold its depth.
+        if (old && old.count !== -1) this.touched.push(Float32Array.from(old.sphere));
       } catch (error) {
         uniform.destroy();
         throw error;

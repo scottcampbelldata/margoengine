@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShadowAtlas, packShadowAtlas } from '../dist/shadow-atlas.js';
 import { Clustered } from '../dist/index.js';
+import { LocalShadows } from '../dist/shadows.js';
 import { Camera } from '../../core/dist/index.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -154,4 +155,61 @@ test('a layer that leaves the atlas and returns to its old rectangle re-renders 
   atlas['tiles']=[a,b];atlas['placeMaps'](c,2,dirty);
   assert.deepEqual([...dirty],[0,1,0,0]);
   atlas.dispose();lights.dispose();
+});
+
+test('atlas: a drawLocalShadow hook source draws every face when added, while unversioned and when removed', () => {
+  const {h,frame}=cached(),
+    lights=Clustered.attach(h.engine,{grid:[1,1,1]}),
+    atlas=ShadowAtlas.attach(h.engine,{lights,resolution:256,minResolution:16,maxResolution:64});
+  lights.setLights([{position:[0,3,0],range:10,castShadow:true}]);
+  atlas.add(box(h.engine,[0,1,0],1));
+  assert.equal(frame(),6);
+  assert.equal(frame(),0);
+  const calls=[];
+  const remove=atlas.add({drawLocalShadow:d=>calls.push(d.layer)});
+  assert.equal(frame(),6,'added unversioned hook: every face (hooks are not culled by bounds)');
+  assert.equal(calls.length,6,'and the hook draws into each');
+  assert.equal(frame(),6,'an unversioned hook re-renders every frame');
+  remove();
+  assert.equal(frame(),6,'removed hook: its depth leaves every face');
+  assert.equal(frame(),0);
+  const removeVersioned=atlas.add({drawLocalShadow:d=>calls.push(d.layer),shadowVersion:1});
+  assert.equal(frame(),6,'added versioned hook');
+  assert.equal(frame(),0,'a versioned hook caches');
+  removeVersioned();
+  assert.equal(frame(),6,'removed versioned hook: its depth leaves every face');
+  atlas.dispose();lights.dispose();
+});
+
+test('atlas: a primitive that swaps geometry re-renders the faces its old bounds reached, not only the new ones', () => {
+  const {h,passes,frame}=cached(),
+    lights=Clustered.attach(h.engine,{grid:[1,1,1]}),
+    atlas=ShadowAtlas.attach(h.engine,{lights,resolution:256,minResolution:16,maxResolution:64});
+  lights.setLights([{position:[0,0,0],range:10,castShadow:true}]);
+  const p={node:{id:1,engine:h.engine,check(){},matrix:new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])},
+    primitive:{},vertex:{},index:{},count:36,stride:80,bounds:[3,0,0,0.5]};
+  atlas.add({shadowPrimitives:[p]});
+  assert.equal(frame(),6);
+  assert.equal(frame(),0);
+  const layout=atlas.layout;
+  // Same primitive identity, new buffers, geometry now on -x: the +x face (layer 0) still holds the old depth.
+  p.vertex={};p.index={};p.bounds=[-3,0,0,0.5];
+  assert.equal(frame(),2,'the +x face (old bounds) and the -x face (new bounds)');
+  const views=passes.map(r=>r.viewport.slice(0,2).join());
+  for(const l of [0,1]) assert.ok(views.includes(`${layout[l].x},${layout[l].y}`),`face ${l} re-rendered`);
+  atlas.dispose();lights.dispose();
+});
+
+test('a castShadow light past index 1,023 keeps its PCSS radius and its cached maps', () => {
+  const {h,frame}=cached(),
+    lights=Clustered.attach(h.engine,{grid:[2,2,2],maxLights:1100}),
+    shadows=LocalShadows.attach(h.engine,{lights,maxLights:2,resolution:64});
+  shadows.add(box(h.engine,[0,1,0],1));
+  const list=Array.from({length:1100},(_,i)=>({position:[i*0.001,3,0],range:10}));
+  list[1050]={position:[0,3,0],range:10,castShadow:true,shadow:{radius:0.5}};
+  lights.setLights(list);
+  assert.equal(frame(),6);
+  assert.match(h.context.shader,/fn clusterSoftShadow\(/,'the soft shadow path is composed');
+  assert.equal(frame(),0,'a still frame re-renders nothing');
+  shadows.dispose();lights.dispose();
 });
