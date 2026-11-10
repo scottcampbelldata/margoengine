@@ -3237,3 +3237,6 @@ Build packages, then node --test --test-timeout=60000 packages/react/tests/porta
 
 ### Repeated line textures (batch 227 job 2)
 After build: node --test --test-timeout=120000 packages/lines/tests/texture.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js and repeat with --compat. Build before starting the browser so served dist changes cannot trigger a reload. The textured check exercises unequal segment lengths, image transparency and picks, UV edits, progress, mip/device restoration, and promise image decoding. Authored red/transparent pixels and a generated 1x1 image are synthetic correctness fixtures, not third-party demo assets.
+### Batch 231 surface placements
+
+After building packages, run node --test --test-timeout=120000 packages/scatter/test/surface.test.js. In a shared GPU slot run node packages/scatter/test/surface.browser.mjs and repeat with --compat. The real-data fixture samples the checked-in standard Teapot and places the licensed Khronos plant through TexturedScatter, comparing it to independently decomposed root transforms. Test PNGs are saved under test-results/batch231-surface-*.png. No wall-clock assertion or benchmark.

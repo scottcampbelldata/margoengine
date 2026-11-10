@@ -13,7 +13,7 @@ const url='/examples/assets/khronos-samples/DiffuseTransmissionPlant.glb';
 let engine,canvas,scatter,models,shadows;
 const errors=[];
 window.check={
- async show({reference=false,normal=true,mask=true,cast=true,samples=4,restore=false}={}){
+ async show({reference=false,normal=true,mask=true,cast=true,samples=4,restore=false,surface=false}={}){
   engine?.dispose();canvas?.remove();
   globalThis.margoLow=samples===1?1:undefined;
   canvas=document.body.appendChild(document.createElement('canvas'));
@@ -24,18 +24,30 @@ window.check={
   const floor=engine.createMesh().setGeometry(box(4,0.01,4)).setMaterial(new PbrMaterial({color:'#888888',roughness:1}));
   floor.setPosition([0,-0.02,0]);
   shadows=Shadows.attach(engine,{resolution:512,cascades:1,distance:6});
-  models=[];let masks=0,normals=0;
+  models=[];let masks=0,normals=0,placements;
+  if(surface){
+   const {scatterSurface}=await import('/packages/scatter/dist/surface.js');
+   const {teapotGeometry}=await import('/packages/geometry/dist/teapot.js');
+   const data=teapotGeometry(0.4,6,{bottom:false}),weights=Array.from({length:data.positions.length/3},(_,i)=>Math.max(0,data.normals[i*3+1]));
+   placements=scatterSurface(data,2,{weights,seed:48,scale:[0.8,0.8],offset:0.03}).transforms;
+  }
   for(let j=0;j<(reference?2:1);j++){
    const model=await loadGLTF(engine,url,{materials:extendedMaterials});models.push(model);
    for(const p of model.primitives){
     if(p.material.settings[0]===1){masks++;p.material.renderState={alphaToCoverage:true};if(!mask)p.material.settings[0]=0;}
     if(p.material.maps[2]){normals++;if(!normal)p.material.maps[2]=undefined;}
    }
-   if(reference)model.root.setPosition([j===0?-0.4:0.4,0,0]);
+   if(reference){
+    if(placements){
+     const {Matrix4,Quaternion,Vector3}=await import('/packages/math/dist/index.js');
+     const m=new Matrix4().fromArray(placements,j*16),p=new Vector3(),q=new Quaternion(),s=new Vector3();
+     m.decompose(p,q,s);model.root.setPosition([p.x,p.y,p.z]).setQuaternion([q.x,q.y,q.z,q.w]).setScale([s.x,s.y,s.z]);
+    }else model.root.setPosition([j===0?-0.4:0.4,0,0]);
+   }
    else {
     const matrices=new Float32Array(32);
     for(let i=0;i<2;i++){matrices.set([1,0,0,0,0,1,0,0,0,0,1,0,i===0?-0.4:0.4,0,0,1],i*16);}
-    scatter=TexturedScatter.attach(engine,model,matrices);
+    scatter=TexturedScatter.attach(engine,model,placements??matrices);
    }
    if(cast)shadows.add(model);
   }

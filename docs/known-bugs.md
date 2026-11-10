@@ -4542,3 +4542,6 @@ No open defect identified in the job: native and compatibility clipmap, RVT and 
 No open correctness defect identified. Independent all-pairs component tests include negative cells, grid seams, chains, minimum size and zoom splitting. Renderer tests show camera zoom restores individual labels; browser tests show count-bubble centroid alignment and logical zoom recovery on native WebGPU and WebGL2.
 
 Batch 266 portal ownership regressions: explicit RenderView replaces the implicit main view, avoiding a duplicate canvas draw; StrictMode, nested cameras, target resize and last-owner cleanup are covered by portals.test.js. No new open defect identified in the tested paths.
+### Batch 231 surface scatter
+
+No open defect in the new placement entry. Its CPU and real-data GPU comparisons cover world area, painted density, source attributes and normal alignment. It explicitly refuses nonfinite sampled attributes rather than returning unusable matrices or colours. Existing geometry/sample accepts nonfinite UV/colour values and can return NaNs (repro: a triangle with all UV.x = NaN or colors[0] = NaN); its constructor checks attribute lengths but not these values. That separate sampler validation gap remains for its owning package in the fix phase; the new surface entry rejects it before returning.

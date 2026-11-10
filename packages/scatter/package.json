@@ -49,6 +49,10 @@
     "./textured": {
       "types": "./dist/textured.d.ts",
       "import": "./dist/textured.js"
+    },
+    "./surface": {
+      "types": "./dist/surface.d.ts",
+      "import": "./dist/surface.js"
     }
   },
   "files": [
@@ -62,13 +66,17 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/lod": {
       "optional": true
     },
     "@margoengine/gltf-pro": {
+      "optional": true
+    },
+    "@margoengine/geometry": {
       "optional": true
     }
   },
@@ -89,6 +97,7 @@
     "test:browser:interact": "cd ../.. && node packages/scatter/test/interact.browser.mjs",
     "test:browser:imposter": "cd ../.. && node packages/scatter/test/imposter.browser.mjs",
     "prepack": "npm run build",
-    "test:browser:textured": "cd ../.. && node packages/scatter/test/textured.browser.mjs"
+    "test:browser:textured": "cd ../.. && node packages/scatter/test/textured.browser.mjs",
+    "test:browser:surface": "cd ../.. && node packages/scatter/test/surface.browser.mjs"
   }
 }

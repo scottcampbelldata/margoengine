@@ -3768,3 +3768,6 @@ React RenderTexture draws child content to a native material texture; Hud stacks
 
 ### Repeated textured strokes (batch 227 job 2)
 Optional textured lines map repeat continuously by world length, with alpha cutouts shared by colour, depth and picking; UV edits and restoration retain Stroke width/progress behavior. Proof: packages/lines/tests/texture.test.js and textured in packages/lines/tests/features-browser.js at 1x/4x samples on both backends. No other material-system or performance parity claim.
+### Batch 231 job 2: scatter on arbitrary mesh surfaces
+
+scatter/surface composes geometry's MeshSurfaceSampler with world-area preprocessing and normal-aligned affine placements. CPU evidence in surface.test.js covers weighted/unweighted moments, four-to-one transformed face area, inverse-transpose normals, undersides and cliffs, colours/UVs, repeatability and invalid output refusal. surface.browser.mjs compares real plant copies on a standard model to independent model-root transforms on both backends at 1x/4x MSAA; mean channel error is below 0.00005 on the development RTX A6000. No speed claim. Research and existing asset licences are recorded in clean-room.md.

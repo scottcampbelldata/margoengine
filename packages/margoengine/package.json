@@ -2970,6 +2970,10 @@
       "types": "./dist/scatter/textured.d.ts",
       "import": "./dist/scatter/textured.js"
     },
+    "./scatter/surface": {
+      "types": "./dist/scatter/surface.d.ts",
+      "import": "./dist/scatter/surface.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
