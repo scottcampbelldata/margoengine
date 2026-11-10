@@ -3586,6 +3586,10 @@
       "types": "./dist/tilemap/objects.d.ts",
       "import": "./dist/tilemap/objects.js"
     },
+    "./tilemap/plane": {
+      "types": "./dist/tilemap/plane.d.ts",
+      "import": "./dist/tilemap/plane.js"
+    },
     "./tiles/properties": {
       "types": "./dist/tiles/properties.d.ts",
       "import": "./dist/tiles/properties.js"

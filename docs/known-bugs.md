@@ -4511,3 +4511,5 @@ depth masking. The visual approximations are listed in docs/limits.md.
 
 - Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
 - Existing physical-material compatibility limit: scripts/gltf-pro-materials-gpu-check.js rejects the two 16-texture worst-case composed pipelines on RTX A6000 with MAX_TEXTURE_IMAGE_UNITS(16); all 160 BRDF numeric cases match and native pipelines pass. The direct shader fixture never attaches MToon; its shader/composition inputs are identical to parent 0d80e463b (hash proof in whitepaper/results/batch213-physical-compat-existing-failure.json). WebGL2 sampler-layout integration waits for the fix phase; no assertion or tolerance changed.
+
+Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and real-GPU ray-plane checks. Existing cross-lane browser-inventory findings remain listed above.

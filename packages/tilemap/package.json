@@ -57,6 +57,10 @@
     "./objects": {
       "types": "./dist/objects.d.ts",
       "import": "./dist/objects.js"
+    },
+    "./plane": {
+      "types": "./dist/plane.d.ts",
+      "import": "./dist/plane.js"
     }
   },
   "files": [
@@ -80,6 +84,7 @@
     "test:gpu": "cd ../.. && node packages/tilemap/test/browser-check.mjs",
     "prepack": "npm run build",
     "test:gpu:iso": "cd ../.. && node packages/tilemap/test/iso-check.mjs",
-    "test:gpu:objects": "cd ../.. && node packages/tilemap/test/objects-check.mjs"
+    "test:gpu:objects": "cd ../.. && node packages/tilemap/test/objects-check.mjs",
+    "test:gpu:plane": "cd ../.. && node packages/tilemap/test/plane-check.mjs"
   }
 }

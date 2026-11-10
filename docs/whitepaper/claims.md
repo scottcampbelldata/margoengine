@@ -3721,3 +3721,7 @@ Batch 213 job 2 MToon: direct-light bands, matcap orientation, local-light rim, 
 ### Batch 211 job 2
 
 Nested, normalized direct, Cartesian gradient-band and polar directional trees play through Animator, typed graphs and layers. Proof: packages/animator/test/blend-trees.test.js uses exact analytical cases and parameter sweeps; layers-browser.mjs renders a nested direct/directional Fox layer. Comparison and research citations are in docs/clean-room.md. No performance or motion-quality superiority claim.
+
+
+### Batch 246 job 3: perspective tile planes
+The optional plane entry places a complete tile map on an affine 3D plane and shares scene depth. CPU proofs check matrix composition, invalid transforms, owned inputs and depth-state controls. Real GPU proofs compare every pixel against independent analytic ray-plane intersections for a tilted perspective map, moved camera, opaque core-mesh occlusion, cutout plane occlusion and separate view cameras. Both native WebGPU and WebGL2 compatibility are checked. Sources: packages/tilemap/test/plane.test.js and plane-check.mjs. No speed claim or picking claim.

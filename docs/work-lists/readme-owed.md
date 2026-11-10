@@ -537,3 +537,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 213 job 2): rigging/mtoon and gltf-pro/material-draw aliases.
 - @margoengine/animator (batch 211 job 2): document /blend-trees RichBlendTree schemas, createBlendTree, gradient modes, direct zero/negative weights, nesting, graph/layer/sync/root-motion integration and limits; examples deferred.
 - margoengine (batch 211 job 2): document generated animator/blend-trees alias.
+
+
+| @margoengine/tilemap | plane: PlaneTileMap transforms, world units, active core/view camera, depth writes/testing, cutouts, transparent order, finite-map repeat, runtime edits and disposal | batch-246 job 3 |
+| margoengine | Generated tilemap/plane alias | batch-246 job 3 |

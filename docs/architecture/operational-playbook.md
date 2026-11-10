@@ -2221,6 +2221,8 @@ It uses the same optional backdrop on native WebGPU and full WebGL2 compatibilit
 core and stage are unchanged. It makes no calibrated lunar photometry claim.
 
 
+Batch 246 job 3: tilemap/plane composes the active core camera with a map-pixel affine basis and loads/stores the existing reversed-Z scene depth. It adds no core or stage path. Independent all-pixel ray-plane proofs cover perspective, camera movement, ordinary mesh occlusion, alpha holes and distinct view cameras on WebGPU and WebGL2 compatibility. CPU tests validate matrix order, mutation and depth controls. No speed or picking evidence is claimed.
+
 Batch 209 GIF: shared exporter palette/codec CPU correctness includes LZW dictionary growth, transparent frames, async cancellation and centisecond rounding. gif-gpu.mjs renders through native WebGPU and full WebGL2 compatibility and independently decodes every frame; three-frame fixture error is zero. Existing exporter capture-browser checks pass on both paths. This changes no render math or core/stage code.
 
 Batch 207 meshopt: section-exact round trips cover seven file variants, plus bounded corrupt-stream and expansion-bomb rejection. Both backends compare all pixels of original and compressed static/animated draws. Existing codecs and GPU layouts are unchanged; no throughput/latency proof is claimed during the speed deferral.

@@ -3191,3 +3191,7 @@ Batch 213 existing extension driver compatibility command: set MARGO_COMPAT=1 in
 ### Batch 211 job 2
 
 After build: node --test packages/animator/test/blend-trees.test.js. Run the animator package GPU command through the shared lock on WebGPU and again with MARGO_COMPAT=1 for WebGL2 compatibility. Fox remains the existing Khronos CC0 model. Exact synthetic weight and pose oracles are CPU conformance tests, not demo content.
+
+
+### Batch 246 job 3
+After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/plane.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tilemap-plane-proof --gpu=perspective-depth-pixel-readback --max=1 --wait-max=60 -- node packages/tilemap/test/plane-check.mjs`, then append `--compat`. Artifacts: test-results/tilemap-plane.json and tilemap-plane-compat.json. All 4096 pixels per scene are compared exactly; source transforms keep projected boundaries off sample centres so the independent oracle does not depend on rasterizer edge tie-breaking.

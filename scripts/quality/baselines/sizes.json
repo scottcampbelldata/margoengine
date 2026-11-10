@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13123686,
+  "total": 13131427,
   "history": [
     {
       "date": "2026-10-24",
@@ -6601,6 +6601,12 @@
       "date": "2026-11-10",
       "commit": "batch-211-job2",
       "reason": "Graph compiled-tree bridge: artifact 9719 B gzip exceeds prior 9699 B ceiling by 20 B; raise to 10011. Controlled source bundles: parent 9325 B -> current 9483 B. Keeping validation shared avoids separate incompatible graph and root samplers."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-246-job-3",
+      "reason": "New optional tilemap/plane: 0 to 7485 B min+gzip, ceiling 7741 B. Reuses ordered quads, image ownership and texture runs with one affine core-camera transform and shared reversed-Z depth. A separate reduced renderer would duplicate its lifecycle and lose object/image parity.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7815,6 +7821,7 @@
     "margoengine/loaders/threemf-lattice": 326,
     "margoengine/loaders/threemf-materials": 328,
     "margoengine/selection/highlight": 322,
-    "@margoengine/animator/blend-trees": 1841
+    "@margoengine/animator/blend-trees": 1841,
+    "@margoengine/tilemap/plane": 7741
   }
 }
