@@ -1,5 +1,9 @@
 # README work owed
 
+- @margoengine/sciviz (review 3 dependency gate): retain the package browser-root bootstrap for fallback and table test commands; examples deferred.
+
+- @margoengine/splats (review 3): cover progressive cancellation during pending async iteration and between buffered batches, including producer cleanup ownership; examples deferred.
+
 - @margoengine/rigging (review 3): cover mixed MToon and standard PBR/unlit materials, alpha queues and restored records; examples deferred.
 
 

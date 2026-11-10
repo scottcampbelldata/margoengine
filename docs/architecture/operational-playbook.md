@@ -14,6 +14,11 @@ compatibility backends, including pixel, validation and teardown assertions. No 
 Optional decoders/ktx2-hdr6 owns its clean-room Rust/Wasm codec and worker assets; no core, stage or rendering backend changes. All 75 UASTC HDR6 configurations and both stream versions match independent ASTC, half-float and RGB9E5 output records. GPU upload/readback covers the real HDR image on WebGPU and WebGL2 (393,216 exact bytes each); native and compatibility browser suites cover emitted production worker/Wasm assets. HDR6 CPU tests cover malformed dimensions, indices and seek tables, pooling, transfer, abort and disposal. Throughput evidence remains deferred to the speed phase.
 # Engine architecture and quality reference
 
+Review 3 dependency gate: sciviz's fallback and table browser scripts use its
+existing browser-root bootstrap, matching the package's enforced launch contract.
+The browser-root child-process CPU regression and both browser commands verify
+package-directory resolution. No rendering, browser-host or shutdown helper changes.
+
 Review 3, section 5 evidence (2026-11-10): the optional rigging MToon adapter now
 selects standard material primitives in their own alpha queues instead of hiding
 them in every beauty layer. CPU regression captures actual encoded fragment

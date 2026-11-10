@@ -112,3 +112,119 @@ test('ASCII PLY split numeric tokens and final row without newline', async () =>
   for await (const b of readSplatsProgressive(packets(bytes, 1), { format: 'ply' })) all.push(...sorted(b.data));
   assert.deepEqual(all.sort(compare), sorted(parsePly(bytes)));
 });
+
+for (const stalledCleanup of [false, true])
+  test(`abort rejects a pending async iterable read (stalled cleanup ${stalledCleanup})`, {
+    timeout: 10000,
+  }, async () => {
+    const controller = new AbortController(),
+      reason = new Error('cancelled iterable');
+    let announce,
+      finishRead,
+      finishClose,
+      finished = false,
+      closed = 0;
+    const started = new Promise((resolve) => {
+      announce = resolve;
+    });
+    const source = {
+      [Symbol.asyncIterator]() {
+        return {
+          next() {
+            announce();
+            return new Promise((resolve) => {
+              finishRead = resolve;
+            });
+          },
+          async return() {
+            closed++;
+            if (stalledCleanup)
+              await new Promise((resolve) => {
+                finishClose = resolve;
+              });
+            return { done: true };
+          },
+        };
+      },
+    };
+    const iterator = readSplatsProgressive(source, { format: 'splat', count: 1, signal: controller.signal });
+    const pending = iterator.next().then(
+      () => {
+        assert.fail('cancelled read resolved');
+      },
+      (error) => {
+        assert.equal(error, reason);
+        finished = true;
+      },
+    );
+    await started;
+    controller.abort(reason);
+    // An event-loop turn drains promise reactions without waiting for source IO or measuring a time budget.
+    await new Promise(setImmediate);
+    const rejectedOnAbort = finished,
+      closedOnAbort = closed;
+    finishRead({ done: true });
+    finishClose?.();
+    await pending;
+    assert.ok(rejectedOnAbort, 'abort must reject before source IO finishes');
+    assert.equal(closedOnAbort, 1, 'abort must request iterator cleanup');
+  });
+
+test('abort releases a pending stream reader while underlying cancellation is pending', {
+  timeout: 10000,
+}, async () => {
+  const controller = new AbortController(),
+    reason = new Error('cancelled stream');
+  let announce,
+    finishClose,
+    finished = false,
+    closed = 0;
+  const started = new Promise((resolve) => {
+    announce = resolve;
+  });
+  const source = new ReadableStream({
+    pull() {
+      announce();
+    },
+    cancel() {
+      closed++;
+      return new Promise((resolve) => {
+        finishClose = resolve;
+      });
+    },
+  });
+  const iterator = readSplatsProgressive(source, { format: 'splat', count: 1, signal: controller.signal });
+  const pending = iterator.next().then(
+    () => {
+      assert.fail('cancelled read resolved');
+    },
+    (error) => {
+      assert.equal(error, reason);
+      finished = true;
+    },
+  );
+  await started;
+  controller.abort(reason);
+  await new Promise(setImmediate);
+  const rejectedOnAbort = finished,
+    lockedOnAbort = source.locked;
+  finishClose();
+  await pending;
+  assert.ok(rejectedOnAbort, 'abort must reject before underlying cancellation finishes');
+  assert.equal(closed, 1);
+  assert.equal(lockedOnAbort, false);
+});
+
+test('abort between batches stops records already buffered from the same chunk', async () => {
+  const controller = new AbortController(),
+    reason = new Error('stop buffered records');
+  const iterator = readSplatsProgressive(packets(fixture('raccoon-v2.splat').subarray(0, 64), 64), {
+    format: 'splat',
+    count: 2,
+    batchSize: 1,
+    signal: controller.signal,
+  });
+  assert.equal((await iterator.next()).value.first, 0);
+  controller.abort(reason);
+  await assert.rejects(iterator.next(), (error) => error === reason);
+});

@@ -47,6 +47,29 @@ class Bytes {
   }
 }
 
+function abortable<T>(pending: PromiseLike<T> | T, signal?: AbortSignal): Promise<T> {
+  if (!signal) return Promise.resolve(pending);
+  return new Promise<T>((resolve, reject) => {
+    const remove = () => signal.removeEventListener('abort', abort);
+    const abort = () => {
+      remove();
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve(pending).then(
+      (value) => {
+        remove();
+        resolve(value);
+      },
+      (error) => {
+        remove();
+        reject(error);
+      },
+    );
+    if (signal.aborted) abort();
+  });
+}
+
 async function* chunks(source: SplatByteStream, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
   signal?.throwIfAborted();
   if (source instanceof ReadableStream) {
@@ -72,9 +95,21 @@ async function* chunks(source: SplatByteStream, signal?: AbortSignal): AsyncGene
       reader.releaseLock();
     }
   } else {
-    for await (const chunk of source) {
-      signal?.throwIfAborted();
-      yield chunk;
+    const iterator = source[Symbol.asyncIterator]();
+    let ended = false;
+    try {
+      for (;;) {
+        signal?.throwIfAborted();
+        const next = await abortable(iterator.next(), signal);
+        signal?.throwIfAborted();
+        if (next.done) {
+          ended = true;
+          break;
+        }
+        yield next.value;
+      }
+    } finally {
+      if (!ended && iterator.return) await abortable(iterator.return(), signal);
     }
   }
 }
@@ -297,6 +332,7 @@ export async function* readSplatsProgressive(
       ascii ? Math.floor(asciiValues.length / width) : Math.max(0, Math.floor((bytes.length - body) / stride)),
     );
     while (emitted < available) {
+      signal?.throwIfAborted();
       const n = Math.min(batch, available - emitted);
       let data: SplatData;
       if (format === 'spz') {

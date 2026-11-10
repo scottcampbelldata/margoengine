@@ -10,6 +10,12 @@ The Cornell comparison is an improvement with a residual loss, not an accuracy-p
 MAE 0.069543 becomes 0.048730 with path mode, one bounce and 32 bounce rays (versus the baseline's quad mode and 16).
 The maximum error falls from 0.900128 to 0.353979. All 881 reference texels are retained; no timing was measured.
 
+Review 3 splats: progressive AbortSignal cancellation rejects pending async
+iteration with exact reason identity, requests iterator cleanup once even when
+it remains pending, and stops between buffered batches. Regression inputs and
+event-order assertions are in packages/splats/test/progressive.test.js. Source
+ownership limits and research comparisons are in docs/splats-progressive.md.
+No new GPU algorithm or speed claim.
 
 Review 3 (2026-11-10): attaching MToon preserves standard PBR/unlit primitives in
 the same model. Evidence: packages/rigging/tests/mtoon.test.js captures visible

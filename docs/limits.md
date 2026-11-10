@@ -14,6 +14,11 @@ shadow visibility. Alpha omission and glass transport retain their explicit visi
 uses the stored texel's front normal and diffuse radiance; it does not add two-sided emission or a new material model.
 The historical Cornell loss remains open as detailed in known-bugs.md; this change makes no accuracy-parity claim.
 
+Progressive splat cancellation rejects pending consumers and requests async
+iterator return without waiting indefinitely for producer IO or cleanup. The
+producer owns external work; its return implementation must release that work.
+Aborting between buffered batches prevents further decoded records. See
+docs/splats-progressive.md for exact cancellation regressions and sources.
 
 Batch 175 job 1: sciviz/omezarr opens OME-NGFF 0.4/Zarr2 and 0.5/Zarr3 multiscales with named spatial/time/channel axes, composed dataset/group scale and translation, one bricked source per stored level, and a dyadic renderer adapter. Reads retain source coordinates; stored LOD samples use nearest-neighbour physical-coordinate sampling, not a claim that arbitrary stored pyramids equal on-the-fly box averaging. Supply volume.bounds and a known range when attaching its source to brickedVolume. Each level also exposes its existing ZarrArray for typed exact-region reads. Rendering is float32; 64-bit integer Zarr reads use the existing Float64 representation and are exact only through 2^53. Arrays are 2D through 5D; renderer volumes need three nondegenerate dimensions. Unknown nonsingleton axes require selection before use. Channel and image default to zero; frame comes from BrickRequest. No IO or GPU allocations occur on import.
 
