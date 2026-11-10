@@ -25,7 +25,10 @@ with recomputed slope normals. `origin` is the minimum world XZ corner; it defau
 to a centered rectangle, and mesh resolution defaults to 192 segments.
 `TerrainHeightmap.attach(engine, height, {size, origin?, resolution?})` owns an
 `r32float` texture sampled at cell centers, exposed as `.texture` for scatter and
-water. Texture resolution defaults to 256. Resolutions are integers in 1..1024.
+water. `Terrain` and `TerrainQuery` read a heightmap corner-aligned instead (texel 0 at `origin`, the last texel at
+`origin + size`), so to draw this texture as a `Terrain` give the terrain `origin + size / (2 resolution)` and
+`size (resolution - 1) / resolution`; the same `origin` and `size` shift the ground by half a cell and stretch it by
+`resolution / (resolution - 1)`. Texture resolution defaults to 256. Resolutions are integers in 1..1024.
 The module validates finite samples and device limits, regenerates the texture
 on device restoration, and destroys it on disposal. Sampling arrays are released
 after upload; there is no per-frame CPU sampling or allocation.

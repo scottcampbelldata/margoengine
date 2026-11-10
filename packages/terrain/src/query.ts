@@ -476,7 +476,6 @@ export class TerrainQuery {
     return t0 + Math.min(Math.max(r, 0), span);
   }
 
-  /** Bilinear world height at (x, z), clamped to the heightmap like the shader's `height`. */
   /** Whether world (x, z) is in a hole cell of `holes` (the cell the terrain's fragment test reads there). */
   private hole(x: number, z: number): boolean {
     const h = this.holes;
@@ -486,6 +485,7 @@ export class TerrainQuery {
     return h.mask[v * h.columns + u] < 128;
   }
 
+  /** Bilinear world height at (x, z), clamped to the heightmap like the shader's `height`. */
   private sample(x: number, z: number): number {
     const c = this.columns,
       px = Math.min(Math.max((x - this.ox) / this.sx, 0), 1) * (c - 1),
