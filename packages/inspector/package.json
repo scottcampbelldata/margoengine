@@ -50,6 +50,10 @@
       "types": "./dist/tweak.d.ts",
       "import": "./dist/tweak.js"
     },
+    "./edit": {
+      "types": "./dist/edit.d.ts",
+      "import": "./dist/edit.js"
+    },
     "./gizmo": {
       "types": "./dist/gizmo.d.ts",
       "import": "./dist/gizmo.js"
@@ -67,7 +71,10 @@
     "@margoengine/lines": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/stats": "^1.0.0",
-    "@margoengine/controls": "^1.0.0"
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/scene": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
@@ -79,6 +86,8 @@
     "test:browser": "node test/parity-browser.mjs",
     "test:browser:compat": "node test/parity-browser.mjs --compat",
     "test:browser:gizmo": "node test/gizmo-browser.mjs",
-    "test:browser:gizmo:compat": "node test/gizmo-browser.mjs --compat"
+    "test:browser:gizmo:compat": "node test/gizmo-browser.mjs --compat",
+    "test:browser:edit": "node test/edit-browser.mjs",
+    "test:browser:edit:compat": "node test/edit-browser.mjs --compat"
   }
 }

@@ -6480,6 +6480,37 @@ Cells are cached as 60-pixel tiles with a one-texel neighbor gutter per side. Fi
 
 Batch 258 job 2 sizes: image 0 to 2524 B min+gzip, ceiling 2700 B; UI root 31885 to 32080 B. The small root addition preserves ordered mixed-image drawing using existing colour quads; a separate painter would require another pipeline and pass coordination. Core + stage stays 23950 B.
 
+
+Batch 252 job 6: borderSize now pads each side of the whole-level voxel grid by ceil(borderSize) cells. The world origin/lattice and walkable bounds remain unchanged; padding contains empty cells. For tiles it is a minimum context margin, combined with the required ceil(walkableRadius)+2 cells by max. Only the tile's original cells become output polygons. The whole padded grid, or each padded tile grid, must fit 16,000,000 cells; oversized borders reject before allocation, including deferred/empty tiled builds. Default borderSize=0 retains the existing automatic tile margin. Positive fractions round up. README's former compatibility/no-effect statement is owed an update in the README phase.
+
+Batch 252 job 6 measured entry sizes: @margoengine/navmesh/build: 12519 B gzip (ceiling 12727 -> 12727 B); @margoengine/navmesh/tiles: 14985 B gzip (ceiling 15113 -> 15113 B); @margoengine/navmesh/wasm: 17357 B gzip (ceiling 17808 -> 17808 B); @margoengine/navmesh dist/workers/navmesh-build.js: 17511 B gzip (ceiling 17951 -> 17951 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+Batch 252 job 6 byte deltas: build 12,491 -> 12,519 B gzip; tiles 14,911 -> 14,985 B; wasm entry 17,289 -> 17,357 B; worker script 17,428 -> 17,511 B. All existing optional ceilings remain sufficient; core plus stage remains 23,950 B.
+@margoengine/input/lock: 1360 B gzip (previously absent), ceiling 1616 B. Cohesive lifecycle retained; no separate fragment entry. Core and stage unchanged.
+
+Batch 253 pointer lock: optional input/lock exports PointerLock. request defaults to unadjustedMovement true and falls back once to adjusted movement only on native NotSupportedError; fallback false rejects instead. Permission and activation failures propagate. Requests must originate in a user gesture; the complete request has a 5000 ms timeout (configurable) and AbortSignal. A legacy void API settles from pointerlockchange/error and raw is null because ignored options cannot be detected. Modern raw is true on confirmed raw acquisition and false on adjusted movement or release. update consumes relative counts, exposes x/y without clamping, and publishes control id lock (configurable on attach), axes x/y. Scale actions to avoid their standard scalar clamp. release cancels pending work, exits only the owned lock and clears counts. Late modern acquisitions after cancellation/disposal are released. Legacy browser requests cannot be canceled by the platform; a late legacy acquisition is released while the publisher is alive. Physical raw-count fidelity is a hardware follow-up.
+Batch 255 job 2: save/scene-state captures bound point, spot, directional and area light lists including all shadow options; mutable directional Shadows.options can be bound separately. Animation/Animator snapshots include pause, rate, loop, state time, triggers, parameters, current/rest/fade pose and independently timed layers. Restore onto the same model topology and installed state definitions, clocks and procedural solvers. Stateful custom clocks supply captureState/restoreState; callbacks and GPU handles remain app-owned. Snapshots use finite JSON; they do not serialize asset data or procedural functions. Failed binding restoration rolls back changed bindings and reports rollback failures. No core or stage changes.
+
+Batch 255 job 2: @margoengine/animation/interactivity 21540 to 24983 B, ceiling 24902 to 25733; @margoengine/animator 19150 to 20041 B, ceiling 19297 to 20643; @margoengine/animator/graph 8527 to 9416 B, ceiling 8542 to 9699; @margoengine/save/scene-state None to 1011 B, ceiling None to 1267. Exact fade poses, layer and sync clocks and transactional save state justify optional bytes. Keeping owner methods avoids a private-field shim or duplicated animator implementation. Core plus stage unchanged at 23950 B.
+
+
+## Batch 262 scene editing
+
+New optional inspector/edit: absent to 4451 B min+gzip (bare imports external).
+Inspector root 9073 -> 9184 B; history 925 B and tweak 4093 B include resource
+finalization. Core plus stage remains 23950 B. Geometry/primitives, clustered and
+scene are explicit optional dependencies of edit; their existing algorithms are reused.
+This entry edits core primitive/group subtrees; package-owned PBR models reject.
+Deleted handles consume transform slots until their last history command expires;
+geometry GPU allocations are released when unused. No new core feature is required.
+Reparent preserves local TRS and checks the whole subtree against the existing 64
+level bound. Preview has ambient lights; point/spot/additional directional lights
+require the WebGPU API (including the compatibility device). Existing light package
+limits remain unchanged. External disposal of retained history handles is unsupported.
+
+Finalizer validation adds 28 B to history (897 -> 925), 28 B to inspector root
+(9156 -> 9184) and 24 B to tweak (4069 -> 4093), within existing ceilings.
+The command rejects a non-callable discard before changing either stack.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -10586,7 +10617,6 @@ text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 ### Batch 255 save capture blockers
 
 - Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
-- Job 2 remains unbuilt: captureScene omits light lists and model playback; exact weighted playback restoration also requires Animator's private fade pose/elapsed and layer/clock state (packages/animator/src/index.ts). Repro: capture during a layered crossfade and restore; the playing clips/time/weights cannot be recovered through the current public save API. That owning-package serialization is outside this lane's scope. No partial scene-state entry is shipped.
 
 ### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
 
@@ -10658,6 +10688,14 @@ Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional 
 Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
 
 Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.
+
+
+Fixed in batch 262 scene editing: a non-callable Edit.discard previously entered
+history and could abandon redo before any error. EditHistory.record now validates
+the optional finalizer before mutation. Regression: the invalid history finalizer
+case in packages/inspector/test/edit.test.js fails without the validation.
+
+Fixed in batch 262: the React after-scene readiness fixture counted historical plugin instances whenever their name was currently attached. Reused materials:opaque-color names could count twice with no material installation, publish ready too soon, then report 0 instead of 1. It now reads the current engine.plugins identities. Regression: packages/react/tests/plugin-state.test.js and the unchanged installation assertion in packages/react/scripts/test-after-scene-browser.js. The latter passed once on clean main 5d6e5facd, failed with the rebased fixture, and passes after the observation fix; no assertion or timeout was loosened.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

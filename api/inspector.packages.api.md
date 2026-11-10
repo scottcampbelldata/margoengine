@@ -65,6 +65,7 @@ interface Edit {
     undo(): void;
     redo(): void;
     key?: string;
+    discard?(): void;
 }
 
 class EditHistory {

@@ -2684,3 +2684,13 @@ After build:packages, run node --test --test-timeout=120000 packages/ui/tests/im
 Batch 252 job 6: after building, run node --test --test-timeout=120000 packages/navmesh/test/border.test.js packages/navmesh/test/wasm.test.js. A 32x32-cell floor with borderSize=3 must allocate 38x38 columns with empty outer padding, retain byte-identical walkable polygons and match the Rust worker. Tile tests inspect bounds and all interior cell centers, not timings.
 Batch 253 pointer lock: build packages, run node --test --test-timeout=30000 packages/input/test/lock.test.js. Under a shared GPU lock, run node packages/input/test/input-browser.mjs and the same command with --compat. The browser fixture uses a click to acquire native lock, feeds vector/locked counts into a mesh transform and compares red-pixel centroids before movement, after movement and after release. It uses generated primitive geometry as a test fixture, no public demo asset.
 Batch 255 scene-state: build packages, then run node --test packages/animator/test/playback-state.test.js packages/save/tests/scene-state.test.js. Run the save engine browser check through the shared GPU lock on native WebGPU and MARGO_COMPAT=1. Use the existing Knight.glb fixture (source/licence already in THIRD-PARTY-NOTICES.md). No benchmarks.
+
+
+## Batch 262 scene editing
+
+Run npm run test --workspace @margoengine/inspector. After build:packages, run
+node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 -- node
+packages/inspector/test/edit-browser.mjs, then the same command with --compat appended.
+The browser tests use real HTML tree dragging and form input, plus rendered native
+point/spot/directional lights and preview ambient. All assertions are correctness
+checks, never time budgets. README coverage is tracked in docs/work-lists/readme-owed.md.

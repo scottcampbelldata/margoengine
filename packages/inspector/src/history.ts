@@ -13,6 +13,8 @@ export interface Edit {
    * across fifty values undoes in one step. The merged edit keeps the first `undo` and takes the latest `redo`.
    */
   key?: string;
+  /** Releases retained resources when this edit leaves both stacks. Called once; never during undo/redo. */
+  discard?(): void;
 }
 
 /**
@@ -70,13 +72,21 @@ export class EditHistory {
    * @throws TypeError when `edit` lacks a label, `undo` or `redo`; MargoError `'state'` from inside an undo or redo.
    */
   record(edit: Edit): void {
-    if (!edit || typeof edit.label !== 'string' || typeof edit.undo !== 'function' || typeof edit.redo !== 'function')
-      throw new TypeError('History edit needs a label, undo and redo; pass {label, undo, redo}');
+    if (
+      !edit ||
+      typeof edit.label !== 'string' ||
+      typeof edit.undo !== 'function' ||
+      typeof edit.redo !== 'function' ||
+      (edit.discard !== undefined && typeof edit.discard !== 'function')
+    )
+      throw new TypeError('History edit needs a label, undo, redo and optional discard function; pass callable actions');
     if (this.running) throw new MargoError('state', 'History is replaying an edit; record edits outside undo and redo');
     const time = this.now(),
       previous = this.done.at(-1);
     if (
       edit.key !== undefined &&
+      !edit.discard &&
+      !previous?.discard &&
       previous?.key === edit.key &&
       !this.undone.length &&
       time - this.last <= this.coalesceMs
@@ -84,10 +94,11 @@ export class EditHistory {
       this.done[this.done.length - 1] = { label: edit.label, key: edit.key, undo: previous.undo, redo: edit.redo };
     else {
       this.done.push(edit);
-      if (this.done.length > this.limit) this.done.shift();
+      if (this.done.length > this.limit) this.done.shift()?.discard?.();
     }
     this.last = time;
-    this.undone.length = 0;
+    const abandoned = this.undone.splice(0);
+    for (const edit of abandoned) edit.discard?.();
     this.changed();
   }
 
@@ -101,7 +112,8 @@ export class EditHistory {
   }
   /** Forgets every edit. */
   clear(): void {
-    this.done.length = this.undone.length = 0;
+    const edits = [...this.done.splice(0), ...this.undone.splice(0)];
+    for (const edit of edits) edit.discard?.();
     this.last = -Infinity;
     this.changed();
   }

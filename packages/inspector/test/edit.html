@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Undoable scene editing</title>
+<canvas width="600" height="400" style="width:600px;height:400px"></canvas>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {engineRuntime,meshRuntime} from '@margoengine/core/extension';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+import {Inspector} from '@margoengine/inspector';
+import {SceneEditor} from '@margoengine/inspector/edit';
+window.setup=async(backend)=>{
+  window.engine?.dispose();
+  const old=document.querySelector('canvas'),canvas=old.cloneNode();old.replaceWith(canvas);
+  const engine=window.engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:{position:[3,3,6],target:[0,0,0]}});
+  const inspector=window.inspector=Inspector.attach(engine),editor=window.editor=SceneEditor.attach(engine,inspector);
+  window.parentId=(m)=>engineRuntime(engine).store.parents[meshRuntime(m).id];
+  engine.start();return engine.backend;
+};
+</script>

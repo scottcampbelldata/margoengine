@@ -11,6 +11,7 @@ export interface Edit {
     undo(): void;
     redo(): void;
     key?: string;
+    discard?(): void;
 }
 
 export class EditHistory {

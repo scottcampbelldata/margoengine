@@ -5728,3 +5728,35 @@ Tests cover modern/legacy acquisition, raw fallback, permission error propagatio
 ### Batch 255 job 2: portable scene playback and lights (2026-11-10)
 Research compared: Ken Perlin and Athomas Goldberg, *Improv: A System for Scripting Interactive Actors in Virtual Worlds*, SIGGRAPH 1996, https://mrl.cs.nyu.edu/~perlin/improv-paper/ (layered motion and transitions); W3C CSS Working Group, *Web Animations*, 2023, https://www.w3.org/TR/web-animations-1/ (separate current time, playing flag and rate); Khronos Group, *glTF 2.0*, 2017, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html and *KHR_lights_punctual*, 2018, https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_lights_punctual (linear light parameters and node/clip identity). Read descriptions and standards, no companion/rival implementation source.
 Combine explicit clock/rate state with a detached current/rest/fade pose and ordered layer weights/masks, rather than attempting to infer a crossfade from current clip time. Stable application ids bind loaded models, lights and shadow options. Built-in sync clocks expose their private phase through paired hooks. Definitions, custom solvers and callbacks are installed by the application, never evaluated from save data. CPU tests compare future poses after restoration; save browser engine check compares layered fade pixels. No timing claim.
+
+
+## Batch 262 job 3: undoable scene editing
+
+Research compared Yiya Yang, Motivation, practice and guidelines for undoing (1992),
+https://doi.org/10.1016/0953-5438(92)90011-4 (publisher abstract), Thomas Berlage,
+A selective undo mechanism for graphical user interfaces based on command objects
+(1994), https://doi.org/10.1145/196699.196721 (bibliographic/abstract search;
+DOI access unavailable), and Brad A. Myers, Command Objects and Support for Undo
+(2021), https://www.cs.cmu.edu/~bam/uicourse/05631fall2021/SSUI-14-command%20objects.pdf
+(central linear history, grouping and resource retention slides). Combine predictable
+whole-action recovery with explicit inverses and retained identity, not selective undo.
+A deleted core mesh retains its handle until the last history command releases it;
+GPU geometry detaches immediately. Reference-counted command retention prevents
+creation-history eviction from invalidating a later deletion's undo.
+
+Public behavior comparison: Babylon.js Editor contributors, Composing scene (2026),
+https://editor.babylonjs.com/documentation/basics/composing-scene, adding primitive
+meshes/lights at the origin and selecting them in a graph; Babylon.js contributors,
+Introducing Inspector v2 (2025), https://forum.babylonjs.com/t/introducing-inspector-v2/60937?page=7,
+tree drag reparenting. This row implements creation, subtree duplicate/delete,
+reparent drag and shared linear undo, not project-file or model-import parity.
+Existing Margo geometry, scene transforms and clustered lighting own their algorithms.
+No rival source, companion code or foreign implementation was read or used. Browser
+fixtures use original procedural primitives; standard assets used by the texture
+fixture are separately licensed in its record. No speed claim or timing proof.
+
+Command inputs, including optional resource finalizers, are validated before stack
+mutation so an invalid finalizer cannot abandon redo or release retained objects.
+This follows the command-level recovery boundary described by Myers above.
+
+Batch 262 React readiness repair: React Team, StrictMode and useEffect reference (2026 living documentation), https://react.dev/reference/react/StrictMode and https://react.dev/reference/react/useEffect, describe effect cleanup/recreation. Compared with React Team, Synchronizing with Effects (2026), https://react.dev/learn/synchronizing-with-effects, on preserving observable behavior through setup/cleanup/setup. The browser fixture must observe attached plugin identities after those transitions, rather than count name matches in an attachment history. The deterministic CPU regression demonstrates the old false positive with two historical opaque-color instances and only one current plugin. No React implementation source was read or copied.

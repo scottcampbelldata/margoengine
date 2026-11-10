@@ -1426,6 +1426,10 @@
       "types": "./dist/inspector/tweak.d.ts",
       "import": "./dist/inspector/tweak.js"
     },
+    "./inspector/edit": {
+      "types": "./dist/inspector/edit.d.ts",
+      "import": "./dist/inspector/edit.js"
+    },
     "./inspector/gizmo": {
       "types": "./dist/inspector/gizmo.d.ts",
       "import": "./dist/inspector/gizmo.js"

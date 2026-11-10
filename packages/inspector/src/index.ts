@@ -15,6 +15,7 @@ import { margoError } from '../../shared/errors.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { inView } from '../../shared/view-rect.js';
 import { EditHistory } from './history.js';
+import { editorDeleted } from './edit-state.js';
 import { hexOf } from './color.js';
 import { restoreSnapshot, snapshotMeshes, type RestoreResult, type SceneSnapshot } from './snapshot.js';
 import { describeEngine, type EngineResources } from './resources.js';
@@ -620,9 +621,9 @@ export class Inspector implements EnginePlugin {
   }
 
   /** The meshes of the scene this inspector is attached to (the default scene unless attached with `scene.use`). */
-  private meshes(): Iterable<Mesh> {
+  private *meshes(): IterableIterator<Mesh> {
     const engine = this.engine!;
-    return (engine.sceneOf(this) ?? engine.scene).meshes.values();
+    for (const mesh of (engine.sceneOf(this) ?? engine.scene).meshes.values()) if (!editorDeleted.has(mesh)) yield mesh;
   }
   // Runs in every view: helpers show for the meshes that view draws (its culling and layers).
   private syncDebug(c: PassContext): void {
@@ -704,7 +705,11 @@ export class Inspector implements EnginePlugin {
     return input;
   }
   private liveSelection(): boolean {
-    return !!this.selection && this.engine?.meshes.get(this.selection.id) === this.selection;
+    return (
+      !!this.selection &&
+      !editorDeleted.has(this.selection) &&
+      this.engine?.meshes.get(this.selection.id) === this.selection
+    );
   }
   private edit(input: HTMLInputElement, action: () => void): void {
     try {

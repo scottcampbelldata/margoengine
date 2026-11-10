@@ -3901,3 +3901,22 @@ Batch 253 pointer lock: optional input/lock exports PointerLock. request default
 Batch 255 job 2: save/scene-state captures bound point, spot, directional and area light lists including all shadow options; mutable directional Shadows.options can be bound separately. Animation/Animator snapshots include pause, rate, loop, state time, triggers, parameters, current/rest/fade pose and independently timed layers. Restore onto the same model topology and installed state definitions, clocks and procedural solvers. Stateful custom clocks supply captureState/restoreState; callbacks and GPU handles remain app-owned. Snapshots use finite JSON; they do not serialize asset data or procedural functions. Failed binding restoration rolls back changed bindings and reports rollback failures. No core or stage changes.
 
 Batch 255 job 2: @margoengine/animation/interactivity 21540 to 24983 B, ceiling 24902 to 25733; @margoengine/animator 19150 to 20041 B, ceiling 19297 to 20643; @margoengine/animator/graph 8527 to 9416 B, ceiling 8542 to 9699; @margoengine/save/scene-state None to 1011 B, ceiling None to 1267. Exact fade poses, layer and sync clocks and transactional save state justify optional bytes. Keeping owner methods avoids a private-field shim or duplicated animator implementation. Core plus stage unchanged at 23950 B.
+
+
+## Batch 262 scene editing
+
+New optional inspector/edit: absent to 4451 B min+gzip (bare imports external).
+Inspector root 9073 -> 9184 B; history 925 B and tweak 4093 B include resource
+finalization. Core plus stage remains 23950 B. Geometry/primitives, clustered and
+scene are explicit optional dependencies of edit; their existing algorithms are reused.
+This entry edits core primitive/group subtrees; package-owned PBR models reject.
+Deleted handles consume transform slots until their last history command expires;
+geometry GPU allocations are released when unused. No new core feature is required.
+Reparent preserves local TRS and checks the whole subtree against the existing 64
+level bound. Preview has ambient lights; point/spot/additional directional lights
+require the WebGPU API (including the compatibility device). Existing light package
+limits remain unchanged. External disposal of retained history handles is unsupported.
+
+Finalizer validation adds 28 B to history (897 -> 925), 28 B to inspector root
+(9156 -> 9184) and 24 B to tweak (4069 -> 4093), within existing ceilings.
+The command rejects a non-callable discard before changing either stack.

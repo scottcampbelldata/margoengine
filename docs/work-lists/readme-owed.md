@@ -128,3 +128,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/animation: document captureState/restoreState clip identity, time, pause, loop and speed.
 - @margoengine/animator: document playback snapshots, fade/layer replacement, same model definitions and paired stateful-clock hooks.
 - @margoengine/save: document optional scene-state stable bindings, light/shadow capture and transactional restoration.
+| @margoengine/inspector | Scene primitives and lights, delete/duplicate/reparent, tree dragging, retained history handles and disposal. | Batch 262 job 3 |
+| margoengine | Optional inspector/edit import and undoable scene editing. | Batch 262 job 3 |
+| @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3 |

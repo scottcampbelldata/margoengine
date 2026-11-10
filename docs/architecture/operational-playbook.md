@@ -5538,3 +5538,17 @@ Evidence is packages/sciviz/tests/atmosphere.test.js (independent NREL solar fix
 
 Whole-level grids and tile contexts honor ceil(borderSize), retain their world lattice and crop tile output after filtering/erosion. Padded grids are checked against the existing 16,000,000-cell budget before allocation; the tile check also covers deferred builds. Evidence: packages/navmesh/test/border.test.js and the padded worker parity case in wasm.test.js. This changes the optional CPU build pipeline only, with no rendering/core/stage change.
 Batch 255 job 2 evidence (section 5): no rendering math/backend changes. Owner playback snapshots preserve interrupted fades and ordered layers. CPU continuation/sync/rollback assertions and the save engine browser exact-pixel check cover capture and restore; changed-package native and compatibility GPU checks are required. No wall-clock performance assertion.
+
+
+## Section 5 evidence: batch 262 scene editor
+
+Optional inspector/edit composes existing geometry and clustered lighting; it adds no
+GPU shader or core/stage behavior. The editor's early light update reads current local
+TRS through scene/worldMatrix before the transform tick, including parents. Reversible
+deletion detaches geometry and retains identity, with last-command finalization.
+CPU regression tests prove prior gizmo/property undo survives deletion and history
+limit eviction cannot destroy another command's retained mesh. Native and preview
+browser input tests cover creation, drag reparent, delete/restore and actual light
+rendering; compatibility runs exercise the same WebGPU API through the layer.
+
+Batch 262 scene-edit gate: React after-scene material readiness now enumerates current engine.plugins values. Its former historical name matches could double-count recreated opaque-color plugins before a material installation attached. The CPU plugin-state regression and original real-pixel transmission assertion cover the repaired observation; production React and engine code are unchanged.

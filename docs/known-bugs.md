@@ -4173,3 +4173,11 @@ Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional 
 Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
 
 Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.
+
+
+Fixed in batch 262 scene editing: a non-callable Edit.discard previously entered
+history and could abandon redo before any error. EditHistory.record now validates
+the optional finalizer before mutation. Regression: the invalid history finalizer
+case in packages/inspector/test/edit.test.js fails without the validation.
+
+Fixed in batch 262: the React after-scene readiness fixture counted historical plugin instances whenever their name was currently attached. Reused materials:opaque-color names could count twice with no material installation, publish ready too soon, then report 0 instead of 1. It now reads the current engine.plugins identities. Regression: packages/react/tests/plugin-state.test.js and the unchanged installation assertion in packages/react/scripts/test-after-scene-browser.js. The latter passed once on clean main 5d6e5facd, failed with the rebased fixture, and passes after the observation fix; no assertion or timeout was loosened.

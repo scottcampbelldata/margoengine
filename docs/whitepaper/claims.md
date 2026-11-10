@@ -3176,3 +3176,20 @@ The optional ui/image entry draws pixel textures and atlas cells with contain/co
 packages/navmesh/test/border.test.js proves borderSize allocates empty raster columns on all sides, leaves world-space output polygons intact, increases tile context above the automatic minimum, crops output to tile bounds, preserves cross-tile paths and rebuilds, rounds fractions upward and rejects padded budgets before allocation. The worker parity fixture also covers borderSize=3. This implements the documented heightfield-border behavior and preserves the larger clearance context needed by the existing filters.
 Batch 253 pointer lock claim: native acquire/release and per-tick locked relative motion feed ordinary Input actions. Promise/event browser APIs, raw negotiation, activation failures, bounded cancellation and modern late-acquisition cleanup are covered by packages/input/test/lock.test.js. Rendered action-to-position proof on WebGPU and WebGL2 compatibility: packages/input/test/input-browser.mjs. Research/rival descriptions: docs/clean-room.md Batch 253 job 3. No physical-device raw-fidelity claim.
 Batch 255 job 2: optional save/scene-state binds exact playback and light/shadow state, with owner APIs in animation and animator. Proof: packages/animator/test/playback-state.test.js compares interrupted fade continuation and sync-phase transitions; packages/save/tests/scene-state.test.js proves detached settings and rollback; packages/save/tests/browser/engine-check.mjs compares restored layered playback pixels. No rival speed or hardware coverage claim.
+
+
+## Batch 262 scene-edit row
+
+Inspector/edit implements primitive/light creation, subtree deletion and duplication,
+and tree drag reparenting with shared undo, compared to the public editor/inspector
+behaviors cited in clean-room.md. The six CPU scenarios in edit.test.js cover all ten
+primitive kinds, inherited ambient, subtree/material sharing, cycles, drag/shortcuts,
+resource release on clear/eviction/redo abandonment, and prior property/gizmo history
+across delete/restore. edit-browser.mjs exercises real browser drag and rendering on
+WebGPU and preview; compatibility runs use the same scene. Model lifecycle and preview
+lighting limits are explicit in limits.md. No universal editor or speed parity claim.
+
+The invalid-finalizer regression fails against the unvalidated implementation and
+proves rejection preserves pending redo and retained resources.
+
+Batch 262 React material proof uses current attached plugin identities. Historical name reuse cannot satisfy readiness; the native after-scene test still requires exactly one material installation and a visible transmission pixel change. Regression: packages/react/tests/plugin-state.test.js.

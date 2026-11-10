@@ -7,9 +7,10 @@ import { Animation } from '@margoengine/react/animation';
 import { Box } from '@margoengine/react/geometry';
 import { Gltf } from '@margoengine/react/gltf-pro';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
-import type { Engine, Mesh as RuntimeMesh, EnginePlugin } from '@margoengine/core/extension';
+import type { Engine, Mesh as RuntimeMesh } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import type { Animator } from '@margoengine/animator';
+import { activePlugins } from './plugin-state.mjs';
 
 type Mode = 'lit' | 'pbr' | 'transmission-zero' | 'transmission-on' | 'skinned';
 interface Resource {
@@ -18,7 +19,6 @@ interface Resource {
 }
 interface Record {
   engine: Engine;
-  plugins: EnginePlugin[];
   resources: Resource[];
 }
 const host = document.querySelector('#app')!,
@@ -76,7 +76,7 @@ window.fetch = async (input, init) => {
   return originalFetch(input, init);
 };
 function created(engine: Engine) {
-  const record: Record = { engine, plugins: [], resources: [] };
+  const record: Record = { engine, resources: [] };
   records.push(record);
   current = record;
   const device = engine.gpu!;
@@ -104,12 +104,6 @@ function created(engine: Engine) {
       }),
     );
     return module;
-  };
-  const use = engine.use.bind(engine);
-  engine.use = (plugin) => {
-    const result = use(plugin);
-    record.plugins.push(plugin);
-    return result;
   };
   const render = engine.render.bind(engine);
   engine.render = (options) => {
@@ -234,9 +228,7 @@ function Scene() {
   );
 }
 function active(prefix: string) {
-  return (
-    current?.plugins.filter((plugin) => plugin.name.startsWith(prefix) && current!.engine.hasPlugin(plugin.name)) ?? []
-  );
+  return activePlugins(current?.engine, prefix);
 }
 function model() {
   return active('gltf-pro:').find((plugin) => (plugin as PBRModel).root === modelRoot) as PBRModel | undefined;
