@@ -19744,70 +19744,73 @@ Import `margoengine/tween` from the `margoengine` package, or `@margoengine/twee
 
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
 
-```ts
-import {Tween, easeInOutCubic} from 'margoengine/tween';
-const object = {opacity: 0};
-const timeline = new Tween();
-const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
-timeline.update(1 / 60);
-```
+## Choose a clock and entry
 
-Times are seconds. delay, onComplete, zero-duration tracks and cancellation are supported. A new track for the same object/property cancels the old one. Callback-created tracks begin next update; clear cancels all tracks. Completed/cancelled tracks compact in place. Track creation and callbacks can allocate; the in-place stepping above does not cover them. Targets are numeric writable properties; for colours, quaternions and paths use `array`, `path` or `custom` (below). CSS strings are not parsed.
+The root Tween and Timeline remain the small numeric API. Additional workflows use
+explicit imports from `@margoengine/tween/<entry>` or `margoengine/tween/<entry>`:
 
-## Repeat, yoyo, easings, springs, timelines, colours, paths
+| Entry | API | Clock owner |
+|---|---|---|
+| `async` | AsyncTween, AsyncTimeline | Caller calls update in seconds. |
+| `props` | to, from, fromTo, keyframes | Each returned operation has update. |
+| `timeline` | Timeline with arrays, paths, custom clips and nesting | Caller updates the parent. |
+| `control` | TweenControl with target/property ownership | Caller updates the control world. |
+| `scroll-pin` | pinTimeline, scrollSnapPoint | The link owns scroll listeners and requestAnimationFrame. |
+| `inertia` | VelocityTracker, inertia | Caller supplies sample times and update deltas in seconds. |
 
-```ts
-import {Tween, Timeline, Spring, easeOutBack, cubicBezier, parseHexColor, toHexColor, slerpArray, catmullRomPath} from 'margoengine/tween';
-const light = {intensity: 1}, door = {angle: 0}, camera = {position: [0, 0, 5]}, node = {rotation: [0, 0, 0, 1]};
-const tween = new Tween();
-tween.to(light, 'intensity', 3, {duration: 1, repeat: Infinity, yoyo: true, easing: cubicBezier(0.25, 0.1, 0.25, 1)});
-const colour = parseHexColor('#ff0000');
-tween.array(colour, parseHexColor('#0000ff'), {duration: 2}); // toHexColor(colour) while it runs
-tween.array(node.rotation, [0, 0.7071, 0, 0.7071], {duration: 1, interpolate: slerpArray}); // quaternions
-tween.path(camera.position, catmullRomPath([[0, 0, 0], [1, 2, 0], [3, 2, 1]]), {duration: 3});
-tween.custom((progress) => console.log(progress), {duration: 1, easing: easeOutBack});
+These imports do not start a clock or install listeners. Only attaching a scroll link
+takes browser input ownership. Do not advance the same operation from both a world or
+parent and an independent frame loop. Handle completion rejections when cancelling,
+replacing or disposing awaitable work; cancellation preserves the last written values.
 
-const timeline = new Timeline({repeat: 1})
-  .to(door, 'angle', 1.5, {duration: 0.6})
-  .label('open')
-  .to(light, 'intensity', 3, {duration: 0.4, at: 'open'})
-  .call(() => console.log('opened'))
-  .play();
+## Awaitable operations
 
-const spring = new Spring({stiffness: 120, damping: 12});
-spring.target = 1;
-const frame = (dt: number) => { tween.update(dt); timeline.update(dt); return spring.update(dt); };
-```
+`AsyncTween` provides the root Tween's to, array, path and custom methods as awaitable
+tasks. A returned TweenTask is also a cancel function; it exposes `finished`,
+`cancel(reason)` and Symbol.dispose. Completion resolves; abort, replacement, clear or
+an update failure rejects. An AbortSignal rejects with its exact reason; explicit
+cancellation defaults to AbortError. A replacement on the same target/property rejects
+the previous task. Invalid input is checked before valid work is replaced.
 
-- `repeat` (integer or `Infinity`), `yoyo` and `onRepeat` work on every tween kind.
-- Easings: `ease{In,Out,InOut}` of `Quad`, `Cubic`, `Quart`, `Quint`, `Sine`, `Expo`, `Circ`, `Back`, `Elastic`, `Bounce`, plus `cubicBezier(x1, y1, x2, y2)` (CSS timing function) and `steps(n)`.
-- `Spring` steps the exact damped-oscillator solution, so any frame time is stable and a new `target` keeps the velocity.
-- `Timeline` chains tweens and callbacks with labels (`at: 'open+0.2'`), `seek`, `pause`, `reverse`, `speed`, `repeat` and `yoyo`. A property's start value is read when the playhead first reaches its entry; seeking back restores values. Callbacks run on `update`, never on `seek`.
+Call `driver.update(deltaSeconds)` from the application loop. Awaiting a task does not
+advance it. `driver.finished` captures operations active when it is read; tasks added
+later are independent. Callback-created work starts on the next update. Recursive
+update is rejected. `clear()` or disposal cancels all active tasks. Timing options
+match the root Tween: required nonnegative duration, delay 0, linear easing, repeat 0,
+yoyo false and optional completion/repeat callbacks; signal defaults to unset.
 
-## smoothDamp: follow a moving target
+`AsyncTimeline` wraps the root scalar Timeline with `finished` and then support,
+signal cancellation and disposal. Its to, label, call, seek, reverse, pause, play and
+update follow the root API. Pause and seek do not settle completion. Replaying a
+settled run creates a fresh finished promise; save or await the promise for that run.
+An already-aborted signal also cancels a replay. Playback callbacks run during update,
+not during seek. Cancelling pauses the timeline and leaves sampled values in place.
 
-`smoothDamp(current, target, velocity, smoothTime, maxSpeed, dt, out)` eases a vector (a camera, a follower, a hand) toward a target with no oscillation, and keeps its `velocity` between frames so a moving target stays smooth. It is a critically damped spring solved exactly, so any frame time is stable, and it works on `Float32Array`, `Float64Array` or plain arrays of any length without creating objects.
+## Multiple properties and keyframes
 
-```ts
-import {smoothDamp} from 'margoengine/tween';
-const position = new Float32Array(3), velocity = new Float32Array(3), target = new Float32Array([0, 1.6, 4]);
-const frame = (dt: number) => smoothDamp(position, target, velocity, 0.3, 6, dt, position); // 0.3 s to arrive, at most 6 units/s
-frame(1 / 60);
-```
+The `props` entry's `to(target, values, options)`, `from(target, values, options)` and
+`fromTo(target, start, end, options)` animate finite numeric writable properties,
+including a Vector3's x/y/z. Destinations may be numbers or relative strings using
++=, -=, *= or /=. Relative scalars resolve against the captured starting value;
+relative entries in a keyframe value list resolve against the preceding value.
+Nonfinite arithmetic, including division by zero, rejects.
 
-- `smoothTime` is roughly the seconds to arrive. Zero lands on the target at once and zeroes `velocity`.
-- `maxSpeed` limits the length of the whole velocity vector (units per second), so the direction of travel is kept. Pass `Infinity` for no limit; 0 holds the point still.
-- Each component matches a `Spring` with stiffness `(2 / smoothTime)^2` and damping `4 / smoothTime`, so a velocity heading toward the target can overshoot once, as the spring does.
-- `dt` 0 copies `current` to `out` and leaves `velocity` alone; a negative, NaN or infinite `dt`, a non-finite value or mismatched lengths throw `RangeError`. A very long `dt` arrives at rest instead of producing NaN.
+`from` and `fromTo` write their starts immediately. An explicit property keyframe list
+also writes its first value immediately, including during a delay; a scalar `to` waits
+for update. Lists need at least two values and distribute offsets evenly.
+`keyframes(target, frames, options)` accepts frames with values, optional offset in
+0..1 and optional per-segment easing. Missing first/last offsets default to 0/1;
+interior omissions distribute between explicit offsets. Offsets must be nondecreasing.
+Omitted properties carry their previous value; values outside the explicit offset
+range hold the corresponding endpoint. Easing defaults to operation easing or linear.
 
-## Stagger: one tween across many targets
+Each result exposes target, keys, duration and finished, plus update, pause, play,
+cancel and Symbol.dispose. Its speed defaults to 1 and accepts finite nonnegative
+values; zero freezes the clock. Advance it with update even when awaiting completion.
+Options include the async timing options and AbortSignal. Cancellation rejects the
+completion promise and leaves current property values intact.
 
-`stagger` from `margoengine/tween/stagger` starts the same tween on every target, each a little later than the one before:
-
-```ts
-import {Tween, Timeline, easeOutBack, easeInQuad} from 'margoengine/tween';
-import {stagger, staggerTimeline} from 'margoengine/tween/stagger';
-```
+## Mixed clips and nested timelines
 
 [README continues: https://margoengine.com/llms/packages/tween.md]
 
