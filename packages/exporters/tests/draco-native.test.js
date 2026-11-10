@@ -67,6 +67,68 @@ function triangles(indices, ids) {
   return out.sort();
 }
 
+test('selected prediction-degree traversal preserves public-ABI source corners in both decoders', {
+  timeout: 30000,
+}, () => {
+  const side = 5,
+    points = side * side,
+    positions = new Float32Array(points * 3),
+    indices = [];
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const a = y * side + x;
+      positions.set([x, y, ((x * y) % 7) / 8], a * 3);
+      if (x + 1 < side && y + 1 < side) indices.push(a, a + 1, a + side + 1, a, a + side + 1, a + side);
+    }
+  const ids = Uint16Array.from({ length: points }, (_, i) => i);
+  const { result, decoded } = checked({
+    points,
+    indices: new Uint32Array(indices),
+    attributes: [attr('POSITION', 'POSITION', 3, positions, 18), attr('_ID', 'GENERIC', 1, ids)],
+    encodeSpeed: 0,
+    decodeSpeed: 0,
+  });
+  assert.deepEqual(triangles(decoded.indices, decoded.attributes._ID.array), triangles(indices, ids));
+
+  // Read the published standard-connectivity framing to reach the actual
+  // selected attribute descriptor; no encoder-internal diagnostic API is used.
+  const data = result.data;
+  assert.equal(data[8], 1, 'selected mesh encoding is Edgebreaker');
+  let offset = 11;
+  assert.equal(data[offset++], 0, 'this small fixture uses standard topology symbols');
+  const variable = () => {
+    let value = 0,
+      scale = 1;
+    for (let i = 0; i < 10; i++) {
+      const byte = data[offset++];
+      value += (byte & 127) * scale;
+      if (byte < 128) return value;
+      scale *= 128;
+    }
+    assert.fail('invalid connectivity varint');
+  };
+  variable();
+  variable();
+  const seamGraphs = data[offset++];
+  variable();
+  variable();
+  const events = variable();
+  for (let i = 0; i < events; i++) {
+    variable();
+    variable();
+  }
+  offset += Math.ceil(events / 8);
+  const symbolBytes = variable();
+  offset += symbolBytes;
+  for (let i = 0; i <= seamGraphs; i++) {
+    offset++; // Binary-ANS probability.
+    const bytes = variable();
+    offset += bytes;
+  }
+  assert.equal(data[offset++], 1, 'one vertex-attribute group');
+  assert.deepEqual(Array.from(data.subarray(offset, offset + 3)), [255, 0, 1], 'production selected prediction degree');
+});
+
 test('both topology methods retain oriented nonmanifold, degenerate and disconnected triangles', {
   timeout: 30000,
 }, () => {
@@ -260,17 +322,20 @@ test('octahedral reconstruction beats the old encoder maximum error on 3000 fixe
 test('bulk Wasm output uses eight boundary calls independently of encoded byte count', { timeout: 30000 }, () => {
   for (const points of [3, 3000]) {
     let calls = 0;
-    const counted = new Proxy({ ...encoder }, {
-      get(target, key) {
-        const value = target[key];
-        return typeof value === 'function'
-          ? (...args) => {
-              calls++;
-              return value(...args);
-            }
-          : value;
+    const counted = new Proxy(
+      { ...encoder },
+      {
+        get(target, key) {
+          const value = target[key];
+          return typeof value === 'function'
+            ? (...args) => {
+                calls++;
+                return value(...args);
+              }
+            : value;
+        },
       },
-    });
+    );
     const result = encodeNativeMesh(counted, {
       points,
       indices: Uint32Array.from({ length: points }, (_, i) => i),
@@ -291,13 +356,35 @@ test('bulk Wasm output uses eight boundary calls independently of encoded byte c
   }
 });
 
-test('thirty-bit normal quantization remains representable without an upstream encoder abort', { timeout: 30000 }, () => {
-  const normals = new Float32Array([-1,0,0, 0,-1,0, 0,0,-1]);
-  const job = { points: 3, indices: new Uint32Array([0,1,2]), attributes: [attr('POSITION', 'POSITION', 3, new Float32Array([0,0,0, 1,0,0, 0,1,0]), 30), attr('NORMAL', 'NORMAL', 3, normals, 30), attr('_ID', 'GENERIC', 1, new Uint16Array([0,1,2]))], encodeSpeed: 5, decodeSpeed: 5 };
+test('thirty-bit normal quantization remains representable without an upstream encoder abort', {
+  timeout: 30000,
+}, () => {
+  const normals = new Float32Array([-1, 0, 0, 0, -1, 0, 0, 0, -1]);
+  const job = {
+    points: 3,
+    indices: new Uint32Array([0, 1, 2]),
+    attributes: [
+      attr('POSITION', 'POSITION', 3, new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 30),
+      attr('NORMAL', 'NORMAL', 3, normals, 30),
+      attr('_ID', 'GENERIC', 1, new Uint16Array([0, 1, 2])),
+    ],
+    encodeSpeed: 5,
+    decodeSpeed: 5,
+  };
   const { decoded } = checked(job);
   for (let i = 0; i < decoded.vertexCount; i++) {
     const id = decoded.attributes._ID.array[i];
-    assert.deepEqual(Array.from(decoded.normals.slice(i * 3, i * 3 + 3)), Array.from(normals.slice(id * 3, id * 3 + 3)));
+    assert.deepEqual(
+      Array.from(decoded.normals.slice(i * 3, i * 3 + 3)),
+      Array.from(normals.slice(id * 3, id * 3 + 3)),
+    );
   }
-  assert.throws(() => encodeNativeMesh(encoder, { ...job, attributes: job.attributes.map(a => a.kind === 'NORMAL' ? { ...a, bits: 1 } : a) }), RangeError);
+  assert.throws(
+    () =>
+      encodeNativeMesh(encoder, {
+        ...job,
+        attributes: job.attributes.map((a) => (a.kind === 'NORMAL' ? { ...a, bits: 1 } : a)),
+      }),
+    RangeError,
+  );
 });

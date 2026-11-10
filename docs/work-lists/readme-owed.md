@@ -1027,3 +1027,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro (batch 201 job 3): document applyGLTFAudio, both draft dialects, caller-owned listener, weighted/event sync controls, audio-only scenes, budgets, cancellation and optional audio peer.
 - margoengine (batch 201 job 3): include the gltf-pro/audio alias in loader coverage after the build phase.
 - @margoengine/audio (batch 201 inherited documentation): panningModel defaults to HRTF in code; reconcile the stale equalpower type comment during the documentation phase.
+
+
+- @margoengine/exporters (batch 136 proof): document the four-setting corpus, prediction-degree and circular-normal candidate selection, bounded RAW alphabet and scoped no-worse ratio/error evidence during the README phase.

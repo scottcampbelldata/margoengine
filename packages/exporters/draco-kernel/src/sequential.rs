@@ -402,9 +402,13 @@ pub fn encode_grouped(
     out.push(sets.len() as u8);
     for i in 0..sets.len() {
         out.extend(if i == 0 {
-            [255, 0, 0]
+            [255, 0, grouped.groups[i].topology.traversal_method]
         } else {
-            [(i - 1) as u8, 1, 0]
+            [
+                (i - 1) as u8,
+                1,
+                grouped.groups[i].topology.traversal_method,
+            ]
         });
     }
     for (order, originals, portable) in &sets {
@@ -455,8 +459,8 @@ fn attributes(
         .map(|&i| portable(&originals[i]))
         .collect::<Result<Vec<_>, _>>()?;
     out.push(1);
-    if topology.is_some() {
-        out.extend([255, 0, 0]);
+    if let Some(topology) = topology {
+        out.extend([255, 0, topology.traversal_method]);
     }
     varint(out, attributes.len() as u64);
     for &id in &order {

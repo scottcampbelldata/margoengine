@@ -87,7 +87,10 @@ fn previous(c: usize) -> usize {
 
 impl<'a> MeshPredictor<'a> {
     pub fn new(topology: &'a crate::topology::Topology) -> Self {
-        debug_assert_eq!(topology.encoded_vertex_count, topology.boundary_vertices.len());
+        debug_assert_eq!(
+            topology.encoded_vertex_count,
+            topology.boundary_vertices.len()
+        );
         let mut vertex_data = vec![usize::MAX; topology.points];
         for (i, &c) in topology.attribute_corners.iter().enumerate() {
             vertex_data[topology.corner_vertices[c] as usize] = i;
@@ -351,9 +354,25 @@ impl<'a> MeshPredictor<'a> {
         positions: &[[i32; 3]],
         bits: u8,
     ) -> Option<Vec<u8>> {
+        let (baseline, circular) = self.normal_candidates(values, positions, bits)?;
+        Some(match circular {
+            Some(candidate) if candidate.len() < baseline.len() => candidate,
+            _ => baseline,
+        })
+    }
+
+    fn normal_candidates(
+        &self,
+        values: &[i32],
+        positions: &[[i32; 3]],
+        bits: u8,
+    ) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
         let center = (1i64 << (bits - 1)) - 1;
+        let modulus = (1u32 << bits) - 1;
         let mut symbols = Vec::with_capacity(values.len());
         let mut flips = Vec::new();
+        let mut circular_symbols = Vec::with_capacity(values.len());
+        let mut circular_flips = Vec::new();
         for (id, &corner) in self.topology.attribute_corners.iter().enumerate() {
             let mut normal = [0i128; 3];
             for c in self.neighbors(corner) {
@@ -418,13 +437,35 @@ impl<'a> MeshPredictor<'a> {
                 symbols.extend(b);
                 flips.push(true);
             }
+            // Octahedron corrections are modular residues, so modulus - 1 is a
+            // correction of -1 rather than a large error. Preserve the previous
+            // unsigned policy as a second complete byte candidate: residual and
+            // flip-stream entropy can favor either policy on a particular mesh.
+            let circular_cost = |values: [u32; 2]| {
+                values
+                    .iter()
+                    .map(|&v| u64::from(v.min(modulus - v)))
+                    .sum::<u64>()
+            };
+            let flip = circular_cost(a) > circular_cost(b);
+            circular_symbols.extend(if flip { b } else { a });
+            circular_flips.push(flip);
         }
-        let mut out = vec![6, 3, 1];
-        out.extend(crate::entropy::symbols(&symbols, 2));
-        out.extend(((1i32 << bits) - 1).to_le_bytes());
-        out.extend((center as i32).to_le_bytes());
-        out.extend(crate::topology::binary(&flips));
-        Some(out)
+        let payload = |symbols: &[u32], flags: &[bool]| {
+            let mut out = vec![6, 3, 1];
+            out.extend(crate::entropy::symbols(symbols, 2));
+            out.extend(((1i32 << bits) - 1).to_le_bytes());
+            out.extend((center as i32).to_le_bytes());
+            out.extend(crate::topology::binary(flags));
+            out
+        };
+        let baseline = payload(&symbols, &flips);
+        let circular = if flips == circular_flips {
+            None
+        } else {
+            Some(payload(&circular_symbols, &circular_flips))
+        };
+        Some((baseline, circular))
     }
 }
 
@@ -481,6 +522,79 @@ mod tests {
                     assert_eq!(decoded, value as i64);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn modular_normal_signs_include_flip_entropy_and_retain_the_previous_candidate() {
+        let width = 32usize;
+        let mut indices = Vec::new();
+        for y in 0..width - 1 {
+            for x in 0..width - 1 {
+                let a = (y * width + x) as u32;
+                let b = a + 1;
+                let c = a + width as u32 + 1;
+                let d = a + width as u32;
+                indices.extend([a, b, c, a, c, d]);
+            }
+        }
+        let mesh = crate::Mesh {
+            points: width * width,
+            indices,
+            attributes: Vec::new(),
+            encode_speed: 0,
+            decode_speed: 0,
+        };
+        let topology = crate::topology::plan(&mesh).unwrap();
+        let predictor = MeshPredictor::new(&topology);
+        let positions: Vec<[i32; 3]> = topology
+            .reordered_indices
+            .iter()
+            .map(|&p| [0, p as i32 % width as i32, p as i32 / width as i32])
+            .collect();
+        let bits = 12;
+        let center = (1i32 << (bits - 1)) - 1;
+        // This planar mesh predicts +X. Alternating normals differ by tiny
+        // negative Y/Z corrections; the unsigned metric wrongly flips those.
+        let values: Vec<i32> = topology
+            .attribute_sequence
+            .iter()
+            .flat_map(|&p| [center - (p % 2) as i32; 2])
+            .collect();
+        let (baseline, alternative) = predictor
+            .normal_candidates(&values, &positions, bits)
+            .unwrap();
+        let alternative = alternative.unwrap();
+        assert!(
+            alternative.len() < baseline.len(),
+            "tiny signed corrections should beat opposite-facing predictions including flags"
+        );
+        assert_eq!(
+            predictor
+                .normal_candidate(&values, &positions, bits)
+                .unwrap(),
+            alternative
+        );
+        // Residual frequencies may favor the original policy on other normals.
+        // Whole-payload selection must always retain that baseline candidate.
+        let mut state = 1u32;
+        for _ in 0..8 {
+            let values: Vec<i32> = (0..topology.points * 2)
+                .map(|_| {
+                    state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+                    (state % 4095) as i32
+                })
+                .collect();
+            let (baseline, _) = predictor
+                .normal_candidates(&values, &positions, bits)
+                .unwrap();
+            assert!(
+                predictor
+                    .normal_candidate(&values, &positions, bits)
+                    .unwrap()
+                    .len()
+                    <= baseline.len()
+            );
         }
     }
 }

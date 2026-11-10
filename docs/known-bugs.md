@@ -4901,3 +4901,6 @@ Repro: `MARGO_COMPAT=1` then `node packages/quality/test/features-browser.mjs` u
 
 Batch 201 job 3: audio emitter loading, audio-only scenes and positional source attachment are built with CPU and real Web Audio/frame regressions. Inherited fix-phase issue outside this job: AudioListener.attach(engine), followed by listener.dispose() and another attach with the same name, rejects as a duplicate plugin because direct disposal does not remove the engine's named plugin registration (audio/src/listener.ts dispose). Use the engine's removePlugin ownership operation; the new browser fixture does so.
 Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
+
+
+Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.

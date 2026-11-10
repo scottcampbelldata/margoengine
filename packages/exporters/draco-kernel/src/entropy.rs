@@ -167,7 +167,7 @@ pub fn symbols(values: &[u32], components: usize) -> Vec<u8> {
     let tagged = tagged(values, components);
     let max = values.iter().copied().max().unwrap();
     // A sparse 32-bit alphabet must not allocate a table proportional to its range.
-    if max > 65535 {
+    if max >= 1 << 20 {
         return tagged;
     }
     let raw = raw(values, max);
@@ -181,6 +181,17 @@ pub fn symbols(values: &[u32], components: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sparse_high_precision_residuals_can_use_raw_ans() {
+        // High quantization precision does not imply a high-entropy alphabet.
+        // An isolated 18-bit correction must not force every zero into tagged bits.
+        let mut values = vec![0; 100_000];
+        values[500] = 131_071;
+        let encoded = symbols(&values, 1);
+        assert_eq!(encoded[0], 1);
+        assert!(encoded.len() < tagged(&values, 1).len());
+        assert_eq!(symbols(&[u32::MAX, 0], 1)[0], 0);
+    }
     #[test]
     fn inverse_ans_equations_recover_symbols() {
         for values in [

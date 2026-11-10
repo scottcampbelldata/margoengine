@@ -152,11 +152,24 @@ fn encode_result(mesh: &Mesh) -> Result<Encoded, &'static str> {
             };
         }
         if mesh.encode_speed.max(mesh.decode_speed) < 8 {
+            let degree = topology::with_prediction_degree(grouped)?;
+            let data = sequential::encode_grouped(&mesh, &degree)?;
+            if data.len() < result.data.len() {
+                result = Encoded {
+                    data,
+                    points: degree.topology.points,
+                    faces,
+                };
+            }
             for seed in topology::seed_candidates(&mesh).into_iter().skip(1) {
                 let grouped = topology::plan_groups_seed(&mesh, seed)?;
                 let data = sequential::encode_grouped(&mesh, &grouped)?;
                 if data.len() < result.data.len() {
-                    result = Encoded { data, points: grouped.topology.points, faces };
+                    result = Encoded {
+                        data,
+                        points: grouped.topology.points,
+                        faces,
+                    };
                 }
             }
         }

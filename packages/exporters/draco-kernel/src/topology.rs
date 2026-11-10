@@ -16,7 +16,7 @@ pub struct Topology {
     /// Input point labels for the three corners of each decoder-order triangle.
     pub reordered_indices: Vec<u32>,
     pub encoded_vertex_count: usize,
-    /// Input point labels, in the published decoder's depth-first attribute order.
+    /// Input point labels, in the selected published attribute traversal order.
     pub attribute_sequence: Vec<u32>,
     pub points: usize,
     /// Topology vertices, independent of source point labels that may be duplicated.
@@ -26,6 +26,8 @@ pub struct Topology {
     pub attribute_corners: Vec<usize>,
     /// Original input index-buffer corner corresponding to every decoded corner.
     pub source_corners: Vec<usize>,
+    /// Published attribute traversal descriptor: 0 depth first, 1 prediction degree.
+    pub traversal_method: u8,
 }
 
 #[derive(Debug)]
@@ -621,6 +623,131 @@ fn depth_first(vertices: &[u32], opposite: &[i32], boundary: &[bool]) -> (Vec<u3
     (sequence, visited_corners)
 }
 
+/// Published three-priority traversal. An unvisited tip gains degree each time
+/// an adjacent decoded face offers it as a prediction candidate; more than one
+/// available face promotes it ahead of tips with only one candidate.
+fn prediction_degree(vertices: &[u32], opposite: &[i32], points: usize) -> Vec<usize> {
+    fn priority(corner: usize, vertices: &[u32], seen: &[bool], degree: &mut [u32]) -> usize {
+        let vertex = vertices[corner] as usize;
+        if seen[vertex] {
+            return 0;
+        }
+        degree[vertex] += 1;
+        if degree[vertex] > 1 {
+            1
+        } else {
+            2
+        }
+    }
+    fn visit(corner: usize, vertices: &[u32], seen: &mut [bool], sequence: &mut Vec<usize>) {
+        let vertex = vertices[corner] as usize;
+        if !seen[vertex] {
+            seen[vertex] = true;
+            sequence.push(corner);
+        }
+    }
+    let mut seen_face = vec![false; vertices.len() / 3];
+    let mut seen_vertex = vec![false; points];
+    let mut degree = vec![0u32; points];
+    let mut stacks: [Vec<usize>; 3] = std::array::from_fn(|_| Vec::new());
+    let mut sequence = Vec::with_capacity(points);
+    for face in 0..seen_face.len() {
+        if seen_face[face] {
+            continue;
+        }
+        let seed = face * 3;
+        stacks[0].push(seed);
+        let mut best = 0;
+        for c in [next(seed), previous(seed), seed] {
+            visit(c, vertices, &mut seen_vertex, &mut sequence);
+        }
+        loop {
+            let Some(which) = (best..3).find(|&i| !stacks[i].is_empty()) else {
+                break;
+            };
+            best = which;
+            let mut c = stacks[which].pop().unwrap();
+            if seen_face[c / 3] {
+                continue;
+            }
+            loop {
+                seen_face[c / 3] = true;
+                visit(c, vertices, &mut seen_vertex, &mut sequence);
+                let (left, right) = (opposite[previous(c)], opposite[next(c)]);
+                let left_seen = left < 0 || seen_face[left as usize / 3];
+                let right_seen = right < 0 || seen_face[right as usize / 3];
+                if !left_seen {
+                    let left = left as usize;
+                    let p = priority(left, vertices, &seen_vertex, &mut degree);
+                    if right_seen && p <= best {
+                        c = left;
+                        continue;
+                    }
+                    stacks[p].push(left);
+                    best = best.min(p);
+                }
+                if !right_seen {
+                    let right = right as usize;
+                    let p = priority(right, vertices, &seen_vertex, &mut degree);
+                    if p <= best {
+                        c = right;
+                        continue;
+                    }
+                    stacks[p].push(right);
+                    best = best.min(p);
+                }
+                break;
+            }
+        }
+    }
+    sequence
+}
+
+fn set_prediction_degree(topology: &mut Topology) -> Result<(), &'static str> {
+    let corners = prediction_degree(
+        &topology.corner_vertices,
+        &topology.opposite_corners,
+        topology.attribute_sequence.len(),
+    );
+    if corners.len() != topology.attribute_sequence.len() {
+        return Err("incomplete prediction-degree traversal");
+    }
+    topology.attribute_sequence = corners
+        .iter()
+        .map(|&c| topology.reordered_indices[c])
+        .collect();
+    topology.attribute_corners = corners;
+    topology.traversal_method = 1;
+    Ok(())
+}
+
+/// An alternate per-vertex attribute traversal using published prediction degree.
+#[cfg(test)]
+pub fn plan_prediction_degree(mesh: &Mesh) -> Result<Topology, &'static str> {
+    let mut topology = plan(mesh)?;
+    set_prediction_degree(&mut topology)?;
+    Ok(topology)
+}
+
+/// Reuse an existing seam plan and change only its base vertex-attribute order.
+/// Corner-attribute seam groups retain the depth-first traversal of their own
+/// graphs; their rows and all connectivity byte streams remain unchanged.
+pub fn with_prediction_degree(
+    mut grouped: GroupedTopology,
+) -> Result<GroupedTopology, &'static str> {
+    let base = grouped
+        .groups
+        .first_mut()
+        .ok_or("missing base attribute group")?;
+    set_prediction_degree(&mut base.topology)?;
+    Ok(grouped)
+}
+
+#[cfg(test)]
+pub fn plan_groups_prediction_degree(mesh: &Mesh) -> Result<GroupedTopology, &'static str> {
+    with_prediction_degree(plan_groups(mesh)?)
+}
+
 pub fn plan(mesh: &Mesh) -> Result<Topology, &'static str> {
     plan_seed(mesh, 0)
 }
@@ -696,6 +823,7 @@ fn assemble(
         boundary_vertices: table.boundary.clone(),
         attribute_corners,
         source_corners: source_corner,
+        traversal_method: 0,
     })
 }
 
@@ -748,6 +876,7 @@ fn cut_topology(base: &Topology, seams: &[bool]) -> Topology {
         boundary_vertices: boundary,
         attribute_corners,
         source_corners: base.source_corners.clone(),
+        traversal_method: 0,
     }
 }
 
@@ -933,6 +1062,39 @@ mod tests {
             }
         }
         assert_eq!(seed_candidates(&grid(50, 50, true, true, &[])), [0]);
+    }
+
+    #[test]
+    fn prediction_degree_visits_every_vertex_once_across_boundaries_and_components() {
+        for input in [
+            grid(6, 5, false, false, &[]),
+            grid(7, 5, true, true, &[]),
+            grid(7, 7, true, true, &[(1, 1), (3, 3)]),
+            mesh(vec![0, 1, 2, 3, 4, 5, 0, 6, 7]),
+        ] {
+            let baseline = plan(&input).unwrap();
+            let degree = plan_prediction_degree(&input).unwrap();
+            assert_eq!(degree.traversal_method, 1);
+            assert_eq!(degree.connectivity, baseline.connectivity);
+            assert_eq!(degree.points, baseline.points);
+            let mut seen = vec![false; degree.points];
+            for (&corner, &source) in degree
+                .attribute_corners
+                .iter()
+                .zip(&degree.attribute_sequence)
+            {
+                let vertex = degree.corner_vertices[corner] as usize;
+                assert!(!seen[vertex]);
+                seen[vertex] = true;
+                assert_eq!(source, degree.reordered_indices[corner]);
+            }
+            assert!(seen.iter().all(|&v| v));
+        }
+        let input = grid(7, 7, true, true, &[(1, 1), (3, 3)]);
+        assert_ne!(
+            plan(&input).unwrap().attribute_sequence,
+            plan_prediction_degree(&input).unwrap().attribute_sequence
+        );
     }
 
     fn grid(w: u32, h: u32, wrap_x: bool, wrap_y: bool, holes: &[(u32, u32)]) -> Mesh {
@@ -1296,6 +1458,14 @@ mod tests {
         assert_eq!(plan.groups[0].topology.attribute_sequence.len(), 4);
         assert_eq!(plan.groups[1].attributes, [2]);
         assert_eq!(plan.groups[1].topology.attribute_sequence.len(), 6);
+        let degree = plan_groups_prediction_degree(&input).unwrap();
+        assert_eq!(degree.groups[0].topology.traversal_method, 1);
+        assert_eq!(degree.groups[1].topology.traversal_method, 0);
+        assert_eq!(degree.topology.connectivity, plan.topology.connectivity);
+        assert_eq!(
+            degree.groups[1].topology.attribute_sequence,
+            plan.groups[1].topology.attribute_sequence
+        );
         for group in &plan.groups {
             let mut row_for_vertex = vec![0u32; group.topology.points];
             for (&corner, &source) in group

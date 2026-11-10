@@ -5778,3 +5778,20 @@ Embedded bufferViews, data URIs and safe relative/external URIs share each decod
 MSFT weighted choices are made on new play triggers, with nonnegative finite weights, at least one positive weight, and options.random in [0,1). options.autoplay true explicitly triggers either dialect; false disables authored autoPlay. sync(time,playing,animation) follows MSFT events and compensates missed frames, pause/resume offsets, stop, backward seek and paused scrubbing; repeated synchronization reuses the event's weighted choice. Call it with the animation clock each tick. Legacy EXT_property_animation is a separate optional extension; this reader consumes authored property values and the required event contract. Dispose releases this attachment's sounds, never the caller's listener/context, and model disposal invokes it. No core/stage change or speed claim.
 
 Audio entry: absent (0 B) to 4,717 B min+gzip, with a 4,973 B ceiling. The reader includes scene instances, safe loading, all clip/event controls and cleanup; keeping one optional entry avoids splitting a single attachment lifecycle. Current gltf-pro root is 78,058 B and model is 58,923 B, both inside their existing ceilings. DDS measures 6,855 B. Core plus stage stays 24,209 B.
+
+
+
+### Batch 136 replacement proof
+
+The four-setting matrix covers 76 real-model primitive/settings rows: default 14/10/12/8/12-bit attributes at speed 5, the same bits at sequential speed 10, exact floats with zero quantization bits, and precise 18/12/14/8/16 bits at speed 0. Every row is no larger than the opaque old encoder, both independent decoders agree on the emitted original stream, oriented source-corner identities match, exact attributes match, and both maximum Euclidean error and summed squared error are no worse. No primitive was excluded. Full per-attribute results and source/oracle/artifact hashes: docs/whitepaper/results/batch-136-draco-parity.json. This proves the recorded corpus, not a universal ratio guarantee.
+
+| Model | Rows | Default bytes, Margo / old | Precise bytes, Margo / old |
+| --- | ---: | ---: | ---: |
+| Box | 4 | 118 / 130 | 118 / 118 |
+| Fox | 4 | 7,079 / 7,566 | 7,708 / 7,773 |
+| MetalRoughSpheres | 20 | 544,426 / 886,439 | 961,982 / 1,062,262 |
+| CommercialRefrigerator | 32 | 735,513 / 877,672 | 1,102,594 / 1,201,346 |
+| Lantern | 12 | 34,947 / 39,849 | 49,600 / 51,249 |
+| RiggedFigure | 4 | 3,518 / 3,714 | 3,812 / 3,842 |
+
+The replacement-proof refinements grow the optional entry from 89,161 to 91,248 B min+gzip, still below the old entry's 181,081 B. Wasm is 160,900 B raw and 59,962 B gzip; core plus stage stays 24,209 B. The added 2,087 entry bytes buy a second attribute traversal and complete normal-prediction candidates that close all observed ratio losses. RAW symbol alphabets are bounded below 2^20; histogram/model/order storage peaks at 16 MiB in wasm32. Wider alphabets retain tagged coding. These are size/work-count measurements; timing is deferred.

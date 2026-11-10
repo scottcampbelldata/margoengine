@@ -1,0 +1,2380 @@
+{
+  "encoderSha256": "c2851bc13eeb4a679d310040f70a06893a7eb89a90de735ad4965f24ceafd0a8",
+  "oracleEncoderSha256": "d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958",
+  "rows": [
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/0/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 720,
+      "faces": 496,
+      "bytes": 3042,
+      "oldBytes": 3264,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.001956963515740906,
+          "oldMaximum": 0.0027729493202130725,
+          "squared": 0.0003974017100805846,
+          "oldSquared": 0.00042055896046375944
+        },
+        "POSITION": {
+          "maximum": 0.00010227040263764731,
+          "oldMaximum": 0.00010227040263764731,
+          "squared": 0.0000022193743407054878,
+          "oldSquared": 0.0000022193743407054878
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016353740980238295,
+          "oldMaximum": 0.00016353740980238295,
+          "squared": 0.000005764124491019172,
+          "oldSquared": 0.000005764124491019172
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/0/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 720,
+      "faces": 496,
+      "bytes": 5682,
+      "oldBytes": 7594,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.001956963515740906,
+          "oldMaximum": 0.0027729493202130725,
+          "squared": 0.0003974017100805844,
+          "oldSquared": 0.0004205589604637592
+        },
+        "POSITION": {
+          "maximum": 0.00010227040263764731,
+          "oldMaximum": 0.00010227040263764731,
+          "squared": 0.0000022193743407054878,
+          "oldSquared": 0.0000022193743407054878
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016353740980238295,
+          "oldMaximum": 0.00016353740980238295,
+          "squared": 0.000005764124491019172,
+          "oldSquared": 0.000005764124491019172
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/0/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 720,
+      "faces": 496,
+      "bytes": 14899,
+      "oldBytes": 14918,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/0/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 720,
+      "faces": 496,
+      "bytes": 3910,
+      "oldBytes": 4320,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0004884820396979678,
+          "oldMaximum": 0.0006912086632122062,
+          "squared": 0.000027861275570564306,
+          "oldSquared": 0.000029296203848517014
+        },
+        "POSITION": {
+          "maximum": 0.0000060522199403898784,
+          "oldMaximum": 0.0000060522199403898784,
+          "squared": 9.49426690044497e-9,
+          "oldSquared": 9.49426690044497e-9
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0000405298593791149,
+          "oldMaximum": 0.0000405298593791149,
+          "squared": 3.9699769063730045e-7,
+          "oldSquared": 3.9699769063730045e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/1/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 582,
+      "faces": 388,
+      "bytes": 2132,
+      "oldBytes": 2579,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0013664311982971027,
+          "oldMaximum": 0.0013664311982971027,
+          "squared": 0.00011649818789385116,
+          "oldSquared": 0.00011649818789385116
+        },
+        "POSITION": {
+          "maximum": 0.0000720784016546092,
+          "oldMaximum": 0.0000720784016546092,
+          "squared": 0.0000014058115714549006,
+          "oldSquared": 0.0000014058115714549006
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016709947427349933,
+          "oldMaximum": 0.00016709947427349933,
+          "squared": 0.000005492834894242453,
+          "oldSquared": 0.000005492834894242453
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/1/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 582,
+      "faces": 388,
+      "bytes": 4932,
+      "oldBytes": 6753,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0013664311982971027,
+          "oldMaximum": 0.0013664311982971027,
+          "squared": 0.00011649818789385086,
+          "oldSquared": 0.00011649818789385086
+        },
+        "POSITION": {
+          "maximum": 0.0000720784016546092,
+          "oldMaximum": 0.0000720784016546092,
+          "squared": 0.0000014058115714549006,
+          "oldSquared": 0.0000014058115714549006
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016709947427349933,
+          "oldMaximum": 0.00016709947427349933,
+          "squared": 0.000005492834894242453,
+          "oldSquared": 0.000005492834894242453
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/1/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 582,
+      "faces": 388,
+      "bytes": 9882,
+      "oldBytes": 9896,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/1/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 582,
+      "faces": 388,
+      "bytes": 2697,
+      "oldBytes": 3016,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0004616837889751637,
+          "oldMaximum": 0.0004616837889751637,
+          "squared": 0.000015108391163965468,
+          "oldSquared": 0.000015108391163965468
+        },
+        "POSITION": {
+          "maximum": 0.000004867322372503314,
+          "oldMaximum": 0.000004867322372503314,
+          "squared": 5.676376963956176e-9,
+          "oldSquared": 5.676376963956176e-9
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004115224849762917,
+          "oldMaximum": 0.00004115224849762917,
+          "squared": 3.7263140457294286e-7,
+          "oldSquared": 3.7263140457294286e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/2/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 42,
+      "faces": 28,
+      "bytes": 352,
+      "oldBytes": 358,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.000002980235194627312,
+          "oldMaximum": 0.000002980235194627312,
+          "squared": 8.903118097368095e-12,
+          "oldSquared": 8.903118097368095e-12
+        },
+        "POSITION": {
+          "maximum": 0.000055195614829862474,
+          "oldMaximum": 0.000055195614829862474,
+          "squared": 7.447455097064903e-8,
+          "oldSquared": 7.447455097064903e-8
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00013370290396729395,
+          "oldMaximum": 0.00013370290396729395,
+          "squared": 2.999038957174349e-7,
+          "oldSquared": 2.999038957174349e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/2/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 42,
+      "faces": 28,
+      "bytes": 521,
+      "oldBytes": 540,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.000002980235194627312,
+          "oldMaximum": 0.000002980235194627312,
+          "squared": 8.903118097368095e-12,
+          "oldSquared": 8.903118097368095e-12
+        },
+        "POSITION": {
+          "maximum": 0.000055195614829862474,
+          "oldMaximum": 0.000055195614829862474,
+          "squared": 7.447455097064903e-8,
+          "oldSquared": 7.447455097064903e-8
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00013370290396729395,
+          "oldMaximum": 0.00013370290396729395,
+          "squared": 2.999038957174349e-7,
+          "oldSquared": 2.999038957174349e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/2/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 42,
+      "faces": 28,
+      "bytes": 886,
+      "oldBytes": 894,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/2/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 42,
+      "faces": 28,
+      "bytes": 397,
+      "oldBytes": 475,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.000002980235194627312,
+          "oldMaximum": 0.000002980235194627312,
+          "squared": 8.903118097368095e-12,
+          "oldSquared": 8.903118097368095e-12
+        },
+        "POSITION": {
+          "maximum": 0.0000033102050032951805,
+          "oldMaximum": 0.0000033102050032951805,
+          "squared": 2.2937740595807554e-10,
+          "oldSquared": 2.2937740595807554e-10
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000030993097075527046,
+          "oldMaximum": 0.000030993097075527046,
+          "squared": 1.7770768856451014e-8,
+          "oldSquared": 1.7770768856451014e-8
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/3/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 4,
+      "faces": 2,
+      "bytes": 146,
+      "oldBytes": 177,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.00003844518070028666,
+          "oldMaximum": 0.00003844518070028666,
+          "squared": 2.956063838155387e-9,
+          "oldSquared": 2.956063838155387e-9
+        },
+        "TEXCOORD_0": {
+          "maximum": 1.1920928955078125e-7,
+          "oldMaximum": 1.1920928955078125e-7,
+          "squared": 2.1316282072803006e-14,
+          "oldSquared": 2.1316282072803006e-14
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/3/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 4,
+      "faces": 2,
+      "bytes": 146,
+      "oldBytes": 157,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.00003844518070028666,
+          "oldMaximum": 0.00003844518070028666,
+          "squared": 2.956063838155387e-9,
+          "oldSquared": 2.956063838155387e-9
+        },
+        "TEXCOORD_0": {
+          "maximum": 1.1920928955078125e-7,
+          "oldMaximum": 1.1920928955078125e-7,
+          "squared": 2.1316282072803006e-14,
+          "oldSquared": 2.1316282072803006e-14
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/3/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 4,
+      "faces": 2,
+      "bytes": 168,
+      "oldBytes": 188,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/3/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 4,
+      "faces": 2,
+      "bytes": 152,
+      "oldBytes": 191,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.0000022085913793622142,
+          "oldMaximum": 0.0000022085913793622142,
+          "squared": 9.755751761986176e-12,
+          "oldSquared": 9.755751761986176e-12
+        },
+        "TEXCOORD_0": {
+          "maximum": 1.1920928955078125e-7,
+          "oldMaximum": 1.1920928955078125e-7,
+          "squared": 2.1316282072803006e-14,
+          "oldSquared": 2.1316282072803006e-14
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/4/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 2612,
+      "faces": 2261,
+      "bytes": 10116,
+      "oldBytes": 10555,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0019569634647447058,
+          "oldMaximum": 0.002621811862841679,
+          "squared": 0.0019898111653642307,
+          "oldSquared": 0.0020307874717300227
+        },
+        "POSITION": {
+          "maximum": 0.00008858672528572912,
+          "oldMaximum": 0.00008858672528572912,
+          "squared": 0.000008619936646254989,
+          "oldSquared": 0.000008619936646254989
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001686295882954341,
+          "oldMaximum": 0.0001686295882954341,
+          "squared": 0.00002568403304887938,
+          "oldSquared": 0.00002568403304887938
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/4/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 2612,
+      "faces": 2261,
+      "bytes": 17589,
+      "oldBytes": 27661,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0019569634647447058,
+          "oldMaximum": 0.002621811862841679,
+          "squared": 0.00198981116536423,
+          "oldSquared": 0.002030787471730021
+        },
+        "POSITION": {
+          "maximum": 0.00008858672528572912,
+          "oldMaximum": 0.00008858672528572912,
+          "squared": 0.000008619936646254989,
+          "oldSquared": 0.000008619936646254989
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001686295882954341,
+          "oldMaximum": 0.0001686295882954341,
+          "squared": 0.00002568403304887938,
+          "oldSquared": 0.00002568403304887938
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/4/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 2612,
+      "faces": 2261,
+      "bytes": 63236,
+      "oldBytes": 63831,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/4/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 2612,
+      "faces": 2261,
+      "bytes": 14285,
+      "oldBytes": 16097,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0005543330983846471,
+          "oldMaximum": 0.0008195268389617409,
+          "squared": 0.0002679195953956563,
+          "oldSquared": 0.0003524646423595189
+        },
+        "POSITION": {
+          "maximum": 0.000005644531536937577,
+          "oldMaximum": 0.000005644531536937577,
+          "squared": 3.594238118936888e-8,
+          "oldSquared": 3.594238118936888e-8
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004173911008277732,
+          "oldMaximum": 0.00004173911008277732,
+          "squared": 0.0000015001685603954415,
+          "oldSquared": 0.0000015001685603954415
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/0/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 58216,
+      "faces": 107616,
+      "bytes": 382115,
+      "oldBytes": 457046,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002663638271902965,
+          "oldMaximum": 0.003952037371903561,
+          "squared": 0.11141149538380783,
+          "oldSquared": 0.1344192321087953
+        },
+        "POSITION": {
+          "maximum": 0.00006435386275632424,
+          "oldMaximum": 0.00006435386275632424,
+          "squared": 0.00008641371255846053,
+          "oldSquared": 0.00008641371255846053
+        },
+        "TANGENT": {
+          "maximum": 0.0004167843022669155,
+          "oldMaximum": 0.0004167843022669155,
+          "squared": 0.0027628525237338238,
+          "oldSquared": 0.0027628525237338238
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000164041078808756,
+          "oldMaximum": 0.000164041078808756,
+          "squared": 0.0005554516827919187,
+          "oldSquared": 0.0005554516827919187
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/0/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 58216,
+      "faces": 107616,
+      "bytes": 922774,
+      "oldBytes": 1282122,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002663638271902965,
+          "oldMaximum": 0.003952037371903561,
+          "squared": 0.1114114953838093,
+          "oldSquared": 0.1344192321087966
+        },
+        "POSITION": {
+          "maximum": 0.00006435386275632424,
+          "oldMaximum": 0.00006435386275632424,
+          "squared": 0.00008641371255846037,
+          "oldSquared": 0.00008641371255846037
+        },
+        "TANGENT": {
+          "maximum": 0.0004167843022669155,
+          "oldMaximum": 0.0004167843022669155,
+          "squared": 0.002762852523733794,
+          "oldSquared": 0.002762852523733794
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000164041078808756,
+          "oldMaximum": 0.000164041078808756,
+          "squared": 0.0005554516827919187,
+          "oldSquared": 0.0005554516827919187
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/0/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 58216,
+      "faces": 107616,
+      "bytes": 2722291,
+      "oldBytes": 2745721,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/0/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 58216,
+      "faces": 107616,
+      "bytes": 564679,
+      "oldBytes": 594888,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006818067871372333,
+          "oldMaximum": 0.0010076251511936083,
+          "squared": 0.007119511067330527,
+          "oldSquared": 0.008755194947541303
+        },
+        "POSITION": {
+          "maximum": 0.00000401105098830476,
+          "oldMaximum": 0.00000401105098830476,
+          "squared": 3.197977154966314e-7,
+          "oldSquared": 3.197977154966314e-7
+        },
+        "TANGENT": {
+          "maximum": 0.000026326164497968187,
+          "oldMaximum": 0.000026326164497968187,
+          "squared": 0.00001325705807639343,
+          "oldSquared": 0.00001325705807639343
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004151466717756445,
+          "oldMaximum": 0.00004151466717756445,
+          "squared": 0.00003391198115609839,
+          "oldSquared": 0.00003391198115609839
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/1/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 51224,
+      "faces": 93024,
+      "bytes": 318471,
+      "oldBytes": 380263,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0026664040781854744,
+          "oldMaximum": 0.004084718846744982,
+          "squared": 0.09172329822914523,
+          "oldSquared": 0.11057251318937623
+        },
+        "POSITION": {
+          "maximum": 0.00005732446304612002,
+          "oldMaximum": 0.00005732446304612002,
+          "squared": 0.000057758175737028254,
+          "oldSquared": 0.000057758175737028254
+        },
+        "TANGENT": {
+          "maximum": 0.0004129746075299503,
+          "oldMaximum": 0.0004129746075299503,
+          "squared": 0.003525147266902469,
+          "oldSquared": 0.003525147266902469
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001571877013159871,
+          "oldMaximum": 0.0001571877013159871,
+          "squared": 0.00041939252995890075,
+          "oldSquared": 0.00041939252995890075
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/1/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 51224,
+      "faces": 93024,
+      "bytes": 782381,
+      "oldBytes": 1088650,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0026664040781854744,
+          "oldMaximum": 0.004084718846744982,
+          "squared": 0.09172329822914614,
+          "oldSquared": 0.11057251318937701
+        },
+        "POSITION": {
+          "maximum": 0.00005732446304612002,
+          "oldMaximum": 0.00005732446304612002,
+          "squared": 0.00005775817573702766,
+          "oldSquared": 0.00005775817573702766
+        },
+        "TANGENT": {
+          "maximum": 0.0004129746075299503,
+          "oldMaximum": 0.0004129746075299503,
+          "squared": 0.003525147266902505,
+          "oldSquared": 0.003525147266902505
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001571877013159871,
+          "oldMaximum": 0.0001571877013159871,
+          "squared": 0.00041939252995890075,
+          "oldSquared": 0.00041939252995890075
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/1/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 51224,
+      "faces": 93024,
+      "bytes": 2382728,
+      "oldBytes": 2399373,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/1/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 51224,
+      "faces": 93024,
+      "bytes": 484642,
+      "oldBytes": 545983,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006832511550989188,
+          "oldMaximum": 0.0010230098681928291,
+          "squared": 0.005818018894852687,
+          "oldSquared": 0.007088561194752822
+        },
+        "POSITION": {
+          "maximum": 0.000003757325675867561,
+          "oldMaximum": 0.000003757325675867561,
+          "squared": 2.313616455522116e-7,
+          "oldSquared": 2.313616455522116e-7
+        },
+        "TANGENT": {
+          "maximum": 0.00002609128190152773,
+          "oldMaximum": 0.00002609128190152773,
+          "squared": 0.000010743312875807902,
+          "oldSquared": 0.000010743312875807902
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000039786647317820346,
+          "oldMaximum": 0.000039786647317820346,
+          "squared": 0.00002940014338481678,
+          "oldSquared": 0.00002940014338481678
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/2/default",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 3420,
+      "faces": 4864,
+      "bytes": 19139,
+      "oldBytes": 23430,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0019979391906049643,
+          "oldMaximum": 0.003167360272061603,
+          "squared": 0.004940579690126135,
+          "oldSquared": 0.006360084315375502
+        },
+        "POSITION": {
+          "maximum": 0.000053807562799965196,
+          "oldMaximum": 0.000053807562799965196,
+          "squared": 0.000003839423935454816,
+          "oldSquared": 0.000003839423935454816
+        },
+        "TANGENT": {
+          "maximum": 0.00040710104811330283,
+          "oldMaximum": 0.00040710104811330283,
+          "squared": 0.00020165620138250045,
+          "oldSquared": 0.00020165620138250045
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00011128915053940331,
+          "oldMaximum": 0.00011128915053940331,
+          "squared": 0.000019175978779983893,
+          "oldSquared": 0.000019175978779983893
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/2/fast",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 3420,
+      "faces": 4864,
+      "bytes": 50230,
+      "oldBytes": 67608,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0019979391906049643,
+          "oldMaximum": 0.003167360272061603,
+          "squared": 0.004940579690126134,
+          "oldSquared": 0.006360084315375507
+        },
+        "POSITION": {
+          "maximum": 0.000053807562799965196,
+          "oldMaximum": 0.000053807562799965196,
+          "squared": 0.000003839423935454815,
+          "oldSquared": 0.000003839423935454815
+        },
+        "TANGENT": {
+          "maximum": 0.00040710104811330283,
+          "oldMaximum": 0.00040710104811330283,
+          "squared": 0.00020165620138250026,
+          "oldSquared": 0.00020165620138250026
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00011128915053940331,
+          "oldMaximum": 0.00011128915053940331,
+          "squared": 0.000019175978779983893,
+          "oldSquared": 0.000019175978779983893
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/2/exact",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 3420,
+      "faces": 4864,
+      "bytes": 164642,
+      "oldBytes": 165766,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb/5/2/precise",
+      "modelSha256": "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+      "points": 3420,
+      "faces": 4864,
+      "bytes": 31832,
+      "oldBytes": 36376,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0005112521176474509,
+          "oldMaximum": 0.0008042747844431675,
+          "squared": 0.0002957469211610228,
+          "oldSquared": 0.00035978904756873525
+        },
+        "POSITION": {
+          "maximum": 0.0000035283986323737085,
+          "oldMaximum": 0.0000035283986323737085,
+          "squared": 1.584939393279847e-8,
+          "oldSquared": 1.584939393279847e-8
+        },
+        "TANGENT": {
+          "maximum": 0.00002524626137187854,
+          "oldMaximum": 0.00002524626137187854,
+          "squared": 7.854105594154953e-7,
+          "oldSquared": 7.854105594154953e-7
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00002921558008106046,
+          "oldMaximum": 0.00002921558008106046,
+          "squared": 0.0000011341507129003503,
+          "oldSquared": 0.0000011341507129003503
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/0/0/default",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 926,
+      "faces": 872,
+      "bytes": 7341,
+      "oldBytes": 8520,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0026599427190781622,
+          "oldMaximum": 0.003008735681599269,
+          "squared": 0.001076581075475914,
+          "oldSquared": 0.0012071971716684452
+        },
+        "POSITION": {
+          "maximum": 0.0012275262053216083,
+          "oldMaximum": 0.0012275262053216083,
+          "squared": 0.0004925397424404565,
+          "oldSquared": 0.0004925397424404565
+        },
+        "TANGENT": {
+          "maximum": 0.00040065568217512567,
+          "oldMaximum": 0.00040065568217512567,
+          "squared": 0.00005590227368206347,
+          "oldSquared": 0.00005590227368206347
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016665441375110209,
+          "oldMaximum": 0.00016665441375110209,
+          "squared": 0.000009379336680043118,
+          "oldSquared": 0.000009379336680043118
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/0/0/fast",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 926,
+      "faces": 872,
+      "bytes": 12817,
+      "oldBytes": 15927,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0026599427190781622,
+          "oldMaximum": 0.003008735681599269,
+          "squared": 0.0010765810754759136,
+          "oldSquared": 0.0012071971716684448
+        },
+        "POSITION": {
+          "maximum": 0.0012275262053216083,
+          "oldMaximum": 0.0012275262053216083,
+          "squared": 0.0004925397424404565,
+          "oldSquared": 0.0004925397424404565
+        },
+        "TANGENT": {
+          "maximum": 0.00040065568217512567,
+          "oldMaximum": 0.00040065568217512567,
+          "squared": 0.00005590227368206347,
+          "oldSquared": 0.00005590227368206347
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016665441375110209,
+          "oldMaximum": 0.00016665441375110209,
+          "squared": 0.000009379336680043118,
+          "oldSquared": 0.000009379336680043118
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/0/0/exact",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 926,
+      "faces": 872,
+      "bytes": 35340,
+      "oldBytes": 35372,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/0/0/precise",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 926,
+      "faces": 872,
+      "bytes": 9639,
+      "oldBytes": 9828,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006370894848017059,
+          "oldMaximum": 0.0007945353957367776,
+          "squared": 0.00006587744369187994,
+          "oldSquared": 0.00007703633049700669
+        },
+        "POSITION": {
+          "maximum": 0.00007594015960053379,
+          "oldMaximum": 0.00007594015960053379,
+          "squared": 0.0000021425393601504084,
+          "oldSquared": 0.0000021425393601504084
+        },
+        "TANGENT": {
+          "maximum": 0.000024413605272836742,
+          "oldMaximum": 0.000024413605272836742,
+          "squared": 2.271248112122379e-7,
+          "oldSquared": 2.271248112122379e-7
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004186580617085436,
+          "oldMaximum": 0.00004186580617085436,
+          "squared": 5.669539683182071e-7,
+          "oldSquared": 5.669539683182071e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/1/0/default",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 756,
+      "faces": 1248,
+      "bytes": 7529,
+      "oldBytes": 8137,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.001984539859633146,
+          "oldMaximum": 0.001984539859633146,
+          "squared": 0.0010359905503948888,
+          "oldSquared": 0.0010359905503948888
+        },
+        "POSITION": {
+          "maximum": 0.0000657722659501983,
+          "oldMaximum": 0.0000657722659501983,
+          "squared": 0.0000016118487922480281,
+          "oldSquared": 0.0000016118487922480281
+        },
+        "TANGENT": {
+          "maximum": 0.00041055886841892504,
+          "oldMaximum": 0.00041055886841892504,
+          "squared": 0.00004683920489046285,
+          "oldSquared": 0.00004683920489046285
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00007531784518330504,
+          "oldMaximum": 0.00007531784518330504,
+          "squared": 0.0000015721825050718508,
+          "oldSquared": 0.0000015721825050718508
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/1/0/fast",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 756,
+      "faces": 1248,
+      "bytes": 11602,
+      "oldBytes": 16131,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.001984539859633146,
+          "oldMaximum": 0.001984539859633146,
+          "squared": 0.0010359905503948877,
+          "oldSquared": 0.0010359905503948877
+        },
+        "POSITION": {
+          "maximum": 0.0000657722659501983,
+          "oldMaximum": 0.0000657722659501983,
+          "squared": 0.0000016118487922480317,
+          "oldSquared": 0.0000016118487922480317
+        },
+        "TANGENT": {
+          "maximum": 0.00041055886841892504,
+          "oldMaximum": 0.00041055886841892504,
+          "squared": 0.00004683920489046285,
+          "oldSquared": 0.00004683920489046285
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00007531784518330504,
+          "oldMaximum": 0.00007531784518330504,
+          "squared": 0.0000015721825050718508,
+          "oldSquared": 0.0000015721825050718508
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/1/0/exact",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 756,
+      "faces": 1248,
+      "bytes": 33602,
+      "oldBytes": 33907,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/1/0/precise",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 756,
+      "faces": 1248,
+      "bytes": 10875,
+      "oldBytes": 11432,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0005627889055913756,
+          "oldMaximum": 0.0009296871130545885,
+          "squared": 0.00006871442926471266,
+          "oldSquared": 0.00007621364415884402
+        },
+        "POSITION": {
+          "maximum": 0.000003840855447688614,
+          "oldMaximum": 0.000003840855447688614,
+          "squared": 4.344232394174136e-9,
+          "oldSquared": 4.344232394174136e-9
+        },
+        "TANGENT": {
+          "maximum": 0.00002486521187365294,
+          "oldMaximum": 0.00002486521187365294,
+          "squared": 1.8294831763827598e-7,
+          "oldSquared": 1.8294831763827598e-7
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000019261155881949097,
+          "oldMaximum": 0.000019261155881949097,
+          "squared": 1.0004134942676046e-7,
+          "oldSquared": 1.0004134942676046e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/2/0/default",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 2463,
+      "faces": 3274,
+      "bytes": 20077,
+      "oldBytes": 23192,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002655327626491004,
+          "oldMaximum": 0.0037497665639351654,
+          "squared": 0.004109740413688508,
+          "oldSquared": 0.0046979208939388895
+        },
+        "POSITION": {
+          "maximum": 0.000261437937486163,
+          "oldMaximum": 0.000261437937486163,
+          "squared": 0.000057018559098670425,
+          "oldSquared": 0.000057018559098670425
+        },
+        "TANGENT": {
+          "maximum": 0.0004149931059061545,
+          "oldMaximum": 0.0004149931059061545,
+          "squared": 0.00017614488818465558,
+          "oldSquared": 0.00017614488818465558
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00010559065022486737,
+          "oldMaximum": 0.00010559065022486737,
+          "squared": 0.000010380333223203309,
+          "oldSquared": 0.000010380333223203309
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/2/0/fast",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 2463,
+      "faces": 3274,
+      "bytes": 37975,
+      "oldBytes": 47927,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002655327626491004,
+          "oldMaximum": 0.0037497665639351654,
+          "squared": 0.004109740413688492,
+          "oldSquared": 0.004697920893938866
+        },
+        "POSITION": {
+          "maximum": 0.000261437937486163,
+          "oldMaximum": 0.000261437937486163,
+          "squared": 0.00005701855909867001,
+          "oldSquared": 0.00005701855909867001
+        },
+        "TANGENT": {
+          "maximum": 0.0004149931059061545,
+          "oldMaximum": 0.0004149931059061545,
+          "squared": 0.0001761448881846563,
+          "oldSquared": 0.0001761448881846563
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00010559065022486737,
+          "oldMaximum": 0.00010559065022486737,
+          "squared": 0.000010380333223203309,
+          "oldSquared": 0.000010380333223203309
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/2/0/exact",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 2463,
+      "faces": 3274,
+      "bytes": 102899,
+      "oldBytes": 103394,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TANGENT": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Lantern/Lantern.glb/2/0/precise",
+      "modelSha256": "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1",
+      "points": 2463,
+      "faces": 3274,
+      "bytes": 29086,
+      "oldBytes": 29989,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006394881227586216,
+          "oldMaximum": 0.0009504725794613128,
+          "squared": 0.00025778918718641797,
+          "oldSquared": 0.00030812941123264015
+        },
+        "POSITION": {
+          "maximum": 0.000016079330398741985,
+          "oldMaximum": 0.000016079330398741985,
+          "squared": 2.096852666222972e-7,
+          "oldSquared": 2.096852666222972e-7
+        },
+        "TANGENT": {
+          "maximum": 0.00002629166218564763,
+          "oldMaximum": 0.00002629166218564763,
+          "squared": 7.35612657817706e-7,
+          "oldSquared": 7.35612657817706e-7
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.000026426107626236225,
+          "oldMaximum": 0.000026426107626236225,
+          "squared": 6.138308767944523e-7,
+          "oldSquared": 6.138308767944523e-7
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/RiggedFigure/RiggedFigure.glb/0/0/default",
+      "modelSha256": "d6be85417d3e256861ee733eea6916093a7af7c79c16366181fd8abcaeb38cf5",
+      "points": 370,
+      "faces": 256,
+      "bytes": 3518,
+      "oldBytes": 3714,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "NORMAL": {
+          "maximum": 0.0021706796407988415,
+          "oldMaximum": 0.0022284578786549167,
+          "squared": 0.0002580003394569884,
+          "oldSquared": 0.0002848348662445558
+        },
+        "POSITION": {
+          "maximum": 0.00006584493545978288,
+          "oldMaximum": 0.00006584493545978288,
+          "squared": 7.200214628723389e-7,
+          "oldSquared": 7.200214628723389e-7
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/RiggedFigure/RiggedFigure.glb/0/0/fast",
+      "modelSha256": "d6be85417d3e256861ee733eea6916093a7af7c79c16366181fd8abcaeb38cf5",
+      "points": 370,
+      "faces": 256,
+      "bytes": 9542,
+      "oldBytes": 10394,
+      "method": 0,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "NORMAL": {
+          "maximum": 0.0021706796407988415,
+          "oldMaximum": 0.0022284578786549167,
+          "squared": 0.00025800033945698843,
+          "oldSquared": 0.00028483486624455593
+        },
+        "POSITION": {
+          "maximum": 0.00006584493545978288,
+          "oldMaximum": 0.00006584493545978288,
+          "squared": 7.200214628723389e-7,
+          "oldSquared": 7.200214628723389e-7
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/RiggedFigure/RiggedFigure.glb/0/0/exact",
+      "modelSha256": "d6be85417d3e256861ee733eea6916093a7af7c79c16366181fd8abcaeb38cf5",
+      "points": 370,
+      "faces": 256,
+      "bytes": 8413,
+      "oldBytes": 8469,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/RiggedFigure/RiggedFigure.glb/0/0/precise",
+      "modelSha256": "d6be85417d3e256861ee733eea6916093a7af7c79c16366181fd8abcaeb38cf5",
+      "points": 370,
+      "faces": 256,
+      "bytes": 3812,
+      "oldBytes": 3842,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "NORMAL": {
+          "maximum": 0.0005899791676543263,
+          "oldMaximum": 0.0006763896903793151,
+          "squared": 0.000019379497193758128,
+          "oldSquared": 0.00002430412101153465
+        },
+        "POSITION": {
+          "maximum": 0.000004077770554562553,
+          "oldMaximum": 0.000004077770554562553,
+          "squared": 3.0111885519767956e-9,
+          "oldSquared": 3.0111885519767956e-9
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/0/0/default",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 31332,
+      "faces": 61440,
+      "bytes": 67445,
+      "oldBytes": 109527,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.06497844798301164,
+          "oldSquared": 0.07695094906946512
+        },
+        "POSITION": {
+          "maximum": 0.0008815753207163244,
+          "oldMaximum": 0.0008815753207163244,
+          "squared": 0.008406520474302383,
+          "oldSquared": 0.008406520474302383
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00012858746541063613,
+          "oldMaximum": 0.00012858746541063613,
+          "squared": 0.00017490521150536308,
+          "oldSquared": 0.00017490521150536308
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/0/0/fast",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 31332,
+      "faces": 61440,
+      "bytes": 309743,
+      "oldBytes": 542881,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.06497844798301144,
+          "oldSquared": 0.07695094906946526
+        },
+        "POSITION": {
+          "maximum": 0.0008815753207163244,
+          "oldMaximum": 0.0008815753207163244,
+          "squared": 0.008406520474302386,
+          "oldSquared": 0.008406520474302386
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00012858746541063613,
+          "oldMaximum": 0.00012858746541063613,
+          "squared": 0.00017490521150536308,
+          "oldSquared": 0.00017490521150536308
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/0/0/exact",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 31332,
+      "faces": 61440,
+      "bytes": 989516,
+      "oldBytes": 1004662,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/0/0/precise",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 31332,
+      "faces": 61440,
+      "bytes": 119196,
+      "oldBytes": 133310,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.000671886116141297,
+          "oldMaximum": 0.0009122523226270943,
+          "squared": 0.0041196558262098105,
+          "oldSquared": 0.004871252053251259
+        },
+        "POSITION": {
+          "maximum": 0.00005604156157404006,
+          "oldMaximum": 0.00005604156157404006,
+          "squared": 0.00003297073595069863,
+          "oldSquared": 0.00003297073595069863
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00003203171578084668,
+          "oldMaximum": 0.00003203171578084668,
+          "squared": 0.000010823322535126294,
+          "oldSquared": 0.000010823322535126294
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/1/0/default",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 134165,
+      "oldBytes": 218428,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.1299360698344299,
+          "oldSquared": 0.15381856583883363
+        },
+        "POSITION": {
+          "maximum": 0.0008810206236471904,
+          "oldMaximum": 0.0008810206236471904,
+          "squared": 0.016873488947808213,
+          "oldSquared": 0.016873488947808213
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001288219527875158,
+          "oldMaximum": 0.0001288219527875158,
+          "squared": 0.00035129517882082507,
+          "oldSquared": 0.00035129517882082507
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/1/0/fast",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 614994,
+      "oldBytes": 1084018,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.12993606983442935,
+          "oldSquared": 0.15381856583883147
+        },
+        "POSITION": {
+          "maximum": 0.0008810206236471904,
+          "oldMaximum": 0.0008810206236471904,
+          "squared": 0.016873488947808244,
+          "oldSquared": 0.016873488947808244
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001288219527875158,
+          "oldMaximum": 0.0001288219527875158,
+          "squared": 0.00035129517882082507,
+          "oldSquared": 0.00035129517882082507
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/1/0/exact",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 1978905,
+      "oldBytes": 2009254,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/1/0/precise",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 237096,
+      "oldBytes": 261580,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.000671886116141297,
+          "oldMaximum": 0.0009122523226270943,
+          "squared": 0.008242299287264054,
+          "oldSquared": 0.009815704929263983
+        },
+        "POSITION": {
+          "maximum": 0.00005660571241283769,
+          "oldMaximum": 0.00005660571241283769,
+          "squared": 0.00006609295597468256,
+          "oldSquared": 0.00006609295597468256
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00003220019226232304,
+          "oldMaximum": 0.00003220019226232304,
+          "squared": 0.000021845632235882942,
+          "oldSquared": 0.000021845632235882942
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/2/0/default",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 134200,
+      "oldBytes": 218385,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0027095039758091395,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.12993710406654546,
+          "oldSquared": 0.15386092979880472
+        },
+        "POSITION": {
+          "maximum": 0.0008811245773224562,
+          "oldMaximum": 0.0008811245773224562,
+          "squared": 0.016873831235238754,
+          "oldSquared": 0.016873831235238754
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001288429779392727,
+          "oldMaximum": 0.0001288429779392727,
+          "squared": 0.0003514112354573405,
+          "oldSquared": 0.0003514112354573405
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/2/0/fast",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 614972,
+      "oldBytes": 1083960,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0027095039758091395,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.12993710406654502,
+          "oldSquared": 0.15386092979880284
+        },
+        "POSITION": {
+          "maximum": 0.0008811245773224562,
+          "oldMaximum": 0.0008811245773224562,
+          "squared": 0.016873831235238786,
+          "oldSquared": 0.016873831235238786
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001288429779392727,
+          "oldMaximum": 0.0001288429779392727,
+          "squared": 0.0003514112354573405,
+          "oldSquared": 0.0003514112354573405
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/2/0/exact",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 1978905,
+      "oldBytes": 2009254,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/2/0/precise",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 237049,
+      "oldBytes": 261690,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006623500196355961,
+          "oldMaximum": 0.0009122523226270943,
+          "squared": 0.00824061430407733,
+          "oldSquared": 0.00978194151512235
+        },
+        "POSITION": {
+          "maximum": 0.00005660571241283769,
+          "oldMaximum": 0.00005660571241283769,
+          "squared": 0.00006608727476041855,
+          "oldSquared": 0.00006608727476041855
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00003224236665778198,
+          "oldMaximum": 0.00003224236665778198,
+          "squared": 0.000021786520169150142,
+          "oldSquared": 0.000021786520169150142
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/3/0/default",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 134156,
+      "oldBytes": 218433,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.12996012015098335,
+          "oldSquared": 0.15391318836517287
+        },
+        "POSITION": {
+          "maximum": 0.0008810206236471904,
+          "oldMaximum": 0.0008810206236471904,
+          "squared": 0.01687315826917707,
+          "oldSquared": 0.01687315826917707
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001293910720432814,
+          "oldMaximum": 0.0001293910720432814,
+          "squared": 0.00035081683978640393,
+          "oldSquared": 0.00035081683978640393
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/3/0/fast",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 614921,
+      "oldBytes": 1083920,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.12996012015098318,
+          "oldSquared": 0.15391318836517098
+        },
+        "POSITION": {
+          "maximum": 0.0008810206236471904,
+          "oldMaximum": 0.0008810206236471904,
+          "squared": 0.0168731582691771,
+          "oldSquared": 0.0168731582691771
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.0001293910720432814,
+          "oldMaximum": 0.0001293910720432814,
+          "squared": 0.00035081683978640393,
+          "oldSquared": 0.00035081683978640393
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/3/0/exact",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 1978905,
+      "oldBytes": 2009254,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/3/0/precise",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 62664,
+      "faces": 122880,
+      "bytes": 236975,
+      "oldBytes": 261401,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006720347044564696,
+          "oldMaximum": 0.0009122523226270943,
+          "squared": 0.008242016080652392,
+          "oldSquared": 0.00978700384990713
+        },
+        "POSITION": {
+          "maximum": 0.000056214227214380876,
+          "oldMaximum": 0.000056214227214380876,
+          "squared": 0.00006607946498502381,
+          "oldSquared": 0.00006607946498502381
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00003234776801082035,
+          "oldMaximum": 0.00003234776801082035,
+          "squared": 0.000021844337712875056,
+          "oldSquared": 0.000021844337712875056
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/4/0/default",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 36590,
+      "faces": 71696,
+      "bytes": 74460,
+      "oldBytes": 121666,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.07579471355505313,
+          "oldSquared": 0.08983990155030058
+        },
+        "POSITION": {
+          "maximum": 0.0012572460946344004,
+          "oldMaximum": 0.0012572460946344004,
+          "squared": 0.01956822335459622,
+          "oldSquared": 0.01956822335459622
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016928442384235012,
+          "oldMaximum": 0.00016928442384235012,
+          "squared": 0.00035459945556663014,
+          "oldSquared": 0.00035459945556663014
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/4/0/fast",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 36590,
+      "faces": 71696,
+      "bytes": 350929,
+      "oldBytes": 623797,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.002711827231933434,
+          "oldMaximum": 0.0036925374759220987,
+          "squared": 0.07579471355505318,
+          "oldSquared": 0.08983990155030079
+        },
+        "POSITION": {
+          "maximum": 0.0012572460946344004,
+          "oldMaximum": 0.0012572460946344004,
+          "squared": 0.019568223354596213,
+          "oldSquared": 0.019568223354596213
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016928442384235012,
+          "oldMaximum": 0.00016928442384235012,
+          "squared": 0.00035459945556663014,
+          "oldSquared": 0.00035459945556663014
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/4/0/exact",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 36590,
+      "faces": 71696,
+      "bytes": 1155584,
+      "oldBytes": 1173178,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb/4/0/precise",
+      "modelSha256": "450c05557b0823a10835e32c05caf77a7b175eba94516555c1c9bb084f563f01",
+      "points": 36590,
+      "faces": 71696,
+      "bytes": 131666,
+      "oldBytes": 144281,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0.0006720347044564696,
+          "oldMaximum": 0.0009122523226270943,
+          "squared": 0.004805769854417467,
+          "oldSquared": 0.00568749522739655
+        },
+        "POSITION": {
+          "maximum": 0.00007901840609216687,
+          "oldMaximum": 0.00007901840609216687,
+          "squared": 0.00007771955246626884,
+          "oldSquared": 0.00007771955246626884
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004235760372202466,
+          "oldMaximum": 0.00004235760372202466,
+          "squared": 0.000022033780415472992,
+          "oldSquared": 0.000022033780415472992
+        }
+      }
+    },
+    {
+      "name": "packages/exporters/tests/fixtures/Box.glb/0/0/default",
+      "modelSha256": "ed52f7192b8311d700ac0ce80644e3852cd01537e4d62241b9acba023da3d54e",
+      "points": 24,
+      "faces": 12,
+      "bytes": 118,
+      "oldBytes": 130,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "packages/exporters/tests/fixtures/Box.glb/0/0/fast",
+      "modelSha256": "ed52f7192b8311d700ac0ce80644e3852cd01537e4d62241b9acba023da3d54e",
+      "points": 24,
+      "faces": 12,
+      "bytes": 144,
+      "oldBytes": 156,
+      "method": 0,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "packages/exporters/tests/fixtures/Box.glb/0/0/exact",
+      "modelSha256": "ed52f7192b8311d700ac0ce80644e3852cd01537e4d62241b9acba023da3d54e",
+      "points": 24,
+      "faces": 12,
+      "bytes": 436,
+      "oldBytes": 436,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "packages/exporters/tests/fixtures/Box.glb/0/0/precise",
+      "modelSha256": "ed52f7192b8311d700ac0ce80644e3852cd01537e4d62241b9acba023da3d54e",
+      "points": 24,
+      "faces": 12,
+      "bytes": 118,
+      "oldBytes": 118,
+      "method": 1,
+      "errors": {
+        "NORMAL": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Fox/Fox.glb/0/0/default",
+      "modelSha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+      "points": 1728,
+      "faces": 576,
+      "bytes": 7079,
+      "oldBytes": 7566,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.007108372412467883,
+          "oldMaximum": 0.007108372412467883,
+          "squared": 0.037166434301863116,
+          "oldSquared": 0.037166434301863116
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016203712337205578,
+          "oldMaximum": 0.00016203712337205578,
+          "squared": 0.00001536029835326122,
+          "oldSquared": 0.00001536029835326122
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Fox/Fox.glb/0/0/fast",
+      "modelSha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+      "points": 1728,
+      "faces": 576,
+      "bytes": 12540,
+      "oldBytes": 14211,
+      "method": 0,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.007108372412467883,
+          "oldMaximum": 0.007108372412467883,
+          "squared": 0.037166434301863116,
+          "oldSquared": 0.037166434301863116
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00016203712337205578,
+          "oldMaximum": 0.00016203712337205578,
+          "squared": 0.00001536029835326122,
+          "oldSquared": 0.00001536029835326122
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Fox/Fox.glb/0/0/exact",
+      "modelSha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+      "points": 1728,
+      "faces": 576,
+      "bytes": 12123,
+      "oldBytes": 12197,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "TEXCOORD_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    },
+    {
+      "name": "examples/assets/khronos/Fox/Fox.glb/0/0/precise",
+      "modelSha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+      "points": 1728,
+      "faces": 576,
+      "bytes": 7708,
+      "oldBytes": 7773,
+      "method": 1,
+      "errors": {
+        "JOINTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        },
+        "POSITION": {
+          "maximum": 0.0004772072786129686,
+          "oldMaximum": 0.0004772072786129686,
+          "squared": 0.00014475557649190618,
+          "oldSquared": 0.00014475557649190618
+        },
+        "TEXCOORD_0": {
+          "maximum": 0.00004048402803638814,
+          "oldMaximum": 0.00004048402803638814,
+          "squared": 0.0000010007052276168882,
+          "oldSquared": 0.0000010007052276168882
+        },
+        "WEIGHTS_0": {
+          "maximum": 0,
+          "oldMaximum": 0,
+          "squared": 0,
+          "oldSquared": 0
+        }
+      }
+    }
+  ],
+  "failures": [],
+  "ineligible": []
+}
