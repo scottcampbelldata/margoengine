@@ -197,6 +197,15 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 wfc: work counts, 2026-11-10
+
+| Work | Before | After | Output | Oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| 16 x 16, 8 weighted tiles, TypeScript heap | 6656 bit scans | 4608 | 5 tile sets x 3 seeds x pins: identical solutions and stats | 0 adjacency violations over 120 solves on three solvers | `perf(wfc): gather the full-domain union once`; timing pending the quiet rerun |
+| Same grid, legacy WFC | 4608 bit scans | 512 | identical solutions | same | timing pending the quiet rerun |
+
+Values and commands: [batch-169.md](batch-169.md#job-6-wfc-full-domain-propagation).
+
 ## Batch 169 terrain: work counts, 2026-11-10
 
 | Work | Before | After | Output | Oracle | Status |

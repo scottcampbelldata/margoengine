@@ -4716,6 +4716,13 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 wfc propagation work (2026-11-10)
+
+Full-domain cells reuse one neighbour union: 6656 to 4608 bit scans (TypeScript heap) and
+4608 to 512 (legacy) on 16 x 16 cells of 8 weighted tiles, identical solutions and stats.
+Regression: `packages/wfc/test/full-domain-workcount.test.js`;
+[oracle](batch-169.md#job-6-wfc-full-domain-propagation). No timing claim.
+
 ### Batch 169 terrain uniform work (2026-11-10)
 
 A still terrain view uploads no uniform bytes: 0 writes instead of 12 per frame for three

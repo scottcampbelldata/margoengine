@@ -178,6 +178,9 @@ export class HeapWFC {
     for (let t = 0; t < T; t++)
       for (let d = 0; d < 6; d++)
         for (const u of this.tiles[t].neighbors[d]) allowed[(t * 6 + d) * B + (u >>> 5)] |= 1 << (u & 31);
+    // A cell holding every tile (all of them at the start) supports this union; it is gathered once, not per cell.
+    const fullSupport = new Uint32Array(6 * B);
+    for (let t = 0; t < T; t++) for (let j = 0; j < 6 * B; j++) fullSupport[j] |= allowed[t * 6 * B + j];
     const less = (a: number, b: number) =>
       keys[a] < keys[b] || (keys[a] === keys[b] && (tie[a] < tie[b] || (tie[a] === tie[b] && a < b)));
     const swap = (a: number, b: number) => {
@@ -274,10 +277,13 @@ export class HeapWFC {
           if (++propagated % 1024 === 0) report();
           const i = queue.pop()!;
           queued[i] = 0;
-          support.fill(0);
-          each(i, (t) => {
-            for (let j = 0; j < 6 * B; j++) support[j] |= allowed[t * 6 * B + j];
-          });
+          if (counts[i] === T) support.set(fullSupport);
+          else {
+            support.fill(0);
+            each(i, (t) => {
+              for (let j = 0; j < 6 * B; j++) support[j] |= allowed[t * 6 * B + j];
+            });
+          }
           for (let d = 0; d < 6; d++) {
             const x = (i % W) + offsets[d][0],
               y = (Math.floor(i / W) % H) + offsets[d][1],

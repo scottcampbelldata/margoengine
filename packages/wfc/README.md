@@ -164,6 +164,19 @@ overlapping and constraints seed streams keep their previous behavior. Local adj
 bounded restarts, without global counts/connectivity or chronological backtracking. Defaults: seed 1, attempts 4
 (1..64), pins empty, signal absent. Grid limits: 1..4096 IDs, <=1,000,000 cells, <=16,777,216 cell/tile pairs.
 Invalid inputs throw RangeError/TypeError; exhausted attempts throw coded failed with a help link.
+A cell that still holds every tile (every cell at the start of an attempt) propagates one neighbour union gathered
+once per solve, so the first pass costs six words per cell rather than a walk over all tiles; the legacy `WFC` also
+reuses the full domain's entropy. Solutions, seeds and `stats` are unchanged:
+
+```ts
+import {HeapWFC} from '@margoengine/wfc/chunks';
+
+const all = Array.from({length: 8}, (_, t) => t);
+const tiles = all.map((t) => ({weight: 1 + t, neighbors: Array.from({length: 6}, () => all)}));
+const model = new HeapWFC([16, 16, 1], tiles); // weighted tiles stay on the TypeScript solver
+const grid = model.solve({seed: 3});
+console.log(grid.length, model.stats.decisions); // 256 256
+```
 All WFC entries reject holes in dimensions, coordinates, pins, rules and constraint lists before search;
 all three dimensions and their safe integer product are validated before grid allocation.
 

@@ -43,6 +43,9 @@ export class WFC {
   private readonly entropyMasks: Uint32Array;
   private readonly entropies: Float64Array;
   private readonly union = new Int32Array(6);
+  // Every cell starts with all tiles, so the full mask's neighbor unions and entropy are worked out once.
+  private readonly fullUnion = new Int32Array(6);
+  private fullEntropy = 0;
   private readonly undecided: Uint32Array;
   private randomState = 1;
   private pending = 0;
@@ -111,6 +114,15 @@ export class WFC {
       throw new RangeError(
         'WFC weight arithmetic overflowed; use weights whose sum and weighted logarithms stay finite',
       );
+    let sum = 0,
+      log = 0;
+    for (let rest = this.full; rest; rest &= rest - 1) {
+      const row = (31 - Math.clz32(rest & -rest)) * 6;
+      for (let direction = 0; direction < 6; direction++) this.fullUnion[direction] |= this.allowed[row + direction];
+      sum += this.weights[row / 6];
+      log += this.weightedLogs[row / 6];
+    }
+    this.fullEntropy = Math.log(sum) - log / sum;
   }
   private random(): number {
     let x = this.randomState;
@@ -142,10 +154,13 @@ export class WFC {
         z = Math.floor(index / (width * height)),
         mask = cells[index];
       // One pass over the set tiles gathers the allowed neighbors for all six directions.
-      union.fill(0);
-      for (let rest = mask; rest; rest &= rest - 1) {
-        const row = (31 - Math.clz32(rest & -rest)) * 6;
-        for (let direction = 0; direction < 6; direction++) union[direction] |= table[row + direction];
+      if (mask === this.full) union.set(this.fullUnion);
+      else {
+        union.fill(0);
+        for (let rest = mask; rest; rest &= rest - 1) {
+          const row = (31 - Math.clz32(rest & -rest)) * 6;
+          for (let direction = 0; direction < 6; direction++) union[direction] |= table[row + direction];
+        }
       }
       for (let direction = 0; direction < 6; direction++) {
         const d = directions[direction],
@@ -231,7 +246,10 @@ export class WFC {
             mask = cells[i];
           if (!(mask & (mask - 1))) continue; // fewer than two tiles left
           undecided[kept++] = i;
-          if (entropyMasks[i] !== mask) {
+          if (entropyMasks[i] !== mask && mask === this.full) {
+            entropyMasks[i] = mask;
+            entropies[i] = this.fullEntropy;
+          } else if (entropyMasks[i] !== mask) {
             let sum = 0,
               log = 0;
             for (let rest = mask; rest; rest &= rest - 1) {

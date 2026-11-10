@@ -9,8 +9,42 @@ No wall-clock benchmarks or budget changes. Timing pending the quiet rerun.
 | 3 | mesh-edit | DONE in `perf(mesh-edit): index subdivision edges numerically` | 1260 to 0 edge-ID parses; 482650 identical bytes; Blender 5.3 vertices match within Float32 |
 | 4 | splines | DONE in `perf(splines): rebuild intersection cubics once per curve` | 512 to 64 point evaluations; 1264 identical bytes; three.js Catmull-Rom values within 4.44e-16 |
 | 5 | terrain | DONE in `perf(terrain): upload only changed ring uniforms` | 12 to 0 uniform writes on an unchanged frame; identical buffer bytes; source heights exact, clipmap error per level recorded |
-| 6 | wfc | Pending | Constraint satisfaction and work count |
+| 6 | wfc | DONE in `perf(wfc): gather the full-domain union once` | 6656 to 4608 (heap) and 4608 to 512 (legacy) bit scans; identical solutions and stats; 0 violations |
 | 7 | procedural | Pending | Published noise values, Poisson spacing and work count |
+
+## Job 6: wfc full-domain propagation
+
+Cause: each attempt starts with every cell holding every tile and queues every cell. The
+TypeScript `HeapWFC` then walked all T tiles of each full cell to OR their allowed
+neighbours, and the legacy `WFC` did the same for its unions and again for each full
+cell's first entropy. These values are the same for every full cell. Both solvers now
+gather the full domain's union (and the legacy full-domain entropy, with the same tile
+order and arithmetic) once and copy it. Decisions, the random stream, heap updates and
+`stats` are unchanged, so the TypeScript and SIMD solvers still report equal statistics.
+The Rust SIMD artifact is not changed.
+
+`packages/wfc/test/full-domain-workcount.test.js` counts bit scans (`Math.clz32`) on a
+16 x 16 grid of 8 weighted tiles: heap 6656 to 4608, legacy 4608 to 512. Five tile sets
+(open, banded, one with a tile that has no X neighbours, 40 banded tiles, 33 unit tiles),
+three seeds, with and without pins, hash solutions, failures and statistics to
+`227a189efccb94eeeae817d4681ec68a705aa058211dc6cd02a62ef31324c37e`, captured on the parent.
+
+Constraint-satisfaction oracle (`scripts/bp-169-wfc-oracle.mjs`): banded 8-tile sets on
+32 x 32 (weighted and unit weights) and a 40-tile set on 12 x 12 x 4, 20 seeds each, solve
+on the TypeScript heap, SIMD heap and legacy solvers with 0 adjacency violations. Gumin's
+bitmap samples exercise the overlapping model, which this job does not change; its tests
+stay as they are. No rival timing was run.
+
+Reproduce after `npm run build:packages`:
+`node --test packages/wfc/test/full-domain-workcount.test.js` and
+`node scripts/bp-169-wfc-oracle.mjs`. No time is measured.
+
+Research: M. Gumin, *WaveFunctionCollapse* (2016), algorithm description in its README,
+https://github.com/mxgmn/WaveFunctionCollapse (description only); I. Karth and A. M. Smith,
+*WaveFunctionCollapse is Constraint Solving in the Wild*, FDG 2017,
+https://doi.org/10.1145/3102071.3110566 (arc consistency); A. K. Mackworth, *Consistency in
+Networks of Relations*, Artificial Intelligence 8(1), 1977,
+https://doi.org/10.1016/0004-3702(77)90007-8. No rival code was read.
 
 ## Job 5: terrain uniform uploads
 

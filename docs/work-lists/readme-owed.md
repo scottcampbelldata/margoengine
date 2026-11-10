@@ -1554,3 +1554,5 @@ in the post README during the README phase (2026-11-10); all 28 runtime examples
 - @margoengine/splines batch 169 job 4: DONE; new query section with a runnable intersectSplines/splineBounds example and the per-call reconstruction note, checked by check:readme-run. The batch 225 query line above is covered by this section.
 
 - @margoengine/terrain batch 169 job 5: DONE; the clipmap section documents changed-only uniform uploads and first writes after restore.
+
+- @margoengine/wfc batch 169 job 6: DONE; HeapWFC section documents the once-per-solve full-domain union with a runnable weighted example, checked by check:readme-run.

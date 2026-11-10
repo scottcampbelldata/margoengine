@@ -473,3 +473,5 @@ Build-ready controls and external-install commands: [sciviz-rivals](../sciviz-ri
 - Batch 169 job 4 splines: time intersectSplines on the six intersect-workcount pairs and larger 64-segment curves in the quiet window; point evaluations 512 to 64 on two 8-segment curves with identical bytes. three.js has no curve intersection, so only value parity (4.44e-16) is shared.
 
 - Batch 169 job 5 terrain: time a still and a moving camera over the terrain GPU scenes in the quiet window; unchanged frames now write 0 of 12 uniforms (2112 bytes) with identical buffer contents.
+
+- Batch 169 job 6 wfc: time HeapWFC (typescript and SIMD) and legacy WFC on the full-domain-workcount sets in the quiet window; bit scans 6656 to 4608 (heap) and 4608 to 512 (legacy), identical outputs and stats.
