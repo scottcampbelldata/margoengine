@@ -131,3 +131,27 @@ test('watchResolution does nothing on the full tier, and an injected apply works
     if (saved !== undefined) globalThis.margoLow = saved;
   }
 });
+
+test('watchResolution dispose puts back the cap it found, not the cap clipped to this display (batch 132)', async () => {
+  const saved = [globalThis.margoLow, globalThis.devicePixelRatio];
+  globalThis.margoLow = 2;
+  globalThis.devicePixelRatio = 1;
+  let clock = 0;
+  const queue = { submit: () => 'ok', onSubmittedWorkDone: () => Promise.resolve() };
+  try {
+    const watch = watchResolution({ queue, now: () => clock, budget: 10, window: 5 });
+    for (let i = 0; i < 5; i++) {
+      const before = clock;
+      queue.submit(i);
+      clock = before + 25;
+      await null;
+      await null;
+    }
+    assert.ok(watch.scale < 1);
+    assert.ok(globalThis.margoLow < 1, 'scaled against the 1x display');
+    watch.dispose();
+    assert.equal(globalThis.margoLow, 2, 'a later move to a 2x display can still use the full cap');
+  } finally {
+    [globalThis.margoLow, globalThis.devicePixelRatio] = saved;
+  }
+});

@@ -209,7 +209,10 @@ export function watchResolution({
     if (stopped) return;
     stopped = true;
     cleanup();
-    setScale(1);
+    // Back to the cap as it was: scaling 1 would leave min(devicePixelRatio, cap), which a later move to a sharper
+    // display could not lift.
+    if (apply) apply(1);
+    else globalThis.margoLow = base;
   };
   return {
     get scale() {
