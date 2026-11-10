@@ -1,0 +1,1060 @@
+{
+  "parent": "abde17aab197cea2e9162b96638c784c97361fca",
+  "native": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "results": {
+      "mesh": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf-tangents": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-tangents": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-uv1": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 96
+      },
+      "mesh-node": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf-node": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-option-coat": {
+        "tiltFromUp": 101,
+        "tiltFromDown": 15,
+        "bumpImageTop": 104,
+        "bumpImageBottom": 15
+      },
+      "mesh-coat": {
+        "tiltFromUp": 99,
+        "tiltFromDown": 15,
+        "bumpImageTop": 96,
+        "bumpImageBottom": 15
+      },
+      "gltf-coat": {
+        "tiltFromUp": 99,
+        "tiltFromDown": 15,
+        "bumpImageTop": 96,
+        "bumpImageBottom": 15
+      },
+      "mesh-option-aniso": {
+        "tiltFromUp": 60,
+        "tiltFromDown": 0
+      },
+      "mesh-aniso": {
+        "tiltFromUp": 249,
+        "tiltFromDown": 0
+      },
+      "gltf-aniso": {
+        "tiltFromUp": 249,
+        "tiltFromDown": 0
+      },
+      "roundTrips": {
+        "original": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ]
+          }
+        },
+        "original-tangents": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ]
+          }
+        },
+        "original-plain": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ]
+          }
+        },
+        "model-glb": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "model-glb-tangents": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "engine-glb": {
+          "error": "TypeError: PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model), whose GLB bytes exportUSDZ and exportAnimatedUSDZ also take, or as OBJ, STL or PLY"
+        },
+        "scene-glb": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "scene-obj": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "scene-dae": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          }
+        }
+      }
+    }
+  },
+  "compatibility": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "results": {
+      "mesh": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf-tangents": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-tangents": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-uv1": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 96
+      },
+      "mesh-node": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "gltf-node": {
+        "tiltFromUp": 221,
+        "tiltFromDown": 75,
+        "bumpImageTop": 222,
+        "bumpImageBottom": 99
+      },
+      "mesh-option-coat": {
+        "tiltFromUp": 101,
+        "tiltFromDown": 15,
+        "bumpImageTop": 104,
+        "bumpImageBottom": 15
+      },
+      "mesh-coat": {
+        "tiltFromUp": 99,
+        "tiltFromDown": 15,
+        "bumpImageTop": 96,
+        "bumpImageBottom": 15
+      },
+      "gltf-coat": {
+        "tiltFromUp": 99,
+        "tiltFromDown": 15,
+        "bumpImageTop": 96,
+        "bumpImageBottom": 15
+      },
+      "mesh-option-aniso": {
+        "tiltFromUp": 60,
+        "tiltFromDown": 0
+      },
+      "mesh-aniso": {
+        "tiltFromUp": 249,
+        "tiltFromDown": 0
+      },
+      "gltf-aniso": {
+        "tiltFromUp": 249,
+        "tiltFromDown": 0
+      },
+      "roundTrips": {
+        "original": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ]
+          }
+        },
+        "original-tangents": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ]
+          }
+        },
+        "original-plain": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ]
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ]
+          }
+        },
+        "model-glb": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "model-glb-tangents": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "engine-glb": {
+          "error": "TypeError: PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model), whose GLB bytes exportUSDZ and exportAnimatedUSDZ also take, or as OBJ, STL or PLY"
+        },
+        "scene-glb": {
+          "fromUp": {
+            "probes": [
+              [
+                225,
+                2,
+                2
+              ],
+              [
+                2,
+                225,
+                2
+              ],
+              [
+                2,
+                2,
+                225
+              ],
+              [
+                221,
+                221,
+                221
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                92,
+                0,
+                0
+              ],
+              [
+                0,
+                92,
+                0
+              ],
+              [
+                0,
+                0,
+                92
+              ],
+              [
+                75,
+                75,
+                75
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "scene-obj": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          }
+        },
+        "scene-dae": {
+          "fromUp": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          },
+          "fromDown": {
+            "probes": [
+              [
+                205,
+                1,
+                1
+              ],
+              [
+                1,
+                205,
+                1
+              ],
+              [
+                1,
+                1,
+                205
+              ],
+              [
+                200,
+                200,
+                200
+              ]
+            ],
+            "maxDiff": 0
+          }
+        }
+      }
+    }
+  },
+  "sizes": {
+    "parent": "abde17aab197cea2e9162b96638c784c97361fca",
+    "before": {
+      "packages/webgl2-compat/dist/index.js": 106041,
+      "packages/webgl2-compat/dist/device.js": 106095,
+      "packages/webgl2-compat/dist/xr.js": 105981,
+      "packages/webgl2-compat/dist/tiers.js": 105802
+    },
+    "after": {
+      "packages/webgl2-compat/dist/index.js": 106142,
+      "packages/webgl2-compat/dist/device.js": 106204,
+      "packages/webgl2-compat/dist/xr.js": 105977,
+      "packages/webgl2-compat/dist/tiers.js": 105902
+    },
+    "counterfactual": {
+      "ok": false,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1.3
+    }
+  },
+  "normalGPU": [
+    {
+      "name": "normal-native",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.9
+    },
+    {
+      "name": "normal-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 11.9
+    }
+  ],
+  "scope": "Normal-map/copy normalization only. A local inspector dependency repair was superseded by equivalent main-owned fix61b17b70d, with its own regressions; no second inspector implementation lands here."
+}

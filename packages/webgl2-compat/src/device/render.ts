@@ -2134,7 +2134,23 @@ export function copyExternalImage(
     throw device.unsupported(`copying an image into a ${info.name} texture`);
   const [w, h] = extent(size),
     [x, y, z] = origin(destination.origin),
-    [sx, sy] = origin(source.origin as GPUOrigin3D | undefined);
+    [sourceX, sourceY] = origin(source.origin as GPUOrigin3D | undefined);
+  let image = source.source,
+    sx = sourceX,
+    sy = sourceY;
+  // WebGL ignores unpack flip and alpha flags for ImageBitmap. A drawable
+  // canvas restores those operations, after cropping the requested rectangle.
+  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) {
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    if (!context) throw device.unsupported('a 2D canvas for external bitmap copies');
+    context.drawImage(image, sx, sy, w, h, 0, 0, w, h);
+    image = canvas;
+    sx = sy = 0;
+  }
   const level = destination.mipLevel ?? 0;
   beforeUpload(device, t, level, z, 1);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !!source.flipY);
@@ -2153,7 +2169,7 @@ export function copyExternalImage(
       h,
       device.enum(info.format),
       device.enum(type),
-      source.source as TexImageSource,
+      image as TexImageSource,
     );
   else
     gl.texSubImage3D(
@@ -2167,7 +2183,7 @@ export function copyExternalImage(
       1,
       device.enum(info.format),
       device.enum(type),
-      source.source as TexImageSource,
+      image as TexImageSource,
     );
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);

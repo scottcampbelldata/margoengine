@@ -346,3 +346,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: cover the generated tiles/features alias.
 - @margoengine/procedural (batch 230 textures-pbr): createPBRTextureBaker, four-map formats, palettes, controls, explicit animation time, mipmaps, compatibility-layer setup and lifecycle; examples deferred.
 - margoengine (batch 230 textures-pbr): generated procedural/textures-pbr alias; examples deferred.
+
+| @margoengine/webgl2-compat | Bitmap source crop/orientation/alpha semantics, temporary canvas cost, destination types and normal-map proof. | Batch273 group12 |
+| margoengine | Generated exporters/sparse alias and its import-equivalence proof. | Batch273 group12 landing blocker |

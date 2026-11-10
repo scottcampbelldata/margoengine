@@ -1162,6 +1162,10 @@
       "types": "./dist/exporters/splats.d.ts",
       "import": "./dist/exporters/splats.js"
     },
+    "./exporters/sparse": {
+      "types": "./dist/exporters/sparse.d.ts",
+      "import": "./dist/exporters/sparse.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"
