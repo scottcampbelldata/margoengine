@@ -3300,6 +3300,13 @@ No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.
 
 `perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.
 
+### Batch 169 job 7: procedural Worley cells (2026-11-10)
+
+`perf(procedural): hash only Worley cells that can win` skips cells whose box is already
+farther than the nearest feature: 1,536,000 to 183,696 hash multiplies over 1024 samples,
+identical values. [Methods](batch-169.md#job-7-procedural-worley-cells). Timing pending the
+quiet rerun.
+
 ### Batch 169 job 6: wfc full-domain propagation (2026-11-10)
 
 `perf(wfc): gather the full-domain union once` copies one precomputed neighbour union for

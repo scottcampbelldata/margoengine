@@ -168,6 +168,19 @@ const swirl = domainWarp(hills, {strength: 0.8, dimensions: 2});
 const clouds = (x: number, y: number, z: number, t: number) => noise.simplex4(x, y, z, t); // 3D animated along w
 ```
 
+`worley(x, y, z)` returns the exact F1 distance over the 5 x 5 x 5 cells around the point (one seeded feature per
+cell, Worley 1996). It visits the 27 nearest cells first and hashes a cell only while the gap to its box is below the
+nearest distance found so far, so most of the outer shell is never hashed; the value is the same bit for bit as
+checking every cell:
+
+```ts
+import {Noise} from '@margoengine/procedural/noise';
+
+const cells = new Noise(7);
+const d = cells.worley(1.25, -3.5, 0.75);
+console.log(d >= 0 && d < Math.sqrt(3)); // true: the point's own cell holds a feature
+```
+
 `Noise` has seeded `simplex2`, `simplex` (3D) and `simplex4`, plus `perlin` and `worley` (3D). The package has no
 third-party runtime dependencies. Simplex is its own, written from Perlin (2001) and Gustavson's "Simplex noise
 demystified": one kernel `(0.5 - |d|^2)^4 (g . d)` per simplex corner, radius^2 0.5 in every dimension, so the field is

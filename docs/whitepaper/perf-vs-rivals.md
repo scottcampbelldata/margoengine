@@ -197,6 +197,14 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 procedural: work counts, 2026-11-10
+
+| Work | Before | After | Output | Oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1024 Worley F1 samples | 1,536,000 hash multiplies | 183,696 | 1029 samples x 3 seeds, identical Float64 bytes | 100,000 points equal an exhaustive 125-cell F1; Poisson minimum spacing at or above the radius | `perf(procedural): hash only Worley cells that can win`; timing pending the quiet rerun |
+
+Values and commands: [batch-169.md](batch-169.md#job-7-procedural-worley-cells).
+
 ## Batch 169 wfc: work counts, 2026-11-10
 
 | Work | Before | After | Output | Oracle | Status |

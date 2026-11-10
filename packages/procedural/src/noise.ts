@@ -264,17 +264,26 @@ export class Noise {
       iy = Math.floor(y),
       iz = Math.floor(z);
     let distance = Infinity;
-    for (let a = -2; a <= 2; a++)
-      for (let b = -2; b <= 2; b++)
-        for (let c = -2; c <= 2; c++) {
-          const cx = ix + a,
-            cy = iy + b,
-            cz = iz + c;
-          const dx = cx + hash(cx, cy, cz, this.seed) / 4294967296 - x;
-          const dy = cy + hash(cx, cy, cz, this.seed ^ 0x9e3779b9) / 4294967296 - y;
-          const dz = cz + hash(cx, cy, cz, this.seed ^ 0x85ebca6b) / 4294967296 - z;
-          distance = Math.min(distance, dx * dx + dy * dy + dz * dz);
-        }
+    // The 27 nearest cells go first, then the outer shell. A cell is hashed only when its box can still beat the
+    // nearest feature so far: its point lies in [c, c + 1) per axis, and the rounded gap to that box is never more than
+    // the rounded offset to the point, so a skipped cell could not lower the minimum (Worley 1996).
+    for (let shell = 1; shell <= 2; shell++)
+      for (let a = -shell; a <= shell; a++)
+        for (let b = -shell; b <= shell; b++)
+          for (let c = -shell; c <= shell; c++) {
+            if (shell === 2 && Math.abs(a) < 2 && Math.abs(b) < 2 && Math.abs(c) < 2) continue;
+            const cx = ix + a,
+              cy = iy + b,
+              cz = iz + c,
+              gx = x < cx ? cx - x : x >= cx + 1 ? x - (cx + 1) : 0,
+              gy = y < cy ? cy - y : y >= cy + 1 ? y - (cy + 1) : 0,
+              gz = z < cz ? cz - z : z >= cz + 1 ? z - (cz + 1) : 0;
+            if (gx * gx + gy * gy + gz * gz >= distance) continue;
+            const dx = cx + hash(cx, cy, cz, this.seed) / 4294967296 - x;
+            const dy = cy + hash(cx, cy, cz, this.seed ^ 0x9e3779b9) / 4294967296 - y;
+            const dz = cz + hash(cx, cy, cz, this.seed ^ 0x85ebca6b) / 4294967296 - z;
+            distance = Math.min(distance, dx * dx + dy * dy + dz * dz);
+          }
     return Math.sqrt(distance);
   }
 }

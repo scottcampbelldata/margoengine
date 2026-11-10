@@ -4716,6 +4716,13 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 procedural Worley work (2026-11-10)
+
+`Noise.worley` needs 183,696 instead of 1,536,000 hash multiplies for 1024 samples and
+returns the same bits; 100,000 random points equal an exhaustive 125-cell evaluation.
+Regression: `packages/procedural/test/worley-workcount.test.js`;
+[oracle](batch-169.md#job-7-procedural-worley-cells). No timing claim.
+
 ### Batch 169 wfc propagation work (2026-11-10)
 
 Full-domain cells reuse one neighbour union: 6656 to 4608 bit scans (TypeScript heap) and

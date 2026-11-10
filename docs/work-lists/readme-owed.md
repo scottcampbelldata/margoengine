@@ -1556,3 +1556,5 @@ in the post README during the README phase (2026-11-10); all 28 runtime examples
 - @margoengine/terrain batch 169 job 5: DONE; the clipmap section documents changed-only uniform uploads and first writes after restore.
 
 - @margoengine/wfc batch 169 job 6: DONE; HeapWFC section documents the once-per-solve full-domain union with a runnable weighted example, checked by check:readme-run.
+
+- @margoengine/procedural batch 169 job 7: DONE; Noise section documents the pruned exact Worley search with a runnable example, checked by check:readme-run.

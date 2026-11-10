@@ -3973,6 +3973,12 @@ This checks seven parent geometry stream digests and exact angular call counts.
 
 [Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.
 
+### Batch 169 procedural Worley work count
+
+After build:packages run `node --test packages/procedural/test/worley-workcount.test.js`
+and `node scripts/bp-169-procedural-oracle.mjs`; see
+[batch-169.md](batch-169.md#job-7-procedural-worley-cells). Timing pending the quiet rerun.
+
 ### Batch 169 wfc propagation work count
 
 After build:packages run `node --test packages/wfc/test/full-domain-workcount.test.js` and

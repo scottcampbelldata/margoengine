@@ -10,7 +10,40 @@ No wall-clock benchmarks or budget changes. Timing pending the quiet rerun.
 | 4 | splines | DONE in `perf(splines): rebuild intersection cubics once per curve` | 512 to 64 point evaluations; 1264 identical bytes; three.js Catmull-Rom values within 4.44e-16 |
 | 5 | terrain | DONE in `perf(terrain): upload only changed ring uniforms` | 12 to 0 uniform writes on an unchanged frame; identical buffer bytes; source heights exact, clipmap error per level recorded |
 | 6 | wfc | DONE in `perf(wfc): gather the full-domain union once` | 6656 to 4608 (heap) and 4608 to 512 (legacy) bit scans; identical solutions and stats; 0 violations |
-| 7 | procedural | Pending | Published noise values, Poisson spacing and work count |
+| 7 | procedural | DONE in `perf(procedural): hash only Worley cells that can win` | 1,536,000 to 183,696 hash multiplies; identical values; Poisson spacing kept; Gustavson table not applicable |
+
+## Job 7: procedural Worley cells
+
+Cause: `Noise.worley` hashed all 125 cells of its 5 x 5 x 5 neighbourhood three times
+(1500 multiplies) for every sample, although most cells cannot hold the nearest feature.
+It now visits the 27 nearest cells, then the outer shell, and hashes a cell only while the
+squared gap from the point to the cell's box is below the nearest squared distance so far.
+The gap is computed so that, in floating point, it never exceeds the cell's actual offset
+(rounding is monotone and the feature lies in [c, c + 1) per axis), so a skipped cell could
+not have lowered the minimum, and the minimum does not depend on visiting order.
+
+`packages/procedural/test/worley-workcount.test.js` counts `Math.imul` over 1024 samples:
+1,536,000 to 183,696. 1029 samples (lattice points, negative zero, coordinates near the
+10,000,000 limit) for three seeds keep their Float64 bytes, SHA-256
+`fa71899e983c10959a7ac96ebd295e88a7071b64059f05804296c9d273325bad`, captured on the parent.
+
+Value oracle (`scripts/bp-169-procedural-oracle.mjs`): 100,000 random points within 1000
+units give 0 differences (`Object.is`) from an exhaustive 125-cell F1 written from Worley's
+definition. Poisson-disk sampling on a 40 x 40 rectangle (Wasm sampler, 100,000 candidates)
+keeps the Bridson separation: radius 0.5, 1 and 2 give 3987, 1059 and 283 points with
+minimum spacing 0.50003, 1.00032 and 2.00113. Gustavson's simplex values cannot be
+compared: Margo seeds its own permutation, so no shared table exists; that oracle is
+recorded as not applicable, not as a match.
+
+Reproduce after `npm run build:packages`:
+`node --test packages/procedural/test/worley-workcount.test.js` and
+`node scripts/bp-169-procedural-oracle.mjs`. No time is measured.
+
+Research: S. Worley, *A Cellular Texture Basis Function*, SIGGRAPH 1996,
+https://doi.org/10.1145/237170.237267 (search neighbouring cubes only while they can hold a
+closer point); R. Bridson, *Fast Poisson Disk Sampling in Arbitrary Dimensions*, SIGGRAPH
+2007 sketches, https://doi.org/10.1145/1278780.1278807; S. Gustavson, *Simplex noise
+demystified* (2005). No rival code was read.
 
 ## Job 6: wfc full-domain propagation
 
