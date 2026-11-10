@@ -4527,6 +4527,17 @@ Shadow settings restored by save/scene-state retain their bound ordinary or null
 ## Audio voice registration failure (2026-11-10)
 AudioVoiceManager.add preserves the caller's existing playback/source and releases registration ownership when gain estimation rejects or throws. A stale disposed handle cannot release a later handle for the same sound. Proof: packages/audio/tests/voice-manager.test.js checks NaN, negative, infinite and throwing estimates, exact phase/source identity, other active voices and repeat registration. The three regressions fail before their repairs; valid-input offline/live waveform checks remain unchanged. This guarantee covers gain estimation and ownership, not arbitrary graph mutation inside caller callbacks.
 
+## Optional Draco wide generic attributes (2026-11-10)
+
+Claim: the owned optional decoder preserves nonzero UI8 component counts through
+255 in its supported sequential, KD and predictor paths. Proof: native wide.rs
+matches a frozen historical width17 public oracle and authored raw, integer,
+quantized and signed/KD cases; the quad regression checks complete parallelogram,
+multi and constrained predictions. draco-wide.test.js checks the shipped Wasm's
+typed arrays and point indices at widths 1, 16, 17, 31, 64, 127 and 255. Existing
+malformed and resource bounds remain. This does not establish default replacement,
+historical predictor 3, malformed-text equivalence, RSS parity or speed parity.
+
 ## Behavior tree text option inference (2026-11-10)
 General TreeTextOptions variables preserve possible subtree references in the inferred SubtreeDocument result; statically absent registrations retain TreeDocument. Proof: packages/behavior/tests/text-types.test.js compiles six inference cases and requires unsafe ordinary-tree assignment to reject. The original declaration fails with false type-equality checks and an unused expected-error diagnostic. Runtime syntax and validation are unchanged.
 ### Batch 176 molecules
@@ -4553,3 +4564,4 @@ Throughput/load/memory comparisons remain scheduled for the quiet speed phase.
 
 PNG and JPEG glTF images load without createImageBitmap using the existing optional image decoder. Evidence: node-images.test.js covers data URI, bufferView and fetched images, exact retained/uploaded bytes, colour-space selection, mip allocation, restoration, abort and invalid input. test-node-images.mjs uses the real Node binding and exact uniform-colour reference renders. test-pixel-images.mjs compares PNG bitmap/pixel uploads and restored models pixel for pixel on both backends. This claim covers these fixtures, not equality of all JPEG decoders or browser support for every optional image codec.
 Entry byte evidence: the quality bundle method measures gltf-pro/model at 60,402 bytes gzip on the parent sources and 60,566 on the repaired sources (+164). This is a byte count, not a timing or speed claim.
+

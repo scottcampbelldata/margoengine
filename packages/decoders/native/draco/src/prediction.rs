@@ -63,7 +63,7 @@ impl Mesh<'_, '_> {
         id: usize,
         components: usize,
         data: &[i32],
-        prediction: &mut [i32; 16],
+        prediction: &mut [i32],
     ) -> bool {
         let corner = self.sequence.entry_corner[id];
         self.parallelogram_at(id, corner, components, data, prediction)
@@ -74,7 +74,7 @@ impl Mesh<'_, '_> {
         corner: usize,
         components: usize,
         data: &[i32],
-        prediction: &mut [i32; 16],
+        prediction: &mut [i32],
     ) -> bool {
         let opposite = self.opposite(corner);
         if opposite == NONE {
@@ -103,15 +103,17 @@ impl Mesh<'_, '_> {
         components: usize,
         data: &[i32],
         budget: &mut Budget,
-    ) -> Result<Option<[i32; 16]>> {
+        sum: &mut [i32],
+        scratch: &mut [i32],
+    ) -> Result<bool> {
         let start = self.sequence.entry_corner[id];
         let mut corner = start;
-        let mut sum = [0_i32; 16];
+        sum.fill(0);
         let mut count = 0_i32;
         while corner != NONE {
             budget.steps(1)?;
-            let mut prediction = [0_i32; 16];
-            if self.parallelogram_at(id, corner, components, data, &mut prediction) {
+            let prediction = &mut scratch[..components];
+            if self.parallelogram_at(id, corner, components, data, prediction) {
                 count = count.checked_add(1).ok_or(Error::Overflow)?;
                 for c in 0..components {
                     sum[c] = sum[c].wrapping_add(prediction[c]);
@@ -123,12 +125,12 @@ impl Mesh<'_, '_> {
             }
         }
         if count == 0 {
-            return Ok(None);
+            return Ok(false);
         }
         for value in &mut sum[..components] {
             *value /= count;
         }
-        Ok(Some(sum))
+        Ok(true)
     }
 
     pub fn constrained(
@@ -139,15 +141,23 @@ impl Mesh<'_, '_> {
         flags: &[Vec<bool>; 4],
         positions: &mut [usize; 4],
         budget: &mut Budget,
-    ) -> Result<Option<[i32; 16]>> {
+        sum: &mut [i32],
+        scratch: &mut [i32],
+    ) -> Result<bool> {
         let start = self.sequence.entry_corner[id];
         let mut corner = start;
         let mut left = true;
-        let mut predictions = [[0_i32; 16]; 4];
+        let predictions = &mut scratch[..4 * components];
         let mut count = 0;
         while corner != NONE {
             budget.steps(1)?;
-            if self.parallelogram_at(id, corner, components, data, &mut predictions[count]) {
+            if self.parallelogram_at(
+                id,
+                corner,
+                components,
+                data,
+                &mut predictions[count * components..(count + 1) * components],
+            ) {
                 count += 1;
                 if count == 4 {
                     break;
@@ -163,12 +173,12 @@ impl Mesh<'_, '_> {
             }
         }
         if count == 0 {
-            return Ok(None);
+            return Ok(false);
         }
         let context = count - 1;
-        let mut sum = [0_i32; 16];
+        sum.fill(0);
         let mut used = 0;
-        for prediction in &predictions[..count] {
+        for prediction in predictions[..count * components].chunks_exact(components) {
             let crease = *flags[context]
                 .get(positions[context])
                 .ok_or(Error::Invalid)?;
@@ -181,12 +191,12 @@ impl Mesh<'_, '_> {
             }
         }
         if used == 0 {
-            return Ok(None);
+            return Ok(false);
         }
         for value in &mut sum[..components] {
             *value /= used;
         }
-        Ok(Some(sum))
+        Ok(true)
     }
 
     pub fn tex_coords(

@@ -21,10 +21,10 @@ pub struct Geometry {
 enum Format {
     Raw,
     Integer,
-    Quantized { minima: [f32; 16], factor: f32 },
+    Quantized { minima: Vec<f32>, factor: f32 },
     Normal(u8),
 }
-fn read_format(c: &mut Cursor, attr: &Attribute) -> Result<Format> {
+fn read_format(c: &mut Cursor, attr: &Attribute, budget: &mut Budget) -> Result<Format> {
     Ok(match attr.encoding {
         0 => Format::Raw,
         1 => {
@@ -37,7 +37,7 @@ fn read_format(c: &mut Cursor, attr: &Attribute) -> Result<Format> {
             if attr.data_type != 9 {
                 return Err(Error::Invalid);
             }
-            let mut minima = [0_f32; 16];
+            let mut minima = budget.vector(usize::from(attr.components), 0_f32)?;
             for min in &mut minima[..usize::from(attr.components)] {
                 *min = c.float()?;
             }
@@ -88,7 +88,7 @@ pub(crate) fn descriptor(c: &mut Cursor) -> Result<Attribute> {
     } else {
         c.count()? as u32
     };
-    if semantic > 4 || !(1..=16).contains(&components) || normalized > 1 {
+    if semantic > 4 || components == 0 || normalized > 1 {
         return Err(Error::Invalid);
     }
     scalar_bytes(data_type)?;
@@ -337,8 +337,8 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     components,
                     &mut budget,
                     gltf_compat,
-                    |c| {
-                        formats[index] = read_format(c, attr)?;
+                    |c, budget| {
+                        formats[index] = read_format(c, attr, budget)?;
                         Ok(())
                     },
                 )?);
@@ -346,7 +346,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
         }
         for (index, attr) in attributes.iter().enumerate().take(last).skip(first) {
             if c.version >= 0x200 || attr.encoding == 0 {
-                formats[index] = read_format(&mut c, attr)?;
+                formats[index] = read_format(&mut c, attr, &mut budget)?;
             }
         }
         portable_groups.push(PortableGroup {

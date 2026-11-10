@@ -24,7 +24,7 @@ impl Integer {
         components: usize,
         budget: &mut Budget,
         gltf_compat: bool,
-        legacy: impl FnOnce(&mut Cursor) -> Result<()>,
+        legacy: impl FnOnce(&mut Cursor, &mut Budget) -> Result<()>,
     ) -> Result<Self> {
         let method = c.byte()? as i8;
         // E20: the shipped glTF build accepts multi-parallelogram framing but
@@ -52,7 +52,7 @@ impl Integer {
             return Err(Error::Unsupported);
         }
         if c.version < 0x200 {
-            legacy(c)?;
+            legacy(c, budget)?;
         }
         let symbols = match c.byte()? {
             0 => {
@@ -168,9 +168,18 @@ impl Integer {
             return Err(Error::Unsupported);
         }
         let mut positions = [0_usize; 4];
+        let mut prediction = budget.vector(components, 0_i32)?;
+        let mut scratch = budget.vector(
+            match self.method {
+                2 => components,
+                4 => 4 * components,
+                _ => 0,
+            },
+            0_i32,
+        )?;
         for row in 0..self.values.len() / components {
             budget.steps(1)?;
-            let mut prediction = [0_i32; 16];
+            prediction.fill(0);
             if self.method == 5 {
                 let value = mesh.ok_or(Error::Invalid)?.tex_coords(
                     row,
@@ -199,21 +208,28 @@ impl Integer {
                         predicted_mesh =
                             mesh.parallelogram(row, components, &self.values, &mut prediction);
                     } else if self.method == 2 {
-                        if let Some(value) = mesh.multi(row, components, &self.values, budget)? {
-                            prediction = value;
+                        if mesh.multi(
+                            row,
+                            components,
+                            &self.values,
+                            budget,
+                            &mut prediction,
+                            &mut scratch,
+                        )? {
                             predicted_mesh = true;
                         }
                     } else if self.method == 4
-                        && let Some(value) = mesh.constrained(
+                        && mesh.constrained(
                             row,
                             components,
                             &self.values,
                             &self.crease,
                             &mut positions,
                             budget,
+                            &mut prediction,
+                            &mut scratch,
                         )?
                     {
-                        prediction = value;
                         predicted_mesh = true;
                     }
                 }

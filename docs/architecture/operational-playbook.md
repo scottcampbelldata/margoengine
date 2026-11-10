@@ -1,5 +1,34 @@
 
 
+### Section 5 evidence: optional Draco component widths
+
+The optional Rust decoder's descriptor and all component-dependent quantization,
+KD and predictor storage accept nonzero UI8 counts. Minima are budgeted vectors;
+prediction scratch is allocated per attribute and reused across rows and faces.
+The retained historical width17 stream fails with Invalid on the parent and
+matches its frozen public output after repair. wide.rs adds independent authored
+streams and strict malformed/budget checks through 255 components, while the
+native quad tests every parallelogram predictor with full-width data. The new
+draco-wide.test.js checks the shipped Wasm and typed TypeScript bridge. Existing
+native/Wasm corpora remain unchanged. No core, default decoder, normal encoding,
+prediction arithmetic or speed claim changes.
+
+Clean-room sources compared: Frank Galligan / Google, *Draco Bitstream
+Specification*, version 2,2, 2017, https://google.github.io/draco/spec/
+(attribute UI8 component field, portable transforms and component-wise prediction);
+Rust Project contributors, *Vec*, 2026,
+https://doc.rust-lang.org/std/vec/struct.Vec.html (bounded owned storage and slices);
+WebAssembly Community Group, *WebAssembly Core Specification 3.0*, 2026,
+https://webassembly.github.io/spec/core/exec/instructions.html (linear-memory
+bounds and loads/stores).
+The existing batch-133 frozen public-API records supply the historical layout
+observation. No foreign implementation or companion code was read or copied.
+
+The dependent CPU gate exposed duplicate fileURLToPath declarations in navmesh's
+border.test.js and wasm.test.js. Remove the two duplicate imports in each file;
+the files could not parse on the parent, and all eight original cases pass after
+repair. No navmesh implementation, assertion or test workload changes.
+
 ### Section 5 evidence: React Grid scene ownership
 
 Grid uses the existing native-binding helpers to attach and detach its Lines

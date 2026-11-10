@@ -835,4 +835,78 @@ mod tests {
             assert_eq!(next(next(next(c))), c);
         }
     }
+
+    #[test]
+    fn wide_parallelogram_predictors_reuse_complete_component_scratch() {
+        use crate::prediction::Mesh;
+        use crate::traversal::{Group, Sequence};
+        let topology = Topology {
+            corners: vec![3, 1, 2, 0, 2, 1],
+            opposite: vec![3, NONE, NONE, 0, NONE, NONE],
+            vertex_corner: vec![3, 1, 2, 0],
+            hole: vec![true; 4],
+            seams: Vec::new(),
+            seam_twice: false,
+            isolated: Vec::new(),
+            created: 4,
+        };
+        let mapping = Mapping {
+            attributes: Vec::new(),
+            corner_to_point: vec![3, 1, 2, 0, 2, 1],
+            points: 4,
+        };
+        let sequence = Sequence {
+            entry_corner: vec![3, 1, 2, 0],
+            vertex_entry: vec![0, 1, 2, 3],
+            point_entry: vec![0, 1, 2, 3],
+        };
+        let mesh = Mesh {
+            topology: &topology,
+            mapping: &mapping,
+            sequence: &sequence,
+            group: Group::default(),
+        };
+        for components in [1, 16, 17, 31, 64, 127, 255] {
+            let data: Vec<i32> = (0..4)
+                .flat_map(|row| {
+                    (0..components).map(move |component| row * 10 + component as i32 * 3)
+                })
+                .collect();
+            let expected = &data[3 * components..];
+            let mut prediction = vec![77; components];
+            let mut scratch = vec![99; components * 4];
+            let mut budget = Budget::new(1024 * 1024);
+            assert!(mesh.parallelogram(3, components, &data, &mut prediction));
+            assert_eq!(prediction, expected);
+            assert!(
+                mesh.multi(
+                    3,
+                    components,
+                    &data,
+                    &mut budget,
+                    &mut prediction,
+                    &mut scratch
+                )
+                .unwrap()
+            );
+            assert_eq!(prediction, expected);
+            let flags = [vec![false], Vec::new(), Vec::new(), Vec::new()];
+            let mut positions = [0; 4];
+            assert!(
+                mesh.constrained(
+                    3,
+                    components,
+                    &data,
+                    &flags,
+                    &mut positions,
+                    &mut budget,
+                    &mut prediction,
+                    &mut scratch
+                )
+                .unwrap()
+            );
+            assert_eq!(prediction, expected);
+            assert_eq!(positions, [1, 0, 0, 0]);
+        }
+    }
 }

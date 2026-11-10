@@ -96,8 +96,8 @@ struct Frame {
 #[derive(Clone)]
 enum Transform {
     Unsigned,
-    Signed([i32; 16]),
-    Quantized([f32; 16], f32),
+    Signed(Vec<i32>),
+    Quantized(Vec<f32>, f32),
 }
 
 fn tree(c: &mut Cursor, points: usize, dimensions: usize, budget: &mut Budget) -> Result<Vec<u32>> {
@@ -279,7 +279,7 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
     for (attr, transform) in attributes.iter().zip(&mut transforms) {
         let components = usize::from(attr.components);
         if attr.data_type == 9 {
-            let mut minima = [0_f32; 16];
+            let mut minima = budget.vector(components, 0_f32)?;
             for min in &mut minima[..components] {
                 *min = c.float()?;
             }
@@ -297,7 +297,7 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
     }
     for (attr, transform) in attributes.iter().zip(&mut transforms) {
         if [1, 3, 5].contains(&attr.data_type) {
-            let mut minima = [0_i32; 16];
+            let mut minima = budget.vector(usize::from(attr.components), 0_i32)?;
             for min in &mut minima[..usize::from(attr.components)] {
                 let symbol = c.count()? as u32;
                 *min = ((symbol >> 1) as i32) ^ -((symbol & 1) as i32);

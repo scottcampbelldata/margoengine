@@ -3468,7 +3468,7 @@ warm losses recorded; default replacement still requires speed parity.
 Coordinator note 2 limits this landing to the decoder. The optional
 `@margoengine/decoders/draco-native` entry exposes mesh and point decoder classes;
 default entries and automatic loaders retain both prebuilts. It uses one lazy
-122,685-byte Wasm (47,360 bytes gzip, Node level 9). Input and internal workspace
+122,842-byte Wasm (47,392 bytes gzip, Node level 9). Input and internal workspace
 are each bounded at 256 MiB; requested output uses the existing decoder limits.
 Native corpus peak linear memory is 18,874,368 bytes versus the prebuilt's
 20,185,088. JS result copies and process RSS are separate from linear memory.
@@ -3482,6 +3482,16 @@ metadata equivalence are incomplete. The optional landing does not close these
 replacement gates or remove either prebuilt. No new speed work is included.
 See [retained speed evidence](whitepaper/results/batch-133-paired-checkpoint.json)
 and [current native evidence](whitepaper/results/batch-133-resume8.json).
+
+Lane G wide-component repair: the optional native reader accepts nonzero UI8
+component counts (1 through 255). Component-sized quantization/KD minima and
+reusable prediction buffers are charged to the existing internal workspace
+budget. Native tests cover sequential raw/integer/quantized data, signed and
+quantized KD data, and parallelogram/multi/constrained prediction at widths
+1, 16, 17, 31, 64, 127 and 255. Shipped Wasm tests preserve typed arrays and point
+indices across the same width boundaries. Zero counts, truncated input and
+requested-output limits still reject. The historical public binding's negative
+count at 255 and the existing predictor/metadata/RSS/speed gaps are not closed.
 
 Batch 133 metadata continuation: the optional bridge now preserves observed
 short-string conversion and exact raw name lookup. All 1,445 bounded crafted

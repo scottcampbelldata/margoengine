@@ -4187,18 +4187,23 @@ Linear-memory peaks pass; physical-page, JIT and live-allocation contributions
 to the RSS excess are not yet isolated. This remains an unaccepted target
 requiring a root allocation diagnosis, not a busy-machine timing waiver.
 
-Native descriptor components are capped at16 despite accepted generic widths
-17/31/64/127 (440 usable crafted cases); descriptor/transform/predictor scratch
-arrays assume16. Expand the owning decoder consistently, with regressions
-for every affected path; removing only the descriptor check would permit
-array slicing traps. The record contains a full width17 i8 repro and frozen
-old output. Another110 width255 streams decode in the old full build but its
-public binding exposes count-1; these are recorded separately.
+Fixed in the lane G sweep: the native descriptor rejected widths above 16,
+and quantization, KD minima and prediction scratch also assumed 16 components.
+The descriptor now accepts nonzero UI8 counts; budgeted component-sized vectors
+cover every affected transform and reuse prediction scratch across rows/faces.
+wide.rs retains the historical width17 i8 repro and frozen public oracle, adds
+raw/integer/quantized and signed/quantized KD cases through 255 components,
+and preserves zero/truncation/output-budget rejection. The native quad checks
+all three parallelogram predictors beyond 16; draco-wide.test.js verifies the
+shipped Wasm and typed output. The old public binding's negative width255 count
+is still a separate parity difference, not reproduced by the owned UI8 API.
 
 Historical predictor3 is absent from integer.rs's supported-method set. The
 record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
 UV bytes and intact canaries; native returns code5. The old-format reconstruction
 rule remains to be established by further crafted public-API observations.
+
+Outside this decoder repair: packageInputs in scripts/package-stamps.mjs omits native Rust folders (PACKAGE_INPUTS lists package.json, tsconfig.json, src and scripts), so a native-only edit can leave API freshness stamps unchanged. Repro: inspect packageInputs(root, 'decoders', manifest), then change native/draco/src/integer.rs; no listed input changes. Full builds still compile the crate. Tooling ownership; deferred under rule 6.
 
 ### Batch 265 native React binding scope
 
