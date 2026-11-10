@@ -3030,6 +3030,10 @@
       "types": "./dist/sprites/slice.d.ts",
       "import": "./dist/sprites/slice.js"
     },
+    "./sprites/pick": {
+      "types": "./dist/sprites/pick.d.ts",
+      "import": "./dist/sprites/pick.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

@@ -2716,3 +2716,12 @@ Batch 257 job 2: build packages, then node --test --test-timeout=20000 packages/
 
 
 Batch 254 voices: after build:packages run node --test --test-timeout=60000 packages/audio/tests/voice-manager.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs voice-manager-browser.js and records cap=1, handoff times, virtual detune and PCM error in the voices report. The reference schedules native source segments without using manager code; the stimulus is the existing CC BY 4.0 rain fixture.
+
+### Sprite hit testing (batch 245 job 3)
+CPU: node --test --test-timeout=120000 packages/sprites/tests/pick.test.js.
+GPU: node scripts/gpu-lock.mjs run --owner=pick-proof --max=3 --wait-max=60 -- node packages/sprites/tests/pick-check.mjs (append --compat for WebGL2).
+The generated white atlas has asymmetric transparent texels so independent
+texture flips affect the proof. Three overlapping tinted sprites use rotated
+and reflected transforms, nonzero camera and zoom; every picked identity is
+compared with the actual canvas pixel, with and without y sorting and a circle
+mask. Unit tests cover fractional alpha and dimension-only box picking as well.

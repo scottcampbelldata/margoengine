@@ -54,6 +54,10 @@
     "./slice": {
       "types": "./dist/slice.d.ts",
       "import": "./dist/slice.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
     }
   },
   "files": [
@@ -79,6 +83,7 @@
     "test:gpu:skeletal": "cd ../.. && node packages/sprites/tests/skeletal-check.mjs",
     "test:gpu:masks": "cd ../.. && node packages/sprites/tests/masks-check.mjs",
     "test:gpu:slice": "cd ../.. && node packages/sprites/tests/slice-check.mjs",
-    "test:gpu:rigging": "cd ../.. && node packages/sprites/tests/rigging-check.mjs"
+    "test:gpu:rigging": "cd ../.. && node packages/sprites/tests/rigging-check.mjs",
+    "test:gpu:pick": "cd ../.. && node packages/sprites/tests/pick-check.mjs"
   }
 }

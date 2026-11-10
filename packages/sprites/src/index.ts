@@ -126,7 +126,6 @@ struct Varying{
   @location(2) @interpolate(flat) high:vec2f,
   @location(3) @interpolate(flat) tint:vec4f,
   @location(4) @interpolate(flat) axes:vec4f,
-  @location(7) pixel:vec2f,
   ${effect ? '@location(5) @interpolate(flat) params:vec4f,' : ''}
   ${pages ? '@location(6) @interpolate(flat) page:u32,' : ''}
 }
@@ -151,7 +150,6 @@ ${effect}`
   let p=s.p+vec2f(q.x*x-q.y*y,q.x*y+q.y*x);
   var v:Varying;
   v.position=vec4f(p/frame.size.xy*vec2f(2,-2)+vec2f(-1,1),0,1);
-  v.pixel=p;
   v.texel=s.rect.xy+s.rect.zw*c;
   v.low=min(s.rect.xy,s.rect.xy+s.rect.zw);
   v.high=max(s.rect.xy,s.rect.xy+s.rect.zw)-1;
@@ -171,8 +169,9 @@ ${
   let m=frame.mask;
   let k=frame.shape.x;
   if(k>0){
-    let d=v.pixel-m.xy;
-    let inside=select(dot(d,d)<=m.z*m.z,all(v.pixel>=m.xy)&&all(v.pixel<m.zw),k==1);
+    let pixel=v.position.xy-frame.shape.zw;
+    let d=pixel-m.xy;
+    let inside=select(dot(d,d)<=m.z*m.z,all(pixel>=m.xy)&&all(pixel<m.zw),k==1);
     if(inside==(frame.shape.y>0)){discard;}
   }
   let t=vec2i(clamp(floor(v.texel),v.low,v.high));
@@ -730,6 +729,10 @@ export class SpriteLayer implements EnginePlugin {
     const linear = format.endsWith('-srgb') || format.includes('float') ? 1 : 0;
     const time = this.effect ? this.time : 0,
       next = [width, height, linear, time, ...maskPixels(this.mask, this.camera)];
+    // Builtin fragment positions are target-relative; mask coordinates are view-relative.
+    // Reuse the uniform's two padding floats instead of interpolating a second copy of the pixel position.
+    next[6] = !own && view ? view.viewport[0] : 0;
+    next[7] = !own && view ? view.viewport[1] : 0;
     if (next.some((value, i) => state.values[i] !== value)) {
       state.values.set(next);
       device.queue.writeBuffer(state.uniform, 0, state.values);

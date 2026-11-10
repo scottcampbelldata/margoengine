@@ -156,3 +156,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/audio/voices: AudioVoiceManager.add returns transport handles; shared cap, priority, distance/cone/custom gain, virtual phase including pitch, caller ownership and raw-control exclusions.
+| @margoengine/sprites | pickSprite target-pixel coordinates, box/pixel modes, RGBA8 atlas pages, opacity thresholds, masks and custom-effect limits | batch-245 job 3 |
+| margoengine | Document the sprites/pick alias and target-pixel coordinate convention | batch-245 job 3 |

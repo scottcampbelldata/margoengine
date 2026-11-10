@@ -5568,3 +5568,17 @@ The optional XR package now provides an eye callback after scene/depth rendering
 
 ### Section 5 evidence: batch 267 live inspection
 Optional mcp/live and mcp/live-host add a development-only page/Node boundary without core or stage changes. Inspector owns property discovery/validation. Canvas capture renders then uses origin-clean PNG serialization; WebGPU and compatibility each pass scene/edit/pixel/error tool proof in packages/mcp/tests/live-browser.mjs. Uncaught page/rejection/GPU errors feed a bounded ring. The host binds loopback and validates bearer, Host and exact Origin. No server-side evaluation or production auto-activation. GPU test uses a shared slot only during browser execution.
+
+### Section 5 evidence: sprite picking (batch 245 job 3)
+The optional CPU picker reuses the float32 transform packer and mask conversion
+from rendering; it inverts the packed rotation and signed scale before sampling
+atlas alpha. It never changes the draw list. Its pixel fixture compares every
+pixel centre to the GPU image under rotated/reflected transforms, flips, camera
+zoom, sorting and masks, on both backends. pick.test.js also checks quantized
+zero-alpha sprites require no missing pixel page and expose underlying images.
+No core/stage or backend code changes.
+Mask regression detail: pixel (16,7) has centre (16.5,7.5), exactly on the circle
+centred at (12,13.5) with radius 7.5. The old renderer dropped the rotated red
+sprite there in both draw orders; pick-check.mjs requires red and zero mismatches.
+SpriteLayer now tests builtin fragment position minus view origin. The origin
+reuses two uniform padding floats; no extra uniform bytes or position varying.

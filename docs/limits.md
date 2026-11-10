@@ -3961,3 +3961,25 @@ Batch 257 optional entry measurement: {"@margoengine/worker/auto":3345,"@margoen
 
 ### Batch 254 global voice budget
 Optional @margoengine/audio/voices: 2117 B minified gzip, new entry from 0 B. AudioVoiceManager has maxVoices=32 (integer >=0) and linear threshold=0.0001. add(sound,{priority=0,gain=()=>1}) returns a managed transport. All registered decoded-buffer sounds on one listener share the cap, including global, stereo and positional sounds. Larger finite priority wins, then volume/fade/master/distance/cone/custom gain; ties retain registration order. Each frame updates managed poses before ranking. Losers release buffer sources before winners allocate, so the cap is never transiently exceeded. Virtual voices allocate no buffer source; logical phase advances on context.currentTime, wraps configured loops and integrates playbackRate*2^(detune/1200). Handle play/pause/stop/seek, playbackRate and detune own transport; pitch changes restart a physical source at the exact phase. Do not call raw sound/pool transport, replace buffers, automate source pitch, or attach Doppler/timeline transport while managed. Raw volume, pose, filters and fades remain available. Media/stream/node sources cannot be phase-virtualized by this buffer-only manager. gain is a caller-supplied estimate for effects/occlusion/bus gain; no perceptual masking analysis. Selection occurs on updates, not within an audio render quantum. Handles/manager stop sources on dispose and preserve caller-owned sounds/buffers; listener teardown owns the sounds. Core/stage unchanged.
+
+### Sprite picking (batch 245 job 3)
+The optional sprites/pick entry exports pickSprite. Points use target pixels,
+y down; CSS pointers need canvas-to-client scaling first. Defaults match
+SpriteLayer: camera (0,0,1), snapping on, y sorting off. Pixel mode (default)
+uses original RGBA8 atlas alpha multiplied by packed sprite opacity; box mode
+requires only atlas dimensions. Threshold defaults to 1 byte; zero alpha never
+picks. Pages have equal dimensions, and source bytes remain caller-owned.
+Rotation, signed scale, pivot, texture flips, z/y/add order and layer masks are
+honoured. Picking never mutates the list or reads the GPU. Shader-generated alpha
+and smooth-filter reconstruction are outside source-alpha hit-test semantics.
+Entry: 1,933 B gzip (new, previously 0), ceiling 2,189 B; core + stage unchanged
+at 23,950 B. The same transform packer avoids a second renderer-specific transform.
+The picking proof also found and fixed the sprite renderer's circle-boundary
+interpolation error. Masks now use raster pixel centres with the view origin
+removed. Sprite root is 7,480 B gzip (was 7,455); its existing 7,660 B ceiling
+holds. Existing uniform padding stores the origin, so uniform allocation does
+not grow. The redundant two-float position interpolator is removed.
+
+Current slice bundle after the shared mask repair is 8,614 B gzip (8,587 B at
+job 1 landing), within its unchanged 8,845 B ceiling. Caller-owned picking
+bytes must match the atlas currently uploaded to the renderer.

@@ -3217,3 +3217,11 @@ Batch 257 job 2: @margoengine/worker/auto runs one shared scene module on a supp
 
 
 Batch 254 voices: optional audio/voices caps physical sources across registered sounds, ranks authored priority and estimated audibility, virtualizes silent sources, and resumes them at their continuously advanced buffer phase. CPU tests cover cap=0, ties, distance, loops, seeks, pause, pitch and natural completion. Real browser Web Audio offline rendering compares two priority handoffs, including a virtual octave-up voice, against independently scheduled native source PCM. Device-output and listening quality unmeasured.
+
+### Sprite picking correctness (batch 245 job 3)
+The optional sprites/pick entry picks the top image in z/y/add order using
+box bounds or source alpha, accounting for camera, pixel snapping, rotation,
+pivot, flips, signed scale, pages, opacity and masks. CPU proof: pick.test.js.
+Rendered proof: pick-check.mjs compares picked identity at all 1,024 pixel
+centres over four sorting/mask combinations on both GPU backends. Custom
+fragment effects are not executed on the CPU. No speed claim.
