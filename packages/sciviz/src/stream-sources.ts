@@ -245,10 +245,12 @@ export async function* eventSource<T = unknown>(
   const own = new AbortController(),
     signal = combined(options.signal, own.signal);
   try {
+    const headers = new Headers(options.request?.headers);
+    if (!headers.has('accept')) headers.set('accept', 'text/event-stream');
     const response = await (options.fetch ?? globalThis.fetch)(url, {
       ...options.request,
       signal,
-      headers: { Accept: 'text/event-stream', ...Object.fromEntries(new Headers(options.request?.headers)) },
+      headers,
     });
     checkResponse(response);
     if (response.status === 204) return;

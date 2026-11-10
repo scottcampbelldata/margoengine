@@ -47,3 +47,19 @@ The additional validation prevents incorrect physical placement; splitting the s
 helper would add loading/API complexity and allow divergent bounds behaviour.
 Core plus stage remains 24,209 bytes. Measured by equivalent parent-source and
 current builds with the repository's bundleBytes/gzip method.
+
+## L1: caller SSE Accept headers
+
+eventSource now constructs one Headers object from the caller's request and adds
+text/event-stream only when Accept is absent. This preserves case-insensitive
+overrides, including an explicitly empty value, without mutating borrowed inputs
+or combining the caller's value with a second default. stream-headers.test.js
+first reproduced the combined header, then verifies record, tuple-list and
+Headers inputs, the default, casing, empty values, other headers and parsed events.
+No API or GPU code changed.
+
+Clean-room sources compared: WHATWG editors, *Fetch Standard*, Headers and header
+lists (living standard, 2026), https://fetch.spec.whatwg.org/#headers-class;
+WHATWG editors, *HTML Standard*, Server-sent events (2026),
+https://html.spec.whatwg.org/multipage/server-sent-events.html. Fetch defines
+case-insensitive header lookup and combination; HTML defines the SSE media type.
