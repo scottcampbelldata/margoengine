@@ -21,6 +21,7 @@ for (const [entry, emptyOutDir] of [
   ['refractor', false],
   ['cube-camera', false],
   ['exr-write', false],
+  ['exr-tiled', false],
   ['main', false],
   ['loaders', false],
   ['blend', false],

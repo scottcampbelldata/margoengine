@@ -78,6 +78,10 @@
       "types": "./dist/exr-write.d.ts",
       "import": "./dist/exr-write.js"
     },
+    "./exr-tiled": {
+      "types": "./dist/exr-tiled.d.ts",
+      "import": "./dist/exr-tiled.js"
+    },
     "./blend": {
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"

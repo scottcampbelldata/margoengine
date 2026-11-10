@@ -6,6 +6,7 @@ import { buildNavMeshInWorker, buildTiledNavMeshInWorker } from '../dist/wasm.js
 import { buildNavMesh } from '../dist/build.js';
 import { TiledNavMesh } from '../dist/tiles.js';
 import { encodeNavMesh, encodeTiledNavMesh } from '../dist/codec.js';
+import { fileURLToPath } from 'node:url';
 import { bundleBytes } from '../../../scripts/measure-size.js';
 import binaryen from 'binaryen';
 import { fileURLToPath } from 'node:url';

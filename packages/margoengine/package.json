@@ -1139,6 +1139,10 @@
       "types": "./dist/environment/exr-write.d.ts",
       "import": "./dist/environment/exr-write.js"
     },
+    "./environment/exr-tiled": {
+      "types": "./dist/environment/exr-tiled.d.ts",
+      "import": "./dist/environment/exr-tiled.js"
+    },
     "./environment/blend": {
       "types": "./dist/environment/blend.d.ts",
       "import": "./dist/environment/blend.js"

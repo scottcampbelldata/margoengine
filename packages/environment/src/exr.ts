@@ -33,35 +33,53 @@ export interface EXRImage extends FloatImage {
 }
 
 const COMPRESSION_NAMES = ['NONE', 'RLE', 'ZIPS', 'ZIP', 'PIZ', 'PXR24', 'B44', 'B44A', 'DWAA', 'DWAB', 'HTJ2K'];
-const LINES_PER_BLOCK: Record<EXRCompression, number> = { NONE: 1, RLE: 1, ZIPS: 1, ZIP: 16, PIZ: 32 };
+export const LINES_PER_BLOCK: Record<EXRCompression, number> = { NONE: 1, RLE: 1, ZIPS: 1, ZIP: 16, PIZ: 32 };
 // Shared with the writer (exr-write.ts): the file magic and pixel types in their file order (index = type code).
 export const EXR_MAGIC = 20000630;
 export const TYPE_NAMES = ['UINT', 'HALF', 'FLOAT'] as const;
 export const TYPE_SIZE = [4, 2, 4];
 // Damaged data throws MargoError 'failed' (as parseHDR), a valid file this decoder does not read 'unsupported', and a
 // decoder bound RangeError.
-const invalid = (problem: string) =>
+export const invalidEXR = (problem: string) =>
   new MargoError('failed', `Invalid EXR: ${problem}; the file is damaged or not OpenEXR, export it again`);
-const unsupported = (message: string, fix = 'export it as a single-part scanline EXR') =>
+const invalid = invalidEXR;
+export const unsupportedEXR = (message: string, fix = 'export it as a single-part scanline EXR') =>
   new MargoError('unsupported', `${message}; ${fix}`);
+const unsupported = unsupportedEXR;
+
+/** Header facts both the scanline and the tiled reader need (internal; shared with exr-tiled.ts). */
+export interface EXRHeader {
+  view: DataView;
+  /** Byte position just past the header (the start of the offset table). */
+  position: number;
+  channels: EXRChannel[];
+  compression: EXRCompression;
+  dataWindow: [number, number, number, number];
+  displayWindow: [number, number, number, number];
+  lineOrder: number;
+  /** The `tiles` attribute (tiledesc), present only in tiled files: tile size and the raw mode byte. */
+  tiles?: { xSize: number; ySize: number; mode: number };
+  width: number;
+  height: number;
+  /** Source channel index for R, G, B, A (-1 when absent). */
+  indices: number[];
+  layout: EXRImage['layout'];
+}
 
 /**
- * Parses a single-part scanline OpenEXR file into linear float RGBA. Picks the R, G, B and A channels
- * (or Y for luminance-only files); other channels are decoded and ignored. Tiled, multi-part, deep and
- * subsampled files and PXR24, B44 and DWA compression are rejected with a descriptive error.
- * @throws MargoError `'failed'` for damaged data, `'unsupported'` for a file feature it does not decode; RangeError for an
- * image or chunk over its bounds; TypeError for a source that is not bytes or an empty compression or lineOrder value.
+ * Reads the magic number, version and header of a single-part file (OpenEXR File Layout, "Version Field" and
+ * "Header"). `tiled` says which part type the caller decodes; the other one is refused, as are deep and multi-part files.
+ * @internal
  */
-export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
-  const bytes = toBytes(source);
+export function readEXRHeader(
+  bytes: Uint8Array,
+  tiled: boolean,
+  unsupportedCompression = rejectCompression,
+): EXRHeader {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let position = 0;
   const need = (n: number) => {
     if (n < 0 || position + n > bytes.length) throw invalid('unexpected end of file');
-  };
-  const _u8 = () => {
-    need(1);
-    return bytes[position++];
   };
   const i32 = () => {
     need(4);
@@ -85,16 +103,23 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   if (bytes.length < 8 || view.getUint32(0, true) !== EXR_MAGIC) throw invalid('bad magic number');
   const version = view.getUint32(4, true);
   if ((version & 255) !== 2) throw unsupported(`Unsupported EXR version ${version & 255}`);
-  if (version & 0x200) throw unsupported('Unsupported EXR: tiled images');
   if (version & 0x800) throw unsupported('Unsupported EXR: deep data');
   if (version & 0x1000) throw unsupported('Unsupported EXR: multi-part files');
+  if (!tiled && version & 0x200)
+    throw unsupported(
+      'Unsupported EXR: tiled images',
+      'read it with parseTiledEXR from @margoengine/environment/exr-tiled, or export it as a scanline EXR',
+    );
+  if (tiled && !(version & 0x200)) throw unsupported('Not a tiled EXR', 'read scanline files with parseEXR');
   const nameLimit = version & 0x400 ? 255 : 31;
+  const partType = tiled ? 'tiledimage' : 'scanlineimage';
   position = 8;
 
   let channels: EXRChannel[] | undefined, compression: EXRCompression | undefined;
   let dataWindow: [number, number, number, number] | undefined,
     displayWindow: [number, number, number, number] | undefined;
   let lineOrder = 0;
+  let tiles: EXRHeader['tiles'];
   for (let attributes = 0; ; attributes++) {
     if (attributes > 1024)
       throw new RangeError('Invalid EXR: too many header attributes; the decoder reads at most 1024');
@@ -127,8 +152,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
         );
       const value = bytes[position],
         label = COMPRESSION_NAMES[value] ?? `#${value}`;
-      if (!(label in LINES_PER_BLOCK))
-        throw unsupported(`Unsupported EXR compression ${label}`, 'export it with NONE, RLE, ZIPS, ZIP or PIZ');
+      if (!(label in LINES_PER_BLOCK)) throw unsupportedCompression(label);
       compression = label as EXRCompression;
     } else if ((name === 'dataWindow' || name === 'displayWindow') && type === 'box2i') {
       if (size !== 16) throw invalid(`bad ${name}`);
@@ -143,15 +167,27 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     } else if (name === 'lineOrder' && type === 'lineOrder') {
       if (size < 1) throw new TypeError('Invalid EXR: bad lineOrder; re-save the file with a standard line order');
       lineOrder = bytes[position];
+    } else if (tiled && name === 'tiles' && type === 'tiledesc') {
+      if (size !== 9) throw invalid('bad tiles');
+      tiles = {
+        xSize: view.getUint32(position, true),
+        ySize: view.getUint32(position + 4, true),
+        mode: bytes[position + 8],
+      };
     } else if (name === 'type' && type === 'string') {
-      // Spread only a short value: a long one would overflow the call stack (and cannot be 'scanlineimage').
+      // Spread only a short value: a long one would overflow the call stack (and cannot be a known part type).
       const value = size <= 64 ? String.fromCharCode(...bytes.subarray(position, end)) : '(too long)';
-      if (value !== 'scanlineimage') throw unsupported(`Unsupported EXR part type ${value}`);
+      if (value !== partType)
+        throw unsupported(
+          `Unsupported EXR part type ${value}`,
+          tiled ? 'export it as a single-part tiled or scanline EXR' : undefined,
+        );
     }
     position = end;
   }
   if (!channels || !channels.length || !compression || !dataWindow)
     throw invalid('missing channels, compression or dataWindow');
+  if (tiled && !tiles) throw invalid('missing tiles');
   if (lineOrder > 2) throw invalid('bad lineOrder');
   for (const channel of channels)
     if (channel.xSampling !== 1 || channel.ySampling !== 1)
@@ -178,10 +214,110 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
       'unsupported',
       `Unsupported EXR channels: ${channels.map((c) => c.name).join(', ')} (need R, G, B or Y)`,
     );
+  return {
+    view,
+    position,
+    channels,
+    compression,
+    dataWindow,
+    displayWindow: displayWindow ?? dataWindow,
+    lineOrder,
+    tiles,
+    width,
+    height,
+    indices,
+    layout,
+  };
+}
+
+function rejectCompression(label: string): MargoError {
+  return unsupported(`Unsupported EXR compression ${label}`, 'export it with NONE, RLE, ZIPS, ZIP or PIZ');
+}
+
+/** Bytes of one pixel across every channel. @internal */
+export const pixelBytesOf = (channels: EXRChannel[]) =>
+  channels.reduce((sum, c) => sum + TYPE_SIZE[TYPE_NAMES.indexOf(c.type)], 0);
+
+/**
+ * Turns one chunk's stored bytes into its uncompressed lines: `lines` lines of `width` pixels, each line holding every
+ * channel's samples in list order. A chunk whose size equals the uncompressed size is stored raw. @internal
+ */
+export function decodeEXRChunk(
+  packed: Uint8Array,
+  expected: number,
+  compression: EXRCompression,
+  channels: EXRChannel[],
+  width: number,
+  lines: number,
+  label: string,
+): Uint8Array {
+  if (packed.length === expected) return packed; // Writers store a chunk raw when compression does not shrink it.
+  if (compression === 'NONE') throw invalid(`${label} has ${packed.length} bytes, expected ${expected}`);
+  if (compression === 'RLE') return unpredict(rleDecode(packed, expected));
+  if (compression === 'ZIP' || compression === 'ZIPS') return unpredict(inflateZlib(packed, expected));
+  return decodePizChunk(packed, expected, channels, width, lines);
+}
+
+/**
+ * Copies uncompressed chunk lines (`width` pixels each) into RGBA floats at column `x0`, row `y0` of an image
+ * `imageWidth` pixels wide. @internal
+ */
+export function copyEXRLines(
+  raw: Uint8Array,
+  lines: number,
+  width: number,
+  channels: EXRChannel[],
+  indices: number[],
+  data: Float32Array,
+  imageWidth: number,
+  x0: number,
+  y0: number,
+): void {
+  const raw16 = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+  const halves = halfFloats();
+  const lineBytes = pixelBytesOf(channels) * width;
+  const channelOffsets: number[] = [];
+  let o = 0;
+  for (const c of channels) {
+    channelOffsets.push(o);
+    o += TYPE_SIZE[TYPE_NAMES.indexOf(c.type)] * width;
+  }
+  for (let line = 0; line < lines; line++) {
+    const lineStart = line * lineBytes;
+    for (let component = 0; component < 4; component++) {
+      const channelIndex = indices[component];
+      if (channelIndex < 0) continue;
+      const type = channels[channelIndex].type;
+      let source = lineStart + channelOffsets[channelIndex],
+        target = ((y0 + line) * imageWidth + x0) * 4 + component;
+      if (type === 'HALF')
+        for (let x = 0; x < width; x++, source += 2, target += 4)
+          data[target] = halves[raw[source] | (raw[source + 1] << 8)];
+      else if (type === 'FLOAT')
+        for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getFloat32(source, true);
+      else for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getUint32(source, true);
+    }
+  }
+}
+
+/**
+ * Parses a single-part scanline OpenEXR file into linear float RGBA. Picks the R, G, B and A channels
+ * (or Y for luminance-only files); other channels are decoded and ignored. Tiled files are read by `parseTiledEXR`
+ * (`@margoengine/environment/exr-tiled`); multi-part, deep and subsampled files and PXR24, B44 and DWA compression are
+ * rejected with a descriptive error.
+ * @throws MargoError `'failed'` for damaged data, `'unsupported'` for a file feature it does not decode; RangeError for an
+ * image or chunk over its bounds; TypeError for a source that is not bytes or an empty compression or lineOrder value.
+ */
+export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
+  const bytes = toBytes(source);
+  const header = readEXRHeader(bytes, false);
+  const { view, channels, compression, dataWindow, displayWindow, width, height, indices, layout } = header;
+  let position = header.position;
+  const yMin = dataWindow[1];
 
   const linesPerBlock = LINES_PER_BLOCK[compression];
   const blocks = Math.ceil(height / linesPerBlock);
-  need(blocks * 8);
+  if (position + blocks * 8 > bytes.length) throw invalid('unexpected end of file');
   const offsets: number[] = [];
   for (let i = 0; i < blocks; i++) {
     const low = view.getUint32(position, true),
@@ -189,16 +325,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     position += 8;
     offsets.push(high ? Infinity : low);
   }
-  const pixelBytes = channels.reduce((sum, c) => sum + TYPE_SIZE[TYPE_NAMES.indexOf(c.type)], 0);
-  const lineBytes = pixelBytes * width;
-  const channelOffsets: number[] = [];
-  {
-    let o = 0;
-    for (const c of channels) {
-      channelOffsets.push(o);
-      o += TYPE_SIZE[TYPE_NAMES.indexOf(c.type)] * width;
-    }
-  }
+  const lineBytes = pixelBytesOf(channels) * width;
 
   // Every chunk is checked before the image is allocated, so a small or truncated file cannot make the parser allocate a
   // large one: each chunk lies inside the file and together they could hold every line (deflate expands at most about
@@ -238,36 +365,11 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
       throw invalid(`chunk ${block} has bad y ${blockY}`);
     filled[index] = 1;
     const lines = Math.min(linesPerBlock, height - index * linesPerBlock);
-    const expected = lines * lineBytes;
     const packed = bytes.subarray(offset + 8, offset + 8 + dataSize);
-    let raw: Uint8Array;
-    if (dataSize === expected)
-      raw = packed; // Writers store a chunk raw when compression does not shrink it.
-    else if (compression === 'NONE') throw invalid(`chunk ${block} has ${dataSize} bytes, expected ${expected}`);
-    else if (compression === 'RLE') raw = unpredict(rleDecode(packed, expected));
-    else if (compression === 'ZIP' || compression === 'ZIPS') raw = unpredict(inflateZlib(packed, expected));
-    else raw = decodePizChunk(packed, expected, channels, width, lines);
-    const raw16 = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
-    const halves = halfFloats();
-    for (let line = 0; line < lines; line++) {
-      const row = index * linesPerBlock + line,
-        lineStart = line * lineBytes;
-      for (let component = 0; component < 4; component++) {
-        const channelIndex = indices[component];
-        if (channelIndex < 0) continue;
-        const type = channels[channelIndex].type;
-        let source = lineStart + channelOffsets[channelIndex],
-          target = row * width * 4 + component;
-        if (type === 'HALF')
-          for (let x = 0; x < width; x++, source += 2, target += 4)
-            data[target] = halves[raw[source] | (raw[source + 1] << 8)];
-        else if (type === 'FLOAT')
-          for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getFloat32(source, true);
-        else for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getUint32(source, true);
-      }
-    }
+    const raw = decodeEXRChunk(packed, lines * lineBytes, compression, channels, width, lines, `chunk ${block}`);
+    copyEXRLines(raw, lines, width, channels, indices, data, width, 0, index * linesPerBlock);
   }
-  return { width, height, data, compression, channels, layout, dataWindow, displayWindow: displayWindow ?? dataWindow };
+  return { width, height, data, compression, channels, layout, dataWindow, displayWindow };
 }
 
 // ------------------------------------------------------------------ RLE, ZIP and ZIPS reconstruction

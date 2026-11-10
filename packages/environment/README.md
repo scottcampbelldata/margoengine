@@ -6,9 +6,9 @@ HDR, EXR and UltraHDR loading, EXR writing, GPU image-based lighting (prefiltere
 
 Build from source with `npm run build` in `packages/environment`.
 
-Decodes Radiance `.hdr` (RGBE), OpenEXR (single-part scanline EXR with NONE, RLE, ZIPS, ZIP or PIZ; no PXR24, B44 or DWAA/DWAB, see Limits) and UltraHDR gain-map JPEG images, prefilters them into image-based lighting (`Environment`, `EnvironmentLighting`), and draws a background (the environment with `exposure`, `rotation` and `blur`, or a color) and fog (linear, exponential-squared and height fog), plus froxel volumetric fog with light shafts in the optional `/volumetric` entry.
+Decodes Radiance `.hdr` (RGBE), OpenEXR (single-part scanline EXR with NONE, RLE, ZIPS, ZIP or PIZ, tiled or mipmapped EXR through `/exr-tiled`, and PXR24, B44 and DWAA/DWAB through the asynchronous `/exr-codecs` worker, see Limits) and UltraHDR gain-map JPEG images, prefilters them into image-based lighting (`Environment`, `EnvironmentLighting`), and draws a background (the environment with `exposure`, `rotation` and `blur`, or a color) and fog (linear, exponential-squared and height fog), plus froxel volumetric fog with light shafts in the optional `/volumetric` entry.
 
-The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"); `/exr-write` writes EXR files (see "Writing EXR").
+The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"); `/exr-write` writes EXR files (see "Writing EXR") and `/exr-tiled` reads tiled and mipmapped ones (see "Reading tiled and mipmapped EXR").
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -638,6 +638,24 @@ const bytes = await (await fetch('/studio.exr')).arrayBuffer();
 const {width, height, data} = parseEXR(bytes); // data: Float32Array RGBA, row 0 at the top
 ```
 
+### Reading tiled and mipmapped EXR
+
+`parseTiledEXR(bytes, {levels?})` (from `@margoengine/environment/exr-tiled`, CPU only, Node or browser) reads single-part
+tiled OpenEXR files as studio tools write them: one level, mipmaps or ripmaps, rounding down or up, with NONE, RLE, ZIPS,
+ZIP or PIZ. It returns the full-resolution level as `parseEXR` does, plus `tiling` and `levels`; `levels: 'all'` also
+decodes every lower level. Scanline files are passed to `parseEXR`, so it reads any EXR the package reads.
+
+```ts
+import {parseTiledEXR} from 'margoengine/environment/exr-tiled';
+const bytes = await (await fetch('/texture-mips.exr')).arrayBuffer();
+const image = parseTiledEXR(bytes, {levels: 'all'});
+console.log(image.tiling?.levelMode, image.levels.map((l) => `${l.width}x${l.height}`)); // MIPMAP_LEVELS ['1024x512', ...]
+```
+
+`parseTiledEXR` is synchronous and clean-room, and decodes every mip or rip level. It refuses PXR24, B44, B44A, DWAA
+and DWAB; `decodeEXR` from `@margoengine/environment/exr-codecs` (asynchronous, a worker with the prebuilt OpenEXR
+decoder) reads those and the full-resolution level of tiled files.
+
 ### Writing EXR
 
 `encodeEXR` (from `@margoengine/environment/exr-write`, CPU only, Node or browser) writes any named channels as an
@@ -769,7 +787,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 
 ## Limits
 
-WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled, multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE` and `GAMMA` headers are reported, not applied. Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression), and the split sum ignores multiple scattering. Source and specular sizes must be powers of two.
+WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE` and `GAMMA` headers are reported, not applied. Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression), and the split sum ignores multiple scattering. Source and specular sizes must be powers of two.
 
 Two portability measures are deliberate: the specular prefilter samples the cube in a fragment pass (cube sampling with explicit LOD in compute shaders returned wrong seam texels on SwiftShader), and the WGSL avoids `atan2(-0.0, x)` (SwiftShader returns PI).
 
@@ -780,7 +798,7 @@ From the repository root, `node packages/environment/scripts/fetch-fixtures.mjs`
 OpenEXR images at pinned hashes. Restore other tracked fixtures with `git restore -- <fixture-path>`;
 `node packages/environment/scripts/make-hdr-fixture.js` regenerates the Margo HDR file.
 
-`npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images (sources in `tests/fixtures/NOTICE.md`) and the Margo-made `sun_sky.hdr` (written by `scripts/make-hdr-fixture.js`), matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; `tests/hdr.test.js`: all eight Radiance scan orders, RGB output, bounds before allocation, FORMAT and XYZE refusals, located damage, Margo Voxel Studio's own HDR fixtures and a 600-file generated corpus whose SHA-256 digest Studio's decoder produced; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
+`npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); `tests/exr-tiled.test.js`: every reference-library chunk of the 31 EXR fixtures repackaged as tiles (in file and reverse order) decodes bit-exactly as its scanline file, and Margo-written edge-tile, mipmap and ripmap files (both rounding modes, the Technical Introduction's 15 x 17 level table) decode exactly, with PXR24, B44 and DWA refused; real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images (sources in `tests/fixtures/NOTICE.md`) and the Margo-made `sun_sky.hdr` (written by `scripts/make-hdr-fixture.js`), matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; `tests/hdr.test.js`: all eight Radiance scan orders, RGB output, bounds before allocation, FORMAT and XYZE refusals, located damage, Margo Voxel Studio's own HDR fixtures and a 600-file generated corpus whose SHA-256 digest Studio's decoder produced; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
 
 `tests/probes-capture.test.js` checks `addCapture` on a mock GPU: only the drawing passes replay by default, once per captured face, with the face's context (real device, `rgba16float`, no frame attachment), named passes in order, the restore with the frame's context, validation, removal and disposal. `npm run test:probe-capture:browser` checks it on a real GPU (section above).
 
