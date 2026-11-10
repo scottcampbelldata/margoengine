@@ -31,6 +31,10 @@ function value(argument, prefix) {
 
 export function mergeScopedApiSurface(current, replacement) {
   const lines = current.replaceAll('\r\n', '\n').split('\n');
+  if (lines.some((line) => /^(?:<{7}|>{7})(?:\s|$)/.test(line)))
+    throw new Error(
+      'docs/api-surface.md contains an unresolved merge boundary; run npm run api:update to regenerate the complete summary before a scoped update',
+    );
   const summaryIndex = lines.findIndex((line) => /\d+ packages, \d+ entries, \d+ exported names\./.test(line));
   if (summaryIndex < 0) throw new Error('docs/api-surface.md has no package summary line');
 

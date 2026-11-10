@@ -192,3 +192,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/scatter | Native and full-compatibility shadow culling, actual command-count observation and parity limits. | Batch 273 group15 |
 | @margoengine/html | inlineResources/resourceInliner, texture prepare hook, same-origin/CORS images/fonts, imported sheets, cancellation, deadlines and explicit fontCSS for script-created faces. | Batch 260 job 3 |
 | margoengine | Generated html/inline alias and synchronised upstream audio/voices export. | Batch 260 job 3 |
+
+
+| margoengine | Review the generated save/scene-state alias with its owning feature in the README phase. | Batch 171 metadata repair |

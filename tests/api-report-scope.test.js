@@ -44,3 +44,22 @@ test('a scoped API update changes only its package row and the aggregate summary
   assert.match(after, /^\| @margoengine\/biomes \| `\.` 4, `\.\/disturbance` 12 \| 2 \|  \| 100 \|$/m);
   assert.equal(after.split('\n').filter((line) => line === scatter).length, 1);
 });
+
+test('scoped API updates reject unresolved boundaries before they can split the table and duplicate package rows', () => {
+  const header = '| Package | Exports per entry | Unexported | `any` | Gzip |';
+  const row = '| @margoengine/biomes | `.` 4 | 1 |  | 100 |';
+  const before = [
+    '1 packages, 1 entries, 4 exported names.',
+    '',
+    header,
+    '| --- | --- | ---: | ---: | ---: |',
+    row,
+    '',
+  ].join('\n');
+  const replacement = { packageName: '@margoengine/biomes', row, entries: 1, exports: 4 };
+  for (const target of ['1 packages, 1 entries, 4 exported names.', header, row]) {
+    const conflict = before.replace(target, `<<<<<<< HEAD\n${target}\n=======\n${target}\n>>>>>>> lane`);
+    for (const text of [conflict, conflict.replaceAll('\n', '\r\n')])
+      assert.throws(() => mergeScopedApiSurface(text, replacement), /unresolved merge boundary.*npm run api:update/);
+  }
+});

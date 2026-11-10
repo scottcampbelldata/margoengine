@@ -5631,3 +5631,10 @@ the CPU plane classifier and distant-tree exclusion. The fixture regression
 executes the actual counts method and fails on the old native-only lookup.
 ### Section 5 evidence: batch 260 self-contained DOM resources
 html/inline supplies inlineResources and resourceInliner; HTMLTexture's optional prepare hook runs before foreignObject serialization on both texture backends. The real browser fixture serves existing licensed image/font bytes from a separate CORS origin, including an imported font stylesheet. 1,893 selected image pixels match the direct image raster within one channel value; the embedded and live Source Sans glyph widths are exactly 92 px. Tests also cover same-origin URL resolution, fetch deduplication, CSS URL strings, SVG fragments, import cycles, errors, deadlines, cancellation and surface-removal cancellation. There is no new rendering backend or core/stage work. Performance is not claimed.
+
+
+### Generated public metadata after concurrent merges
+
+tests/generated-metadata-conflicts.test.js checks the generated API summary, public help/llms files and umbrella manifest for unresolved merge boundaries. It runs with root CPU tests in local CI/check:merge. Its actual test fails against a88cfd4fe's published metadata in an isolated worktree-local fixture and passes after authoritative api:update regeneration. Native Windows PowerShell command sequences must explicitly stop on nonzero LASTEXITCODE; an earlier failed merge helper must never be followed by staging/commit/push. All graphical source hashes and previous atmosphere CPU/GPU evidence are unchanged by this repair.
+
+Scoped API updates now reject inherited unresolved boundaries before interpreting a table. tests/api-report-scope.test.js covers conflicts in the headline, table header and package row, with LF and CRLF. This prevents the truncated-table path from inserting duplicate package rows and inflating summary totals.

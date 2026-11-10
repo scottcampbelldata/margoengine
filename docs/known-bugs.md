@@ -4207,3 +4207,7 @@ Outside batch 262: scoped API surface merging accepts conflict markers and dupli
 ### Batch 254 voice registration callback rollback (fix phase)
 Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for invalid gain; a second manager.add(sound) raises attached and the original sound remains paused. Cause: registration pauses the sound and inserts ownership before update evaluates the user gain callback, with no rollback on that error. Valid-input voice budgeting/phase tests pass. Per build-phase rules 21/22 this invalid-callback edge waits for the fix phase; restore the prior playback/ownership on failed registration with a regression test.
 - Batch 260 HTMLBlend inherited custom view: with `HTMLBlend.attach(engine, {view: {viewport: [0.5, 0, 0.5, 1]}})`, the DOM projects into that rectangle while the aperture uses the active render context's camera/viewport. Cause: mask draw consumes PassContext rather than LabelRenderer.view. Ordinary full-canvas blending passes on all three backends; synchronize explicit view/scissor/camera in the fix phase.
+
+
+Fixed immediately after batch 171 landing: a88cfd4fe contained unresolved boundaries in docs/api-surface.md after a native helper failed but its PowerShell caller continued. Authoritative api:update regenerates the summary; generated-metadata-conflicts.test.js fails on that published artifact and passes on the repair. No engine or atmosphere runtime source changed.
+
