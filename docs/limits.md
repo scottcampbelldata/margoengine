@@ -3676,3 +3676,17 @@ Batch 252 job 3: NavMeshQuery takes `{seed:0}` for an independent reproducible 3
 
 Batch 252 job 3 measured entry sizes: @margoengine/navmesh/queries: 4473 B gzip (ceiling 3371 -> 4729 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
 Batch 252 job 3 entry delta: queries 3,115 -> 4,473 B gzip, ceiling 3,371 -> 4,729 B. The added optional bytes retain uniform area sampling, strict radius rejection and correct partial-portal wall intervals together with their shared graph helpers.
+## Fuzzy decisions (batch 251)
+
+New behavior/fuzzy measures 2,621 B min+gzip (previously absent), generated umbrella
+alias 61 B external; no existing ceiling raised. Inputs are finite world/domain
+values, and memberships outside a shape's finite domain are zero. Default output
+method centroid, 256 midpoint samples (integer 1..1,000,000), fallback 0 when no
+rule fires. Mean-of-max is the mean of the sampled maxima, not an exact continuous
+integral. Max-average uses weighted set representatives. Continuous and discrete
+singleton sets use separate output variables. Custom sampling ranges must have
+finite min <= max and finite width. Expression depth is limited to 256; cycles
+reject. Rules are one forward Mamdani stage; evaluation has no inter-agent state
+or implicit recurrent feedback. JSON round trips preserve the whole designer
+configuration. No GPU entry or speed claim; default-sized decision evaluation
+has no proven Wasm gain.

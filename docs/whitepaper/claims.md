@@ -3030,3 +3030,13 @@ The optional BoxGizmo provides eight corner scale and twelve edge rotation handl
 ## Batch 252 job 3: surface sampling and walls
 
 `packages/navmesh/test/sampling.test.js` proves reproducible random streams, the 1:9 area frequency on unequal islands, triangle centroids, slope surface-area weighting, strict-radius support and disk second moments, disconnected-floor exclusion, filters, exact wall distances/normals and partially open tile seam intervals. These match the published web navigation query behaviors; strict radius support and projected heights are explicit Margo guarantees. Distribution checks use fixed seeds and analytic expectations, not timed performance assertions.
+## Fuzzy decisions (batch 251 job 3)
+
+`behavior/fuzzy` adds designer-serializable sets, named propositions, AND/OR/NOT,
+very/fairly hedges, weighted multi-output Mamdani rules and independent FuzzySystem
+evaluation. Outputs support sampled centroid, sampled mean-of-max and weighted
+representative max-average. Analytical shape boundaries, clipped rectangular
+centroids, maxima plateaus, discrete outputs, rule aggregation and agent isolation
+are checked by packages/behavior/tests/fuzzy.test.js. This proves the fuzzy-set,
+rule and defuzzification row against published formulas and the documented web
+reference; it makes no full-library or real-game decision-quality claim.

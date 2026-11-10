@@ -5427,3 +5427,28 @@ Combined design: exact local vertex bounds, transformed corners, screen-space ha
 Sources compared before implementation: Greg Turk, *Generating Random Points in Triangles* (1990), in Andrew S. Glassner (ed.), *Graphics Gems*, pp. 24-28, publisher table of contents https://www.sciencedirect.com/book/9780080507538/graphics-gems; Robert Osada, Thomas Funkhouser, Bernard Chazelle and David Dobkin, *Shape Distributions* (2002), ACM TOG 21(4), https://pixl.cs.princeton.edu/pubs/Osada_2002_SD/ (surface-area sampling and square-root barycentrics); I. E. Sutherland and G. W. Hodgman, *Reentrant Polygon Clipping* (1974), https://doi.org/10.1145/360767.360802 (radius bounding-square clipping); Mikko Mononen and Recast Navigation contributors, *dtNavMeshQuery API reference* (2009-present), https://recastnav.com/classdtNavMeshQuery.html (area-weighted random queries, circle neighborhood and wall-segment contracts). Only descriptions/papers were consulted; no rival or companion code read.
 
 Combined design: weight convex fan triangles by true 3D surface area, choose a cumulative-area interval, then sample square-root barycentrics using the existing independent seeded math stream. Radius sampling first limits the connected ground graph to portals touching the circle, clips proposal polygons to its bounding square, and rejects points outside the exact disk, preserving uniform density with a finite proposal bound. Wall queries subtract unions of traversable portal intervals from each polygon edge before taking the closest segment point. This is essential for partial tile portals and area filters. Synthetic distribution, ramp and tiled-floor fixtures only; no new asset demo, timing assertion or speed claim.
+## Batch 251 job 3: fuzzy decisions
+
+Research compared: Lotfi A. Zadeh, *Fuzzy Sets* (1965),
+https://doi.org/10.1016/S0019-9958(65)90241-X (graded membership);
+Ebrahim H. Mamdani and Sedrak Assilian, *An Experiment in Linguistic Synthesis
+with a Fuzzy Logic Controller* (1975), https://doi.org/10.1016/S0020-7373(75)80002-2
+(rule activation); Segismundo S. Izquierdo and Luis R. Izquierdo, *Mamdani Fuzzy
+Systems for Modelling and Simulation: A Critical Assessment* (2018),
+https://jasss.soc.surrey.ac.uk/21/3/2.html (min/max aggregation and explicit
+controller semantics); Timothy J. Ross, *Fuzzy Logic with Engineering
+Applications*, chapter 4 (2010), https://doi.org/10.1002/9781119994374.ch4
+(centroid and maxima methods); Nicholas J. Higham, *The Accuracy of Floating
+Point Summation* (1993), https://nhigham.com/wp-content/uploads/2023/10/high93s.pdf
+(compensated accumulation after a plateau-mean rounding failure in the exact
+analytical fixture); Michael Herzog, *Yuka FuzzyModule/FuzzyVariable public API*
+(accessed 2026-11-10), https://mugen87.github.io/yuka/docs/FuzzyVariable.html
+and https://mugen87.github.io/yuka/docs/FuzzyModule.html . No source links opened.
+
+Combined design: serializable bounded membership shapes, min/max/complement
+logic and very/fairly hedges, weighted rule activation, max aggregation of clipped
+consequences, independent outputs and pure evaluation between agents. Centroid
+and mean-of-max use midpoint sampling; max-average uses set representatives.
+Analytical tests cover the public reference behavior, plus Gaussian, trapezoid,
+singleton and true sampled mean-of-max outputs. No copied code, downloaded asset
+demo, timing claim or assertion of truth-preserving logical deduction.

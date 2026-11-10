@@ -198,6 +198,10 @@
       "types": "./dist/behavior/inspect.d.ts",
       "import": "./dist/behavior/inspect.js"
     },
+    "./behavior/fuzzy": {
+      "types": "./dist/behavior/fuzzy.d.ts",
+      "import": "./dist/behavior/fuzzy.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"
