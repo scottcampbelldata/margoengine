@@ -65,6 +65,10 @@
     "./keyboard": {
       "types": "./dist/keyboard.d.ts",
       "import": "./dist/keyboard.js"
+    },
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "import": "./dist/i18n.js"
     }
   },
   "files": [
@@ -99,6 +103,7 @@
     "test:browser:image": "npm run build && node tests/image-browser.mjs",
     "test:browser:forms": "npm run build && node tests/forms-browser.mjs",
     "test:browser:world-gl": "npm run build && node tests/world-gl-browser.mjs",
-    "test:browser:keyboard": "npm run build && node tests/keyboard-browser.mjs"
+    "test:browser:keyboard": "npm run build && node tests/keyboard-browser.mjs",
+    "test:browser:i18n": "npm run build && node tests/i18n-browser.mjs"
   }
 }

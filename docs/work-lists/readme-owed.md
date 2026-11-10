@@ -417,3 +417,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/headless: document /tiles renderTiles streaming, renderTiled assembly, sample-count AA, padding, cancellation, WebGPU-only readback and temporal-filter limits.
 - margoengine: document headless/tiles as the one-install alias of @margoengine/headless/tiles.
+- @margoengine/ui (batch 259 job 3): document /i18n Localization tables, fallback/plurals/parameters, live bindings, relayout and text-direction switching in the README phase.
+- margoengine (batch 259 job 3): document ui/i18n alias in the README phase.

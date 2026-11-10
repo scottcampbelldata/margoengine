@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Localization checks</title><link rel="icon" href="data:,"><style>body{margin:0}canvas{width:400px;height:200px;display:block}</style><canvas width="400" height="200"></canvas><script type="module">
+import {Engine} from '@margoengine/core';import{Ui,UiRenderer,Label,Panel}from'@margoengine/ui';import{Localization}from'@margoengine/ui/i18n';
+const engine=await Engine.create(document.querySelector('canvas')),ui=new Ui({width:400,height:200,safeArea:[0,0,0,0],reducedMotion:true});
+const label=new Label({text:'',size:'title'});ui.add(new Panel({anchor:'center',padding:20,background:'surface',children:[label]}));
+// Planet labels: Wikidata Q111, CC0: https://www.wikidata.org/wiki/Q111 .
+const locale=new Localization({en:{planet:'Mars'},ar:{planet:'المريخ'},es:{planet:'Marte'}});const off=locale.bind(ui,[{target:label,key:'planet'}]);
+const renderer=UiRenderer.attach(engine,ui);await ui.ready;let running=true;function frame(){engine.render(0)}function tick(){if(running){frame();requestAnimationFrame(tick)}}tick();
+window.localeTest={locale,ui,label,renderer,frame,close(){running=false;off();locale.dispose();engine.dispose();ui.dispose()}};
+</script></html>

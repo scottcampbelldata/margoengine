@@ -3630,6 +3630,10 @@
       "types": "./dist/ui/keyboard.d.ts",
       "import": "./dist/ui/keyboard.js"
     },
+    "./ui/i18n": {
+      "types": "./dist/ui/i18n.d.ts",
+      "import": "./dist/ui/i18n.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

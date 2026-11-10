@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12840050,
+  "total": 12841986,
   "history": [
     {
       "date": "2026-10-24",
@@ -6386,6 +6386,12 @@
       "date": "2026-11-10",
       "reason": "Batch 209 tiles new optional entry: absent to 2210 B gzip, ceiling 2466 B. Streaming subfrusta and linear-alpha supersampling stay coherent; splitting would add loading plumbing. Core plus stage 24209 B unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-259",
+      "reason": "Optional ui/i18n: absent to 1680 B min+gzip, ceiling 1936 B. Type-only UI bindings call existing widget setters and own disposable locale/abort subscriptions. Splitting would complicate this small optional API; core/stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7557,6 +7563,7 @@
     "leak @margoengine/animation/playback -> @margoengine/gltf-pro/model": 1,
     "@margoengine/blender/objects": 5201,
     "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1,
-    "@margoengine/headless/tiles": 2466
+    "@margoengine/headless/tiles": 2466,
+    "@margoengine/ui/i18n": 1936
   }
 }
