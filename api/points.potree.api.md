@@ -144,12 +144,16 @@ interface OctreeNodeData {
     positions: Float32Array;
     colors?: Uint8Array | Float32Array | null;
     colorComponents?: 3 | 4;
+    attributes?: Readonly<Record<string, PointAttribute>>;
+    rowIds?: ArrayLike<string | number>;
 }
 
 interface OctreeSource {
     readonly root: OctreeNode;
     load(node: OctreeNode, signal: AbortSignal): OctreeNodeData | Promise<OctreeNodeData>;
 }
+
+type PointAttribute = Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
 
 function parseLAS(input: ArrayBuffer | Uint8Array, options?: LASOptions): Promise<LASPoints>;
 ```

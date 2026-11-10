@@ -1,0 +1,181 @@
+{
+  "base": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/IA_FullState/",
+  "license": "US Government Public Domain",
+  "attribution": "USGS 3DEP, Iowa statewide EPT, coarse root and first-level tiles",
+  "metadata": {
+    "bounds": [
+      -10758075,
+      4793202,
+      -361911,
+      -10034133,
+      5517144,
+      362031
+    ],
+    "boundsConforming": [
+      -10758074,
+      4920531,
+      -1897,
+      -10034134,
+      5389814,
+      2017
+    ],
+    "dataType": "laszip",
+    "hierarchyType": "json",
+    "points": 167692896718,
+    "reprojection": {
+      "in": "EPSG:26915",
+      "out": "EPSG:3857"
+    },
+    "schema": [
+      {
+        "name": "X",
+        "offset": -10396104,
+        "scale": 0.01,
+        "size": 4,
+        "type": "signed"
+      },
+      {
+        "name": "Y",
+        "offset": 5155173,
+        "scale": 0.01,
+        "size": 4,
+        "type": "signed"
+      },
+      {
+        "name": "Z",
+        "offset": 60,
+        "scale": 0.01,
+        "size": 4,
+        "type": "signed"
+      },
+      {
+        "name": "Intensity",
+        "size": 2,
+        "type": "unsigned"
+      },
+      {
+        "name": "ReturnNumber",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "NumberOfReturns",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "ScanDirectionFlag",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "EdgeOfFlightLine",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "Classification",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "ScanAngleRank",
+        "size": 4,
+        "type": "float"
+      },
+      {
+        "name": "UserData",
+        "size": 1,
+        "type": "unsigned"
+      },
+      {
+        "name": "PointSourceId",
+        "size": 2,
+        "type": "unsigned"
+      },
+      {
+        "name": "GpsTime",
+        "size": 8,
+        "type": "float"
+      },
+      {
+        "name": "OriginId",
+        "size": 4,
+        "type": "unsigned"
+      }
+    ],
+    "srs": {
+      "authority": "EPSG",
+      "horizontal": "3857",
+      "wkt": "PROJCS[\"WGS 84 / Pseudo-Mercator\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Mercator_1SP\"],PARAMETER[\"central_meridian\",0],PARAMETER[\"scale_factor\",1],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],EXTENSION[\"PROJ4\",\"+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs\"],AUTHORITY[\"EPSG\",\"3857\"]]"
+    },
+    "version": "1.1.0",
+    "span": 256
+  },
+  "nodes": [
+    {
+      "key": "0-0-0-0",
+      "count": 34923,
+      "bytes": 603312,
+      "sha256": "68c4b0ed247501a15d020d9a758d0345904f38785235732bd8e3386a3fca71c1",
+      "recordsSha256": "eefb666e8eff1dacbc95f75f0db3e25a014ddecc0274211f82bf413425e9a55a"
+    },
+    {
+      "key": "1-0-0-0",
+      "count": 35,
+      "bytes": 1493,
+      "sha256": "ef55350db7631f72c22305216449d944b12657be717e596bbf5ce8c96d4ebd5b",
+      "recordsSha256": "953e1686f09fed31aff8172fb607c9c7eda395d74696b344e26680167517059f"
+    },
+    {
+      "key": "1-0-0-1",
+      "count": 30122,
+      "bytes": 467734,
+      "sha256": "5f5145f199211f1ae4017035b0a3662aa3396687ce1fd0223587103a79101ba7",
+      "recordsSha256": "4ab9f60fb1a58ff78c80cf3444c2640092334b63da335eecc49401c99c75bc74"
+    },
+    {
+      "key": "1-0-1-0",
+      "count": 10,
+      "bytes": 1070,
+      "sha256": "02504d28ece362535b1a7cc38a63d27cddb1637c822a4a7106086943957905a7",
+      "recordsSha256": "8fabefe896e6179961b622e430bf20c879beb01ffb3045c0b9da4cef09ce8bcd"
+    },
+    {
+      "key": "1-0-1-1",
+      "count": 50459,
+      "bytes": 743451,
+      "sha256": "5271d20583407511d3d9301b6bcca5421686b8102abdb5ce344536550d25ee52",
+      "recordsSha256": "7bfe989d25bb241003a0ec74822403b84c1f6c9429287a3d620b9dc16f9108bd"
+    },
+    {
+      "key": "1-1-0-0",
+      "count": 817,
+      "bytes": 13688,
+      "sha256": "e9edc89e6642b9001bc509cea650dabfb9ed0d8a6d302aeb172e8a38c921c8e7",
+      "recordsSha256": "ae8a43191e22a10dc97e7969bd2f5773c4447f9a408563b06cfe02aa318079a9"
+    },
+    {
+      "key": "1-1-0-1",
+      "count": 33258,
+      "bytes": 526542,
+      "sha256": "e1b96bf137952459c34ac678046fd9badd08c3b026f89609d9d40e36d01e825c",
+      "recordsSha256": "dbd72052f29e42a9a291f1a55d33d88dcb0ffb4b1bcea9459c3e8c1d69da3925"
+    },
+    {
+      "key": "1-1-1-0",
+      "count": 21,
+      "bytes": 1323,
+      "sha256": "9ffe2a782be5032bafbdfcc46fa9cbf244067066ec6c5853b49ce9c3ab3aac0c",
+      "recordsSha256": "4bc6bec5c82a65dcff550ea0ef96d54c24c86d2ac3da6b774fe2a6f8366dd670"
+    },
+    {
+      "key": "1-1-1-1",
+      "count": 39242,
+      "bytes": 632033,
+      "sha256": "f5c9e76b1fb8440f6e82285a376c076518e1883b3acc38b544273b25baaf4089",
+      "recordsSha256": "88aa0ae5bf9304db5c2ad15a1ee87fe09eefbbb7f31e30e503bbe27de56f2ea4"
+    }
+  ],
+  "oracle": "laspy 2.7.0 with lazrs 0.8.2, complete raw point records, unchanged source files"
+}

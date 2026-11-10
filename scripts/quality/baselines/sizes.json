@@ -7595,6 +7595,12 @@
       "commit": "0ea7d7376",
       "reason": "Review 4 LTC accuracy: area 10545 to 10901 B min+gzip; ceiling 10652 to 11229 B. The shared owned angle closes the unchanged WebGL2 horizon-cancellation accuracy failure. A split adds shader-composition/loading contracts but cannot remove the required per-fragment math. Core plus stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "a331427a0",
+      "reason": "Batch 175 job 2: optional pointcloud figure adapter, typed octree columns and stable row identities; preserve all unrelated ceilings. Measured before/after in limits.md; no core/stage growth.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8256,7 +8262,7 @@
     "@margoengine/points/las base (without LAZ decoder)": 6017,
     "@margoengine/points/las lazy LAZ decoder": 8779,
     "@margoengine/points/laz": 8872,
-    "@margoengine/points/octree": 9267,
+    "@margoengine/points/octree": 9654,
     "@margoengine/points/pick": 6015,
     "@margoengine/points/potree": 17694,
     "@margoengine/points/surfels": 15381,
@@ -8977,7 +8983,8 @@
     "@margoengine/sciviz/exodus": 20567,
     "@margoengine/sciviz/hdf5": 9260,
     "@margoengine/sciviz/openfoam": 10883,
-    "@margoengine/sciviz/xdmf": 19832
+    "@margoengine/sciviz/xdmf": 19832,
+    "@margoengine/sciviz/pointcloud": 21685
   },
-  "total": 14427412
+  "total": 14449484
 }

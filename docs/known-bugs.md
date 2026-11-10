@@ -4932,3 +4932,8 @@ The original fourteen packages were repaired by 68b55c2ed. The later umbrella pa
 The rebased cube-projector alias was appended after the umbrella kits, failing the existing generated-manifest and package export-order checks. Running scripts/umbrella.mjs restores its owning package position without changing the export set.
 ## Batch 178 PDF and math
 No open correctness defect in the documented TeX subset or figure-SVG PDF contract after CPU, both-backend browser and independent MuPDF checks. Font-specific math spacing and variant glyph assembly are accepted appearance differences, tracked in the private finish-phase handoff.
+
+
+Batch 175 job 2 source-data defect: USGS IA_FullState/ept-data/0-0-0-0.laz first GPS time is -4.799510766208031e194 (implausible). Repro: parseLAS of the archived original, point 0. Cause: identical bits in the uncompressed seed record of the producer file; independent laspy 2.7.0/lazrs 0.8.2 agrees on every decoded record. Preserve original values; use intensity/classification/elevation for this demo, not GPS-time analysis.
+
+Pre-existing points/octree validation gap (batch 175 job 2): constructing OctreeCloud with maxConcurrentLoads: 0 then select(view) schedules no loads and reports loading 0; ready-style callers can mistake that for completion. Cause: constructor validates point and cache budgets but omits the concurrency option. Valid positive-concurrency pointcloud paths pass; track this input-validation repair for the fix phase under lane rule 21.

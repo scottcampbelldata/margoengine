@@ -9,7 +9,7 @@ import { ColorInput } from "@margoengine/math";
 export class MemoryOctree implements OctreeSource {
     readonly root: OctreeNode;
     readonly indices: ReadonlyMap<OctreeNode, Uint32Array>;
-    constructor(root: OctreeNode, indices: Map<OctreeNode, Uint32Array>, positions: ArrayLike<number>, colors?: ArrayLike<number> | null | undefined, colorComponents?: 3 | 4);
+    constructor(root: OctreeNode, indices: Map<OctreeNode, Uint32Array>, positions: ArrayLike<number>, colors?: ArrayLike<number> | null | undefined, colorComponents?: 3 | 4, attributes?: Readonly<Record<string, PointAttribute>>, rowIds?: ArrayLike<string | number> | undefined);
     nodes(): IterableIterator<OctreeNode>;
     load(node: OctreeNode): OctreeNodeData;
 }
@@ -71,6 +71,8 @@ export interface OctreeNodeData {
     positions: Float32Array;
     colors?: Uint8Array | Float32Array | null;
     colorComponents?: 3 | 4;
+    attributes?: Readonly<Record<string, PointAttribute>>;
+    rowIds?: ArrayLike<string | number>;
 }
 
 export interface OctreeOptions {
@@ -97,10 +99,14 @@ export interface OctreeView {
     readonly fov?: number;
 }
 
+export type PointAttribute = Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
+
 export function buildOctree(cloud: {
     positions: ArrayLike<number>;
     colors?: ArrayLike<number> | null;
     colorComponents?: 3 | 4;
+    attributes?: Readonly<Record<string, PointAttribute>>;
+    rowIds?: ArrayLike<string | number>;
 }, options?: OctreeOptions): MemoryOctree;
 
 // Not exported from this entry, but used by the exports above:

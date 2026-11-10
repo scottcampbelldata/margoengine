@@ -11,6 +11,27 @@ const keys = Array.from({ length: 40 }, (_, i) => i);
 const red = keys.filter((i) => stars[2_000_000 + i] > 0.6);
 const bright = keys.filter((i) => stars[3_000_000 + i] < 13);
 
+test('open selection stores streaming predicates without a preallocated universe', () => {
+  using store = new SelectionStore([], { universe: 'open', resolve: 'intersect' });
+  const changes = [];
+  store.subscribe((change) => changes.push(change));
+  assert(store.has('unloaded/node/1'));
+  assert.deepEqual(store.rowIds, []);
+  store.select(['a', 'b'], { source: 'cloud' });
+  store.select(['b', 'c'], { source: 'table' });
+  assert.deepEqual(store.rowIds, ['b']);
+  assert.deepEqual(changes.at(-1).rowIds, ['b']);
+  assert(!store.has('a'));
+  assert.throws(() => store.select([NaN]), /Unknown selection/);
+  store.undo();
+  assert.deepEqual(store.rowIds, ['a', 'b']);
+  store.redo();
+  assert.deepEqual(store.rowIds, ['b']);
+  store.clear();
+  assert(store.has('later/node/2'));
+  assert.throws(() => new SelectionStore([], { universe: 'unknown' }), /universe/);
+});
+
 test('shared selection matches the published global, union and intersect truth tables', () => {
   for (const resolve of ['global', 'union', 'intersect']) {
     using store = new SelectionStore(keys, { resolve });

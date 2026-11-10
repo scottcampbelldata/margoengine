@@ -20,6 +20,8 @@ export interface SelectionChange {
 }
 /** Resolution, empty-predicate and undo policy for a shared dataset. */
 export interface SelectionOptions {
+  /** Open accepts stable keys as they arrive from streamed sources; rowIds enumerates explicit selections only. Default fixed. */
+  readonly universe?: 'fixed' | 'open';
   readonly resolve?: SelectionResolve;
   /** Rows pass when there is no brush. Default true. An explicit empty brush rejects every row. */
   readonly empty?: boolean;
@@ -44,6 +46,7 @@ export class SelectionStore extends EventTarget {
   readonly #resolve: SelectionResolve;
   readonly #empty: boolean;
   readonly #limit: number;
+  readonly #open: boolean;
   #brushes: Brushes = new Map();
   #selected = new Set<RowKey>();
   #past: Brushes[] = [];
@@ -60,6 +63,9 @@ export class SelectionStore extends EventTarget {
     this.#universe = new Set(keys);
     if (this.#universe.size !== keys.length) throw rangeError('Selection dataset row keys must be unique', 'sciviz');
     this.#keys = keys;
+    this.#open = options.universe === 'open';
+    if (options.universe !== undefined && !['fixed', 'open'].includes(options.universe))
+      throw rangeError('Unknown selection universe', 'sciviz');
     this.#resolve = options.resolve ?? 'global';
     if (!['global', 'union', 'intersect'].includes(this.#resolve))
       throw rangeError('Unknown selection resolve rule', 'sciviz');
@@ -79,6 +85,7 @@ export class SelectionStore extends EventTarget {
     return this.#resolve;
   }
   get rowIds(): readonly RowKey[] {
+    if (this.#open) return this.active ? [...this.#selected] : [];
     return this.#keys.filter((key) => this.has(key));
   }
   get canUndo(): boolean {
@@ -88,10 +95,12 @@ export class SelectionStore extends EventTarget {
     return this.#future.length > 0;
   }
   has(key: RowKey): boolean {
-    return this.#universe.has(key) && (this.active ? this.#selected.has(key) : this.#empty);
+    return this.contains(key) && (this.active ? this.#selected.has(key) : this.#empty);
   }
   contains(key: RowKey): boolean {
-    return this.#universe.has(key);
+    return this.#open
+      ? typeof key === 'string' || (typeof key === 'number' && Number.isFinite(key))
+      : this.#universe.has(key);
   }
 
   #check(): void {
@@ -116,6 +125,7 @@ export class SelectionStore extends EventTarget {
       active = this.active,
       empty = this.#empty,
       keys = this.#keys;
+    const open = this.#open;
     this.dispatchEvent(
       new CustomEvent<SelectionChange>('change', {
         detail: {
@@ -123,7 +133,7 @@ export class SelectionStore extends EventTarget {
           active,
           version: ++this.#version,
           get rowIds() {
-            return keys.filter((key) => (active ? selected.has(key) : empty));
+            return open ? (active ? [...selected] : []) : keys.filter((key) => (active ? selected.has(key) : empty));
           },
         },
       }),

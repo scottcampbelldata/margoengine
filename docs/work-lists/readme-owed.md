@@ -1087,3 +1087,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/cutscene (review 3 C1): document graph channel reconciliation on undo/redo and fallback after track removal.
 
 - @margoengine/exporters (review 2): describe optimize-extra pruning of off-scene animation targets, transform ancestors and their skin/joint dependencies; examples deferred.
+
+
+
+- @margoengine/sciviz: pointcloud async factory/openPointCloud, source origins, global attribute maps, point/cache budgets, attribute hover, rectangle/lasso and open SelectionStore universes.
+- @margoengine/points: OctreeNodeData typed attributes/rowIds, MemoryOctree column preservation and COPC attributes.
+- margoengine: generated sciviz/pointcloud alias and synchronized environment/exr-codecs alias.

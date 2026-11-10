@@ -47,6 +47,7 @@ export interface SelectionChange {
 export type SelectionOperation = 'replace' | 'union' | 'intersect' | 'toggle' | 'subtract';
 
 export interface SelectionOptions {
+    readonly universe?: 'fixed' | 'open';
     readonly resolve?: SelectionResolve;
     readonly empty?: boolean;
     readonly history?: number;

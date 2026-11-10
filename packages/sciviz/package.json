@@ -207,6 +207,10 @@
     "./ensight": {
       "types": "./dist/ensight.d.ts",
       "import": "./dist/ensight.js"
+    },
+    "./pointcloud": {
+      "types": "./dist/pointcloud.d.ts",
+      "import": "./dist/pointcloud.js"
     }
   },
   "files": [
@@ -254,6 +258,7 @@
     "test:browser:fallback": "node scripts/browser-root.mjs tests/fallback-browser.mjs",
     "test:browser:charts-extra": "node scripts/browser-root.mjs tests/charts-extra-browser.mjs",
     "test:browser:table": "node scripts/browser-root.mjs tests/table-browser.mjs",
-    "test:browser:pdf": "node scripts/browser-root.mjs tests/pdf-browser.mjs"
+    "test:browser:pdf": "node scripts/browser-root.mjs tests/pdf-browser.mjs",
+    "test:browser:pointcloud": "node tests/pointcloud-browser.mjs"
   }
 }

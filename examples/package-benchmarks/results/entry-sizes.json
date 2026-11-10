@@ -1,6 +1,6 @@
 {
-  "commit": "974b6a6a2",
-  "dirty": false,
+  "commit": "0ebc05527",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59802,
@@ -614,8 +614,8 @@
         "gzip": 4100
       },
       "./projector": {
-        "raw": 6410,
-        "gzip": 2705
+        "raw": 6444,
+        "gzip": 2720
       },
       "./physical-lobes": {
         "raw": 1372,
@@ -648,6 +648,10 @@
       "./shadow-atlas": {
         "raw": 39304,
         "gzip": 14027
+      },
+      "./cube-projector": {
+        "raw": 13519,
+        "gzip": 4493
       }
     },
     "@margoengine/compute": {
@@ -692,8 +696,8 @@
         "gzip": 2281
       },
       "./nn": {
-        "raw": 57539,
-        "gzip": 18737
+        "raw": 58058,
+        "gzip": 18873
       },
       "./graph": {
         "raw": 21733,
@@ -714,6 +718,10 @@
       "./cpu-wasm": {
         "raw": 134574,
         "gzip": 40235
+      },
+      "./nn-extra": {
+        "raw": 63524,
+        "gzip": 20860
       }
     },
     "@margoengine/controls": {
@@ -806,8 +814,8 @@
         "gzip": 659
       },
       "./targets": {
-        "raw": 11373,
-        "gzip": 4027
+        "raw": 11411,
+        "gzip": 4042
       },
       "./toon": {
         "raw": 1899,
@@ -840,6 +848,10 @@
       "./paint-aniso": {
         "raw": 9827,
         "gzip": 3746
+      },
+      "./targets-depth": {
+        "raw": 8498,
+        "gzip": 3398
       }
     },
     "@margoengine/culling": {
@@ -1062,6 +1074,10 @@
       "./lzfse": {
         "raw": 4547,
         "gzip": 2295
+      },
+      "./snappy": {
+        "raw": 2844,
+        "gzip": 1250
       }
     },
     "@margoengine/dof": {
@@ -1930,8 +1946,8 @@
         "gzip": 3801
       },
       "./global": {
-        "raw": 19219,
-        "gzip": 7765
+        "raw": 19249,
+        "gzip": 7781
       },
       "./refracted": {
         "raw": 20924,
@@ -2780,12 +2796,12 @@
         "gzip": 6281
       },
       "./copc": {
-        "raw": 44517,
-        "gzip": 15177
+        "raw": 44857,
+        "gzip": 15309
       },
       "./octree": {
-        "raw": 25519,
-        "gzip": 9179
+        "raw": 26139,
+        "gzip": 9372
       },
       "./surfels": {
         "raw": 41763,
@@ -3268,8 +3284,8 @@
         "gzip": 6543
       },
       "./mtoon": {
-        "raw": 26540,
-        "gzip": 9540
+        "raw": 26816,
+        "gzip": 9611
       },
       "./vrm-constraints": {
         "raw": 7243,
@@ -3472,8 +3488,8 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 156414,
-        "gzip": 55803
+        "raw": 158085,
+        "gzip": 56339
       },
       "./bricks": {
         "raw": 66283,
@@ -3501,15 +3517,15 @@
       },
       "./maths": {
         "raw": 21395,
-        "gzip": 8854
+        "gzip": 8853
       },
       "./nrrd": {
         "raw": 1846,
         "gzip": 972
       },
       "./fallback": {
-        "raw": 4305,
-        "gzip": 2002
+        "raw": 4698,
+        "gzip": 2135
       },
       "./webgl2": {
         "raw": 12194,
@@ -3588,8 +3604,8 @@
         "gzip": 3802
       },
       "./link": {
-        "raw": 11498,
-        "gzip": 4587
+        "raw": 11768,
+        "gzip": 4662
       },
       "./export-vector": {
         "raw": 9120,
@@ -3606,6 +3622,34 @@
       "./omezarr": {
         "raw": 57333,
         "gzip": 20866
+      },
+      "./curvilinear": {
+        "raw": 21828,
+        "gzip": 8220
+      },
+      "./geo-lod": {
+        "raw": 18073,
+        "gzip": 7261
+      },
+      "./charts-extra": {
+        "raw": 16984,
+        "gzip": 7292
+      },
+      "./table": {
+        "raw": 32797,
+        "gzip": 12324
+      },
+      "./math": {
+        "raw": 10549,
+        "gzip": 4750
+      },
+      "./pdf": {
+        "raw": 12255,
+        "gzip": 5434
+      },
+      "./pointcloud": {
+        "raw": 47150,
+        "gzip": 21055
       }
     },
     "@margoengine/selection": {
@@ -3946,8 +3990,8 @@
         "gzip": 966
       },
       "./skeletal": {
-        "raw": 22058,
-        "gzip": 7952
+        "raw": 22084,
+        "gzip": 7961
       },
       "./slice": {
         "raw": 24420,
@@ -4274,8 +4318,8 @@
         "gzip": 2745
       },
       "./features": {
-        "raw": 26934,
-        "gzip": 9560
+        "raw": 27036,
+        "gzip": 9575
       },
       "./fade": {
         "raw": 4338,
@@ -4428,8 +4472,8 @@
         "gzip": 2524
       },
       "./forms": {
-        "raw": 9498,
-        "gzip": 3492
+        "raw": 9516,
+        "gzip": 3499
       },
       "./world-gl": {
         "raw": 20474,
@@ -5050,8 +5094,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 348444,
-        "gzip": 106495
+        "raw": 349219,
+        "gzip": 106729
       },
       "./adapter": {
         "raw": 1861,
@@ -5062,8 +5106,8 @@
         "gzip": 48345
       },
       "./device": {
-        "raw": 347647,
-        "gzip": 106547
+        "raw": 348422,
+        "gzip": 106784
       },
       "./glsl": {
         "raw": 147111,
@@ -5074,8 +5118,8 @@
         "gzip": 26482
       },
       "./xr": {
-        "raw": 347687,
-        "gzip": 106325
+        "raw": 348462,
+        "gzip": 106563
       },
       "./preview": {
         "raw": 8187,
@@ -5094,8 +5138,8 @@
         "gzip": 3810
       },
       "./tiers": {
-        "raw": 349189,
-        "gzip": 106254
+        "raw": 349964,
+        "gzip": 106479
       }
     },
     "@margoengine/wfc": {
@@ -5439,16 +5483,6 @@
       "gzip": 59962,
       "brotli": 49143
     },
-    "packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js": {
-      "raw": 49007,
-      "gzip": 10087,
-      "brotli": 8693
-    },
-    "packages/exporters/dist/draco-encoder/draco_encoder.wasm": {
-      "raw": 370188,
-      "gzip": 110087,
-      "brotli": 82436
-    },
     "packages/exporters/dist/basis-encoder/basis_encoder.js": {
       "raw": 113970,
       "gzip": 29986,
@@ -5584,14 +5618,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 249631,
-        "gzip": 75159,
+        "raw": 250406,
+        "gzip": 75413,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime and read-back",
         "raw": 98812,
-        "gzip": 31757,
+        "gzip": 31756,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

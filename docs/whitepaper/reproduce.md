@@ -3712,3 +3712,6 @@ Review 4: after build:packages, run packages/clustered/test/stochastic.test.js a
 
 
 Review 2 off-scene animation dependencies: after building packages, run `node --test --test-timeout=120000 packages/exporters/tests/optimize-extra.test.js`. The pruning regression covers a directly animated skinned mesh and an animation target below a skinned ancestor outside scene roots. It validates both GLBs and the retained transform/joint references.
+
+
+Batch 175 job 2: build packages; run `node --experimental-test-module-mocks --test --test-timeout=30000 packages/sciviz/tests/pointcloud.test.js packages/sciviz/tests/pointcloud-data.test.js packages/sciviz/tests/link.test.js packages/points/tests/octree-attributes.test.js packages/points/tests/copc.test.js`. Run `node scripts/gpu-lock.mjs run --owner=pointcloud --wait-max=60 --max=3 -- node packages/sciviz/tests/pointcloud-browser.mjs` for native and compatibility pixels and work counts. Open examples/sciviz-pointcloud.html for original archived USGS EPT tiles. Their manifest pins compressed and decoded hashes; the independent oracle was laspy 2.7.0 with lazrs 0.8.2, comparing SHA-256 of complete little-endian point records, including extras. No download is required by tests.

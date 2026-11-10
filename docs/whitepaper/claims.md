@@ -4266,3 +4266,7 @@ Review 4 clustered composition and LTC accuracy (2026-11-10): cube cookies and s
 
 
 Review 2, 2026-11-10: the exporters/optimize-extra retention claim now covers animation dependencies outside scene roots, including ancestors owning skins. The original regression in packages/exporters/tests/optimize-extra.test.js checks retained names, transforms and remapped skin/joint links; both source and output pass the Khronos validator. No speed result is asserted.
+
+
+
+Batch 175 job 2 claim: optional sciviz/pointcloud draws existing points octree/COPC/Potree/LAS/LAZ sources in a shared linear figure frame, preserves attributes and stable selection keys, and applies global colour maps without new network reads. Proof: points/tests/octree-attributes.test.js and copc.test.js; sciviz/tests/pointcloud.test.js, pointcloud-data.test.js and pointcloud-browser.mjs. Independent complete raw records agree with lazrs for all nine original USGS tiles. Both GPU backends check pixels, budget changes, keyed selection and exact restoration on clear. No speed claim or full billion-point rendering measurement.

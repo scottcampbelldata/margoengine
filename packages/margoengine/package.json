@@ -3519,6 +3519,10 @@
       "types": "./dist/sciviz/ensight.d.ts",
       "import": "./dist/sciviz/ensight.js"
     },
+    "./sciviz/pointcloud": {
+      "types": "./dist/sciviz/pointcloud.d.ts",
+      "import": "./dist/sciviz/pointcloud.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

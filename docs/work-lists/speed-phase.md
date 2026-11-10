@@ -425,3 +425,5 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 
 
 - Batch 174 job 2: quiet-machine TLC cross-filter/aggregation timing at 10M rows and web-library comparison still owed. Correctness/work counts proved on both backends: 39 GPU passes, 1,250,016 partial bins, 36,621 indexed rows touched for a boundary move. No speed run during build phase.
+
+- Batch 175 job 2: quiet-machine pointcloud streaming and picking on full large remote sources still owed. Build-phase proof uses 1-billion-point metadata with 2 loaded points/20 attribute bytes, and original USGS archived 188,887 points/2,266,644 attribute bytes; no wall-clock assertions or speed budgets ran.

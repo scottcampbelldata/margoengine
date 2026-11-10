@@ -29,7 +29,22 @@ export interface OctreeNodeData {
   positions: Float32Array;
   colors?: Uint8Array | Float32Array | null;
   colorComponents?: 3 | 4;
+  /** Point-major scalar or vector attributes, preserved in source point order. */
+  attributes?: Readonly<Record<string, PointAttribute>>;
+  /** Stable source rows, when supplied by an in-memory source. Otherwise use node id and point index. */
+  rowIds?: ArrayLike<string | number>;
 }
+
+/** Numeric columns supported by octree sources. */
+export type PointAttribute =
+  | Int8Array
+  | Uint8Array
+  | Int16Array
+  | Uint16Array
+  | Int32Array
+  | Uint32Array
+  | Float32Array
+  | Float64Array;
 
 /** Where nodes come from: their hierarchy up front, their points on demand. */
 export interface OctreeSource {
@@ -61,6 +76,8 @@ export class MemoryOctree implements OctreeSource {
     private readonly positions: ArrayLike<number>,
     private readonly colors?: ArrayLike<number> | null,
     private readonly colorComponents: 3 | 4 = 3,
+    private readonly attributes: Readonly<Record<string, PointAttribute>> = {},
+    private readonly rowIds?: ArrayLike<string | number>,
   ) {
     this.root = root;
     this.indices = indices;
@@ -91,7 +108,16 @@ export class MemoryOctree implements OctreeSource {
       positions[i * 3 + 2] = this.positions[p * 3 + 2];
       if (colors) for (let k = 0; k < c; k++) colors[i * c + k] = this.colors![p * c + k];
     }
-    return { positions, colors, colorComponents: colors ? c : undefined };
+    const attributes: Record<string, PointAttribute> = {};
+    for (const [name, values] of Object.entries(this.attributes)) {
+      const components = values.length / (this.positions.length / 3);
+      const out = new (values.constructor as new (n: number) => PointAttribute)(index.length * components);
+      for (let i = 0; i < index.length; i++)
+        for (let k = 0; k < components; k++) out[i * components + k] = values[index[i] * components + k];
+      attributes[name] = out;
+    }
+    const rowIds = this.rowIds ? Array.from(index, (i) => this.rowIds![i]) : index;
+    return { positions, colors, colorComponents: colors ? c : undefined, attributes, rowIds };
   }
 }
 
@@ -105,7 +131,13 @@ interface MutableNode extends OctreeNode {
  * rest to its octants. Every point lands in exactly one node.
  */
 export function buildOctree(
-  cloud: { positions: ArrayLike<number>; colors?: ArrayLike<number> | null; colorComponents?: 3 | 4 },
+  cloud: {
+    positions: ArrayLike<number>;
+    colors?: ArrayLike<number> | null;
+    colorComponents?: 3 | 4;
+    attributes?: Readonly<Record<string, PointAttribute>>;
+    rowIds?: ArrayLike<string | number>;
+  },
   options: OctreeOptions = {},
 ): MemoryOctree {
   const { positions } = cloud,
@@ -114,6 +146,10 @@ export function buildOctree(
     grid = options.grid ?? 128,
     maxDepth = options.maxDepth ?? 16;
   if (!Number.isInteger(n)) throw new RangeError('positions length must be a multiple of 3');
+  for (const [name, values] of Object.entries(cloud.attributes ?? {}))
+    if (n ? !Number.isInteger(values.length / n) || values.length < n : values.length !== 0)
+      throw new RangeError(`Attribute ${name} must have a whole number of components per point`);
+  if (cloud.rowIds && cloud.rowIds.length !== n) throw new RangeError('rowIds must have one key per point');
   if (!(maxPoints >= 1)) throw new RangeError('Invalid maxPointsPerNode; pass a number of 1 or more');
   if (!Number.isInteger(grid) || grid < 1 || grid > 1024)
     throw new RangeError('Invalid grid; pass a whole number from 1 to 1024');
@@ -210,7 +246,7 @@ export function buildOctree(
       stack.push({ node: child, points: Uint32Array.from(rest[o]) });
     }
   }
-  return new MemoryOctree(root, indices, positions, cloud.colors, components as 3 | 4);
+  return new MemoryOctree(root, indices, positions, cloud.colors, components as 3 | 4, cloud.attributes, cloud.rowIds);
 }
 
 /** The camera in world coordinates, for `OctreeCloud.select`. */

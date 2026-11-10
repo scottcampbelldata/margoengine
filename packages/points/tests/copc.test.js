@@ -106,6 +106,10 @@ test('load reads one range and decodes its points around the origin, with 16-bit
   assert.deepEqual([...rootData.positions], [-5, -5, -5, 5, 5, 5]);
   assert.deepEqual([...rootData.colors], [255, 0, 0, 0, 255, 0]);
   assert.equal(rootData.colorComponents, 3);
+  assert(rootData.attributes.intensity instanceof Uint16Array);
+  assert(rootData.attributes.classification instanceof Uint8Array);
+  assert.equal(rootData.attributes.intensity.length, source.root.count);
+  assert.equal(rootData.attributes.gps_time.length, source.root.count);
   const child = await source.load(source.root.children[2], signal);
   assert.deepEqual([...child.positions], [-2, 3, -4, 2, -3, 4, 0, 0, 0]);
   assert.deepEqual([...child.colors.subarray(0, 3)], [0, 0, 2]);

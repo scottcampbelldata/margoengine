@@ -83,3 +83,5 @@ examples/assets/sciviz/clip/ct-org-0-samples.bin -text
 
 # NASA writer bytes and their provenance digests must survive Windows checkouts unchanged.
 examples/assets/sciviz/datasets/** -text
+
+examples/assets/sciviz/pointcloud/*.laz -text

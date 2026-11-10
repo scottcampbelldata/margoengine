@@ -169,13 +169,26 @@ export class CopcSource implements OctreeSource {
     signal.throwIfAborted();
     const points = decodePoints({ ...this.header, pointCount: count }, this.records, data, { origin: this.origin }),
       rgb = points.rgb;
-    if (!rgb) return { positions: points.positions };
+    const attributes = {
+      intensity: points.intensity,
+      classification: points.classification,
+      return_number: points.returnNumber,
+      number_of_returns: points.numberOfReturns,
+      classification_flags: points.classificationFlags,
+      scan_angle: points.scanAngle,
+      point_source_id: points.pointSourceId,
+      user_data: points.userData,
+      ...(points.gpsTime ? { gps_time: points.gpsTime } : {}),
+      ...(points.nir ? { nir: points.nir } : {}),
+      ...points.extra,
+    };
+    if (!rgb) return { positions: points.positions, attributes };
     const colors = new Uint8Array(rgb.length);
     // The specification asks for 16-bit colour; files with 8-bit values stored as they are stay visible.
     let wide = false;
     for (let i = 0; i < rgb.length && !wide; i++) wide = rgb[i] > 255;
     for (let i = 0; i < rgb.length; i++) colors[i] = wide ? rgb[i] >> 8 : rgb[i];
-    return { positions: points.positions, colors, colorComponents: 3 };
+    return { positions: points.positions, colors, colorComponents: 3, attributes };
   }
 }
 /** Where the point data starts, from the first bytes of a LAS 1.4 header. */

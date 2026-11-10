@@ -6650,3 +6650,9 @@ Batch 183 job 1 evidence (section 5): stage/gltf delegates PBR textures/material
 Review 4 clustered composition (2026-11-10): cube cookies reserve storage binding 152, separate from stochastic shadow uniform 151. The package CPU regression composes both hooks and checks shader and resource binding uniqueness; clustered-cube-projector-gpu.mjs exercises core rendering, compute probes and exact one-light equivalence with both hooks on native WebGPU and WebGL2 compatibility. This closes the previously untested combined-hook failure without a core change.
 
 Review 4 LTC accuracy: use an owned octant-folded half-angle arctangent for area/shaped-light edge terms. The WebGL2 backend atan2 exceeded the existing shaped-light mirror bar after cancellation; replacing that operation alone closes the failing 54-case comparison. CPU coverage retains all previous edge/quadrature bars and adds a full angular sweep. Core/stage and the compatibility implementation are unchanged; no performance claim.
+
+
+
+### Section 5 evidence: batch 175 point cloud figures
+
+The optional pointcloud adapter owns the data-frame origin, shared selection and colour mapping; points owns source decoding, additive LOD, draw budgets, cache eviction and GPU rendering. No core/stage change. Float64 origin subtraction precedes float32 model upload; CPU tests protect world-coordinate picks, typed vector/scalar correspondence, abort/error/disposal and billion-point metadata bounded work. The original USGS root plus eight child tiles match an independent raw-record decoder exactly. Native WebGPU and WebGL2 tests show axis titles, attribute colour pixels, selected-key highlights, exact clear restoration, nine tile reads and the requested draw bounds. Attribute memory is counted from retained typed arrays. No elapsed-time or full-density statewide claim.
