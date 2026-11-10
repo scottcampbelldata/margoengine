@@ -100,6 +100,25 @@ try {
     globe.selected >= 2 && globe.lit > 10_000 && globe.red > 500 && globe.blue > 500,
     globe,
   );
+  const imagery = (results.imagery = await call((n) => window.tilesFixture.run(n), 'imagery'));
+  assert.deepEqual(imagery.errors, [], 'imagery: GPU or tile errors');
+  check(
+    'imagery: WMS and WMTS alpha-over compose in order and drape real quantized-mesh data on a Mercator globe',
+    imagery.wms &&
+      imagery.wmts &&
+      imagery.selected === 1 &&
+      imagery.center[0] === 127 &&
+      imagery.center[1] === 0 &&
+      imagery.center[2] === 128 &&
+      imagery.center[3] === 255 &&
+      imagery.purple > 500,
+    imagery,
+  );
+  check(
+    'imagery: polar terrain outside Mercator imagery remains transparent without invalid map requests',
+    imagery.polarAlpha === 0 && imagery.polarRequests === 0,
+    imagery,
+  );
   const style = (results.style = await call((n) => window.tilesFixture.run(n), 'style'));
   assert.deepEqual(style.errors, [], 'style: GPU or tile errors');
   check(

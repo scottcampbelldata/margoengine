@@ -54,7 +54,7 @@ export interface TerrainSource {
 
 export function geographicTileRectangle(z: number, x: number, y: number): Rectangle;
 
-export function meshB3dm(mesh: QuantizedMesh, rectangle: Rectangle, drape: Drape | undefined, skirt: number): Uint8Array;
+export function meshB3dm(mesh: QuantizedMesh, rectangle: Rectangle, drape: Drape | undefined, skirt: number, latitudeAt?: (fraction: number) => number): Uint8Array;
 
 export function parseQuantizedMesh(bytes: Uint8Array): QuantizedMesh;
 

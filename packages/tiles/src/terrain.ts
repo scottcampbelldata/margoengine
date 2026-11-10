@@ -475,6 +475,7 @@ export function meshB3dm(
   rectangle: Rectangle,
   drape: Drape | undefined,
   skirt: number,
+  latitudeAt?: (fraction: number) => number,
 ): Uint8Array {
   const [west, south, east, north] = rectangle,
     count = mesh.u.length,
@@ -501,7 +502,7 @@ export function meshB3dm(
   };
   for (let i = 0; i < count; i++) {
     const longitude = west + (mesh.u[i] / 32767) * (east - west),
-      latitude = south + (mesh.v[i] / 32767) * (north - south);
+      latitude = latitudeAt ? latitudeAt(mesh.v[i] / 32767) : south + (mesh.v[i] / 32767) * (north - south);
     lonlat[i * 2] = longitude;
     lonlat[i * 2 + 1] = latitude;
     put(i, longitude, latitude, mesh.minimumHeight + (mesh.height[i] / 32767) * range);

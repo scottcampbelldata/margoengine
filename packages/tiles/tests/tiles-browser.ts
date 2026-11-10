@@ -9,6 +9,7 @@ import { i3dm } from '../dist/i3dm.js';
 import { splats, tileSplats } from '../dist/splats.js';
 import { terrain } from '../dist/terrain.js';
 import { TilesStyle } from '../dist/style.js';
+import { terrainImagery, wms, wmts, compositeImagery } from '../dist/imagery.js';
 import { PointCloud, PointsPlugin } from '../../points/dist/index.js';
 import { Splats, transformSplats } from '../../splats/dist/index.js';
 import { TilesRenderer } from '../dist/index.js';
@@ -87,6 +88,105 @@ function snapshot() {
 }
 
 async function run(name: string): Promise<unknown> {
+  if (name === 'imagery') {
+    const from = errors.length;
+    const png = async (color: string) => {
+      const canvas = new OffscreenCanvas(16, 16),
+        ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 16, 16);
+      return new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer());
+    };
+    const red = await png('#ff0000'),
+      blue = await png('#0000ff');
+    const terrainBytes = new Uint8Array(
+      await (
+        await fetch(
+          new URL(
+            '../../../examples/assets/terrain/QuantizedMeshWithOctVertexNormals/tile.octvertexnormals.terrain',
+            import.meta.url,
+          ),
+        )
+      ).arrayBuffer(),
+    );
+    const requests: string[] = [];
+    const outer = async (url: string) => {
+      requests.push(url);
+      if (url.endsWith('layer.json'))
+        return new Response(JSON.stringify({ tiles: ['{z}/{x}/{y}.terrain'], projection: 'EPSG:3857', maxzoom: 0 }));
+      return new Response(
+        (url.includes('/wms?') ? red : url.includes('/wmts?') ? blue : terrainBytes) as Uint8Array<ArrayBuffer>,
+      );
+    };
+    const layers = [
+      wms({ url: 'https://map.test/wms', layers: 'red', crs: 'CRS:84' }),
+      Object.assign(wmts({ url: 'https://map.test/wmts', layer: 'blue', matrixSet: 'WebMercator' }), { opacity: 0.5 }),
+    ];
+    const merged = await compositeImagery(
+      layers,
+      [-Math.PI, -1, Math.PI, 1],
+      0,
+      outer,
+      new AbortController().signal,
+      16,
+    );
+    const image = await createImageBitmap(new Blob([merged.bytes as Uint8Array<ArrayBuffer>], { type: 'image/png' })),
+      canvas = new OffscreenCanvas(16, 16),
+      ctx = canvas.getContext('2d')!;
+    ctx.drawImage(image, 0, 0);
+    image.close();
+    const center = [...ctx.getImageData(8, 8, 1, 1).data];
+    const beforePolar = requests.length;
+    const polar = await compositeImagery(
+      [
+        wms({ url: 'https://map.test/wms', layers: 'polar', crs: 'EPSG:3857' }),
+        wmts({ url: 'https://map.test/wmts', layer: 'polar', matrixSet: 'WebMercator' }),
+      ],
+      [-1, 1.5, 1, Math.PI / 2],
+      0,
+      outer,
+      new AbortController().signal,
+      16,
+    );
+    const polarImage = await createImageBitmap(
+      new Blob([polar.bytes as Uint8Array<ArrayBuffer>], { type: 'image/png' }),
+    );
+    ctx.clearRect(0, 0, 16, 16);
+    ctx.drawImage(polarImage, 0, 0);
+    polarImage.close();
+    const polarAlpha = ctx.getImageData(8, 8, 1, 1).data[3],
+      polarRequests = requests.length - beforePolar;
+    const source = await terrainImagery('https://terrain.test/layer.json', {
+      fetch: outer,
+      imagery: layers,
+      imagerySize: 64,
+    });
+    engine.camera.near = 100_000;
+    engine.camera.far = 100_000_000;
+    engine.camera.position = [0, 0, 23_400_000];
+    engine.camera.target = [0, 0, 0];
+    tiles = await TilesRenderer.load(engine, source.url, { fetch: source.fetch, frame: 'local' });
+    tiles.tileset.on('error', ({ error }) => errors.push(String(error)));
+    await converge();
+    const data = pixels();
+    let purple = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] > 30 && data[i + 1] < 5 && data[i + 2] > 30) purple++;
+    const selected = tiles.last.selected.length;
+    tiles.dispose();
+    source.dispose();
+    engine.camera.near = 1;
+    engine.camera.far = 20_000;
+    return {
+      purple,
+      center,
+      selected,
+      polarAlpha,
+      polarRequests,
+      wms: requests.some((url) => url.includes('SERVICE=WMS')),
+      wmts: requests.some((url) => url.includes('SERVICE=WMTS')),
+      errors: errors.slice(from),
+    };
+  }
   if (name === 'style') {
     // Real OGC metadata sample, already licensed in examples/assets/3d-tiles/NOTICE.md.
     const start = errors.length;

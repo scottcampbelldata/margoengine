@@ -136,3 +136,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/worker (batch 257 job 1): document /rpc typed RpcClient, exposeRpc handlers/context, rpcTransfer and RpcPool; defaults, ownership, queue limits, cancellation, deadlines and failure/disposal examples.
 
 - margoengine (batch 257 job 1): cover the generated worker/rpc alias with the worker RPC documentation.
+| @margoengine/tiles | tiles/imagery terrain source, Mercator/metadata availability, WMS/WMTS/XYZ layers, matrix configuration, opacity and source disposal | batch 239 job 3 |
+| margoengine | tiles/imagery generated optional re-export | batch 239 job 3 |

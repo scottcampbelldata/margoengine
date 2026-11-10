@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12306800,
+  "total": 12314251,
   "history": [
     {
       "date": "2026-10-24",
@@ -5610,6 +5610,12 @@
       "commit": "0d911b2ca",
       "reason": "Batch 257 worker optional entries: measured gzip {\"@margoengine/worker\":1872,\"@margoengine/worker/canvas\":1341,\"@margoengine/worker/rpc\":2152}; previous ceilings {\"@margoengine/worker\":2128,\"@margoengine/worker/canvas\":1597,\"@margoengine/worker/rpc\":0}. New orchestration, cancellation and lifecycle behavior remains optional. Splitting would complicate ownership and duplicate the protocol. Core/stage source unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "9b7ee32a0",
+      "reason": "Batch 239 job 3 adds the optional tiles/imagery entry for exact Mercator terrain, metadata availability and layered WMS/WMTS/XYZ imagery; core and stage unchanged. Keeping protocol, projection and composition in one optional entry preserves quality and shared lifecycle.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6671,6 +6677,7 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/tiles/imagery": 7451
   }
 }
