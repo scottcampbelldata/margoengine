@@ -3102,3 +3102,7 @@ Optional tween/timeline supplies mixed scalar/array/path/custom clips and nested
 ### Target/key tween control (batch 215 job 4)
 
 Optional tween/control supplies target/key kills and overwrite, per-operation pause/play/speed and a world-wide time scale, meeting the requested control row. packages/tween/test/control.test.js verifies atomic replacement, delayed/paused registration, remaining-key independence, exact cancellation and grouped callbacks. New entry 3714 B gzip; no core/stage change or performance claim.
+
+### Scroll pin and idle snap (batch 215 job 5)
+
+Optional tween/scroll-pin pins a section during timeline scrubbing and snaps real scroll offsets to nearest/directional labels or other normalized stops after idle, matching the requested ScrollTrigger row. packages/tween/test/scroll-pin.test.js covers deterministic selection and lifecycle. scroll-pin-browser.mjs asserts real window and element geometry, refresh, label/interval destinations and restoration. Entry 2105 B gzip; no speed claim.

@@ -2625,3 +2625,7 @@ Build packages; run node --test --test-timeout=120000 packages/tween/test/full-t
 ### Tween control reproduction (batch 215 job 4)
 
 Build packages, then node --test --test-timeout=120000 packages/tween/test/control.test.js. All clocks are caller-driven. Measure packages/tween/dist/control.js with bundleBytes and gzipSync.
+
+### Pin and snap fixture (batch 215 job 5)
+
+Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll-pin.test.js. Browser: node scripts/gpu-lock.mjs run --owner=codex-batch215 --max=4 --wait-max=60 -- node packages/tween/test/scroll-pin-browser.mjs, then add --compat for the second backend. The assertions check scroll/layout results, not a speed budget.

@@ -3786,3 +3786,7 @@ New tween/timeline entry: 3184 B gzip from 0 B. A separate Timeline class holds 
 ### Tween control world (batch 215 job 4)
 
 Optional tween/control: 3714 B gzip (previously 0 B). TweenControl is an explicit world, with global timeScale 1 by default and no module-global state. Local speed defaults to 1; either speed may be zero to hold even instantaneous work. overwrite defaults to auto (matching keys, including delayed/paused work), all kills every target key, false coexists. Partial kills preserve surviving channels and their original clock. Whole removal rejects the group's promise; repeats/completions notify once per group. New requests validate before overwrite.
+
+### Scroll pin entry (batch 215 job 5)
+
+New tween/scroll-pin: 2105 B gzip, previously 0 B. pinTimeline accepts a positive finite-duration seekable animation, root or optional timeline. Vertical window/element sources; one viewport distance by default, natural section start, pinSpacing true. Numeric start/distance may be refreshed by functions. Snap is disabled by default; labels (or directional labels), intervals, lists and custom functions select normalized progress. Idle delay 0.2 s, snap duration 0.25 s and scrub 0 s. Root timelines supply a labels map; the optional full timeline supplies labelTimes. Interval stops use constant storage regardless of interval size. No playback callbacks fire on scrubbing. Disposal restores DOM and styles.

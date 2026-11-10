@@ -57,6 +57,10 @@
     "./control": {
       "types": "./dist/control.d.ts",
       "import": "./dist/control.js"
+    },
+    "./scroll-pin": {
+      "types": "./dist/scroll-pin.d.ts",
+      "import": "./dist/scroll-pin.js"
     }
   },
   "files": [
@@ -77,7 +81,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js tween",
     "test": "npm run build && node --test test/*.test.js",
-    "test:browser": "cd ../.. && node packages/tween/test/scroll-browser.mjs",
+    "test:browser": "cd ../.. && node packages/tween/test/scroll-browser.mjs && node packages/tween/test/scroll-pin-browser.mjs",
     "prepack": "npm run build"
   }
 }

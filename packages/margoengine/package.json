@@ -3246,6 +3246,10 @@
       "types": "./dist/tween/control.d.ts",
       "import": "./dist/tween/control.js"
     },
+    "./tween/scroll-pin": {
+      "types": "./dist/tween/scroll-pin.d.ts",
+      "import": "./dist/tween/scroll-pin.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

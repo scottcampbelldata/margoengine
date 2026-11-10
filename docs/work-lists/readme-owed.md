@@ -86,3 +86,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: tween/timeline alias (batch 215 job 3).
 - @margoengine/tween: TweenControl world, key vs target overwrite, partial cancellation promises, pause and global/local speed (batch 215 job 4).
 - margoengine: tween/control alias (batch 215 job 4).
+- @margoengine/tween: pinTimeline, window/element sections, full/root label maps, snap modes, input cancellation, responsive refresh and disposal (batch 215 job 5).
+- margoengine: tween/scroll-pin alias (batch 215 job 5).
