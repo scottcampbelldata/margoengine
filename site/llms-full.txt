@@ -5819,6 +5819,18 @@ replacement gates or remove either prebuilt. No new speed work is included.
 See [retained speed evidence](whitepaper/results/batch-133-paired-checkpoint.json)
 and [current native evidence](whitepaper/results/batch-133-resume8.json).
 
+Batch 133 metadata continuation: the optional bridge now preserves observed
+short-string conversion and exact raw name lookup. All 1,445 bounded crafted
+cases match the full oracle. Across all 1,613, 1,591 match and 22 trailing malformed
+groups differ; 168 can consume beyond the value plus terminal NUL in the oracle.
+The owned decoder zero-fills missing bytes rather than reading another
+allocation. This does not close malformed UTF8 equivalence or any replacement
+gate. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+
+Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
+for a destructured direction alias, matching core's unit-direction contract.
+No core/stage changes or pixel tolerances are involved.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9752,6 +9764,28 @@ rerun need the GPU. Decoder/glTF/glTF-pro GPU and README runtime gates remain
 unrun. Reproduce/resume with the bounded resume9 GPU bundle after ownership
 changes; no lock bypass or blind retry was used. Nothing was pushed. The command
 results and log hashes are in whitepaper/results/batch-133-landing.json.
+
+### Open: batch 133 malformed metadata trailing groups
+
+The optional native decoder still differs from the full opaque prebuilt on 22
+of 1,613 crafted metadata strings. Its short public conversion can consume bytes
+beyond the value and terminal NUL. Repro held-8: value8a bf84 4456 d525 3cf2;
+opaque UTF16 ends d9c0 dc09, owned conversion ends d9c0 dc00. See the complete stream in
+[the 22 retained repros](whitepaper/results/batch-133-metadata-strings.json).
+The owned bridge zero-fills absent bytes and never reads another allocation.
+Root boundary: public-string conversion outside the bitstream, not metadata
+framing or raw preservation. All 1,445 in-bounds cases agree; 168 inputs exercise
+external padding, of which 146 happen to agree. No external-padding semantics
+have been proved, so default replacement and full UTF8 equivalence remain open.
+
+### Fixed: glTF textured pass raw light alias
+
+The textured frame destructured engine.lighting.direction and copied it raw
+after core's shader began consuming an already normalized direction. This
+made textured pixels brighter than the equivalent constant material. The
+existing shared unitLight writer repairs the owning package. The real draw
+writer regression fails before and passes after; GPU comparison assertions
+and tolerances remain unchanged.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

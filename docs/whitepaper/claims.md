@@ -2727,3 +2727,9 @@ normalized accessor conversion, subset/output budgets, corrupt-input recovery,
 concurrent workers and a production consumer. This is an opt-in integration claim,
 not complete feature or speed parity. Open warm losses and incomplete cold/RSS/
 historical inventory remain in limits and perf-history.
+
+Batch 133 E21: optional Draco public metadata conversion matches the opaque
+full build on 1,445 crafted bounded-read names, including malformed groups, BOM
+and exact raw name keys. Total 1,613: 1,591 exact,22 trailing-storage losses still
+open. This is not full equivalence. Proof: decoders/tests/draco-native-entry.test.js
+and [the complete experiment record](results/batch-133-metadata-strings.json).

@@ -3929,3 +3929,25 @@ rerun need the GPU. Decoder/glTF/glTF-pro GPU and README runtime gates remain
 unrun. Reproduce/resume with the bounded resume9 GPU bundle after ownership
 changes; no lock bypass or blind retry was used. Nothing was pushed. The command
 results and log hashes are in whitepaper/results/batch-133-landing.json.
+
+### Open: batch 133 malformed metadata trailing groups
+
+The optional native decoder still differs from the full opaque prebuilt on 22
+of 1,613 crafted metadata strings. Its short public conversion can consume bytes
+beyond the value and terminal NUL. Repro held-8: value8a bf84 4456 d525 3cf2;
+opaque UTF16 ends d9c0 dc09, owned conversion ends d9c0 dc00. See the complete stream in
+[the 22 retained repros](whitepaper/results/batch-133-metadata-strings.json).
+The owned bridge zero-fills absent bytes and never reads another allocation.
+Root boundary: public-string conversion outside the bitstream, not metadata
+framing or raw preservation. All 1,445 in-bounds cases agree; 168 inputs exercise
+external padding, of which 146 happen to agree. No external-padding semantics
+have been proved, so default replacement and full UTF8 equivalence remain open.
+
+### Fixed: glTF textured pass raw light alias
+
+The textured frame destructured engine.lighting.direction and copied it raw
+after core's shader began consuming an already normalized direction. This
+made textured pixels brighter than the equivalent constant material. The
+existing shared unitLight writer repairs the owning package. The real draw
+writer regression fails before and passes after; GPU comparison assertions
+and tolerances remain unchanged.

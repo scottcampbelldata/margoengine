@@ -537,3 +537,10 @@ Apache-2.0 licensed.
 ## Content Security Policy
 
 Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).
+
+The optional decoder matches short metadata name conversion and exact raw name
+keys on1,445 crafted bounded-read cases. Malformed trailing groups remain an
+open equivalence gate:22 of1,613 observations differ where the opaque binding
+consumes storage beyond the value and terminal NUL. Missing bytes are treated
+as zero, with no read outside the owned value. See
+[the retained cases](../../docs/whitepaper/results/batch-133-metadata-strings.json).

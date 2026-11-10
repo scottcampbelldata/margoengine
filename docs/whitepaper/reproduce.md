@@ -2272,3 +2272,9 @@ corrupt-input recovery checks. The regular decoder browser gate now also covers
 its dedicated worker, concurrent jobs, transfer, abort, disposal and production
 Vite-emitted worker/Wasm assets. Run it through the shared GPU lock with owner
 codex-133. Neither default entry nor either prebuilt is replaced.
+
+Batch 133 E21: build packages, then run node --test --test-timeout=60000
+packages/decoders/tests/draco-native-entry.test.js. The metadata-strings fixture
+contains 1,445 Margo-crafted streams and frozen full-oracle names. The receipt
+results/batch-133-metadata-strings.json retains discovery/held input/output
+hashes and complete22 failed streams. No timing or GPU is involved.

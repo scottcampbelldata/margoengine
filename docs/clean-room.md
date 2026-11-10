@@ -4565,3 +4565,58 @@ No implementation, wrapper listing, disassembly or remembered internals supplied
 any rule. Seam-free fan search removal is an arithmetic/work equivalence of
 Margo's existing mapping, with an independent closed-tetrahedron step count;
 it adds no format inference or claimed overall speed gain.
+
+### Batch 133 E21: public metadata strings
+
+Research compares Galligan/Google, *Draco Bitstream Specification* (2017),
+[metadata framing](https://google.github.io/draco/spec/), with Yergeau,
+*UTF-8, a transformation format of ISO 10646*, RFC 3629 (2003),
+[validity and security sections](https://www.rfc-editor.org/rfc/rfc3629.html),
+WHATWG editors, *Encoding Standard* (2026),
+[UTF8 decoder and TextDecoder](https://encoding.spec.whatwg.org/#utf-8-decoder),
+and Unicode Consortium, *The Unicode Standard*, chapter 3 (2026),
+[encoding conformance and maximal subparts](https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-3/).
+Only the Draco specification was previously read in full; these text sources
+were read in the named sections. Standards define valid UTF8 and replacement
+behavior but do not prescribe the old public binding's malformed conversion.
+The owned bridge combines standard long-string conversion with the short-string
+rule established solely by Margo-crafted opaque public-API observations.
+
+E21 discovery 372 varies all nonzero byte values, malformed lead/continuation
+classes, NUL, BOM and padding. Held 1,241 adds thresholds 14/15/16/17/18, raw key
+lookups and 1,200 independently seeded byte strings. The full oracle accepts 1,613.
+The first NUL defines the conversion length: above 16 bytes the standard decoder
+is observed; at most 16, payload bits are masked in 2/3/4-byte groups, including
+surrogates and overlong forms. Short BOM remains; long BOM is removed. Exact raw
+key lookup distinguishes name from name+NUL/suffix and BOM+name. The old bridge's
+unconditional TextDecoder and decoded key comparison caused both defects.
+
+All 1,445 cases bounded by the value plus implicit terminal NUL are now exact.
+The unchanged source fails the new regression at byte-128; the repair passes.
+All 1,613 observations are retained: 1,591 exact,22 losses on groups consuming bytes
+past the value and its terminal NUL. Another 146 such inputs happen to agree with
+zero padding, without establishing a padding rule. The owned code never reads
+another allocation. Perturbing the public allocator 64 times preserves held-8;
+that stability proves no bitstream rule for trailing storage. The loss stays
+open; full metadata equivalence is not claimed. No foreign implementation,
+wrapper text, disassembly or remembered internals supplied this rule.
+[Inputs, outputs, hashes and all 22 losses](whitepaper/results/batch-133-metadata-strings.json).
+
+### Batch 133 gate repair: textured glTF light frame
+
+Research compared W3C, *WebGPU Shading Language* (Baker, Derin, Neto,
+2026), [normalize semantics](https://www.w3.org/TR/WGSL/#normalize-builtin),
+Khronos 3D Formats Working Group, *glTF 2.0.1* (2021),
+[Appendix B BRDF](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#appendix-b-brdf-implementation),
+and Walter, Marschner, Li, Torrance, *Microfacet Models for Refraction through
+Rough Surfaces* (EGSR 2007), [unit-direction notation and microfacet section](https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf).
+Read the named sections, not full sources; no companion code was consulted.
+All three require unit light directions for the angular terms. Core now
+uploads those on CPU. Textured glTF destructured direction into an alias and
+uploaded it raw; the upstream textual scan did not recognize that alias. The
+package now uses the existing shared unitLight writer. No core/stage change.
+The real GPU gate failed texel 124,45,193 vs constant 97,27,155. A CPU regression
+executes the actual draw writer at [3,4,0,2.5], huge and tiny directions, checks
+exact float32-normalized XYZ, intensity and caller input. It fails before and
+passes after. This runtime check joins check:merge through the package tests;
+no tolerance or GPU assertion is changed.

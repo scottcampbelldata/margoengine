@@ -42,6 +42,37 @@ const load = (engine, { doc, bytes }, options = {}) =>
 /** The floats of the one UV buffer the device was given. */
 const uploadedUV = (device) => [...device.vertexUploads.at(-1)];
 
+test('textured frames upload the unit light direction while preserving intensity and caller input', async (t) => {
+  withBitmaps(t);
+  const { engine, device } = await gpuEngine(t);
+  engine.renderer.geometryBuffers = () => ({ vertex: {}, index: {}, instance: {} });
+  const pass = {
+    setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, drawIndexed() {}, end() {},
+  };
+  try {
+    const model = await load(engine, file()),
+      plugin = engine.plugins.get('gltf-textured'),
+      geometry = model.meshes[0].geometry;
+    // Isolate the real draw/frame writer from shader compilation in this CPU regression.
+    plugin.pipeline = () => ({ getBindGroupLayout: () => ({}) });
+    for (const direction of [[3, 4, 0, 2.5], [3e38, -3e38, 3e38, 1], [0, -1e-30, 0, 0]]) {
+      engine.lighting.direction.set(direction);
+      const input = [...engine.lighting.direction], length = Math.hypot(...input.slice(0, 3));
+      plugin.draw({
+        device, camera: engine.camera, batches: [{ geometry, count: 1 }], bindings: [],
+        descriptor: { depthStencil: { format: 'depth24plus' } },
+        encoder: { beginRenderPass: () => pass }, color: {}, depth: {},
+      });
+      assert.deepEqual([...device.uniformUploads.at(-1).subarray(20, 24)],
+        [...input.slice(0, 3).map((x) => Math.fround(x / length)), input[3]]);
+      assert.deepEqual([...engine.lighting.direction], input);
+    }
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('textured refuses the synchronous parse, and the root refuses the file without it', async () => {
   const { engine } = await headlessEngine();
   try {

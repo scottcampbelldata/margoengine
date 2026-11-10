@@ -14,6 +14,16 @@ const {
   instance: { exports: module },
 } = await WebAssembly.instantiate(readFileSync(new URL('../dist/draco-native.wasm', import.meta.url)));
 
+test('optional Draco metadata strings preserve opaque conversion and require the exact raw name key', () => {
+  const rows = JSON.parse(new TextDecoder().decode(fixture('draco-metadata-strings.json')));
+  assert.equal(rows.length, 1445);
+  for (const { id, bytes, expected } of rows) {
+    const result = decodeNativePoints(module, Uint8Array.from(bytes));
+    assert.equal(result.attributes[0].name, expected, id);
+    assert.deepEqual([...result.attributes[0].array], [2.5, -7.25, 11.125], id);
+  }
+});
+
 test('optional Draco entry has a registered transfer budget, a smaller Wasm, and no default-entry import', {
   timeout: 60_000,
 }, async () => {

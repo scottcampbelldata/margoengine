@@ -12,6 +12,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { setGeometrySurface } from '../../shared/mesh-source.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
+import { unitLight } from '../../shared/unit-light.js';
 import type { GLTFDocument, GLTFMaterial, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
 import { entry, integer, readAccessor } from './accessor.js';
 import type { GLTFBuilt, GLTFExtension, GLTFFile, Model } from './index.js';
@@ -365,7 +366,7 @@ class TexturedDraw implements EnginePlugin {
           values = this.values;
         values.set(c.camera.matrix);
         values.set(c.camera.position, 16);
-        values.set(direction, 20);
+        unitLight(values, 20, direction);
         values.set(radiance, 24);
         values.fill(1, 28, 31);
         if (ambient) values.set(ambient, 28);

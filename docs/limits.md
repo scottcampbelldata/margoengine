@@ -3228,3 +3228,15 @@ metadata equivalence are incomplete. The optional landing does not close these
 replacement gates or remove either prebuilt. No new speed work is included.
 See [retained speed evidence](whitepaper/results/batch-133-paired-checkpoint.json)
 and [current native evidence](whitepaper/results/batch-133-resume8.json).
+
+Batch 133 metadata continuation: the optional bridge now preserves observed
+short-string conversion and exact raw name lookup. All 1,445 bounded crafted
+cases match the full oracle. Across all 1,613, 1,591 match and 22 trailing malformed
+groups differ; 168 can consume beyond the value plus terminal NUL in the oracle.
+The owned decoder zero-fills missing bytes rather than reading another
+allocation. This does not close malformed UTF8 equivalence or any replacement
+gate. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+
+Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
+for a destructured direction alias, matching core's unit-direction contract.
+No core/stage changes or pixel tolerances are involved.

@@ -73,6 +73,33 @@ export async function loadNativeDraco(url: string): Promise<NativeExports> {
   return (await WebAssembly.instantiate(await response.arrayBuffer())).instance.exports as unknown as NativeExports;
 }
 
+// E21: opaque public-string observations, not the codec implementation. The
+// binding switches to standard UTF-8 above 16 bytes before the first NUL.
+// Short strings retain masked payload bits even for malformed sequences.
+// Never read another allocation when an incomplete group reaches the end.
+function metadataString(bytes: Uint8Array): string {
+  const zero = bytes.indexOf(0),
+    length = zero < 0 ? bytes.length : zero;
+  if (length > 16) return new TextDecoder().decode(bytes.subarray(0, length));
+  let result = '',
+    at = 0;
+  while (at < length) {
+    const first = bytes[at++];
+    let value = first;
+    if (first >= 128) {
+      const width = (first & 224) === 192 ? 2 : (first & 240) === 224 ? 3 : 4;
+      value = first & (width === 2 ? 31 : width === 3 ? 15 : 7);
+      for (let i = 1; i < width; i++) value = value * 64 + ((bytes[at++] ?? 0) & 63);
+    }
+    if (value <= 65535) result += String.fromCharCode(value);
+    else {
+      value -= 65536;
+      result += String.fromCharCode(55296 | (value >>> 10), 56320 | (value & 1023));
+    }
+  }
+  return result;
+}
+
 function unpack(data: Uint8Array): Geometry {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let at = 8;
@@ -118,17 +145,15 @@ function unpack(data: Uint8Array): Geometry {
         root = num();
       ids.set(root, [...(ids.get(root) ?? []), id]);
     }
-    const text = (bytes: Uint8Array): string => {
-      const end = bytes.indexOf(0);
-      return new TextDecoder().decode(end < 0 ? bytes : bytes.subarray(0, end));
-    };
     for (let i = 0; i < nodes; i++) {
       const entries = num(),
         children = num();
       for (let j = 0; j < entries; j++) {
-        const key = text(blob()),
+        const key = blob(),
           value = blob();
-        if (key === 'name') for (const id of ids.get(i) ?? []) names.set(id, text(value));
+        // HasEntry("name") is an exact byte lookup; name\0suffix is another key.
+        if (key.length === 4 && key[0] === 110 && key[1] === 97 && key[2] === 109 && key[3] === 101)
+          for (const id of ids.get(i) ?? []) names.set(id, metadataString(value));
       }
       for (let j = 0; j < children; j++) {
         blob();

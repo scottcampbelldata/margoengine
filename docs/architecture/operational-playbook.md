@@ -5137,3 +5137,15 @@ remain blocked on GPU acquisition. The 20-minute exclusive queue expired before
 test startup. Lint, hygiene, quality, 888 API entries / 8,646 exports and explicit
 decoders/glTF/glTF-pro CPU suites pass. No GPU, README runtime or push is claimed.
 Evidence: whitepaper/results/batch-133-landing.json.
+
+Batch 133 E21 correctness evidence: decoders entry tests add 1,445 frozen opaque
+metadata string cases and exact raw key lookup. All 1,613 observations are retained
+in whitepaper/results/batch-133-metadata-strings.json, including 22 incomplete
+trailing-group losses. No GPU, timing, core or stage changes; full metadata and
+replacement acceptance remain open.
+
+The batch 133 glTF GPU gate also found the textured pass copying a destructured
+raw direction into a shader that now expects a unit light. Its package-owned
+writer uses shared/unit-light.js; textured.test.js exercises the real frame
+upload with ordinary, huge and tiny vectors, unchanged intensity and caller
+input. This closes an alias form missed by the upstream textual writer scan.
