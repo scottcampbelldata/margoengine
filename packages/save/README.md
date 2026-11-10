@@ -401,7 +401,9 @@ version is `MargoError` `'failed'` naming it; a save newer than the game is a `R
 ## Bytes and storage
 
 `encodeSave(document, {compress, signal})` gives UTF-8 JSON, gzipped with `compress: true` (CompressionStream, in
-browsers and Node 18+); `decodeSave(bytes)` reads either. Storage adapters share one interface, `read`, `write`,
+browsers and Node 18+); `decodeSave(bytes, {signal, maxBytes})` reads either, and stops gzip data that decompresses past
+`maxBytes` (default 268435456, 256 MiB) with a RangeError, so a small hostile file cannot fill memory. Storage adapters
+share one interface, `read`, `write`,
 `delete` and `keys`, each async with `{signal}`:
 
 | Adapter | Where | Atomic write |

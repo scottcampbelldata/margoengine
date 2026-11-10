@@ -5,6 +5,11 @@
 ```ts
 export type ComponentCheck = (value: Json) => string | undefined | null | void;
 
+export interface DecodeOptions {
+    signal?: AbortSignal;
+    maxBytes?: number;
+}
+
 export interface EcsComponentLike {
     readonly fields: Readonly<Record<string, ArrayLike<number>>>;
     readonly entities: ArrayLike<number>;
@@ -146,9 +151,7 @@ export interface WorldAdapter<H> {
     destroy(handle: H): void;
 }
 
-export function decodeSave(bytes: Uint8Array, options?: {
-    signal?: AbortSignal;
-}): Promise<unknown>;
+export function decodeSave(bytes: Uint8Array, options?: DecodeOptions): Promise<unknown>;
 
 export function ecsAdapter(world: EcsWorldLike, components: Readonly<Record<string, EcsComponentLike>>): WorldAdapter<number>;
 

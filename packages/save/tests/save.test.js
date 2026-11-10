@@ -551,3 +551,22 @@ test('IndexedDB writes ask for strict durability, so a finished save has reached
   await storage.delete('a');
   assert.deepEqual(idb.durabilities, ['strict', 'strict']);
 });
+
+test('decodeSave stops a gzip member that expands past maxBytes before it fills memory', async () => {
+  const { gzipSync } = await import('node:zlib');
+  // 64 MiB of one repeated byte gzips to about 64 KiB: a thousandfold expansion, as a hostile save could carry.
+  const json = new Uint8Array(64 * 1024 * 1024).fill(0x20);
+  json[0] = 0x31; // the JSON value 1 followed by spaces
+  const bomb = new Uint8Array(gzipSync(json));
+  assert.ok(bomb.length < 128 * 1024, `bomb is ${bomb.length} bytes`);
+  await assert.rejects(decodeSave(bomb, { maxBytes: 16 * 1024 * 1024 }), (error) => {
+    assert.ok(error instanceof RangeError);
+    assert.match(error.message, /16777216 bytes/);
+    return true;
+  });
+  // At or under the limit it reads as before, and the default (256 MiB) reads it too.
+  assert.equal(await decodeSave(bomb, { maxBytes: json.length }), 1);
+  assert.equal(await decodeSave(bomb), 1);
+  await assert.rejects(decodeSave(bomb, { maxBytes: json.length - 1 }), RangeError);
+  await assert.rejects(decodeSave(bomb, { maxBytes: -1 }), RangeError);
+});

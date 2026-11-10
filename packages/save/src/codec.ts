@@ -52,13 +52,72 @@ export async function encodeSave(document: unknown, options: EncodeOptions = {})
   return pipe(bytes, new (compression())('gzip'), options.signal);
 }
 
+/** Options of {@link decodeSave}. */
+export interface DecodeOptions {
+  /** Stops the work; the promise rejects with the signal's reason. */
+  signal?: AbortSignal;
+  /**
+   * Largest decompressed size accepted, in bytes. Default 268435456 (256 MiB). A gzip member can expand about a
+   * thousand times, so a small hostile file would otherwise fill memory before the JSON is ever read.
+   */
+  maxBytes?: number;
+}
+
+/** Gunzips `bytes`, stopping as soon as the output passes `max` bytes. */
+async function inflate(bytes: Uint8Array<ArrayBuffer>, max: number, signal?: AbortSignal): Promise<Uint8Array> {
+  const stream = new DecompressionStream('gzip'),
+    writer = stream.writable.getWriter(),
+    reader = stream.readable.getReader(),
+    chunks: Uint8Array[] = [];
+  const stop = (reason: unknown): void => {
+    void writer.abort(reason).then(undefined, () => undefined);
+    void reader.cancel(reason).then(undefined, () => undefined);
+  };
+  const abort = (): void => stop(signal!.reason);
+  signal?.addEventListener('abort', abort, { once: true });
+  // The write settles only as the output is read, so it is not awaited before reading; its failure surfaces below.
+  const writing = writer.write(bytes).then(() => writer.close());
+  writing.catch(() => undefined);
+  try {
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        const error = new RangeError(
+          `Save decompresses past ${max} bytes; it is not a save of this game, or pass a larger maxBytes to decodeSave`,
+        );
+        stop(error);
+        throw error;
+      }
+      chunks.push(value);
+    }
+    await writing;
+    signal?.throwIfAborted();
+  } finally {
+    signal?.removeEventListener('abort', abort);
+  }
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out;
+}
+
 /**
  * Bytes written by {@link encodeSave} (gzipped or not) back to a JSON value. Validate it with `parseSave` before use.
  * @throws TypeError when the bytes are not a save (damaged gzip, not UTF-8 JSON), naming the fix.
+ * @throws RangeError when gzip data decompresses past `maxBytes`.
  */
-export async function decodeSave(bytes: Uint8Array, options: { signal?: AbortSignal } = {}): Promise<unknown> {
+export async function decodeSave(bytes: Uint8Array, options: DecodeOptions = {}): Promise<unknown> {
   options.signal?.throwIfAborted();
   if (!(bytes instanceof Uint8Array)) throw new TypeError('Save bytes must be a Uint8Array; read the file as bytes');
+  const max = options.maxBytes ?? 268_435_456;
+  if (!(Number.isSafeInteger(max) && max >= 0))
+    throw new RangeError('decodeSave maxBytes must be a whole number of bytes, 0 or more');
   let data = bytes;
   if (bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
     if (typeof DecompressionStream !== 'function')
@@ -67,9 +126,10 @@ export async function decodeSave(bytes: Uint8Array, options: { signal?: AbortSig
         'DecompressionStream is not available here; load gzipped saves in a current browser or Node 18+',
       );
     try {
-      data = await pipe(new Uint8Array(bytes), new DecompressionStream('gzip'), options.signal);
+      data = await inflate(new Uint8Array(bytes), max, options.signal);
     } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof RangeError) throw error;
       throw Object.assign(
         new TypeError('Save is damaged: its gzip data does not decompress; restore the file from a backup'),
         { cause: error },

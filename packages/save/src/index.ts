@@ -22,7 +22,7 @@ export {
 } from './document.js';
 export { expandSave, mergePatch, type ResolvedEntity } from './prefab.js';
 export { Migrations, type Migration } from './migrations.js';
-export { decodeSave, encodeSave, type EncodeOptions } from './codec.js';
+export { decodeSave, encodeSave, type DecodeOptions, type EncodeOptions } from './codec.js';
 export {
   indexedDBStorage,
   memoryStorage,
