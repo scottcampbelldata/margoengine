@@ -4,6 +4,8 @@ import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from 
 import { hexColor } from '@margoengine/math';
 import { MaskData, maskShader } from './masks.js';
 import { checkCamera, checkLayer, checkLight } from './validation.js';
+import type { SDFScene2D } from './sdf.js';
+import { sdfShader } from './sdf-shader.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Light2D, type Occluder2D, type Point2D, occluderEdges, lightAt } from './index.js';
 
@@ -405,6 +407,8 @@ export function evaluate2DGI(
 }
 /** Options for GILighting2D WebGPU engine plugin. */
 export interface GILighting2DOptions {
+  /** Borrowed painted alpha/albedo/emission scene. Encoded every frame before the GI passes. */
+  readonly painted?: SDFScene2D;
   /** Target texture receiving GI irradiance. */
   /** Direct-light layer mask. Default all bits. */
   readonly layer?: number;
@@ -545,6 +549,8 @@ fn merge(p:vec2f,angle:u32)->vec4f{
 `;
 /** WebGPU spatial radiance intervals, with finite-order diffuse surface gathers. */
 export class GILighting2D implements EnginePlugin, Disposable {
+  /** Borrowed painted scene; dispose it separately after all consumers. */
+  declare painted?: SDFScene2D;
   declare name: string;
   declare order: number;
   declare readonly cascades: RadianceCascade2D;
@@ -561,6 +567,9 @@ export class GILighting2D implements EnginePlugin, Disposable {
   #sceneLayout?: GPUBindGroupLayout;
   #inputLayout?: GPUBindGroupLayout;
   #outputLayout?: GPUBindGroupLayout;
+  #paintLayout?: GPUBindGroupLayout;
+  #renderGap?: GPUBindGroup;
+  #hasPaint = false;
   #cascade?: GPUComputePipeline;
   #bounce?: GPUComputePipeline;
   #show?: GPURenderPipeline;
@@ -571,6 +580,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
   constructor(options: GILighting2DOptions) {
     if (!options?.target) throw typeError('target is required for GILighting2D', 'pixel-lighting');
     this.#target = options.target;
+    this.painted = options.painted;
     this.name = options.name ?? `gi-lighting2d-${++giPluginCount}`;
     this.order = options.order ?? 20;
     this.cascades = new RadianceCascade2D(options.cascades);
@@ -588,7 +598,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
   }
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'GILighting2D disposed; create a new one');
-    if (engine.backend !== 'webgpu') throw fault('unsupported', 'GILighting2D needs WebGPU', 'webgpu');
+    if (engine.backend !== 'webgpu' || !engine.gpu) throw fault('unsupported', 'GILighting2D needs WebGPU', 'webgpu');
     this.#engine = engine;
     engine.frameGraph.add({
       name: this.name,
@@ -620,13 +630,18 @@ export class GILighting2D implements EnginePlugin, Disposable {
     return buffer;
   }
   #prepare(device: GPUDevice, format: GPUTextureFormat): void {
-    if (this.#device !== device) {
+    if (this.#device !== device || this.#hasPaint !== !!this.painted) {
       this.#release();
       this.#device = device;
+      this.#hasPaint = !!this.painted;
     }
     const visibility = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT;
     if (!this.#module) {
-      this.#module = device.createShaderModule({ label: 'radiance cascades', code: maskShader(4) + giShader });
+      const shader = this.painted ? giShader.replace('return vec4f(rgb,select(1.0,0.0,hit));', `
+        let paintedHit=tracePaint(p,d,nearest);
+        if(paintedHit.w>=0){rgb=paintedHit.rgb;hit=true;}
+        return vec4f(rgb,select(1.0,0.0,hit));`) + sdfShader : giShader;
+      this.#module = device.createShaderModule({ label: 'radiance cascades', code: maskShader(4) + shader });
       this.#sceneLayout = device.createBindGroupLayout({
         entries: [
           { binding: 0, visibility, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 128 } },
@@ -639,8 +654,12 @@ export class GILighting2D implements EnginePlugin, Disposable {
       this.#outputLayout = device.createBindGroupLayout({
         entries: [{ binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } }],
       });
+      if (this.painted) this.#paintLayout = device.createBindGroupLayout({ entries: [
+        { binding: 0, visibility, buffer: { type: 'uniform' } },
+        ...[1, 2, 3].map(binding => ({ binding, visibility, texture: { sampleType: 'unfilterable-float' as const } })),
+      ] });
       const layout = device.createPipelineLayout({
-        bindGroupLayouts: [this.#sceneLayout, this.#inputLayout, this.#outputLayout],
+        bindGroupLayouts: [this.#sceneLayout, this.#inputLayout, this.#outputLayout, ...(this.#paintLayout ? [this.#paintLayout] : [])],
       });
       this.#cascade = device.createComputePipeline({
         layout,
@@ -650,8 +669,12 @@ export class GILighting2D implements EnginePlugin, Disposable {
     }
     if (format !== this.#format) {
       this.#format = format;
+      const gap = device.createBindGroupLayout({ entries: [] });
+      this.#renderGap = device.createBindGroup({ layout: gap, entries: [] });
       this.#show = device.createRenderPipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [this.#sceneLayout!, this.#inputLayout!] }),
+        layout: device.createPipelineLayout({ bindGroupLayouts: this.#paintLayout
+          ? [this.#sceneLayout!, this.#inputLayout!, gap, this.#paintLayout]
+          : [this.#sceneLayout!, this.#inputLayout!] }),
         vertex: { module: this.#module!, entryPoint: 'wide' },
         fragment: { module: this.#module!, entryPoint: 'show', targets: [{ format }] },
       });
@@ -669,6 +692,8 @@ export class GILighting2D implements EnginePlugin, Disposable {
     const ambient = color(this.ambient),
       device = c.device;
     this.#prepare(device, target.format);
+    this.painted?.encode(device, c.encoder);
+    const paintGroup = this.painted?.bindGroup(device, this.#paintLayout!);
     this.#masks.upload(device, this.lights);
     const patchData = new Float32Array(Math.max(8, scene.patches.length * 8));
     scene.patches.forEach((p, i) => patchData.set([...p.a, ...p.b, ...p.n], i * 8));
@@ -781,6 +806,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, sceneGroup, [offset]);
       pass.setBindGroup(1, sources);
+      if (paintGroup) pass.setBindGroup(3, paintGroup);
       pass.setBindGroup(
         2,
         device.createBindGroup({
@@ -812,6 +838,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
     pass.setPipeline(this.#show!);
     pass.setBindGroup(0, sceneGroup, [offset]);
     pass.setBindGroup(1, input(upper, surface));
+    if (paintGroup) { pass.setBindGroup(2, this.#renderGap!); pass.setBindGroup(3, paintGroup); }
     pass.draw(3);
     pass.end();
     device.queue.writeBuffer(uniforms, 0, values);
@@ -828,6 +855,8 @@ export class GILighting2D implements EnginePlugin, Disposable {
       this.#sceneLayout =
       this.#inputLayout =
       this.#outputLayout =
+      this.#paintLayout =
+      this.#renderGap =
       this.#cascade =
       this.#bounce =
       this.#show =

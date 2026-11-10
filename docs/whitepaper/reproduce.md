@@ -3248,3 +3248,5 @@ Build packages, then `node --test packages/usdz/tests/curves.test.js`. GPU: `nod
 ### Batch 211 job 4
 
 Build packages, then node --test packages/animator/test/masks.test.js. Run the animator GPU suite through the shared GPU lock on WebGPU and with MARGO_COMPAT=1. The Fox fixture combines the completed layer graph, nested tree, transition offset and fractional mask. Synthetic CPU tracks are exact mathematical conformance inputs, not demo replacements.
+### Batch 247 job 1
+After build:packages, run node --test --test-timeout=90000 packages/lighting2d/tests/*.test.js. For actual GPU work use node scripts/gpu-lock.mjs run --owner=lighting2d-sdf --wait-max=60 --max=3 -- node packages/lighting2d/tests/browser-check.mjs, then the same command with --compat after the browser driver. The SDF checks are named SDF in test-results/lighting2d-browser.json. Generated tiny RGBA fixtures have independent distance and analytic opaque-rectangle oracles; no downloads or external art are required. Size measurement uses bundleBytes in scripts/measure-size.js with bare imports external; no benchmark runs during build phase.

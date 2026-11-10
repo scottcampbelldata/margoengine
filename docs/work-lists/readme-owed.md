@@ -591,3 +591,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/usdz (batch 206 job 3): document curves(), pose/timeCode, interpolation, automatic Lines/Points attachment, optional peers, worker lifetime and tessellation limits.
 - @margoengine/animator (batch 211 job 4): document /masks createBoneMask and addWeightedLayer clip/graph forms, live dense node weights, effective strength, override/additive/morph behaviour, default zero entries and lifetime; examples deferred.
 - margoengine (batch 211 job 4): document generated animator/masks alias.
+- @margoengine/lighting2d (batch 247 job 1): document sdf SDFScene2D source/emission layer getters, camera, alpha threshold, linear color/HDR, borrowed lifetime, resize/restore and GILighting2D painted input.
+- margoengine (batch 247 job 1): document generated lighting2d/sdf alias.

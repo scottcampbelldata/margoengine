@@ -20,6 +20,7 @@ export interface EmissiveSprite2D {
 }
 
 export class GILighting2D implements EnginePlugin, Disposable {
+    painted?: SDFScene2D;
     name: string;
     order: number;
     readonly cascades: RadianceCascade2D;
@@ -42,6 +43,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
 }
 
 export interface GILighting2DOptions {
+    readonly painted?: SDFScene2D;
     readonly layer?: number;
     readonly target: GPUTexture | (() => GPUTexture);
     readonly order?: number;
@@ -176,4 +178,36 @@ type Occluder2D = {
 type Point2D = readonly [number, number];
 
 type RGB = [number, number, number];
+
+class SDFScene2D implements Disposable {
+    source: TextureSource;
+    emission?: TextureSource;
+    camera: {
+        x: number;
+        y: number;
+        zoom: number;
+    };
+    alphaThreshold: number;
+    emissionIntensity: number;
+    constructor(options: SDFScene2DOptions);
+    get distanceTexture(): GPUTexture | undefined;
+    encode(device: GPUDevice, encoder: GPUCommandEncoder): void;
+    bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface SDFScene2DOptions {
+    readonly source: TextureSource;
+    readonly emission?: TextureSource;
+    readonly camera?: {
+        x: number;
+        y: number;
+        zoom: number;
+    };
+    readonly alphaThreshold?: number;
+    readonly emissionIntensity?: number;
+}
+
+type TextureSource = GPUTexture | (() => GPUTexture);
 ```

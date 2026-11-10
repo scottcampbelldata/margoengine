@@ -33,6 +33,10 @@
   },
   "sideEffects": false,
   "exports": {
+    "./sdf": {
+      "types": "./dist/sdf.d.ts",
+      "import": "./dist/sdf.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

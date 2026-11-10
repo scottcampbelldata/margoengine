@@ -1678,6 +1678,10 @@
       "types": "./dist/labels/cluster.d.ts",
       "import": "./dist/labels/cluster.js"
     },
+    "./lighting2d/sdf": {
+      "types": "./dist/lighting2d/sdf.d.ts",
+      "import": "./dist/lighting2d/sdf.js"
+    },
     "./lighting2d": {
       "types": "./dist/lighting2d.d.ts",
       "import": "./dist/lighting2d.js"

@@ -1,4 +1,5 @@
 import { giRegressions } from './gi-regressions.js';
+import { sdfRegressions } from './sdf-regressions.js';
 import { frameRegressions } from './frame-regressions.js';
 // The page of browser-check.mjs: each picture is read back and compared with the CPU form, pixel by pixel.
 import { EngineKernel } from '/packages/core/dist/index.js';
@@ -618,6 +619,7 @@ window.check = {
       height: HEIGHT,
     });
     await giRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
+    await sdfRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
     out.errors = errors.splice(0);
     return out;
   },
