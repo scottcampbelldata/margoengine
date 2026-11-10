@@ -57,6 +57,10 @@
     "./stream": {
       "types": "./dist/stream.d.ts",
       "import": "./dist/stream.js"
+    },
+    "./decoded": {
+      "types": "./dist/decoded.d.ts",
+      "import": "./dist/decoded.js"
     }
   },
   "files": [

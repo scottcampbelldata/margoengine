@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12609288,
+  "total": 12613828,
   "history": [
     {
       "date": "2026-10-24",
@@ -6232,6 +6232,12 @@
       "commit": "batch-226",
       "reason": "Batch 226 graph: new optional entries {\"@margoengine/scene/graph\":1998,\"margoengine/scene/graph\":58} B gzip, each ceiling measured +256 B. Complete atomic TRS attach, hierarchy search and axis operations justify bytes; splitting would duplicate validation and affine ownership. Core plus stage remains 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-208",
+      "reason": "cache/decoded: new optional entry 0 to 4284 B gzip including shared AssetCache storage. Preserving complete typed arrays and transactional eviction warrants the bytes; a separate serialization API adds complexity.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7357,6 +7363,7 @@
     "@margoengine/ui/world-gl": 7556,
     "leak @margoengine/ui/world-gl -> @margoengine/text": 1,
     "@margoengine/scene/graph": 2254,
-    "margoengine/scene/graph": 314
+    "margoengine/scene/graph": 314,
+    "@margoengine/cache/decoded": 4540
   }
 }

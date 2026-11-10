@@ -139,6 +139,16 @@ try {
   assert.equal(streamedMiss.stats.stored, 1);
   assert.equal(streamedMiss.stats.hits, 1);
   report.streamedMiss = { first: firstMiss, ...streamedMiss };
+  const decodedCold = await call('decodedCold');
+  assert.equal(decodedCold.decodes, 2);
+  assert.equal(decodedCold.vertices, 24);
+  assert.equal(decodedCold.format, 'rgba8unorm');
+  assert.equal(decodedCold.mips, 6);
+  await open();
+  const decodedWarm = await call('decodedWarm', decodedCold.keys);
+  assert.deepEqual(decodedWarm.digest, decodedCold.digest, 'all real decoded arrays and mip metadata survive reload');
+  assert.equal(decodedWarm.hits, 2);
+  report.decoded = { ...decodedCold, warmHits: decodedWarm.hits };
   let before = log.length;
   const cold = await call('streamRanges', 'chair', '/cache-files/chair.glb'),
     coldRequests = log.slice(before);

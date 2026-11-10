@@ -4,6 +4,9 @@ import { AssetCache } from '../dist/index.js';
 import { evictionIndex } from '../dist/eviction.js';
 import { RangeCache } from '../dist/ranges.js';
 import { StreamingAssetCache } from '../dist/stream.js';
+import { DecodedAssetCache } from '../dist/decoded.js';
+import { hashBytes } from '../dist/hashed.js';
+import { DracoDecoder, KTX2Decoder } from '../../decoders/dist/index.js';
 
 const query = new URLSearchParams(location.search);
 
@@ -29,6 +32,20 @@ const hex = async (bytes) =>
     .join('');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 2));
 const read = async (response) => new Uint8Array(await response.arrayBuffer());
+const decodedDigest = async (value) => {
+  if (ArrayBuffer.isView(value))
+    return {
+      type: value.constructor.name,
+      bytes: value.byteLength,
+      sha: await hex(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)),
+    };
+  if (Array.isArray(value)) return Promise.all(value.map(decodedDigest));
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      await Promise.all(Object.entries(value).map(async ([key, item]) => [key, await decodedDigest(item)])),
+    );
+  return value;
+};
 
 /** gltf-pro's progressive streaming code (the half that runs in its worker) with the global fetch answered by `ranges`. */
 async function stream(ranges, url) {
@@ -54,6 +71,64 @@ async function stream(ranges, url) {
 }
 
 window.cacheChecks = {
+  async decodedCold() {
+    const cache = new DecodedAssetCache({ name: 'decoded-browser' });
+    const draco = new DracoDecoder({ workerLimit: 1 }),
+      ktx = new KTX2Decoder({ target: 'rgba8', workerLimit: 1 });
+    let decodes = 0;
+    try {
+      const sources = await Promise.all(
+        ['Box.bin', 'Rib_N.ktx2'].map(async (name) =>
+          (await fetch(`/packages/decoders/tests/fixtures/${name}`)).arrayBuffer(),
+        ),
+      );
+      const keys = await Promise.all(
+        sources.map(async (source, i) => ({
+          sourceHash: await hashBytes(source),
+          deviceFormat: i ? 'rgba8unorm' : 'geometry-f32-u16',
+          decoder: i ? 'basis-bundled' : 'draco-bundled',
+          variant: i ? '' : 'NORMAL=0,POSITION=1',
+        })),
+      );
+      const values = [];
+      for (let i = 0; i < sources.length; i++)
+        values.push(
+          await cache.getOrDecode(keys[i], async () => {
+            decodes++;
+            return i
+              ? ktx.transcode(sources[i])
+              : draco.decode(sources[i], { attributeIds: { NORMAL: 0, POSITION: 1 } });
+          }),
+        );
+      return {
+        keys,
+        decodes,
+        digest: await Promise.all(values.map(decodedDigest)),
+        vertices: values[0].vertexCount,
+        format: values[1].format,
+        mips: values[1].mipmaps.length,
+      };
+    } finally {
+      draco.dispose();
+      ktx.dispose();
+      cache.dispose();
+    }
+  },
+  async decodedWarm(keys) {
+    const cache = new DecodedAssetCache({ name: 'decoded-browser' });
+    try {
+      const values = [];
+      for (const key of keys)
+        values.push(
+          await cache.getOrDecode(key, async () => {
+            throw new Error('a warm decoded hit invoked its decoder');
+          }),
+        );
+      return { digest: await Promise.all(values.map(decodedDigest)), hits: cache.stats.hits };
+    } finally {
+      cache.dispose();
+    }
+  },
   async beginMiss() {
     const cache = new StreamingAssetCache({ name: 'stream-miss' });
     const response = await cache.fetch('/cache-files/stream-chair.glb');

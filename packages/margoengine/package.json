@@ -458,6 +458,10 @@
       "types": "./dist/cache/stream.d.ts",
       "import": "./dist/cache/stream.js"
     },
+    "./cache/decoded": {
+      "types": "./dist/cache/decoded.d.ts",
+      "import": "./dist/cache/decoded.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"
