@@ -1,5 +1,10 @@
 # Clean room
 
+### Batch 170 cache work counts (2026-11-10)
+
+Read the W3C *Indexed Database API 3.0* transaction scheduling sections. [Title, link and counts](whitepaper/batch-170-cache.md).
+Workbox ran only as a black box outside this repository. No external implementation was read.
+
 ### Batch 170 worker work counts (2026-11-10)
 
 Read the W3C *Resize Observer* draft and the WHATWG *HTML Living Standard* channel messaging and OffscreenCanvas

@@ -1,5 +1,13 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 cache: one write for a burst of hits (2026-11-10)
+
+`AssetCache` queued one IndexedDB read-write transaction per hit to stamp the last-used time: 300 for 300 hits issued
+together, as Workbox 7.4.1 `CacheFirst` with `ExpirationPlugin` also does. Hits queued back to back now share one
+transaction, applied per file in hit order, with identical stored records: 1 read-write transaction for the burst.
+Fix commit subject: `perf(cache): stamp a burst of hits in one write`. Timing pending the quiet rerun.
+[Counts and research](batch-170-cache.md).
+
 ## Batch 170 worker: no size message the worker already holds (2026-11-10)
 
 The page end of a worker canvas posted the size again on the Resize Observer's first call and on every call with

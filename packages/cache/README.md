@@ -190,7 +190,8 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
 ## Budget, quota and failures
 
 - `maxBytes` (default 512 MiB): before each write the least recently used files are evicted until the new one fits; a
-  file larger than `maxBytes` is not stored. Every hit refreshes its file's last-used time.
+  file larger than `maxBytes` is not stored. Every hit refreshes its file's last-used time; hits that arrive together
+  share one IndexedDB write (a failed one counts once in `stats.errors`).
 - Browser quota: a write that fails with `QuotaExceededError` evicts as many more bytes as the new file needs and
   tries once more; if that fails too the file is simply not stored (`stats.errors`). `usage()` reports
   `navigator.storage.estimate()`; `persist: true` calls `navigator.storage.persist()` (the browser may say no).

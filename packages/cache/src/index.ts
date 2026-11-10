@@ -97,6 +97,13 @@ export interface AssetCacheUsage {
   /** Origin storage used in bytes from `navigator.storage.estimate()`, when available. */
   usage?: number;
 }
+
+/** A hit whose last-used time (and, after a 304, freshness) is still to be written. */
+interface Touch {
+  entry: Entry;
+  reason?: 'revalidated' | 'offline';
+}
+
 interface Entry {
   url: string;
   size: number;
@@ -137,6 +144,10 @@ export class AssetCache {
   readonly timeout: number;
   private db: Promise<IDBDatabase | null>;
   private network: typeof globalThis.fetch;
+  /** The hits of the last queued write while it is still the last one and has not started. */
+  private touches?: Touch[];
+  /** `writes` as the batch above left it; any later write replaces it and closes the batch. */
+  private touchesTail?: Promise<unknown>;
   private keys?: AssetCacheKeys;
   private maxAgeOnly: boolean;
   private eviction?: AssetCacheEviction;
@@ -320,22 +331,43 @@ export class AssetCache {
     this.stats.hits++;
     if (reason) this.stats[reason]++;
     entry.used = Date.now();
-    this.queue(() =>
-      this.tx('readwrite', (meta) => {
-        const saved = meta.get(entry.url);
-        saved.onsuccess = () => {
-          if (!isEntry(saved.result)) return;
-          const current = saved.result;
-          current.used = Math.max(current.used, entry.used);
-          if (reason === 'revalidated' && current.etag === entry.etag && current.modified === entry.modified) {
-            current.fresh = entry.fresh;
-            current.control = entry.control;
-            current.expires = entry.expires;
+    // Hits queued back to back share one write, applied in hit order per file: the stored records end as separate
+    // writes would leave them. Any other write chained after it (queue, serial) closes the batch, so writes keep their
+    // order: a hit joins only while the batch is still the last write and has not started.
+    const touch = { entry, reason };
+    if (this.touches && this.writes === this.touchesTail) this.touches.push(touch);
+    else {
+      const touches = [touch];
+      this.queue(() => {
+        if (this.touches === touches) this.touches = undefined;
+        const files = new Map<string, Touch[]>();
+        for (const item of touches) {
+          const list = files.get(item.entry.url);
+          if (list) list.push(item);
+          else files.set(item.entry.url, [item]);
+        }
+        return this.tx('readwrite', (meta) => {
+          for (const [url, list] of files) {
+            const saved = meta.get(url);
+            saved.onsuccess = () => {
+              if (!isEntry(saved.result)) return;
+              const current = saved.result;
+              for (const { entry, reason } of list) {
+                current.used = Math.max(current.used, entry.used);
+                if (reason === 'revalidated' && current.etag === entry.etag && current.modified === entry.modified) {
+                  current.fresh = entry.fresh;
+                  current.control = entry.control;
+                  current.expires = entry.expires;
+                }
+              }
+              meta.put(current, url);
+            };
           }
-          meta.put(current, entry.url);
-        };
-      }),
-    );
+        });
+      });
+      this.touches = touches;
+      this.touchesTail = this.writes;
+    }
     return this.respond(entry, blob, range);
   }
 

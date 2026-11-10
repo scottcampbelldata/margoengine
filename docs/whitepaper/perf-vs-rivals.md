@@ -295,3 +295,11 @@ Method and rival harness: [batch-170-stats.md](batch-170-stats.md). No rival tim
 | worker | Start plus 100 unchanged Resize Observer calls | 100 size messages | 0, same worker state | three.js 0.186.1: no library code on this path | `perf(worker)`; frame time pending the quiet rerun |
 
 Method: [batch-170-worker.md](batch-170-worker.md). No rival timing was run.
+
+## Batch 170 cache: work counts, 2026-11-10
+
+| Package | Work | Before | After | Rival | Status |
+| --- | --- | --- | --- | --- | --- |
+| cache | 300 hits on 3 stored files, issued together | 300 readonly + 300 readwrite IndexedDB transactions | 300 readonly + 1 readwrite, same records | Workbox 7.4.1 CacheFirst + ExpirationPlugin: 300 Cache Storage reads + 300 readwrite | `perf(cache)`; timing pending the quiet rerun |
+
+Method and rival harness: [batch-170-cache.md](batch-170-cache.md). No rival timing was run.

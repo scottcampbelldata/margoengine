@@ -1,5 +1,8 @@
 # Reproducing Margo's numbers
 
+- Batch 170 cache: `npm test --workspace @margoengine/cache` runs the hit write work count
+  ([batch-170-cache.md](batch-170-cache.md)).
+
 - Batch 170 worker: `npm test --workspace @margoengine/worker` runs the size message work count
   ([batch-170-worker.md](batch-170-worker.md)).
 

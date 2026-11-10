@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 cache: 300 cache hits issued together write their last-used times in 1 IndexedDB read-write transaction
+  instead of 300, with identical stored records. Work evidence only, no speed claim.
+  [Scope, Workbox count and reproduction](batch-170-cache.md).
+
 - Batch 170 worker: a transferred canvas followed by 100 Resize Observer calls with no change posts 100 size messages
   on the parent and none after, with identical worker size and position. Work evidence only, no speed claim.
   [Scope and reproduction](batch-170-worker.md).

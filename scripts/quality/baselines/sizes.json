@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14713468,
+  "total": 14713585,
   "history": [
     {
       "date": "2026-10-24",
@@ -8159,6 +8159,12 @@
       "commit": "e89263ea7",
       "reason": "New optional entry @margoengine/sciviz/multivolume (multi-volume and multi-component ray marching); paid only by importers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e89263ea7",
+      "reason": "batch 170 cache: a burst of hits stamps last-used times in one IndexedDB write (41 B gzip)",
+      "grew": 3
     }
   ],
   "items": {
@@ -8274,15 +8280,15 @@
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 11036,
-    "@margoengine/cache": 3801,
+    "@margoengine/cache": 3842,
     "@margoengine/cache/bundles": 1883,
-    "@margoengine/cache/decoded": 5069,
+    "@margoengine/cache/decoded": 5108,
     "@margoengine/cache/eviction": 793,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
     "@margoengine/cache/ranges": 4640,
-    "@margoengine/cache/stream": 4196,
+    "@margoengine/cache/stream": 4233,
     "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
