@@ -3357,3 +3357,7 @@ Batch 244 composite look: build packages and run `node --test --test-timeout=600
 
 ### Batch 238 streamed SOG
 Build packages; node --test --test-timeout=120000 packages/splats/test/lod-sog.test.js. Fixtures derive from existing MIT raccoon.sog and Margo's own WebP encoder. GPU under shared lock: node scripts/gpu-lock.mjs run --owner=codex-batch238 --gpu=splats-lod-sog --max=3 --wait-max=60 -- node packages/splats/test/gpu/lod-sog-check.mjs, then with --compat. Full changed-package suite: packages/splats/test/gpu/check.mjs on both backends. No benchmarks.
+
+### Batch 196 stereo
+
+Build packages, run node --test packages/cameras/test/*.test.js, then under a shared GPU lock run node packages/cameras/test/stereo-browser.mjs and the same command with --compat. stereo-check.html is the analytic fixture. It checks all four layouts against separately rendered eye images at constant-colour interior pixels, including a CPU Dubois reference, both swaps, row/column phase, one plugin update, resize and device restoration.

@@ -722,3 +722,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/splats and margoengine (batch 238 job 3): document /lod-sog loadStreamedSog/StreamedSogSource, lazy ranges, metadata/cache/abort/disposal defaults, environment, structural-node budget and SOG v3 degree-4/extended-opacity read/write limits.
 
 | @margoengine/lightmap | apply: applyLightmap on a materials mesh, a glTF-pro model, a core mesh (uv1) and a live GPULightmapBaker; lightmapTexture; dispose | batch-54 job 3 |
+
+| @margoengine/cameras | stereo: StereoRig, StereoOutput.render in an app loop, four modes, geometry, layers, swap, stripe parity, disposal and resize behaviour | batch-196 job 2 |
+| margoengine | cameras/stereo alias | batch-196 job 2 |

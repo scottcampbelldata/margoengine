@@ -53,6 +53,10 @@
     "./panorama": {
       "types": "./dist/panorama.d.ts",
       "import": "./dist/panorama.js"
+    },
+    "./stereo": {
+      "types": "./dist/stereo.d.ts",
+      "import": "./dist/stereo.js"
     }
   },
   "files": [

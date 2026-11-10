@@ -534,6 +534,10 @@
       "types": "./dist/cameras/panorama.d.ts",
       "import": "./dist/cameras/panorama.js"
     },
+    "./cameras/stereo": {
+      "types": "./dist/cameras/stereo.d.ts",
+      "import": "./dist/cameras/stereo.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13489024,
+  "total": 13492424,
   "history": [
     {
       "date": "2026-10-24",
@@ -6972,6 +6972,12 @@
       "commit": "961eca859",
       "reason": "batch 54 job 3: new @margoengine/lightmap/apply entry (lightmaps at draw time)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-196-stereo",
+      "reason": "Stereo optional entry: 0 to 3144 B gzip, ceiling 3400 B. Parallel off-axis eyes, four packing modes, linear-light Dubois projection, resource ownership and device restoration belong together. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8236,6 +8242,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/cameras/stereo": 3400
   }
 }

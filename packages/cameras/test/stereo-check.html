@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Stereo output correctness</title></head><body>
+<canvas width="320" height="180" style="width:320px;height:180px"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {StereoOutput} from '/packages/cameras/dist/stereo.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,0],target:[0,0,-5]}});
+engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0.5;
+engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:'#ff0000'})).setPosition([0,0,-2]);
+engine.createMesh().setGeometry(box(2,2,1)).setMaterial(new PbrMaterial({color:'#00ff00'})).setPosition([2,0,-8]);
+const output=new StereoOutput(engine,{eyeSeparation:0.6,focusDistance:5}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+let updates=0;engine.use({name:'stereo-count',setup(){},onPreUpdate(){updates++;}});
+window.check={
+ async render(mode,swapEyes=false,barrierAxis='columns',barrierPhase=0){
+  Object.assign(output.options,{mode,swapEyes,barrierAxis,barrierPhase});
+  device.pushErrorScope('validation');const before=updates;output.render(0.1);await device.queue.onSubmittedWorkDone();
+  return {validation:(await device.popErrorScope())?.message??null,errors:errors.splice(0),updates:updates-before,position:[...engine.camera.position]};
+ },
+ async eye(side,mode){
+  const aspect=320/180*(mode==='side-by-side'?0.5:mode==='top-bottom'?2:1);
+  output.rig.update(engine.camera,aspect);engine.render({camera:output.rig[side]});await device.queue.onSubmittedWorkDone();
+ },
+ async resize(){canvas.width=400;canvas.height=200;canvas.style.width='400px';canvas.style.height='200px';output.render();await device.queue.onSubmittedWorkDone();return [canvas.width,canvas.height];},
+ async restore(){await engine.rebootDevice();return window.check.render('anaglyph');},
+ dispose(){output.dispose();output.dispose();let code;try{output.render();}catch(e){code=e.code;}engine.dispose();return code;}
+};window.ready=true;
+</script></body></html>

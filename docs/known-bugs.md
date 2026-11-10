@@ -4658,3 +4658,7 @@ The CRT composite-video look is built with signal invariants and native/compatib
 Batch 238 job 3: no open reader defect found by real range extraction, cancellation, malformed manifest, v3 and both-backend GPU checks. Fixed owning LOD pool slot exhaustion for uneven nodes while adding structural sources; maxNodes regression in lod-sog.test.js covers it.
 
 Batch 238 dependent gate finding: npm test --workspace @margoengine/sciviz runs glyph-data.test.js from the package directory although its readFileSync paths start at repository-root examples/assets/sciviz/glyph; repro fails ENOENT displacement.e. Cause is the test working directory assumption. All 281 tests pass unchanged from the repository root; suite launcher repair belongs to the fix phase.
+
+### Batch 196 stereo
+
+No known open correctness defect in the completed output modes. StereoRig's initial constructor geometry now matches StereoOutput settings before the first render; stereo.test.js retains the regression. The automatic resize resolution follow-up is recorded privately for finishing polish.
