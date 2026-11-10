@@ -111,6 +111,7 @@ export function webmFixture({
   codec = 'V_VP8',
   malformed = false,
   lastDuration,
+  empty = false,
 } = {}) {
   const header = elem(0x1a45dfa3, elem(0x4282, text('webm'))),
     info = elem(0x1549a966, uint(0x2ad7b1, 1000000)),
@@ -122,6 +123,7 @@ export function webmFixture({
         uint(0x83, 1),
         elem(0x86, text(codec)),
         uint(0x23e383, 100000000),
+        ...(empty ? [elem(0x23314f)] : []),
         elem(0xe0, uint(0xb0, 2), uint(0xba, 2)),
       ),
     );
@@ -142,7 +144,7 @@ export function webmFixture({
       new Uint8Array(values),
     );
   const content = cat(
-    uint(0xe7, 0),
+    empty ? elem(0xe7) : uint(0xe7, 0),
     ...(lacing
       ? [blockGroup ? elem(0xa0, elem(0xa1, block(0, [10, 11, 12]))) : elem(0xa3, block(0, [10, 11, 12]))]
       : [0, 100, 200].map((t, i) =>

@@ -64,21 +64,25 @@ export function readWebM(bytes: Uint8Array): Movie {
     const found = list.filter((e) => e.id === id);
     return found.length === 1 ? found[0]! : invalid();
   };
-  const uint = (e: Element): number => {
-    if (e.end - e.start > 8 || e.end === e.start) invalid();
+  // RFC 8794 sections 7.2 and 7.3: an empty unsigned or float element is the element's default, or 0 without one.
+  const uint = (e: Element, fallback = 0): number => {
+    if (e.end - e.start > 8) invalid();
+    if (e.end === e.start) return fallback;
     let n = 0n;
     for (let p = e.start; p < e.end; p++) n = n * 256n + BigInt(bytes[p]!);
     return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : invalid();
   };
-  const number = (e: Element): number => {
+  const number = (e: Element, fallback = 0): number => {
     const n =
-      e.end - e.start === 4 ? view.getFloat32(e.start) : e.end - e.start === 8 ? view.getFloat64(e.start) : invalid();
+      e.end === e.start
+        ? fallback
+        : e.end - e.start === 4 ? view.getFloat32(e.start) : e.end - e.start === 8 ? view.getFloat64(e.start) : invalid();
     return Number.isFinite(n) ? n : invalid();
   };
   const text = (e: Element): string => new TextDecoder().decode(bytes.subarray(e.start, e.end));
   const value = (list: Element[], id: number, fallback: number): number => {
     const e = list.find((e) => e.id === id);
-    return e ? uint(e) : fallback;
+    return e ? uint(e, fallback) : fallback;
   };
   const roots = elements(0, bytes.length),
     header = kids(one(roots, 0x1a45dfa3));
@@ -100,7 +104,7 @@ export function readWebM(bytes: Uint8Array): Movie {
     height = uint(one(video, 0xba)),
     defaultDuration = value(track, 0x23e383, 0),
     trackScale = track.find((e) => e.id === 0x23314f),
-    timeScale = trackScale ? number(trackScale) : 1,
+    timeScale = trackScale ? number(trackScale, 1) : 1,
     codecPrivate = track.find((e) => e.id === 0x63a2);
   if (!id || !width || !height || !(timeScale > 0)) invalid();
   let codec: string;

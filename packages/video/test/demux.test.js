@@ -54,6 +54,16 @@ test('a WebM BlockDuration overrides the track DefaultDuration (RFC 9559)', () =
     assert.equal(video.frameCount, 3);
     assert.equal(video.duration, 0.24);
   }));
+test('WebM reads empty unsigned and float elements as their default or zero (RFC 8794 sections 7.2, 7.3)', () =>
+  mocks(async () => {
+    // Batch 132 audit: a zero-length Cluster Timestamp (0) and TrackTimestampScale (default 1.0) were refused.
+    using video = await openDemuxedVideo(webmFixture({ empty: true }));
+    assert.equal(video.frameCount, 3);
+    assert.deepEqual(
+      [0, 1, 2].map((i) => video.timestamp(i)),
+      [0, 0.1, 0.2],
+    );
+  }));
 test('WebM parses every lace mode, block groups and unknown-length cluster/segment boundaries', () =>
   mocks(async () => {
     for (const lacing of [0, 1, 2, 3])
