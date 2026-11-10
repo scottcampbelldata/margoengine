@@ -819,3 +819,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/usdz (batch 206 job 5): valueClips(), composition provenance, manifests/retiming/templates, async frame iteration/player, topology replacement, serial requests, cancellation and byte-bounded encoded cache.
 - @margoengine/vfx (batch 270 job 1): document /space, local/world rigid transforms, position frame, inherited velocity, distance births and reset/restoration; examples deferred.
 - margoengine (batch 270 job 1): document generated vfx/space alias; examples deferred.
+
+- @margoengine/water and margoengine (batch 235 job 2): cover /flow painted/generated providers, encoded versus signed RG, two normal maps or procedural detail, world region, speed/period/scale/defaults, setTime, borrowed lifetimes and restoration; examples deferred.

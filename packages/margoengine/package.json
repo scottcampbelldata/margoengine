@@ -4514,6 +4514,10 @@
       "types": "./dist/water/ripples.d.ts",
       "import": "./dist/water/ripples.js"
     },
+    "./water/flow": {
+      "types": "./dist/water/flow.d.ts",
+      "import": "./dist/water/flow.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

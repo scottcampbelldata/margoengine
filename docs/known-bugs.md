@@ -4735,3 +4735,8 @@ Batch 240 job 2: object-block tests cover source-disposal independence, invalid 
 
 - Fixed during batch 242 replay build: Node Buffer.slice returned an alias and a Buffer-typed payload in decodeVoxelRecording. Payloads now copy into owned Uint8Arrays; replay.test.js mutates the original recording and requires decoded messages to remain intact.
 Batch 270 job 1: no new open defects identified in space. The cutscene compatibility replay finding is resolved by the batch 217 fixture readiness correction already on main; no cutscene or browser lifecycle files changed here.
+### Batch 235 job 2: flow maps
+
+Dual-phase flow shading is optional and stays out of geometric wave captures, so WaveQuery and caustic capture retain valid layouts. GPU regression: packages/water/test/flow-map.browser.mjs composes flow with ripple geometry and queries, checks independent vector/normal values and fixed-time rendering on both backends. No open defect identified in this job.
+
+- Batch 235 follow-up: force GPUDevice.createBuffer to throw during Ripples.readFrame after a successful render, then read again; the second call reports a pending read because the reading flag is set before staging allocation. Non-rendering allocation-error cleanup gap; fix-phase regression should inject allocation failure and move flag assignment after allocation.

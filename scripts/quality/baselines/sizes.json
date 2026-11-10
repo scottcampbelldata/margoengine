@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13707461,
+  "total": 13710619,
   "history": [
     {
       "date": "2026-10-24",
@@ -7156,6 +7156,12 @@
       "commit": "batch-190",
       "reason": "oit/precise: new optional float32 weighted accumulation with scalar multisampled targets, 0 to 3777 B gzip; 4033 B ceiling; no core, stage or OIT root growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-235-job-2",
+      "reason": "New optional water/flow: absent to 2902 B gzip, ceiling 3158 B. Dual-phase shading, procedural/authored normals and borrowed texture lifecycle belong in this entry; a split would duplicate binding/lifetime logic. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7787,6 +7793,7 @@
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/peel": 3293,
+    "@margoengine/oit/precise": 4033,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
     "@margoengine/physics/decomposition": 11130,
@@ -8180,6 +8187,7 @@
     "@margoengine/usdz": 13126,
     "@margoengine/usdz dist/workers/usdz.js": 135992,
     "@margoengine/usdz/anim": 6436,
+    "@margoengine/usdz/clips": 23845,
     "@margoengine/usdz/compose": 19970,
     "@margoengine/usdz/curves": 3531,
     "@margoengine/usdz/instancer": 2451,
@@ -8207,6 +8215,7 @@
     "@margoengine/vfx/skinned": 2314,
     "@margoengine/vfx/soft": 1551,
     "@margoengine/vfx/sort": 1356,
+    "@margoengine/vfx/space": 1697,
     "@margoengine/vfx/stretch": 1099,
     "@margoengine/vfx/texture": 1527,
     "@margoengine/vfx/wrap": 496,
@@ -8249,6 +8258,7 @@
     "@margoengine/voxel-net/chat": 4235,
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
+    "@margoengine/voxel-net/replay": 3840,
     "@margoengine/voxel-net/rewind": 2409,
     "@margoengine/voxel-net/rooms": 19966,
     "@margoengine/voxel-net/server": 18515,
@@ -8291,6 +8301,7 @@
     "@margoengine/water": 20817,
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
+    "@margoengine/water/flow": 3158,
     "@margoengine/water/query": 4719,
     "@margoengine/water/ripples": 3940,
     "@margoengine/weather": 5230,
@@ -8446,10 +8457,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/voxel-net/replay": 3840,
-    "@margoengine/usdz/clips": 23845,
-    "@margoengine/vfx/space": 1697,
-    "@margoengine/oit/precise": 4033
+    "margoengine/web": 577
   }
 }
