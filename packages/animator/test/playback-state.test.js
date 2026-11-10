@@ -62,6 +62,25 @@ test('fade and independent layers survive JSON and continue with the same pose',
   assert.throws(() => animator.restoreState(saved));
   assert.deepEqual(animator.captureState(), expected);
 });
+test('restoreState keeps the caller layer object live, so later weight writes and its remover still work', async (t) => {
+  const { animation, model } = await fixture(t);
+  const animator = new Animator(animation, { initial: 'a', states: { a: 'Back' } });
+  const layer = { clip: 'Move', weight: 0, mask: [0], blend: 'override' };
+  const off = animator.addLayer(layer);
+  animator.onPreUpdate(0.5);
+  const saved = JSON.parse(JSON.stringify(animator.captureState()));
+  layer.weight = 0.25;
+  animator.restoreState(saved);
+  assert.equal(layer.weight, 0);
+  layer.weight = 1;
+  animator.onPreUpdate(0);
+  assert.equal(animator.captureState().layers[0].weight, 1);
+  assert.ok(model.nodes[0].position.x > 0, 'the override layer drives the pose');
+  off();
+  assert.deepEqual(animator.captureState().layers, []);
+  animator.onPreUpdate(0);
+  assert.ok(model.nodes[0].position.x < 0, 'the base state drives the pose again');
+});
 test('animation preserves duplicate clip indices, pause, loop and speed', async (t) => {
   const { animation } = await fixture(t);
   animation.seek(0.4);

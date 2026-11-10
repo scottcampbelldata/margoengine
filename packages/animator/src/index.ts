@@ -498,10 +498,20 @@ export class Animator implements EnginePlugin {
       fail();
     const rest = loadPose(state.rest),
       current = loadPose(state.current);
+    // Reconcile into the caller's live layer objects (same clip, blend and mask, in order) so their handles, weight
+    // writes and removers keep working after a restore; only layers missing now are recreated as copies.
+    const live = [...this.layers];
     const layers = state.layers.map((layer) => {
       this.clip(layer.clip);
       this.validateLayer(layer);
-      return { ...layer, mask: [...layer.mask] };
+      const i = live.findIndex(
+        (l) =>
+          l.clip === layer.clip &&
+          (l.blend ?? 'additive') === (layer.blend ?? 'additive') &&
+          l.mask.length === layer.mask.length &&
+          l.mask.every((v, k) => v === layer.mask[k]),
+      );
+      return { saved: layer, target: i < 0 ? undefined : live.splice(i, 1)[0] };
     });
     let fade: Animator['fade'];
     if (state.fade) {
@@ -531,7 +541,17 @@ export class Animator implements EnginePlugin {
     Object.assign(this.parameters, state.parameters);
     this.triggers.clear();
     for (const trigger of state.triggers) this.triggers.add(trigger);
-    this.layers = new Set(layers);
+    this.layers = new Set(
+      layers.map(({ saved, target }) => {
+        if (!target) return { ...saved, mask: [...saved.mask] };
+        const writable = target as { -readonly [K in keyof AdditiveLayer]: AdditiveLayer[K] };
+        writable.weight = saved.weight;
+        for (const key of ['blend', 'time', 'referenceTime'] as const)
+          if (saved[key] === undefined) delete writable[key];
+          else (writable as Record<string, unknown>)[key] = saved[key];
+        return target;
+      }),
+    );
     this.fade = fade;
     copyPose(rest, this.rest, this.weightNodes);
     this.current = current;
