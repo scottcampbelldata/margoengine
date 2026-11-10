@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14669931,
+  "total": 14670546,
   "history": [
     {
       "date": "2026-10-24",
@@ -8087,6 +8087,12 @@
       "commit": "88e07c98a",
       "reason": "culling C=1 follows core's culled-pipeline rule",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "39ffe8bbf",
+      "reason": "culling LodInstances ordered compaction (three kernels)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8303,7 +8309,7 @@
     "@margoengine/culling/bounds": 19473,
     "@margoengine/culling/depth": 6320,
     "@margoengine/culling/dynamic": 7461,
-    "@margoengine/culling/lod": 4010,
+    "@margoengine/culling/lod": 4625,
     "@margoengine/culling/meshlets": 18258,
     "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 14606,

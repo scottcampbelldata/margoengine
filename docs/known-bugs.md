@@ -5532,11 +5532,16 @@ drop triangles (0)"): the WebGL2 layer draws the whole mesh by design. It now ha
 match core and repeat, and "clusters drop triangles" is skipped with a printed note. Both runs pass on the M6. The `parts-check.mjs`
 shadows step 2 1-pixel failure was the entry above (CulledParts back-culled pipeline under shadows), fixed 2026-11-10.
 
-Open (M6, found reading the code, not yet seen failing): `LodInstances` appends each kept instance to its level's list
-at an `atomicAdd` slot (lod.ts shader), so the order of a level's instances changes from frame to frame. Its doc said
-that shows only between exactly coplanar faces; on the M6 4x MSAA edge pixels also follow draw order (the meshlet
-probe above, and scatter's entry), so overlapping instance edges can change between identical frames. `lod-check.mjs`
-has no frame-repeat assertion. The fix is scatter's and MeshletMesh's: flag, prefix count, compact in instance order.
+Fixed (2026-11-10, Mac lane H): `LodInstances` appended each kept instance to its level's list at an `atomicAdd` slot
+(lod.ts shader), so the order of a level's instances changed from frame to frame. On the M6 lod-check's pictures still
+repeated (its boxes share no edges), but the lists read back did not: a redraw of the unchanged step 0 moved instances
+64 to 82 to other places in a level's list, on both runs. Fix: three kernels like MeshletMesh's, `cull` (each
+instance's level and a workgroup scan of one-hot level counts), `scan` (workgroup totals to offsets, and each level's
+count) and `scatter` (copy into the level's list at offset plus place); each list is in instance order every frame.
+Regression: lod-check.mjs redraws every step and compares the pixels and each level's list (read back; the lists'
+buffers gained COPY_SRC) to the byte, and checks each list is in ascending instance order; it fails on the old kernel.
+lod.test.js checks the three entry points and no atomics. lod-check also gained a compat branch (the WebGL2 layer draws
+every shown instance at the first level by design, so core's side does too and "every level drew" is skipped).
 
 
 ## Batch 132 audit: input (fixed and open)

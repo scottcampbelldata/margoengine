@@ -47,14 +47,23 @@ export interface LodInstancesOptions {
 }
 
 const NO_MESH = 16777216;
+// Three kernels keep each level's list in instance order, so an unchanged frame draws the same order every time (an
+// atomicAdd slot changed it from frame to frame, and with it MSAA edges where instances overlap on the M6). `cull`
+// picks each instance's level (`levels` for none) and scans one-hot level counts in its workgroup (Hillis and Steele
+// 1986, doubling in workgroup memory); `scan` turns the workgroup totals into offsets and writes each level's count;
+// `scatter` copies each kept record to its level's list at its offset plus its place in the workgroup.
 const shader = (levels: number): string => `${cullInputs(',limits:vec4f')}
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var<uniform> b:Part;
 @group(0) @binding(2) var<storage,read> records:array<Record>;
 @group(0) @binding(3) var<storage,read> hidden:array<u32>;
-@group(0) @binding(4) var<storage,read_write> counts:array<atomic<u32>>;
-${Array.from({ length: levels }, (_, l) => `@group(0) @binding(${5 + l}) var<storage,read_write> drawn${l}:array<Record>;`).join('\n')}
+@group(0) @binding(4) var<storage,read_write> counts:array<u32>;
+@group(0) @binding(5) var<storage,read_write> level:array<u32>;
+@group(0) @binding(6) var<storage,read_write> local:array<u32>;
+@group(0) @binding(7) var<storage,read_write> groups:array<vec4u>;
+${Array.from({ length: levels }, (_, l) => `@group(0) @binding(${8 + l}) var<storage,read_write> drawn${l}:array<Record>;`).join('\n')}
+var<workgroup> scratch:array<vec4u,256>;
 ${sphereCode}
 // The first level whose limit the sphere's radius in pixels reaches; an eye inside the sphere takes the first level.
 fn pick(s:vec4f)->u32 {
@@ -64,12 +73,28 @@ fn pick(s:vec4f)->u32 {
   for(var l=0u;l<${levels}u;l++){if(size>=b.limits[l]){return l;}}
   return ${levels}u;
 }
-@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u) {
-  let i=g.x;if(i>=b.count||hidden[i]!=0u){return;}
-  let r=records[i];let s=bound(r.m);if(!keep(s)){return;}
-  let l=pick(s);if(l>=${levels}u){return;}
-  let p=atomicAdd(&counts[l*5u+1u],1u);
-  ${Array.from({ length: levels }, (_, l) => `if(l==${l}u){drawn${l}[p]=r;}`).join('')}
+@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) t:u32,@builtin(workgroup_id) w:vec3u) {
+  let i=g.x;var lv=${levels}u;
+  if(i<b.count){if(hidden[i]==0u){let s=bound(records[i].m);if(keep(s)){lv=pick(s);}}level[i]=lv;}
+  var v=vec4u(0u);if(lv<${levels}u){v[lv]=1u;}
+  scratch[t]=v;workgroupBarrier();
+  for(var o=1u;o<256u;o=o<<1u){var x=vec4u(0u);if(t>=o){x=scratch[t-o];}workgroupBarrier();scratch[t]+=x;workgroupBarrier();}
+  if(i<b.count&&lv<${levels}u){let e=scratch[t]-v;local[i]=e[lv];}
+  if(t==255u){groups[w.x]=scratch[255];}
+}
+@compute @workgroup_size(256) fn scan(@builtin(local_invocation_index) t:u32) {
+  let n=(b.count+255u)/256u;let per=(n+255u)/256u;let lo=min(t*per,n);let hi=min(lo+per,n);
+  var sum=vec4u(0u);for(var k=lo;k<hi;k++){sum+=groups[k];}
+  scratch[t]=sum;workgroupBarrier();
+  for(var o=1u;o<256u;o=o<<1u){var x=vec4u(0u);if(t>=o){x=scratch[t-o];}workgroupBarrier();scratch[t]+=x;workgroupBarrier();}
+  var run=scratch[t]-sum;for(var k=lo;k<hi;k++){let x=groups[k];groups[k]=run;run+=x;}
+  if(t==255u){let total=scratch[255];${Array.from({ length: levels }, (_, l) => `counts[${l * 5 + 1}u]=total[${l}];`).join('')}}
+}
+@compute @workgroup_size(256) fn scatter(@builtin(global_invocation_id) g:vec3u) {
+  let i=g.x;if(i>=b.count){return;}
+  let lv=level[i];if(lv>=${levels}u){return;}
+  let p=groups[i>>8u][lv]+local[i];
+  ${Array.from({ length: levels }, (_, l) => `if(lv==${l}u){drawn${l}[p]=records[i];}`).join('')}
 }
 `;
 
@@ -87,9 +112,9 @@ let serial = 0;
 /**
  * Instances of one object at several levels of detail. One compute pass tests each instance against the frustum, picks its
  * level by its size on screen and appends it to that level's list, so the frame has no CPU loop over instances. Core draws
- * each list as one batch through `Batch.redirect`, with its own shader and shader patches. Instances of a level draw in no
- * fixed order. That shows between exactly coplanar faces, and on GPUs whose multisampled edges depend on draw order
- * (the Apple M6) where instances overlap at an edge: known-bugs.md, batch 132 culling.
+ * each list as one batch through `Batch.redirect`, with its own shader and shader patches. Instances of a level draw in
+ * instance order, so an unchanged frame repeats to the byte (coplanar faces and, on the Apple M6, multisampled edges
+ * follow draw order).
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class LodInstances implements EnginePlugin {
@@ -118,8 +143,11 @@ export class LodInstances implements EnginePlugin {
     hidden: GPUBuffer;
     counts: GPUBuffer;
     reset: GPUBuffer;
-    pipeline: GPUComputePipeline;
-    group: GPUBindGroup;
+    level: GPUBuffer;
+    local: GPUBuffer;
+    groups: GPUBuffer;
+    pipelines: GPUComputePipeline[];
+    binds: GPUBindGroup[];
   };
 
   /** Creates the instances and attaches them to `engine`. */
@@ -246,7 +274,7 @@ export class LodInstances implements EnginePlugin {
       template = new Uint32Array(levels * 5);
     this.levels.forEach((level, l) => {
       template[l * 5] = level.source.indices.length;
-      level.drawn = made(n * 96, S | GPUBufferUsage.VERTEX | C);
+      level.drawn = made(n * 96, S | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | C);
       level.args = made(20, S | GPUBufferUsage.INDIRECT | C);
       level.redirect.instances = level.drawn;
       level.redirect.args = level.args;
@@ -256,27 +284,32 @@ export class LodInstances implements EnginePlugin {
       frame = made(176, GPUBufferUsage.UNIFORM | C),
       part = made(64, GPUBufferUsage.UNIFORM | C),
       records = made(n * 96, S | C),
-      hidden = made(n * 4, S | C);
+      hidden = made(n * 4, S | C),
+      level = made(n * 4, S),
+      local = made(n * 4, S),
+      groups = made(Math.ceil(n / 256) * 16, S);
     d.queue.writeBuffer(reset, 0, template);
-    const pipeline = d.createComputePipeline({
-      layout: 'auto',
-      compute: { module: d.createShaderModule({ code: shader(levels) }), entryPoint: 'cull' },
-    });
-    const entry = (binding: number, buffer: GPUBuffer) => ({ binding, resource: { buffer } }),
-      group = d.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          entry(0, frame),
-          entry(1, part),
-          entry(2, records),
-          entry(3, hidden),
-          entry(4, counts),
-          ...this.levels.map((level, l) => entry(5 + l, level.drawn!)),
-        ],
-      });
+    const module = d.createShaderModule({ code: shader(levels) }),
+      entry = (binding: number, buffer: GPUBuffer) => ({ binding, resource: { buffer } }),
+      all = [frame, part, records, hidden, counts, level, local, groups, ...this.levels.map((l) => l.drawn!)],
+      // layout 'auto' keeps each entry point's group to the bindings it uses (at most 8 storage buffers each).
+      uses = [
+        [0, 1, 2, 3, 5, 6, 7],
+        [1, 4, 7],
+        [1, 2, 5, 6, 7, ...this.levels.map((_, l) => 8 + l)],
+      ],
+      pipelines = ['cull', 'scan', 'scatter'].map((entryPoint) =>
+        d.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } }),
+      ),
+      binds = pipelines.map((pipeline, k) =>
+        d.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: uses[k].map((binding) => entry(binding, all[binding])),
+        }),
+      );
     this.low = this.hiddenLow = 0;
     this.high = this.hiddenHigh = n;
-    return { frame, part, records, hidden, counts, reset, pipeline, group };
+    return { frame, part, records, hidden, counts, reset, level, local, groups, pipelines, binds };
   }
   private cull(c: Context): void {
     const d = c.device,
@@ -327,10 +360,13 @@ export class LodInstances implements EnginePlugin {
     d.queue.writeBuffer(gpu.frame, 0, this.frame as Float32Array<ArrayBuffer>);
     d.queue.writeBuffer(gpu.part, 0, this.part);
     c.encoder.copyBufferToBuffer(gpu.reset, 0, gpu.counts, 0, gpu.counts.size);
-    const pass = c.encoder.beginComputePass();
-    pass.setPipeline(gpu.pipeline);
-    pass.setBindGroup(0, gpu.group);
-    pass.dispatchWorkgroups(Math.ceil(this.count / 256));
+    const pass = c.encoder.beginComputePass(),
+      groups = Math.ceil(this.count / 256);
+    gpu.pipelines.forEach((pipeline, k) => {
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, gpu.binds[k]);
+      pass.dispatchWorkgroups(k === 1 ? 1 : groups);
+    });
     pass.end();
     this.levels.forEach((level, l) => c.encoder.copyBufferToBuffer(gpu.counts, l * 20, level.args!, 0, 20));
   }
@@ -353,7 +389,18 @@ export class LodInstances implements EnginePlugin {
     }
     const gpu = this.gpu;
     if (gpu)
-      for (const buffer of [gpu.frame, gpu.part, gpu.records, gpu.hidden, gpu.counts, gpu.reset]) buffer.destroy();
+      for (const buffer of [
+        gpu.frame,
+        gpu.part,
+        gpu.records,
+        gpu.hidden,
+        gpu.counts,
+        gpu.reset,
+        gpu.level,
+        gpu.local,
+        gpu.groups,
+      ])
+        buffer.destroy();
     this.gpu = undefined;
   }
   onDeviceRestored(engine: Engine): void {

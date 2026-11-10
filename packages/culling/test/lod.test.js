@@ -36,10 +36,17 @@ test('one compute pass feeds every level: core draws each from its own list and 
   assert.ok(near.redirect.instances && far.redirect.instances);
   assert.notEqual(near.redirect.instances, far.redirect.instances);
   assert.notEqual(near.redirect.args, far.redirect.args);
-  const code = h.pipelines.find((p) => p.compute).compute.module.code;
+  const compute = h.pipelines.filter((p) => p.compute),
+    code = compute[0].compute.module.code;
   assert.match(code, /fn pick/);
-  assert.match(code, /drawn1\[p\]=r/);
-  assert.equal(h.pipelines.filter((p) => p.compute).length, 1);
+  assert.match(code, /drawn1\[p\]=records\[i\]/);
+  // batch 132: an atomicAdd slot per instance reordered each level's list every frame; test, scan and copy keep
+  // instance order (lod-check.mjs reads the lists back and compares redraws).
+  assert.doesNotMatch(code, /atomic/);
+  assert.deepEqual(
+    compute.map((p) => p.compute.entryPoint),
+    ['cull', 'scan', 'scatter'],
+  );
 });
 
 test('the frame writes no records when nothing changed, and one range when one instance moved', () => {
@@ -83,7 +90,7 @@ test('on the WebGL2 layer every shown instance draws the first level, without co
   h.run();
   const args = new Uint32Array(h.batches[0].redirect.args.data);
   assert.equal(args[1], 2);
-  assert.equal(h.pipelines.filter((p) => p.compute).length, 1, 'compiled, never dispatched');
+  assert.equal(h.pipelines.filter((p) => p.compute).length, 3, 'compiled, never dispatched');
 });
 
 test('a level that cannot be retained releases the levels taken, once each, and the error reaches the caller', () => {

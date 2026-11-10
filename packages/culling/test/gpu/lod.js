@@ -16,13 +16,15 @@ const errors = [],
   matrix = ([x, y, z]) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 const spots = Array.from({ length: count }, (_, n) => place(n)),
   shown = new Array(count).fill(true);
-let a, b, lod, meshes, eye;
+let a, b, lod, meshes, eye, compat;
 const draw = async () => {
   for (const e of [a, b]) e.render({ culling: false });
   await Promise.all([a, b].map((e) => e.gpu.queue.onSubmittedWorkDone()));
 };
-// The level of an instance by its depth along the view, as the kernel does; -1 draws nothing.
+// The level of an instance by its depth along the view, as the kernel does; -1 draws nothing. The WebGL2 layer (compat)
+// has no compute and draws every shown instance at the first level.
 function level(n) {
+  if (compat) return 0;
   const w = eye - spots[n][2];
   if (w <= 0) return -2;
   const radius = (geometries[0].bounds[3] * (b.canvas.clientHeight / 2 / Math.tan((25 * Math.PI) / 180))) / w;
@@ -46,7 +48,8 @@ const move = (z) => {
     e.camera.target = [0, 3, z - 30];
   }
 };
-async function setup() {
+async function setup(onCompat = false) {
+  compat = onCompat;
   a = await Engine.create(document.getElementById('a'), { camera });
   b = await Engine.create(document.getElementById('b'), { camera, capacity: 2048 });
   for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
@@ -89,5 +92,30 @@ async function step(i) {
   await draw();
   return { label, counts: await lod.readCounts(), expected };
 }
-window.check = { setup, step, steps: steps.length, errors };
+// The same frame again with nothing changed: each level's instances must come out in the same order.
+const redraw = () => draw();
+// Each level's drawn list as instance numbers, read back from the GPU (column 3 of each record's matrix is its spot).
+async function order() {
+  const counts = await lod.readCounts(),
+    d = a.gpu,
+    out = [];
+  for (const [l, level] of lod['levels'].entries()) {
+    const size = Math.max(counts[l] * 96, 4),
+      staging = d.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+      encoder = d.createCommandEncoder();
+    encoder.copyBufferToBuffer(level.drawn, 0, staging, 0, size);
+    d.queue.submit([encoder.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const f = new Float32Array(staging.getMappedRange().slice(0));
+    staging.unmap();
+    staging.destroy();
+    out.push(
+      Array.from({ length: counts[l] }, (_, k) =>
+        spots.findIndex((s) => s[0] === f[k * 24 + 12] && s[2] === f[k * 24 + 14]),
+      ),
+    );
+  }
+  return out;
+}
+window.check = { setup, step, steps: steps.length, errors, redraw, order };
 window.ready = true;
