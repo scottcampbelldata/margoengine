@@ -814,6 +814,10 @@
       "types": "./dist/culling/sort.d.ts",
       "import": "./dist/culling/sort.js"
     },
+    "./culling/depth": {
+      "types": "./dist/culling/depth.d.ts",
+      "import": "./dist/culling/depth.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"
@@ -2270,6 +2274,10 @@
       "types": "./dist/mixer/stereo.d.ts",
       "import": "./dist/mixer/stereo.js"
     },
+    "./mixer/analyser": {
+      "types": "./dist/mixer/analyser.d.ts",
+      "import": "./dist/mixer/analyser.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
@@ -3045,6 +3053,10 @@
     "./scatter/surface": {
       "types": "./dist/scatter/surface.d.ts",
       "import": "./dist/scatter/surface.js"
+    },
+    "./scatter/occlusion": {
+      "types": "./dist/scatter/occlusion.d.ts",
+      "import": "./dist/scatter/occlusion.js"
     },
     "./scene": {
       "types": "./dist/scene.d.ts",
@@ -4529,14 +4541,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./culling/depth": {
-      "types": "./dist/culling/depth.d.ts",
-      "import": "./dist/culling/depth.js"
-    },
-    "./scatter/occlusion": {
-      "types": "./dist/scatter/occlusion.d.ts",
-      "import": "./dist/scatter/occlusion.js"
     }
   },
   "dependencies": {

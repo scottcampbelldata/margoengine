@@ -54,6 +54,10 @@
     "./stereo": {
       "types": "./dist/stereo.d.ts",
       "import": "./dist/stereo.js"
+    },
+    "./analyser": {
+      "types": "./dist/analyser.d.ts",
+      "import": "./dist/analyser.js"
     }
   },
   "files": [

@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { bounded } from './worklet-host.js';
 import { measureTruePeak } from './true-peak.js';
+import { loudnessFilters } from './loudness-filters.js';
 
 /** File/segment loudness measurements. Loudness values use LUFS; linear truePeak includes sample peaks. */
 export interface LoudnessReport {
@@ -54,24 +55,6 @@ const rates = [32000, 44100, 48000, 88200, 96000, 176400, 192000];
 const help = 'https://margoengine.com/llms/packages/mixer.md';
 const level = (power: number) => power > 0 ? -0.691 + 10 * Math.log10(power) : -Infinity;
 
-// Bilinear re-expression of the published 48 kHz transfer functions at the target rate.
-// old z^-1 = (B + A*new z^-1) / (A + B*new z^-1), A=1+r, B=1-r, r=rate/48000.
-function filters(sampleRate: number): Filter[] {
-  const r = sampleRate / 48000, a = 1 + r, b = 1 - r;
-  const polynomial = (p: readonly number[]) => [
-    p[0] * a * a + p[1] * a * b + p[2] * b * b,
-    2 * a * b * (p[0] + p[2]) + p[1] * (a * a + b * b),
-    p[0] * b * b + p[1] * a * b + p[2] * a * a,
-  ];
-  const stage = (num: readonly number[], den: readonly number[]): Filter =>
-    [num[0] / den[0], num[1] / den[0], num[2] / den[0], den[1] / den[0], den[2] / den[0]];
-  // ITU-R BS.1770-5 Annex 1, Tables 1 and 2. Preserve the high-pass double DC zero algebraically.
-  return [
-    stage(polynomial([1.53512485958697, -2.69169618940638, 1.19839281085285]),
-      polynomial([1, -1.69065929318241, 0.73248077421585])),
-    stage([4 * r * r, -8 * r * r, 4 * r * r], polynomial([1, -1.99004745483398, 0.99007225036621])),
-  ];
-}
 
 function validate(channels: readonly Float32Array[], sampleRate: number): number {
   bounded(sampleRate, 32000, 192000, 'Loudness sampleRate');
@@ -100,7 +83,7 @@ export function measureLoudness(channels: readonly Float32Array[], sampleRate = 
   const length = validate(channels, sampleRate), hop = sampleRate / 100;
   const energy = new Float64Array(Math.floor(length / hop));
   const weights = channels.length === 6 ? [1, 1, 1, 0, 1.41, 1.41] : channels.map(() => 1);
-  const coefficients = filters(sampleRate);
+  const coefficients = loudnessFilters(sampleRate);
   for (let channel = 0; channel < channels.length; channel++) {
     if (weights[channel] === 0) continue;
     const state = coefficients.map(() => new Float64Array(4));

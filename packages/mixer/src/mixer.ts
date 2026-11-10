@@ -158,6 +158,7 @@ export class Bus implements Disposable {
   private gainDb: number;
   private effectList: Effect[] = [];
   private readonly inserts = new Set<{ input: AudioNode; output: AudioNode; dispose(): void }>();
+  private insertEdges: [AudioNode, AudioNode][] = [];
   private readonly ducks = new Set<{ depth: number }>();
   private readonly sends = new Set<{ node: GainNode; target: Bus }>();
   private analyser: AnalyserNode | undefined;
@@ -183,6 +184,7 @@ export class Bus implements Disposable {
     this.fader.gain.value = gain;
     this.state = { name, parent, muted: !!options.muted, solo: !!options.solo, soloSafe: !!options.soloSafe };
     this.preTap.connect(this.fader).connect(this.duckNode).connect(this.gate).connect(this.output);
+    this.insertEdges.push([this.gate, this.output]);
     this.setEffects(options.effects ?? []);
   }
 
@@ -213,20 +215,21 @@ export class Bus implements Disposable {
     this.wireInserts();
     return () => {
       if (!this.inserts.delete(stage)) return;
-      stage.output.disconnect();
       if (!this.disposed) this.wireInserts();
     };
   }
 
   private wireInserts(): void {
-    this.gate.disconnect();
+    for (const [from, to] of this.insertEdges) from.disconnect(to);
+    this.insertEdges = [];
     let tail: AudioNode = this.gate;
     for (const stage of this.inserts) {
-      stage.output.disconnect();
       tail.connect(stage.input);
+      this.insertEdges.push([tail, stage.input]);
       tail = stage.output;
     }
     tail.connect(this.output);
+    this.insertEdges.push([tail, this.output]);
   }
 
   private alive(): void {

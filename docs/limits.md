@@ -1541,8 +1541,8 @@ Normalisation copies PCM, defaults -23 LUFS/-1 dBTP, target above -70 through 0 
 membership may prevent the requested loudness, and the after report exposes the actual outcome.
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
-Loudness entry: 2,107 B gzip, budget 2,363 B.
-Mixer root entry: 7,084 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
+Loudness entry: 2,106 B gzip, budget 2,363 B.
+Mixer root entry: 7,115 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -5096,8 +5096,6 @@ cinematic/ortho is new: 0 to 2877 B minified gzip, budget 3133 B. Optional brain
 ### React effects helpers (batch 266 job 4)
 Effects-extra is optional: 0 -> 8,131 B min+gzip, ceiling 8,387 B. Core plus stage remains 24,209 B. Stars defaults: count 5000, radius 100, depth 50, size factor 4, speed 1, seed 1; shell samples are uniform in volume. Sparkles defaults: count 100, scale 1, size 6 pixels, speed/opacity/noise 1, seed 1. Counts are whole numbers 0..1000000. Size/speed/opacity arrays have count values, RGB and per-point noise arrays count*3. Point phase and float RGBA are updated on the CPU; stars upload 16*count colour bytes per animated frame, sparkles also update 12*count position bytes. Sparkle displacement is at most 0.1*noise*scale per axis beyond its initial half-scale box. Trail and Edges retain native line options; Decal clips in target-local coordinates and inherits its transform once. Native point, line and material GPU paths apply. No timing or shader-only animation claim.
 
-=======
-=======
 Stereo entry: 815 B gzip, budget 1,071 B.
 
 ## Batch 212 job 1: mixer stereo
@@ -5118,14 +5116,10 @@ Minified gzip before/after: gltf root 6,983/6,997 B; scene-data 1,526/1,540 B; t
 `@margoengine/text/fit` adds `FittedText` and pure `fitText`. Defaults: maxLines/maxHeight unlimited, ellipsis true (U+2026), no clip, autoFit false, minFontSize 0.1 and maxFontSize the initial fontSize (1). maxWidth and all existing layout controls apply. Auto fit tests the full source against width, height and line count, selecting a size within the supplied positive finite bounds with 32 binary subdivisions. If the minimum still cannot fit, overflow rules apply. Truncation removes whole graphemes and reshapes the last candidate with a custom marker; a marker wider than the box is omitted. Less than one line of height yields no visible lines. Source text and UTF-16 offsets are retained; synthetic marker glyphs have zero source length. `displayText`, `visibleEnd`, `truncated` and `fits` expose the decision. `clipRect` is [left,bottom,right,top] in local coordinates and clips fill, outline and shadow on native WebGPU and full WebGL2. It is independent of layout bounds. Font fitting uses advance/line boxes rather than ink extents; the clip enforces ink bounds. No core or stage changes.
 
 Batch 248 job 1 entry measurement: text root 16,522 to 16,610 B gzip; new /fit 0 to 10,354 B gzip, including Text and layout. The optional root ceiling grows to hold clipping in the existing renderer and avoid a second renderer. Core plus stage is unchanged at 24,209 B.
-=======
 
 ### Batch 231 scatter occlusion
 `scatter/occlusion` adds `OccludedScatter`, the existing seeded ground-scatter options plus live `enabled` (default true), `addOccluder` and `removeOccluder`. Registered opaque core meshes, models, materials meshes and Terrain supply current-frame depth. Cutout, blended, displaced and clipped model primitives are conservatively excluded; a changed core vertex/discard shader disables occluder submission. Callers register real surfaces that are also drawn in that view. Occlusion only changes colour rings; the baseline camera/frustum/LOD rings remain available to shadow passes. Near-plane/eye crossings stay visible. No previous-frame occlusion or GPU readback is required by the native path. The WebGL2 layer runs the same kernels and actually drops hidden instances.
 The new `culling/depth` public entry exposes `DepthPyramid` and `depthPyramidShader` (Cull uniform binding 0, read-only farthest-depth storage binding 5, WGSL `unoccluded(vec4f(worldCenter,radius))`). `encode(context,engine)` precedes consumers in the same encoder. Sources persist through `release`; GPU resources recreate on a different device, view size or sample count; `dispose` is final. It uses the frame's sample count. A width W by height H view consumes a depth attachment (4*W*H*samples bytes) plus four bytes per pyramid texel across ceil-halved levels, and 4544 uniform bytes. Occluded scatter adds 96*count bytes for colour rings, 60 indirect bytes and 16 uniform bytes, in addition to baseline scatter storage. Entry gzip: occlusion 1177 B, depth 6064 B; core plus stage 24209 B unchanged. No timing or rival speed claim.
->>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
->>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 - Batch 244 job 1: `@margoengine/pixel/follow` adds `PixelFollow`, manual `update(seconds)` or automatic engine attachment. Defaults: lerp 1 at 60 Hz, zero dead zone/offset, unlimited world bounds, overlay order 100/layers 1. Low-res pixel snapping occurs after fractional integration. Dead-zone sizes are low-res pixels, positions/bounds are world units. A world smaller than the view is centered on the pixel lattice. Shake is deterministic at 60 Hz ticks, decays and stays inside world bounds; flash and fade overlay the complete canvas viewport. Fade-out holds until replaced/reset. A manual rig exposes overlay RGBA for another renderer; the attached overlay requires the full WebGPU or WebGL2 tier. No rotation/zoom tween or follow velocity prediction is claimed.
 
@@ -5133,3 +5127,7 @@ Batch 244 job 1 entry size: pixel/follow 0 -> 3605 B gzip. A single optional ent
 
 ## Imported weather (batch 236 job 1)
 `@margoengine/weather/gltf` is an optional 4,947 B gzip entry (new entry, previous 0 B; budget 5,203 B). Core plus stage remains 24,209 B. GLTFWeather.add(model) uses the existing gltf-pro shading hook; wetness, puddles, rings, slope cover, grain and vertex depth share the core-weather functions and their ranges. Only standard gltf-pro surface shaders are accepted. WebGPU and WebGL2 compatibility rendering are covered. Snow depth follows vertex density; silhouettes are not tessellated. No shelter yet; precipitation cover is batch 236 job 2.
+Analyser entry: 2,911 B gzip, budget 3,167 B.
+
+## Batch 212 job 2: live analysis
+Analyser entry: 2,911 B gzip, budget 3,167 B. Mixer root now 7,115 B gzip (ceiling 7,340 B) for destination-specific insert rewiring, preserving internal taps. Loudness 2,106 B after shared coefficient extraction. Native FFT power-of-two size 32..32768 (default 2048); smoothing 0..1 (default 0.8), FFT dBFS or linear amplitude and per-channel waveform with reusable ArrayBuffer-backed buffers. Audio-thread reports every 0.01..1 s (default 0.05) give per-channel window RMS/sample peak/dBFS and trailing momentary 400 ms and short-term 3 s LUFS. No integrated live meter or true-peak claim; those remain in loudness/worklet. Supports mono, stereo and Web Audio 5.1 (LFE omitted only from loudness), standard rates 32000/44100/48000/88200/96000/176400/192000. LUFS windows must be complete; silence/unavailable reads -Infinity. Energy ring holds 3 seconds, no unbounded history, fixed per-sample work. Readouts arrive via MessagePort; reset occurs on the audio thread. Analysis preserves samples, adds no algorithmic delay, has a silent analysis sink and no timers. Bus teardown disposes processors; manual disposal restores the bus. Requires secure AudioWorklet and blob CSP permission. Worklet options fixed; change native pan and FFT-independent controls using their existing APIs. No speed measurement or other-browser certification. Documentation conflict markers from the stereo landing were removed without dropping either side; docs.test.js guards all touched shared documents.

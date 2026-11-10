@@ -17,6 +17,7 @@ import { createDynamics, measureTruePeak } from '@margoengine/mixer/worklet';
 import { createRoomReverb, roomImpulseResponse } from '@margoengine/mixer/reflections';
 import { measureLoudness, normalizeLoudness } from '@margoengine/mixer/loudness';
 import { createBusStereo } from '@margoengine/mixer/stereo';
+import { createBusAnalyser } from '@margoengine/mixer/analyser';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -370,6 +371,33 @@ export async function runChecks() {
         : [l * Math.cos(x * Math.PI / 2), r + l * Math.sin(x * Math.PI / 2)];
       for (let c = 0; c < 2; c++) near(out.getChannelData(c)[64], expected[c], 1e-7, `width ${width}, pan ${pan}, channel ${c}`);
     }
+  });
+  await check('live bus analysis keeps anti-phase stereo, FFT bins, waveform and audio-clock RMS/LUFS', async () => {
+    const context = new OfflineAudioContext(2, rate * 4, rate);
+    using mixer = new Mixer(context, { buses: { x: {} } });
+    using stage = await createBusAnalyser(mixer.bus('x'), { fftSize: 2048, smoothing: 0 });
+    const b = context.createBuffer(2, rate * 4, rate);
+    const signal = sine(750, 4, 0.1);
+    b.getChannelData(0).set(signal); b.getChannelData(1).set(signal.map(v => -v));
+    const source = new AudioBufferSourceNode(context, { buffer: b }); source.connect(mixer.bus('x').input); source.start();
+    const reported = new Promise(resolve => stage.output.port.addEventListener('message', e => {
+      if (e.data.frames >= rate * 4) resolve();
+    }));
+    const suspended = context.suspend(0.25);
+    const rendered = context.startRendering();
+    await suspended;
+    for (let c = 0; c < 2; c++) {
+      const spectrum = stage.spectrum(c), waveform = stage.waveform(c);
+      const max = spectrum.reduce((best, v, i) => v > spectrum[best] ? i : best, 0);
+      near(stage.frequency(max), 750, 0, 'per-channel FFT retains anti-phase tone');
+      near(measure(waveform).peak, 0.1, 1e-7, 'waveform peak');
+    }
+    await context.resume(); const out = await rendered; await reported;
+    const reading = stage.read(), reference = measureLoudness([signal, signal.map(v => -v)], rate);
+    near(reading.rms[0], 0.1 / Math.sqrt(2), 1e-7, 'live RMS');
+    near(reading.momentary, reference.momentary, 1e-6, 'live momentary LUFS');
+    near(reading.shortTerm, reference.shortTerm, 1e-6, 'live short-term LUFS');
+    for (let c = 0; c < 2; c++) assert(out.getChannelData(c).every((v, i) => v === b.getChannelData(c)[i]), 'analysis output preserves samples');
   });
   device?.destroy();
   return { checks, backend };

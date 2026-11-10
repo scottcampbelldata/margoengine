@@ -4586,9 +4586,8 @@ Batch 216 job 2: no open defect found in orthographic follow, screen framing, pr
 Batch 266 effects regressions: explicit Trail target=null stays in native manual mode; new source hooks retain decal parent transforms exactly once. effects-extra.test.js and the native pixel-oracle fixture cover these cases. The kit test fake now declares the existing meshRuntime export used by the new entry; none of its behavior assertions changed.
 
 Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
-=======
 Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
 
 
 
@@ -4601,10 +4600,8 @@ The light loader rejected every model without a renderable primitive before scen
 
 Batch 200 rebase finding: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. Preserve existing content here; owning lanes repair in the fix phase under rule 21.
 Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage; no open defect identified in this job.
-=======
 
 - Batch 231 scope finding: `node packages/culling/test/gpu/meshes-occlusion-check.mjs --compat` fails its native Hi-Z draw-count assertion (1509/1509 behind the wall). Cause: existing CulledMeshes compatibility route intentionally performs frustum-only culling (`src/compat.ts`), separate from the new DepthPyramid API; software `culling/webgl2` is a separate API. New scatter/occlusion performs real Hi-Z on both backends. Deferred legacy parity per build-phase rule 21.
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 ### Batch 244 job 1
 The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
@@ -4612,3 +4609,4 @@ The camera rig is built with direct CPU trace and GPU overlay regressions. No op
 Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing unregistered headless/rigging/splats/worker browser files before selecting pixel. Repro: node scripts/gpu-package-tests.mjs --no-build --only=pixel. Cause: global registration audit precedes selection. Pixel package GPU scripts run directly on both backends for this batch.
 
 - Batch 236: origin/main 42c1cbdac already contains conflict markers in known-bugs.md and whitepaper/reproduce.md; reproduce with rg for conflict markers. Cause: committed shared-doc merge text. Outside weather scope, deferred under rule 21.
+Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.

@@ -35,11 +35,16 @@ test('every bus supports serial optional inserts, effects replacement, removal a
   const c = context();
   using m = new Mixer(c, { buses: { music: {} } });
   const b = m.bus('music');
+  const tap = c.createGain();
+  const standalone = createStereo(c); standalone.output.connect(tap);
+  const detach = b.insert(standalone);
+  assert.ok(reaches(standalone.output, tap), 'inserting preserves owned output taps');
   const a = createBusStereo(b), z = createBusStereo(b);
   assert.ok(reaches(b.gate, a.input) && reaches(a.output, z.input) && reaches(z.output, b.output));
   b.setEffects([{ type: 'filter', filter: 'lowpass', frequency: 1000 }]);
   assert.ok(reaches(b.input, a.input));
   a.dispose(); assert.ok(reaches(b.gate, z.input)); assert.ok(!reaches(b.gate, a.input));
+  detach(); assert.ok(reaches(standalone.output, tap), 'detaching preserves owned output taps'); standalone.dispose();
   b.dispose(); assert.throws(() => z.setPan(0), { code: 'disposed' });
   assert.ok(c.nodes.filter(n => n.kind === 'constant').every(n => n.stopped));
   assert.throws(() => createBusStereo(b), { code: 'disposed' });

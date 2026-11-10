@@ -8,6 +8,13 @@ import { bundleBytes } from '../../../scripts/measure-size.js';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
+test('mixer landing documents contain no unresolved merge markers', () => {
+  for (const file of ['api-surface.md', 'clean-room.md', 'known-bugs.md', 'limits.md',
+    'whitepaper/claims.md', 'whitepaper/reproduce.md', 'work-lists/readme-owed.md']) {
+    assert.doesNotMatch(readFileSync(join(root, 'docs', file), 'utf8'), /^(?:<{7}|={7}|>{7})(?: |\r?$)/m, file);
+  }
+});
+
 // Public budgets can become stale when a shared size ratchet shrinks them, even without a source edit here.
 test('mixer public current entry bytes and budgets match built entries and the shared size baseline', async () => {
   const limits = readFileSync(join(root, 'docs/limits.md'), 'utf8');

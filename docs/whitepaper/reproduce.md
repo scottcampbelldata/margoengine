@@ -3293,8 +3293,6 @@ After build:packages, run node --experimental-test-module-mocks --test --test-ti
 
 ## Batch 212 job 1: stereo controls
 Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
-=======
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 
 
@@ -3307,9 +3305,10 @@ After npm run build:packages, run npm test --workspace @margoengine/gltf. The tw
 Batch 248 job 1: build packages, then `node --test --test-timeout=240000 packages/text/tests/fit.test.js`; run `node scripts/gpu-lock.mjs run --owner=codex-batch248 --max=8 --wait-max=60 -- node packages/text/scripts/test-browser.js`, then the same with `--compat` after test-browser.js. Existing Source Sans 3 font data is SIL OFL 1.1 (packages/text/tests/fixtures/fonts/NOTICE.md). No benchmark or timing assertion.
 ### Batch 231 scatter Hi-Z
 After build:packages, run `node packages/scatter/test/occlusion.browser.mjs` and the same with `--compat`, each in a shared GPU slot. It renders the licensed Utah Teapot geometry behind building/terrain occluders, compares exact pixels against disabled culling, reads colour/shadow indirect counts and exercises camera/projection changes, near-plane, odd sizes, restore and multiple views. CPU: `node --test packages/culling/test/depth.test.js packages/scatter/test/occlusion.test.js`. No timing assertion or benchmark.
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 Batch 244 camera rig: build packages, run `node --test --test-timeout=60000 packages/pixel/tests/follow.test.js`, then `node scripts/gpu-lock.mjs run --owner=pixel-follow --max=2 --wait-max=60 -- node packages/pixel/tests/follow-check.mjs` and the same command with `--compat` after the script path. Original analytic fixtures need no downloaded data.
 
 ## Imported weather (batch 236 job 1)
 After build: `node --test --test-timeout=60000 packages/weather/tests/gltf.test.js`. GPU: `node scripts/gpu-lock.mjs run --owner=weather-proof --wait-max=60 --max=2 -- node packages/weather/tests/parity-browser.mjs gltf`, then the same with `--compat`. Fixture is original procedural test geometry, not an imported third-party demo. The gate requires wetness, puddles, animated rings and snow to change pixels; zero weather and disposal must match the baseline exactly.
+## Batch 212 job 2: live meters
+Build packages, run node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js. Run the existing shared GPU-locked mixer/scripts/test-browser.js on both backends; its live-analysis check includes FFT, waveform, audio-clock reports and exact output samples.

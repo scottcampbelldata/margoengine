@@ -652,21 +652,18 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf (batch 200): scene-data accepts meshless camera/light and empty scenes; allowEmptyScene defaults false; clarify textured WebGL2 compatibility support and preview escalation. Add examples only in the README phase.
 - @margoengine/text (batch 248 job 1): document /fit FittedText and fitText, defaults, source offsets, overflow marker, bounded auto fit and local clip including shadow.
 - margoengine (batch 248 job 1): document text/fit forwarding.
-=======
-=======
 - @margoengine/mixer (batch 212 stereo): document Bus.insert ownership and createStereo/createBusStereo, normalized width, automation, post-send placement and disposal.
 
 - margoengine (batch 212 stereo): document the generated mixer/stereo alias.
-=======
 
 - @margoengine/culling (batch 231 job 3): document depth entry, DepthPyramid lifetime/source registration, WGSL bindings and conservative same-frame sphere tests.
 - @margoengine/scatter (batch 231 job 3): document OccludedScatter, live enabled, terrain/building occluders, colour/shadow separation and memory.
 - margoengine (batch 231 job 3): document scatter/occlusion and culling/depth aliases.
->>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
->>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
->>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 - @margoengine/pixel (batch 244 job 1): document /follow, PixelFollow manual/attach, target/getter, per-axis lerp/dead-zone/offset/world units, bounds/undersized worlds, seeded shake, flash/fade/reset, overlay RGBA, timing, defaults and disposal.
 - margoengine (batch 244 job 1): document generated pixel/follow forwarding entry.
 - @margoengine/weather (batch 236 job 1): document /gltf GLTFWeather attach/add/removal, shared puddle/snow options, texture/extension composition, backend support, shader and vertex-density limits; examples deferred.
 - margoengine (batch 236 job 1): document weather/gltf forwarding entry; examples deferred.
+- @margoengine/mixer (batch 212 analyser): document createAnalyser/createBusAnalyser, per-channel FFT/waveform buffer reuse, live audio-clock RMS/peak/LUFS windows and reset/disposal.
+
+- margoengine (batch 212 analyser): document generated mixer/analyser alias.
