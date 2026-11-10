@@ -260,7 +260,10 @@ export function readVRM(source: Uint8Array | VRMDocument): VRMAvatar {
     vrm = extensions.VRMC_vrm as VRMAvatar | undefined;
   if (!object(vrm)) {
     if (object(extensions.VRM))
-      throw new MargoError('unsupported', 'This is a VRM 0.x file; export it as VRM 1.0, or convert it, to read it here');
+      throw new MargoError(
+        'unsupported',
+        'This is a VRM 0.x file; export it as VRM 1.0, or convert it, to read it here',
+      );
     throw new TypeError('This glTF has no VRMC_vrm extension; pass a VRM 1.0 file');
   }
   if (typeof vrm.specVersion !== 'string' || !/^1(\.|$)/.test(vrm.specVersion))
@@ -287,7 +290,8 @@ export function checkVRM(avatar: VRMAvatar, doc: VRMDocument): string[] {
     nodes = doc.nodes ?? [],
     parents = new Array<number>(nodes.length).fill(-1);
   nodes.forEach((node, i) => node.children?.forEach((child) => (parents[child] = i)));
-  const known = (node: unknown): boolean => Number.isInteger(node) && (node as number) >= 0 && (node as number) < nodes.length;
+  const known = (node: unknown): boolean =>
+    Number.isInteger(node) && (node as number) >= 0 && (node as number) < nodes.length;
   const above = (low: number, high: number): boolean => {
     for (let b = parents[low]; b !== -1; b = parents[b]) if (b === high) return true;
     return false;
@@ -413,7 +417,13 @@ export interface CreateVRMOptions {
 
 /** A new avatar for {@link writeVRM}, from the fields a VRM must have. The other `meta` fields take their defaults. */
 export function createVRM(options: CreateVRMOptions): VRMAvatar {
-  const { name, authors, bones, licenseUrl = 'https://vrm.dev/licenses/1.0/', ...rest } = options ?? ({} as CreateVRMOptions),
+  const {
+      name,
+      authors,
+      bones,
+      licenseUrl = 'https://vrm.dev/licenses/1.0/',
+      ...rest
+    } = options ?? ({} as CreateVRMOptions),
     entries = bones instanceof Map ? [...bones] : Object.entries(bones ?? {}),
     humanBones = Object.fromEntries(entries.map(([bone, node]) => [bone, { node }]));
   return { specVersion: '1.0', meta: { name, authors, licenseUrl }, humanoid: { humanBones }, ...rest };
@@ -443,7 +453,8 @@ export function vrmSprings(avatar: VRMAvatar): SpringBonesOptions | null {
   for (const spring of data.springs) {
     if (spring.joints.length < 2) continue;
     const hits = new Set<number>();
-    for (const group of spring.colliderGroups ?? []) for (const index of groups[group]?.colliders ?? []) hits.add(index);
+    for (const group of spring.colliderGroups ?? [])
+      for (const index of groups[group]?.colliders ?? []) hits.add(index);
     chains.push({
       joints: spring.joints.map((joint) => joint.node),
       settings: spring.joints.map((joint) => ({
@@ -610,13 +621,12 @@ export function vrmGaze(
   target: Vec3,
 ): VRMGaze {
   const offset = lookAt.offsetFromHeadBone ?? [0, 0, 0],
-    origin = [0, 1, 2].map((k) => head[k] * offset[0] + head[4 + k] * offset[1] + head[8 + k] * offset[2] + head[12 + k]),
+    origin = [0, 1, 2].map(
+      (k) => head[k] * offset[0] + head[4 + k] * offset[1] + head[8 + k] * offset[2] + head[12 + k],
+    ),
     world = rotationOfMatrix(head),
     space = multiplyQuaternions(world, conjugate(headRest)),
-    local = rotateByQuaternion(
-      [target[0] - origin[0], target[1] - origin[1], target[2] - origin[2]],
-      conjugate(space),
-    ),
+    local = rotateByQuaternion([target[0] - origin[0], target[1] - origin[1], target[2] - origin[2]], conjugate(space)),
     degrees = 180 / Math.PI;
   return {
     yaw: Math.atan2(local[0], local[2]) * degrees,
@@ -701,8 +711,12 @@ export interface VRMHandle {
   lookAtTarget: Vec3 | null;
   /** Gaze of the last update, or null when not looking at anything. */
   readonly gaze: VRMGaze | null;
+  /** Explicit gaze angles in degrees, for motion capture or VRMA; null (default) follows lookAtTarget. */
+  lookAtGaze: VRMGaze | null;
   /** What this model cannot show: MToon-only colour binds, by expression. Empty for most avatars. */
   readonly unsupported: readonly string[];
+  /** Add a pose producer, evaluated before gaze, expressions and springs, in registration order. Returns its removal. */
+  addPoseSource(update: (delta: number) => void): () => void;
   /** Runs one frame by hand; the Animator or the engine does this each frame by itself. */
   update(delta: number): void;
   /** Puts expressions and eyes back to neutral and stops. */
@@ -796,19 +810,23 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
         live,
         value: live[0] ? live[0][field].slice() : [],
         strength:
-          field === 'emission'
-            ? (definition.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1)
-            : 1,
+          field === 'emission' ? (definition.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1) : 1,
       });
     }
     for (const bind of expression.textureTransformBinds ?? [])
       if (!transforms.has(bind.material)) transforms.set(bind.material, transformBase(bind.material));
   }
-  const state: { target: Vec3 | null; gaze: VRMGaze | null } = { target: null, gaze: null };
+  const poseSources = new Set<(delta: number) => void>();
+  const state: { target: Vec3 | null; gaze: VRMGaze | null; input: VRMGaze | null } = {
+    target: null,
+    gaze: null,
+    input: null,
+  };
   const applyGaze = (): void => {
     if (!lookAt) return;
     const target = state.target;
-    if (target) state.gaze = vrmGaze(lookAt, nodes[head].matrix, rest.model[head], target);
+    if (state.input) state.gaze = state.input;
+    else if (target) state.gaze = vrmGaze(lookAt, nodes[head].matrix, rest.model[head], target);
     else state.gaze = null;
     const gaze = state.gaze ?? { yaw: 0, pitch: 0 };
     if (lookAt.type === 'expression') {
@@ -858,7 +876,8 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
           const next = transformRows(offset, scale, map.turn, map.texCoord);
           for (let k = 0; k < TRANSFORM_ROW; k++) live.uvt![map.slot * TRANSFORM_ROW + k] = next[k];
         }
-        if (!rows.length) throw new MargoError('state', 'This material has no texture transform rows; rebuild the model');
+        if (!rows.length)
+          throw new MargoError('state', 'This material has no texture transform rows; rebuild the model');
       }
   };
   const update = (delta: number): void => {
@@ -866,6 +885,7 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
       for (const bone of chainHeads) nodes[bone].setQuaternion(rest.local[bone]);
       store.tick(false);
     }
+    for (const source of poseSources) source(delta);
     applyGaze();
     applyExpressions();
     if (springs) {
@@ -883,6 +903,7 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
   const stop = (): void => {
     remove?.();
     remove = null;
+    poseSources.clear();
     unsubscribe?.();
     unsubscribe = null;
   };
@@ -893,6 +914,7 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
     stop();
     for (const expressionName of expressions.names) expressions.set(expressionName, 0);
     state.target = null;
+    state.input = null;
     applyGaze();
     applyExpressions();
     store.tick(false);
@@ -902,6 +924,14 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
     expressions,
     springs,
     unsupported,
+    addPoseSource(source) {
+      if (!remove) throw new MargoError('disposed', 'VRM controller is disposed; create a new controller');
+      if (typeof source !== 'function') throw new TypeError('VRM pose source must be a function');
+      poseSources.add(source);
+      return () => {
+        poseSources.delete(source);
+      };
+    },
     get lookAtTarget() {
       return state.target;
     },
@@ -909,6 +939,14 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
       if (value !== null && !(Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)))
         throw new RangeError('lookAtTarget must be three finite numbers or null');
       state.target = value;
+    },
+    get lookAtGaze() {
+      return state.input;
+    },
+    set lookAtGaze(value) {
+      if (value !== null && (!Number.isFinite(value.yaw) || !Number.isFinite(value.pitch)))
+        throw new RangeError('lookAtGaze needs finite yaw and pitch in degrees, or null');
+      state.input = value === null ? null : { yaw: value.yaw, pitch: value.pitch };
     },
     get gaze() {
       return state.gaze;

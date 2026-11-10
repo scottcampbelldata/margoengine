@@ -1950,6 +1950,10 @@
       "types": "./dist/loaders/threemf-lattice.d.ts",
       "import": "./dist/loaders/threemf-lattice.js"
     },
+    "./lod/msft": {
+      "types": "./dist/lod/msft.d.ts",
+      "import": "./dist/lod/msft.js"
+    },
     "./lod/clusters": {
       "types": "./dist/lod/clusters.d.ts",
       "import": "./dist/lod/clusters.js"
@@ -2949,6 +2953,10 @@
     "./rigging/vrm-constraints": {
       "types": "./dist/rigging/vrm-constraints.d.ts",
       "import": "./dist/rigging/vrm-constraints.js"
+    },
+    "./rigging/vrma": {
+      "types": "./dist/rigging/vrma.d.ts",
+      "import": "./dist/rigging/vrma.js"
     },
     "./road": {
       "types": "./dist/road.d.ts",

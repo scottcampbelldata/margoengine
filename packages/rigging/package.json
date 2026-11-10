@@ -84,6 +84,10 @@
     "./vrm-constraints": {
       "types": "./dist/vrm-constraints.d.ts",
       "import": "./dist/vrm-constraints.js"
+    },
+    "./vrma": {
+      "types": "./dist/vrma.d.ts",
+      "import": "./dist/vrma.js"
     }
   },
   "files": [
@@ -103,7 +107,8 @@
     "@margoengine/animator": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/kinematics-constraints": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/animation": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {
@@ -117,6 +122,9 @@
     },
     "@margoengine/gltf-pro": {
       "optional": true
+    },
+    "@margoengine/animation": {
+      "optional": true
     }
   },
   "scripts": {
@@ -125,6 +133,7 @@
     "test:browser": "npm run build && node tests/rigging-browser.mjs",
     "prepack": "npm run build",
     "test:mtoon:browser": "node tests/mtoon-light.browser.mjs && node tests/mtoon-replica.browser.mjs && node tests/mtoon-matcap.browser.mjs && node tests/mtoon-uv.browser.mjs && node tests/mtoon-uv-animation.browser.mjs && node tests/mtoon-expressions.browser.mjs && node tests/mtoon-local-rim.browser.mjs && node tests/mtoon-gbuffer.browser.mjs && node tests/mtoon-outline.browser.mjs && node tests/mtoon-avatar.browser.mjs && node tests/mtoon-avatar.browser.mjs --vrm1",
-    "test:constraints:browser": "node tests/vrm-constraints.browser.mjs"
+    "test:constraints:browser": "node tests/vrm-constraints.browser.mjs",
+    "test:vrma:browser": "node tests/vrma.browser.mjs"
   }
 }

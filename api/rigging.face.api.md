@@ -234,7 +234,9 @@ interface VRMHandle {
     readonly springs: SpringBones | null;
     lookAtTarget: Vec3 | null;
     readonly gaze: VRMGaze | null;
+    lookAtGaze: VRMGaze | null;
     readonly unsupported: readonly string[];
+    addPoseSource(update: (delta: number) => void): () => void;
     update(delta: number): void;
     dispose(): void;
     [Symbol.dispose](): void;

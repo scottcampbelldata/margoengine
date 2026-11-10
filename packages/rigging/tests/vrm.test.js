@@ -433,6 +433,31 @@ test('an avatar that does not fit the model is refused', async (t) => {
   assert.throws(() => addVRM(animation, avatar), /morph target 999/);
 });
 
+test('VRM pose sources run before expression and gaze evaluation, detach and stop on disposal', async (t) => {
+  const { animation, doc } = await setup(t, seed),
+    handle = addVRM(animation, readVRM(doc), { springs: false });
+  const gaze = { yaw: 30, pitch: 10 };
+  let calls = 0;
+  const remove = handle.addPoseSource((delta) => {
+    calls++;
+    assert.equal(delta, 0.1);
+    handle.lookAtGaze = gaze;
+    handle.expressions.set('aa', 0.6);
+  });
+  handle.update(0.1);
+  assert.equal(calls, 1);
+  assert.deepEqual(handle.gaze, gaze);
+  gaze.yaw = 200;
+  assert.equal(handle.lookAtGaze.yaw, 30);
+  assert.throws(() => (handle.lookAtGaze = { yaw: NaN, pitch: 0 }), RangeError);
+  remove();
+  handle.update(0);
+  assert.equal(calls, 1);
+  handle.dispose();
+  assert.equal(handle.lookAtGaze, null);
+  assert.throws(() => handle.addPoseSource(() => {}), { code: 'disposed' });
+});
+
 test('a model disposed first takes the avatar with it, and dispose after that does nothing', async (t) => {
   const { model, animation, doc } = await setup(t, seed),
     vrm = addVRM(animation, readVRM(doc));
