@@ -3494,3 +3494,8 @@ References expand before execution, with occurrence-specific state, paths and la
 The runtime document stores the expanded form; retain the original input to edit
 reference names. No automatic blackboard remapping or dynamic hot replacement.
 Core + stage remains 23,950 B gzip, below 25,000 B.
+
+
+Batch 252 job 1: `@margoengine/navmesh/queries` provides `NavMeshQuery.raycast` and `moveAlongSurface`. Rays ignore destination Y, return t in [0,1], an outward XZ unit normal, the hit polygon edge and connected visited corridor; t=1 and a null edge mean no hit. An off-mesh or forbidden start returns null. Optional startPolygon selects the ground layer on a shared edge. Movement is local: only portals intersecting the segment-diameter disk are expanded. Use small controller steps on a mesh already eroded for the controller radius. Both queries project result Y onto the reached polygon plane, honor area filters and never take off-mesh links. Tile polygon ids expire on rebuild. No new core/stage feature or GPU work.
+
+Batch 252 job 1 measured entry sizes: @margoengine/navmesh/queries: 1609 B gzip (ceiling 0 -> 1865 B); @margoengine/navmesh/tiles: 14857 B gzip (ceiling 15113 -> 15113 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.

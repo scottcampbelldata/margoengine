@@ -291,6 +291,8 @@ class TiledNavMesh implements NavSurface {
     tile(x: number, z: number): NavTile | null;
     polygonCenter(index: number): Vec3;
     polygonLinks(index: number): readonly NavLink[];
+    polygonPoints(index: number): readonly Vec3[];
+    areaCost(index: number): number;
     polygonArea(index: number): number;
     heightAt(index: number, x: number, z: number): number;
     locate(position: Vec3): number;

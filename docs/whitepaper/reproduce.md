@@ -2490,3 +2490,6 @@ depth, AR alpha, controller and lifecycle assertion unchanged.
 Batch 251 subtrees: build behavior and run
 `node --test --test-timeout=120000 packages/behavior/tests/subtrees.test.js`.
 All fixtures are generated locally; no renderer, GPU, external assets or timings.
+
+
+Batch 252 job 1: build packages, then run `node --test --test-timeout=120000 packages/navmesh/test/queries.test.js`. The clean-room record cites the clipping paper, triangulation paper and rival query contracts. Fixtures are generated analytically in the test and require no GPU or external assets.

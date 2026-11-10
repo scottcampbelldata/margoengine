@@ -519,6 +519,16 @@ export class TiledNavMesh implements NavSurface {
     this.owner(index);
     return this.adjacency[index];
   }
+  /** World-space corners of polygon `index`, in winding order, for optional surface queries. */
+  polygonPoints(index: number): readonly Vec3[] {
+    const mesh = this.owner(index).mesh as NavMesh;
+    return mesh.polygonVertices(this.locals[index]).map((id) => mesh.vertices[id]);
+  }
+  /** Area cost multiplier of polygon `index` (1 by default). */
+  areaCost(index: number): number {
+    this.owner(index);
+    return this.costs[index];
+  }
   /** Area number of polygon `index`, for route filters. */
   polygonArea(index: number): number {
     this.owner(index);

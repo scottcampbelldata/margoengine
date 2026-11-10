@@ -2931,3 +2931,8 @@ expand once during construction. Each occurrence has independent node state;
 blackboard, seeded random stream and task cancellation retain standard tree
 semantics. Proof: packages/behavior/tests/subtrees.test.js compares inline and
 resolved traces and exercises nested/diamond reuse, missing names and cycles.
+
+
+## Batch 252 job 1: ground queries
+
+`NavMeshQuery` in `@margoengine/navmesh/queries` covers the web rival's documented walkability ray and local surface movement behaviors. Evidence: `packages/navmesh/test/queries.test.js` checks exact hit fraction/edge/normal for both windings, connected corridors, vertex ties, blocking costs and filters, forbidden/off-mesh starts, off-mesh-link exclusion, wall sliding, sloped height projection and live tiled rebuilds. Contract comparison: Detour/recast-navigation-js expose a surface ray and constrained local movement with visited polygons; Margo supplies those results and a projected move height. This is a behavior comparison against published API contracts, not a runtime speed or universal navigation claim.

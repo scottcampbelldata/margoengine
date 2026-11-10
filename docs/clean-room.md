@@ -5121,3 +5121,10 @@ runtime. Tests compare resolved and inline statuses/traces, nested/diamond reuse
 per-occurrence task cancellation, missing names, cycles and expansion depth. This
 covers the documented reference/reuse row without introducing global state.
 No asset demo or timing claim is added; generated trees are correctness fixtures.
+
+
+## Batch 252 job 1: walkability queries
+
+Sources compared before implementation (2026-11-10): Mike Cyrus and Jay Beck, *Generalized two- and three-dimensional clipping* (1978), https://doi.org/10.1016/0097-8493(78)90021-3 (convex half-plane segment intervals); Douglas Demyen and Michael Buro, *Efficient Triangulation-Based Pathfinding* (2006), https://cdn.aaai.org/AAAI/2006/AAAI06-148.pdf (traversable portals versus constrained walls); Mikko Mononen and Recast Navigation contributors, *dtNavMeshQuery API reference* (2009-present), https://recastnav.com/classdtNavMeshQuery.html (raycast and local move contracts); Isaac Mason and contributors, *recast-navigation-js NavMeshQuery API reference* (accessed 2026-11-10), https://recast-navigation-js-docs.isaacmason.com/classes/index.NavMeshQuery.html (web rival contract). Only papers and published API descriptions were consulted, no implementation or companion source.
+
+Combined design: clip an XZ segment against convex polygon half-planes, then follow only connected ground portals at the exit parameter. Explore tied vertex exits so a zero-length polygon crossing is valid. Report the exact edge and outward normal. Local movement searches portals intersecting the disk with the requested segment as diameter and selects the closest point on the reachable polygons. Unlike the reference contract's unprojected move result, Margo projects onto the polygon plane. Filters, blocked polygons, partial tile portals and live rebuilds share the existing mesh graph. Synthetic corridors, ramps and floors are analytic test fixtures; no downloaded asset or new public demo. The private CAD kernel's package layout was inspected; these ground graph queries belong to navmesh, not the private CAD kernel.

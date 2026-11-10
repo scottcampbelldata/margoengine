@@ -19,3 +19,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/webgl2-compat | Canvas output persistence when reconfiguring between page-backed XR and offscreen devices; supported XR preparation. | Batch 273 XR group |
 | @margoengine/behavior | subtrees: explicit registries, reference-aware validateTree, resolveTree and SubtreeTree with occurrence-local state and limits | batch-251 job 1 |
 | margoengine | Generated behavior/subtrees alias | batch-251 job 1 |
+
+| @margoengine/navmesh | queries: raycast wall edge/normal, local moveAlongSurface, filters, tiled lifetime and height projection | batch-252 job 1 |
+| margoengine | Generated navmesh/queries alias | batch-252 job 1 |
