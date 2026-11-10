@@ -1,0 +1,40 @@
+<!doctype html><html><meta charset="utf-8"><title>Mesh UV and smooth-normal transport</title><canvas width="16" height="16"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {MeshPathTracer,triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],rows=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);device.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=.01;out[14]=1;out[15]=1;};engine.render();
+ const scene=()=>({revision:1,models:[],instances:[],materials:[{id:1,type:'diffuse',color:[1,1,1]}],meshes:[],environment:{ground:false,skyIntensity:0,sunIntensity:Math.PI,sunAngularSize:0,sunDirection:[0,0,1]}});
+ const render=async(name,s,expected,composed=false)=>{
+  const pending=composed?ComposedVoxelPathTracer.create(engine,{scene:s,features:[triangleMeshes()],denoise:false,maxBounces:1}):MeshPathTracer.create(engine,{scene:s,denoise:false,maxBounces:1});
+  // The caller may recycle both attribute arrays as soon as create returns its promise.
+  for(const m of s.meshes){m.normals?.fill(NaN);m.uvs?.fill(NaN);}
+  const t=await pending;
+  try{await t.ready;const im=await t.renderImage({width:16,height:16,samples:1,jitter:false,seed:17,signal:AbortSignal.timeout(120000)});
+   let maximumError=0;for(let i=0;i<im.color.length;i++)maximumError=Math.max(maximumError,Math.abs(im.color[i]-expected[i]));
+   rows.push({name,composed,maximumError,finite:im.color.every(Number.isFinite)});
+  }finally{t.dispose();}
+ };
+ try{
+  for(const composed of [false,true]){
+   let s=scene();s.meshes=[{id:'smooth',material:1,positions:new Float32Array([-4,-4,0,4,-4,0,0,4,0]),indices:new Uint32Array([0,1,2]),normals:new Float32Array([0,0,1,0,.6,.8,.6,0,.8])}];
+   const smooth=[];for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+    const px=(x+.5)/8-1,py=1-(y+.5)/8,b2=(py+4)/8,b1=(px+4-4*b2)/8,b0=1-b1-b2;
+    const n=[.6*b2,.6*b1,b0+.8*(b1+b2)],z=n[2]/Math.hypot(...n);smooth.push(z,z,z);
+   }
+   await render('barycentric normals under analytic sun',s,smooth,composed);
+   s=scene();s.materials[0].texture=0;s.textures=[{width:2,height:2,data:new Uint8Array([255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255])}];
+   s.meshes=[{id:'uv',material:1,positions:new Float32Array([-2,-2,0,2,-2,0,2,2,0,-2,2,0]),indices:new Uint32Array([0,1,2,0,2,3]),uvs:new Float32Array([0,0,1,0,1,1,0,1])}];
+   const pixels=[];for(let y=0;y<16;y++)for(let x=0;x<16;x++){const i=(y<8?2:0)+(x>=8?1:0);pixels.push(...[[1,0,0],[0,1,0],[0,0,1],[1,1,1]][i]);}
+   await render('interpolated UV texels and shared edge',s,pixels,composed);
+  }
+  await Promise.all(reports);return {rows,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>

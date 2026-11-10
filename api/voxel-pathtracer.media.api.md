@@ -97,6 +97,11 @@ interface TraceFog {
     anisotropy?: number;
 }
 
+interface TraceGeometryBuilder {
+    build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
+    dispose(): void;
+}
+
 interface TraceGrid {
     color: TraceVec3;
     spacing: number;
@@ -280,7 +285,7 @@ interface VoxelTraceFeature {
     readonly id: VoxelTraceFeatureId;
     readonly source: (source: string) => string;
     readonly scene?: (scene: VoxelTraceScene) => VoxelTraceScene;
-    readonly geometry?: (scene: VoxelTraceScene, signal?: AbortSignal) => Promise<Uint32Array>;
+    readonly geometry?: () => TraceGeometryBuilder;
 }
 
 type VoxelTraceFeatureId = 'resampling' | 'mesh' | 'media' | 'guiding' | 'spectral';

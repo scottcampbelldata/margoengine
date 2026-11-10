@@ -98,7 +98,9 @@
     "test:gpu:compose-native": "cd ../.. && node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native",
     "test:gpu:compose-compat": "cd ../.. && node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=compat",
     "test:gpu:parity-gamma": "cd ../.. && node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs",
-    "test:gpu:history-taps": "cd ../.. && node packages/voxel-pathtracer/tests/history-taps-browser.mjs"
+    "test:gpu:history-taps": "cd ../.. && node packages/voxel-pathtracer/tests/history-taps-browser.mjs",
+    "test:gpu:mesh-attributes": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-attributes-browser.mjs",
+    "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -116,7 +118,9 @@
       "test:gpu:compose-native": 12,
       "test:gpu:compose-compat": 12,
       "test:gpu:parity-gamma": 6,
-      "test:gpu:history-taps": 6
+      "test:gpu:history-taps": 6,
+      "test:gpu:mesh-attributes": 4,
+      "test:gpu:mesh-instances": 7
     }
   },
   "peerDependenciesMeta": {

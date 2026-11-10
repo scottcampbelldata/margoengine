@@ -34,7 +34,8 @@ for (const compat of [false, true]) {
         );
       if (row.maximumError !== undefined) assert.ok(row.maximumError < 1e-5, 'no shared-edge cracks');
       if (row.differing !== undefined) assert.equal(row.differing, 0);
-      if (row.ids) assert.deepEqual(row.ids, [-4, -5]);
+      if (row.ids) assert.deepEqual(row.ids, row.expectedIds ?? [-4, -5]);
+      if (row.expectedGeometry) assert.deepEqual(row.geometry, row.expectedGeometry);
     }
     assert.equal(result.lifecycle.newDevice, true);
     assert.ok(result.lifecycle.traced > 1000);

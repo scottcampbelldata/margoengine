@@ -1,17 +1,19 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { MeshTraceScene } from './mesh.js';
 
-interface Kernel {
+export interface MeshKernel {
   memory: WebAssembly.Memory;
   allocate(n: number): number;
   release(p: number, n: number): void;
   build_mesh(p: number, n: number): number;
+  build_instances(p: number, n: number): number;
+  equal_words(p: number, n: number): number;
   output_ptr(): number;
   output_len(): number;
 }
 
 /** Lazy and feature-local. No Wasm fetch or compilation happens on import. */
-async function kernel(signal?: AbortSignal): Promise<Kernel> {
+export async function meshKernel(signal?: AbortSignal): Promise<MeshKernel> {
   const url = new URL('./mesh.wasm?no-inline', import.meta.url);
   let bytes: ArrayBuffer;
   if (url.protocol === 'file:') {
@@ -32,7 +34,7 @@ async function kernel(signal?: AbortSignal): Promise<Kernel> {
   signal?.throwIfAborted();
   const result = await WebAssembly.instantiate(bytes);
   signal?.throwIfAborted();
-  return result.instance.exports as unknown as Kernel;
+  return result.instance.exports as unknown as MeshKernel;
 }
 
 /** Validate/copy caller arrays before the first wait; the Rust kernel owns the heavy geometry work. */
@@ -57,13 +59,28 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
       throw new TypeError('MeshPathTracer expects Float32Array xyz positions and Uint32Array triangle indices');
     const material = materials.get(m.material);
     if (!material) throw new TypeError('MeshPathTracer mesh.material must name a scene palette material');
-    if (material.type === 'media' || material.texture !== undefined || material.cutout !== undefined)
-      throw new TypeError('MeshPathTracer meshes support surface materials without voxel textures or media; pass an untextured surface material');
+    if (
+      material.type === 'media' ||
+      material.cutout !== undefined ||
+      (material.texture !== undefined && (typeof material.texture !== 'number' || m.uvs === undefined))
+    )
+      throw new TypeError(
+        'MeshPathTracer meshes support surface materials; textures require one numeric texture index and vertex UVs; media and cutout are unsupported',
+      );
+    if (m.normals !== undefined && (!(m.normals instanceof Float32Array) || m.normals.length !== m.positions.length))
+      throw new TypeError('MeshPathTracer normals must be Float32Array xyz values, one per position');
+    if (m.uvs !== undefined && (!(m.uvs instanceof Float32Array) || m.uvs.length !== (m.positions.length / 3) * 2))
+      throw new TypeError('MeshPathTracer uvs must be Float32Array pairs, one per position');
     triangles += m.indices.length / 3;
     size += 3 + m.positions.length + m.indices.length;
   }
   if (triangles > 1_000_000 || size > (128 << 20) / 4)
-    throw new RangeError('MeshPathTracer accepts at most 1,000,000 triangles and 128 MiB of input words; pass fewer triangles or vertices');
+    throw new RangeError(
+      'MeshPathTracer accepts at most 1,000,000 triangles and 128 MiB of input words; pass fewer triangles or vertices',
+    );
+  const attributes = scene.meshes.some((m) => m.normals !== undefined || m.uvs !== undefined);
+  if (attributes) size += 1 + scene.meshes.reduce((n, m) => n + 2 + (m.normals?.length ?? 0) + (m.uvs?.length ?? 0), 0);
+  if (size > (128 << 20) / 4) throw new RangeError('MeshPathTracer accepts at most 128 MiB of input words');
   const input = new Uint32Array(size);
   input[0] = scene.meshes.length;
   let at = 1;
@@ -75,14 +92,26 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
     input.set(m.indices, at);
     at += m.indices.length;
   }
-  const k = await kernel(signal),
+  if (attributes) {
+    input[at++] = 0x4d415454;
+    for (const m of scene.meshes) {
+      input.set([m.normals?.length ?? 0, m.uvs?.length ?? 0], at);
+      at += 2;
+      for (const a of [m.normals, m.uvs])
+        if (a) {
+          input.set(new Uint32Array(a.buffer, a.byteOffset, a.length), at);
+          at += a.length;
+        }
+    }
+  }
+  const k = await meshKernel(signal),
     p = k.allocate(size);
   try {
     new Uint32Array(k.memory.buffer, p, size).set(input);
     const code = k.build_mesh(p, size);
     if (code)
       throw new RangeError(
-        `MeshPathTracer ${['', 'invalid mesh packet', 'positions must be finite within +/-1e8 world units', 'index outside positions', 'degenerate triangle'][code] ?? 'invalid mesh'}; check scene.meshes`,
+        `MeshPathTracer ${['', 'invalid mesh packet', 'positions must be finite within +/-1e8 world units', 'index outside positions', 'normals must be finite and nonzero', 'UVs must be finite within +/-1e8'][code] ?? 'invalid mesh'}; check scene.meshes`,
       );
     signal?.throwIfAborted();
     return new Uint32Array(k.memory.buffer, k.output_ptr(), k.output_len()).slice();

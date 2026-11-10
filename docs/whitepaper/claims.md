@@ -3472,3 +3472,68 @@ React callbacks run by ascending finite priority, with stable ties. A positive s
 Optional exporters/textures supplies clean-room box, bilinear and Lanczos resizing with exact sRGB transfer and associated colour filtering, plus native WebP/AVIF output with MIME feature detection and coded unsupported-format errors. GLB output writes extension image sources with optional resized PNG/JPEG core fallbacks. Proof: packages/exporters/tests/textures.test.js and textures-browser.js, the latter invoked on native WebGPU and WebGL2 compatibility by the exporter browser gate. Native WebP decoded correctly; this Chromium runtime did not support AVIF encoding, so its unsupported error was checked. No portable encoder, universal AVIF support, ratification, compression ratio or speed claim. Defaults, bounds, research and evidence: docs/exporter-textures.md.
 ### UI on-screen text entry (batch 259)
 The optional keyboard edits TextInput and TextArea through pointer, gamepad and world-panel rays, including selections, grapheme deletion and shift/caps modes. Evidence: keyboard.test.js and keyboard-browser.mjs; no typing-speed or headset hardware claim.
+
+
+
+
+
+### Review 99 mesh builder checkpoint
+
+Exactly zero-area Float32 triangles are counted and omitted; thin nonzero input
+geometry is retained. Original triplet IDs remain stable after compaction and
+mesh statistics update atomically in standalone and composed tracers. Proof:
+mesh-build-regression.test.js fails twice on the prior Wasm, then passes; its
+512-case independent scaled-integer oracle and five Rust tests pass. The 16-bin
+SAH fixture reduces a gap ray's node checks from five to three. This proves
+that fixture's work only, with no throughput, universal watertightness or
+full-scene transport claim. The continuation passes the full mesh suite on native and WebGL2/Vulkan and the exact README example. The additional composed native run times out at its unchanged 12-minute lease; the separate compatibility run passes.
+
+### Review 99 mesh checkpoint validation update
+
+Mesh native and WebGL2/Vulkan transport, degeneracy statistics, original AOV IDs
+and lifecycle pass, and the triangle-mesh README example runs as written. The
+full composed native suite times out at the unchanged twelve-minute lease,
+with subset 31 awaiting its trace pipeline. No full-scene or composed-native
+acceptance claim is made; the failure is retained in known-bugs and the
+checkpoint receipt. No timing result here is a throughput claim.
+
+### Review 99 local vertex attributes
+
+Indexed Float32 normals and UVs are snapshotted and gathered for nondegenerate
+mesh faces. Independent analytic per-pixel sun/texture oracles pass in standalone
+and composed tracers on native WebGPU and WebGL2/Vulkan at the existing mesh
+1e-5 value bound; maximum observed error is below 4.76838e-7. The two new CPU
+regressions fail against the preceding build, then the full package passes
+147/147; six Rust cases pass. This is a local attribute checkpoint, not whole-
+scene closure, a conservation guarantee for shading normals, or a speed claim.
+
+### Review 99 composition timeout phase evidence
+
+The retained failing native log proves lease exhaustion during pipeline readiness,
+with subset 31's trace pipeline outstanding after preview/ids completion. It
+does not prove a permanently stuck compile or identify a Dawn/driver subphase.
+The new independent host watchdog reports pending operations and stops its child
+tree within the unchanged lease. Deterministic regressions cover the recorded
+event ordering, blocked phases and owned-tree termination. This repairs missing
+diagnostics only; native acceptance and the earlier unattributed WebGL2 timeout
+remain open. [Evidence](results/review-99-compose-timeout-20261109.json).
+
+The changed supervisor's full WebGL2/Vulkan suite passes all original checks.
+The required full-package README gate separately fails the resampled module's
+20-second deadline. No retry was made and no checkpoint push is claimed.
+
+### Review 99 shared-instance transport evidence
+
+Explicit meshInstances share one object-space BLAS per geometry id in standalone
+and composed tracers. Matrix-only updates reuse byte-identical BLAS; an exact
+content change invalidates all referencing placements. Independent baked mesh
+reference checks cover affine translation, rotation/nonuniform scaling, shear,
+reflection, smooth normals and UVs, overlapping TLAS leaves, depth and stable
+triangle ids. Native and WebGL2/Vulkan maximum color/depth errors are below 1e-5;
+failed transforms preserve the committed image. CPU tests verify per-tracer cache
+isolation, snapshots, restoration, disposal, invalidation and SIMD lane/tail
+comparison. See results/review-99-shared-instances-20261109.json and the package
+mesh-instances tests. This closes only the shared-instance implementation gap;
+triangle NEE/RIS, independent guiding, many-light lobes/scattering, RIS naming
+and equal-cost work, and root emitter-MIS suite coverage remain open. Full-package
+README and native full-composition acceptance remain blocked in lane-U.

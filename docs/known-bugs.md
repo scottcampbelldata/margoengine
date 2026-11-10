@@ -4412,3 +4412,42 @@ Fixed during integration: synchronous parent/creation notifications could expose
 `check:gpu-packages --no-build --only=sprites --serial` cannot plan on main 59061a16b: packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs drive browsers but have no matching registered package script. The planner checks unrelated unregistered leaves before filtering. Batch 245 runs every sprites GPU leaf directly under the shared GPU lock, both backends; no assertions or scripts are weakened. Planner registration repair waits for its owning lanes.
 
 - XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21).
+
+
+
+### Open: review 99 composed native validation exceeds its twelve-minute lease
+
+Repro at mesh checkpoint 4a40f2e29, rebased as 3c9a4f8f8 onto main 0ba1d4f94:
+build packages, then run `node scripts/gpu-lock.mjs run --owner=review-99-mesh-compose-native
+--wait-max=60 --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs
+--backend=native` with MARGO_GPU_SLOTS=1. On the RTX A6000 / native Edge WebGPU,
+the lock kills the process tree at 12 minutes. Subsets 0..30 finish; subset 31
+(all five features) starts at page time 707653.5 ms and remains in tracer-ready-wait.
+The last flushed event is preview pipeline-ready at 710230.1 ms. That subset's
+trace pipeline has started but has no pipeline-ready event. Reflected-light and
+atomic-update cases have not run. Thirty-one completed trace pipeline creations
+account for 704992.5 ms (6179..40723.3 ms each), so accumulated pipeline readiness
+consumes the lease. The underlying native compiler cause remains unresolved;
+these records do not establish a permanently stuck compile or attribute bug 45.
+No assertion, feature subset, readiness wait or lease was changed, and the failed
+command was not retried. This is an open bug, not a busy-machine waiver or pass.
+
+Owned receipts: .review/mesh-checkpoint-compose-native.log and process snapshots
+mesh-checkpoint-native-processes[-late|-deadline].json, including full command
+lines and parent PIDs. At the deadline the GPU lock reported this as its sole
+active holder, with lane-U's bug45-dawn-localize and lane-A's mipmap probe queued.
+The process tree was killed and the lock released. Raw process snapshots remain
+private in this worktree. Durable summary: [mesh checkpoint receipt](whitepaper/results/review-99-mesh-build-checkpoint-20261109.json).
+The earlier unattributed WebGL2 timeout remains a distinct bug; this native run
+cannot supply its missing phase attribution. The separate unchanged compatibility run passes all 32 subsets, reflected RGB RIS shadows and atomic update on WebGL2/Vulkan; page completion is 12589.7 ms. The earlier WebGL2 timeout did not recur.
+
+The later local vertex-attribute shader passes the same complete composed
+WebGL2/Vulkan suite under the unchanged twelve-minute lease. The earlier
+WebGL2 timeout did not recur on either checkpoint or attribute inputs. Native
+composition was not retried; its readiness failure remains open.
+- Bug 45 PARKED (rule 21): native path-tracing compiler pressure and CPU/GPU camera rounding remain unresolved; native split work retained on bug45-native-split at 333a02a44 for the fix phase.
+- BLAS landing dependent-gate repair: controls/globe had a manually ordered umbrella export and lacked its generator banner; node scripts/umbrella.mjs restores canonical output, covered by tests/umbrella.test.js.
+- Outside batch 243: direct serial scripts/gpu-package-tests.mjs requests use owner check:gpu-packages for every worktree; ownerLane collapses them to check, so unrelated runners block admission. Repro: two direct serial runners on different worktrees. Use the brief-required outer named shared lock for this lane; tooling repair waits for the fix phase.
+- BLAS dependent-gate repair: React bindings/instances commands served rooted fixture URLs from the package directory and returned navigation errors. Commands now select the repository root; packages/react/tests/browser-scripts.test.js fails before repair and checks the browser fixture class.
+
+Batch 243 outside scope: the package GPU planner rejects webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs as unregistered browser leaves on main. Cause: planning scans support runners without matching their registered parent script. Changed mesh/React GPU fixtures run directly under this lane's named shared lock; planner repair waits for the fix phase.

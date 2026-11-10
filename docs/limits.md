@@ -4446,3 +4446,96 @@ Frame priority bytes: React root 10243 B gzip (ceiling 9852 -> 10551 B); React X
 `@margoengine/ui/keyboard` exports VirtualKeyboard. Default QWERTY rows include number/punctuation shifts, backspace, Enter, caps lock, space, arrows and delete. keyWidth defaults to 44 UI pixels; custom nonempty rows accept strings or {key,label,shifted,width}. connect(field|null) binds an explicit TextInput/TextArea, including a separate UI on an XR panel; same-UI TextInput focus reconnects automatically. Shift is one-shot; CapsLock persists. Editing preserves selection, grapheme boundaries and maxLength, emits normal field change/submit events, and refuses disabled/read-only/composing fields. Virtual keys are ordinary engine-rendered Buttons, using inherited keyboard/gamepad and XR ray routing. No prediction, dictionary or separate virtual IME; native IME retains ownership during composition.
 
 Batch 259 keyboard entry: 1,514 B min+gzip (bare imports external), ceiling 1,770 B; core plus stage unchanged at 24,209 B.
+
+
+
+
+### Review 99 mesh build checkpoint limits
+
+Exactly zero-area triangles are skipped and counted; all submitted triangles,
+including skipped ones, still count toward the 1,000,000 input limit. Input
+indices, coordinates and packet size retain their previous rejection rules.
+IDs count original mesh/index-triplet order. Each retained triangle still takes
+64 bytes and each BVH node 32 bytes. All axes use 16 centroid bins and actual
+triangle bounds. At 32 SAH split levels or coincident centroids a balanced
+median partition bounds recursion; at most 20 additional levels are needed
+for the accepted input count. No new GPU intersection tolerance is introduced.
+
+Entry min+gzip before/after: mesh 23021 -> 25754 B, compose 1333 -> 1402 B,
+root unchanged at 81091 B. Mesh ceiling 23559 -> 26527 B under Scott's optional
+package ruling. Exact classification and SAH share the existing feature-local
+Wasm; a split would add a fetch/instance or duplicate geometry ownership.
+The installed mesh module is 4937 B gzip, with Wasm 39317 B raw / 15331 B gzip.
+Do not add its asset-inclusive entry gate figure to the artifact twice. Core
+plus stage stays 23924 B. The continuation passes standalone mesh GPU validation on both backends and its exact README example; additional composed native acceptance is blocked by the recorded timeout. Full-scene work stays open.
+
+Review 99 checkpoint validation: standalone mesh passes native and
+WebGL2/Vulkan with the original assertions, and its exact README example passes.
+Full composed native acceptance is blocked by its recorded twelve-minute
+pipeline-readiness timeout. The earlier unattributed WebGL2 timeout is not
+attributed by this native failure. Full-scene transport remains open.
+
+### Review 99 local vertex-attribute checkpoint
+
+Optional mesh `normals` are Float32 xyz values, one nonzero finite vector per
+position; `uvs` are finite Float32 pairs within +/-1e8. Rust normalizes/gathers
+indexed attributes for retained faces. Their record adds 64 bytes per attributed
+triangle; un-attributed triangles retain their 64-byte record. UV textures use
+one numeric material texture index, repeat wrapping and nearest RGBA8 texels,
+sRGB RGB, and linear alpha. Base/metal colour is textured; emission is not.
+Alpha cutouts, shared BLAS/instances and triangle NEE/RIS remain open. Shading
+normals keep geometric offsets and sidedness; mismatched directions are null
+samples. Coarse shading normals can lose energy at the geometric terminator.
+This is not a displacement or conservation guarantee.
+
+Mesh entry 25754 -> 28206 B min+gzip, ceiling 26527 -> 29053 B under Scott's
+optional-entry ruling. The extra validation and barycentric transport share the
+existing lazy Wasm and triangle state. A split adds another asset/build boundary
+or duplicates ownership. Installed mesh module is 5892 B gzip; Wasm 41886 B raw,
+16400 B gzip. Root 81091 B and core plus stage 23924 B remain unchanged. Canonical
+paired entry/network provenance is still pending; do not relabel old records.
+paired entry/network provenance was pending at that checkpoint. The r6 records
+were genuinely recaptured together on 3e1b3bc13/dirty=true, with those same mesh,
+root and core-plus-stage figures; no old provenance field was relabeled. The
+complete pair is archived in [the measurement receipt](whitepaper/results/review-99-size-pair-20261109.json).
+The final rebase retains the newer upstream canonical pair whole. Refresh those
+canonical files genuinely together when the remaining mesh source is stable.
+
+Review 99 composed browser diagnostics retain the existing 720-second per-backend
+hard budget, with 30 seconds reserved for owned-child-tree termination. The
+host snapshots logical phase, subset and individually pending module, pipeline,
+compilation-report, queue and readback operations without querying a hung page.
+Native acceptance still fails in accumulated pipeline readiness; the native
+compiler subphase and the earlier WebGL2 timeout remain unresolved. The test
+supervisor adds no shipped engine bytes and proves no performance improvement.
+
+The full-package runtime README check currently blocks checkpoint landing:
+the resampled-lighting example misses its unchanged 20-second module deadline.
+The composed example passes first; the mesh example is not reached in that run.
+Earlier isolated example passes do not waive this failure or identify its cause.
+
+### Review 99 explicit mesh-instance limits
+
+Without meshInstances the existing world-space packet and ids are unchanged.
+An explicit array draws only those placements; [] draws none. One BLAS per mesh
+id is retained in each tracer's last prepared scene. Content changes invalidate
+all references, including mutations with an unchanged scene revision. Each
+nonempty placement takes 128 bytes, each TLAS node 32 bytes (at most 2N-1).
+Both unique and instanced input triangle counts are bounded at 1,000,000,
+including degenerate holes. Input and assembled geometry are bounded at 128 MiB,
+and root scene storage must fit the device binding limit. Transforms default to
+identity, are column-major affine 4x4, invertible in Float32 with finite matrix,
+inverse and transformed bounds within +/-1e8. No mesh motion blur, skinning,
+cutouts, nested/overlapping mesh media or triangle emitter sampler is claimed.
+Unique geometry counts and explicit instance/build/reuse stats are documented
+in the package README; legacy scenes report zero for the three new counters.
+Mesh entry grows 28206 -> 32933 B min+gzip; its optional ceiling grows
+29053 -> 33913 B. Compose grows 1402 -> 1461 B (within its existing ceiling).
+The added bytes retain one lazy Wasm, share BLAS across placements and preserve
+one transactional tracer lifecycle. A split would introduce another asset/cache
+boundary or duplicate packet/traversal ownership. Installed mesh module is
+7659 B gzip; the Wasm asset is 46898 B raw / 18402 B gzip. Asset-inclusive entry
+size must not be added to that asset a second time. Root stays 81091 B and
+core plus stage 23924 B, below its unchanged 25000 B gate. No speed claim.
+
+BLAS landing: the combined mesh entry is 32,933 B min+gzip (before 23,021 B), optional ceiling 23,559 to 33,913 B. The increase includes the required SAH/attributes prerequisites and shared affine BLAS/TLAS ownership; splitting would duplicate the geometry packet and tracer lifetime. Core plus stage is 24,209 B on the rebased main; this job changes neither source.

@@ -9,8 +9,14 @@ import type {
   VoxelTraceImage,
   TraceVec3,
 } from '@margoengine/voxel-pathtracer';
-import type { VoxelTraceFeature, VoxelTraceFeatureId } from './compose-types.js';
-export type { VoxelTraceFeature, VoxelTraceFeatureId } from './compose-types.js';
+import {
+  traceMeshStats,
+  type TraceGeometryBuilder,
+  type TraceMeshStats,
+  type VoxelTraceFeature,
+  type VoxelTraceFeatureId,
+} from './compose-types.js';
+export type { TraceMeshStats, TraceGeometryBuilder, VoxelTraceFeature, VoxelTraceFeatureId } from './compose-types.js';
 
 /** Root settings and explicitly imported optional features. */
 export interface ComposedVoxelPathTracerOptions<Scene extends VoxelTraceScene = VoxelTraceScene>
@@ -67,12 +73,11 @@ function copyScene(input: VoxelTraceScene, selected: readonly VoxelTraceFeature[
 
 async function geometry(
   scene: VoxelTraceScene,
-  selected: readonly VoxelTraceFeature[],
+  builder: TraceGeometryBuilder | undefined,
   signal?: AbortSignal,
 ): Promise<Uint32Array> {
   signal?.throwIfAborted();
-  const mesh = selected.find((f) => f.geometry);
-  const words = mesh ? await mesh.geometry!(scene, signal) : new Uint32Array(0);
+  const words = builder ? await builder.build(scene, signal) : new Uint32Array(0);
   signal?.throwIfAborted();
   return words;
 }
@@ -102,6 +107,9 @@ class ComposedKernel extends VoxelPathTracer {
   protected override sceneWordReserve(): number {
     return this.#geometry.length;
   }
+  override get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
+    return { ...super.stats, ...traceMeshStats(this.#geometry) };
+  }
   protected override sceneStorage(base: Uint32Array): Uint32Array {
     if (this.#geometry.length === 0) return base;
     const words = new Uint32Array(base.length + this.#geometry.length);
@@ -125,9 +133,15 @@ export class ComposedVoxelPathTracer {
   #tracer: ComposedKernel;
   #updates: Promise<unknown> = Promise.resolve();
   #features: readonly VoxelTraceFeature[];
-  private constructor(tracer: ComposedKernel, selected: readonly VoxelTraceFeature[]) {
+  #builder: TraceGeometryBuilder | undefined;
+  private constructor(
+    tracer: ComposedKernel,
+    selected: readonly VoxelTraceFeature[],
+    builder: TraceGeometryBuilder | undefined,
+  ) {
     this.#tracer = tracer;
     this.#features = selected;
+    this.#builder = builder;
   }
 
   /** Build the geometry and attach. The returned tracer's ready promise also waits for GPU pipelines. */
@@ -141,11 +155,13 @@ export class ComposedVoxelPathTracer {
     const selected = features(requested);
     signal?.throwIfAborted();
     const scene = copyScene(input, selected);
-    const words = await geometry(scene, selected, signal);
+    const builder = selected.find((f) => f.geometry)?.geometry?.();
+    const words = await geometry(scene, builder, signal);
     signal?.throwIfAborted();
     return new ComposedVoxelPathTracer(
       ComposedKernel.attach(engine, { ...rest, scene, geometry: words, features: selected }),
       selected,
+      builder,
     );
   }
 
@@ -169,7 +185,7 @@ export class ComposedVoxelPathTracer {
     return this.#tracer.error;
   }
   /** Viewport samples and allocated GPU bytes, including triangle storage. */
-  get stats(): VoxelPathTracer['stats'] {
+  get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
     return this.#tracer.stats;
   }
   /** Resolved rendering defaults. */
@@ -193,13 +209,10 @@ export class ComposedVoxelPathTracer {
     } catch (error) {
       return Promise.reject(error);
     }
-    const data = geometry(snapshot, this.#features, options.signal);
-    // Observe an early build rejection even while an earlier update is pending.
-    data.catch(() => {});
     const update = this.#updates.then(async () => {
-      const geometry = await data;
+      const words = await geometry(snapshot, this.#builder, options.signal);
       options.signal?.throwIfAborted();
-      this.#tracer.replace(snapshot, geometry);
+      this.#tracer.replace(snapshot, words);
     });
     this.#updates = update.catch(() => {});
     return update;
@@ -239,6 +252,7 @@ export class ComposedVoxelPathTracer {
   }
   /** Release all owned GPU state. Idempotent; pending updates cannot resurrect it. */
   dispose(): void {
+    this.#builder?.dispose();
     this.#tracer.dispose();
   }
   /** Deterministic using cleanup. */

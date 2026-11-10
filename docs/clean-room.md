@@ -6353,3 +6353,114 @@ The real-time paper distinguishes priority order from deadline guarantees; this 
 Batch 265 landing runner: Wesley Eddy (editor), Transmission Control Protocol, RFC 9293 (2022), https://www.rfc-editor.org/rfc/rfc9293.html, and Simon Stewart et al., WebDriver (W3C, 2026), https://www.w3.org/TR/webdriver/. Independent loopback listeners prevent shared GPU jobs from waiting on a fixed port; use the existing free-port API, with all XR runners pinned by browser-runner.test.js. No external source code read or copied.
 ### UI virtual keyboard (batch 259 job 2)
 Combines W3C UI Events KeyboardEvent key Values (Web Applications WG, 2025), https://www.w3.org/TR/uievents-key/ , with Unicode grapheme boundaries and the selectable soft-keyboard approach surveyed by I. Scott MacKenzie and R. William Soukoreff, *Text Entry for Mobile Computing: Models and Methods, Theory and Practice* (2002), https://www.yorku.ca/mack/hci3.html . Compared with the documented Babylon.js VirtualKeyboard connection, rows, shift and backspace behavior at https://doc.babylonjs.com/features/featuresDeepDive/gui/gui/ . No rival source read. Native engine Buttons preserve gamepad navigation and world-panel/XR ray activation; target selection remains on the text field while keyboard focus moves.
+
+
+
+
+## Review 99 full-scene mesh build checkpoint
+
+Research compared before implementation:
+- Ingo Wald, On Fast Construction of SAH-based Bounding Volume Hierarchies,
+  2007, section 3, https://www.sci.utah.edu/~wald/Publications/2007/ParallelBVHBuild/fastbuild.pdf .
+- Timo Aila, Tero Karras and Samuli Laine, On Quality Metrics of Bounding Volume
+  Hierarchies, 2013, sections 1-2, https://research.nvidia.com/sites/default/files/pubs/2013-09_On-Quality-Metrics/aila2013hpg_paper.pdf .
+- Thiago Ize, Robust BVH Ray Traversal, 2013 (2015 correction), sections 1-2,
+  https://jcgt.org/published/0002/02/02/paper.pdf .
+- Jonathan Richard Shewchuk, Adaptive Precision Floating-Point Arithmetic and
+  Fast Robust Geometric Predicates, 1997, sections 2.3-2.4,
+  https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf .
+
+Wald supplies centroid binning with full primitive bounds. The builder uses
+16 bins on all axes and the area-times-count objective; coincident centroids
+and a 32-level SAH prefix fall back to balanced median partitions to bound
+Wasm recursion. Aila et al. show why SAH alone establishes no throughput claim.
+Ize distinguishes geometry bounds from traversal arithmetic; existing outward
+rounding and GPU slab handling stay intact. Single-precision products fit
+exactly in Float64; error-free addition retains the six signed area products
+without a tolerance, so only exact zero-area inputs are removed. Independent
+BigInt decisions cover 512 Float32 cases. The retained original triplet ordinal
+is separate from packed triangle index. No companion code or foreign engine
+source was read. Private kernel APIs were inspected first; no serializable
+offline BLAS builder fits this packet, so the feature-local crate remains owner.
+
+## Review 99 vertex attributes research and implementation
+
+Compared Eric Veach, Robust Monte Carlo Methods for Light Transport Simulation,
+1997, chapter 5.3 (author's table of contents and discussion overview),
+https://graphics.stanford.edu/papers/veach_thesis/ ; Matt Jen-Yuan Chiang,
+Yining Karl Li and Brent Burley, Taming the Shadow Terminator, 2019,
+abstract and section 1, https://www.yiningkarlli.com/projects/shadowterminator/shadow_terminator_v1_0.pdf ;
+and Khronos Group, glTF 2.0 Specification, 2026, vertex attributes and
+baseColorTexture definitions, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html .
+Veach distinguishes shading from geometric normals; Chiang et al. explain
+why their hemispheres can disagree. The mesh design retains geometric normals
+for sidedness, boundary offsets and area densities, and interpolates supplied
+vertex normals in barycentric coordinates for surface shading. glTF defines
+UV vertex attributes and sRGB base colour; this optional tracer accepts the
+already decoded arrays, with format parsing retained by the consumer. The
+existing scene texture storage and sRGB conversion are reused, with UV repeat
+wrapping and nearest texels. Validation rejects malformed attributes before
+GPU allocation. Normalization and indexed gathering remain inside the existing
+feature-local Rust/Wasm kernel. No foreign implementation or companion code
+was read. Full-text Veach PDF fetches timed out; no claim relies on an unread
+chapter equation. Vertex-normal conservation/terminator treatment requires
+separate transport validation before any full-scene closure claim.
+
+For the next shared-BLAS work, also compared Ingo Wald, William R. Mark,
+Johannes Guenther, Solomon Boulos, Thiago Ize, Warren Hunt, Steven G. Parker
+and Peter Shirley, State of the Art in Ray Tracing Animated Scenes, 2007,
+sections 3.2.2 and 4.3, https://www.sci.utah.edu/~wald/Publications/2009/STAR09/star09.pdf .
+Its two-level description transforms rays into object space and leaves shared
+object hierarchies unchanged when instance transforms change. This is design
+research only; no shared-BLAS implementation is claimed by the attributes patch.
+
+## Review 99 composition timeout diagnosis
+
+Compared W3C GPU for the Web Working Group, WebGPU, 2026,
+sections 3.2.2, 9 and 10, https://www.w3.org/TR/webgpu/ ;
+Lewis Crawford and Michael O'Boyle, A Cross-platform Evaluation of Graphics
+Shader Compiler Optimization, ISPASS 2018,
+https://www.pure.ed.ac.uk/ws/portalfiles/portal/56917122/A_Cross_platform_Evaluation_of_Graphics_Shader_Compiler_Optimization.pdf ;
+and Yong He, Theresa Foley and Kayvon Fatahalian, A System for Rapid Exploration
+of Shader Optimization Choices, SIGGRAPH 2016,
+https://graphics.cs.cmu.edu/projects/spire/he16_spire.pdf .
+The specification distinguishes module, pipeline, queue and mapping promises,
+with no general ordering guarantee. Crawford and O'Boyle motivate treating
+compiler behavior as platform dependent; He et al. discuss architectural shader
+choices rather than a universal compiler workaround. Neither paper identifies
+this native failure. Caching hints, shader restructuring and the separate
+WebGL2 wavefront investigation therefore cannot be claimed as a repair here.
+The clean-room test supervisor tracks these operations separately on the host,
+preserves the failing phase and kills its own child tree within the existing
+lease. This is diagnostics and timeout correctness, not a speed experiment.
+No foreign engine, paper companion implementation or browser compiler source
+was read. The native compiler root remains unresolved in known-bugs.
+
+## Review 99 shared mesh instances
+
+Clean-room comparison: Ingo Wald, William R. Mark, Johannes Guenther, Solomon
+Boulos, Thiago Ize, Warren Hunt, Steven G. Parker and Peter Shirley, State of the
+Art in Ray Tracing Animated Scenes (Eurographics STAR, 2007), sections 3.2.2 and
+4.3, https://www.sci.utah.edu/~wald/Publications/2009/STAR09/star09.pdf ; Stephan
+Reiter, Real-Time Ray Tracing of Dynamic Scenes (2008), section 3.2.2,
+https://llvm.org/pubs/2008-06-Reiter-Thesis.pdf ; Khronos Group, glTF 2.0
+Specification (2017, maintained specification), transformations and triangle
+winding, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html .
+Wald/Reiter motivate shared object-space hierarchies beneath a world-space
+instance hierarchy; glTF supplies affine placement and reflected outside
+orientation conventions. Keep Margo's existing bounded binned SAH and exact
+Woop/Benthin/Wald predicate, with no foreign implementation. Transform rays
+without normalizing their directions, preserving t. Derive normal transforms
+from the inverse transpose. Transform all eight corners in Float64, enclose
+Float32 arithmetic by gamma(7), round outwards, then build the TLAS with the
+same Rust SAH builder. Per-tracer exact SIMD word comparison invalidates changed
+geometry, indices, attributes or palette ids; no hash/revision assumptions.
+The SIMD equality loop compares four u32 words per vector group plus a scalar
+tail, proven against changes in every lane/tail. This is a work description,
+not an overall speed claim (copies and validation are still performed).
+Private CAD indexed-mesh and scene-picking contracts were rechecked; there is no
+serialized GPU BLAS API to consume. No private CAD code, parser or dependency
+was added. Mathematical descriptions/standards only; no companion source used.
+
+### BLAS landing: dependent React fixture server root
+Research: npm CLI team, npm Scripts (2026), https://docs.npmjs.com/using-npm/scripts/ and npm run (2026), https://docs.npmjs.com/cli/v11/commands/npm-run/ document package-root command execution. WHATWG, URL Standard (living standard, accessed 2026-11-09), https://url.spec.whatwg.org/ describes rooted URL paths. Combined with Margo's own Vite root contract: the two new React runners lacked the older runners' repository chdir, so their rooted fixture URLs resolved under the package instead of the repository. The commands now select the repository before execution. A package regression resolves every browser command's effective fixture root and fails before this repair. No third-party implementation read or copied.

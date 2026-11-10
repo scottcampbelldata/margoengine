@@ -5821,3 +5821,138 @@ The React Canvas keeps native engine clocks and callbacks while ordering React s
 The registered bindings, instances and priority browser scripts establish the repository working directory before starting their server. Running them as package commands previously rooted Vite in packages/react while requesting repository-relative page paths. The unchanged bindings and instances GPU assertions now pass from the package runner. Automatic and manual XR eye output is also compared byte-for-byte in tests/modern-xr-passes.ts on both backends.
 ### Section 5 evidence: batch 204 native texture output
 Optional exporters/textures adds CPU linear-light/associated-alpha resampling and platform canvas serialization; no renderer, kernel, core or stage change. Its analytical CPU checks cover box/bilinear/Lanczos, data roles, transparent edges, metadata and fallback ownership. Both native WebGPU and WebGL2 compatibility exporter browser runs independently decode native WebP and PNG fallbacks, verify dimensions/extension flags and detect unsupported AVIF encoding. Chromium 157 supplied WebP but not an AVIF encoder; the coded unsupported path is evidence, not AVIF bitstream certification. See docs/exporter-textures.md for limits and research.
+
+
+
+
+### Review 99 mesh build checkpoint and section 5 evidence
+
+The optional mesh kernel now skips/counts exactly zero-area input triangles
+and keeps original input IDs after compaction. Float64 product expansions avoid
+misclassifying thin Float32 geometry. The same committed counts are exposed by
+mesh and composed tracers, including failed-update atomicity. The existing lazy
+Rust/Wasm feature builds all-axis 16-bin SAH with a bounded median fallback,
+without changing the triangle/node record sizes or traversal tolerance.
+
+Evidence: both new regressions fail on the preceding Wasm and pass after repair;
+144 package tests pass, then the expanded regression file passes all three tests
+including 512 independent BigInt classifications. Five Rust tests pass. A gap-ray
+fixture visits three node bounds instead of the median tree's five; this is a
+deterministic work count only. The initial queue was cancelled before start; the continuation passes the complete mesh suite on native and WebGL2/Vulkan and its exact README example. Additional composed native acceptance fails at the unchanged 12-minute lease; the separate compatibility run passes all 32 subsets, reflected RIS and atomic updates. No full-scene closure is claimed: UVs,
+smooth normals, shared BLAS/instance transforms and triangle NEE/RIS remain.
+
+### Review 99 checkpoint validation and section 5 evidence
+
+The complete mesh suite passes on native WebGPU and WebGL2/Vulkan, including
+skipped counts, stable original IDs, mixed transport, exact predicates and
+disabled/restored/disposed raster equality. The exact triangle-mesh README
+example passes its unchanged 20-second deadline. Composed native validation
+fails its unchanged 12-minute lease at subset 31 readiness; no retry was run.
+The retained pipeline markers and process tree distinguish accumulated native
+pipeline construction from the earlier unattributed WebGL2 timeout. Both are
+bugs until repaired; the separate compatibility run passes all 32 subsets, reflected RIS and atomic updates. See known-bugs
+and the updated review-99 mesh checkpoint receipt. Full scenes are still open.
+
+### Review 99 local vertex attributes and section 5 evidence
+
+The optional mesh build validates and gathers normal/UV arrays in its existing
+Rust/Wasm feature, with caller snapshots taken before awaits. The GPU retains
+Woop shear barycentrics, geometric boundary normals and offsets, and a distinct
+interpolated shading normal. UVs address the existing sRGB texture table. All
+147 package tests and six Rust tests pass; the two new regressions fail against
+the prior build (missing attributes and missing validation). Strict types, lint,
+hygiene and README type checks pass. Native and WebGL2/Vulkan each pass four
+analytic image cases covering standalone and composed tracers, with shader
+errors/messages empty; normals differ by at most 1.97087e-7 and UVs by at most
+4.76838e-7. The full existing mesh suite also passes both backends, and both changed README examples pass their unchanged 20-second limits. Repository closing gates are recorded separately.
+The full-scene finding remains open; the twelve-minute composed native timeout
+is retained and has not been retried. No core or stage changes.
+
+Review 99 local attribute closing checks: lint and sequenced hygiene pass. One
+full verify for the changed inputs passes every chain and all 13,986 repository
+tests, with zero failures/skips and zero shadow-cache disagreements. It ran
+without GPU settings under a forty-minute hard tree limit. An earlier hygiene
+command was incorrectly overlapped with the rebuild and observed a temporarily
+absent animator declaration; that invalid run is retained, then hygiene passes
+after the build completes. Full-scene and native-timeout findings remain open.
+
+The updated attribute shader also passes all 32 composed WebGL2/Vulkan subsets,
+triangle markers, reflected RGB RIS shadows and atomic scene replacement at
+the unchanged twelve-minute lease. The native failure was not retried, and
+this compatibility proof does not repair or attribute it. The local attribute
+receipt retains the complete backend results. Shared BLAS/instances, triangle
+NEE/RIS and the P3 findings still block full-scene closure and pushing this work.
+NEE/RIS and the P3 findings still block full-scene closure. Checkpoint landing
+also requires the unchanged release gates, including the package README check.
+
+### Review 99 timeout diagnostics and section 5 evidence
+
+Retained native evidence isolates the lease exhaustion to cumulative trace
+pipeline creation: subsets 0..30 finish, and subset 31 has only trace outstanding.
+The device exists and renderImage has not begun; no readback or disposal has
+started for that subset. Internal Dawn/compiler/driver attribution is missing.
+The earlier WebGL2 timeout lacks phase evidence and stays separately open.
+The browser correctness suite now has an independent host supervisor and durable
+per-backend JSON snapshots. Pipeline completions have operation IDs, so preview
+completion cannot hide a pending trace. Shader reports, queue completion,
+readback, device loss and browser teardown have distinct evidence. At 690 seconds
+it reports the current phase and begins terminating only its owned child tree;
+the remaining 30 seconds belong to the unchanged 720-second total lease.
+The CPU regression is included in normal package tests and therefore verify and
+check:merge. No assertion, feature subset or numerical bound is relaxed. No
+native acceptance rerun or compiler repair is claimed. Scott's current request
+allows the complete mesh builder and attribute checkpoints to land separately
+with the full-scene and compiler gaps retained explicitly.
+
+The r6 compatibility supervisor integration passes all 32 subsets, triangle
+markers, reflected RGB RIS and atomic updates; shader errors/messages are empty.
+All 159 package units and the twelve diagnostic regressions pass. Paired entry
+and network records were genuinely recaptured together on 3e1b3bc13/dirty=true:
+mesh 28206 B gzip and core plus stage 23924 B. Provenance was not relabeled.
+The required full-package README command then fails the resampled example's
+unchanged 20-second module deadline, after the composed example passes and
+before the mesh example runs. No retry was made, and pushing is blocked.
+The single full verify catches a stale generated controls size row (27266
+instead of 27268 B): api:update ran before its refreshed size-record input.
+Regenerate after the pair, then run only api:check and the cancelled unit chain;
+retain every successful verify chain. No passing full verify is claimed for r6.
+
+The corrected API check, LLM corpus check and links pass. The standalone unit
+continuation returns 14094 passes and three ViewCube fixture failures: its
+old fake engine lacks sceneOf after Controls began using the real owner API.
+Current main already repairs that fixture in d15e46fd2. An independently
+implemented matching fixture and identity regression pass 19/19; that redundant
+draft is discarded so rebase supplies the existing owner repair. ViewCube's
+real browser proof and both runtime README examples pass. No production API
+or assertion is weakened. The full tracer README deadline remains the blocker.
+
+The final rebase onto 79dbd81d1 includes main's d15e46fd2 fixture repair. Its
+actual upstream test file passes all 19 cases after rebuilding the integrated
+packages. The captured 3e1b3bc13/dirty=true size pair is archived whole in
+review-99-size-pair-20261109.json; newer upstream canonical records are retained
+whole, with no provenance relabeling. API and LLM outputs are regenerated from
+the integrated build. There is no second full verify, native acceptance retry,
+resampled README retry or push. The compiler, full-scene and P3 gaps stay open.
+
+### Review 99 shared-instance checkpoint (section 5 evidence)
+
+The optional mesh feature now accepts explicit meshInstances referencing shared
+object-space geometry. A tracer-local cache compares all geometry/attribute
+words exactly in the feature-local SIMD Wasm; matrix-only setScene performs
+zero BLAS builds and retains identical BLAS bytes. A Rust binned-SAH TLAS wraps
+conservatively transformed bounds. Object-space traversal preserves ray t;
+inverse-transpose normals preserve outside orientation under reflection.
+Instance AOV ordinals concatenate original triplets, preserving degenerate holes.
+Both standalone and composed tracers own builder lifetimes, queue updates in
+call order and release CPU cache on disposal. No core/stage source changed.
+Independent baked-reference GPU checks pass translation, rotation/nonuniform
+scale, shear, reflection, overlapping TLAS leaves, smooth normals/UVs, depth and
+original triangle ids on native WebGPU and WebGL2/Vulkan. Maximum RGB discrepancy
+is 1.1920928955078125e-7; maximum depth discrepancy 1.430511474609375e-6 against
+unchanged 1e-5 bounds. Invalid transforms preserve image/storage/revision.
+Receipt: whitepaper/results/review-99-shared-instances-20261109.json.
+Triangle NEE/RIS and the P3 findings remain open. Lane-U owns the unchanged native
+composition readiness failure and full-package README 20 s deadline failure;
+these are not waived, attributed anew or retried by this checkpoint.
+
+Batch 243 landing continuation: floor-browser.mjs restoration passes once on clean e95938f23 and once with the rebased BLAS implementation. No assertion, tolerance or rendering source was changed for the floor. Rule 23 applies: dependent CPU tests gate the push; dependent GPU suites remain local CI coverage.

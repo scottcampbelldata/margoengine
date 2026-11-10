@@ -63,7 +63,7 @@ test('mixed geometry is optional, copied, restored, atomically replaced and disp
   assert.ok(h.device.buffers.every((b) => b.destroyed));
 });
 
-test('hostile mesh shape, indices, material, coordinates and degeneracy fail before GPU allocation', async () => {
+test('hostile mesh shape, indices, material and coordinates fail before GPU allocation', async () => {
   for (const edit of [
     (s) => s.meshes.push(mesh()),
     (s) => (s.meshes[0].id = ''),
@@ -79,7 +79,6 @@ test('hostile mesh shape, indices, material, coordinates and degeneracy fail bef
     (s) => (s.meshes[0].positions[0] = Infinity),
     (s) => (s.meshes[0].positions[0] = 1e9),
     (s) => (s.meshes[0].indices[0] = 99),
-    (s) => (s.meshes[0].indices[1] = 0),
   ]) {
     const h = harness(),
       s = scene();

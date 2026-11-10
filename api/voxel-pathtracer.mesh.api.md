@@ -15,7 +15,7 @@ export class MeshPathTracer {
     get ready(): Promise<void>;
     get status(): VoxelPathTracer['status'];
     get error(): unknown;
-    get stats(): VoxelPathTracer['stats'];
+    get stats(): VoxelPathTracer['stats'] & TraceMeshStats;
     get options(): VoxelPathTracer['options'];
     setScene(scene: MeshTraceScene, options?: {
         signal?: AbortSignal;
@@ -43,12 +43,30 @@ export interface MeshTraceImage extends VoxelTraceImage {
 
 export interface MeshTraceScene extends VoxelTraceScene {
     meshes: readonly TraceTriangleMesh[];
+    meshInstances?: readonly TraceMeshInstance[];
+}
+
+export interface TraceMeshInstance {
+    id: string;
+    mesh: string;
+    transform?: readonly number[] | Float32Array;
+}
+
+export interface TraceMeshStats {
+    readonly meshTriangles: number;
+    readonly skippedDegenerateTriangles: number;
+    readonly meshBvhNodes: number;
+    readonly meshInstances: number;
+    readonly builtMeshBlases: number;
+    readonly reusedMeshBlases: number;
 }
 
 export interface TraceTriangleMesh {
     id: string;
     positions: Float32Array;
     indices: Uint32Array;
+    normals?: Float32Array;
+    uvs?: Float32Array;
     material: number;
 }
 
@@ -116,6 +134,11 @@ interface TraceFog {
     density: number;
     color?: TraceVec3;
     anisotropy?: number;
+}
+
+interface TraceGeometryBuilder {
+    build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
+    dispose(): void;
 }
 
 interface TraceGrid {
@@ -301,7 +324,7 @@ interface VoxelTraceFeature {
     readonly id: VoxelTraceFeatureId;
     readonly source: (source: string) => string;
     readonly scene?: (scene: VoxelTraceScene) => VoxelTraceScene;
-    readonly geometry?: (scene: VoxelTraceScene, signal?: AbortSignal) => Promise<Uint32Array>;
+    readonly geometry?: () => TraceGeometryBuilder;
 }
 
 type VoxelTraceFeatureId = 'resampling' | 'mesh' | 'media' | 'guiding' | 'spectral';

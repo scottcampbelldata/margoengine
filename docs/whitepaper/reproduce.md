@@ -2968,3 +2968,63 @@ After building packages, run `node --test --test-timeout=120000 packages/react/t
 Build packages, then run node --test --test-timeout=60000 packages/exporters/tests/textures.test.js. Under a shared GPU lock run node packages/exporters/scripts/test-browser.js, then repeat with --compat. textures-browser.js checks actual native WebP, decoded dimensions, PNG fallbacks, required-extension metadata, DOM toBlob and AVIF capability/error reporting. AVIF success-path extension wiring also has an explicitly labelled platform double in the CPU suite. Existing package PNG/capture checks remain in the package GPU gate. Results are in packages/exporters/test-results/exporters-browser.json. No timing or README execution. See docs/exporter-textures.md for sources and format/runtime limits.
 ### UI virtual keyboard (batch 259)
 After building packages, run `node --test --test-timeout=60000 packages/ui/tests/keyboard.test.js` and `node scripts/gpu-lock.mjs run --owner=ui-keyboard --max=3 --wait-max=60 -- node packages/ui/tests/keyboard-browser.mjs`; repeat the latter with `--compat`. The browser edits the public-domain NASA planet name Mars (https://nssdc.gsfc.nasa.gov/planetary/factsheet/) with real pointer clicks and gamepad commands.
+
+
+
+
+
+### Review 99 mesh builder checkpoint
+
+From the repository root, run node packages/voxel-pathtracer/scripts/build-mesh.mjs
+--test, then the same command without --test and npm test --workspace
+@margoengine/voxel-pathtracer. Every command needs an outer hard tree limit
+(5 minutes for Rust, 4 for the package). The independent exact-classification
+case is in tests/mesh-build-regression.test.js. Run the registered mesh browser
+suite under gpu-lock with --owner=review-99-mesh-build --wait-max=60 --max=6;
+it retains all previous assertions and adds skipped-count/original-ID checks
+on native and WebGL2/Vulkan. No benchmark or timing assertion is needed.
+
+The review-99 checkpoint mesh suite and exact README example now pass on the
+rebased checkpoint build. The additional composed native run uses --max=12 and
+--backend=native; it fails at subset 31 readiness. Preserve that lease, all 32
+subsets and the reflected/update cases when investigating. Per-pipeline markers
+are already flushed by compose.html. The failed command has not been retried.
+
+### Review 99 local normal and UV transport
+
+Build the mesh Wasm and package, then run mesh-attributes.test.js with an outer
+hard limit. The registered test:gpu:mesh-attributes runs both backends with
+independent per-pixel barycentric-normal and UV sun/texture oracles, standalone
+and composed, under one shared slot (--wait-max=60 --max=4). It never polls for
+a visual match, changes a bound, or uses a timing assertion. The full existing
+mesh suite must also run after these shader changes. Full composed native
+validation remains blocked by the separate recorded timeout; it was not retried.
+
+### Review 99 bounded composition diagnosis
+
+Run `node --test packages/voxel-pathtracer/tests/compose-diagnostic.test.js` under
+a one-minute process-tree deadline. Its clock is simulated; it tests timeouts,
+not execution speed, and needs no GPU lock. The full browser command remains
+`node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`
+under one shared slot with `--wait-max=60 --max=12`; compatibility uses
+`--backend=compat`. It executes all 32 subsets and the reflected/update checks.
+The host records `test-results/voxel-pathtracer-compose-native-all-diagnostic.json`
+(or compat), and emits `compose-diagnostic` before terminating a stuck child tree.
+The original timeout snapshot is preserved through cleanup. A 30-second cleanup
+reserve is included in the same twelve-minute budget. Do not rerun a failed
+native acceptance to green without a repair; retained phase and process evidence
+is in results/review-99-compose-timeout-20261109.json. Neither timeout is waived.
+
+### Review 99 shared mesh instances
+
+Build packages, then run the voxel-pathtracer package units and
+`npm run test:mesh-kernel --workspace=@margoengine/voxel-pathtracer`.
+With MARGO_GPU_SLOTS=1, run
+`node scripts/gpu-lock.mjs run --owner=review-99-instances --wait-max=60 --max=7 -- node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs`.
+The generated scene compares explicit instances against independently baked
+geometry on native WebGPU and WebGL2/Vulkan with the original 1e-5 color/depth
+bounds, exact ids and atomic-failure checks. The CPU test mutates every SIMD
+comparison lane and scalar tail. Also retain the existing mesh, mesh-attributes
+and composed compatibility GPU suites. Do not rerun the known native full-
+composition failure or full-package README deadline to green; lane-U owns both.
+No timing/benchmark command is needed for these correctness proofs.

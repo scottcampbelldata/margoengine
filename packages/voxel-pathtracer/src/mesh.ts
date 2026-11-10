@@ -9,35 +9,53 @@ import type {
   VoxelTraceImage,
   TraceVec3,
 } from '@margoengine/voxel-pathtracer';
-import { buildTraceMeshes } from './mesh-build.js';
+import { TraceMeshBuilder } from './mesh-instances.js';
 import { meshSource } from './mesh-shader.js';
-import type { VoxelTraceFeature } from './compose-types.js';
+import { traceMeshStats, type TraceMeshStats, type VoxelTraceFeature } from './compose-types.js';
+export type { TraceMeshStats } from './compose-types.js';
 
 /** Mixed triangle geometry for a composed tracer. Wasm loads only during create/setScene. */
 export function triangleMeshes(): VoxelTraceFeature {
   return Object.freeze({
     id: 'mesh',
     source: meshSource,
-    geometry: (scene: VoxelTraceScene, signal?: AbortSignal) => buildTraceMeshes(scene as MeshTraceScene, signal),
+    geometry: () => new TraceMeshBuilder(),
   });
 }
 
-/** Indexed world-space triangles. Positions are copied; no engine mesh or loader is required. */
+/** Indexed triangles. All vertex arrays are copied before the asynchronous build. */
 export interface TraceTriangleMesh {
   /** Unique nonempty id within scene.meshes. */
   id: string;
-  /** World-space xyz triplets, finite within +/-1e8 world units. */
+  /** Object-space xyz triplets with meshInstances; otherwise world-space. finite within +/-1e8 world units. */
   positions: Float32Array;
-  /** Three vertex indices per nondegenerate triangle, counterclockwise viewed from outside a closed shell. */
+  /** Three indices per triangle, counterclockwise from outside. Exactly zero-area triangles are counted and skipped. */
   indices: Uint32Array;
-  /** Scene palette id, 1..255. Surface materials only, without voxel textures. */
+  /** Optional xyz shading normals, one per position; finite and nonzero. Default geometric normals. */
+  normals?: Float32Array;
+  /** Optional UV pairs, one per position. Required for textured materials. Repeat wrapping, nearest sampling. */
+  uvs?: Float32Array;
+  /** Scene palette id, 1..255. Surface materials; a texture index uses interpolated UVs. */
   material: number;
+}
+
+/** A placement of shared triangle geometry. */
+export interface TraceMeshInstance {
+  /** Unique nonempty id within meshInstances. */
+  id: string;
+  /** An id in scene.meshes. */
+  mesh: string;
+  /** Column-major affine 4x4, finite/invertible in Float32. Default identity. Reflections preserve outside orientation. */
+  transform?: readonly number[] | Float32Array;
 }
 
 /** Triangles and voxels share all paths, lights and the environment. */
 export interface MeshTraceScene extends VoxelTraceScene {
-  /** Static world-space meshes. Empty is allowed. All are rebuilt on setScene. */
+  /** Geometry definitions. Without meshInstances, each is drawn once in world space. */
   meshes: readonly TraceTriangleMesh[];
+  /** Explicit placements over shared object-space BLAS. Default undefined draws each mesh once; [] draws none.
+   * Exact geometry/attribute/material content reuses BLAS across setScene; transforms rebuild only the TLAS. */
+  meshInstances?: readonly TraceMeshInstance[];
 }
 
 /** Root tracer settings, with triangle geometry and an optional build cancellation signal. */
@@ -51,7 +69,7 @@ export interface MeshPathTracerOptions extends Omit<VoxelPathTracerOptions, 'sce
 /** Root image with triangle ids retained in the optional instance AOV. */
 export interface MeshTraceImage extends VoxelTraceImage {
   /** With aovs: voxel instance index, -1 sky, -2 ground, -3 area light, or -(4 + triangle ordinal).
-   * Triangle ordinals follow mesh order then index-triplet order. Palette remains 0 for a triangle. */
+   * Triangle ordinals follow mesh order, or explicit instance order, then original index-triplet order. Palette remains 0 for a triangle. */
   readonly instance?: Int32Array;
 }
 
@@ -96,6 +114,9 @@ class TriangleTracer extends VoxelPathTracer {
   protected override sceneWordReserve(): number {
     return this.#geometry.length;
   }
+  override get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
+    return { ...super.stats, ...traceMeshStats(this.#geometry) };
+  }
   protected override sceneStorage(base: Uint32Array): Uint32Array {
     const words = new Uint32Array(base.length + this.#geometry.length);
     words.set(base);
@@ -115,8 +136,10 @@ class TriangleTracer extends VoxelPathTracer {
 export class MeshPathTracer {
   #tracer: TriangleTracer;
   #updates: Promise<unknown> = Promise.resolve();
-  private constructor(tracer: TriangleTracer) {
+  #builder: TraceMeshBuilder;
+  private constructor(tracer: TriangleTracer, builder: TraceMeshBuilder) {
     this.#tracer = tracer;
+    this.#builder = builder;
   }
 
   /** Build the geometry and attach. The returned tracer's ready promise also waits for GPU pipelines. */
@@ -126,9 +149,10 @@ export class MeshPathTracer {
     const { signal, scene: input, ...rest } = options;
     signal?.throwIfAborted();
     const scene = copyScene(input);
-    const geometry = await buildTraceMeshes(scene, signal);
+    const builder = new TraceMeshBuilder();
+    const geometry = await builder.build(scene, signal);
     signal?.throwIfAborted();
-    return new MeshPathTracer(TriangleTracer.attach(engine, { ...rest, scene, geometry }));
+    return new MeshPathTracer(TriangleTracer.attach(engine, { ...rest, scene, geometry }), builder);
   }
 
   /** Whether the tracer replaces the raster image. Default true. */
@@ -151,7 +175,7 @@ export class MeshPathTracer {
     return this.#tracer.error;
   }
   /** Viewport samples and allocated GPU bytes, including triangle storage. */
-  get stats(): VoxelPathTracer['stats'] {
+  get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
     return this.#tracer.stats;
   }
   /** Resolved rendering defaults. */
@@ -159,7 +183,7 @@ export class MeshPathTracer {
     return this.#tracer.options;
   }
 
-  /** Rebuild every triangle and atomically replace the whole scene, in call order. */
+  /** Prepare geometry and atomically replace the whole scene in call order, reusing unchanged explicit-instance BLAS. */
   setScene(scene: MeshTraceScene, options: { signal?: AbortSignal } = {}): Promise<void> {
     if (this.status === 'disposed')
       return Promise.reject(
@@ -172,11 +196,8 @@ export class MeshPathTracer {
     } catch (error) {
       return Promise.reject(error);
     }
-    const data = buildTraceMeshes(snapshot, options.signal);
-    // Observe an early build rejection even while an earlier update is pending.
-    data.catch(() => {});
     const update = this.#updates.then(async () => {
-      const geometry = await data;
+      const geometry = await this.#builder.build(snapshot, options.signal);
       options.signal?.throwIfAborted();
       this.#tracer.replace(snapshot, geometry);
     });
@@ -218,6 +239,7 @@ export class MeshPathTracer {
   }
   /** Release all owned GPU state. Idempotent; pending updates cannot resurrect it. */
   dispose(): void {
+    this.#builder.dispose();
     this.#tracer.dispose();
   }
   /** Deterministic using cleanup. */

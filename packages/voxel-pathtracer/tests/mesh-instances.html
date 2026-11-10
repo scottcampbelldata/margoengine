@@ -1,0 +1,54 @@
+<!doctype html><html><meta charset="utf-8"><title>Shared mesh instance transport</title><canvas width="16" height="16"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {MeshPathTracer,triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],rows=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);device.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=.01;out[14]=1;out[15]=1;};engine.render();
+ const base=()=>({revision:1,models:[],instances:[],materials:[{id:1,type:'diffuse',color:[1,1,1],texture:0}],textures:[{width:2,height:2,data:new Uint8Array([255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255])}],meshes:[],environment:{ground:false,skyIntensity:0,sunIntensity:Math.PI,sunAngularSize:0,sunDirection:[0,0,1]}});
+ const geometry=()=>({id:'shared',material:1,positions:new Float32Array([-4,-4,0,4,-4,0,4,4,0,-4,4,0]),indices:new Uint32Array([0,0,0,0,1,2,0,2,3]),normals:new Float32Array([0,.6,.8,0,.6,.8,0,.6,.8,0,.6,.8]),uvs:new Float32Array([0,0,1,0,1,1,0,1])});
+ // Independent baked geometry is the reference. The normal is specified from
+ // each transform's transformed tangent basis, rather than the inverse routine.
+ const cases=[
+  {name:'translation',m:[1,0,0,0,0,1,0,0,0,0,1,0,.25,.25,.5,1],n:[0,.6,.8]},
+  {name:'rotation and nonuniform scale',m:[1.6,0,-1.2,0,0,2,0,0,.3,0,.4,0,0,0,0,1],n:[.96,.3,1.28]},
+  {name:'shear',m:[1,0,0,0,.3,1,0,0,.2,.4,1,0,0,0,.5,1],n:[0,.6,.56]},
+  {name:'reflection and scale',m:[-2,0,0,0,0,1,0,0,0,0,.5,0,0,0,0,1],n:[0,.6,1.6],mirror:true},
+ ];
+ const image=t=>t.renderImage({width:16,height:16,samples:1,jitter:false,seed:17,aovs:true,signal:AbortSignal.timeout(120000)});
+ try{
+  for(const composed of [false,true]){
+   let s=base();s.meshes=[geometry()];s.meshInstances=[{id:'near',mesh:'shared'}];
+   const t=await(composed?ComposedVoxelPathTracer.create(engine,{scene:s,features:[triangleMeshes()],denoise:false,maxBounces:1}):MeshPathTracer.create(engine,{scene:s,denoise:false,maxBounces:1}));
+   try{
+    await t.ready;let revision=1;
+    for(const c of cases){
+     s=base();s.revision=++revision;s.meshes=[geometry()];
+     const far=c.m.slice();far[14]-=2;
+     // Far first forces overlapping TLAS traversal and original-instance AOV ids.
+     s.meshInstances=[{id:'far',mesh:'shared',transform:far},{id:'near',mesh:'shared',transform:c.m}];
+     await t.setScene(s);const actual=await image(t),stats=t.stats;
+     const baked=geometry();baked.id='baked';
+     for(let i=0;i<baked.positions.length;i+=3){const [x,y,z]=baked.positions.slice(i,i+3);for(let r=0;r<3;r++)baked.positions[i+r]=c.m[r]*x+c.m[4+r]*y+c.m[8+r]*z+c.m[12+r];baked.normals.set(c.n,i);}
+     if(c.mirror)for(let i=0;i<baked.indices.length;i+=3){const a=baked.indices[i+1];baked.indices[i+1]=baked.indices[i+2];baked.indices[i+2]=a;}
+     const reference=base();reference.revision=++revision;reference.meshes=[baked];await t.setScene(reference);const expected=await image(t);
+     let maximumError=0,maximumDepthError=0,aovMismatch=0;
+     for(let i=0;i<actual.color.length;i++)maximumError=Math.max(maximumError,Math.abs(actual.color[i]-expected.color[i]));
+     for(let i=0;i<actual.depth.length;i++){maximumDepthError=Math.max(maximumDepthError,Math.abs(actual.depth[i]-expected.depth[i]));if(actual.instance[i]!==expected.instance[i]-3)aovMismatch++;}
+     rows.push({name:c.name,composed,maximumError,maximumDepthError,aovMismatch,finite:actual.color.every(Number.isFinite),triangles:stats.meshTriangles,instances:stats.meshInstances});
+    }
+    // Failed transform replacement keeps the committed image, storage and revision.
+    const before=await image(t),old=t.stats,bad=base();bad.meshes=[geometry()];const singular=Array(16).fill(0);singular[15]=1;bad.meshInstances=[{id:'bad',mesh:'shared',transform:singular}];
+    let rejected=false;try{await t.setScene(bad);}catch(e){rejected=e instanceof RangeError;}
+    const after=await image(t);rows.push({name:'atomic invalid transform',composed,rejected,unchanged:before.color.every((v,i)=>v===after.color[i])&&old.sceneRevision===t.stats.sceneRevision&&old.gpuBytes===t.stats.gpuBytes});
+   }finally{t.dispose();}
+  }
+  await Promise.all(reports);return {rows,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>

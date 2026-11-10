@@ -1,0 +1,53 @@
+{
+  "status": "local mesh build checkpoint: mesh and README pass; composed native timeout blocks acceptance; full-scene work remains open",
+  "scope": [
+    "exact zero-area skipping and counts",
+    "thin Float32 input retained with error-free area sums",
+    "input triangle IDs survive compaction",
+    "16-bin SAH construction in the existing lazy Rust/Wasm feature"
+  ],
+  "stillMissing": [
+    "UV textures",
+    "smooth shading normals",
+    "shared BLAS and instance transforms",
+    "emissive triangle NEE/RIS"
+  ],
+  "validation": {
+    "newRegressionOnPriorWasm": "2 failures, both rejecting valid requested input",
+    "packageCpu": "144/144 pass before adding the independent oracle",
+    "expandedRegressionFile": "3/3 pass including 512 BigInt classifications",
+    "rust": "5/5 pass",
+    "lint": "pass",
+    "hygiene": "pass",
+    "quality": "all five pass",
+    "readmeTypes": "pass",
+    "runtimeReadme": "PASS: exact changed triangle-mesh README selection, 1/1 at the unchanged 20-second example limit",
+    "gpu": "PASS: complete mesh suite on native WebGPU and WebGL2/Vulkan, 2026-11-09; errors/messages empty, original furnace and lifecycle assertions retained",
+    "verify": "historical composed-step result retained, no full repeat",
+    "composeNative": "FAIL: unchanged 12-minute lease expired while subset 31 awaited the trace pipeline; 31 completed trace pipeline creations totalled 704992.5 ms. No retry.",
+    "composeCompat": "PASS: all 32 subsets, triangle marker, reflected RGB RIS shadows and atomic update; WebGL2/Vulkan, page completes at 12589.7 ms within unchanged 12-minute lease. The earlier WebGL2 timeout did not recur."
+  },
+  "measurements": {
+    "method": "Vite bare-peer rebundle and default gzip, measured locally with uncommitted package changes; no edited revision provenance",
+    "meshEntryBefore": 23021,
+    "meshEntryAfter": 25754,
+    "meshCeilingBefore": 23559,
+    "meshCeilingAfter": 26527,
+    "composeEntryBefore": 1333,
+    "composeEntryAfter": 1402,
+    "wasmRaw": 39317,
+    "wasmGzip": 15331,
+    "meshModuleGzip": 4937,
+    "rootGzip": 81091,
+    "coreStageGzip": 23924,
+    "pairedEntryNetworkForThisCheckpoint": "pending",
+    "checkpointDistWasmSha256": "577dd8d50713ff61b2916927922b93b54ed69ac93c9290d7e10671469e1dc30e"
+  },
+  "notes": [
+    "All submitted triangles, skipped ones included, retain the existing input count limit.",
+    "The old degeneracy rejection case now has affirmative retained/omitted/count assertions. Malformed index/coordinate/material rejection remains.",
+    "A gap-ray fixture tests three node bounds compared with five for median splitting; no wall-clock or general throughput claim.",
+    "SAH uses a balanced median after 32 split levels or coincident centroids, bounding hostile recursion.",
+    "No core, stage, parsing or third-party implementation code changed."
+  ]
+}

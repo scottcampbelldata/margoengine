@@ -15,7 +15,7 @@ export class ComposedVoxelPathTracer {
     get ready(): Promise<void>;
     get status(): VoxelPathTracer['status'];
     get error(): unknown;
-    get stats(): VoxelPathTracer['stats'];
+    get stats(): VoxelPathTracer['stats'] & TraceMeshStats;
     get options(): VoxelPathTracer['options'];
     setScene<Scene extends VoxelTraceScene>(scene: Scene, options?: {
         signal?: AbortSignal;
@@ -38,11 +38,25 @@ export interface ComposedVoxelPathTracerOptions<Scene extends VoxelTraceScene = 
     signal?: AbortSignal;
 }
 
+export interface TraceGeometryBuilder {
+    build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
+    dispose(): void;
+}
+
+export interface TraceMeshStats {
+    readonly meshTriangles: number;
+    readonly skippedDegenerateTriangles: number;
+    readonly meshBvhNodes: number;
+    readonly meshInstances: number;
+    readonly builtMeshBlases: number;
+    readonly reusedMeshBlases: number;
+}
+
 export interface VoxelTraceFeature {
     readonly id: VoxelTraceFeatureId;
     readonly source: (source: string) => string;
     readonly scene?: (scene: VoxelTraceScene) => VoxelTraceScene;
-    readonly geometry?: (scene: VoxelTraceScene, signal?: AbortSignal) => Promise<Uint32Array>;
+    readonly geometry?: () => TraceGeometryBuilder;
 }
 
 export type VoxelTraceFeatureId = 'resampling' | 'mesh' | 'media' | 'guiding' | 'spectral';

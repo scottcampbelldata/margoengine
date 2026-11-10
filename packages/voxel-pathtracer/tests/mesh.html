@@ -18,7 +18,8 @@ window.run=async(compat=false)=>{
  const render=async(name,s,expected,samples=1,options={})=>{
   const t=await MeshPathTracer.create(engine,{scene:s,denoise:false,maxBounces:16,...options});
   try {await t.ready;const im=await t.renderImage({width:16,height:16,samples,seed:173,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
-   coverage.push({name,actual:mean(im),expected,finite:im.color.every(Number.isFinite)});return im;
+   coverage.push({name,actual:mean(im),expected,finite:im.color.every(Number.isFinite),
+    geometry:{triangles:t.stats.meshTriangles,skipped:t.stats.skippedDegenerateTriangles,nodes:t.stats.meshBvhNodes}});return im;
   }finally{t.dispose();}
  };
  try {
@@ -26,6 +27,14 @@ window.run=async(compat=false)=>{
   let im=await render('shared edges and flat bounds',s,[2,1,0.5]);
   coverage.at(-1).maximumError=Math.max(...im.color.map((v,i)=>Math.abs(v-[2,1,0.5][i%3])));
   coverage.at(-1).ids=Array.from(new Set(im.instance)).sort((a,b)=>b-a);
+  s.meshes[0].indices=new Uint32Array([0,0,0,0,1,2,0,2,3,1,1,1]);
+  im=await render('degenerates skipped with original triangle IDs',s,[2,1,0.5]);
+  coverage.at(-1).ids=Array.from(new Set(im.instance)).sort((a,b)=>b-a);
+  coverage.at(-1).expectedIds=[-5,-6];
+  coverage.at(-1).expectedGeometry={triangles:2,skipped:2,nodes:3};
+  s.meshes[0].indices=new Uint32Array([0,0,0,1,1,1]);
+  await render('all-degenerate geometry is an empty scene',s,[0,0,0]);
+  coverage.at(-1).expectedGeometry={triangles:0,skipped:2,nodes:0};
   s.meshes=[pane('back face',0,1,true)];await render('double sided emission',s,[2,1,0.5]);
   s.meshes=[pane('near',0)];s.materials.push({id:2,type:'emit',color:[0,0,0],emissionColor:[0,0,1],emission:3});
   s.models=[{id:'cube',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}];s.instances=[{id:'cube',modelId:'cube',matrix:matrix(-0.5,-0.5,1)}];
