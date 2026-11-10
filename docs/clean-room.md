@@ -1,5 +1,10 @@
 # Clean room
 
+### Batch 170 Blender export size (2026-11-10)
+
+Read the Khronos *glTF 2.0 Specification* buffer, buffer view and accessor sections. [Title, link and sizes](whitepaper/batch-170-blender.md).
+glTF-Blender-IO ran only as a black box inside Blender. No external implementation was read.
+
 ### Batch 170 cache work counts (2026-11-10)
 
 Read the W3C *Indexed Database API 3.0* transaction scheduling sections. [Title, link and counts](whitepaper/batch-170-cache.md).

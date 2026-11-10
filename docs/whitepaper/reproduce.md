@@ -1,5 +1,8 @@
 # Reproducing Margo's numbers
 
+- Batch 170 blender: `blender --background --factory-startup --python engine-bench/batch-170/blender-compare.py --
+  <margo repo> <out dir>`, then gzip both files at level 9 ([batch-170-blender.md](batch-170-blender.md)).
+
 - Batch 170 cache: `npm test --workspace @margoengine/cache` runs the hit write work count
   ([batch-170-cache.md](batch-170-cache.md)).
 

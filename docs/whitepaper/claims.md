@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 blender: one test scene exports to an 11,227,568 B `.margo` (2,910,714 B gzipped) against Blender's glTF
+  at 4,959,600 B (1,160,872 B). Accepted difference: 80-byte GPU-ready vertices against 32 bytes, so loading copies no
+  vertex data. Size evidence only, no speed claim. [Scene, cause and reproduction](batch-170-blender.md).
+
 - Batch 170 cache: 300 cache hits issued together write their last-used times in 1 IndexedDB read-write transaction
   instead of 300, with identical stored records. Work evidence only, no speed claim.
   [Scope, Workbox count and reproduction](batch-170-cache.md).

@@ -1,5 +1,13 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 blender: `.margo` is larger than Blender's glTF (2026-11-10, accepted difference)
+
+A 256 by 128 UV sphere shared by 10 objects exports to 11,227,568 B as `.margo` (2,910,714 B gzipped) and 4,959,600 B
+as glTF-Blender-IO `.glb` (1,160,872 B). Cause: `.margo` stores the 80-byte interleaved vertex layout the GPU draws
+from, so loading copies no vertex data; the glTF file stores 32 bytes per vertex (position, normal, one UV set). No fix
+keeps that load path, so it is an accepted difference with a like-for-like row; a compact export layout is listed in
+finish-later. Load time pending the quiet rerun. [Scene, cause and reproduction](batch-170-blender.md).
+
 ## Batch 170 cache: one write for a burst of hits (2026-11-10)
 
 `AssetCache` queued one IndexedDB read-write transaction per hit to stamp the last-used time: 300 for 300 hits issued

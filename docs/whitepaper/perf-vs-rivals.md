@@ -303,3 +303,12 @@ Method: [batch-170-worker.md](batch-170-worker.md). No rival timing was run.
 | cache | 300 hits on 3 stored files, issued together | 300 readonly + 300 readwrite IndexedDB transactions | 300 readonly + 1 readwrite, same records | Workbox 7.4.1 CacheFirst + ExpirationPlugin: 300 Cache Storage reads + 300 readwrite | `perf(cache)`; timing pending the quiet rerun |
 
 Method and rival harness: [batch-170-cache.md](batch-170-cache.md). No rival timing was run.
+
+## Batch 170 blender: export size, 2026-11-10
+
+| Package | Work | Margo | Rival | Status |
+| --- | --- | --- | --- | --- |
+| blender | 256 x 128 UV sphere, 10 objects sharing it: file size (gzip -9) | `.margo` 11,227,568 B (2,910,714 B); meshopt 3,386,244 B (2,373,541 B) | glTF-Blender-IO (Blender 5.3.0 Beta) `.glb` 4,959,600 B (1,160,872 B) | accepted difference: 80 B GPU-ready vertices against 32 B, so load copies no vertex data; load time pending the quiet rerun |
+| blender | Like for like: vertex bytes at 80 B per vertex, 130,560 vertices | 10,444,800 B | 10,444,800 B if glTF stored the same six attributes (4,177,920 B as written, 32 B) | same size for the same layout |
+
+Method and harness: [batch-170-blender.md](batch-170-blender.md). No rival timing was run.

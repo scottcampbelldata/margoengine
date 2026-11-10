@@ -4,6 +4,8 @@ Import `margoengine/blender` from the `margoengine` package, or `@margoengine/bl
 
 Optional offline Blender `.margo` assets for Margo WebGPU PBR. Core and the stage facade remain unchanged. Geometry is validated and uploaded from views of the original binary buffer without glTF accessor decoding or vertex repacking. Repeated meshes share CPU views and GPU geometry buffers; each object keeps its own transform/material uniforms.
 
+File size: a mesh with a UV set or colours is stored at 80 bytes per vertex, the layout the GPU draws from, so a `.margo` file is larger than Blender's glTF of the same scene (11,227,568 B against 4,959,600 B for a 256 x 128 sphere, [measured](../../docs/whitepaper/batch-170-blender.md)). `compressMargoMeshopt` from `@margoengine/blender/meshopt` shrinks it (3,386,244 B there); a compact export layout is planned.
+
 Nothing is on npm yet. Once the runtime packages are published, install the peer packages too:
 
 ```sh

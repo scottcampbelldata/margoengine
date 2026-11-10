@@ -4,6 +4,7 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 
 | Job | Package | What is left |
 | --- | --- | --- |
+| 170.7 | blender | optional compact `.margo` vertex layout: attributes trimmed (no tangent, second UV set or colour when the mesh lacks them) or quantized (16-bit normals and UVs, as KHR_mesh_quantization allows) chosen at export, measured against glTF-Blender-IO size on the batch 170 scene (11,227,568 B against 4,959,600 B today), aiming to meet or beat it while keeping a no-copy load |
 | 54.8 | lightmap | refracted: multiple-scattering rough glass (Heitz et al. 2016) instead of dropping masked light; anisotropic roughness; Walter et al. 2007 still to read |
 | 54.8 | lightmap | refracted: Sellmeier dispersion and spectral Beer absorption; hero-wavelength sampling to cut colour noise |
 | 54.8 | lightmap | refracted: bounces use quad albedo only (no `surface` callback or textures) and are diffuse only; glossy receivers |
