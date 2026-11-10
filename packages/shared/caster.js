@@ -126,9 +126,17 @@ export const opacityEntries = (opacity, first = 4) => [
 
 /**
  * A caster shader that leaves vertex alpha out of its cut-out, for a primitive with `vertexAlpha: false` (materials
- * `vertexColors: false`, whose colour pass reads white). An instance's tint still counts. Apply it after `instancedDepth`.
+ * `vertexColors: false`, whose colour pass reads white, or gltf-pro vertices whose colour alpha is all 1). An instance's
+ * tint still counts. Apply it after `instancedDepth`. The stage hands on 1 - alpha and the fragment reads 1 minus that:
+ * interpolating a constant 0 is exact on every rasterizer, a constant 1 is not (0.99999994 in some pixels), which cut
+ * texels whose alpha equals the cutoff (glTF 2.0 3.9.4 keeps them). Code writing `o.alpha` more than once keeps the plain
+ * form.
  */
-export const solidVertexDepth = (code) => code.replace('o.alpha=i.color.a', 'o.alpha=1.0');
+export const solidVertexDepth = (code) => {
+  const solid = code.replace('o.alpha=i.color.a', 'o.alpha=1.0');
+  if (solid.match(/\bo\.alpha=/g)?.length !== 1) return solid;
+  return solid.replace(/\bo\.alpha=([^;]*);/, 'o.alpha=1.0-($1);').replace(/\bi\.alpha\b/g, '(1.0-i.alpha)');
+};
 
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export const depthPassDescriptor = () => ({

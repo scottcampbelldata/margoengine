@@ -92,6 +92,21 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
   `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
 
+### Fixed 2026-11-10: a MASK texel with alpha equal to alphaCutoff was cut where vertex alpha was 1
+
+- **What:** glTF 2.0 keeps a MASK texel whose alpha is greater than or equal to `alphaCutoff`. With base colour alpha
+  0.5, cutoff 0.5 and COLOR_0 alpha 1 (or no COLOR_0, which packs 1), the gltf-pro colour pass cut 40,257 of 77,822
+  pixels of a tilted grid and the pick pass lost 8 of 64 points (RTX A6000, WebGPU). Cause: the stage output alpha
+  of 1 reaches the fragment through perspective-correct interpolation as 0.99999994 in some pixels; the
+  `vertexAlpha: false` caster path wrote `o.alpha=1.0` and kept the same fault. Found in Scott's native Rust engine.
+- **Fix:** the stage hands on 1 - alpha and the fragment reads 1 minus that, so a constant alpha of 1 arrives as an
+  exactly interpolated 0 (gltf-pro `exactAlphaShader` on MASK pipelines; `solidVertexDepth` in `packages/shared/caster.js`
+  for shadows, selection, clustered, staging and taa). gltf-pro casters and pick primitives whose vertex alpha is all 1
+  take the `vertexAlpha: false` path. Regression: `packages/gltf-pro/scripts/test-mask-alpha-browser.mjs`
+  (`npm run test:gpu:mask-alpha`, WebGPU and WebGL2 compat), `packages/gltf-pro/tests/vertex-inputs.test.js`,
+  `packages/shadows/test/cutout-casters.test.js`. The directional shadow map lost nothing before the fix on this GPU
+  (orthographic, no perspective division); it is checked anyway.
+
 ### Fixed 2026-11-10: GGX importance samples collapsed onto the normal at low roughness
 
 - **What:** `importanceGGX` (`packages/environment/src/shader-common.ts`, used by the prefilter, the BRDF LUT and

@@ -1,3 +1,12 @@
+### Section 5 evidence: exact vertex alpha at an alpha cutoff (2026-11-10)
+
+Perspective-correct interpolation of a constant stage output of 1 is not exact (0.99999994 in some pixels); a
+constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `vertexAlpha: false` caster path
+(`solidVertexDepth`, shared by shadows, selection, clustered, staging and taa) hand on 1 - alpha. Evidence:
+`packages/gltf-pro/scripts/test-mask-alpha-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: alpha exactly at
+the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
+texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
+
 ### Section 5 evidence: stable GGX inverse CDF in the environment bakes (2026-11-10)
 
 `importanceGGX` takes cosTheta and sinTheta from d = (1 - xi) + alpha^2 xi, so the f32 lobe no longer collapses onto

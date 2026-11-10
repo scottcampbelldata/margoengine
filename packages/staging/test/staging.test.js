@@ -131,7 +131,7 @@ test('a cut-out caster draws with its UV transform, opacity map and vertex alpha
     s.frame();
     const code = modules.find((c) => c.includes('margoOpacityAt'));
     assert.match(code, /alphaUV0:vec4f,alphaUV1:vec4f/);
-    assert.match(code, /o\.alpha=1\.0;/);
+    assert.match(code, /o\.alpha=1\.0-\(1\.0\);/);
     assert.match(code, /\.a\*margoOpacityAt\(i\.margoUV\)\*f\.alpha\.x/);
     primitive.alphaTransform = new Float32Array(4);
     assert.throws(() => s.frame(), /alpha transform/);

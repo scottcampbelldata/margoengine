@@ -52,6 +52,8 @@ import {
   vertexInputs,
   vertexLayout,
   whiteColours,
+  opaqueColours,
+  exactAlphaShader,
 } from './vertex-inputs.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
@@ -1196,6 +1198,14 @@ function preparedPrimitive(
 const whiteVertices = new WeakMap<GPUBuffer, boolean>();
 /** Whether an instanced draw of `r` may read the white constant: its own, undeformed vertices are all white. */
 const whiteDraw = (r: DrawResource): boolean => !r.primitive.deformed && whiteVertices.get(r.vertex) === true;
+/**
+ * Vertex buffers whose every colour alpha is 1 (`opaqueColours`): a cut-out depth or pick pass of one takes the
+ * `vertexAlpha: false` path, so an interpolated 0.99999994 cannot cut a texel alpha equal to the cutoff.
+ */
+const opaqueVertices = new WeakMap<GPUBuffer, boolean>();
+/** Whether `r` draws its own, undeformed and uninstanced vertices, all of colour alpha 1. */
+const opaqueDraw = (r: DrawResource): boolean =>
+  !r.primitive.deformed && !r.primitive.instances && opaqueVertices.get(r.vertex) === true;
 interface DrawResource {
   primitive: PBRPrimitive;
   device: GPUDevice;
@@ -1364,7 +1374,7 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   const opacity = mask?.opacity;
   if (opacity) value.opacity = opacity;
   else delete value.opacity;
-  if (m.vertexAlpha === false && value.cutoff > 0) value.vertexAlpha = false;
+  if ((m.vertexAlpha === false || opaqueDraw(r)) && value.cutoff > 0) value.vertexAlpha = false;
   else delete value.vertexAlpha;
   // Rows 20 to 23 of `physical`: KHR_materials_diffuse_transmission's factor, then its colour. Its textures are not read.
   const diffuse = m.extended?.diffuseTransmission ? m.physical! : undefined;
@@ -2515,6 +2525,7 @@ export class PBRModel implements EnginePlugin {
       const from = this.bufferSources?.get(p) ?? p;
       r.vertex = upload(from.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
       if (!whiteVertices.has(r.vertex)) whiteVertices.set(r.vertex, whiteColours(from.vertices));
+      if (!opaqueVertices.has(r.vertex)) opaqueVertices.set(r.vertex, opaqueColours(from.vertices));
       r.index = upload(from.indices, GPUBufferUsage.INDEX);
       if (from.uvs) r.uvs = upload(from.uvs, GPUBufferUsage.VERTEX);
       p.buffers = { vertex: r.vertex, index: r.index };
@@ -2693,6 +2704,12 @@ export class PBRModel implements EnginePlugin {
         range && r.vertex === old
           ? whiteVertices.get(old) === true && whiteColours(g.vertices, range.start, range.count)
           : whiteColours(g.vertices),
+      );
+      opaqueVertices.set(
+        r.vertex,
+        range && r.vertex === old
+          ? opaqueVertices.get(old) === true && opaqueColours(g.vertices, range.start, range.count)
+          : opaqueColours(g.vertices),
       );
       r.index = place(r, r.index, g.indices, GPUBufferUsage.INDEX, range && [0, 0]);
       if (g.uvs) {
@@ -3489,7 +3506,7 @@ export class PBRModel implements EnginePlugin {
               ? { alphaTransform: textureCoordinates(m.maps[0]).transform }
               : {}),
           ...(mask?.opacity ? { opacity: mask.opacity } : {}),
-          ...(m.vertexAlpha === false && cutoff > 0 ? { vertexAlpha: false } : {}),
+          ...((m.vertexAlpha === false || opaqueDraw(r)) && cutoff > 0 ? { vertexAlpha: false } : {}),
           ...(m.displacement ? { displacement: m.displacement } : {}),
           ...(m.surfaceClip ? { clip: m.surfaceClip } : {}),
         };
@@ -4919,6 +4936,8 @@ export class PBRModel implements EnginePlugin {
     // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
     const mask = +(m.settings[0] === 1);
     // Only a multisampled target has samples to cover, so anywhere else the same pipeline keeps the hard test.
+    // A cut-out reads its vertex alpha exactly where it is constant (`exactAlphaShader`).
+    if (mask) code = exactAlphaShader(code);
     const coverage = !!state?.alphaToCoverage && !!mask && (c.descriptor.multisample?.count ?? 1) > 1;
     if (coverage) code = alphaCoverageShader(code);
     let id = draws.codes.get(code);

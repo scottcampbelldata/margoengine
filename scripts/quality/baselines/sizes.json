@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14736013,
+  "total": 14737072,
   "history": [
     {
       "date": "2026-10-24",
@@ -8237,6 +8237,12 @@
       "commit": "8239215b3",
       "reason": "batch 132 audit: FITS commentary cards, complex and blank values, and a bounded zero-width table row count (+73 B gzip measured, 5124 to 5197)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "40e6f183d",
+      "reason": "exact vertex alpha in the solid caster path (shared/caster.js solidVertexDepth): 1 - alpha interpolation, rust-port job 2",
+      "grew": 2
     }
   ],
   "items": {
@@ -8529,10 +8535,10 @@
     "@margoengine/environment/exr-tiled": 8112,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/fog-volumes": 1638,
-    "@margoengine/environment/gi": 19267,
+    "@margoengine/environment/gi": 19260,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/prefiltered": 3949,
-    "@margoengine/environment/probes": 19120,
+    "@margoengine/environment/probes": 19114,
     "@margoengine/environment/reflector": 11438,
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/environment/refractor": 11397,
@@ -9202,7 +9208,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 18738,
+    "@margoengine/shadows": 19333,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
     "@margoengine/shadows/rt": 6486,
@@ -9295,7 +9301,7 @@
     "@margoengine/stats/panels": 10192,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
-    "@margoengine/taa": 14629,
+    "@margoengine/taa": 15106,
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7593,
     "@margoengine/taa/upscale-velocity": 19045,

@@ -82,6 +82,40 @@ export function whiteColours(vertices: Float32Array, start = 0, count = vertices
   return true;
 }
 
+/** True when every vertex of `vertices` from vertex `start` on, `count` of them, has colour alpha 1 (COLOR_0 absent included). */
+export function opaqueColours(vertices: Float32Array, start = 0, count = vertices.length / 20 - start): boolean {
+  for (let i = start * 20 + 19, end = (start + count) * 20; i < end; i += 20) if (vertices[i] !== 1) return false;
+  return true;
+}
+
+/**
+ * A MASK colour pass hands the colour's transparency (1 - alpha) from the vertex stage on, and the fragment reads
+ * 1 minus that. Interpolating a constant 0 is exact on every rasterizer; interpolating a constant 1 is not (perspective
+ * division leaves 0.99999994 in some pixels), and a texel alpha equal to `alphaCutoff` must stay opaque (glTF 2.0,
+ * 3.9.4) when the vertex alpha is 1 or COLOR_0 is absent. Code that names the stage output any other way than
+ * `i:Out` / `o.color` is returned unchanged.
+ */
+export function exactAlphaShader(code: string): string {
+  const [start, end] = stage(code);
+  if (start < 0 || end < 0) return code;
+  const body = code.slice(start, end),
+    outside = code.slice(0, start) + code.slice(end),
+    writes = body.match(/\bo\.color=[^;]*;/g);
+  if (writes?.length !== 1 || code.includes('fn margoClearAlpha(')) return code;
+  // Every `Out` outside the vertex stage is a parameter named `i`, and nothing else is named `i` there.
+  if ([...outside.matchAll(/(\w+)\s*:\s*Out\b/g)].some((m) => m[1] !== 'i')) return code;
+  if ([...outside.matchAll(/\bi\s*:\s*(\w+)/g)].some((m) => m[1] !== 'Out') || /\b(let|var|const)\s+i\b/.test(outside))
+    return code;
+  const vertex = body.replace(/\bo\.color=([^;]*);/, 'o.color=margoClearAlpha($1);'),
+    swap = (text: string) => text.replace(/\bi\.color\b/g, 'margoClearAlpha(i.color)');
+  return (
+    swap(code.slice(0, start)) +
+    vertex +
+    swap(code.slice(end)) +
+    '\nfn margoClearAlpha(c:vec4f)->vec4f {return vec4f(c.rgb,1.0-c.a);}\n'
+  );
+}
+
 /** Vertex buffer slot 0: the 80-byte vertex, one attribute per location `inputs` reads, three floats where xyz do. */
 export function vertexLayout(inputs: VertexInputs): GPUVertexBufferLayout {
   return {

@@ -58,8 +58,12 @@ test('untransformed shadow casters retain the recorded shader and 144-byte unifo
     s.frame();
     const pipelines = shadowPipelines(s);
     assert.equal(pipelines.length, 1);
+    // The quad has no COLOR_0, so it casts on the exact vertex alpha path (shared/caster.js solidVertexDepth): the
+    // recorded shader with only that path's two edits.
+    const code = pipelines[0].vertex.module.code;
+    assert.match(code, /o\.alpha=1\.0-\(1\.0\);/);
     assert.equal(
-      digest(pipelines[0].vertex.module.code),
+      digest(code.replace('o.alpha=1.0-(1.0);', 'o.alpha=i.color.a;').replace('(1.0-i.alpha)', 'i.alpha')),
       'f8d50d66edc6126585b54be2138ec93f0f98cf6dc7da45405c7953fdfc3cf47f',
     );
     assert.equal(s.resources.filter((r) => r.size === 144 && !r.destroyed).length, 4);

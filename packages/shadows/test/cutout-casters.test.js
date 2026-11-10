@@ -109,7 +109,11 @@ test('vertexColors false keeps vertex alpha out of a cutting caster, and only a 
       mesh = createMesh(s.engine, quad, material);
     assert.equal(mesh.shadowPrimitives[0].vertexAlpha, false);
     material.vertexColors = true;
-    assert.equal(mesh.shadowPrimitives[0].vertexAlpha, undefined);
+    // Vertex alpha 1 everywhere (no colours): reading it changes nothing, so the caster still takes the exact path.
+    assert.equal(mesh.shadowPrimitives[0].vertexAlpha, false);
+    const translucent = new Material({ alphaTest: 0.5, vertexColors: true }),
+      tinted = createMesh(s.engine, { ...quad, colors: [1, 1, 1, 0.5, 1, 1, 1, 1, 1, 1, 1, 1] }, translucent);
+    assert.equal(tinted.shadowPrimitives[0].vertexAlpha, undefined, 'a vertex alpha below 1 cuts');
     assert.equal(s.caster({ vertexColors: false }).shadowPrimitives[0].vertexAlpha, undefined, 'nothing to cut');
   } finally {
     s.close();
@@ -143,10 +147,17 @@ test('a mesh picks through what its colour pass leaves out', async () => {
 });
 
 test('solidVertexDepth takes vertex alpha out, whatever else the caster does', () => {
-  const plain = '@location(4) color:vec4f @vertex fn vertex(i:In)->Out {o.alpha=i.color.a;return o;}';
-  assert.match(solidVertexDepth(plain), /o\.alpha=1\.0;/);
+  const plain =
+    '@location(4) color:vec4f @vertex fn vertex(i:In)->Out {o.alpha=i.color.a;return o;}\n' +
+    '@fragment fn fragment(i:Out){if(t*i.alpha<c){discard;}}';
+  // The stage hands on 1 - alpha, so a constant alpha of 1 reaches the fragment as exactly 1 (interpolated 0).
+  assert.match(solidVertexDepth(plain), /o\.alpha=1\.0-\(1\.0\);/);
+  assert.match(solidVertexDepth(plain), /t\*\(1\.0-i\.alpha\)<c/);
   // An instance's tint still multiplies in.
-  assert.match(solidVertexDepth(instancedDepth(plain)), /o\.alpha=1\.0\*i\.tint\.a;/);
+  assert.match(solidVertexDepth(instancedDepth(plain)), /o\.alpha=1\.0-\(1\.0\*i\.tint\.a\);/);
+  // A stage writing the output twice keeps the plain form rather than flipping half of it.
+  const twice = plain.replace('return o;', 'o.alpha=o.alpha;return o;');
+  assert.doesNotMatch(solidVertexDepth(twice), /1\.0-i\.alpha/);
 });
 
 test('opacityDepth reads every sampling form the caster passes use', () => {

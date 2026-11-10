@@ -3,7 +3,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { instancedShader } from '../src/instanced-shader.ts';
 import { extendedPBRShader, pbrShader } from '../src/shader.ts';
-import { instanceInputs, vertexInputs, vertexLayout, whiteColours } from '../src/vertex-inputs.ts';
+import {
+  exactAlphaShader,
+  instanceInputs,
+  opaqueColours,
+  vertexInputs,
+  vertexLayout,
+  whiteColours,
+} from '../src/vertex-inputs.ts';
 import { instanceLayout } from '../../shared/instances.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
@@ -115,6 +122,31 @@ test('whiteColours finds a colour other than (1, 1, 1, 1) in the whole buffer or
   assert.equal(whiteColours(vertices, 0, 2), true);
   assert.equal(whiteColours(vertices, 2, 1), false);
   assert.equal(whiteColours(vertices, 3, 1), true);
+});
+
+test('opaqueColours finds a colour alpha other than 1, whatever the RGB', () => {
+  const vertices = new Float32Array(20 * 3);
+  for (let v = 0; v < 3; v++) vertices.fill(1, v * 20 + 16, v * 20 + 20);
+  vertices[20 + 16] = 0.25;
+  assert.equal(opaqueColours(vertices), true);
+  assert.equal(whiteColours(vertices), false);
+  vertices[2 * 20 + 19] = 0.99999994;
+  assert.equal(opaqueColours(vertices), false);
+  assert.equal(opaqueColours(vertices, 0, 2), true);
+});
+
+test('exactAlphaShader hands on 1 - alpha and reads 1 minus that in every Out reader', () => {
+  const code = exactAlphaShader(pbrShader);
+  assert.match(code, /o\.color=margoClearAlpha\(i\.color\);/);
+  assert.match(code, /\*f\.base\*margoClearAlpha\(i\.color\);/);
+  assert.doesNotMatch(code.slice(code.indexOf('return o;')), /[^(]i\.color\b/);
+  assert.match(code, /fn margoClearAlpha\(c:vec4f\)->vec4f \{return vec4f\(c\.rgb,1\.0-c\.a\);\}/);
+  // Applied once only, and code that hands `Out` on under another name is left alone.
+  assert.equal(exactAlphaShader(code), code);
+  const renamed = pbrShader.replace('fn uv(i:Out, coord:f32)', 'fn uv(j:Out, coord:f32)');
+  assert.equal(exactAlphaShader(renamed), renamed);
+  // The instanced vertex stage keeps its tint inside the flipped write.
+  assert.match(exactAlphaShader(instancedShader(bare(pbrShader))), /o\.color=margoClearAlpha\(i\.color\*k\.tint\);/);
 });
 
 test('createInstancedMesh boxes (bare material, colours on): 48 B and 6 instance rows become 24 B and 5', () => {
