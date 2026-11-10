@@ -2162,7 +2162,6 @@ Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 - **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
 - **Missing grid filters:** threshold, plot over line, integrate, resample, warp and connectivity are not in the
   batch 172 pipeline.
-- **Zarr Blosc and Zstandard codecs are refused** (README "Medical and array formats").
 - **SPLOM has no test.** `scatterMatrix` in `src/parcoords.ts` is exported without a test of its own.
 - **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
 - **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked

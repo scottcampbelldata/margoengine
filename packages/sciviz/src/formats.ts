@@ -6,8 +6,8 @@
 //   Bit, the Modality LUT (PS3.3 C.11.1), and series stacked by position along the slice normal (PS3.3 C.7.6.2, Image
 //   Plane Module) or by time (Frame Increment Pointer, C.7.6.6). Compressed pixel data (JPEG, JPEG 2000, RLE and the
 //   rest) is refused.
-// - Zarr v2 and v3 arrays over HTTP or any key store: regular chunks, C and F order, the bytes, gzip, zlib, crc32c and
-//   transpose codecs, and missing chunks as the fill value (Zarr storage specification 2 and 3.1).
+// - Zarr v2 and v3 arrays over HTTP or any key store: regular chunks, C and F order, the bytes, gzip, zlib, crc32c,
+//   transpose, blosc and zstd codecs, and missing chunks as the fill value (Zarr storage specification 2 and 3.1).
 // gzip (RFC 1952, every member), zlib (RFC 1950) and raw DEFLATE (RFC 1951) go through the shared inflater's raw entry,
 // which reports where a stream ends: the pad byte after a deflated DICOM data set and the next member of a gzip file.
 import { crc32 } from '../../shared/crc32.js';
@@ -1340,11 +1340,15 @@ const CODEC_KIND: Record<string, 'array' | 'bytes' | 'compress'> = {
   bytes: 'bytes',
   gzip: 'compress',
   crc32c: 'compress',
+  // Blosc 1 frames (https://www.blosc.org/docs/blosc-format.html) and RFC 8878 Zstandard frames, decoded by the
+  // clean-room decoders of the cloud volume reader, loaded only when a chunk needs one.
+  blosc: 'compress',
+  zstd: 'compress',
 };
 
 /**
  * Opens a Zarr v2 or v3 array at `path` in `store`. Rejects with code `unsupported` for a codec, chunk grid, chunk key
- * encoding, storage transformer or metadata field this reader has not (blosc, zstd, sharding and the rest), naming
+ * encoding, storage transformer or metadata field this reader has not (sharding and the rest), naming
  * it, and with a RangeError for metadata the specification does not allow.
  */
 export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions = {}): Promise<ZarrArray> {
@@ -1500,7 +1504,7 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
     if (compressor !== null) {
       if (!isObject(compressor) || typeof compressor.id !== 'string')
         throw rangeError('Zarr: compressor is neither null nor an object with an id', 'sciviz');
-      if (compressor.id !== 'gzip' && compressor.id !== 'zlib')
+      if (!['gzip', 'zlib', 'blosc', 'zstd'].includes(compressor.id))
         throw fault('unsupported', `Zarr: compressor ${compressor.id} is not read`, 'sciviz');
       compressors.push({ name: compressor.id, mustUnderstand: true });
     }
@@ -1522,7 +1526,7 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
     chunkBytes = chunkSamples * SIZE[sampleKind];
   // Each bytes to bytes codec decodes to what it was given on encode: exactly so after bytes and crc32c, at most a
   // stored-block deflate stream plus a header allowance after a compressor.
-  const steps: ((bytes: Uint8Array) => Uint8Array)[] = [];
+  const steps: ((bytes: Uint8Array, signal?: AbortSignal) => Uint8Array | Promise<Uint8Array>)[] = [];
   let encoded = chunkBytes;
   for (const { name } of compressors) {
     const decoded = encoded;
@@ -1535,6 +1539,18 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
         return body;
       });
       encoded += 4;
+    } else if (name === 'blosc' || name === 'zstd') {
+      steps.unshift(async (b, signal) => {
+        const codecs = await import('./cloud-codecs.js');
+        const out = await (name === 'blosc'
+          ? codecs.decodeBlosc(b, decoded, signal)
+          : codecs.decodeCloudCodec('zstd', b, decoded, signal));
+        if (out.length > decoded)
+          throw rangeError(`Zarr: a ${name} chunk decodes past ${decoded} bytes; ${ZARR_LIMIT_HINT}`, 'sciviz');
+        return out;
+      });
+      // Blosc adds a 16 byte header, a block table and 4 bytes a stream; Zstandard adds frame and block headers.
+      encoded += 16 + 8 * Math.ceil(encoded / 4096 + 1) + 65536;
     } else {
       steps.unshift(
         name === 'zlib' ? (b) => unzlib(b, decoded, ZARR_LIMIT_HINT) : (b) => gunzip(b, decoded, ZARR_LIMIT_HINT),
@@ -1542,9 +1558,9 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
       encoded += 5 * Math.ceil(encoded / 65535 + 1) + 65536;
     }
   }
-  const decodeChunk = (bytes: Uint8Array): GridData => {
+  const decodeChunk = async (bytes: Uint8Array, signal?: AbortSignal): Promise<GridData> => {
     let b = bytes;
-    for (const step of steps) b = step(b);
+    for (const step of steps) b = await step(b, signal);
     if (b.length !== chunkBytes)
       throw rangeError(
         `Zarr: a chunk decodes to ${b.length} bytes, its shape and data type give ${chunkBytes}`,
@@ -1638,7 +1654,7 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
           (async () => {
             const bytes = await get(prefix + key(at), signal);
             if (!bytes) return;
-            const values = decodeChunk(bytes);
+            const values = await decodeChunk(bytes, signal);
             // Copy the overlap of this chunk and the box, a row of the last dimension at a time.
             const lo = at.map((c, d) => Math.max(start[d], c * chunks[d])),
               hi = at.map((c, d) => Math.min(stop[d], (c + 1) * chunks[d]));

@@ -849,6 +849,38 @@ test('real Zarr v2 store: the zarr_implementations astronaut (gzip, 108 chunks) 
   }
 });
 
+test('real Zarr blosc and zstd stores decode to the same samples as their gzip twins', async () => {
+  // v2: the zarr_implementations astronaut again, as Blosc 1 LZ4 with byte shuffle (numcodecs default settings).
+  const v2 = join(ZARR, 'v2-astronaut');
+  const gzip = await (await openZarr(storeOf(v2), 'gzip')).read();
+  const blosc = await openZarr(storeOf(v2), 'blosc');
+  assert.deepEqual(blosc.chunks, [100, 100, 1]);
+  const decoded = await blosc.read();
+  assert.deepEqual(decoded.shape, gzip.shape);
+  assert.equal(Buffer.compare(Buffer.from(decoded.data.buffer, decoded.data.byteOffset, decoded.data.byteLength), Buffer.from(gzip.data.buffer, gzip.data.byteOffset, gzip.data.byteLength)), 0);
+  // v3: zarrs test data written by zarr-python, Blosc zstd with bit shuffle and a plain zstd codec; 0 to 99 exactly.
+  for (const folder of ['v3-zarrs/array_blosc.zarr', 'v3-zarrs/array_zstd.zarr']) {
+    const root = join(ZARR, folder),
+      server = await serve(root);
+    try {
+      for (const store of [storeOf(root), server.base]) {
+        const array = await openZarr(store);
+        assert.deepEqual([...(await array.read()).data], Array.from({ length: 100 }, (_, i) => i), folder);
+        const box = await array.read({ start: [3, 4], stop: [7, 6] });
+        assert.deepEqual([...box.data], [34, 35, 44, 45, 54, 55, 64, 65]);
+      }
+    } finally {
+      await server.close();
+    }
+  }
+  // A damaged Blosc header and a truncated Zstandard frame are refused, never read as data.
+  const files = Object.fromEntries(['zarr.json', 'c/0/0', 'c/0/1', 'c/1/0', 'c/1/1'].map((k) => [k, readFileSync(join(ZARR, 'v3-zarrs/array_zstd.zarr', k))]));
+  await assert.rejects((await openZarr({ ...files, 'c/0/0': files['c/0/0'].subarray(0, 20) })).read());
+  const bfiles = Object.fromEntries(['zarr.json', 'c/0/0', 'c/0/1', 'c/1/0', 'c/1/1'].map((k) => [k, readFileSync(join(ZARR, 'v3-zarrs/array_blosc.zarr', k))]));
+  const bad = Uint8Array.from(bfiles['c/0/0']); bad[12] ^= 1;
+  await assert.rejects((await openZarr({ ...bfiles, 'c/0/0': bad })).read());
+});
+
 test('real Zarr v3 stores: zarrs array_gzip and GDAL order_f_u2 and gzip read their known values', async () => {
   for (const [folder, path, check] of [
     [

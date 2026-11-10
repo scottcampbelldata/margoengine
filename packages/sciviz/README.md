@@ -889,11 +889,16 @@ Zarr chunk byte limits come from shape and dtype metadata; their errors name tha
   read as explicit VR little endian when a VR follows its first tag, else as implicit VR little endian.
 - **Zarr** (`openZarr(store, path)`, `array.read({ start, stop })`, `zarrGrid(read, spacing)`): v2 (`.zarray`) and v3
   (`zarr.json`, with the v3.1 short-hand names) arrays with regular chunks, over HTTP (a base URL), an object of keys,
-  or your own `(key, signal) => bytes` function. Codecs: bytes in either order, gzip, zlib, crc32c (checked) and
-  transpose (chained ones compose); C and F order. Only an absent key (HTTP 404) is a missing chunk, read as the fill
-  value; any other HTTP error fails with code `failed`. `read` fetches only the chunks the box touches, at once. blosc,
-  zstd, sharding, storage transformers, other chunk key encodings and metadata fields this reader does not know (unless
-  marked `must_understand: false`) are refused with code `unsupported`, naming them. Metadata the specification does
+  or your own `(key, signal) => bytes` function. Codecs: bytes in either order, gzip, zlib, crc32c (checked),
+  transpose (chained ones compose), Zstandard (v2 compressor `zstd`, v3 codec `zstd`) and Blosc 1 (v2 compressor and v3
+  codec `blosc`: blosclz, LZ4, LZ4HC, zlib and Zstandard inside, byte or bit shuffle, split or whole blocks); C and F
+  order. Zstandard follows [RFC 8878](https://www.rfc-editor.org/rfc/rfc8878) and Blosc the
+  [Blosc 1 format description](https://www.blosc.org/docs/blosc-format.html); both decoders are Margo's own, loaded
+  only when a chunk needs one. Snappy inside Blosc, Blosc 2 frames and Zstandard dictionaries are refused with code
+  `unsupported`. Only an absent key (HTTP 404) is a missing chunk, read as the fill value; any other HTTP error fails
+  with code `failed`. `read` fetches only the chunks the box touches, at once. Sharding, storage transformers, other
+  chunk key encodings and metadata fields this reader does not know (unless marked `must_understand: false`) are
+  refused with code `unsupported`, naming them. Metadata the specification does
   not allow (a codec chain without one bytes codec, a fill value outside its data type, a `.` or `..` path segment,
   `dimension_names` of the wrong length) and a chunk that ends with fewer bytes than its shape needs are refused
   with a `RangeError`. A compressor that exceeds the chunk byte allowance reports linked `MargoError` code `failed`.

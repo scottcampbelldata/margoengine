@@ -37,7 +37,7 @@ current on that date.
 | Vector and tensor | quiver, RK4 streamlines, particles and pathlines, LIC, tubes and ribbons, tensor glyphs, DTI fibre tracking (README "Vector fields", `tests/flow.test.js`, `tests/lic.test.js`, `tests/tubes.test.js`, `tests/tensor.test.js`, `tests/tensor-real.test.js`) | Plotly cone and streamtube traces; VTK.js glyph mapper | ParaView stream tracer, LIC, tensor glyphs |
 | Volume scale | bricked level-of-detail volumes, OME-Zarr multiscale, N5, precomputed chunks (README "Bricked volumes", `tests/bricks.test.js`, `tests/omezarr.test.js`) | Neuroglancer reads precomputed, N5 and OME-Zarr chunked sources | Out-of-core readers |
 | Grid types | image, structured, rectilinear, curvilinear, unstructured, polydata, multiblock, polyhedra, higher-order cells, AMR (`tests/grids.test.js`, `tests/datasets.test.js`, `tests/datasets-elements.test.js`, `tests/amr.test.js`) | VTK.js documents ImageData and PolyData | ParaView: every VTK data type |
-| Formats | NRRD, NIfTI, DICOM, Zarr, VTK legacy and XML, NetCDF classic, HDF5, CGNS, Xdmf, Exodus, OpenFOAM, EnSight, FITS, MRC, OME-TIFF, Arrow, Parquet, CSV (`tests/nrrd.test.js`, `tests/formats.test.js`, `tests/climate-formats.test.js`, `tests/hdf5.test.js`, `tests/engineering.test.js`, `tests/astronomy.test.js`, `tests/table.test.js`). Zarr Blosc and Zstandard are not supported (README "Medical and array formats") | ParaView Glance lists its readers through ITK and VTK.js | ParaView and VisIt read hundreds of formats |
+| Formats | NRRD, NIfTI, DICOM, Zarr, VTK legacy and XML, NetCDF classic, HDF5, CGNS, Xdmf, Exodus, OpenFOAM, EnSight, FITS, MRC, OME-TIFF, Arrow, Parquet, CSV (`tests/nrrd.test.js`, `tests/formats.test.js`, `tests/climate-formats.test.js`, `tests/hdf5.test.js`, `tests/engineering.test.js`, `tests/astronomy.test.js`, `tests/table.test.js`); Zarr Blosc 1 and Zstandard chunks from real zarr-python and zarr_implementations stores (`tests/formats-spec.test.js`) | ParaView Glance lists its readers through ITK and VTK.js | ParaView and VisIt read hundreds of formats |
 | Scale | point budget option, exact binary64 aggregation, additive point octree (README "Figures", `tests/aggregate.test.js`, `tests/pointcloud.test.js`) | deck.gl performance guide, regl-scatterplot and Cosmograph document million-scale rendering | Datashader-style aggregation |
 | Interaction | hover, pick, box and lasso, linked selection across figures, cross-filter, annotations, measurement (README "Picking, tooltips and selection", `tests/pick.test.js`, `tests/link.test.js`, `tests/annotate.test.js`) | Bokeh linked brushing; Vega-Lite union and intersect selections | Linked views and rulers |
 | Analysis filters | contour, clip, probe, calculator, gradient, glyph in a re-executing pipeline (`tests/datasets.test.js`, `tests/contour.test.js`, `tests/clip.test.js`, `tests/probe.test.js`, `tests/calc.test.js`, `tests/glyph.test.js`). Threshold, plot over line, integrate, resample, warp and connectivity: not found | Vega-Lite table transforms; VTK.js has few grid filters | ParaView: all of these |
@@ -138,7 +138,7 @@ included.
 ## Not found in Margo today
 
 MinIP, multi-component and general multi-volume compositing, the threshold, plot-over-line, integrate, resample,
-warp and connectivity filters, Zarr Blosc and Zstandard, and a SPLOM test. These are listed in docs/known-bugs.md
+warp and connectivity filters, and a SPLOM test. These are listed in docs/known-bugs.md
 under "Sciviz comparison gaps".
 
 ## Reproduce

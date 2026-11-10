@@ -455,8 +455,8 @@ test('a Zarr v3 array with gzip, crc32c and big-endian bytes reads; a damaged ch
   });
   assert.deepEqual([...(await transposed.read()).data], [1, 2, 3, 4]);
   await assert.rejects(
-    openZarr({ 'zarr.json': json({ ...JSON.parse(meta), codecs: [{ name: 'bytes' }, { name: 'blosc' }] }) }),
-    (error) => error.code === 'unsupported' && /blosc/.test(error.message),
+    openZarr({ 'zarr.json': json({ ...JSON.parse(meta), codecs: [{ name: 'bytes' }, { name: 'sharding_indexed' }] }) }),
+    (error) => error.code === 'unsupported' && /sharding_indexed/.test(error.message),
   );
 });
 
