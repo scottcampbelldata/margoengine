@@ -400,3 +400,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | react/performance optional alias | batch 265 job 5 |
 - @margoengine/geometry (batch 219 job 1): nurbs-edit insertion/elevation for curves and both surface axes, UV trimming with holes/islands, defaults and numerical/resolution limits; generated margoengine/geometry/nurbs-edit alias.
 - margoengine (batch 219 job 1): generated geometry/nurbs-edit alias and current umbrella alias completeness; examples remain deferred.
+
+- @margoengine/mesh-edit: document repairMesh soup input, exact/distance welding, reported removals, winding/fan policy, hole limits, cavity orientation, corner UV reset, provenance, readyForBoolean meaning and cancellation (batch 224 job 3).
+- margoengine: document mesh-edit/repair alias in the README phase (batch 224 job 3).

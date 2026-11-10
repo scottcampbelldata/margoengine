@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12797432,
+  "total": 12807352,
   "history": [
     {
       "date": "2026-10-24",
@@ -6352,6 +6352,12 @@
       "commit": "batch-219",
       "reason": "New optional geometry/nurbs-edit: absent -> 11646 B gzip, ceiling 11996 B. Homogeneous editing, UV trimming and exact one-sided surface evaluation share rational evaluation and topology helpers. Core/stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-224-job3",
+      "reason": "New optional mesh-edit/repair: 0 to 9631 gzip bytes, 9920 B ceiling, soup welding/orientation/manifold cleanup/cavity nesting and existing hole filling; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7513,6 +7519,7 @@
     "leak @margoengine/ui/keyboard -> @margoengine/text": 1,
     "@margoengine/sciviz/contour": 3323,
     "@margoengine/react/performance": 5769,
-    "@margoengine/geometry/nurbs-edit": 11996
+    "@margoengine/geometry/nurbs-edit": 11996,
+    "@margoengine/mesh-edit/repair": 9920
   }
 }

@@ -3548,3 +3548,6 @@ Batch 219 job 1: geometry/nurbs-edit preserves rational curve shape and knot con
 
 Batch 219 regression: the trim tessellator preserves both sides of a degree+1 repeated surface knot, with no triangle crossing the gap between disconnected planar sheets. Evidence: the fully discontinuous u/v case in packages/geometry/tests/nurbs-edit.test.js fails against the previous surface-side API and passes with explicit span-side selection.
 
+
+### Batch 224 mesh repair
+The optional repair entry combines welding, consistent winding, degenerate/duplicate/non-manifold cleanup, fan separation and bounded hole closure. The repaired dirty cube enters the actual exact boolean API and preserves unit volume; nested shells preserve a 0.125-unit cavity and 0.875-unit total volume. The repair tests also prove retained corner UV correspondence and explicit loss/provenance. This is a topology repair workflow with documented deterministic loss policy; it does not claim arbitrary geometric self-intersection reconstruction. See the clean-room comparison and limits.

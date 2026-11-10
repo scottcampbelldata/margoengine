@@ -6,6 +6,7 @@ import { SculptView } from '@margoengine/mesh-edit/sculpt-view';
 import { paintMeshWeights, VertexGroups } from '@margoengine/mesh-edit/weights';
 import { splitMeshByPlane } from '@margoengine/mesh-edit/section';
 import { batchBooleanMeshes } from '@margoengine/mesh-edit/boolean-batch';
+import { repairMesh } from '@margoengine/mesh-edit/repair';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -126,6 +127,17 @@ window.runSculptTests = async () => {
   assert(difference(empty, snapshot(engine)) > 1000, 'batch union output reaches the renderer');
   batchView.dispose();
   checks.push('batchBooleanMeshes output renders');
+  const dirty = createPrimitiveMesh('cube', 'repair');
+  dirty.faces.pop();
+  dirty.faces[0].vertices.reverse();
+  dirty.faces[0].uv.reverse();
+  const repaired = repairMesh(dirty),
+    repairSession = new MeshSculptSession(repaired.mesh),
+    repairView = SculptView.attach(engine, repairSession);
+  assert(repaired.readyForBoolean, 'repaired surface is closed and oriented');
+  assert(difference(empty, snapshot(engine)) > 1000, 'repaired output reaches the renderer');
+  repairView.dispose();
+  checks.push('repairMesh output renders');
   engine.dispose();
   return { checks };
 };

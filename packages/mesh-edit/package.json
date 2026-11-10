@@ -66,6 +66,10 @@
     "./boolean-batch": {
       "types": "./dist/boolean-batch.d.ts",
       "import": "./dist/boolean-batch.js"
+    },
+    "./repair": {
+      "types": "./dist/repair.d.ts",
+      "import": "./dist/repair.js"
     }
   },
   "files": [
