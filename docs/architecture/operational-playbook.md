@@ -6118,3 +6118,5 @@ Optional tree compilation provides leaf clips and weights to the existing Animat
 
 ### 5. Batch 261 distance label layout
 Distance policy is CPU/DOM layout code. LabelRenderer honors a layout-adjusted final scale while preserving its existing distanceScale output. The browser gate checks real scaled geometry and opacity over native WebGPU and WebGL2 scenes. No core, stage, backend pipeline or GPU shader change.
+### Section 5 evidence: batch 172 calculator
+Optional /calc adds bounded grammar-generated WGSL and sparse numeric reductions without core/stage changes. Topology, rank-revealing geometric basis and least-squares coefficients stay CPU-side; expression/reduction output is read from the GPU with finally-owned resources. calc.test.js supplies independent affine/transfer/quality oracles; calc-browser.mjs compares all derived operations and NASA data on both backends with explicit per-value forward-error bounds. Quantisation and reconstruction error are separate from execution parity; see docs/sciviz-analysis.md.

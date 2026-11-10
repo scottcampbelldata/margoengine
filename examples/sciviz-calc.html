@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NASA calculator | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
+<body><header><h1>Derived arrays on a NASA solution</h1><p>Least-squares gradient magnitude of eddy viscosity ratio, computed per cell on the original NASA FUN3D slice.</p></header>
+<div class="controls"><label>Expression <input id="expression" value="log(1+mag(gradient))" aria-label="Cell expression"></label><button id="apply">Calculate</button><label>Backend <select id="backend"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></label></div>
+<div class="view"><canvas id="viewport" aria-label="NASA derived gradient"></canvas></div><p id="status" role="status">Loading NASA solution...</p>
+<footer>NASA TMR FUN3D bump solution, US government public domain. Gradient is a per-cell least-squares fit. <a href="https://tmbwg.github.io/turbmodels/bump3d_sa.html">Source</a>.</footer>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-calc.ts'));</script></body></html>

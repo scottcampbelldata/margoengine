@@ -549,3 +549,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/webgl2-compat: document direct full-image straight-alpha bitmap copies and the existing Canvas2D path for crop, flip and requested premultiplication.
 - margoengine: document the generated /splats/progressive alias alongside the scoped entry.
+- @margoengine/sciviz: document /calc grammar, derived operation contracts, bounds, pipeline adapter and NASA calculator demo; README examples deferred during build phase.
+
+- margoengine: document the sciviz/calc optional alias after build phase.

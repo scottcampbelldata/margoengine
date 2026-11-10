@@ -1862,6 +1862,10 @@
       "types": "./dist/loaders/geo.d.ts",
       "import": "./dist/loaders/geo.js"
     },
+    "./loaders/threemf-lattice": {
+      "types": "./dist/loaders/threemf-lattice.d.ts",
+      "import": "./dist/loaders/threemf-lattice.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
@@ -3069,6 +3073,10 @@
     "./sciviz/clip": {
       "types": "./dist/sciviz/clip.d.ts",
       "import": "./dist/sciviz/clip.js"
+    },
+    "./sciviz/calc": {
+      "types": "./dist/sciviz/calc.d.ts",
+      "import": "./dist/sciviz/calc.js"
     },
     "./sciviz/probe": {
       "types": "./dist/sciviz/probe.d.ts",
@@ -4381,10 +4389,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./loaders/threemf-lattice": {
-      "types": "./dist/loaders/threemf-lattice.d.ts",
-      "import": "./dist/loaders/threemf-lattice.js"
     }
   },
   "dependencies": {

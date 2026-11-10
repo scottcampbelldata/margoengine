@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13165765,
+  "total": 13172743,
   "history": [
     {
       "date": "2026-10-24",
@@ -6619,6 +6619,11 @@
       "commit": "08069a9d5",
       "reason": "Batch238-progressive-entry-includes-shared-renderer-and-lazy-SPZ-no-core-growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-172-job5",
+      "reason": "New optional sciviz/calc: 0 to 6722 B, ceiling 6978 B; typed grammar, complete derived operations and GPU bounds share one entry. Splitting would add import complexity without reducing bytes when these operations are used together. Core/stage unchanged 24209 B."
     }
   ],
   "items": {
@@ -7837,6 +7842,7 @@
     "margoengine/react/instances": 318,
     "margoengine/selection/highlight": 322,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/calc": 6978
   }
 }
