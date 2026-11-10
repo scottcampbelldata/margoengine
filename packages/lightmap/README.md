@@ -104,7 +104,7 @@ no extra rays.
 `rgba16float` texture at the lightmap size) holds the running mean, so a viewer can draw it while it improves.
 
 ```ts
-import { bakeMeshLightmapGPU, GPULightmapBaker } from 'margoengine/lightmap/gpu';
+import { bakeMeshLightmapGPU, GPULightmapBaker, type GPULightmapOptions } from 'margoengine/lightmap/gpu';
 
 const adapter = await navigator.gpu.requestAdapter();
 const device = await adapter!.requestDevice(); // or pass an engine: its `gpu` is used
@@ -113,11 +113,11 @@ const mesh = {
   uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
   indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
 };
-const options = {
+const options: GPULightmapOptions = {
   width: 64,
-  radiometry: 'physical' as const,
+  radiometry: 'physical',
   bounces: 2,
-  lights: [{ type: 'directional' as const, direction: [0.3, 1, 0.2], intensity: 2 }],
+  lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }],
 };
 {
   using baker = await GPULightmapBaker.create(device, mesh, options);
@@ -128,6 +128,10 @@ const options = {
 const done = await bakeMeshLightmapGPU(device, mesh, { ...options, passes: 128 });
 console.log(done.samples);
 ```
+
+Annotating the shared options object with `GPULightmapOptions` keeps light directions typed as three-element tuples
+through TypeScript's [contextual typing](https://www.typescriptlang.org/docs/handbook/type-inference.html#contextual-typing)
+(TypeScript Team, TypeScript Handbook), so the same options work with both GPU baking APIs.
 
 - **Per pass, per texel.** A shadow ray to each light (the same falloff, cone and shadow rules as the CPU bake) and
   one cosine-weighted path: its first ray is the AO sample, and with `bounces` (0 to 8, physical radiometry) each hit

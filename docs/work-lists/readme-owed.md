@@ -1,5 +1,9 @@
 # README work owed
 
+| Package | Completed README validation | Status |
+|---|---|---|
+| @margoengine/lightmap | All existing quad, mesh and progressive GPU examples: explicit GPU options typing preserves the direction tuple; `npm run check:readmes` and `npm run check:readme-run -- --packages=lightmap`. Other feature examples listed below remain owed. | DONE (lightmap-readme-fix) |
+
 - @margoengine/react (lane A known-bugs sweep): document that subpath test consumers are disposable generated files, excluded from source inventories.
 
 - @margoengine/sciviz (review L2): document incremental circular spreading, neighbour-presence density, clipped edges and unchanged numerical bins.

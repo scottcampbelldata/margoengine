@@ -50,6 +50,15 @@ const example = (buffer) =>
     '',
   ].join('\n');
 
+test('every lightmap README example type-checks against its public API', { timeout: 120000 }, (t) => {
+  // TypeScript Team, Handbook: Type Inference (contextual typing), and TypeScript 4.9 (2022).
+  // https://www.typescriptlang.org/docs/handbook/type-inference.html
+  // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html
+  // A standalone GPU options object needs context so direction stays a three-element tuple.
+  const markdown = readFileSync(join(root, 'packages/lightmap/README.md'), 'utf8');
+  assert.deepEqual(check(t, 'lightmap', markdown), []);
+});
+
 test('a Float64Array where a Float32Array belongs fails, and only it', (t) => {
   // The evaluator's out parameter is the type batch 85 job 1 got wrong. Whichever array it takes, the other one is an
   // error: a compiler pass on both would mean the examples are not really being checked.
