@@ -757,3 +757,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/react (batch 266 job 3): document /test createTestRenderer, DOM/jsdom setup, null-stage ownership, frame/query/pointer helpers, and /offscreen main-thread React plus shared-scene URL, worker/page fallback, startup props and cleanup; examples deferred.
 - margoengine (batch 266 job 3): document generated react/test and react/offscreen aliases; examples deferred.
+
+- @margoengine/kinematics-constraints (batch 214 job 1): document /chain, CCD/FABRIK settings, failure ownership, query protocol, static-only guarantee and createLimbAvoidance.
+- @margoengine/animator (batch 214 job 1): document FullBodyLimb.avoidance, clear result and atomic whole-body rollback.
+- margoengine (batch 214 job 1): document kinematics-constraints/chain alias.

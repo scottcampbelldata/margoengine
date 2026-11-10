@@ -38,6 +38,8 @@ export interface FullBodyLimb {
   pinned?: boolean;
   /** Bears weight, so balance counts it. Default true for legs, false for arms. */
   support?: boolean;
+  /** Optional static avoidance search on the posed world root, knee and end. Return a legal knee, or null to roll back the entire body. Default none. */
+  avoidance?: (joints: readonly [Vec3, Vec3, Vec3]) => Vec3 | null;
 }
 
 /** The head of {@link FullBodyIK}. */
@@ -94,6 +96,8 @@ export interface FullBodyResult {
   imbalance: number;
   /** Torso steps run. */
   iterations: number;
+  /** Every installed limb avoidance search accepted this frame. False rolls back the whole body. */
+  clear: boolean;
 }
 
 /** A full-body IK handle. */
@@ -317,7 +321,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     start: Point[] = links.map(() => [0, 0, 0]),
     relative: number[][] = links.map(() => [0, 0, 0, 1]),
     worlds: number[][] = links.map(() => [0, 0, 0, 1]);
-  const result: FullBodyResult = { reached: true, distance: 0, balanced: true, imbalance: 0, iterations: 0 };
+  const result: FullBodyResult = { reached: true, distance: 0, balanced: true, imbalance: 0, iterations: 0, clear: true };
   /** A point hanging from link `link` at `offset` from it in the animated pose, where the solve has it now. */
   const carried = (link: number, offset: ArrayLike<number>): Point =>
     add(places[link], rotateByQuaternion(offset as number[], turns[link]));
@@ -365,6 +369,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     result.balanced = true;
     result.imbalance = 0;
     result.iterations = 0;
+    result.clear = true;
     if (weight === 0) return;
     // The animated pose.
     for (let j = 0; j < count; j++) {
@@ -502,6 +507,13 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       for (let j = 1; j < count; j++) relative[j] = multiplyQuaternions(turns[j], conjugate(turns[j - 1]));
       rebuild(maxBend);
     }
+    // A rejected limb must not leave the torso or a previously solved limb committed.
+    const guarded = limbs.some(({limb}) => limb.avoidance !== undefined);
+    const transforms = model.root.engine.store.transforms;
+    const saved = guarded ? nodes.map((bone) => ({bone, position: [transforms.x[bone.id],transforms.y[bone.id],transforms.z[bone.id]] as Point,
+      rotation: [transforms.qx[bone.id],transforms.qy[bone.id],transforms.qz[bone.id],transforms.qw[bone.id]]})) : [];
+    let committed = false;
+    try {
     // Write the torso back, from the pelvis up, then finish each limb on it.
     tools.moveBy(pelvis, subtract(places[0], start[0]));
     for (let j = 0; j < count; j++) tools.setWorldRotation(links[j], multiplyQuaternions(turns[j], worlds[j]));
@@ -525,6 +537,21 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         const influence = limb.rotation ? (limb.weight ?? 1) * weight : 1;
         tools.setWorldRotation(end, influence < 1 ? quaternionBlend(rest, wanted, influence) : wanted);
       }
+      if (limb.avoidance) {
+        const root = position(upper), knee = position(lower), tip = position(end);
+        const next = limb.avoidance([root, knee, tip]);
+        if (next === null) {
+          result.clear = false;
+          result.reached = false;
+          return;
+        }
+        finiteVector(next, 3, 'Full-body IK avoidance knee');
+        if (Math.abs(distance(root, next)-distance(root,knee))>tolerance ||
+          Math.abs(distance(next,tip)-distance(knee,tip))>tolerance)
+          throw new RangeError('Full-body IK avoidance must preserve both bone lengths; return a legal knee or null');
+        tools.placeLimb(upper,lower,end,tip,next);
+        if (wanted) tools.setWorldRotation(end, limb.rotation ? quaternionBlend(rest,wanted,(limb.weight ?? 1)*weight) : wanted);
+      }
     }
     if (headBone) {
       if (rig.head!.rotation)
@@ -543,7 +570,17 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       result.imbalance = Math.hypot(off[0], off[2]);
       result.balanced = result.imbalance <= tolerance;
     }
-    rig.onSolve?.(result);
+    committed = true;
+    } finally {
+      if (!committed && guarded) {
+        for (const {bone, position: original, rotation} of saved) {
+          bone.setPosition(original);
+          animator.writeNodeRotation(bone,rotation);
+        }
+        model.root.engine.store.tick(false);
+      }
+      rig.onSolve?.(result);
+    }
   });
   const dispose = () => {
     if (removed) return;

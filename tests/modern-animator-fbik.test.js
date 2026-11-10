@@ -4,6 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addFullBodyIK } from '../packages/animator/dist/fbik.js';
+import { ChainAvoidanceSolver, createLimbAvoidance } from '../packages/kinematics-constraints/dist/chain.js';
+import { SphereVolume } from '../packages/kinematics-constraints/dist/index.js';
 import {
   animatorDocument,
   animatorGLB,
@@ -44,6 +46,32 @@ const FEET = [
   [0.1, 0.06, 0],
   [-0.1, 0.06, 0],
 ];
+
+test('full-body avoidance clears the whole limb and preserves the reached hand', async (t) => {
+  const f=await rig();
+  t.after(()=>f.release());
+  f.left.target=[0.5,1.3,0.2];
+  f.step();
+  const obstacle=new SphereVolume({center:f.world('LeftForeArm'),radius:0.025});
+  f.left.avoidance=createLimbAvoidance(new ChainAvoidanceSolver([obstacle],{radius:0.01,minClearance:0.005,candidates:64}));
+  f.step();
+  assert.equal(f.ik.result.clear,true);
+  near(f.world('LeftHand'),f.left.target,1e-3,'hand');
+  assert.ok(obstacle.segmentClearance(f.world('LeftArm'),f.world('LeftForeArm'),0.01)>=0.005-1e-6);
+  assert.ok(obstacle.segmentClearance(f.world('LeftForeArm'),f.world('LeftHand'),0.01)>=0.005-1e-6);
+});
+test('a rejected late limb rolls back the torso and previously solved limbs together', async (t) => {
+  const f=await rig();
+  t.after(()=>f.release());
+  f.step();
+  const before=places(f);
+  f.left.target=[0.3,1.15,0.85];
+  f.right.avoidance=()=>null;
+  f.step();
+  assert.equal(f.ik.result.clear,false);
+  assert.equal(f.ik.result.reached,false);
+  places(f).forEach((p,i)=>near(p,before[i],1e-6,ALL[i]));
+});
 const planted = (f) => {
   near(f.world('LeftFoot'), FEET[0], 2e-3, 'left foot');
   near(f.world('RightFoot'), FEET[1], 2e-3, 'right foot');

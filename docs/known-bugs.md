@@ -4680,3 +4680,8 @@ Batch 212 pitch: no open defect found in transposition ratios, source-clock/quan
 
 Build-phase follow-up (batch 212, outside pitch landing): hold a disposed Bus after inserting a stage; Bus.teardown clears inserts but retains its insertEdges node-reference array. Clear those references in the fix phase and prove released ownership.
 Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), then deliver the queued report; read() can briefly show pre-reset frames because messages carry no reset generation. Add generation-tagged reset/report handling in the fix phase.
+
+### Batch 214 scope
+Chain avoidance has no known defect from its correctness cases; bounded search and static-only limitations are documented in limits.md.
+
+Batch 214 unrelated GPU planner repro: node scripts/gpu-package-tests.mjs --no-build --select=animator/test:gpu rejects cameras/test/panorama-browser.mjs and weather/tests/parity-browser.mjs because neither has a registered package test script. Changed-package GPU leaves run directly under the lock instead; owners must register these scripts.

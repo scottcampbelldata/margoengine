@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13537199,
+  "total": 13539725,
   "history": [
     {
       "date": "2026-10-24",
@@ -7026,6 +7026,12 @@
       "commit": "batch-266-job-3",
       "reason": "New optional React test/offscreen entries, 0 to 5944/1167 B gzip; ceilings 6200/1423 B. DOM testing and shared-scene lifetime stay together without core/stage growth.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "a1d27197e",
+      "reason": "Batch 214 job 1: chain is a new optional 1904 B entry. Full-body IK grows 5434 to 5728 B for an optional avoidance hook and atomic whole-body rollback. Splitting the commit logic would lose atomicity. Core plus stage stays 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7047,7 +7053,7 @@
     "@margoengine/animation/vat": 8800,
     "@margoengine/animator": 20643,
     "@margoengine/animator/blend-trees": 1841,
-    "@margoengine/animator/fbik": 5618,
+    "@margoengine/animator/fbik": 5984,
     "@margoengine/animator/graph": 10483,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/layers": 11052,
@@ -8300,6 +8306,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/react/test": 6200,
-    "@margoengine/react/offscreen": 1423
+    "@margoengine/react/offscreen": 1423,
+    "@margoengine/kinematics-constraints/chain": 2160
   }
 }

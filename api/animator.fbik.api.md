@@ -46,6 +46,7 @@ export interface FullBodyLimb {
     weight?: number;
     pinned?: boolean;
     support?: boolean;
+    avoidance?: (joints: readonly [Vec3, Vec3, Vec3]) => Vec3 | null;
 }
 
 export interface FullBodyResult {
@@ -54,6 +55,7 @@ export interface FullBodyResult {
     balanced: boolean;
     imbalance: number;
     iterations: number;
+    clear: boolean;
 }
 
 export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHandle;

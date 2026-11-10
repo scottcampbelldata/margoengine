@@ -1686,6 +1686,10 @@
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"
     },
+    "./kinematics-constraints/chain": {
+      "types": "./dist/kinematics-constraints/chain.d.ts",
+      "import": "./dist/kinematics-constraints/chain.js"
+    },
     "./kinematics-constraints/swept": {
       "types": "./dist/kinematics-constraints/swept.d.ts",
       "import": "./dist/kinematics-constraints/swept.js"
