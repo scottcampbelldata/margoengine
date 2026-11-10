@@ -127,6 +127,10 @@
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
+    },
+    "./cinematic": {
+      "types": "./dist/cinematic.d.ts",
+      "import": "./dist/cinematic.js"
     }
   },
   "files": [
@@ -155,7 +159,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs && node tests/pipeline-browser.mjs && node tests/contour-browser.mjs && node tests/clip-browser.mjs && node tests/probe-browser.mjs && node tests/calc-browser.mjs && node tests/glyph-browser.mjs && node tests/transfer-browser.mjs && node tests/labels-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs && node tests/pipeline-browser.mjs && node tests/contour-browser.mjs && node tests/clip-browser.mjs && node tests/probe-browser.mjs && node tests/calc-browser.mjs && node tests/glyph-browser.mjs && node tests/transfer-browser.mjs && node tests/labels-browser.mjs && node tests/cinematic-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",

@@ -344,3 +344,6 @@ Amiri Regular, Copyright 2010-2022 The Amiri Project Authors, SIL Open Font Lice
 
 ## External video demux correctness fixture
 MDN flower.webm, https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm , CC0-1.0 (MDN interactive examples, https://github.com/mdn/interactive-examples/blob/main/LICENSE), 554058 bytes, SHA-256 c6f8a348953395598a9a73b9bab1676436410797bce9f398f4be1531d6e76dda. Downloaded to the existing external-test-assets cache, no movie bytes ship in this repository. packages/video/test/webm-ffprobe.json contains independent FFprobe 8.1.2 packet metadata/digests only. Existing flower.mp4 attribution also covers its test-only fragmented repacking.
+
+### EMD-8117 demonstration density
+examples/assets/sciviz/emdb-8117.bin contains retained original density samples at stride 3 from EMD-8117, TRPV1 with DkTx/RTX in a lipid nanodisc (2016). EMDB density data are CC0: https://www.ebi.ac.uk/pdbe/about/public-data-access-statement. Source: https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-8117/map/emd_8117.map.gz. Full source/output hashes and reduction are recorded in emdb-8117.json; scripts/prepare-sciviz-emdb.mjs reproduces it. No source code or other-repository files were used in the engine implementation.

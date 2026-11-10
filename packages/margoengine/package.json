@@ -3322,6 +3322,10 @@
       "types": "./dist/sciviz/labels.d.ts",
       "import": "./dist/sciviz/labels.js"
     },
+    "./sciviz/cinematic": {
+      "types": "./dist/sciviz/cinematic.d.ts",
+      "import": "./dist/sciviz/cinematic.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

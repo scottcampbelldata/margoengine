@@ -866,3 +866,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/toon (batch 194 job 3): document /hatch-models ModelHatching, shared live controls, material/glTF attachment, linear ink, primary-sun tone, adapter ownership, disposal, tiers and display-hook limits; examples deferred.
 - @margoengine/gltf-pro (batch 194 job 3): document synchronous material-draw layer encoding under PBRDrawRun and the per-layer batch boundary; examples deferred.
 - margoengine (batch 194 job 3): document generated toon/hatch-models alias; examples deferred.
+
+
+
+- @margoengine/sciviz (batch 173 job 3): document cinematicVolume, independent default-off lighting modes, HG/radiance/step/sample defaults, camera-rest resets, scene metric, exact cost readback, disposal/source sharing, limits and real EMDB/TCIA demo; examples in README phase.
+- margoengine (batch 173 job 3): document optional sciviz/cinematic alias in README phase.

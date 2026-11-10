@@ -395,3 +395,5 @@ Batch 208: quiet-machine real-network throttle throughput, burst behavior and pr
 - Batch 231 scatter Hi-Z: deterministic same-output wall scene reduces colour instances 100 to 42, retains all 100 shadow instances. Quiet-machine timing of depth prepass, reduction and the second compaction remains owed; test occlusion.browser.mjs on both backends. No published speed claim.
 
 - Batch 206 value clips: investigate reusing PBR model/geometry buffers between fixed-topology frames in ValueClipPlayer, with identical pose/ownership output and deterministic allocation counts; current complete-frame replacement handles changing topology correctly. No speed run in the build phase.
+
+- Batch 173 job 3: time plain VolumeLayer, unlit cinematic wrapper, local spherical AO, directional volume shadows and progressive HG paths on the same constant-field and real EMDB/TCIA scenes in the quiet speed phase. Keep the exact work-count fixture in cinematic-browser.mjs; unlit/AO/shadow counts 169400/4235000/5590200 scalar fetches. Include the wrapper's extra integration/display passes and 48 B per pixel targets. No wall-clock speed claim during build phase.

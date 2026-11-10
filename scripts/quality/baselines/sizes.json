@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13814443,
+  "total": 13820705,
   "history": [
     {
       "date": "2026-10-24",
@@ -7245,6 +7245,12 @@
       "commit": "batch-194-job3",
       "reason": "New optional model/material hatching entry: 0 to 4302 B min+gzip; shared pattern controls, material composition, physical-pixel ink and frame ownership. Splitting would duplicate state for one attachment. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-173-cinematic",
+      "reason": "Batch 173 job 3: optional cinematic entry 0 to 6006 B min+gzip; ceiling 6262 B. Shared classified transport, HG paths, camera-rest accumulation and exact work counters; splitting duplicates resource ownership. Root 52045 B. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8558,6 +8564,7 @@
     "margoengine/creative/planet-atmosphere": 329,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/cinematic": 6262
   }
 }

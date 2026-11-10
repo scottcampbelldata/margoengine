@@ -1,0 +1,35 @@
+{
+  "dataset": "EMD-8117, TRPV1 with DkTx and RTX in a lipid nanodisc, 2.95 Angstrom",
+  "source": "https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-8117/map/emd_8117.map.gz",
+  "license": "CC0-1.0",
+  "licenseURL": "https://www.ebi.ac.uk/pdbe/about/public-data-access-statement",
+  "format": "https://files.wwpdb.org/pub/emdb/doc/Map-format/current/EMDB_map_format.pdf",
+  "originalSHA256": "586c2f9297682366755bfdccee354b704f2984dee51b72c9283cc2f78f2a34e2",
+  "sha256": "3038136de7cb04a79460842ea3d9b46f82a97b9fde3dc2fb3c26692d5aae9c9c",
+  "originalDims": [
+    192,
+    192,
+    192
+  ],
+  "dims": [
+    64,
+    64,
+    64
+  ],
+  "stride": 3,
+  "bounds": [
+    0,
+    229.74840259552002,
+    0,
+    229.74840259552002,
+    0,
+    229.74840259552002
+  ],
+  "range": [
+    -9.853487014770508,
+    21.94888687133789
+  ],
+  "units": "Angstrom",
+  "encoding": "gzip little-endian float32, x fastest",
+  "reduction": "Original scalar samples at uniform integer stride; no interpolation or intensity scaling."
+}
