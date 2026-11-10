@@ -1,0 +1,87 @@
+[
+  {
+    "name": "blosclz-0.blosc",
+    "codec": "blosc",
+    "bytes": 4137
+  },
+  {
+    "name": "blosclz-1.blosc",
+    "codec": "blosc",
+    "bytes": 4169
+  },
+  {
+    "name": "blosclz-2.blosc",
+    "codec": "blosc",
+    "bytes": 4137
+  },
+  {
+    "name": "lz4-0.blosc",
+    "codec": "blosc",
+    "bytes": 3319
+  },
+  {
+    "name": "lz4-1.blosc",
+    "codec": "blosc",
+    "bytes": 2128
+  },
+  {
+    "name": "lz4-2.blosc",
+    "codec": "blosc",
+    "bytes": 3319
+  },
+  {
+    "name": "lz4hc-0.blosc",
+    "codec": "blosc",
+    "bytes": 3317
+  },
+  {
+    "name": "lz4hc-1.blosc",
+    "codec": "blosc",
+    "bytes": 1110
+  },
+  {
+    "name": "lz4hc-2.blosc",
+    "codec": "blosc",
+    "bytes": 3317
+  },
+  {
+    "name": "zlib-0.blosc",
+    "codec": "blosc",
+    "bytes": 1279
+  },
+  {
+    "name": "zlib-1.blosc",
+    "codec": "blosc",
+    "bytes": 491
+  },
+  {
+    "name": "zlib-2.blosc",
+    "codec": "blosc",
+    "bytes": 1279
+  },
+  {
+    "name": "zstd-0.blosc",
+    "codec": "blosc",
+    "bytes": 1198
+  },
+  {
+    "name": "zstd-1.blosc",
+    "codec": "blosc",
+    "bytes": 1204
+  },
+  {
+    "name": "zstd-2.blosc",
+    "codec": "blosc",
+    "bytes": 669
+  },
+  {
+    "name": "lz4.bin",
+    "codec": "lz4",
+    "bytes": 3289
+  },
+  {
+    "name": "zstd.bin",
+    "codec": "zstd",
+    "bytes": 903
+  }
+]

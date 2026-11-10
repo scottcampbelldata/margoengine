@@ -1,0 +1,155 @@
+{
+  "name": "hemibrain",
+  "base": "https://storage.googleapis.com/neuroglancer-janelia-flyem-hemibrain/emdata/clahe_yz/jpeg",
+  "license": "CC BY 4.0",
+  "attribution": "Janelia FlyEM hemibrain, Scheffer et al.",
+  "selected": 8,
+  "size": [
+    32,
+    32,
+    32
+  ],
+  "origin": [
+    51,
+    62,
+    65
+  ],
+  "samples": 32768,
+  "sampleRange": [
+    110,
+    185
+  ],
+  "requests": [
+    {
+      "key": "info",
+      "file": "2272a3ae01f8fd1822ac03416ac8ea76148863e9b70d6f7dd5b6bef25687b5e2.bin",
+      "sha256": "2272a3ae01f8fd1822ac03416ac8ea76148863e9b70d6f7dd5b6bef25687b5e2",
+      "bytes": 4650
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 0,
+        "length": 16
+      },
+      "file": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7.bin",
+      "sha256": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7",
+      "bytes": 16
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 0,
+        "length": 16
+      },
+      "file": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7.bin",
+      "sha256": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7",
+      "bytes": 16
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 0,
+        "length": 16
+      },
+      "file": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7.bin",
+      "sha256": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7",
+      "bytes": 16
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 0,
+        "length": 16
+      },
+      "file": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7.bin",
+      "sha256": "74c64a2e8093adf6cba429d4c7cedb8c69583d875920f38e6e89cc30ae63c0d7",
+      "bytes": 16
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 419072,
+        "length": 142
+      },
+      "file": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd.bin",
+      "sha256": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd",
+      "bytes": 142
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 419072,
+        "length": 142
+      },
+      "file": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd.bin",
+      "sha256": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd",
+      "bytes": 142
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 419072,
+        "length": 142
+      },
+      "file": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd.bin",
+      "sha256": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd",
+      "bytes": 142
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 419072,
+        "length": 142
+      },
+      "file": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd.bin",
+      "sha256": "2685709d77afb9b7ff52c491f801c0366f448dc99ff3c7ac48558bd4e97328fd",
+      "bytes": 142
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 128181,
+        "length": 37886
+      },
+      "file": "559f5a7b3f650b8dbfd9f31fc57977550c889f4d74c0384a47921a7f033e67de.bin",
+      "sha256": "559f5a7b3f650b8dbfd9f31fc57977550c889f4d74c0384a47921a7f033e67de",
+      "bytes": 37886
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 235688,
+        "length": 32010
+      },
+      "file": "cea1787afebc8f343b9134424c040d2f716e2ae3120cf26ebd54667a7fb37457.bin",
+      "sha256": "cea1787afebc8f343b9134424c040d2f716e2ae3120cf26ebd54667a7fb37457",
+      "bytes": 32010
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 166067,
+        "length": 33525
+      },
+      "file": "3ca8bcb27c1cc0942e793c77b37c37e44b507068d40c7f0bb8357dc825391e65.bin",
+      "sha256": "3ca8bcb27c1cc0942e793c77b37c37e44b507068d40c7f0bb8357dc825391e65",
+      "bytes": 33525
+    },
+    {
+      "key": "2048.0x2048.0x2048.0/0.shard",
+      "range": {
+        "offset": 199592,
+        "length": 36096
+      },
+      "file": "80aa1ee26c7f5bdd076a3b6896d7331ed5739dbea0f37e081d8fcafbe463adc2.bin",
+      "sha256": "80aa1ee26c7f5bdd076a3b6896d7331ed5739dbea0f37e081d8fcafbe463adc2",
+      "bytes": 36096
+    }
+  ],
+  "reference": {
+    "reader": "Independent Python numcodecs/Pillow",
+    "maxSampleDifference": 1.0,
+    "samples": 32768
+  }
+}

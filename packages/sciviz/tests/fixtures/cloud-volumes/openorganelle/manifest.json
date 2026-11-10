@@ -1,0 +1,113 @@
+{
+  "name": "openorganelle",
+  "base": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-2/jrc_hela-2.n5/em/fibsem-uint16",
+  "license": "CC BY 4.0",
+  "attribution": "Janelia COSEM / OpenOrganelle, jrc_hela-2, Heinrich et al.",
+  "selected": 4,
+  "size": [
+    32,
+    32,
+    32
+  ],
+  "origin": [
+    359,
+    34,
+    183
+  ],
+  "samples": 32768,
+  "sampleRange": [
+    26343,
+    34648
+  ],
+  "requests": [
+    {
+      "key": "attributes.json",
+      "file": "a44123fa7960a56f8612f542c489a35681756725ce92040d9383b02609aa1c67.bin",
+      "sha256": "a44123fa7960a56f8612f542c489a35681756725ce92040d9383b02609aa1c67",
+      "bytes": 4688
+    },
+    {
+      "key": "s0/attributes.json",
+      "file": "fc3817dc1e549bfb00ff1b82f1a8c1fafcbcfe0c8f0eefc78a30c58b0d1181b2.bin",
+      "sha256": "fc3817dc1e549bfb00ff1b82f1a8c1fafcbcfe0c8f0eefc78a30c58b0d1181b2",
+      "bytes": 747
+    },
+    {
+      "key": "s1/attributes.json",
+      "file": "b615afd9159f679da022a56b349c309e19e72c588cdef5b4ec6cc4f1160d934a.bin",
+      "sha256": "b615afd9159f679da022a56b349c309e19e72c588cdef5b4ec6cc4f1160d934a",
+      "bytes": 748
+    },
+    {
+      "key": "s2/attributes.json",
+      "file": "4431b1d53f9e0986d4fcd206872cc59009e4be19469c42dfff4a313495b8aff6.bin",
+      "sha256": "4431b1d53f9e0986d4fcd206872cc59009e4be19469c42dfff4a313495b8aff6",
+      "bytes": 778
+    },
+    {
+      "key": "s3/attributes.json",
+      "file": "a48ee89a4d975f24bd228528ac1cde7446782d3f86c524f13406757f78c15168.bin",
+      "sha256": "a48ee89a4d975f24bd228528ac1cde7446782d3f86c524f13406757f78c15168",
+      "bytes": 767
+    },
+    {
+      "key": "s4/attributes.json",
+      "file": "2d5c065150767ed477c2453ed105e5adde830db6ccd9d3753e207bbe0887de7a.bin",
+      "sha256": "2d5c065150767ed477c2453ed105e5adde830db6ccd9d3753e207bbe0887de7a",
+      "bytes": 766
+    },
+    {
+      "key": "s4/5/0/2",
+      "file": "1bd9c253569af9332d9f0c947c13759dd9cf21c9e8f97b520e58ed721a08385e.bin",
+      "sha256": "1bd9c253569af9332d9f0c947c13759dd9cf21c9e8f97b520e58ed721a08385e",
+      "bytes": 452436
+    },
+    {
+      "key": "s4/5/1/2",
+      "file": "2a153e079c4f0fc9f2db7ee97276dd1ed635f1e3a74924abd9f628f9f4b44523.bin",
+      "sha256": "2a153e079c4f0fc9f2db7ee97276dd1ed635f1e3a74924abd9f628f9f4b44523",
+      "bytes": 252285
+    },
+    {
+      "key": "s4/6/1/2",
+      "file": "428c5745ea45f40ff584344de85717361c88168dececab72260a55dd4c510f58.bin",
+      "sha256": "428c5745ea45f40ff584344de85717361c88168dececab72260a55dd4c510f58",
+      "bytes": 249823
+    },
+    {
+      "key": "s4/5/1/3",
+      "file": "26afc56bf93927bd28541cd6b99761dbbb21c02fb9ae255bfee11fa1698e9902.bin",
+      "sha256": "26afc56bf93927bd28541cd6b99761dbbb21c02fb9ae255bfee11fa1698e9902",
+      "bytes": 234869
+    },
+    {
+      "key": "s4/6/0/2",
+      "file": "2858f7eebfadb002b556bef2d84805f35f3fad6578ba833d5a0c5b0a4f363558.bin",
+      "sha256": "2858f7eebfadb002b556bef2d84805f35f3fad6578ba833d5a0c5b0a4f363558",
+      "bytes": 453188
+    },
+    {
+      "key": "s4/5/0/3",
+      "file": "a93ec420683451ea4f54ae6df255bc34f92e4bef4907f0c0a89a10b7ca71a056.bin",
+      "sha256": "a93ec420683451ea4f54ae6df255bc34f92e4bef4907f0c0a89a10b7ca71a056",
+      "bytes": 452147
+    },
+    {
+      "key": "s4/6/0/3",
+      "file": "a512e6c83525c921f9ce91d902413761371adb0057ed8a358bee21021ad8942d.bin",
+      "sha256": "a512e6c83525c921f9ce91d902413761371adb0057ed8a358bee21021ad8942d",
+      "bytes": 450855
+    },
+    {
+      "key": "s4/6/1/3",
+      "file": "8e4131ff0cd7ee408debcdbad14c900e7c6ba1a78011f3accab81d7fa6059d25.bin",
+      "sha256": "8e4131ff0cd7ee408debcdbad14c900e7c6ba1a78011f3accab81d7fa6059d25",
+      "bytes": 232447
+    }
+  ],
+  "reference": {
+    "reader": "Independent Python numcodecs/Pillow",
+    "maxSampleDifference": 0.0,
+    "samples": 32768
+  }
+}

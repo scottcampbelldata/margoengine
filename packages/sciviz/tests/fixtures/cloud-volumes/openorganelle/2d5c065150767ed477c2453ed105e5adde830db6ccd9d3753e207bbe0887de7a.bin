@@ -1,0 +1,48 @@
+{
+    "blockSize": [
+        64,
+        64,
+        64
+    ],
+    "compression": {
+        "level": -1,
+        "type": "gzip",
+        "useZlib": false
+    },
+    "dataType": "uint16",
+    "dimensions": [
+        750,
+        100,
+        398
+    ],
+    "pixelResolution": {
+        "dimensions": [
+            64.0,
+            64.0,
+            83.84
+        ],
+        "unit": "nm"
+    },
+    "transform": {
+        "axes": [
+            "z",
+            "y",
+            "x"
+        ],
+        "scale": [
+            83.84,
+            64.0,
+            64.0
+        ],
+        "translate": [
+            39.300000000000004,
+            30.0,
+            30.0
+        ],
+        "units": [
+            "nm",
+            "nm",
+            "nm"
+        ]
+    }
+}

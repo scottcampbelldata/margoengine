@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14183410,
+  "total": 14204902,
   "history": [
     {
       "date": "2026-10-24",
@@ -7513,6 +7513,12 @@
       "commit": "3efc31f94",
       "reason": "Batch 177 statistical charts: maths 5703 B to 8854 B, ceiling 5959 B to 9120 B; new stats 6719 B, ceiling 6975 B gzip. Shared transforms, fractional-df confidence bands and SVG keep one math implementation. Core+stage remains 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "439e938ec",
+      "reason": "Batch175-optional-cloud-volume-entry-adds-multiscale-stores-and-clean-room-codecs-without-core-or-stage-growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8873,6 +8879,7 @@
     "@margoengine/staging/backdrop": 1588,
     "@margoengine/sciviz/datasets": 13423,
     "@margoengine/cutscene/scroll": 2304,
-    "@margoengine/sciviz/stats": 6975
+    "@margoengine/sciviz/stats": 6975,
+    "@margoengine/sciviz/omezarr": 21492
   }
 }

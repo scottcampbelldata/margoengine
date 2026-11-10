@@ -1009,3 +1009,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 217 job 3): document generated cutscene/scroll alias.
 
 - @margoengine/sciviz and margoengine/sciviz/stats (batch 177 job 2): all statistical charts, /maths exports, confidence/robustness assumptions, defaults, missing values and real GHCN/NASA vector demo.
+- @margoengine/sciviz (batch 175 job 1): document /omezarr cloud stores, OME 0.4/0.5, N5/precomputed, stored-level sources, bounds/ranges, codec refusals, Range reads, cancellation and the three recorded scientific crops; examples deferred.
+- margoengine (batch 175 job 1): document generated sciviz/omezarr alias; examples deferred.

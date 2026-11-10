@@ -3434,6 +3434,10 @@
       "types": "./dist/sciviz/stats.d.ts",
       "import": "./dist/sciviz/stats.js"
     },
+    "./sciviz/omezarr": {
+      "types": "./dist/sciviz/omezarr.d.ts",
+      "import": "./dist/sciviz/omezarr.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -155,6 +155,10 @@
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
+    },
+    "./omezarr": {
+      "types": "./dist/omezarr.d.ts",
+      "import": "./dist/omezarr.js"
     }
   },
   "files": [
@@ -178,7 +182,8 @@
     "@margoengine/math": "^1.0.0",
     "@margoengine/points": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/sky": "^1.0.0"
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
@@ -193,6 +198,7 @@
     "test:browser:atmosphere": "node tests/atmosphere-browser.mjs",
     "test:browser:contour2d": "node tests/contour2d-browser.mjs",
     "test:browser:export-vector": "node tests/export-vector-browser.mjs",
-    "test:browser:stats": "node tests/stats-browser.mjs"
+    "test:browser:stats": "node tests/stats-browser.mjs",
+    "test:browser:omezarr": "node tests/omezarr-browser.mjs"
   }
 }

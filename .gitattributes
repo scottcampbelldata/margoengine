@@ -17,6 +17,12 @@ packages/exporters/scripts/generate-unity-support.js text eol=lf
 examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
 
+# Original cloud object bytes include text metadata stored under content hashes; never translate their bytes.
+packages/sciviz/tests/fixtures/cloud-volumes/**/*.bin -text
+packages/sciviz/tests/fixtures/cloud-volumes/**/*.f32 -text
+packages/sciviz/tests/fixtures/cloud-codecs/*.bin -text
+packages/sciviz/tests/fixtures/cloud-codecs/*.blosc -text
+
 # Package bin scripts: npm rewrites a bin's CRLF shebang line to LF on install, which left a CRLF checkout modified
 # (mixed endings) after every npm ci on Windows; tests/package-bins.test.js
 packages/*/bin/** text eol=lf
