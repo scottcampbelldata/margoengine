@@ -1,4 +1,13 @@
 {
+  "10.21": {
+    "cause": "Batch 165 job 1: parseCube split the whole file, allocated comment-split arrays and reread every RGBA sample after validating RGB conversion. Fix commit perf(tonemap): stream Cube lines and validate samples once removes the file/comment arrays and the second sample scan, retaining full validation for external LUTs. For 33 cubed: split arrays 71,878 to 35,938; finite checks 251,568 to 107,820; output bytes identical. See batch-165-workcounts.md. Historical timing unchanged; timing pending the quiet rerun. Original diagnosis retained in docs/whitepaper/parity-diagnoses.md",
+    "fixes": [
+      {
+        "commit": "perf(tonemap): stream Cube lines and validate samples once",
+        "rerun": "node bench/cli.mjs parity --cases=p-cube-lut --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
   "6.5": {
     "cause": "Before: about 10 us of CPU per materials mesh per frame (1,000 boxes), not the video upload. Fixed by the materials draw-path work (runs, instancing, reused steady materials) through b89ac9c1, with no change of its own; rerun 20261026-165034 shows 0.46 ms CPU against three-webgl 0.75. The image differs only because the video plays in real time (SSIM 0.93)",
     "fixes": [
@@ -315,9 +324,6 @@
   },
   "10.20": {
     "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The task runs TGA, DDS, KTX and TIFF parsers to produce five 64-square images, one with seven mip levels. Margo validates container headers and decodes typed pixel payloads without GPU upload. The preflight also finds the rival DDS adapter rejects the supplied FourCC-zero fixture; do not publish a replacement ratio until that black-box fixture contract is corrected. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
-  },
-  "10.21": {
-    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples concentrate in parseCube numeric validation and the final LUT validation. A 33-cubed LUT contains 35,937 RGB rows: 107,811 numeric syntax/range checks, followed by a 143,748-word finite scan including alpha. The extra checked parse work is in tonemap/src/cube.ts; keep rejection behavior when removing duplicate scans. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
   },
   "11.2": {
     "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples identify exportOBJ string generation and garbage collection, followed by scene normalization/toWorld and float formatting. One task emits 14,130,060 OBJ characters, 410,882 vertex/normal/face lines, a 10,240,084-byte STL and a 5,135,650-byte PLY. Each public writer currently collects/validates the same input scene independently. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."

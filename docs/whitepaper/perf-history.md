@@ -28,6 +28,16 @@ historical rival loss is retained. [Reproduce](reproduce.md#batch-164-ssao-resol
 
 
 
+## Batch 165 job 1: Cube parsing work counts (2026-11-10)
+
+Fix commit `perf(tonemap): stream Cube lines and validate samples once` removes
+whole-file/comment split arrays and a redundant RGBA scan in row 10.21.
+At 33 cubed: 71,878 to 35,938 split arrays; 251,568 to 107,820 finite checks;
+574,992 identical output bytes. Optional tonemap root gzip 12,490 to 12,598 B (+108 B);
+ceiling 12,561 to 12,976 B. Keeping the synchronous root API avoids a separate
+entry that would retain the existing parser anyway. [Methods, regression and sources](batch-165-workcounts.md).
+The historical loss remains recorded; timing pending the quiet rerun. No timed run occurred.
+
 ## Verify cache metadata work
 
 The post-build pause repeated a full synchronous archive stat/sort per newly

@@ -1,5 +1,16 @@
 # @margoengine/webgl2-compat
 
+The WGSL front end resolves adjacent minus signs in expression context, while keeping statement decrements:
+
+```ts
+import {checkWGSL} from '@margoengine/webgl2-compat/wgsl';
+const module = checkWGSL('const value = 1--2; fn f(){var i=2; i--;}');
+const value = module.globals.find(item => item.name === 'value');
+console.log(value?.kind === 'const' ? value.value : undefined); // 3
+```
+
+This also accepts subtraction of negative constants in generated shaders, including Tonemap's custom curves.
+
 Live `/restore` rebuilds and renderer disposal release the renderer's current shader program before
 deleting it. Other plugins can save and restore GL state during reconstruction without retaining a
 deleted program; a current program owned by another plugin is preserved. The existing restore example

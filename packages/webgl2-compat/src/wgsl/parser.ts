@@ -93,6 +93,13 @@ class Parser {
     return this.tokens[this.i - 1].end;
   }
 
+  /** In expression position, WGSL's context-aware lookahead makes `--` two minus tokens. */
+  private takeNegation(): void {
+    const token = this.t;
+    // Consume the first minus and retain the second at this cursor. No shifting of the token array.
+    this.tokens[this.i] = { ...token, value: '-', start: token.start + 1 };
+  }
+
   // ---- module ----
   module(): ModuleAst {
     const directives: Directive[] = [];
@@ -556,9 +563,10 @@ class Parser {
       return { kind: 'binary', op, left: first, right, start, end: this.last() };
     }
     let left = this.multiplicativeRest(first, start);
-    while (this.is('+') || this.is('-')) {
-      const op = this.t.value as BinaryOp;
-      this.i++;
+    while (this.is('+') || this.is('-') || this.is('--')) {
+      const op = this.is('--') ? '-' : (this.t.value as BinaryOp);
+      if (this.is('--')) this.takeNegation();
+      else this.i++;
       const rightStart = this.t.start;
       left = {
         kind: 'binary',
@@ -586,13 +594,14 @@ class Parser {
     const t = this.t;
     if (
       t.kind === 'punct' &&
-      (t.value === '-' || t.value === '!' || t.value === '~' || t.value === '*' || t.value === '&')
+      (t.value === '-' || t.value === '--' || t.value === '!' || t.value === '~' || t.value === '*' || t.value === '&')
     ) {
-      this.i++;
+      if (t.value === '--') this.takeNegation();
+      else this.i++;
       this.enter();
       const operand = this.unary();
       this.leave();
-      return { kind: 'unary', op: t.value, operand, start: t.start, end: this.last() };
+      return { kind: 'unary', op: t.value === '--' ? '-' : t.value, operand, start: t.start, end: this.last() };
     }
     if (t.kind === 'punct' && t.value === '&&') {
       // `&&x` is `&(&x)` in unary position.

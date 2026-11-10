@@ -4,6 +4,8 @@
   `node --test --test-timeout=120000 packages/controls/tests/workcount.test.js` after building packages. Timing
   pending the quiet rerun; no new speed ratio is claimed.
 
+- Batch 165 job 1: build packages, then run `node --test --test-timeout=120000 packages/tonemap/tests/cube-workcount.test.js packages/tonemap/tests/cube-sizes.test.js packages/webgl2-compat/test/wgsl-minus.test.js` for deterministic operation counts, pre-change byte hashes, malformed inputs and context-aware WGSL minus parsing. Run `npm run check:readme-run -- --packages=tonemap,webgl2-compat` for runnable examples. [Complete method and quiet-run separation](batch-165-workcounts.md).
+
 - Batch 179 provenance: after building packages, run node --test packages/sciviz/tests/provenance.test.js. Browser correctness: node scripts/gpu-lock.mjs run --owner=provenance-review --wait-max=60 --max=8 -- node packages/sciviz/tests/provenance-browser.mjs, with a hard outer process-tree timeout. Default covers all 24 demos on both backends. PROVENANCE_BACKENDS=webgpu or webgl2 and PROVENANCE_DEMOS=head,points select affected cases; PROVENANCE_ARTIFACTS=1 writes MRI PNG/SVG/PDF and the executed ESM trace under test-results/sciviz-provenance. Reports include record data hash counts, package/device identity and exported byte counts, which are file sizes rather than speed measurements. All real inputs retain their existing demo source/licence attribution.
 
 

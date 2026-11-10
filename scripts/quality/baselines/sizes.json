@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14673825,
+  "total": 14674240,
   "history": [
     {
       "date": "2026-10-24",
@@ -8111,6 +8111,12 @@
       "commit": "c7891f49a",
       "reason": "creative targets-depth: the mip shader clamps each average to its footprint's least and greatest texel so half-float mips of a uniform level stay exact on every GPU (amd-gpu-hunt row 7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "2f10e6d2c",
+      "reason": "Batch 165 Cube parser: tonemap root gzip 12490 to 12598 B (+108 B); stream lines and remove 143748 redundant sample reads at 33 cubed, with identical bytes. Keep the synchronous parseCube API; splitting it would add an entry without removing the existing root API. Scott 2026-11-10 optional entry growth rule; no core/stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9214,7 +9220,7 @@
     "@margoengine/tiles/splats": 2316,
     "@margoengine/tiles/style": 10057,
     "@margoengine/tiles/terrain": 5974,
-    "@margoengine/tonemap": 12561,
+    "@margoengine/tonemap": 12976,
     "@margoengine/tonemap/custom": 1459,
     "@margoengine/tonemap/export-cube": 1407,
     "@margoengine/tonemap/grade": 1808,

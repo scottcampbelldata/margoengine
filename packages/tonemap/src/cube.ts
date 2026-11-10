@@ -29,14 +29,19 @@ export function parseCube(text: string): CubeLUT {
     min = false,
     max = false,
     count = 0;
-  for (const raw of text.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+  for (let start = 0; start < text.length; ) {
+    const newline = text.indexOf('\n', start),
+      end = newline < 0 ? text.length : newline,
+      raw = text.slice(start, end);
+    start = end + 1;
     if (/^TITLE\s/.test(raw.trim())) {
       if (title || count || !/^TITLE\s+"[^"]*"\s*(?:#.*)?$/.test(raw.trim()))
         throw new TypeError('.cube TITLE is invalid; supply one quoted title before the sample rows');
       title = true;
       continue;
     }
-    const line = raw.split('#', 1)[0].trim();
+    const comment = raw.indexOf('#'),
+      line = (comment < 0 ? raw : raw.slice(0, comment)).trim();
     if (!line) continue;
     const tokens = line.split(/\s+/),
       key = tokens[0];
@@ -69,7 +74,9 @@ export function parseCube(text: string): CubeLUT {
   if (!data || count !== size ** 3)
     throw new TypeError('.cube sample count is invalid; supply exactly size³ RGB rows after a LUT_3D_SIZE header');
   const lut = { size, data, domainMin, domainMax };
-  validateLUT(lut);
+  // Conversion already checked every RGB value after Float32 rounding; alpha is always 1.
+  // External LUTs still need the complete scan in validateLUT.
+  validateDomain(lut);
   return lut;
 }
 function number(token: string, subject: string): number {
@@ -101,6 +108,13 @@ export function validateLUT(lut: CubeLUT): void {
     lut.domainMax.length !== 3
   )
     throw new TypeError('LUT arrays are invalid; supply size³ RGBA samples and two three-value Float32 domains');
+  validateDomain(lut);
+  for (let i = 0; i < lut.data.length; i++)
+    if (!Number.isFinite(lut.data[i]))
+      throw new RangeError('LUT sample is not finite; supply finite RGB and alpha values');
+}
+
+function validateDomain(lut: CubeLUT): void {
   for (let i = 0; i < 3; i++)
     if (
       !Number.isFinite(lut.domainMin[i]) ||
@@ -109,7 +123,4 @@ export function validateLUT(lut: CubeLUT): void {
       lut.domainMax[i] <= lut.domainMin[i]
     )
       throw new RangeError('LUT domain is invalid; supply finite minima below maxima with finite Float32 ranges');
-  for (let i = 0; i < lut.data.length; i++)
-    if (!Number.isFinite(lut.data[i]))
-      throw new RangeError('LUT sample is not finite; supply finite RGB and alpha values');
 }

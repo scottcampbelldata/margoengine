@@ -4,6 +4,8 @@
   raw replay bytes. Both work-count tests fail on the parent. This is scoped deterministic work evidence, not
   a measured speedup or a rival win. [Methods and reproduction](batch-170-controls.md).
 
+- Batch 165 job 1: Cube parsing removes file/comment split arrays and one complete RGBA validation pass while preserving output bytes. Counts refer to instrumented split and finite-check calls, not hidden allocations or throughput. Tests cover 2, 17, 33 and 65 cubed and pre-change numeric byte hashes. [Evidence and sources](batch-165-workcounts.md). Timing pending the quiet rerun; no rival speed claim.
+
 - Batch 179 provenance/trace: packages/sciviz/tests/provenance.test.js proves runnable intermediate mutation/removal history, stable saved resource IDs and noncolliding future IDs, explicit recording limits, metadata hashes/versions, PNG image-chunk identity and CRC/cancellation bounds, safe namespaced SVG JSON, and full Unicode PDF information. packages/sciviz/tests/provenance-browser.mjs exercises PNG/SVG provenance and trace generation on all 24 existing scientific demos, MRI trace execution on both backends, and PDF provenance for MRI, NOAA wind and the surface scene. The record follows PROV-DM concepts but does not claim PROV-O graph conformance or cryptographic authorship. No speed result is claimed.
 
 

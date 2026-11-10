@@ -1,3 +1,13 @@
+### Section 5 evidence: WGSL minus lookahead (batch 165)
+
+The compatibility parser now distinguishes expression subtraction/negation from
+statement decrement using WGSL's context-aware lookahead. The parent-failing
+wgsl-minus CPU regression checks folded values, spans, chains and unchanged
+decrement statements. The existing Tonemap custom-curve pixel oracle caught
+the issue on ANGLE D3D11; its native shader and arithmetic are unchanged.
+Sources, cause and exact reproduction context are in
+[batch-165-workcounts.md](../whitepaper/batch-165-workcounts.md).
+No GPU math, backend capability, public API, core or stage change is introduced.
 
 
 ### Section 5 evidence: optional Draco component widths

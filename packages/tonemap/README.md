@@ -92,6 +92,25 @@ stage.dispose();
 
 Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast around linear 18% gray (0 to 4) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
 
+For CPU-only parsing, supply the complete text. The result can later be passed to `tonemap.setLUT`:
+
+```ts
+import {parseCube} from '@margoengine/tonemap';
+const lut = parseCube(`LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1`);
+console.log(lut.size, lut.data.length); // 2, 32 RGBA values
+```
+
+Parsing reads one line at a time, validates RGB while converting it, and checks the domain before returning.
+Manually supplied LUT objects receive full validation when passed to `setLUT`.
+
 `parseCube(text)` accepts `LUT_3D_SIZE` integers from 2 through 65, including common 16³, 17³, 32³, 33³, 64³ and
 65³ files. Supply exactly `size³` finite RGB rows with red varying fastest. Optional quoted `TITLE`, `DOMAIN_MIN`,
 `DOMAIN_MAX`, comments and scientific notation are supported. Unsupported/1D headers, duplicate or late headers,
