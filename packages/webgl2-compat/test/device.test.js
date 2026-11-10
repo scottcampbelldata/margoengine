@@ -1,11 +1,11 @@
 // The compatibility GPU and adapter on stand-in WebGL2 contexts (the device itself renders, so its checks run in a
 // browser: compat-browser-check.mjs, corpus-draw-browser.mjs). Here: an adapter only for the `full` tier, WebGPU limits
-// taken from the context and never above WebGPU's defaults, features only where an extension backs them, one device
+// conservatively capped except for the negotiated hardware array-layer capacity, features only where an extension backs them, one device
 // per adapter, and requests the adapter cannot meet refused.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPAT_LIMITS, webgl2Capabilities } from '../dist/index.js';
-import { COMPAT_VENDOR, CompatCanvasContext, createCompatGPU, isCompatDevice } from '../dist/device.js';
+import { COMPAT_VENDOR, CompatCanvasContext, CompatDevice, createCompatGPU, isCompatDevice } from '../dist/device.js';
 
 /** A stand-in context: just what webgl2Capabilities reads. */
 function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = {}) {
@@ -166,6 +166,40 @@ test('limits come from the context, never above WebGPU defaults; vertex strides 
     createContext: () => fakeContext({ limits: { MAX_TEXTURE_SIZE: 2048 } }),
   }).requestAdapter();
   assert.equal(small.limits.maxStorageBufferBindingSize, 2048 * 16 * 2048);
+});
+
+test('array layer capacity is advertised from GL and negotiated independently for each device', async () => {
+  for (const capacity of [256, 2048, 4096]) {
+    const fresh = async () => {
+      const context = fakeContext({ limits: { MAX_ARRAY_TEXTURE_LAYERS: capacity } });
+      const gl = new Proxy(context, { get: (target, key) => key in target ? target[key] : () => ({}) });
+      return createCompatGPU({ createContext: () => gl }).requestAdapter();
+    };
+    const plainAdapter = await fresh();
+    assert.equal(plainAdapter.limits.maxTextureArrayLayers, capacity, 'adapter advertises the backed capacity');
+    const plain = await plainAdapter.requestDevice();
+    assert.equal(plain.limits.maxTextureArrayLayers, 256, 'an unrequested device keeps the WebGPU default');
+    assert.ok(Object.isFrozen(plain.limits));
+    plain.destroy();
+    const requestedAdapter = await fresh();
+    const requested = await requestedAdapter.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity } });
+    assert.equal(requested.limits.maxTextureArrayLayers, capacity, 'the full requested capacity reaches the device');
+    assert.equal(requestedAdapter.limits.maxTextureArrayLayers, capacity, 'negotiating leaves the adapter unchanged');
+    requested.destroy();
+    const below = await (await fresh()).requestDevice({ requiredLimits: { maxTextureArrayLayers: 128 } });
+    assert.equal(below.limits.maxTextureArrayLayers, 256, 'a lower request never reduces the default');
+    below.destroy();
+    const refused = await fresh();
+    assert.throws(() => new CompatDevice({}, refused, new Set(), {
+      requiredLimits: { maxTextureArrayLayers: capacity + 1 },
+    }), { name: 'RangeError', message: /use adapter\.limits\.maxTextureArrayLayers or fewer layers/ },
+    'direct construction refuses before touching GL and gives the remedy');
+    await assert.rejects(refused.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity + 1 } }),
+      { name: 'OperationError' });
+    const recovered = await refused.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity } });
+    assert.equal(recovered.limits.maxTextureArrayLayers, capacity, 'an invalid request does not consume the adapter');
+    recovered.destroy();
+  }
 });
 
 test('features only where an extension backs them', async () => {

@@ -261,6 +261,27 @@ uploads, same-format copies, sample-only float32 precision, mip/array views, MSA
 blending and fragment/CPU texture-store compute. They mask extensions on a real GL
 device; they do not constitute measurements on physical lower-tier hardware.
 
+### Texture array capacity
+
+The WebGL2-backed adapter advertises its actual `maxTextureArrayLayers`.
+A device starts at 256 layers unless a higher backed limit is requested.
+Core already requests the adapter's layer capacity at creation and restoration,
+so high-layer voxel textures need no engine option. Other limits retain their
+existing conservative caps. A request above the adapter's capacity rejects
+with `OperationError` and leaves the adapter available for a valid request.
+
+```ts
+import { createCompatGPU } from 'margoengine/webgl2-compat/device';
+
+const adapter = await createCompatGPU().requestAdapter();
+if (!adapter) throw new Error('This browser needs the full WebGL2 tier');
+const device = await adapter.requestDevice({
+  requiredLimits: { maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers },
+});
+console.log(device.limits.maxTextureArrayLayers);
+device.destroy();
+```
+
 ### Native WebGPU on older GPUs (`margoengine/webgl2-compat/adapter`)
 
 Before falling to WebGL2, a browser can offer WebGPU at compatibility level on OpenGL ES and Direct3D 11 class devices.

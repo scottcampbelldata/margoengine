@@ -88,7 +88,7 @@ const WEBGPU_DEFAULT_LIMITS: Record<string, number> = {
   maxComputeWorkgroupsPerDimension: 65535,
 };
 
-/** WebGPU limits from what the context reports (never above WebGPU's defaults, never above the context's own). */
+/** Backed adapter limits. Array-layer capacity may exceed the device default and is negotiated at requestDevice. */
 function limitsOf(caps: WebGL2Capabilities): Record<string, number> {
   const l = caps.limits,
     out = { ...WEBGPU_DEFAULT_LIMITS };
@@ -96,7 +96,7 @@ function limitsOf(caps: WebGL2Capabilities): Record<string, number> {
   cap('maxTextureDimension1D', l.MAX_TEXTURE_SIZE);
   cap('maxTextureDimension2D', l.MAX_TEXTURE_SIZE);
   cap('maxTextureDimension3D', l.MAX_3D_TEXTURE_SIZE);
-  cap('maxTextureArrayLayers', l.MAX_ARRAY_TEXTURE_LAYERS);
+  out.maxTextureArrayLayers = l.MAX_ARRAY_TEXTURE_LAYERS;
   cap('maxSampledTexturesPerShaderStage', l.MAX_TEXTURE_IMAGE_UNITS);
   cap('maxSamplersPerShaderStage', l.MAX_TEXTURE_IMAGE_UNITS);
   cap('maxUniformBuffersPerShaderStage', Math.min(l.MAX_VERTEX_UNIFORM_BLOCKS, l.MAX_FRAGMENT_UNIFORM_BLOCKS));
@@ -229,7 +229,7 @@ export class CompatAdapter {
       if (better) return Promise.reject(new DOMException(`The WebGL2 adapter's ${name} is ${have}`, 'OperationError'));
     }
     this.used = true;
-    const device = new CompatDevice(this.gl, this, new Set(descriptor.requiredFeatures ?? []));
+    const device = new CompatDevice(this.gl, this, new Set(descriptor.requiredFeatures ?? []), descriptor);
     // Lower tiers cannot blit sample-only float textures. View synchronization can need the readback helper in
     // an ordinary render command, so make it available before exposing a device with these copy semantics.
     if (this.tierFormats) await device.loadReadback();
@@ -301,10 +301,15 @@ export class CompatDevice extends EventTarget {
     readonly gl: WebGL2RenderingContext,
     readonly adapter: CompatAdapter,
     features: ReadonlySet<string>,
+    descriptor: GPUDeviceDescriptor = {},
   ) {
     super();
     this.features = features;
-    this.limits = adapter.limits;
+    const defaultLayers = Math.min(WEBGPU_DEFAULT_LIMITS.maxTextureArrayLayers, adapter.limits.maxTextureArrayLayers),
+      layers = Math.max(defaultLayers, descriptor.requiredLimits?.maxTextureArrayLayers ?? defaultLayers);
+    if (layers > adapter.limits.maxTextureArrayLayers)
+      throw new RangeError('Requested array layer limit exceeds the adapter capacity; use adapter.limits.maxTextureArrayLayers or fewer layers');
+    this.limits = Object.freeze({ ...adapter.limits, maxTextureArrayLayers: layers });
     this.adapterInfo = adapter.info;
     this.cpuWorkBudget = adapter.cpuWorkBudget;
     this.ext = extensions(gl);

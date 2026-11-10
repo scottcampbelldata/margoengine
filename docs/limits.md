@@ -3336,8 +3336,8 @@ and the remaining prediction/transform/quantization cross product remain open.
 Seven native-reference browser drivers opt out of the outer forced-backend
 shim and continue selecting the compatibility device in their own cases.
 This changes no device limit, render path, image bound or package runtime.
-Compatibility entry gzip sizes stay root 105186, device 105232, XR 105035,
-tiers 104920 bytes; core plus stage stays 23950 bytes, below 25000.
+At the baseline fix, compatibility entry gzip sizes were root 105186, device
+105232, XR 105035 and tiers 104920 bytes; core plus stage was 23950 bytes.
 Remaining defects and coverage limits are retained in known-bugs and
 `work-lists/batch-273-compat-triage.md`; full suite closure requires every leaf.
 
@@ -3385,3 +3385,15 @@ The initial ceilings are respectively 2,675 B, 2,313 B and 1,516 B including the
 normal 256 B headroom. These bytes buy the event state machine, exact proximity
 and React parent routing; further splitting would fragment one public feature.
 The combined core + stage stays 23,950 B, below 25,000 B.
+
+### Batch 273 round 9: array-layer limits
+
+The adapter's array-layer limit is the actual GL MAX_ARRAY_TEXTURE_LAYERS,
+not a ceiling of 256. Unrequested devices retain the 256-layer default;
+larger backed requests negotiate a separate frozen device limit. Requests
+above the adapter reject before consuming it. Other conservative limits
+are unchanged. Core's existing adapter-capacity request needs no change.
+Entry gzip before/after: root 105186/105282, device 105232/105329,
+XR 105035/105139, tiers 104920/105031 bytes. No ceiling increases are needed.
+Core plus stage remains 23950 bytes, below 25000. These are size counts,
+not a timing or whole-package parity claim.

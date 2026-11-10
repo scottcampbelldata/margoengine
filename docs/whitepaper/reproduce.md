@@ -2417,3 +2417,20 @@ native output. scripts/modern-xr-tests.js is the native XRGPUBinding fixture;
 forcing that fixture through compat without installXR correctly refuses setup.
 React's scene-browser suite is run normally and with --compat; its fixture now
 prepares the corresponding binding before its XR-only modes.
+
+### Batch 273 round 9: texture array negotiation
+
+Build webgl2-compat and run node --test --test-timeout=120000
+packages/webgl2-compat/test/device.test.js. The array-layer regression fails on
+the prior owner at adapter capacity 2048 (256 advertised). It tests physical
+capacities 256/2048/4096, default and explicit requests, immutable state,
+refusal and recovery. api:update records the constructor's optional descriptor.
+
+Under MARGO_COMPAT=1 run the complete voxel test:gpu, test:gpu:slow-compile
+and test:gpu:slow-mesh scripts, preserving both sample counts. Run the bevel
+leaf natively too, plus the optional layer's render/pick/restore, feature,
+compute, package-route and XR comparison leaves. GPU leaves use shared locks,
+one per lane, --wait-max=60 and command-specific hard bounds. The whole voxel
+suite includes GI and debris; no test is removed. The separate native-only
+delay injection gap is not treated as compatibility slow-compiler evidence.
+[Receipt](results/batch-273-array-layer-limits.json).

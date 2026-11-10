@@ -271,7 +271,7 @@ class CompatDevice extends EventTarget {
     readonly replayer: Replayer;
     computeRuntime: ComputeRuntime | null;
     readback: typeof import('./readback.js') | null;
-    constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>);
+    constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>, descriptor?: GPUDeviceDescriptor);
     enum(name: string): number;
     compare(f: GPUCompareFunction): number;
     unsupported(what: string): Error;

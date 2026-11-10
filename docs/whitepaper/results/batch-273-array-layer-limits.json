@@ -1,0 +1,199 @@
+{
+  "fix": "Advertise physical array-layer capacity and negotiate independent device limits",
+  "originalFailures": [
+    22,
+    23,
+    24
+  ],
+  "originalIndexedCommandsPassing": [
+    5,
+    6,
+    10,
+    21,
+    22,
+    23,
+    24
+  ],
+  "regression": {
+    "file": "packages/webgl2-compat/test/device.test.js",
+    "before": "Fails at backed 2048 layer adapter: actual 256 versus required 2048",
+    "after": "256/2048/4096 capacity cases, 256 default, explicit high requests, below-default requests, immutable limits, refusal and recovery pass"
+  },
+  "packageUnits": {
+    "pass": 161,
+    "failed": 0,
+    "skipped": 0
+  },
+  "gpu": [
+    {
+      "name": "bevel-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "voxel-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "slow-compile-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "slow-mesh-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "bevel-native",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "parity",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "features",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "compute",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "routes",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "xr",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    }
+  ],
+  "slowCompileCaveat": "The canonical command passes its unchanged assertions, but the forced-compat synthetic pipeline delay currently patches the native prototype before the compatibility device loads. This separate coverage gap remains in known-bugs; no injected compatibility-delay proof is claimed.",
+  "entryGzip": {
+    "before": {
+      "index": 105186,
+      "device": 105232,
+      "xr": 105035,
+      "tiers": 104920
+    },
+    "after": {
+      "index": 105282,
+      "device": 105329,
+      "xr": 105139,
+      "tiers": 105031
+    }
+  },
+  "coreAndStageGzip": 23950,
+  "api": {
+    "entries": 911,
+    "exports": 8753,
+    "note": "Three optional constructor snapshots retained; incoming React and XR pointer exports preserved"
+  },
+  "gates": {
+    "lint": true,
+    "hygiene": true,
+    "verify": {
+      "invocations": 1,
+      "initialPass": false,
+      "shadowRecording": false,
+      "failure": "The new direct-constructor RangeError lacked an actionable remedy; quality stopped verify and cancelled the main unit chain",
+      "repair": "Add the supported-limit remedy and a direct-constructor rejection/message regression, then rebuild and regenerate guides",
+      "completedOriginalCommands": [
+        "npm run api:check",
+        "npm run check:parity",
+        "npm run check:xr-runs",
+        "npm run check:preview-contract",
+        "npm run build --workspace examples/gameplay-sandbox",
+        "npm run test --workspace examples/gameplay-sandbox",
+        "npm run build --workspace examples/voxel-sandbox",
+        "npm run test --workspace examples/voxel-sandbox",
+        "npm run docs:links",
+        "npm run check:readmes",
+        "npm run measure:size",
+        "npm run proofs -- --current"
+      ],
+      "repairedQuality": true,
+      "completedFullMainUnitChain": {
+        "tests": 14226,
+        "passed": 14226,
+        "failed": 0,
+        "skipped": 0
+      },
+      "allComponentsPass": true,
+      "note": "The failed full verify command was not rerun. Its failed quality check and cancelled full unit chain were completed separately after the repair; other completed chains were retained."
+    },
+    "readmeRuntime": {
+      "passed": 15,
+      "node": 3,
+      "browser": 12,
+      "failed": 0,
+      "note": "The later change is the invalid direct-constructor message only; the README happy path and rendered paths are unchanged"
+    },
+    "bannedTerms": true,
+    "landingPolicy": "Current AGENTS fast gate; no additional full verify invocation. Full newest-main verification belongs to local CI and is required before release."
+  },
+  "preserved": [
+    "all texture layers and maps",
+    "all voxel scene work",
+    "all numerical/image assertions",
+    "all sample counts",
+    "all resource checks"
+  ],
+  "noTimingClaim": true,
+  "integration": {
+    "fullComponentBase": "913d44282",
+    "finalMain": "0de0ad705",
+    "preservedBothSharedDocs": true,
+    "regeneratedGuidesAfterBuild": true,
+    "checks": {
+      "tests": 449,
+      "passed": 449,
+      "failed": 0,
+      "skipped": 0,
+      "quality": true,
+      "api": true
+    },
+    "note": "A concurrent XR pointer feature caused the first fast-forward push to be rejected. Rebased without overwriting it, rebuilt all packages and passed the complete affected React/selection/XR units, modern/peer-reach and generated-doc checks, quality and API. No full verify repetition.",
+    "checkedPackageMain": "5345be708",
+    "rulesOnlyRebase": "The last fast-forward rejection was an AGENTS-only update: Scott now requires the fast gate before a package push and moves full verify to local CI. No package source or tests changed in this last rebase.",
+    "policyWordingRepair": {
+      "originalFailure": "AGENTS.md:84 failed the unchanged private-name guard",
+      "repair": "Use neutral check-tooling wording; the fast-gate policy is unchanged",
+      "regression": "tests/banned-terms.test.js: no tracked file contains a banned term",
+      "negative": "Initial standalone check failed only the new instruction line",
+      "positive": "Repaired standalone scan passes; no ban-list or test change"
+    }
+  },
+  "previousIntegration": {
+    "componentCheckBase": "913d44282",
+    "finalMain": "2c1b94730",
+    "preservedBothSharedDocs": true,
+    "regeneratedGuides": true,
+    "checks": {
+      "tests": 36,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "documentationLinks": true
+    },
+    "note": "The later main commit changes GPU queue observer ordering and its tests/docs. Package runtime source and APIs are unchanged by that integration; its affected tests and generated documentation checks pass."
+  }
+}

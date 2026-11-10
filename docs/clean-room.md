@@ -4956,3 +4956,28 @@ implementation or companion code was read or copied. This implements the batch
 row, not the separate object-manipulation techniques or a physical device proof.
 The real GPU fixture loads Khronos Box (Cesium, CC BY 4.0), already noticed in
 packages/exporters/tests/fixtures/NOTICE.md and THIRD-PARTY-NOTICES.md.
+
+### Batch 273 round 9: array-layer capacity and device negotiation
+
+Sources researched before this repair: W3C GPU for the Web Working Group,
+*WebGPU* (Candidate Recommendation Draft, 15 September 2026), optional
+capabilities, supported limits and requestDevice/new-device algorithms,
+https://www.w3.org/TR/webgpu/ ; Khronos WebGL Working Group, *WebGL 2.0
+Specification* (2026 editor draft), MAX_ARRAY_TEXTURE_LAYERS and texture array
+storage, https://registry.khronos.org/webgl/specs/latest/2.0/ ; Khronos Group,
+*OpenGL ES 3.2 Specification* (5 May 2022), texture array limits,
+https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf .
+The distinction is capability versus negotiated default: GL's backed capacity
+is the adapter limit; 256 is the unrequested WebGPU device default, not an
+adapter ceiling. The device receives at least that default and any supported
+larger request. Core already asks for the adapter's full layer capacity.
+
+Scientific method comparison uses Donaldson, *Metamorphic Testing of Android
+Graphics Drivers* (2019), and Donaldson, Evrard and Thomson, *Putting Randomized
+Compiler Testing into Production* (2020), linked in the preceding baseline
+record. Apply their setup-validation principle to independent adapter/device
+states: regression tests cover 256/2048/4096 backed layers, default and explicit
+requests, immutable adapter/device limits, refusal and recovery. Native and
+compatibility bevel cases retain layers 256/2047 and all image assertions.
+Only the standards' relevant limit sections and the papers' scopes recorded
+above were read. No companion code or other engine implementation was used.

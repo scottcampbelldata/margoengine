@@ -2843,3 +2843,16 @@ and packages/xr/tests/pointer.browser.mjs on native WebGPU and WebGL2 compat.
 This is deterministic interface and real desktop GPU evidence, not a Quest or
 phone run. Proximity is geometric (not texture alpha), and per-query world BVH
 construction carries no timing or scaling claim.
+
+### Batch 273 round 9: backed texture array capacity
+
+The optional compatibility adapter reports the actual GL array-layer capacity
+instead of capping it at the WebGPU device default. requestDevice retains 256
+by default and negotiates larger backed requests independently. Core's
+existing capacity request therefore enables the unchanged voxel layers 256
+and 2047. The full voxel compatibility suite, both slow-path commands, native
+bevel reference and five compatibility comparison leaves pass. The native-only
+synthetic delay injection gap remains in known-bugs; command success does not
+prove that the delay reached the compatibility device. No core/stage runtime,
+scene reduction, image-bound change or timing claim is included.
+[Receipt](results/batch-273-array-layer-limits.json).

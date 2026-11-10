@@ -453,9 +453,18 @@ passes. The following additional failures remain with batch 273:
   is repaired, but its complete package suite is not claimed: it includes the
   tracer compilation assigned to a separate owner. No bounds or work changed.
   Receipt: whitepaper/results/batch-273-native-baselines.json.
-- `voxel/test:gpu`, `test:gpu:slow-compile` and `test:gpu:slow-mesh`: the bevel
-  fixture needs 2,048 texture array layers on an adapter advertising 256. Review
-  the fixture/device request and hardware route without dropping texture work.
+- Resolved original failures 22-24: the layer capped adapter array capacity at
+  the 256-layer device default. It now advertises actual GL capacity and
+  negotiates a separate device limit, preserving the unrequested default.
+  The full voxel compatibility suite and both slow-path commands pass their
+  unchanged assertions, including layers 256/2047 at 4x and 1x. The separate
+  synthetic delay coverage gap below remains open. No texture work was reduced.
+  Receipt: whitepaper/results/batch-273-array-layer-limits.json.
+- Forced-compatibility slow-compile coverage gap: `MARGO_COMPAT=1` with
+  `--pipeline-delay=500` patches the native GPUDevice prototype before
+  compatShim loads/replaces it, so the synthetic delay does not wrap the later
+  CompatDevice. Repro: voxel's slow-compile script with that environment;
+  apply/observe the delay on the actual device in a separate harness repair.
 - `root/modern:test:xr:browser`: XR refuses the full layer until `installXR()`
   supplies its route; the generic forced-backend fixture does not install it.
   Review that setup together with the React XR preparation failure above.
