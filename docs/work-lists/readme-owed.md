@@ -571,3 +571,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/animator (batch 211 job 3): document graph offset, interruptionSource including both precedence orders, legacy interruptible defaults, event entry boundaries and independent fade/source clocks; examples deferred.
 
 - margoengine (batch 211 job 3): regenerated alias ordering after rebase; no example work during build phase.
+
+- @margoengine/labels (batch 261 job 3): document ClusterLabels radius components, minCount, camera/logical zoom, bubble styling and member handles, nested layouts and disposal.
+- margoengine (batch 261 job 3): document labels/cluster alias.

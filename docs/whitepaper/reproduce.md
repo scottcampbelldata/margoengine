@@ -3228,3 +3228,6 @@ Build with npm run build:packages. Run node --test --test-timeout=120000 package
 ### Batch 211 job 3
 
 Build packages, then node --test packages/animator/test/transitions.test.js tests/modern-animator-graph.test.js. The animator GPU package suite runs through the shared GPU lock; run again with MARGO_COMPAT=1. The real Fox graph transitions to Run at normalized offset 0.25.
+
+### Batch 261 label clustering
+Build packages, then node --test --test-timeout=120000 packages/labels/tests/cluster.test.js. The normal labels CPU suite covers composition. Render node scripts/gpu-lock.mjs run --owner=labels-cluster --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for real centroid/count/zoom checks. Generated numeric clouds are correctness controls; no geographic demo is introduced.

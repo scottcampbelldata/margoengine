@@ -3,6 +3,7 @@ import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
 import { Callouts } from '@margoengine/labels/callouts';
 import { DistanceLabels } from '@margoengine/labels/distance';
+import { ClusterLabels } from '@margoengine/labels/cluster';
 import { projectPoint } from '@margoengine/math/mat4';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
@@ -289,6 +290,32 @@ async function scenario(backend) {
   assert(note.onScreen, 'distance label did not recover');
   distance.dispose();
   checks.push(`${backend}: distance layout scales real DOM geometry, fades, hides and recovers`);
+
+  const clusterLayout = new ClusterLabels({ maxZoom: 2 });
+  const clusterRenderer = new LabelRenderer({ name: 'cluster-check', layout: clusterLayout });
+  engine.use(clusterRenderer);
+  const ca = clusterRenderer.add(tag('a'), { position: engine.camera.target });
+  const cb = clusterRenderer.add(tag('b'), { position: engine.camera.target });
+  engine.render();
+  assert(clusterLayout.clusters.length === 1 && clusterLayout.clusters[0].count === 2, 'cluster count missing');
+  assert(!ca.onScreen && !cb.onScreen, 'cluster members were not hidden');
+  const bubble = clusterLayout.clusters[0].element;
+  const bubbleCenter = center(bubble),
+    expectedBubble = pagePoint(engine, engine.camera.target);
+  assert(
+    Math.hypot(bubbleCenter[0] - expectedBubble[0], bubbleCenter[1] - expectedBubble[1]) <= 1,
+    'cluster bubble is not at the projected centroid',
+  );
+  assert(bubble.textContent === '2' && bubble.getBoundingClientRect().width > 0, 'cluster bubble not drawn');
+  clusterLayout.setZoom(3);
+  engine.render();
+  assert(
+    ca.onScreen && cb.onScreen && !bubble.isConnected && clusterLayout.clusters.length === 0,
+    'cluster zoom split failed',
+  );
+  engine.removePlugin(clusterRenderer.name);
+  clusterLayout.dispose();
+  checks.push(`${backend}: count bubble projects at its centroid, hides members and splits at the zoom limit`);
 
   // Dispose cleans the DOM.
   const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted, note.element, callouts.svg];

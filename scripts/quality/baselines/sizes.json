@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13216978,
+  "total": 13220520,
   "history": [
     {
       "date": "2026-10-24",
@@ -6665,6 +6665,12 @@
       "date": "2026-11-10",
       "commit": "batch-211-job3",
       "reason": "Graph 9719 -> 10177 B gzip and layers 10281 -> 10730 B. Raise graph ceiling 10011 -> 10483, layers 10436 -> 11052. Offset/source clock separation and complete interruption selection share one controller; splitting would duplicate graph state and trigger ownership."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-261-job3",
+      "reason": "New optional label clustering 0 B (absent) -> 1515 B gzip; exact radius components, count bubbles, member handles, zoom and cleanup stay together. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7891,6 +7897,8 @@
     "margoengine/fbx/legacy": 314,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/lines/stroke": 4663,
-    "@margoengine/terrain/imagery": 6241
+    "@margoengine/terrain/imagery": 6241,
+    "@margoengine/labels/cluster": 1771,
+    "margoengine/labels/cluster": 1771
   }
 }

@@ -6155,3 +6155,7 @@ The new optional terrain/imagery collection patches the lit surface color after 
 ### Section 5 evidence: graph transition clocks (batch 211 job 3)
 
 Graph source selection and normalized destination entry are CPU pose controls; GPU skinning is unchanged. The fade uses elapsed seconds independently of destination time. CPU tests assert exact event boundaries, policy precedence, source chaining and continuity of the captured blended pose. The Fox GPU fixture exercises the new offset through the existing palette on both backends. No speed claim.
+
+
+### 5. Batch 261 label cluster evidence
+Clustering is optional CPU layout over the existing renderer projection; count bubbles are DOM overlays. Radius-graph components have independent all-pairs proof, 100k deterministic coincident-point coverage, renderer camera-zoom splitting and native WebGPU/WebGL2 DOM alignment checks. Core/stage and GPU shaders are unchanged.

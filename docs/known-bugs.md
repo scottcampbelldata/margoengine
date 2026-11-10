@@ -4537,3 +4537,6 @@ Build-phase tooling gap: node scripts/gpu-package-tests.mjs --no-build --only=sc
 ### Batch 229 job 1: imagery evidence
 No open defect identified in the job: native and compatibility clipmap, RVT and planet checks use exact XYZ/WMTS/GPU image equality, ordered composition, alpha, brightness and bounds. Operational and resource limits are in docs/terrain-imagery.md.
 - AnimatorGraph snapshot follow-up (batch 211, rules 21/22): capture graph.animator during a graph fade, change a bool/trigger or take a different interruption, restore the Animator snapshot and update. Graph bools/triggers and the selected interruption source/policy live in the controller and are outside AnimatorState, so restoring playback alone does not rewind graph decisions. Add a graph-level snapshot in the fix phase; live layer, tree and transition features are built.
+
+### Batch 261 label clusters
+No open correctness defect identified. Independent all-pairs component tests include negative cells, grid seams, chains, minimum size and zoom splitting. Renderer tests show camera zoom restores individual labels; browser tests show count-bubble centroid alignment and logical zoom recovery on native WebGPU and WebGL2.

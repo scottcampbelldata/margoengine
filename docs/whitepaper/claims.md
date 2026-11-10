@@ -3758,3 +3758,6 @@ terrain/imagery supplies the requested XYZ, WMTS and GPU imagery with ordered al
 ### Batch 211 job 3
 
 AnimatorGraph starts destinations at normalized offsets and restricts fade interruptions to current, next, neither or both states in either order. Proof: packages/animator/test/transitions.test.js covers offset events, fade elapsed time, trigger retention, chained interruptions and invalid snapshots; existing modern-animator-graph tests retain prior behaviour. layers-browser.mjs renders the real Fox at a 0.25 normalized entry on both backends. No timing or seamless-motion synthesis claim.
+
+### Batch 261 count-bubble clustering
+The optional cluster layout groups screen-space neighbors and retains exact member counts. Twenty seeded 80-point cases match independent all-pairs connectivity, and 100,000 coincident points form one bubble with zero pairwise distance tests. Camera zoom splits clusters without permanently hiding members. Browser checks place the bubble centroid within 1 px on native WebGPU and WebGL2. Work counts are deterministic, not a speed result.

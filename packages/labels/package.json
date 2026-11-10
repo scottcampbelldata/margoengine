@@ -50,6 +50,10 @@
     "./distance": {
       "types": "./dist/distance.d.ts",
       "import": "./dist/distance.js"
+    },
+    "./cluster": {
+      "types": "./dist/cluster.d.ts",
+      "import": "./dist/cluster.js"
     }
   },
   "files": [

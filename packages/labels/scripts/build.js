@@ -25,6 +25,7 @@ await build({
         callouts: resolve(root, 'src/callouts.ts'),
         gpu: resolve(root, 'src/gpu.ts'),
         distance: resolve(root, 'src/distance.ts'),
+        cluster: resolve(root, 'src/cluster.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',
