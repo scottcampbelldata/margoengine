@@ -8,6 +8,8 @@ import { meshRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@m
 import type { PBRModel } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
 import type { LOD, LODObject, LODSystem } from './index.js';
+import { fadeTest } from './fade-pattern.js';
+export { fadeTest } from './fade-pattern.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 
 /** Options of {@link LODFade}. */
@@ -27,10 +29,6 @@ interface Active {
   finish(): void;
   set(value: number): void;
 }
-
-const dither = 'fract(52.9829189*fract(dot(floor(lod_at),vec2f(0.06711056,0.00583715))))';
-/** Pixel `lod_at` survives a fade value `lod_f`: zero keeps everything. */
-export const fadeTest = `fn lod_fade_keep(lod_at:vec2f,lod_f:f32)->bool {let d=${dither};if(lod_f>0.0){return d<lod_f;}return lod_f==0.0||d>=-lod_f;}`;
 
 /**
  * The same test on the CPU, for tests and tools: whether pixel (x, y) draws at fade value `value`. A value and its
@@ -76,7 +74,8 @@ const owner = (o: LODObject): PBRModel | undefined => {
 
 /**
  * Cross-fades the levels of a `LODSystem`: mesh, model, materials mesh and Geometry levels dissolve into each other, or
- * into nothing for a `null` level. A switch to or from an Imposter stays instant, as does everything on WebGL2.
+ * into nothing for a `null` level, including Imposter and ImposterFrames levels. Native WebGPU and the full WebGL2
+ * compatibility layer use the same dither; the small WebGL2 preview requires promotion to a compatibility device.
  * @throws RangeError for a `duration` that is not above 0; MargoError `'state'` when the system is on no engine.
  */
 export class LODFade implements EnginePlugin {
@@ -218,8 +217,18 @@ export class LODFade implements EnginePlugin {
       };
     return { set, end: () => set(0) };
   }
-  private fader(object: LODObject): Fader | undefined {
+  private fader(lod: LOD, level: number): Fader | undefined {
+    const object = lod.levels[level].object;
     if (!object || object instanceof Geometry) return undefined;
+    if (this.system.imposterFade(lod, level))
+      return {
+        set: (value) => {
+          this.system.imposterFade(lod, level, value);
+        },
+        end: () => {
+          this.system.imposterFade(lod, level, 0);
+        },
+      };
     const model = owner(object);
     if (model) {
       const set = this.effect(model);
@@ -235,7 +244,9 @@ export class LODFade implements EnginePlugin {
     this.fades.delete(lod);
     const a = lod.levels[from].object,
       b = lod.levels[to].object;
-    if (!this.fadeable(a) || !this.fadeable(b) || (a === null && b === null)) return false;
+    const impA = this.system.imposterFade(lod, from),
+      impB = this.system.imposterFade(lod, to);
+    if ((!impA && !this.fadeable(a)) || (!impB && !this.fadeable(b)) || (a === null && b === null)) return false;
     const anchor = lod.anchor,
       steps: Fader[] = [],
       leaving: (() => void)[] = [];
@@ -253,9 +264,9 @@ export class LODFade implements EnginePlugin {
         this.ghosts.push(ghost);
       });
     } else if (a) {
-      outgoing = this.fader(a);
+      outgoing = this.fader(lod, from);
       leaving.push(() => {
-        if (this.alive(a)) target(a as Mesh).visible = false;
+        if (!impA && this.alive(a)) target(a as Mesh).visible = false;
       });
     }
     if (b instanceof Geometry) {
@@ -264,8 +275,8 @@ export class LODFade implements EnginePlugin {
     } else {
       if (a instanceof Geometry) anchor.setGeometry(null);
       if (b) {
-        incoming = this.fader(b);
-        target(b as Mesh).visible = true;
+        incoming = this.fader(lod, to);
+        if (!impB) target(b as Mesh).visible = true;
       }
     }
     for (const fader of [outgoing, incoming]) if (fader) steps.push(fader);

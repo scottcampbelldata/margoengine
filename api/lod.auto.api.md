@@ -196,6 +196,7 @@ class LODSystem implements EnginePlugin {
     levelOf(lod: LOD): number;
     pickProxies(): readonly LOD[];
     remove(lod: LOD): void;
+    imposterFade(lod: LOD, level: number, value?: number): boolean;
     setTransition(transition: (lod: LOD, from: number, to: number) => boolean): () => void;
     update(): void;
     addLighting(effect: ImposterLighting): () => void;

@@ -3964,3 +3964,5 @@ Optional voxel/models prepares 24 proper cube orientations of box unions and fac
 ### Batch 235 job 1: GPU interactive local water (2026-11-10)
 
 Optional water/ripples provides drop and swept object disturbances, GPU height/velocity propagation, camera-preserving scroll and actual displacement/normals. Evidence: packages/water/test/ripples.browser.mjs compares an independent stencil and verifies query height/vertical velocity and lifecycle on both backends. Bounds: docs/water-ripples.md. No speed or full hydrodynamics claim.
+### Imposter transition coverage (batch 222 job 3)
+LODFade dissolves mesh, static/animated imposter and empty levels on native WebGPU and full WebGL2 compatibility. Evidence: lod/test/imposter-fade.test.js and imposter-fade-check.mjs. The real FlightHelmet check reads both colored levels during the dissolve, monotonically decreasing outgoing/increasing incoming coverage and a clean final target. Independent shared-image animation rates also pass. The same complementary threshold covers meshes and imposters; this is behavior parity for the requested transition row, without a timing, temporal-antialiasing or identical-silhouette claim.

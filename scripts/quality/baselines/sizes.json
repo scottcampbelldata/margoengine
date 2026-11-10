@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13607327,
+  "total": 13607985,
   "history": [
     {
       "date": "2026-10-24",
@@ -7080,6 +7080,12 @@
       "commit": "batch-235-job-1",
       "reason": "New optional water/ripples: absent to 3683 B gzip, ceiling 3940 B. GPU local wave propagation, swept disturbances and query composition belong together; a split would duplicate lifecycle and field bindings. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "cd9b20763",
+      "reason": "Batch 222 job 3: lod root 14118 to 14569 B and fade 2413 to 2479 B; shared complementary imposter coverage, transition lifetime and sequence atlas ownership stay with LODSystem rather than splitting mandatory renderer state. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7578,7 +7584,7 @@
     "@margoengine/loaders/vtk-xml": 7748,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/loaders/xml": 1561,
-    "@margoengine/lod": 14316,
+    "@margoengine/lod": 14974,
     "@margoengine/lod/auto": 9492,
     "@margoengine/lod/clusters": 3680,
     "@margoengine/lod/fade": 2542,

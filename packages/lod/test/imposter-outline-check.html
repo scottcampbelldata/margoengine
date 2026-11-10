@@ -10,7 +10,9 @@ const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,
 engine.stop();
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const copy=new OffscreenCanvas(W,W),g=copy.getContext('2d',{willReadFrequently:true});
-const magenta=()=>{
+const magenta=async()=>{
+  // Selection can lazily load its compute queue. Wait for submitted work, then capture a fresh canvas in this task.
+  engine.render();await device.queue.onSubmittedWorkDone();
   engine.render();g.clearRect(0,0,W,W);g.drawImage(canvas,0,0);
   const d=g.getImageData(0,0,W,W).data;let n=0;
   for(let i=0;i<d.length;i+=4)if(d[i]>150&&d[i+1]<90&&d[i+2]>150)n++;
@@ -28,37 +30,37 @@ window.check={
     const lod=system.add(anchor,[{object:near},{object:atlas,distance:5}],{radius:2});
     engine.render();engine.render();
     out.level=lod.level;
-    out.none=magenta();
+    out.none=await magenta();
     selection.set([anchor]);
-    out.anchor=magenta();
+    out.anchor=await magenta();
     selection.set([near]);
-    out.levelSelected=magenta();
+    out.levelSelected=await magenta();
     // A second object stays out of it.
     const other=engine.createMesh().setPosition([3,0,0]);
     const otherLod=system.add(other,[{object:atlas}]);
     engine.render();
     selection.set([other]);
-    out.other=magenta();
+    out.other=await magenta();
     otherLod.remove();
     // A real mesh level gives about the same outline as its imposter.
     selection.set([anchor]);
     engine.camera.position=[0,0,4];
     engine.render();engine.render();
     out.nearLevel=lod.level;
-    out.nearOutline=magenta();
+    out.nearOutline=await magenta();
     engine.camera.position=[0,0,12];
     engine.render();engine.render();
     // Behind a wall: only the x-ray shows it.
     const wall=engine.createMesh().setGeometry(box(6,6,0.2)).setPosition([0,0,4]).setMaterial(grey);
     engine.render();
-    out.hidden=magenta();
+    out.hidden=await magenta();
     selection.options.xray={dash:0};
-    out.xray=magenta();
+    out.xray=await magenta();
     selection.options.xray=undefined;
     wall.dispose();
     // Hidden, it draws no outline.
     anchor.visible=false;
-    out.anchorHidden=magenta();
+    out.anchorHidden=await magenta();
     anchor.visible=true;
     lod.remove();
     selection.set([]);

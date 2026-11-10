@@ -5,6 +5,7 @@ import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
 import { neutralShader } from '../../shared/display.js';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
+import { fadeTest } from './fade-pattern.js';
 import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
 import { normalMatrix } from './attributes.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
@@ -327,7 +328,8 @@ export class Imposter {
         'Imposter frames 4-32, frameSize a power of two 16-1024; use 4 to 32 frames and a power-of-two frame size from 16 to 1024',
       );
     if (material !== undefined && !(material instanceof PbrMaterial)) throw new TypeError('Expected a PbrMaterial');
-    if (!(margin >= 1 && margin < Infinity)) throw new RangeError('Imposter margin must be 1 or more; pass a finite scale');
+    if (!(margin >= 1 && margin < Infinity))
+      throw new RangeError('Imposter margin must be 1 or more; pass a finite scale');
     if (pose !== undefined && typeof pose !== 'function')
       throw new TypeError('Imposter pose must be a function; pass one that poses the source');
     this.emissive = !!emissive || !!data?.emissive;
@@ -656,7 +658,8 @@ export class ImposterFrames {
   ) {
     if (!(imposters?.length >= 2) || imposters.some((i) => !(i instanceof Imposter)))
       throw new RangeError('ImposterFrames needs 2 or more imposters; pass one per frame');
-    if (!(fps >= 0 && fps < Infinity)) throw new RangeError('ImposterFrames fps must be 0 or more; pass frames a second');
+    if (!(fps >= 0 && fps < Infinity))
+      throw new RangeError('ImposterFrames fps must be 0 or more; pass frames a second');
     this.fps = fps;
   }
   /** Bakes `count` atlases now (WebGPU). Keep the source alive if the device may be lost: the atlases rebake from it. */
@@ -699,6 +702,7 @@ struct Instance {m:mat4x4f,color:vec4f,emissive:vec4f}
 @group(0) @binding(4) var colorSampler:sampler;
 @group(0) @binding(5) var<uniform> atlas:Atlas;
 @group(0) @binding(6) var glowMap:texture_2d<f32>;
+${fadeTest}
 struct Out {@builtin(position) clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) eye:vec3f,@location(2) @interpolate(flat) a:vec4f,@location(3) @interpolate(flat) b:vec2f,@location(4) @interpolate(flat) w:vec3f,@location(5) @interpolate(flat) id:u32}
 struct Pixel {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
 fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(dot(l,b[0]),-dot(l,b[1]))*0.5+0.5;}
@@ -737,6 +741,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  // Views that still disagree (silhouettes) cross-fade over alpha 0.25-0.75 instead of a hard cut at 0.5, where whole regions
  // would switch at once as the weights pass it: alpha-to-coverage under MSAA, a per-pixel dither threshold at 1x.
  let alpha=acc.a;let coverage=clamp((alpha-0.5)/max(fwidth(alpha),0.5)+0.5,0.0,1.0);
+ if(!lod_fade_keep(i.clip.xy,instances[i.id].color.w)){discard;}
  // Alpha 0 is no surface at all, whatever a steep neighbour does to fwidth: \`along\` holds no depth there, and the pixel would land on the eye, in front of everything.
  if(alpha<=0.000001||coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
  let instance=instances[i.id];let m=instance.m;let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
@@ -798,4 +803,7 @@ fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(
 }`;
 
 /** The imposter as `@margoengine/selection` marks it: the same pixels at the same depth, at full strength. */
-export const imposterMaskShader = imposterShader.replace('return Pixel(vec4f(color,coverage),', 'return Pixel(vec4f(1.0),');
+export const imposterMaskShader = imposterShader.replace(
+  'return Pixel(vec4f(color,coverage),',
+  'return Pixel(vec4f(1.0),',
+);

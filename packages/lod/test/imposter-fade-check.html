@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>FlightHelmet imposter dissolve</title><canvas width="256" height="256" style="width:256px;height:256px"></canvas><script type="module">
+// Real FlightHelmet geometry: Gary Hsu / Microsoft, CC0; examples/assets/ATTRIBUTION.md.
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {LODSystem,Imposter,ImposterFrames} from '/packages/lod/dist/index.js';
+import {LODFade} from '/packages/lod/dist/fade.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,2],target:[0,0,0]}});engine.stop();
+const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb');model.root.visible=false;
+const primitive=[...model.primitives].sort((a,b)=>b.indices.length-a.indices.length)[0],positions=[],normals=[];
+for(let i=0;i<primitive.vertices.length;i+=20){positions.push(...primitive.vertices.subarray(i,i+3));normals.push(...primitive.vertices.subarray(i+4,i+7));}
+const geometry=new Geometry(positions,normals,primitive.indices),[x,y,z,r]=geometry.bounds;
+engine.camera.position=[x,y,z+r*3.5];engine.camera.target=[x,y,z];
+const material=color=>new PbrMaterial({color,roughness:1,metalness:0}),red=material([1,0.01,0.01]),green=material([0.01,1,0.01]),blue=material([0.01,0.01,1]);
+const a=Imposter.bake(engine,geometry,{material:green,frames:8,frameSize:64}),b=Imposter.bake(engine,geometry,{material:blue,frames:8,frameSize:64}),frames=new ImposterFrames([a,b],2);
+const system=LODSystem.attach(engine),fade=LODFade.attach(engine,system,{duration:1000}),anchor=engine.createMesh().setMaterial(red);
+const distance=Math.hypot(...engine.camera.position),lod=system.add(anchor,[{object:geometry},{object:a,distance:distance*2},{object:frames,distance:distance*4},{object:null,distance:distance*8}],{hysteresis:0});
+const image=()=>{engine.render();const c=new OffscreenCanvas(256,256),g=c.getContext('2d');g.drawImage(engine.canvas,0,0);const d=g.getImageData(0,0,256,256).data;const count={red:0,green:0,blue:0};for(let i=0;i<d.length;i+=4){if(d[i]>d[i+1]+20&&d[i]>d[i+2]+20)count.red++;if(d[i+1]>d[i]+20&&d[i+1]>d[i+2]+20)count.green++;if(d[i+2]>d[i]+20&&d[i+2]>d[i+1]+20)count.blue++;}return count;};
+const settle=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+window.check={async run(){await settle();const start=image(),out={start};
+ const walk=async(bias)=>{system.bias=bias;system.update();const active=fade.active;fade.onPreUpdate(250);const quarter=image();fade.onPreUpdate(500);const late=image();const proxies=system.pickProxies().length;fade.finish();await settle();return {active,quarter,late,end:image(),proxies,left:fade.active,level:lod.level};};
+ out.toImposter=await walk(2.5);lod.frame=1;out.toFrames=await walk(5);out.toMesh=await walk(1);out.back=await walk(2.5);out.toNull=await walk(10);
+ const left=engine.createMesh().setPosition([-r*1.2,0,0]),right=engine.createMesh().setPosition([r*1.2,0,0]);
+ system.add(left,[{object:frames}]);system.add(right,[{object:new ImposterFrames([a,b],7)}]);system.onPreUpdate(0.2);await settle();
+ engine.render();const c=new OffscreenCanvas(256,256),g=c.getContext('2d');g.drawImage(engine.canvas,0,0);const pixels=g.getImageData(0,0,256,256).data;
+ const playback={leftGreen:0,leftBlue:0,rightGreen:0,rightBlue:0};for(let i=0;i<pixels.length;i+=4){const half=(i/4)%256<128?'left':'right';if(pixels[i+1]>pixels[i+2]+20)playback[half+'Green']++;if(pixels[i+2]>pixels[i+1]+20)playback[half+'Blue']++;}
+ out.playback=playback;out.errors=errors;return out;}};
+window.ready=true;
+</script>

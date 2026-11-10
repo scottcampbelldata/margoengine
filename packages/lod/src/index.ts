@@ -28,6 +28,7 @@ export {
 export { normalMatrix } from './attributes.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 import { worldRadius } from '../../shared/sphere.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -214,6 +215,7 @@ export class LODSystem implements EnginePlugin {
   private readonly castValues = new Float32Array(20);
   private readonly maskPipelines = new Map<string, GPURenderPipeline>();
   private transition?: (lod: LOD, from: number, to: number) => boolean;
+  private readonly fading = new Map<LOD, Map<number, number>>();
   private readonly descriptor = overlayDepthPass();
   private readonly color = this.descriptor.colorAttachments[0];
   private readonly depth = this.descriptor.depthStencilAttachment;
@@ -344,7 +346,15 @@ export class LODSystem implements EnginePlugin {
     const out = this.proxies;
     let n = 0;
     for (let i = 0; i < this.count; i++) {
-      const slot = this.slots[i];
+      let slot = this.slots[i];
+      if (slot < 0) {
+        const levels = this.fading.get(this.handles[i]);
+        if (levels)
+          for (const level of levels.keys()) {
+            slot = this.levelSlots[i * MAX_LEVELS + level];
+            if (slot >= 0) break;
+          }
+      }
       if (slot < 0) continue;
       const h = this.handles[i],
         imp = this.atlases[slot].imposter,
@@ -359,6 +369,7 @@ export class LODSystem implements EnginePlugin {
     return out;
   }
   /** @internal */ remove(lod: LOD): void {
+    this.fading.delete(lod);
     const i = lod.index;
     if (this.handles[i] !== lod) return;
     const last = --this.count,
@@ -398,7 +409,11 @@ export class LODSystem implements EnginePlugin {
   }
   private atlas(object: Imposter | ImposterFrames): number {
     const list = object instanceof Imposter ? [object] : object.imposters;
-    let s = this.atlases.findIndex((a) => a.imposter === list[0]);
+    // A frame sequence owns its contiguous range and playback settings. Sharing only its first image with a
+    // static level or another sequence would use a missing range or the other sequence's frame count/fps.
+    let s = this.atlases.findIndex(
+      (a) => a.imposter === list[0] && (object instanceof ImposterFrames ? a.frames === object : !a.frames),
+    );
     if (s < 0) {
       s = this.atlases.length;
       for (const imposter of list)
@@ -429,22 +444,50 @@ export class LODSystem implements EnginePlugin {
     return s;
   }
   /** The atlas object `i` draws from now: its level's, or for ImposterFrames the frame its time has reached. */
-  private slotOf(i: number): number {
-    const s = this.slots[i],
-      frames = this.atlases[s].frames;
+  private slotOf(i: number, s = this.slots[i]): number {
+    const frames = this.atlases[s].frames;
     if (!frames) return s;
     const n = frames.imposters.length,
       at = Math.floor(this.handles[i].frame + this.time * frames.fps);
     return s + (((at % n) + n) % n);
   }
   /** Writes object `i`'s instance record: world matrix `m` at `o`, then its colour and emissive. */
-  private record(data: Float32Array, at: number, m: Float32Array, o: number, i: number): void {
+  private record(data: Float32Array, at: number, m: Float32Array, o: number, i: number, fade = 0): void {
     const h = this.handles[i];
     for (let j = 0; j < 16; j++) data[at + j] = m[o + j];
     for (let j = 0; j < 3; j++) {
       data[at + 16 + j] = h.color[j];
       data[at + 20 + j] = h.emissive[j];
     }
+    data[at + 19] = fade;
+  }
+
+  /**
+   * Optional fade-entry hook: queries whether a managed level is an imposter, or sets its signed pixel threshold.
+   * Zero clears the override. A nonzero outgoing level stays drawn until cleared; current-level metadata is unchanged.
+   * Returns false for an unregistered handle or a non-imposter level. Values must be finite in [-1,1].
+   */
+  imposterFade(lod: LOD, level: number, value?: number): boolean {
+    if (
+      this.handles[lod.index] !== lod ||
+      !Number.isInteger(level) ||
+      level < 0 ||
+      level >= lod.levels.length ||
+      !isImposter(lod.levels[level].object)
+    )
+      return false;
+    if (value === undefined) return true;
+    if (!(value >= -1 && value <= 1) || typeof value !== 'number')
+      throw new RangeError('Invalid imposter fade; pass a finite signed threshold in [-1,1], or zero to clear it.');
+    let levels = this.fading.get(lod);
+    if (value === 0) {
+      levels?.delete(level);
+      if (!levels?.size) this.fading.delete(lod);
+    } else {
+      if (!levels) this.fading.set(lod, (levels = new Map()));
+      levels.set(level, value);
+    }
+    return true;
   }
 
   /**
@@ -546,45 +589,42 @@ export class LODSystem implements EnginePlugin {
     this.slots[i] = this.levelSlots[i * MAX_LEVELS + to];
   }
 
+  /** Adds one live imposter level, with the same visibility and sphere culling as an unfaded instance. */
+  private appendImposter(i: number, slot: number, fade: number, planes: Float32Array): number {
+    const store = this.engine!.store,
+      m = store.matrices;
+    if (hiddenInTree(store, this.ids[i])) return 0;
+    const a = this.atlases[this.slotOf(i, slot)],
+      imp = a.imposter,
+      o = this.ids[i] * 16,
+      k = imp.center;
+    const x = m[o] * k[0] + m[o + 4] * k[1] + m[o + 8] * k[2] + m[o + 12],
+      y = m[o + 1] * k[0] + m[o + 5] * k[1] + m[o + 9] * k[2] + m[o + 13],
+      z = m[o + 2] * k[0] + m[o + 6] * k[1] + m[o + 10] * k[2] + m[o + 14];
+    const r = worldRadius(m, o, imp.radius, x, y, z);
+    for (let q = 0; q < 24; q += 4)
+      if (planes[q] * x + planes[q + 1] * y + planes[q + 2] * z + planes[q + 3] < -r) return 0;
+    this.record(a.data, a.count++ * STRIDE, m, o, i, fade);
+    return 1;
+  }
+
   private draw(c: Context): void {
     const atlases = this.atlases;
     if (!atlases.length) return;
-    const e = this.engine!,
-      m = e.store.matrices,
-      hidden = e.store.hidden,
-      parents = e.store.parents,
-      planes = c.camera.planes;
+    const e = this.engine!;
     let total = 0;
     for (let s = 0; s < atlases.length; s++) atlases[s].count = 0;
     for (let i = 0; i < this.count; i++) {
-      const s = this.slots[i];
-      if (s < 0) continue;
-      let shown = true;
-      for (let p = this.ids[i]; p >= 0; p = parents[p])
-        if (hidden[p]) {
-          shown = false;
-          break;
-        }
-      if (!shown) continue;
-      const a = atlases[this.slotOf(i)],
-        imp = a.imposter,
-        o = this.ids[i] * 16,
-        k = imp.center;
-      // Frustum cull the transformed bounding sphere.
-      const x = m[o] * k[0] + m[o + 4] * k[1] + m[o + 8] * k[2] + m[o + 12],
-        y = m[o + 1] * k[0] + m[o + 5] * k[1] + m[o + 9] * k[2] + m[o + 13],
-        z = m[o + 2] * k[0] + m[o + 6] * k[1] + m[o + 10] * k[2] + m[o + 14];
-      // A bound that holds under shear too (a rotated child of a non-uniformly scaled parent).
-      const r = worldRadius(m, o, imp.radius, x, y, z);
-      let inside = true;
-      for (let q = 0; q < 24; q += 4)
-        if (planes[q] * x + planes[q + 1] * y + planes[q + 2] * z + planes[q + 3] < -r) {
-          inside = false;
-          break;
-        }
-      if (!inside) continue;
-      this.record(a.data, a.count++ * STRIDE, m, o, i);
-      total++;
+      const levels = this.fading.get(this.handles[i]),
+        current = this.current[i],
+        slot = this.slots[i];
+      if (slot >= 0) total += this.appendImposter(i, slot, levels?.get(current) ?? 0, c.camera.planes);
+      if (levels)
+        for (const [level, value] of levels)
+          if (level !== current) {
+            const extra = this.levelSlots[i * MAX_LEVELS + level];
+            if (extra >= 0) total += this.appendImposter(i, extra, value, c.camera.planes);
+          }
     }
     if (!total) return;
     const device = c.device,
@@ -892,6 +932,7 @@ export class LODSystem implements EnginePlugin {
   }
   /** Removes the keeper meshes and GPU resources; level objects keep their current visibility. Imposters are not disposed. */
   dispose(): void {
+    this.fading.clear();
     this.release();
     for (const keeper of this.keepers.values()) keeper.dispose();
     this.keepers.clear();

@@ -780,3 +780,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - `@margoengine/rigging` (batch 213 job 5): document pose-tracking body/hand solvers, Tasks/Holistic frames, coordinate/mirror/aspect conventions, confidence/calibration/smoothing/loss, native VRM binding/cancellation/disposal and root-motion limits; runnable README examples wait for README phase.
 - `margoengine` (batch 213 job 5): document the generated rigging/pose-tracking alias in README phase.
 - @margoengine/water and margoengine (batch 235 job 1): cover /ripples attachment, drops, swept boat/character wakes, camera following, query/capture composition, defaults, limits, cancellation and disposal; examples deferred.
+- @margoengine/lod (batch 222 job 3): document static/animated imposter LODFade, native/full compatibility, reverse/null/interrupted transitions, sequence ownership and target-only shadows/masks; examples deferred.
