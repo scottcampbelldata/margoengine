@@ -78,7 +78,7 @@ export class Component<S extends Schema = Schema> {
     const inserted = row < 0;
     if (inserted) {
       row = this.size;
-      this.initializeRow(row);
+      this.initializeRow(row, values);
       this.size++;
       this.sparse[entity % this.world.stride] = row;
       this.entities[row] = entity;
@@ -108,7 +108,7 @@ export class Component<S extends Schema = Schema> {
     }
   }
   /** Initialize storage before the add notification. */
-  protected initializeRow(row: number): void {
+  protected initializeRow(row: number, _values: Partial<Record<keyof S, number>> = {}): void {
     for (const column of this.columns) column[row] = 0;
   }
   /** Move storage before the remove notification. Optional stores also release reference fields here. */
@@ -175,6 +175,27 @@ export class World {
     const array = new Type(this.capacity);
     if (fill) array.fill(fill);
     return array;
+  }
+  /** Number of free, nonretired entity slots. */
+  get available(): number {
+    return this.freeCount;
+  }
+  /** Ensure at least count free slots, growing only buffers; throws RangeError before entity mutation if unavailable. */
+  reserve(count: number): void {
+    if (!Number.isSafeInteger(count) || count < 0 || count > this.stride)
+      throw new RangeError('Invalid ECS reservation; use a free-slot count from zero to world.stride');
+    while (this.freeCount < count) this.grow();
+  }
+  /** Write current entity ids, excluding teardown, into output; throws RangeError if the output is too small. */
+  entities(output: Uint32Array): number {
+    let count = 0;
+    for (let slot = 0; slot < this.capacity; slot++)
+      if (this.live[slot] === 1) {
+        if (count === output.length)
+          throw new RangeError('Entity output is too small; allocate world.capacity entries');
+        output[count++] = this.generations[slot] * this.stride + slot;
+      }
+    return count;
   }
   /** Make slots `from` up to `to` free, lowest first out. */
   protected release(from: number, to: number): void {

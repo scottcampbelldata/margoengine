@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12578275,
+  "total": 12582796,
   "history": [
     {
       "date": "2026-10-24",
@@ -6115,6 +6115,18 @@
       "commit": "batch-273-integration-repair",
       "reason": "Restore28 already-approved size ceilings lost during append-document integration, exactly as recorded at10bf82909. Core version guard2873b6acb and lazy SNORM298227511 remain present; no new growth or core/stage source change.",
       "grew": 0
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f95b2ba16",
+      "reason": "Batch 249 serialize: new optional binary graph, native compression and baseline-checked deltas, 0 -> 4004 B gzip. Kept together for graph identity and bounded restore validation.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f95b2ba16",
+      "reason": "Batch 249 serialize: ECS allocation/entity enumeration and supplied object defaults; root 4538 -> 4559 B gzip, ceiling 4554 -> 4815 B. Native serializer needs safe reservation and complete empty-entity capture; splitting allocator state would duplicate world internals. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6334,7 +6346,7 @@
     "@margoengine/dof": 9297,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 3529,
-    "@margoengine/ecs": 4554,
+    "@margoengine/ecs": 4815,
     "@margoengine/ecs/changes": 882,
     "@margoengine/ecs/engine": 2064,
     "@margoengine/ecs/growable": 2237,
@@ -7233,6 +7245,7 @@
     "@margoengine/splines/offset": 4261,
     "@margoengine/exporters/materials": 18507,
     "@margoengine/bvh/parallel": 11405,
-    "margoengine/bvh/parallel": 11405
+    "margoengine/bvh/parallel": 11405,
+    "@margoengine/ecs/serialize": 4260
   }
 }

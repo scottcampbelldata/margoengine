@@ -61,6 +61,10 @@
     "./reactive": {
       "types": "./dist/reactive.d.ts",
       "import": "./dist/reactive.js"
+    },
+    "./serialize": {
+      "types": "./dist/serialize.d.ts",
+      "import": "./dist/serialize.js"
     }
   },
   "files": [

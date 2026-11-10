@@ -290,3 +290,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/bvh | buildParallel options/defaults, nested worker assets, shared/cloned memory costs, cancellation/deadline, serial-byte parity and existing index-preserving default. | Batch 221 |
 | margoengine | Generated bvh/parallel alias, reviewed with the owning bvh example in the README phase. | Batch 221 |
+
+- @margoengine/ecs (batch 249 job 4): WorldSerializer snapshots/restores, remote id maps, chosen component semantics, createDelta/applyDelta/undo, limits/cancellation/native API requirements, codecs and World reserve/entities.
+- margoengine (batch 249 job 4): generated ecs/serialize alias.

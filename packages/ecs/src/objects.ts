@@ -51,8 +51,8 @@ export class ObjectComponent<S extends ObjectSchema> extends Component<Record<ne
     }
     super.validateValues(numeric);
   }
-  protected override initializeRow(row: number): void {
-    const defaults = this.objects.map(([, field]) => field.create());
+  protected override initializeRow(row: number, values: Record<string, unknown> = {}): void {
+    const defaults = this.objects.map(([key, field]) => (Object.hasOwn(values, key) ? values[key] : field.create()));
     super.initializeRow(row);
     for (let i = 0; i < this.objects.length; i++) (this.fields[this.objects[i][0]] as unknown[])[row] = defaults[i];
   }

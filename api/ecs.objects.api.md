@@ -10,7 +10,7 @@ export class ObjectComponent<S extends ObjectSchema> extends Component<Record<ne
         [K in keyof S]: ObjectValue<S[K]>;
     }>): number;
     protected validateValues(values: Record<string, unknown>): void;
-    protected initializeRow(row: number): void;
+    protected initializeRow(row: number, values?: Record<string, unknown>): void;
     protected moveRow(row: number, last: number): void;
 }
 
@@ -47,7 +47,7 @@ class Component<S extends Schema = Schema> {
     has(entity: Entity): boolean;
     add(entity: Entity, values?: Partial<Record<keyof S, number>>): number;
     protected validateValues(values: Partial<Record<keyof S, number>>): void;
-    protected initializeRow(row: number): void;
+    protected initializeRow(row: number, _values?: Partial<Record<keyof S, number>>): void;
     protected moveRow(row: number, last: number): void;
     touch(entity: Entity): boolean;
     remove(entity: Entity): boolean;
@@ -72,6 +72,9 @@ class World {
     readonly stride: number;
     constructor(capacity?: number, stride?: number);
     allocate<T extends NumericArray>(Type: new (length: number) => T, fill?: number): T;
+    get available(): number;
+    reserve(count: number): void;
+    entities(output: Uint32Array): number;
     protected release(from: number, to: number): void;
     protected grow(): void;
     alive(entity: Entity): boolean;

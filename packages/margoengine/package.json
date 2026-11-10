@@ -922,6 +922,10 @@
       "types": "./dist/ecs/reactive.d.ts",
       "import": "./dist/ecs/reactive.js"
     },
+    "./ecs/serialize": {
+      "types": "./dist/ecs/serialize.d.ts",
+      "import": "./dist/ecs/serialize.js"
+    },
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"
@@ -1141,6 +1145,10 @@
     "./exporters/optimize-extra": {
       "types": "./dist/exporters/optimize-extra.d.ts",
       "import": "./dist/exporters/optimize-extra.js"
+    },
+    "./exporters/materials": {
+      "types": "./dist/exporters/materials.d.ts",
+      "import": "./dist/exporters/materials.js"
     },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
