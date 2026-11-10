@@ -74,6 +74,10 @@
     "./preview-surface": {
       "types": "./dist/preview-surface.d.ts",
       "import": "./dist/preview-surface.js"
+    },
+    "./clips": {
+      "types": "./dist/clips.d.ts",
+      "import": "./dist/clips.js"
     }
   },
   "scripts": {

@@ -1,0 +1,9 @@
+#usda 1.0
+def Xform "Cache" (clips={dictionary default={string templateAssetPath="hole.###.usda"
+double templateStartTime=1
+double templateEndTime=3
+double templateStride=1
+string primPath="/Geometry"
+}
+}) {double value
+}

@@ -41,6 +41,7 @@ function compose(
 ): Specs {
   const cache = new Map<string, Specs | undefined>();
   return composeStage(read.id, {
+    trackValueSources: read.trackValueSources,
     variants: options.variants,
     payloads: options.payloads,
     issues: read.issues as ComposeIssue[],
@@ -55,7 +56,8 @@ function compose(
         return bytes;
       };
       const specs = data && (readLayer(data, read) ?? read.foreign?.({ id, data, file, issues: read.issues }));
-      if (data && !specs) read.issues.push({ code: 'unsupported-layer', message: `${id} is not a USD layer this reader knows` });
+      if (data && !specs)
+        read.issues.push({ code: 'unsupported-layer', message: `${id} is not a USD layer this reader knows` });
       cache.set(id, specs);
       return specs;
     },
@@ -81,7 +83,13 @@ export function composition(options: CompositionOptions = {}): USDExtension {
 export type USDFileReader = (id: string) => Promise<Uint8Array | undefined> | Uint8Array | undefined;
 const isZip = (data: Uint8Array) => data[0] === 0x50 && data[1] === 0x4b;
 /** The files of a `.usdz` under `<id>[<entry>]`, and the id of its root layer. */
-async function unpack(id: string, data: Uint8Array, files: Map<string, Uint8Array>, maxBytes: number, signal?: AbortSignal) {
+async function unpack(
+  id: string,
+  data: Uint8Array,
+  files: Map<string, Uint8Array>,
+  maxBytes: number,
+  signal?: AbortSignal,
+) {
   const directory = readZipDirectory(data, { maxEntries: 10_000 });
   let root: (typeof directory)[number] | undefined;
   for (const entry of directory) {
@@ -116,7 +124,11 @@ export interface USDStage {
  * Composes a stage spread over files. `read` gets each id once, the root first: only the layers the stage really uses
  * are read, so a variant that is not selected costs nothing. `.usdz` files among them are opened.
  */
-export async function composeUSDFiles(root: string, read: USDFileReader, options: USDOptions & CompositionOptions = {}): Promise<USDStage> {
+export async function composeUSDFiles(
+  root: string,
+  read: USDFileReader,
+  options: USDOptions & CompositionOptions = {},
+): Promise<USDStage> {
   const maxBytes = options.maxBytes ?? 64 * 1024 * 1024,
     maxDepth = options.maxDepth ?? 32,
     files = new Map<string, Uint8Array>(),
@@ -148,20 +160,49 @@ export async function composeUSDFiles(root: string, read: USDFileReader, options
     const missing = new Set<string>();
     issues.length = 0;
     specs = compose(
-      { id: rootId, data: rootData, entries: files, maxBytes, maxDepth, issues, signal: options.signal, foreign: foreignReader(options) },
+      {
+        id: rootId,
+        data: rootData,
+        entries: files,
+        maxBytes,
+        maxDepth,
+        issues,
+        signal: options.signal,
+        foreign: foreignReader(options),
+        trackValueSources: (options.extensions as readonly ExtensionHooks[] | undefined)?.some(
+          (hook) => hook.requiresValueSources,
+        ),
+      },
       options,
       (id) => files.get(aliases.get(id) ?? id),
       missing,
     );
+    for (const hook of (options.extensions ?? []) as readonly ExtensionHooks[])
+      for (const id of hook.files?.({
+        specs,
+        entries: files,
+        maxBytes,
+        maxDepth,
+        issues,
+        signal: options.signal,
+        absent,
+      }) ?? [])
+        if (!files.has(id)) missing.add(id);
     const wanted = [...missing].filter((id) => !absent.has(id));
     if (!wanted.length) break;
     for (const id of wanted) await fetchId(id);
   }
   for (const id of assets(specs)) await fetchId(id);
+  for (const hook of (options.extensions ?? []) as readonly ExtensionHooks[])
+    hook.resolve?.({ specs, entries: files, maxBytes, maxDepth, issues, signal: options.signal, absent });
   return { specs, files, issues };
 }
 /** `composeUSDFiles`, then the scene as a `USDAsset`. */
-export async function parseUSDFiles(root: string, read: USDFileReader, options: USDOptions & CompositionOptions = {}): Promise<USDAsset> {
+export async function parseUSDFiles(
+  root: string,
+  read: USDFileReader,
+  options: USDOptions & CompositionOptions = {},
+): Promise<USDAsset> {
   const { specs, files, issues } = await composeUSDFiles(root, read, options);
   return assetFromSpecs(specs, files, options, issues);
 }

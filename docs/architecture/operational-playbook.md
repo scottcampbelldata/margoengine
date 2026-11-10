@@ -2236,6 +2236,9 @@ Batch 190 job 1 adds optional oit/peel without core/stage changes. Private depth
 
 Batch 203 JPEG: the decoder and exporter use one shared clean-room CPU implementation. jpeg-browser.mjs decodes baseline and progressive files in a module worker, uploads RGBA8 and reads back all 15,688 channels exactly on WebGPU and WebGL2 compatibility. The existing decoder WebGPU and exporter native/compatibility suites also pass. No renderer, GPU mathematics, core or stage feature changes. Pixel bounds against libjpeg-turbo and unsupported JPEG coding modes remain explicit in limits.md.
 
+Batch 206 clips: OpenUSD public-API pose/topology oracles cover composed clip values. Direct and worker models render the same pose; the managed player changes caches and releases prior frames on both backends. Clip metadata provenance is opt-in and stays within optional usdz composition. The frame player preserves arbitrary topology with full model replacement; reuse timing is deferred to the speed phase.
+
+
 Batch 206 PreviewSurface: independent alpha sampling and numeric primvar storage use existing PBR material shading hooks and later-UV input. Indexed/topology and geometry-budget regressions run on CPU; native/compatibility direct-worker GPU tests exercise upload, interpolation and disposal. uploadImage now declares the WebGPU external-copy destination usages, tested in its owning gltf-pro package. No core/stage feature.
 
 

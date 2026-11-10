@@ -16,6 +16,7 @@ import { pointInstancers } from './instancer.js';
 import { implicitShapes } from './shapes.js';
 import { curveGeometry } from './curve-geometry.js';
 import { previewSurface } from './preview-surface.js';
+import { valueClips } from './clips.js';
 
 const known: Record<string, (options?: never) => USDExtension> = {
   compose: composition,
@@ -28,6 +29,7 @@ const known: Record<string, (options?: never) => USDExtension> = {
   shapes: implicitShapes,
   curves: curveGeometry,
   'preview-surface': previewSurface,
+  clips: valueClips,
 };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {

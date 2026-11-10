@@ -4098,6 +4098,10 @@
       "types": "./dist/usdz/preview-surface.d.ts",
       "import": "./dist/usdz/preview-surface.js"
     },
+    "./usdz/clips": {
+      "types": "./dist/usdz/clips.d.ts",
+      "import": "./dist/usdz/clips.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

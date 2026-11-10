@@ -67,6 +67,8 @@ export interface ComposeIssue {
   message: string;
 }
 export interface ComposeOptions {
+  /** Preserve value provenance and merge/anchor clip dictionaries for optional clip resolution. Default false. */
+  trackValueSources?: boolean;
   /** A layer by its id (a path from the root layer's folder), or nothing when it cannot be had. */
   layer(id: string): Specs | undefined;
   /** Variant selections that beat the file's, by prim path: `{'/Model': {shadingVariant: 'red'}}`. */
@@ -349,7 +351,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     for (const c of node.children.slice()) expandAll(top, c, depth);
     expand(top, node, depth);
   }
-  function placeReference(node: Node, depth: number, kind: 'reference' | 'payload', item: ArcItem, entry: StackLayer, order: number) {
+  function placeReference(
+    node: Node,
+    depth: number,
+    kind: 'reference' | 'payload',
+    item: ArcItem,
+    entry: StackLayer,
+    order: number,
+  ) {
     const stack = item.assetPath ? stackOf(anchored(entry.layer.id, item.assetPath)) : node.stack;
     if (!stack) {
       const id = anchored(entry.layer.id, item.assetPath);
@@ -374,10 +383,24 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     const site = tree(stack, target, false);
     attach(
       node,
-      graft(site, kind, depth, order, [{ from: target, to: stripVariants(node.path), open: internal }, ...node.steps], after(node.offset, time)),
+      graft(
+        site,
+        kind,
+        depth,
+        order,
+        [{ from: target, to: stripVariants(node.path), open: internal }, ...node.steps],
+        after(node.offset, time),
+      ),
     );
   }
-  function placeClass(node: Node, depth: number, kind: 'inherit' | 'specialize', target: string, order: number, implied = false) {
+  function placeClass(
+    node: Node,
+    depth: number,
+    kind: 'inherit' | 'specialize',
+    target: string,
+    order: number,
+    implied = false,
+  ) {
     const path = stripVariants(target);
     if (under(stripVariants(node.path), path) || under(path, stripVariants(node.path))) return undefined;
     // One node holds a class site once: the arc that reached it first keeps it.
@@ -389,7 +412,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       return undefined;
     }
     const site = tree(node.stack, path, false);
-    const placed = graft(site, kind, depth, order, [{ from: path, to: stripVariants(node.path), open: true }, ...node.steps], node.offset);
+    const placed = graft(
+      site,
+      kind,
+      depth,
+      order,
+      [{ from: path, to: stripVariants(node.path), open: true }, ...node.steps],
+      node.offset,
+    );
     placed.implied = implied;
     attach(node, placed);
     return placed;
@@ -570,6 +600,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     let specType = 1,
       settled = false,
       haveDefault = false;
+    if (options.trackValueSources)
+      fields._margoValueSources = nodes.flatMap((node) => node.stack.layers.map((entry) => entry.layer.id));
     const targets: { field: string; op: ListOp<string> | string[]; node: Node }[] = [];
     for (const node of nodes)
       for (const entry of node.stack.layers) {
@@ -578,12 +610,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         specType = spec.specType;
         const own = spec.fields;
         for (const key in own) {
-          if (key === 'default' || key === 'timeSamples' || key === 'connectionPaths' || key === 'targetPaths') continue;
+          if (key === 'default' || key === 'timeSamples' || key === 'connectionPaths' || key === 'targetPaths')
+            continue;
           if (!(key in fields)) fields[key] = own[key];
         }
         const type = fields.typeName;
         if (!settled) {
-          if (own.timeSamples !== undefined) {
+          if ((own.timeSamples as TimeSamples | undefined)?.times.length) {
+            if (options.trackValueSources) fields._margoValueLayer = entry.layer.id;
             const samples = own.timeSamples as TimeSamples,
               time = after(node.offset, entry.offset),
               order = samples.times.map((t, i) => [time.scale * t + time.offset, i]).sort((a, b) => a[0] - b[0]);
@@ -592,7 +626,10 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
               values: order.map(([, i]) => value(samples.values[i], type, entry)),
             };
             settled = true;
-          } else if (own.default !== undefined) settled = true;
+          } else if (own.default !== undefined) {
+            settled = true;
+            if (options.trackValueSources) fields._margoValueLayer = entry.layer.id;
+          }
         }
         if (!haveDefault && own.default !== undefined) {
           haveDefault = true;
@@ -632,11 +669,52 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       fields: Record<string, unknown> = Object.create(null);
     const props = new Set<string>(),
       names = new Set<string>();
+    const clipOrders: (ListOp<string> | string[])[] = [];
     for (const node of nodes)
       for (const entry of node.stack.layers) {
         const spec = specAt(entry, node.path);
         if (spec)
           for (const key in spec.fields) {
+            if (options.trackValueSources && key === 'clipSets') {
+              clipOrders.unshift(spec.fields[key] as ListOp<string>);
+              continue;
+            }
+            if (options.trackValueSources && key === 'clips') {
+              const out = (fields.clips ??= Object.create(null)) as Record<string, Record<string, unknown>>,
+                time = after(node.offset, entry.offset);
+              for (const [setName, definition] of Object.entries(
+                spec.fields.clips as Record<string, Record<string, unknown>>,
+              )) {
+                const target = (out[setName] ??= Object.create(null));
+                for (const [name, value] of Object.entries(definition))
+                  if (!(name in target)) {
+                    if (name.startsWith('_margo')) continue;
+                    const asset = (v: unknown) => (typeof v === 'string' ? v : (v as { assetPath: string }).assetPath);
+                    const flatPairs = (v: unknown): number[][] => {
+                      const list = v as number[] | number[][];
+                      return Array.isArray(list[0])
+                        ? (list as number[][])
+                        : Array.from({ length: list.length / 2 }, (_, i) => [
+                            (list as number[])[i * 2],
+                            (list as number[])[i * 2 + 1],
+                          ]);
+                    };
+                    target[name] =
+                      name === 'assetPaths'
+                        ? (value as unknown[]).map((v) => anchored(entry.layer.id, asset(v)))
+                        : name === 'manifestAssetPath' || name === 'templateAssetPath'
+                          ? anchored(entry.layer.id, asset(value))
+                          : name === 'active' || name === 'times'
+                            ? flatPairs(value).map(([a, b]) => [a * time.scale + time.offset, b])
+                            : value;
+                    if (name === 'assetPaths' || (name === 'templateAssetPath' && !target._margoAnchor)) {
+                      target._margoAnchor = entry.layer.id;
+                      target._margoOffset = time;
+                    }
+                  }
+              }
+              continue;
+            }
             if (key in fields) continue;
             if (key === 'specifier' || key === 'typeName') {
               if (spec.fields[key] === '') continue;
@@ -647,6 +725,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         for (const name of entry.layer.children.get(node.path) ?? []) names.add(name);
       }
     fields.specifier = definition(nodes, path);
+    if (clipOrders.length) fields.clipSets = clipOrders.reduce<string[]>((out, op) => apply(out, op), []);
     if (fields.specifier !== 0 || fields.active === false) return;
     out[path] = { specType: 6, fields };
     for (const name of props) propertyOf(path, name, nodes);
@@ -676,6 +755,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     return tree(rootStack, path, true);
   }
   for (const entry of rootStack.layers)
-    for (const name of entry.layer.children.get('/') ?? []) if (!trees.has(rootStack.id + '\0/' + name + '\0v')) prim('/' + name, site('/' + name));
+    for (const name of entry.layer.children.get('/') ?? [])
+      if (!trees.has(rootStack.id + '\0/' + name + '\0v')) prim('/' + name, site('/' + name));
   return { specs: out, layers: [...layers.keys()].filter((id) => layers.get(id)) };
 }

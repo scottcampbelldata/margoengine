@@ -23,6 +23,7 @@ const LIST_FIELDS: Record<string, string> = {
   specializes: 'specializes',
   variantSets: 'variantSetNames',
   apiSchemas: 'apiSchemas',
+  clipSets: 'clipSets',
 };
 const WORD = /[\p{L}\p{N}_:.!|-]/u;
 const isSpace = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
@@ -86,9 +87,11 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
     const start = at;
     while (at < end) {
       const c = text.charCodeAt(at);
-      if ((c >= 97 && c <= 122) || (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95 || c === 58 || c === 46) at++;
+      if ((c >= 97 && c <= 122) || (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95 || c === 58 || c === 46)
+        at++;
       else if (c === 33 || c === 124 || (c === 45 && at > start)) at++;
-      else if (c > 127 && WORD.test(String.fromCodePoint(text.codePointAt(at)!))) at += text.codePointAt(at)! > 0xffff ? 2 : 1;
+      else if (c > 127 && WORD.test(String.fromCodePoint(text.codePointAt(at)!)))
+        at += text.codePointAt(at)! > 0xffff ? 2 : 1;
       else break;
     }
     if (at === start) fail('syntax', `expected a name at offset ${at}`);
@@ -108,7 +111,15 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
       if (text[i] === '\\') {
         out += text.slice(from, i);
         const e = text[i + 1];
-        const escapes: Record<string, string> = { n: '\n', t: '\t', r: '\r', '\\': '\\', '"': '"', "'": "'", '0': '\0' };
+        const escapes: Record<string, string> = {
+          n: '\n',
+          t: '\t',
+          r: '\r',
+          '\\': '\\',
+          '"': '"',
+          "'": "'",
+          '0': '\0',
+        };
         out += escapes[e] ?? e;
         i += 2;
         from = i;
@@ -490,7 +501,14 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
     if (depth > maxDepth) fail('limit', 'prim hierarchy exceeds maxDepth');
     signal?.throwIfAborted();
     const specifier = word(),
-      code = specifier === 'def' ? 0 : specifier === 'over' ? 1 : specifier === 'class' ? 2 : fail('syntax', 'expected a prim');
+      code =
+        specifier === 'def'
+          ? 0
+          : specifier === 'over'
+            ? 1
+            : specifier === 'class'
+              ? 2
+              : fail('syntax', 'expected a prim');
     let typeName = '';
     if (peek() !== '"' && peek() !== "'") typeName = word();
     const name = string(),

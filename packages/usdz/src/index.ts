@@ -226,6 +226,7 @@ function parseLayer(
   const composer = hooks(options).find((hook) => hook.compose);
   if (composer)
     return composer.compose!({
+      trackValueSources: hooks(options).some((hook) => hook.requiresValueSources),
       id,
       data,
       entries,
@@ -510,6 +511,8 @@ function asset(
   options: USDOptions,
   issues: USDIssue[],
 ): USDAsset {
+  for (const hook of hooks(options))
+    hook.resolve?.({ specs, entries, ...budget(options), issues, signal: options.signal });
   for (const hook of hooks(options)) hook.prepare?.({ specs, ...budget(options), signal: options.signal });
   const limits = budget(options),
     buffers: ArrayBufferView[] = [],

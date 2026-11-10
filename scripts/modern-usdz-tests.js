@@ -54,6 +54,77 @@ def PointInstancer "Scatter" {
     }
   });
   assert.deepEqual(scatter, { sharedMeshes: 1, instances: 2, changed: true });
+  const clipLayers = Object.fromEntries(
+    await Promise.all(
+      [
+        'explicit.usda',
+        'a.usda',
+        'b.usda',
+        'manifest.usda',
+        'topology.usda',
+        'topology-manifest.usda',
+        'topology-a.usda',
+        'topology-b.usda',
+      ].map(async (name) => [name, await readFile('packages/usdz/tests/fixtures/clips/' + name, 'utf8')]),
+    ),
+  );
+  const clipResult = await page.evaluate(async (layers) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { parseUSDA } = await import('/packages/usdz/dist/index.js'),
+      { composition } = await import('/packages/usdz/dist/compose.js');
+    const { valueClips, ValueClipPlayer } = await import('/packages/usdz/dist/clips.js'),
+      { parseUSDInWorker } = await import('/packages/usdz/dist/worker.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [10, 0.5, 28], target: [10, 0.5, 0] },
+    });
+    try {
+      const outcomes = [];
+      for (const worker of [false, true]) {
+        const options = { extensions: [composition(), valueClips({ timeCode: 8, layers })] };
+        const model = worker
+          ? await parseUSDInWorker(engine, layers['explicit.usda'], options)
+          : await parseUSDA(layers['explicit.usda'], options).create(engine);
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        outcomes.push({ x: model.primitives[0].vertices[0], rendered: canvas.toDataURL() });
+        model.destroy();
+      }
+      const player = new ValueClipPlayer(engine, 'explicit.usda', (id) => new TextEncoder().encode(layers[id]));
+      const first = await player.setTimeCode(0);
+      engine.render({ culling: false });
+      await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+      const a = canvas.toDataURL();
+      await player.setTimeCode(8);
+      engine.render({ culling: false });
+      await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+      const b = canvas.toDataURL();
+      const disposed = first.disposed;
+      player.dispose();
+      const topology = new ValueClipPlayer(engine, 'topology.usda', (id) => new TextEncoder().encode(layers[id]));
+      const triangle = await topology.setTimeCode(0),
+        triangles = triangle.primitives[0].indices.length;
+      const quad = await topology.setTimeCode(1),
+        quads = quad.primitives[0].indices.length;
+      topology.dispose();
+      return { outcomes, changed: a !== b, disposed, remaining: engine.meshes.size, triangles, quads };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, clipLayers);
+  assert.equal(clipResult.outcomes[0].x, 14);
+  assert.equal(clipResult.outcomes[1].x, 14);
+  assert.equal(clipResult.outcomes[0].rendered, clipResult.outcomes[1].rendered);
+  assert.equal(clipResult.changed, true);
+  assert.equal(clipResult.disposed, true);
+  assert.equal(clipResult.remaining, 0);
+  assert.equal(clipResult.triangles, 3);
+  assert.equal(clipResult.quads, 6);
   const previewBytes = Array.from((await import('../packages/usdz/tests/preview-fixture.js')).previewFixture());
   const previewResult = await page.evaluate(async (bytes) => {
     const { Engine } = await import('/packages/core/dist/index.js');

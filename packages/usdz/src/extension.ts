@@ -19,6 +19,8 @@ export interface USDIssue {
 }
 /** What the composing hook gets: the root layer, what the archive holds, and the limits. */
 export interface LayerRead {
+  /** Keep authored value strength for optional value resolution after composition. Default false. */
+  trackValueSources?: boolean;
   id: string;
   data: Uint8Array;
   entries: Map<string, Uint8Array>;
@@ -164,6 +166,12 @@ export interface USDSurface {
 }
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
+  /** Requests composition provenance for optional value resolution. */
+  requiresValueSources?: boolean;
+  /** Additional assets needed to resolve the selected pose. Called again after each group of reads. */
+  files?(read: ValueRead): string[];
+  /** Resolves optional time-dependent value sources before geometry preparation. */
+  resolve?(read: ValueRead): void;
   /** Lazily supplies optional PBR material readers before direct or worker model construction. */
   decoders?(): Promise<NonNullable<Parameters<typeof import('@margoengine/gltf-pro/model').parseGLTF>[4]>>;
   /** Attaches optional renderers after model creation, on the main thread, including worker loads. */
@@ -184,4 +192,15 @@ export interface ExtensionHooks extends USDExtension {
   geometry?(read: SceneRead): void;
   /** Keeps a prim that starts invisible but has a visible sample later, so this extension can show it then. */
   showsLater?: boolean;
+}
+/** A composed stage and available files for optional value resolution. */
+export interface ValueRead {
+  /** Identifiers already queried and absent during asynchronous discovery. */
+  absent?: ReadonlySet<string>;
+  specs: Specs;
+  entries: Map<string, Uint8Array>;
+  maxBytes: number;
+  maxDepth: number;
+  issues: USDIssue[];
+  signal?: AbortSignal;
 }

@@ -1,0 +1,4 @@
+#usda 1.0
+over "Geometry" {double value.timeSamples={3:30
+}
+}

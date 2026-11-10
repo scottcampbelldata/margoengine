@@ -1,0 +1,8 @@
+#usda 1.0
+def Xform "Cache" (clips={dictionary default={asset[] assetPaths=[@gap-a.usda@,@empty.usda@,@b.usda@]
+asset manifestAssetPath=@manifest-gap.usda@
+string primPath="/Geometry"
+double2[] active=[(0,0),(5,1),(10,2)] 
+}
+}) {double value
+}

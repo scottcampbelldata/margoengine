@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13671109,
+  "total": 13700295,
   "history": [
     {
       "date": "2026-10-24",
@@ -7138,6 +7138,12 @@
       "date": "2026-11-10",
       "commit": "batch-242",
       "reason": "New optional voxel-net/replay: absent (0 B) -> 3584 B gzip; ordered bounded recording sink, binary file validation and tick playback. Server observation stays within its existing ceiling."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206-clips",
+      "reason": "Complete value clips with composition provenance, bounded frame playback, templates and retiming. [{\"key\":\"@margoengine/usdz/compose\",\"before\":19101,\"bytes\":19388,\"ceiling\":19970},{\"key\":\"@margoengine/usdz/clips\",\"before\":0,\"bytes\":23150,\"ceiling\":23845},{\"key\":\"@margoengine/usdz dist/workers/usdz.js\",\"before\":131528,\"bytes\":132031,\"ceiling\":135992}]; splitting would duplicate existing layer/scene loading or create a second cache sampler.",
+      "grew": 3
     }
   ],
   "items": {
@@ -8160,10 +8166,10 @@
     "@margoengine/ui/world": 9836,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 13126,
-    "@margoengine/usdz dist/workers/usdz.js": 131528,
+    "@margoengine/usdz dist/workers/usdz.js": 135992,
     "@margoengine/usdz/anim": 6436,
-    "@margoengine/usdz/compose": 19101,
-    "@margoengine/usdz/curves": 3523,
+    "@margoengine/usdz/compose": 19970,
+    "@margoengine/usdz/curves": 3531,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7905,
@@ -8429,6 +8435,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/voxel-net/replay": 3840
+    "@margoengine/voxel-net/replay": 3840,
+    "@margoengine/usdz/clips": 23845
   }
 }

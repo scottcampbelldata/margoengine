@@ -1,0 +1,14 @@
+#usda 1.0
+def Xform "Cache" (clips={dictionary A={asset[] assetPaths=[@a.usda@]
+asset manifestAssetPath=@manifest-gap-linear.usda@
+string primPath="/Geometry"
+double2[] active=[(0,0)]
+}
+dictionary B={asset[] assetPaths=[@b.usda@]
+asset manifestAssetPath=@manifest-gap-linear.usda@
+string primPath="/Geometry"
+double2[] active=[(0,0)]
+}
+}
+clipSets=["B","A"]) {double value
+}

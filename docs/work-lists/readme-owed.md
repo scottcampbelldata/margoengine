@@ -813,3 +813,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-net: document /replay VoxelRecorder, recordVoxelFile/readVoxelRecording, recipient selection, forward tick stepping, cancellable play, file bounds/ownership and server.onSend observation.
 
 - margoengine: document the generated voxel-net/replay alias.
+- @margoengine/usdz (batch 206 job 5): valueClips(), composition provenance, manifests/retiming/templates, async frame iteration/player, topology replacement, serial requests, cancellation and byte-bounded encoded cache.
