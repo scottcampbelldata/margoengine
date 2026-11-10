@@ -26,3 +26,11 @@ The schema's feature declarations select capabilities without decoding geometry 
 still validates the entire asset. No other engine source or companion implementation was read or copied.
 
 Optional stage/gltf measures 1,660 to 3,794 B gzip; its ceiling rises from 1,729 to 4,050 B. The bytes pay for bounded feature selection, a single network root fetch and package-specific diagnostics. Splitting the small routing step would add loading and coordination while saving no core/stage root bytes.
+
+Network gate: `node scripts/basic-scene-network.mjs` (launch gate 4, the sizes page's basic scene record) loads a
+plain cube, so the page must fetch the `@margoengine/gltf` chunk and its static imports, never the gltf-pro or
+animation chunk. `scripts/support/basic-scene-graph.mjs` derives that request list and the build's allowed files
+from the Vite manifest: the basic loader's graph plus the named gltf-pro and animation graphs with their codec
+assets, deferred. Any other emitted file, a fetched deferred loader or a feature loader made a static import fails
+(`tests/basic-scene-graph.test.js`). Until this was updated the gate still expected gltf-pro and failed on the build
+step after 8f4f4db72.

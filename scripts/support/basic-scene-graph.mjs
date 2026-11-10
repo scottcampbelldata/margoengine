@@ -48,18 +48,50 @@ function emittedFiles(manifest, roots) {
 }
 
 export function sceneGraph(manifest) {
-  // Stage/gltf selected the full PBR loader on main in 3d7dd74c9. No runtime API is changed here.
-  const loader = Object.keys(manifest).find((key) => /packages\/gltf-pro\/dist\/index\.js$/.test(key));
-  assert.ok(loader, 'the build has the selected @margoengine/gltf-pro chunk');
-  const animation = Object.keys(manifest).find((key) => /packages\/animation\/dist\/index\.js$/.test(key));
+  // margoengine/stage/gltf routes by asset features (8f4f4db72): an asset with no extension, skin or animation (the
+  // basic scene's cube) loads @margoengine/gltf, the chunk the page fetches. @margoengine/gltf-pro and
+  // @margoengine/animation stay dynamic imports: the build emits them and their codec assets, the page never fetches them.
+  const chunk = (pkg) => Object.keys(manifest).find((key) => key.endsWith(`packages/${pkg}/dist/index.js`));
+  const loader = chunk('gltf');
+  assert.ok(loader, 'the build has the routed basic @margoengine/gltf chunk');
+  const deferred = [chunk('gltf-pro'), chunk('animation')].filter(Boolean),
+    entry = staticFiles(manifest, 'index.html'),
+    gltf = staticFiles(manifest, loader),
+    deferredChunks = new Set(deferred.map((key) => manifest[key].file));
+  for (const file of [...entry, ...gltf])
+    assert.ok(!deferredChunks.has(file), `${file}, a deferred glTF feature loader, is a static import of the basic scene`);
   return {
     loader,
-    entry: staticFiles(manifest, 'index.html'),
-    gltf: staticFiles(manifest, loader),
-    deferredAssets: loaderAssets(manifest, loader),
-    emittedFiles: new Set([
-      ...staticFiles(manifest, 'index.html'),
-      ...emittedFiles(manifest, [loader, ...(animation ? [animation] : [])]),
-    ]),
+    entry,
+    gltf,
+    deferredChunks,
+    deferredAssets: new Set([loader, ...deferred].flatMap((key) => [...loaderAssets(manifest, key)])),
+    emittedFiles: new Set([...entry, ...emittedFiles(manifest, [loader, ...deferred])]),
   };
+}
+
+/**
+ * The build check: the files the build emitted (`built`, outDir paths without .vite) must be exactly the page's
+ * requests (`expected`) plus the emitted graph of the basic loader and the named deferred loaders. Any other file fails.
+ */
+export function checkBuilt(built, expected, graph) {
+  assert.deepEqual(
+    [...built].sort(),
+    [...new Set([...expected, ...graph.emittedFiles])].sort(),
+    'every emitted file belongs to the selected glTF feature graph',
+  );
+}
+
+/**
+ * The network check: the page's requests (`paths`, outDir paths in request order) must be exactly `expected`, each once.
+ * A deferred loader chunk (gltf-pro, animation) fetched by the basic scene is named first.
+ */
+export function checkFetched(paths, expected, graph) {
+  assert.deepEqual(
+    paths.filter((path) => graph.deferredChunks.has(path)),
+    [],
+    'the basic scene fetched a deferred glTF feature loader (gltf-pro or animation)',
+  );
+  assert.deepEqual([...new Set(paths)].sort(), [...expected].sort(), 'exactly the HTML, entry chunk, glTF chunk and model');
+  assert.equal(paths.length, expected.size, 'each file once');
 }

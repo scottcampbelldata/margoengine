@@ -22,7 +22,7 @@ import { listenWhenFree } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { sceneGraph } from './support/basic-scene-graph.mjs';
+import { checkBuilt, checkFetched, sceneGraph } from './support/basic-scene-graph.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -112,7 +112,8 @@ await build({
 });
 await writeFile(join(out, 'model.glb'), cubeGLB());
 
-// Expected: the HTML, the entry chunk and its static imports, the @margoengine/gltf chunk (and its static imports), the model.
+// Expected: the HTML, the entry chunk and its static imports, the routed basic @margoengine/gltf chunk (and its static
+// imports), the model. Never @margoengine/gltf-pro or @margoengine/animation: the cube needs neither.
 const manifest = JSON.parse(readFileSync(join(out, '.vite/manifest.json'), 'utf8'));
 const graph = sceneGraph(manifest);
 const [entry, ...entryImports] = graph.entry,
@@ -122,18 +123,14 @@ const roles = new Map([
   ...entryImports.map((file) => [file, 'Shared chunk']),
   ...gltfImports.map((file) => [file, 'Shared chunk']),
   [entry, 'Entry: core + stage + app'],
-  [gltf, '@margoengine/gltf-pro (addGLTF)'],
+  [gltf, '@margoengine/gltf (addGLTF)'],
   ['model.glb', 'Model'],
 ]);
 const expected = new Set(roles.keys());
 const built = readdirSync(out, { recursive: true })
   .map((file) => file.replaceAll('\\', '/'))
   .filter((file) => !file.startsWith('.vite') && statSync(join(out, file)).isFile());
-assert.deepEqual(
-  [...built].sort(),
-  [...new Set([...expected, ...graph.emittedFiles])].sort(),
-  'every emitted file belongs to the selected glTF feature graph',
-);
+checkBuilt(built, expected, graph);
 // Regression (2026-10-27): the stage's class methods put every optional pack into every stage app's build.
 assert.deepEqual(
   built.filter(
@@ -142,7 +139,7 @@ assert.deepEqual(
       (/\.wasm$|worker/i.test(file) && !graph.deferredAssets.has(file)),
   ),
   [],
-  'the build emits no unrelated optional pack or worker/Wasm outside the selected PBR loader asset graph',
+  "the build emits no unrelated optional pack or worker/Wasm outside the glTF loaders' asset graphs",
 );
 
 const release = await acquire({ owner: 'basic-scene-network', max: 1, waitMax: 60, poll: 2000 });
@@ -223,12 +220,11 @@ try {
     [],
     'no Wasm, worker or optional decoder file',
   );
-  assert.deepEqual(
-    [...new Set(fetched.map((file) => file.path))].sort(),
-    [...expected].sort(),
-    'exactly the HTML, entry chunk, glTF chunk and model',
+  checkFetched(
+    fetched.map((file) => file.path),
+    expected,
+    graph,
   );
-  assert.equal(fetched.length, expected.size, 'each file once');
 
   const files = fetched.map(({ path, encoding, body, headers }) => {
     const bytes = readFileSync(join(out, path));
