@@ -196,6 +196,7 @@ export function blockMaterials(blocks: readonly BlockType[]): Uint16Array {
 }
 
 interface Table {
+  unmerged: Uint8Array;
   n: number;
   flags: Uint8Array;
   materials: Uint16Array;
@@ -221,7 +222,15 @@ function prepare(blocks: readonly BlockType[]): Table {
     stairs[id] = +(blocks[id].shape === 'stair');
     waterlogs[id] = blocks[id].waterlog ?? 0;
   }
-  table = { n: blocks.length, flags, materials: blockMaterials(blocks), stairs, waterlogs };
+  const materials = blockMaterials(blocks),
+    unmerged = new Uint8Array(4096);
+  for (const type of blocks)
+    if (type.vertexMotion)
+      for (let d = 0; d < 6; d++) {
+        const m = materials[type.id * 6 + d];
+        if (m !== 65535) unmerged[m] = 1;
+      }
+  table = { n: blocks.length, flags, materials, stairs, waterlogs, unmerged };
   tables.set(blocks, table);
   return table;
 }
@@ -233,6 +242,7 @@ function prepare(blocks: readonly BlockType[]): Table {
 // octants, whether a slab or stair is within one cell, and the slice's trimmed or inset faces (cell, the two words,
 // and the half-block bits) waiting for their own merges.
 interface Work {
+  unmerged: Uint8Array;
   states: Uint32Array;
   light: Uint8Array;
   kind: Uint8Array;
@@ -312,9 +322,9 @@ function merge(w: Work, d: number, s: number, n: number): void {
     // Half-block bits (key bits 26-30: inset, then the trims): a trimmed quad leaves a gap along its trimmed axis, so
     // it only merges across the other one.
     const part = (A >>> 26) & 31;
-    if (o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2 && !(part & 6))
+    if (!w.unmerged[A & 4095] && o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2 && !(part & 6))
       while (u + width < 32 && keys[m + width] === A && lights[m + width] === B) width++;
-    if (o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2 && !(part & 24))
+    if (!w.unmerged[A & 4095] && o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2 && !(part & 24))
       grow: for (; v + height < 32; height++)
         for (let k = m + (height << 5), end = k + width; k < end; k++) if (keys[k] !== A || lights[k] !== B) break grow;
     for (let j = 0; j < height; j++) for (let k = m + (j << 5), end = k + width; k < end; k++) keys[k] = 0;
@@ -763,6 +773,7 @@ export function meshChunk(input: MeshInput): ChunkMesh {
   const prepared = prepare(blocks),
     { flags, materials } = prepared,
     w = (work ??= {
+      unmerged: new Uint8Array(0),
       states: new Uint32Array(VOLUME),
       light: new Uint8Array(VOLUME),
       kind: new Uint8Array(VOLUME),
@@ -792,6 +803,7 @@ export function meshChunk(input: MeshInput): ChunkMesh {
     { palette, bits, words } = chunk,
     lightBytes = chunk.light,
     mask = (1 << bits) - 1;
+  w.unmerged = prepared.unmerged;
   w.count.fill(0);
   w.keys.fill(0);
   // The chunk's cells row by row, then the shell rows: whole rows on the y and z borders, else the two x ends.

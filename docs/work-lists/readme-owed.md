@@ -811,7 +811,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/exporters: document jpeg-read sharing the decoder implementation with unchanged API.
 - margoengine: expose the generated decoders/jpeg optional facade in the decoder index.
 
-- @margoengine/voxel and margoengine (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase.
+- @margoengine/voxel (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase.
 
 - @margoengine/voxel-net: document /replay VoxelRecorder, recordVoxelFile/readVoxelRecording, recipient selection, forward tick stepping, cancellable play, file bounds/ownership and server.onSend observation.
 
@@ -903,3 +903,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 214 job 3): document generated kinematics-constraints/multi-goal forwarding.
 
 - @margoengine/creative and margoengine (batch 271 job 4): document /paint-aniso AnisotropicPainterly defaults, LDR ordering, tensor/elliptical sector controls, smooth radial support, 32 B/pixel intermediate budget, exact bypass/alpha, views and both GPU backends; examples deferred.
+
+- @margoengine/voxel (batch 240 job 3): document /wind per-block definitions, direction/clock controls, rooting, liquid seams, bounds, mesher/shadow integration and ownership; runnable README examples owed in the README phase.
+
+- margoengine (batch 240 job 2): document the voxel/objects alias in the README phase.
+- margoengine (batch 240 job 3): document the voxel/wind alias in the README phase.

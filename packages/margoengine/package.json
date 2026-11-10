@@ -4422,6 +4422,10 @@
       "types": "./dist/voxel/objects.d.ts",
       "import": "./dist/voxel/objects.js"
     },
+    "./voxel/wind": {
+      "types": "./dist/voxel/wind.d.ts",
+      "import": "./dist/voxel/wind.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

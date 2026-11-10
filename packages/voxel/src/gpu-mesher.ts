@@ -22,7 +22,7 @@ const VOLUME = 39304,
   PART = 64,
   INVISIBLE = 3,
   LAYERS: Record<string, number> = { opaque: 0, cutout: 1, translucent: 2, invisible: 3 },
-  SHAPES: Record<string, number> = { cube: 0, cross: 4, liquid: 8, slab: 76, stair: 76 };
+  SHAPES: Record<string, number> = { cube: 0, cross: 4, liquid: 8, slab: 76, stair: 76, model:96, object:96 };
 
 // Visibility bits of every pair among the chunk faces set in `faces` (bit a * 6 + b for a < b).
 const pairs = (faces: number): number => {
@@ -541,7 +541,7 @@ export class GpuVoxelMesher {
         shape = SHAPES[blocks[id]?.shape] as number | undefined;
       if (layer === undefined || shape === undefined)
         throw new TypeError(`GpuVoxelMesher block type ${id} is not a block type; use the world's BlockTypes`);
-      flags[id] = layer | shape | (layer === 0 && shape === 0 ? OCCLUDES : 0) | (layer === 3 || shape === 4 ? 32 : 0);
+      flags[id] = layer | shape | (layer === 0 && shape === 0 ? OCCLUDES : 0) | (layer === 3 || shape === 4 ? 32 : 0) | (blocks[id].vertexMotion?PART:0);
       data[id * 8] = flags[id];
       for (let f = 0; f < 6; f++) data[id * 8 + 1 + f] = materials[id * 6 + f];
     }

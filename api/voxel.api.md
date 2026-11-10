@@ -11,6 +11,7 @@ export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 export interface BlockType {
+    readonly vertexMotion?: VoxelBlockMotion;
     readonly model?: readonly ModelOrientation[];
     readonly id: number;
     readonly name: string;
@@ -40,6 +41,7 @@ export interface BlockType {
 }
 
 export interface BlockTypeOptions {
+    vertexMotion?: VoxelBlockMotion;
     model?: readonly ModelOrientation[];
     textures?: number | readonly [number, number, number, number, number, number];
     layer?: BlockLayer;
@@ -155,5 +157,13 @@ interface ModelBox {
 interface ModelOrientation {
     readonly boxes: readonly ModelBox[];
     readonly covered: number;
+}
+
+interface VoxelBlockMotion {
+    readonly kind: 'foliage' | 'liquid';
+    readonly amplitude: number;
+    readonly speed: number;
+    readonly frequency: number;
+    readonly rooted: boolean;
 }
 ```

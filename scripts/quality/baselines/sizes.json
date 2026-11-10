@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13888948,
+  "total": 13892021,
   "history": [
     {
       "date": "2026-10-24",
@@ -7322,6 +7322,12 @@
       "commit": "batch-271-aniso",
       "reason": "New optional anisotropic paint: 0 to 3746 B gzip plus alias. Tensor, smoothing and eight-sector filter share one per-view lifecycle; splitting would add resource coordination without removing shader work. Core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "911001992",
+      "reason": "Batch 240 per-block GPU wind, shared shadow/depth/capture adapter and unit-cell tessellation",
+      "grew": 1
     }
   ],
   "items": {
@@ -7514,6 +7520,7 @@
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/grass-terrain": 1907,
     "@margoengine/creative/paint": 3329,
+    "@margoengine/creative/paint-aniso": 4002,
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7174,
     "@margoengine/creative/planet-atmosphere": 3377,
@@ -7559,6 +7566,7 @@
     "@margoengine/decoders/ktx2-layers": 386324,
     "@margoengine/decoders/ktx2-stream": 390517,
     "@margoengine/decoders/lz4": 2417,
+    "@margoengine/decoders/lzfse": 2551,
     "@margoengine/decoders/meshopt": 3309,
     "@margoengine/decoders/meshopt-simd": 19391,
     "@margoengine/decoders/pcx": 1460,
@@ -7756,6 +7764,7 @@
     "@margoengine/kinematics-constraints": 11751,
     "@margoengine/kinematics-constraints/chain": 2160,
     "@margoengine/kinematics-constraints/joint-limits": 1468,
+    "@margoengine/kinematics-constraints/multi-goal": 3631,
     "@margoengine/kinematics-constraints/sdf": 7229,
     "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 5806,
@@ -7847,6 +7856,7 @@
     "@margoengine/materials/skin": 11568,
     "@margoengine/materials/stochastic": 2802,
     "@margoengine/materials/transmission": 8350,
+    "@margoengine/materials/transmission-layers": 5500,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
@@ -7996,6 +8006,7 @@
     "@margoengine/post/image": 12478,
     "@margoengine/post/lens": 7078,
     "@margoengine/post/lens-flare": 7016,
+    "@margoengine/post/mask": 6262,
     "@margoengine/post/material-decals": 8835,
     "@margoengine/post/motion-blur": 8245,
     "@margoengine/post/mrt": 3753,
@@ -8183,6 +8194,7 @@
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/serialization": 19875,
     "@margoengine/shader/subgroups": 3517,
+    "@margoengine/shader/texture-array": 3442,
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/distance": 2421,
@@ -8384,6 +8396,7 @@
     "@margoengine/vfx/obstacles": 1364,
     "@margoengine/vfx/over-life": 1831,
     "@margoengine/vfx/ribbons": 2854,
+    "@margoengine/vfx/schedule": 1198,
     "@margoengine/vfx/shadows": 3061,
     "@margoengine/vfx/shapes": 3848,
     "@margoengine/vfx/skinned": 2314,
@@ -8418,6 +8431,7 @@
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
     "@margoengine/voxel-edit/formats": 9294,
+    "@margoengine/voxel-edit/formats-extra": 5190,
     "@margoengine/voxel-edit/generate": 2735,
     "@margoengine/voxel-edit/gpu": 6177,
     "@margoengine/voxel-edit/history": 1330,
@@ -8478,6 +8492,7 @@
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
+    "@margoengine/voxel/wind": 3073,
     "@margoengine/water": 20817,
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
@@ -8639,18 +8654,10 @@
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
     "margoengine/creative/grass-terrain": 325,
+    "margoengine/creative/paint-aniso": 323,
     "margoengine/creative/planet-atmosphere": 329,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/vfx/schedule": 1198,
-    "@margoengine/decoders/lzfse": 2551,
-    "@margoengine/voxel-edit/formats-extra": 5190,
-    "@margoengine/shader/texture-array": 3442,
-    "@margoengine/post/mask": 6262,
-    "@margoengine/materials/transmission-layers": 5500,
-    "@margoengine/kinematics-constraints/multi-goal": 3631,
-    "@margoengine/creative/paint-aniso": 4002,
-    "margoengine/creative/paint-aniso": 323
+    "margoengine/web": 577
   }
 }

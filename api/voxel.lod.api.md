@@ -48,6 +48,7 @@ type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 interface BlockType {
+    readonly vertexMotion?: VoxelBlockMotion;
     readonly model?: readonly ModelOrientation[];
     readonly id: number;
     readonly name: string;
@@ -77,6 +78,7 @@ interface BlockType {
 }
 
 interface BlockTypeOptions {
+    vertexMotion?: VoxelBlockMotion;
     model?: readonly ModelOrientation[];
     textures?: number | readonly [number, number, number, number, number, number];
     layer?: BlockLayer;
@@ -150,6 +152,14 @@ interface PackedChunk {
 }
 
 type Vec3 = readonly [number, number, number] | ArrayLike<number>;
+
+interface VoxelBlockMotion {
+    readonly kind: 'foliage' | 'liquid';
+    readonly amplitude: number;
+    readonly speed: number;
+    readonly frequency: number;
+    readonly rooted: boolean;
+}
 
 class VoxelChunk {
     constructor(state?: number);

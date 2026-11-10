@@ -337,6 +337,18 @@ export interface VoxelRendererEffect {
   bindings(): GPUBindGroupEntry[];
 }
 
+/** Optional quad/bevel vertex motion supplied by a feature entry such as voxel/wind. */
+export interface VoxelVertexMotion {
+  /** Shader transform for beauty, surface capture and shadow passes. */
+  shader(code: string): string;
+  /** Additional group-zero bindings, from binding 11 upward; refreshes live uniforms each frame. */
+  bindings(device: GPUDevice): GPUBindGroupEntry[];
+  /** Maximum outward displacement in blocks, for conservative chunk bounds. */
+  readonly padding: number;
+  /** Changes when shader definitions change. */
+  readonly version: number;
+}
+
 /** Material capture contract shared with SSR and SSGI from `@margoengine/post`; neither package is required. */
 export interface VoxelCapture {
   /** PBR Surface capture declarations, including `MargoCapture` and `margoCapture(s,v,k)`. */
@@ -471,6 +483,8 @@ interface Finished {
   eye: Vec3;
 }
 interface Pipelines {
+  motion?: VoxelVertexMotion;
+  motionVersion?: number;
   /** Format, samples and depth format they draw to. */
   target: string;
   /** Quad pipelines per layer, and with a bevel the triangle pipelines. */
@@ -596,6 +610,8 @@ const isNumber = (value: unknown, name: string, fix: string): number => {
  * ```
  */
 export class VoxelRenderer implements EnginePlugin {
+  #motion?: VoxelVertexMotion;
+  #motionVersion = -1;
   /** Plugin name, unique per renderer. */
   readonly name = `voxel:${serial++}`;
   /** The world drawn. */
@@ -881,7 +897,15 @@ export class VoxelRenderer implements EnginePlugin {
       )
         .then(([layers, bevelLayers]) => {
           if (this.#gpu !== gpu) return;
-          pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
+          pending.ready = {
+            target,
+            layers,
+            bevel: bevelLayers,
+            effects,
+            lit,
+            motion: this.#motion,
+            motionVersion: this.#motion?.version,
+          };
           retain(post.states, target, key);
         })
         .catch((error) => this.#engine?.onError(error));
@@ -983,6 +1007,25 @@ export class VoxelRenderer implements EnginePlugin {
     };
   }
 
+  /** Adds one optional vertex-motion feature. Returns its removal function; dispose that feature after removal. */
+  addVertexMotion(motion: VoxelVertexMotion): () => void {
+    this.#unscaled('Vertex motion');
+    if (this.#motion)
+      throw new MargoError('attached', 'VoxelRenderer already has vertex motion; remove it before adding another');
+    this.#motion = motion;
+    this.#motionVersion = -1;
+    this.#resources++;
+    return () => {
+      if (this.#motion !== motion) return;
+      this.#motion = undefined;
+      this.#motionVersion = -1;
+      this.#gpu?.shadow?.uniform.destroy();
+      if (this.#gpu) this.#gpu.shadow = undefined;
+      this.#resources++;
+      this.#shadowVersion++;
+    };
+  }
+
   /**
    * `Shadows` calls this per cascade (add the renderer with `shadows.add(voxels, {static: true})`): the opaque and
    * cutout chunks inside the cascade, culled on the CPU, into its depth pass. Translucent blocks cast no shadow. With a
@@ -1021,6 +1064,7 @@ export class VoxelRenderer implements EnginePlugin {
                 entries: [
                   { binding: 0, resource: { buffer: s.uniform, offset: i * 256, size: 80 } },
                   ...(l ? cutout : depth),
+                  ...(this.#motion?.bindings(gpu.device) ?? []),
                 ],
               }),
             ),
@@ -1190,6 +1234,16 @@ export class VoxelRenderer implements EnginePlugin {
       k = 1 / this.#scale,
       eye: Vec3 = [c.camera.position[0] * k, c.camera.position[1] * k, c.camera.position[2] * k];
     this.#time += c.delta;
+    if (this.#motion) {
+      this.#motion.bindings(device);
+      if (this.#motionVersion !== this.#motion.version) {
+        gpu.shadow?.uniform.destroy();
+        gpu.shadow = undefined;
+        this.#motionVersion = this.#motion.version;
+        this.#resources++;
+      }
+      this.#shadowVersion++;
+    }
     this.#materials(gpu);
     const view = blockTextureView(this.textures, device);
     if (view !== gpu.view) {
@@ -1575,12 +1629,13 @@ export class VoxelRenderer implements EnginePlugin {
 
   #chunkBox(chunk: Chunk): { min: Vec3Like; max: Vec3Like } {
     const box = this.#box;
-    box.min.x = chunk.x;
-    box.min.y = chunk.y;
-    box.min.z = chunk.z;
-    box.max.x = chunk.x + 32;
-    box.max.y = chunk.y + 32;
-    box.max.z = chunk.z + 32;
+    const pad = this.#motion?.padding ?? 0;
+    box.min.x = chunk.x - pad;
+    box.min.y = chunk.y - pad;
+    box.min.z = chunk.z - pad;
+    box.max.x = chunk.x + 32 + pad;
+    box.max.y = chunk.y + 32 + pad;
+    box.max.z = chunk.z + 32 + pad;
     return box;
   }
 
@@ -1604,7 +1659,9 @@ export class VoxelRenderer implements EnginePlugin {
         values: new Float32Array(20),
       },
       bevel = this.#bevel,
-      module = device.createShaderModule({ code: SHADOW_SHADER + (bevel?.shadow ?? '') }),
+      module = device.createShaderModule({
+        code: this.#motion?.shader(SHADOW_SHADER + (bevel?.shadow ?? '')) ?? SHADOW_SHADER + (bevel?.shadow ?? ''),
+      }),
       create = (vertex: string, cutout?: string) =>
         device.createRenderPipelineAsync({
           layout: 'auto',
@@ -1640,6 +1697,10 @@ export class VoxelRenderer implements EnginePlugin {
       code = lightPBR(code, hooks);
       if (bevel) bevel = lightPBR(bevel, hooks);
       effects.push(effect);
+    }
+    if (this.#motion) {
+      code = this.#motion.shader(code);
+      if (bevel) bevel = this.#motion.shader(bevel);
     }
     return { code, bevel, effects };
   }
@@ -1786,6 +1847,8 @@ export class VoxelRenderer implements EnginePlugin {
     paced = false,
   ): { ready?: Pipelines } {
     const samples = c.descriptor.multisample?.count ?? 1,
+      motion = this.#motion,
+      motionVersion = motion?.version,
       pending: { ready?: Pipelines } = {},
       format = c.format,
       depth = c.descriptor.depthStencil!.format;
@@ -1814,7 +1877,7 @@ export class VoxelRenderer implements EnginePlugin {
     ])
       .then(([[layers, bevelLayers], surface]) => {
         if (this.#gpu !== gpu) return;
-        pending.ready = { target, layers, bevel: bevelLayers, effects, lit, surface };
+        pending.ready = { target, layers, bevel: bevelLayers, effects, lit, surface, motion, motionVersion };
         // The current composition's neighbours, each one effect short, stay among those kept.
         retain(gpu.pipelines, target, key, KEPT + this.#effects.size, true);
       })
@@ -1912,6 +1975,8 @@ export class VoxelRenderer implements EnginePlugin {
       if (
         p?.target === target &&
         p.lit === lit &&
+        p.motion === this.#motion &&
+        p.motionVersion === this.#motion?.version &&
         (!best || p.effects.length >= best.effects.length) &&
         p.effects.every((e) => this.#effects.has(e) && e.pbr(1))
       )
@@ -1935,13 +2000,23 @@ export class VoxelRenderer implements EnginePlugin {
           { binding: 6, resource: gpu.sampler },
           ...(p.lit ? this.#lightmapBindings(gpu) : []),
           ...extra,
+          ...(this.#motion?.bindings(gpu.device) ?? []),
         ],
         // The triangle shaders read no quad pool.
         shared = entries.filter((e) => e.binding < 1 || e.binding > 3);
       if (p.surface)
         p.surfaceGroups = [
-          group(p.surface[0], 0, entries.slice(0, 5)),
-          p.surface[1] && group(p.surface[1], 0, entries.slice(0, 1)),
+          group(
+            p.surface[0],
+            0,
+            entries.filter((e) => e.binding <= 4 || e.binding >= 11),
+          ),
+          p.surface[1] &&
+            group(
+              p.surface[1],
+              0,
+              entries.filter((e) => e.binding === 0 || e.binding >= 11),
+            ),
         ];
       p.groups = p.layers.map((pipeline) => group(pipeline, 0, entries));
       p.bevelGroups = p.bevel?.map((pipeline) => group(pipeline, 0, shared));

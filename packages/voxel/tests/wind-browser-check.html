@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Voxel wind correctness</title><canvas width="320" height="240" style="width:320px;height:240px"></canvas>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {BlockTypes,VoxelWorld} from '@margoengine/voxel';
+import {VoxelLighting} from '@margoengine/voxel/light';
+import {BlockTextures,VoxelRenderer} from '@margoengine/voxel/render';
+import {defineWindBlock,VoxelWind} from '@margoengine/voxel/wind';
+import {voxelBevel} from '@margoengine/voxel/bevel';
+import {Shadows} from '@margoengine/shadows';
+import {GpuVoxelMesher} from '@margoengine/voxel/gpu-mesher';
+import {defineBlockModel} from '@margoengine/voxel/models';
+const canvas=document.querySelector('canvas'),errors=[];window.windErrors=errors;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[31.5,5,1],target:[31.5,1.5,12],near:0.1,far:100}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const blocks=new BlockTypes(),world=new VoxelWorld({blocks}),stone=blocks.define('stone',{textures:0});
+const grass=defineWindBlock(blocks,'grass',{shape:'cross',layer:'cutout',solid:false,textures:1},{amplitude:0.4,speed:2,frequency:0.7});
+const water=defineWindBlock(blocks,'water',{shape:'liquid',liquid:true,solid:false,layer:'translucent',textures:2},{amplitude:0.3,speed:1.7,frequency:1.3});
+const leaf=defineWindBlock(blocks,'leaf',{layer:'cutout',textures:1},{amplitude:0.3,rooted:false});
+for(let x=27;x<37;x++)for(let z=7;z<17;z++)world.setBlock(x,0,z,stone);
+for(let x=29;x<35;x++)for(let z=11;z<15;z++)world.setBlock(x,1,z,water);
+world.setBlock(29,1,8,grass);world.setBlock(31,1,8,grass);world.setBlock(34,2,10,leaf);
+const textures=new BlockTextures({images:[[160,160,160,255],[25,220,20,255],[10,50,240,220]].map(c=>({width:1,height:1,data:new Uint8Array(c)}))});
+defineBlockModel(blocks,'unused custom',{boxes:[{min:[0,0,0],max:[0.2,1,0.2]}]});blocks.define('unused object',{shape:'object'});
+const useGpu=new URLSearchParams(location.search).has('bevel'),mesher=useGpu?new GpuVoxelMesher(engine.gpu):undefined;
+const lighting=VoxelLighting.attach(world,{budget:Infinity});lighting.update();
+const renderer=VoxelRenderer.attach(engine,{world,textures,workers:1,...(useGpu?{bevel:voxelBevel(0.06),mesher}:{})});
+const wind=new VoxelWind(renderer,{direction:[1,0],time:0}),shadows=Shadows.attach(engine,{resolution:256,cascades:1});const removeShadow=shadows.add(renderer);
+let shadowReady=false,shadowWaits=0;const drawShadow=renderer.drawShadow.bind(renderer);renderer.drawShadow=(context)=>{shadowReady=drawShadow(context);return shadowReady;};
+const read=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+async function settle(){let stable=0;for(let i=0;i<2000&&stable<6;i++){lighting.update();engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r,1));const visible=!world.dirty.size&&!renderer.stats.pending&&!renderer.stats.compiling&&renderer.stats.draws;if(visible&&!shadowReady)shadowWaits++;stable=visible&&shadowReady?stable+1:0;}if(stable<6)throw new Error('wind scene did not settle');engine.render({delta:0});return read();}
+const diff=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(a[i]!==b[i]||a[i+1]!==b[i+1]||a[i+2]!==b[i+2])n++;return n;};
+window.check={async run(){
+ const before=await settle();wind.time=1;const moved=await settle();wind.time=0;const restored=await settle();wind.direction=[0,0];const still=await settle();wind.time=2;const stillLater=await settle();
+ const out={motion:diff(before,moved),repeat:diff(before,restored),zero:diff(still,stillLater),cpuFallback:mesher?.stats.cpu??0,shadowWaits,errors};
+ wind.dispose();await settle();renderer.dispose();mesher?.dispose();removeShadow();shadows.dispose();lighting.dispose();textures.dispose();engine.dispose();return out;
+}};window.ready=true;
+</script>

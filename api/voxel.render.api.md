@@ -77,6 +77,7 @@ export class VoxelRenderer implements EnginePlugin {
     get lightmap(): VoxelLightmap | undefined;
     set lightmap(lightmap: VoxelLightmap | undefined);
     addLighting(effect: VoxelRendererEffect): () => void;
+    addVertexMotion(motion: VoxelVertexMotion): () => void;
     drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): boolean;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -129,6 +130,13 @@ export interface VoxelShadowContext {
     readonly cascade: number;
 }
 
+export interface VoxelVertexMotion {
+    shader(code: string): string;
+    bindings(device: GPUDevice): GPUBindGroupEntry[];
+    readonly padding: number;
+    readonly version: number;
+}
+
 // Not exported from this entry, but used by the exports above:
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
@@ -136,6 +144,7 @@ type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 interface BlockType {
+    readonly vertexMotion?: VoxelBlockMotion;
     readonly model?: readonly ModelOrientation[];
     readonly id: number;
     readonly name: string;
@@ -165,6 +174,7 @@ interface BlockType {
 }
 
 interface BlockTypeOptions {
+    vertexMotion?: VoxelBlockMotion;
     model?: readonly ModelOrientation[];
     textures?: number | readonly [number, number, number, number, number, number];
     layer?: BlockLayer;
@@ -248,6 +258,14 @@ interface VoxelBevel {
     readonly layout: GPUVertexBufferLayout;
     readonly shader: string;
     readonly shadow: string;
+}
+
+interface VoxelBlockMotion {
+    readonly kind: 'foliage' | 'liquid';
+    readonly amplitude: number;
+    readonly speed: number;
+    readonly frequency: number;
+    readonly rooted: boolean;
 }
 
 class VoxelChunk {

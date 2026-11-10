@@ -4,6 +4,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { octants, SLAB_DOUBLE, SLAB_TOP, STAIR_CORNER, STAIR_FIXED, WATERLOGGED } from './octants.js';
 import type { VoxelWorld } from './world.js';
 import type { ModelOrientation } from './model-data.js';
+import type { VoxelBlockMotion } from './wind-data.js';
 
 /**
  * Render pass of a block type: `'opaque'` (back-face culled, hides its neighbours' faces), `'cutout'` (alpha
@@ -41,6 +42,8 @@ export type StairCorner =
 
 /** Options of {@link BlockTypes.define}. Every field is optional. */
 export interface BlockTypeOptions {
+  /** Prepared optional vertex motion; use defineWindBlock from the wind entry. Default none. */
+  vertexMotion?: VoxelBlockMotion;
   /** Prepared box model; use defineBlockModel from the optional models entry. Default none. */
   model?: readonly ModelOrientation[];
   /**
@@ -91,6 +94,8 @@ export interface BlockTypeOptions {
 
 /** A defined block type with every option resolved; `color` is linear RGB. Plain, structured-cloneable data. */
 export interface BlockType {
+  /** Optional vertex motion, copied as worker-safe data. */
+  readonly vertexMotion?: VoxelBlockMotion;
   /** Prepared orientations for a custom box model, absent on built-in shapes. */
   readonly model?: readonly ModelOrientation[];
   /** Its id: the low 16 bits of a block state. */
@@ -338,6 +343,7 @@ export class BlockTypes {
       layer,
       shape,
       ...(o.model ? { model: o.model } : {}),
+      ...(o.vertexMotion ? { vertexMotion: { ...o.vertexMotion } } : {}),
       solid: flag(o.solid, 'solid', true),
       liquid: flag(o.liquid, 'liquid', false),
       light: level(o.light, 'light', 0),
