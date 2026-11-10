@@ -3,11 +3,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { preview } from 'vite';
-import { consumerRoot } from './erosion-consumer.mjs';
+import { buildErosionConsumer, consumerRoot } from './erosion-consumer.mjs';
 import { closeAll, runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { erode } from '../dist/erosion.js';
 const root = consumerRoot;
+// The suite serves the production consumer, so it builds it itself (CPU work, before the GPU lease): run alone, as
+// check:gpu-packages runs it, there is no earlier erosion-bundle.test.js run to leave one behind.
+await buildErosionConsumer();
 const built = await preview({ root, configFile: false, logLevel: 'warn', preview: { host: '127.0.0.1', port: 0 } });
 let browser;
 const errors = [],
