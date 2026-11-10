@@ -3051,7 +3051,8 @@ export class PBRModel implements EnginePlugin {
     models.segments.set(this, models.segment);
     // The capture's non-model passes run outside the model order. Register them after joining this model so merely
     // owning native glass does not split an existing HDR model run or introduce extra MSAA stores/loads.
-    if (!this.releaseNativeGlass && this.materials.some((m) => m.tint || m.attenuation))
+    // The capture is WebGPU-only and refuses other engines; a headless or preview engine draws no native glass.
+    if (!this.releaseNativeGlass && this.engine.gpu && this.materials.some((m) => m.tint || m.attenuation))
       this.releaseNativeGlass = acquireNativeGlass(
         this.engine,
         () =>
