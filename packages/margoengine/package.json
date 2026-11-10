@@ -842,6 +842,10 @@
       "types": "./dist/cutscene/editor.d.ts",
       "import": "./dist/cutscene/editor.js"
     },
+    "./cutscene/curve-editor": {
+      "types": "./dist/cutscene/curve-editor.d.ts",
+      "import": "./dist/cutscene/curve-editor.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

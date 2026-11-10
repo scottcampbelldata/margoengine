@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>Cutscene graph interaction proof</title>
+<div id="host" style="max-width:1000px"></div>
+<script type="module">
+import { TimelineEditor } from '../src/editor.ts';
+import { CurveEditor } from '../src/curve-editor.ts';
+const editor = new TimelineEditor({format:'margo-cutscene',version:1,duration:10,tracks:[
+  {type:'property',id:'value',target:'box',property:'x',keys:[{time:1,value:1},{time:5,value:5},{time:9,value:9}]},
+  {type:'audio',id:'audio',clips:[{start:1,duration:4,sound:'tone'}]}
+]},{parent:document.querySelector('#host')});
+const graph = new CurveEditor(editor);
+window.proof={editor,graph}; window.ready=true;
+</script>

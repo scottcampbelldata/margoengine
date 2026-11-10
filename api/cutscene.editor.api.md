@@ -71,6 +71,7 @@ export class TimelineModel {
     addItem(track: string, item: Record<string, unknown>): ItemRef;
     moveItems(items: readonly ItemRef[], delta: number): ItemRef[];
     setItem(ref: ItemRef, fields: Record<string, unknown>): boolean;
+    updateItem(ref: ItemRef, fields: Record<string, unknown>): ItemRef | undefined;
     deleteItems(items: readonly ItemRef[]): boolean;
     setDuration(seconds: number): boolean;
     begin(label: string): void;

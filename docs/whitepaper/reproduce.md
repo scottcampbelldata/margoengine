@@ -3274,7 +3274,6 @@ After build, run node --test --test-timeout=120000 packages/labels/tests/callout
 ### Immediate debug and arc correctness (batch 227 job 3)
 After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Under a shared GPU lock run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.
 
-<<<<<<< HEAD
 ### Batch 238 formats
 Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use gpu-lock run --owner=codex-batch238 --gpu=splats-format-render --max=2 --wait-max=60 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.
 
@@ -3291,13 +3290,21 @@ Use the lighting2d CPU and shared-lock native/--compat browser commands listed f
 
 Batch 216 orthographic: after build:packages, run node --test packages/cinematic/test/ortho.test.js; run node packages/cinematic/test/ortho-browser.mjs under the shared GPU lock, then with --compat. The diagnostic checks the subject at quarter-width/three-quarter-height before and after a depth move, interpolated world height 15 between 10 and 20, and a two-sphere group at height 5.625. No external data or timing run.
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### Batch 266 effect helpers
 After build:packages, run node --experimental-test-module-mocks --test --test-timeout=60000 packages/react/tests/effects-extra.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-effects-extra-browser.mjs, then repeat with --compat appended. All five native pixel oracles must be exact.
-=======
+
 =======
 =======
 ## Batch 212 job 1: stereo controls
 Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
->>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
+=======
+
+
+
+### Batch 217 job 1: graph authoring
+
+Build packages, then run node --test --test-timeout=120000 packages/cutscene/tests/curve-editor.test.js. For actual mouse/keyboard interactions run node scripts/gpu-lock.mjs run --owner=cutscene-curve --wait-max=60 --max=2 -- node packages/cutscene/tests/curve-browser.mjs. The cutscene package test:gpu also runs this suite; MARGO_COMPAT=1 selects the compatibility backend for rendering suites. No timing assertion or benchmark is used.
+>>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

@@ -5,6 +5,7 @@ import { createHeadlessCanvas, installGPU, readPixels } from '@margoengine/headl
 import { VFX } from '@margoengine/vfx';
 import { Cutscene, CutscenePlayer } from '../src/index.ts';
 import { VfxDirector, activationTrack, applyActivation, vfxTrack } from '../src/vfx.ts';
+import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';
 
 const STEP = 1 / 60;
 
@@ -66,6 +67,15 @@ window.check = async () => {
     player = new CutscenePlayer(cutscene),
     director = new VfxDirector(cutscene, { sparks: effect }, { step: (delta) => engine.render({ delta }), stepSize: STEP });
   engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+
+  // The optional compatibility route loads asynchronously. Both captures must use the same arithmetic path:
+  // recording the CPU fallback before its import finishes and replaying on the GPU differs by a few float bits.
+  // This fixture intentionally probes the private route to wait on actual readiness, never on a fixed frame count.
+  await waitForPipelines(async () => {
+    engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  }, { ready: () => !globalThis.__margoCompat || Boolean(effect.route) });
+  effect.reset();
 
   const draw = () => {
     director.apply(player.state);

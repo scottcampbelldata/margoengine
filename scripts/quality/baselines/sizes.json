@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13362993,
+  "total": 13366786,
   "history": [
     {
       "date": "2026-10-24",
@@ -6828,6 +6828,12 @@
       "commit": "batch212-stereo",
       "reason": "Optional stereo controls and owned bus inserts; @margoengine/mixer 6926 -> 7340, measured 7084; @margoengine/mixer/stereo 0 -> 1071, measured 815. A separate bus lifecycle would duplicate routing ownership; core/stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-217-job-1",
+      "reason": "New optional curve graph with validated atomic key edits and clip edge gestures; no core or stage changes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6968,6 +6974,7 @@
     "@margoengine/cinematic/group": 2101,
     "@margoengine/cinematic/lens": 1269,
     "@margoengine/cinematic/noise": 1612,
+    "@margoengine/cinematic/ortho": 3133,
     "@margoengine/cinematic/physical-lens": 845,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10652,
@@ -7031,6 +7038,7 @@
     "@margoengine/culling/sort": 14464,
     "@margoengine/culling/webgl2": 3284,
     "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/curve-editor": 3793,
     "@margoengine/cutscene/editor": 11360,
     "@margoengine/cutscene/lipsync": 3364,
     "@margoengine/cutscene/record": 3415,
@@ -7396,6 +7404,7 @@
     "@margoengine/mixer/reflections": 3483,
     "@margoengine/mixer/sidechain": 1815,
     "@margoengine/mixer/snapshots": 1956,
+    "@margoengine/mixer/stereo": 1071,
     "@margoengine/mixer/worklet": 2825,
     "@margoengine/navmesh": 7694,
     "@margoengine/navmesh dist/workers/navmesh-build.js": 17951,
@@ -7519,6 +7528,7 @@
     "@margoengine/react/controls-extra": 4412,
     "@margoengine/react/devtools": 1008,
     "@margoengine/react/dof": 1157,
+    "@margoengine/react/effects-extra": 8387,
     "@margoengine/react/environment": 3131,
     "@margoengine/react/fbx": 3843,
     "@margoengine/react/geometry": 5658,
@@ -8066,11 +8076,8 @@
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
     "margoengine/game": 996,
+    "margoengine/mixer/stereo": 1071,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/cinematic/ortho": 3133,
-    "@margoengine/react/effects-extra": 8387,
-    "@margoengine/mixer/stereo": 1071,
-    "margoengine/mixer/stereo": 1071
+    "margoengine/web": 577
   }
 }

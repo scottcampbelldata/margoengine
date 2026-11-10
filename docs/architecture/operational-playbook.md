@@ -6228,3 +6228,10 @@ Painted SDF cells now provide four implicit outward surface faces, with previous
 ### 5. Orthographic cinematic evidence (batch 216 job 2)
 World height is optional pose state in cinematic/brain, copied every frame and mixed by the existing live blend stack. cinematic/ortho alone supplies framing maths and projection output; cameras still owns the projection hook and clipping. Screen translation uses the rolled orthonormal camera basis, and sphere fits are depth-independent projected extents. CPU tests cover zones, damping subdivision, portrait/rolled views, weighted groups, limits and interrupted height blends. Both GPU backends verify picking coordinates and visible pixels. Core/stage and GPU shaders are unchanged; mixed projection modes switch at blend completion.
 Batch 266 section 5 effects evidence: effects-extra binds existing native points, lines, trails, welded crease extraction and decal clipping. No backend or core math changes. CPU evidence checks shell bounds/isotropy, reproducible absolute-time animation, per-point attributes, manual trail targeting, twelve box edges, transforms and StrictMode disposal. Native and compatibility captures compare all five components with direct native calls, exactly.
+
+
+
+
+### Section 5 evidence: batch 217 cutscene authoring
+
+The optional curve editor is DOM/SVG only, sharing the validated timeline and undo stack. Real mouse tests cover key values, Bezier handles, clip trims and disposal. Both renderer paths also run the existing cutscene render and replay suites. The replay fixture now waits for actual lazy VFX compatibility-route and pipeline readiness before reset/capture, so both reference and replay use one arithmetic path. Exact particle words, live counts and pixels remain required; the prior CPU-to-GPU switch produced ulp differences despite identical images. No renderer, GPU math or core code changed.

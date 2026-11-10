@@ -4569,7 +4569,6 @@ No open correctness defect identified. The planar assignment replaces independen
 - In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
 - Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
 
-<<<<<<< HEAD
 Batch 238 formats: no open format defect found by the malformed-input, real-data getter, SH and PLY round-trip checks. Existing transformed-bitmap alpha precision follow-up above remains outside these CPU entries.
 
 
@@ -4585,12 +4584,20 @@ GILighting2D previously removed a plugin by name on its saved engine, which can 
 
 Batch 216 job 2: no open defect found in orthographic follow, screen framing, projected-sphere group fit or height blends. Mixed projection transitions switch mode at the endpoint, as documented in limits; continuous interpolation between projection families is outside this orthographic job.
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 Batch 266 effects regressions: explicit Trail target=null stays in native manual mode; new source hooks retain decal parent transforms exactly once. effects-extra.test.js and the native pixel-oracle fixture cover these cases. The kit test fake now declares the existing meshRuntime export used by the new entry; none of its behavior assertions changed.
-=======
+
 =======
 =======
 Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
->>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
+=======
+
+
+
+### Fixed: batch 217 cutscene compatibility replay fixture
+
+The VFX replay fixture recorded early frames on the CPU fallback while the lazy WebGL2 GPU route was loading, then replayed on that route. Frame 40 differed in 182 particle words by a few float ulps, with identical picture and live count. The fixture now waits for actual route and pipeline readiness before reset and capture. The unchanged exact-byte and pixel assertions in packages/cutscene/tests/vfx-browser.mjs are the regression; no engine arithmetic or tolerance changed.
+>>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

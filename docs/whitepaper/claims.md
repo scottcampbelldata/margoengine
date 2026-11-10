@@ -3811,7 +3811,6 @@ Balanced planar matching assigns projected anchors to separated column ports, th
 ### Immediate debug and endpoint arcs (batch 227 job 3)
 Immediate lines batch by style and expire on the next rendered frame while all views share the current frame; picking preparation preserves queued commands. Persistent arcs expose ordinary Line picking and materials. Planar and spherical arc sampling keeps exact endpoints and finite coincident/antipodal cases. Proof: packages/lines/tests/debug.test.js and debugLines in packages/lines/tests/features-browser.js, run on both backends at 1x/4x MSAA. Tests prove draw counts, not timing; speed measurements remain deferred.
 
-<<<<<<< HEAD
 ### Batch 238 capture formats
 The optional formats entry reads KSplat 0.1 levels 0/1/2 and SuperSplat compressed PLY, and writes standard Gaussian PLY in binary little-endian or ASCII. packages/splats/test/formats.test.js compares the real MIT raccoon capture against 64 black-box getter samples per KSplat level, checks all compressed-PLY word fields and SH degrees 0-3 against independent attributes, rejects malformed layouts and round-trips the real capture's positions exactly and colour/SH/covariance within float32 conversion bounds. The GPU formats-check renders the three KSplat derivatives and PLY export on each backend. Covariance normalization/floor and the display/linear SH approximation are retained accepted differences. No runtime or compression-quality claim.
 
@@ -3829,13 +3828,21 @@ The GI entry now includes painted finite-order diffuse interreflection and tempo
 ### Orthographic cinematic cameras (batch 216 job 2)
 The optional ortho entry supports follow through the existing spring rig, screen-space framing with dead/soft zones and lookahead, sphere group framing by full visible height, and live/interrupted orthographic height blends. CPU proof: cinematic/test/ortho.test.js checks independent projection geometry, depth independence, roll, portrait aspect, custom up, damping subdivision, membership/weight/size limits, cuts and mode endpoints. ortho-browser.mjs checks actual picks at authored screen points at two depths, group endpoints, rendered pixels and blend heights on native WebGPU and WebGL2. No claim about continuous mixed-projection blends or speed.
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### Batch 266 effect helpers
 Stars, Sparkles, Trail, Decal and Edges are available from the optional React effects-extra entry. Each uses native owning-package rendering and geometry. Proof: effects-extra.test.js plus test-effects-extra-browser.mjs in packages/react, with exact native pixel comparisons for all five helpers on WebGPU and compatibility WebGL2. Animated point attributes use the CPU and native partial update API; there is no GPU-only simulation or speed claim.
-=======
+
 =======
 =======
 ## Batch 212 job 1: stereo controls
 Optional mixer/stereo matches the documented equal-power pan and normalized mid/side width behaviour. Proof: stereo.test.js checks ownership and atomic setters; browser.js checks 25 pan/width combinations against independent equations in OfflineAudioContext beside WebGPU and WebGL2. No performance or listening-quality claim.
->>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
 >>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
+=======
+
+
+
+### Batch 217 job 1: graph authoring
+
+cutscene/curve-editor provides numeric key graphs with editable Bezier controls, value/time dragging and clip edge trimming over the editor's validated undo model. Evidence: packages/cutscene/tests/curve-editor.test.js and curve-browser.mjs. Comparison is to the value/handle authoring behavior documented by Theatre.js and Babylon's curve editor, recorded in docs/clean-room.md. This is a feature-coverage claim, not a speed or whole-editor superiority claim.
+>>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

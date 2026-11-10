@@ -229,6 +229,18 @@ export class TimelineModel {
       }
     });
   }
+  /** Atomically edits and sorts an item, including its time. Returns its new ref, or undefined if validation refuses it. */
+  updateItem(ref: ItemRef, fields: Record<string, unknown>): ItemRef | undefined {
+    const item = this.item(ref);
+    const changed = this.edit('Set', false, () => {
+      for (const [name, value] of Object.entries(fields)) {
+        if (value === undefined) delete item[name];
+        else item[name] = JSON.parse(JSON.stringify(value)) as unknown;
+      }
+      sort(this.list(ref.track));
+    });
+    return changed ? { track: ref.track, index: this.list(ref.track).indexOf(item) } : undefined;
+  }
   /** Deletes items. A delete the document refuses, such as a track's last key, changes nothing and gives false. */
   deleteItems(items: readonly ItemRef[]): boolean {
     const held = items.map((ref) => ({ ref, item: this.item(ref) }));
