@@ -2,7 +2,7 @@
 // Built cleanly on @margoengine/sciviz: million-star 3D point cloud with Eye-Dome Lighting (EDL),
 // spatial lasso cross-filtering, 2D Freedman-Diaconis distribution histograms,
 // date-and-log scale photometric time series, and OKLab Hertzsprung-Russell heatmaps.
-import { Figure, type ScatterLayer } from '@margoengine/sciviz';
+import { Figure, type ScatterLayer } from '@margoengine/sciviz/spec';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas3d = $<HTMLCanvasElement>('canvas3d');

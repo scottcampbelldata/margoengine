@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { glyphLayer, warpByVector, warpByScalar, type GlyphLayer, type GlyphShape } from '@margoengine/sciviz/glyph';
 import { gridLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import { readDisplacement } from './sciviz-glyph-data.js';

@@ -1145,3 +1145,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/gltf-pro (review 4): cover independent non-mip min/mag filtering on ordinary and packed physical textures and unchanged native interpolation differences; examples deferred.
 - margoengine (batch 180 integration): cover the generated sciviz/monitor alias with its owning monitor entry in the README phase; no README example work now.
+
+- @margoengine/sciviz: document /spec factories, async state saves, schema, hashes and URL arrays, /link brush/history JSON, timeline snapshots, pipeline registry, custom codecs and exact-size round trips (batch 179).
+- margoengine: document the sciviz/spec optional alias after the build phase (batch 179).
+- margoengine: retain the generated sciviz/monitor alias alongside sciviz/spec; both are optional subpaths (batch 179 integration repair).

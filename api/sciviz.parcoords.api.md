@@ -579,6 +579,19 @@ interface SelectionChange {
     readonly rowIds: readonly RowKey[];
 }
 
+interface SelectionJSON {
+    readonly version: 1;
+    readonly rowIds: readonly RowKey[];
+    readonly options: Required<SelectionOptions>;
+    readonly brushes: readonly {
+        readonly source: string;
+        readonly rows: readonly RowKey[];
+    }[];
+    readonly past: readonly SelectionJSON['brushes'][];
+    readonly future: readonly SelectionJSON['brushes'][];
+    readonly revision: number;
+}
+
 type SelectionOperation = 'replace' | 'union' | 'intersect' | 'toggle' | 'subtract';
 
 interface SelectionOptions {
@@ -592,6 +605,8 @@ type SelectionResolve = 'global' | 'union' | 'intersect';
 
 class SelectionStore extends EventTarget {
     constructor(rowIds: ArrayLike<RowKey>, options?: SelectionOptions);
+    toJSON(): SelectionJSON;
+    static fromJSON(state: SelectionJSON): SelectionStore;
     get active(): boolean;
     get version(): number;
     get resolve(): SelectionResolve;

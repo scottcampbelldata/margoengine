@@ -2,7 +2,7 @@
 // fused @margoengine/compute expression into a GpuArray that the sciviz surface layer reads in place. The colour map
 // and contours follow the fixed range [-1.6, 1.6]; prefers-reduced-motion holds the waves still.
 import { createCompute } from '@margoengine/compute';
-import { Figure, type ColormapName, type SurfaceLayer } from '@margoengine/sciviz';
+import { Figure, type ColormapName, type SurfaceLayer } from '@margoengine/sciviz/spec';
 import { still } from './multi-view.js';
 
 declare global {

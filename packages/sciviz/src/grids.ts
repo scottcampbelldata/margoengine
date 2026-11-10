@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // Unstructured grids: tetrahedra, hexahedra, wedges and pyramids with point or cell data, in VTK's UnstructuredGrid
 // layout (points, connectivity, offsets, cell types; VTK file formats, Kitware, "VTK User's Guide" chapter 19). The
 // outer surface is every face exactly one cell owns, found by a sorted-vertex key per face. A slice cuts every cell the
@@ -966,7 +967,7 @@ export function meshLayer(figure: Figure, set: TriangleSet, options: MeshLayerOp
   const layer = new MeshLayer(figure.renderer, set, options);
   try {
     figure.renderer.add(layer);
-    return figure.addLayer(layer);
+    return trackSpecLayer(figure, 'mesh', [set, options], figure.addLayer(layer));
   } catch (error) {
     layer.dispose();
     throw error;

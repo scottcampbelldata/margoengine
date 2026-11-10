@@ -8,7 +8,7 @@ import {
   type IsosurfaceLayer,
   type SliceLayer,
   type VolumeLayer,
-} from '@margoengine/sciviz';
+} from '@margoengine/sciviz/spec';
 
 declare global {
   interface Window {

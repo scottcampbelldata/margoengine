@@ -1,4 +1,4 @@
-import { Figure, type LineLayer } from '@margoengine/sciviz';
+import { Figure, type LineLayer } from '@margoengine/sciviz/spec';
 import { FilterPipeline, type PipelineRegistry } from '@margoengine/sciviz/pipeline';
 import { element, fail } from './sciviz-demo.js';
 
@@ -59,6 +59,7 @@ export const pipeline = new FilterPipeline(registry)
   .add({ id: 'solution', type: 'nasa.fun3d' })
   .add({ id: 'minimum', type: 'samples.minimum', inputs: ['solution'], params: 0 })
   .add({ id: 'chart', type: 'figure.line', inputs: ['minimum'] });
+figure.pipeline = pipeline;
 
 export async function show(minimum: number): Promise<void> {
   pipeline.setParams('minimum', minimum);

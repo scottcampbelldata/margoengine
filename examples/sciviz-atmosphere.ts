@@ -1,4 +1,4 @@
-import {Figure} from '@margoengine/sciviz';
+import {Figure} from '@margoengine/sciviz/spec';
 import {globeAtmosphere} from '@margoengine/sciviz/atmosphere';
 import type {FlowGrid} from '@margoengine/sciviz/flow';
 import type {TriangleSet} from '@margoengine/sciviz/grids';

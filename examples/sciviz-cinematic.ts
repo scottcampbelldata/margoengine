@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { cinematicVolume, type CinematicOptions } from '@margoengine/sciviz/cinematic';
 import { element } from './sciviz-demo.js';
 const signal = AbortSignal.timeout(120000);

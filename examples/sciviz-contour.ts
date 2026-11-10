@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { contourGrid, contourGridGPU, type GridContours } from '@margoengine/sciviz/contour';
 import { meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import { readBumpSlice } from './sciviz-contour-data.js';

@@ -7,7 +7,7 @@ import {
   type IsosurfaceLayer,
   type SliceLayer,
   type VolumeLayer,
-} from '@margoengine/sciviz';
+} from '@margoengine/sciviz/spec';
 import { parseNIfTI } from '@margoengine/sciviz/formats';
 
 import { loadNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';

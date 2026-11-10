@@ -1,5 +1,5 @@
 // Same hash-pinned NOAA daily winds as the other official wind examples; no synthetic velocity or height.
-import { Figure, type Layer } from '@margoengine/sciviz';
+import { Figure, type Layer } from '@margoengine/sciviz/spec';
 import { deriveFlowGPU, type GpuDerivedFlowFields } from '@margoengine/sciviz/derive';
 import { element, exportButton, fail, floats, signal } from './sciviz-demo.js';
 

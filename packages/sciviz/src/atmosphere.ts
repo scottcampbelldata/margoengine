@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 import { PlanetAtmosphere, planetWGSL } from '@margoengine/sky/planet';
 import type { AtmosphereParameters } from '@margoengine/sky/planet';
 import { sunPosition, greenwichSiderealTime } from '@margoengine/sky/astro';
@@ -133,14 +134,14 @@ export class GlobeAtmosphere implements Drawable {
  async flow(grid:FlowGrid,options:FlowParticlesOptions={}):Promise<FlowParticles>{
   this.#check();const layer=await flowParticles(this.#figure,geographicFlowGrid(grid),{...options,signal:options.signal??this.#options.signal,projection:'globe',appearance:this.appearance});
   if(this.#disposed){this.#figure.remove(layer);throw rangeError('Globe disposed during flow creation; keep it alive until settlement','sciviz');}
-  this.#children.push(layer);return layer;
+  this.#children.push(layer);return trackSpecLayer(this.#figure, 'globe.flow', [this, grid, options], layer);
  }
  /** Projects lon/lat/metre triangles and preserves values and masks, with per-fragment aerial perspective. */
  mesh(set:TriangleSet,options:MeshLayerOptions={}):MeshLayer{
   this.#check();const positions=new Float32Array(set.positions.length);
   for(let i=0;i<positions.length;i+=3)positions.set(project(set.positions[i],set.positions[i+1],set.positions[i+2],'globe'),i);
   const layer=meshLayer(this.#figure,{...set,positions,bounds:[-1,1,-1,1,-1,1]},{...options,appearance:options.appearance??this.appearance});
-  this.#children.push(layer);return layer;
+  this.#children.push(layer);return trackSpecLayer(this.#figure, 'globe.mesh', [this, set, options], layer);
  }
  /** Geographic point glyphs as tangent discs; radius metres (default 10000), scalar colour and central height preserved. */
  points(coordinates:ArrayLike<number>,values:ArrayLike<number>,options:MeshLayerOptions&{radius?:number}={}):MeshLayer{
@@ -156,13 +157,13 @@ export class GlobeAtmosphere implements Drawable {
     scalars[at/3]=values[i];
    }
   }
-  const layer=meshLayer(this.#figure,{positions,normals,values:scalars,cells:new Uint32Array(count*8),bounds:[-1,1,-1,1,-1,1]},{...options,appearance:this.appearance});this.#children.push(layer);return layer;
+  const layer=meshLayer(this.#figure,{positions,normals,values:scalars,cells:new Uint32Array(count*8),bounds:[-1,1,-1,1,-1,1]},{...options,appearance:this.appearance});this.#children.push(layer);return trackSpecLayer(this.#figure, 'globe.points', [this, coordinates, values, options], layer);
  }
  /** Optional cloud data: supply geographic shell triangles with density values in [0,1]; no procedural weather is generated. */
  clouds(set:TriangleSet,options:Omit<MeshLayerOptions,'colormap'>={}):MeshLayer{
   const self=this;
   const appearance:LayerAppearance={key:'planet-clouds',shader:planetWGSL,surface:true,get layout(){return self.#planet.layout;},get group(){return self.#planet.group;},prepare(context){self.prepare(context);}};
-  return this.mesh(set,{...options,colormap:[[0,'#ffffff'],[1,'#ffffff']],scalarOpacity:true,appearance,opacity:options.opacity??0.6});
+  return trackSpecLayer(this.#figure, 'globe.clouds', [this,set,options], this.mesh(set,{...options,colormap:[[0,'#ffffff'],[1,'#ffffff']],scalarOpacity:true,appearance,opacity:options.opacity??0.6}));
  }
  #check():void{if(this.#disposed)throw rangeError('Atmospheric globe disposed; create a new one','sciviz');this.#options.signal?.throwIfAborted();}
  /** Removes owned data and tiles and frees the sky resources; idempotent. */
@@ -176,6 +177,8 @@ export async function globeAtmosphere(figure:Figure,options:GlobeAtmosphereOptio
  try{
   figure.renderer.add(globe);figure.addLayer(globe);
   globe.ground=await tileLayer(figure,{tiles:async()=>new ImageData(new Uint8ClampedArray([45,85,105,255]),1,1),...options.tiles,projection:'globe',appearance:globe.appearance,signal:options.signal??options.tiles?.signal});
+  trackSpecLayer(figure, 'globe', [options], globe);
+  trackSpecLayer(figure, 'globe.ground', [globe], globe.ground);
   return globe;
  }catch(error){figure.remove(globe);throw error;}
 }

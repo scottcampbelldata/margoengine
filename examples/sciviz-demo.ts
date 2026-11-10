@@ -1,11 +1,11 @@
 // Small helpers shared by the real-data demos. Data and plotting stay in each page's source.
-import { Figure, type CreateFigureOptions } from '@margoengine/sciviz';
+import { Figure, type CreateFigureOptions } from '@margoengine/sciviz/spec';
 
 // ?backend=webgl2 demonstrates the complete shared renderer, including CPU isosurfaces.
 export async function createFigure(canvas: HTMLCanvasElement, options: CreateFigureOptions = {}): Promise<Figure> {
   if (new URLSearchParams(location.search).get('backend') === 'webgl2') {
     const { createFallbackFigure } = await import('@margoengine/sciviz/fallback');
-    return createFallbackFigure(canvas, options);
+    return Figure.record(await createFallbackFigure(canvas, options), options);
   }
   return Figure.create(canvas, options);
 }

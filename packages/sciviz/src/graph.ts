@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // Force-directed graph layout and drawing for networks with millions of edges. The forces are those of T. M. J.
 // Fruchterman and E. M. Reingold, "Graph drawing by force-directed placement", Software: Practice and Experience
 // 21(11), 1991: edges pull with d^2 / k, every pair of nodes pushes with k^2 / d, and each node moves at most a
@@ -776,5 +777,5 @@ export function graphLayer(
 ): GraphLayer {
   const layer = new GraphLayer(figure.renderer, graph, positions, options);
   figure.renderer.add(layer);
-  return figure.addLayer(layer);
+  return trackSpecLayer(figure, 'graph', [graph, positions, options], figure.addLayer(layer));
 }

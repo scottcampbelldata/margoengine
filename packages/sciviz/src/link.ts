@@ -1,6 +1,7 @@
 // Clean room: Vega-Lite selection algebra (Satyanarayan et al., 2017) and linked
 // sources (Heer and Agrawala, 2006). The renderer is separate from the store.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { recordSelectionValue } from './spec-hooks.js';
 
 export { bindSelection, type SelectionBinding, type SelectionBindingOptions } from './link-layer.js';
 
@@ -37,6 +38,16 @@ export function selectionOperation(
 }
 
 type Brushes = Map<string, Set<RowKey>>;
+/** Portable brush and undo/redo state for a shared dataset. */
+export interface SelectionJSON {
+  readonly version: 1;
+  readonly rowIds: readonly RowKey[];
+  readonly options: Required<SelectionOptions>;
+  readonly brushes: readonly { readonly source: string; readonly rows: readonly RowKey[] }[];
+  readonly past: readonly SelectionJSON['brushes'][];
+  readonly future: readonly SelectionJSON['brushes'][];
+  readonly revision: number;
+}
 const copy = (brushes: Brushes): Brushes => new Map([...brushes].map(([key, rows]) => [key, new Set(rows)]));
 
 /** Shared keyed selection. All mutations validate before publishing; no globals or import side effects. */
@@ -73,6 +84,62 @@ export class SelectionStore extends EventTarget {
     this.#limit = options.history ?? 32;
     if (!Number.isInteger(this.#limit) || this.#limit < 0)
       throw rangeError('Selection history must be a nonnegative integer', 'sciviz');
+    recordSelectionValue(this, () => this.toJSON());
+  }
+
+  /** Snapshot keys, resolution, brushes and history without materializing renderer masks. */
+  toJSON(): SelectionJSON {
+    this.#check();
+    const snapshot = (brushes: Brushes) => [...brushes].map(([source, rows]) => ({ source, rows: [...rows] }));
+    return {
+      version: 1,
+      rowIds: [...this.#keys],
+      options: { universe: this.#open ? 'open' : 'fixed', resolve: this.#resolve, empty: this.#empty, history: this.#limit },
+      brushes: snapshot(this.#brushes),
+      past: this.#past.map(snapshot),
+      future: this.#future.map(snapshot),
+      revision: this.#version,
+    };
+  }
+  /** Restore validated state without dispatching application events during construction. */
+  static fromJSON(state: SelectionJSON): SelectionStore {
+    if (
+      !state ||
+      state.version !== 1 ||
+      !Array.isArray(state.rowIds) ||
+      !Array.isArray(state.brushes) ||
+      !Array.isArray(state.past) ||
+      !Array.isArray(state.future) ||
+      !Number.isSafeInteger(state.revision) ||
+      state.revision < 0
+    )
+      throw typeError('Invalid selection state; use a version 1 snapshot', 'sciviz');
+    const store = new SelectionStore(state.rowIds, state.options);
+    const restore = (brushes: SelectionJSON['brushes']): Brushes => {
+      if (!Array.isArray(brushes)) throw typeError('Invalid brush history; supply ordered brush arrays', 'sciviz');
+      const result: Brushes = new Map();
+      for (const brush of brushes) {
+        if (
+          !brush ||
+          typeof brush.source !== 'string' ||
+          result.has(brush.source) ||
+          !Array.isArray(brush.rows) ||
+          brush.rows.some((key: RowKey) => !store.contains(key)) ||
+          new Set(brush.rows).size !== brush.rows.length
+        )
+          throw typeError('Invalid brush keys; use unique sources and dataset row IDs', 'sciviz');
+        result.set(brush.source, new Set(brush.rows));
+      }
+      return result;
+    };
+    if (state.past.length + state.future.length > store.#limit)
+      throw rangeError('Selection history exceeds its limit; correct the saved history', 'sciviz');
+    store.#brushes = restore(state.brushes);
+    store.#past = state.past.map(restore);
+    store.#future = state.future.map(restore);
+    store.#version = state.revision - 1;
+    store.#publish('restore');
+    return store;
   }
 
   get active(): boolean {

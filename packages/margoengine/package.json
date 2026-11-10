@@ -3547,6 +3547,10 @@
       "types": "./dist/sciviz/geo-vector.d.ts",
       "import": "./dist/sciviz/geo-vector.js"
     },
+    "./sciviz/spec": {
+      "types": "./dist/sciviz/spec.d.ts",
+      "import": "./dist/sciviz/spec.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

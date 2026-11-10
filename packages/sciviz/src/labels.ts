@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // Clean room: Max (1995), Brecheisen et al. (2008), Lindholm and Bock (2013).
 import { invertMatrix } from '@margoengine/math/mat4';
 import { rangeError, fault } from '../../shared/errors.js';
@@ -457,7 +458,7 @@ export function fusionVolume(
   try {
     figure.addLayer(layer);
     figure.renderer.add(layer);
-    return layer;
+    return trackSpecLayer(figure, 'fusion', [sources, options], layer);
   } catch (e) {
     layer.dispose();
     throw e;

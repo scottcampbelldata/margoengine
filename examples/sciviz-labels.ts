@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import {
   fusionVolume,
   labelLegend,

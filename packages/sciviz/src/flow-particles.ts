@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
@@ -395,5 +396,5 @@ export class FlowParticles implements Drawable {
 
 /** Creates a GPU particle/trail layer, copying inputs before joining a 3D figure's bounds and disposal. */
 export function flowParticles(figure: Figure, grid: FlowGrid, options: FlowParticlesOptions = {}): Promise<FlowParticles> {
-  return FlowParticles.create(figure, grid, options);
+  return FlowParticles.create(figure, grid, options).then((layer) => trackSpecLayer(figure, 'particles', [grid, options], layer));
 }

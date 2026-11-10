@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { lic, type LicLayer } from '@margoengine/sciviz/lic';
 import { element, exportButton, fail, floats } from './sciviz-demo.js';
 

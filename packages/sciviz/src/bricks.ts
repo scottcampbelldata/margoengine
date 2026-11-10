@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/sciviz/bricks: volumes larger than one texture or the GPU budget. Bricks of a level-of-detail pyramid
 // live in one atlas texture; a page table with one entry per full-resolution brick names the finest loaded brick over
@@ -986,5 +987,5 @@ export function brickedVolume(
 ): BrickedVolumeLayer {
   const layer = new BrickedVolumeLayer(figure.renderer, source, options);
   figure.renderer.add(layer);
-  return figure.addLayer(layer);
+  return trackSpecLayer(figure, 'bricks', [source, options], figure.addLayer(layer));
 }

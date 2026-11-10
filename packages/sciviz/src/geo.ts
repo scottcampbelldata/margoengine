@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // Geographic layers: map projections, slippy-map raster tiles and a globe under a figure's data layers.
 // - Web Mercator (EPSG:3857 on the sphere; J. P. Snyder, "Map Projections: A Working Manual", USGS Professional Paper
 //   1395, 1987, chapter 7), equirectangular (Snyder chapter 12) and the WGS 84 ellipsoid (NIMA TR8350.2, 3rd ed.,
@@ -427,5 +428,5 @@ export async function tileLayer(figure: Figure, options: TileLayerOptions): Prom
     throw error;
   }
   figure.renderer.add(layer);
-  return figure.addLayer(layer);
+  return trackSpecLayer(figure, 'tiles', [options], figure.addLayer(layer));
 }

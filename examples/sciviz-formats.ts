@@ -1,4 +1,4 @@
-import { Figure, type VolumeLayer } from '@margoengine/sciviz';
+import { Figure, type VolumeLayer } from '@margoengine/sciviz/spec';
 import { openNetCDF } from '@margoengine/sciviz/netcdf';
 import { openVTK, parseVtk } from '@margoengine/sciviz/vtk';
 import { gridLayer, type MeshLayer } from '@margoengine/sciviz/grids';

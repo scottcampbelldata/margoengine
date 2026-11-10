@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { streamline, sampleField } from '@margoengine/sciviz/maths';
 import { meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles } from '@margoengine/sciviz/tubes';

@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { calcGrid, calcGridGPU, type CalcOperation } from '@margoengine/sciviz/calc';
 import { meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import { simplices } from '../packages/sciviz/src/cell-complex.js';

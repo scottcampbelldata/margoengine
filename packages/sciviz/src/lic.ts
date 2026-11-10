@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // GPU LIC on regular fields and affine planar slices. Research: docs/clean-room.md.
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
@@ -294,5 +295,5 @@ export class LicLayer implements Drawable {
 
 /** Creates a GPU LIC layer, with an immutable field copy, in a 3D figure. WebGPU and webgl2-compat are supported. */
 export function lic(figure: Figure, grid: VectorGrid, options: LicOptions = {}): Promise<LicLayer> {
-  return LicLayer.create(figure, grid, options);
+  return LicLayer.create(figure, grid, options).then((layer) => trackSpecLayer(figure, 'lic', [grid, options], layer));
 }

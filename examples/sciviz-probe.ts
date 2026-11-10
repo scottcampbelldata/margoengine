@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { meshLayer, type TriangleSet } from '@margoengine/sciviz/grids';
 import { loadNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';
 import { clipGrid } from '@margoengine/sciviz/clip';

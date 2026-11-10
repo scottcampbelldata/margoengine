@@ -1,4 +1,4 @@
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 import { thresholdGrid, clipGrid, type AnalysisImage, type AnalysisGrid } from '@margoengine/sciviz/clip';
 import { gridSurface, meshLayer, type MeshLayer, type TriangleSet } from '@margoengine/sciviz/grids';
 import { readBumpSlice } from './sciviz-contour-data.js';

@@ -3,6 +3,7 @@ import type { RectsLayer } from './rects.js';
 import type { SelectionStore, RowKey, SelectionOperation } from './link.js';
 import { frameWGSL, type Drawable, type GpuContext } from './render.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import { trackSpecLayer } from './spec-hooks.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -295,4 +296,8 @@ export const bindSelection = (
   layer: LinkedLayer,
   store: SelectionStore,
   options?: SelectionBindingOptions,
-): SelectionBinding => new SelectionBinding(figure, layer, store, options);
+): SelectionBinding => {
+  const binding = new SelectionBinding(figure, layer, store, options);
+  trackSpecLayer(figure, 'selection-store', [store], store);
+  return trackSpecLayer(figure, 'selection-binding', [layer, store, { ...options, source: binding.source }], binding);
+};

@@ -1,7 +1,7 @@
 // Synthetic wind test page: Geophysical Vortex & Fluid Dynamics Observatory.
 // Built cleanly on @margoengine/sciviz: 4th-order Runge-Kutta streamlines, 3D quiver vector fields,
 // isobaric height fields with contours, and spatiotemporal timeline playback.
-import { Figure, type ColormapName, type LineLayer, type SurfaceLayer } from '@margoengine/sciviz';
+import { Figure, type ColormapName, type LineLayer, type SurfaceLayer } from '@margoengine/sciviz/spec';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('viewport');

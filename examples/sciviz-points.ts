@@ -3,7 +3,7 @@
 // with a point budget). Changing the count or the budget rebuilds the figure.
 import { createCompute } from '@margoengine/compute';
 import { Random } from '@margoengine/compute/random';
-import { Figure } from '@margoengine/sciviz';
+import { Figure } from '@margoengine/sciviz/spec';
 
 declare global {
   interface Window {

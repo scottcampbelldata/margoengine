@@ -1,4 +1,4 @@
-import { Figure, type LineLayer } from '@margoengine/sciviz';
+import { Figure, type LineLayer } from '@margoengine/sciviz/spec';
 import { flowParticles, tracePathline, traceStreakline, type FlowGrid, type FlowParticles, type FlowSeeding } from '@margoengine/sciviz/flow';
 import { element, exportButton, fail, floats, signal } from './sciviz-demo.js';
 

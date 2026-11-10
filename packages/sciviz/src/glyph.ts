@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 import { Geometry, PbrMaterial, type Mesh, type PbrMaterialOptions } from '@margoengine/core';
 import { boxGeometry, coneGeometry, cylinderGeometry, sphereGeometry } from '@margoengine/geometry/primitives';
 import { decomposeAffine } from '@margoengine/math/affine';
@@ -295,7 +296,7 @@ export async function glyphLayer(figure: Figure, input: GlyphInput, options: Gly
   options.signal?.throwIfAborted();
   const layer = new GlyphLayer(figure, instances, options);
   try {
-    return figure.addLayer(layer);
+    return trackSpecLayer(figure, 'glyph', [input, options], figure.addLayer(layer));
   } catch (error) {
     layer.dispose();
     throw error;

@@ -1,3 +1,4 @@
+import { trackSpecLayer } from './spec-hooks.js';
 // Optional volume lighting. References and derivations: docs/clean-room.md, batch 173 job 3.
 import { invertMatrix } from '@margoengine/math/mat4';
 import { rangeError, fault } from '../../shared/errors.js';
@@ -412,5 +413,5 @@ export class CinematicVolume implements Drawable {
 export function cinematicVolume(figure: Figure, volume: VolumeLayer, options: CinematicOptions = {}): CinematicVolume {
   const layer = new CinematicVolume(figure.renderer, volume, options);
   figure.renderer.add(layer);
-  return layer;
+  return trackSpecLayer(figure, 'cinematic', [volume, options], layer);
 }

@@ -7642,6 +7642,12 @@
       "commit": "3d7dd74c9",
       "reason": "batch183-stage-lights-new-optional-entry-retains-complete-shared-lifecycle-and-all-four-light-kinds-root-unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-179",
+      "reason": "New optional sciviz/spec 0 to 24979 B gzip, ceiling 25645 B. sciviz/link 4544 to 5170 B, ceiling 4800 to 5335 B, for portable shared brushes and undo/redo state. Ordered recipes, exact numerical inputs, timeline, hashes and lazy layer codecs retain one schema; splitting moves serialization ownership to applications without removing feature bytes. Core/stage unchanged at 24209 B. Fusion labels 6529 to 6565 B, ceiling 6548 to 6821 B, for recording complete volume-source recipes; splitting would force callers to manually register one native layer kind or duplicate its state. Rebased sciviz/parcoords 8860 to 9276 B, ceiling 9126 to 9555 B: its shared SelectionStore retains portable brush/history state. Splitting that state from the linked controller would duplicate store ownership or change row identity; preserve the full optional API.",
+      "grew": 4
     }
   ],
   "items": {
@@ -8477,7 +8483,7 @@
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 23118,
     "@margoengine/sciviz/grids": 25269,
-    "@margoengine/sciviz/labels": 6548,
+    "@margoengine/sciviz/labels": 6821,
     "@margoengine/sciviz/lic": 24165,
     "@margoengine/sciviz/maths": 9120,
     "@margoengine/sciviz/netcdf": 3674,
@@ -8996,7 +9002,7 @@
     "@margoengine/sciviz/contour2d": 4058,
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/staging/caustics": 5703,
-    "@margoengine/sciviz/link": 4800,
+    "@margoengine/sciviz/link": 5335,
     "@margoengine/clustered/shadow-atlas": 14448,
     "@margoengine/post/curvature": 9209,
     "@margoengine/sciviz/export-vector": 4213,
@@ -9029,10 +9035,11 @@
     "@margoengine/sciviz/format": 7562,
     "@margoengine/sciviz/categorical": 22371,
     "@margoengine/sciviz/tetvolume": 6578,
-    "@margoengine/sciviz/parcoords": 9126,
+    "@margoengine/sciviz/parcoords": 9555,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/geo-vector": 26691,
-    "@margoengine/stage/lights": 1957
+    "@margoengine/stage/lights": 1957,
+    "@margoengine/sciviz/spec": 25645
   },
-  "total": 14526260
+  "total": 14555099
 }
