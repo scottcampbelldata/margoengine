@@ -20,6 +20,7 @@ import { SceneTarget } from '../../shared/msaa.js';
 import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -106,7 +107,7 @@ override manualSRGB:bool=true;
 @group(0) @binding(1) var image:texture_2d<f32>;
 ${sharpenCode}
 @fragment fn fragment(i:Fullscreen)->@location(0) vec4f {
- let out=max(margoSharpen(image,vec2i(i.clip.xy),sharpen.x),vec3f(0));
+ let out=max(margoSharpen(image,vec2i(i.clip.xy-sharpen.zw),sharpen.x),vec3f(0));
  return vec4f(select(out,select(out*12.92,1.055*pow(out,vec3f(1.0/2.4))-0.055,out>=vec3f(0.0031308)),manualSRGB),1);
 }`;
 
@@ -127,12 +128,12 @@ export class TAAUpscale implements EnginePlugin {
   private uniform?: GPUBuffer;
   private sharpenUniform?: GPUBuffer;
   private cameraBinding?: GPUBindGroupEntry;
-  private readonly values = new Float32Array(56);
+  protected readonly values = new Float32Array(56);
   private readonly last = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
   private readonly sharpenValue = new Float32Array(4);
   private scene?: GPUTexture;
-  private depth?: GPUTexture;
+  protected depth?: GPUTexture;
   private target?: SceneTarget;
   private lowTextures: GPUTexture[] = [];
   private histories: GPUTexture[] = [];
@@ -146,11 +147,24 @@ export class TAAUpscale implements EnginePlugin {
   private presentGroups: GPUBindGroup[] = [];
   private front = 0;
   private frame = 0;
-  private valid = false;
+  protected valid = false;
   private manual = '';
   private originalCamera?: Context['camera'];
   private cameraView?: Context['camera'];
   private saved?: { width: number; height: number };
+
+  /** Output rectangle used by optional view-aware upscalers. */
+  protected outputView?: Context['view'];
+
+  /** Specialises the temporal resolve without loading an optional renderer in this entry. */
+  protected resolveCode(code: string): string {
+    return code;
+  }
+
+  /** Additional resources of an optional temporal resolve. */
+  protected resolveEntries(): GPUBindGroupEntry[] {
+    return [];
+  }
 
   constructor(readonly options: TAAUpscaleOptions = {}) {
     this.validate();
@@ -215,7 +229,7 @@ export class TAAUpscale implements EnginePlugin {
     });
   }
 
-  private capture(c: Context): void {
+  protected capture(c: Context): void {
     this.validate();
     if (c.view)
       throw new MargoError('unsupported', 'TAAUpscale handles one full-canvas view; use TAA with several views');
@@ -304,7 +318,7 @@ export class TAAUpscale implements EnginePlugin {
             layout: 'auto',
             compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants: { manualSRGB } },
           });
-      this.resolvePipeline = compute(resolve);
+      this.resolvePipeline = compute(this.resolveCode(resolve));
       this.spatialPipeline = compute(spatial);
       const module = device.createShaderModule({ code: present });
       this.presentKey = '';
@@ -318,7 +332,6 @@ export class TAAUpscale implements EnginePlugin {
     }
     if (!rebuilt) return;
     const scene = this.scene!.createView(),
-      depth = this.depth!.createView({ aspect: 'depth-only' }),
       entries = (list: GPUBindingResource[], bindings: number[]) =>
         list.map((resource, i) => ({ binding: bindings[i], resource })),
       group = (pipeline: GPUComputePipeline | GPURenderPipeline, list: GPUBindGroupEntry[]) =>
@@ -329,23 +342,6 @@ export class TAAUpscale implements EnginePlugin {
     for (let i = 0; i < 2; i++) {
       const next = 1 - i,
         buffer = { buffer: this.uniform! };
-      this.resolveGroups.push(
-        group(
-          this.resolvePipeline!,
-          entries(
-            [
-              buffer,
-              scene,
-              depth,
-              this.histories[i].createView(),
-              this.depths[i].createView(),
-              this.histories[next].createView(),
-              this.depths[next].createView(),
-            ],
-            [0, 1, 2, 3, 4, 5, 6],
-          ),
-        ),
-      );
       this.spatialGroups.push(
         group(this.spatialPipeline!, entries([buffer, scene, this.histories[next].createView()], [0, 1, 5])),
       );
@@ -358,7 +354,7 @@ export class TAAUpscale implements EnginePlugin {
     }
   }
 
-  private finish(c: Context): void {
+  protected finish(c: Context): void {
     const saved = this.saved;
     if (!saved) return;
     this.saved = undefined;
@@ -370,6 +366,29 @@ export class TAAUpscale implements EnginePlugin {
     c.width = saved.width;
     c.height = saved.height;
     if (c.camera === this.cameraView) c.camera = this.originalCamera!;
+    if ((this.options.temporal ?? true) && !this.resolveGroups.length) {
+      const extra = this.resolveEntries();
+      this.resolveGroups = [0, 1].map((i) =>
+        c.device.createBindGroup({
+          layout: this.resolvePipeline!.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: this.uniform! } },
+            ...[
+              this.scene!,
+              this.depth!,
+              this.histories[i],
+              this.depths[i],
+              this.histories[1 - i],
+              this.depths[1 - i],
+            ].map((texture, index) => ({
+              binding: index + 1,
+              resource: texture.createView(index === 1 ? { aspect: 'depth-only' } : {}),
+            })),
+            ...extra,
+          ],
+        }),
+      );
+    }
     const temporal = this.options.temporal ?? true,
       compute = c.encoder.beginComputePass();
     compute.setPipeline(temporal ? this.resolvePipeline! : this.spatialPipeline!);
@@ -377,14 +396,29 @@ export class TAAUpscale implements EnginePlugin {
     compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     compute.end();
     const sharpen = this.options.sharpen ?? 0.2;
-    if (this.sharpenValue[0] !== Math.fround(sharpen) || !this.presentKey) {
+    const rect = this.outputView?.viewport;
+    if (
+      this.sharpenValue[0] !== Math.fround(sharpen) ||
+      !this.presentKey ||
+      this.sharpenValue[2] !== (rect?.[0] ?? 0) ||
+      this.sharpenValue[3] !== (rect?.[1] ?? 0)
+    ) {
       this.sharpenValue[0] = sharpen;
+      this.sharpenValue[2] = rect?.[0] ?? 0;
+      this.sharpenValue[3] = rect?.[1] ?? 0;
       this.presentKey = 'written';
       c.device.queue.writeBuffer(this.sharpenUniform!, 0, this.sharpenValue);
     }
     const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [
+        {
+          view: c.color,
+          loadOp: viewLoadOp({ width: c.width, height: c.height, view: this.outputView }, 'clear'),
+          storeOp: 'store',
+        },
+      ],
     });
+    applyView(pass, { width: c.width, height: c.height, view: this.outputView });
     pass.setPipeline(this.presentPipeline!);
     pass.setBindGroup(0, this.presentGroups[this.front]);
     pass.draw(3);
@@ -392,6 +426,19 @@ export class TAAUpscale implements EnginePlugin {
     this.front = 1 - this.front;
     this.valid = temporal;
     this.frame++;
+  }
+
+  /** Restores a capture abandoned by an optional pass, without copying a differently sized depth attachment. */
+  protected cancelCapture(c: Context): void {
+    if (this.saved) {
+      (this.target as unknown as { retired: boolean }).retired = true;
+      this.target!.restore(c);
+      c.width = this.saved.width;
+      c.height = this.saved.height;
+      this.saved = undefined;
+      if (c.camera === this.cameraView) c.camera = this.originalCamera!;
+    }
+    this.reset();
   }
 
   onDeviceRestored(engine: Engine): void {
@@ -414,7 +461,7 @@ export class TAAUpscale implements EnginePlugin {
     this.dispose();
   }
 
-  private release(): void {
+  protected release(): void {
     this.target?.dispose();
     for (const t of [...this.lowTextures, ...this.histories, ...this.depths]) t.destroy();
     this.uniform?.destroy();

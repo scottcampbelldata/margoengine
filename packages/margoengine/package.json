@@ -3794,6 +3794,10 @@
       "types": "./dist/taa/sharpen.d.ts",
       "import": "./dist/taa/sharpen.js"
     },
+    "./taa/upscale-velocity": {
+      "types": "./dist/taa/upscale-velocity.d.ts",
+      "import": "./dist/taa/upscale-velocity.js"
+    },
     "./terrain": {
       "types": "./dist/terrain.d.ts",
       "import": "./dist/terrain.js"

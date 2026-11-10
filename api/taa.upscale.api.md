@@ -4,19 +4,29 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export class TAAUpscale implements EnginePlugin {
     readonly options: TAAUpscaleOptions;
     readonly name = "taa-upscale";
+    protected readonly values: Float32Array<ArrayBuffer>;
+    protected depth?: GPUTexture;
+    protected valid: boolean;
+    protected outputView?: Context['view'];
+    protected resolveCode(code: string): string;
+    protected resolveEntries(): GPUBindGroupEntry[];
     constructor(options?: TAAUpscaleOptions);
     static attach(engine: EngineKernel, options?: TAAUpscaleOptions): TAAUpscale;
     reset(): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    protected capture(c: Context): void;
+    protected finish(c: Context): void;
+    protected cancelCapture(c: Context): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    protected release(): void;
 }
 
 export interface TAAUpscaleOptions {
@@ -27,4 +37,10 @@ export interface TAAUpscaleOptions {
     clampGamma?: number;
     sharpen?: number;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

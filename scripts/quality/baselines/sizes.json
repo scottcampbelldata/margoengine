@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13892021,
+  "total": 13911356,
   "history": [
     {
       "date": "2026-10-24",
@@ -7328,6 +7328,12 @@
       "commit": "911001992",
       "reason": "Batch 240 per-block GPU wind, shared shadow/depth/capture adapter and unit-cell tessellation",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "57d8d3296",
+      "reason": "Batch 192: taa/upscale ceiling 7303 to 7593 B for shared motion hooks and viewport presentation (7377 B measured); new taa/upscale-velocity 18598 B within a 19045 B ceiling includes existing per-object velocity renderer, upscaler and independent view histories. Splitting would add loading/state coordination and duplicate resolve contracts; root entries stay independent.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8284,7 +8290,8 @@
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 14629,
     "@margoengine/taa/sharpen": 1023,
-    "@margoengine/taa/upscale": 7303,
+    "@margoengine/taa/upscale": 7593,
+    "@margoengine/taa/upscale-velocity": 19045,
     "@margoengine/terrain": 13295,
     "@margoengine/terrain/blend": 3676,
     "@margoengine/terrain/deform": 5192,

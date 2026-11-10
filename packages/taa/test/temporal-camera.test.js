@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TAA } from '../dist/index.js';
+import { TAAUpscaleVelocity } from '../dist/upscale-velocity.js';
 import { TAAUpscale } from '../dist/upscale.js';
 import { unjitteredCamera } from '../../shared/temporal-camera.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { wgsl } from '../../core/src/shaders.ts';
-for (const Type of [TAA, TAAUpscale])
+for (const Type of [TAA, TAAUpscale, TAAUpscaleVelocity])
   test(`${Type.name} exposes the unjittered source only on its temporary wrapper`, () => {
     const gpu = mockGPU(),
       engine = {

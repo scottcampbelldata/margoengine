@@ -207,7 +207,7 @@ test('TAA draws every object velocity in one render pass and rewrites a mesh blo
     return begin.call(h.context.encoder, descriptor);
   };
   d.queue.writeBuffer = (buffer, ...rest) => {
-    if (buffer.size === 160) blocks++;
+    if (buffer.size === 160 && buffer.label !== 'TAA object camera') blocks++;
     return write.call(d.queue, buffer, ...rest);
   };
   try {

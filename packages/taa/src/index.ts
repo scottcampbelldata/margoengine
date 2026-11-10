@@ -135,6 +135,8 @@ export interface TAAVelocity {
    * order 9. Both frames' projections carry TAA's Halton jitter, so every vector also holds the jitter difference
    * `jitter`; subtract it for the scene's own motion. Replaced on resize and device restoration. */
   readonly texture: GPUTexture;
+  /** Previous reversed depth of the moving surface, r32float; a negative value rejects history. */
+  readonly expectedDepth: GPUTexture;
   /** This frame's jitter offset minus the previous frame's, in uv (x, y): the part of each vector that is not motion.
    * Zero on a frame without history (first frame, reset, resize). Updated in place every frame. */
   readonly jitter: Float32Array;
@@ -267,7 +269,7 @@ export class TAA implements EnginePlugin {
   private draws = new Map<Mesh, Map<object, Draw>>();
   /** The object velocity draws' shared camera block, and its rows. */
   private objectCamera?: GPUBuffer;
-  private readonly cameraRows = new Float32Array(36);
+  private readonly cameraRows = new Float32Array(40);
   private sources = new Set<VelocitySource | TAAVelocityPass>();
   private whiteTexture?: GPUTexture;
   private whiteView?: GPUTextureView;
@@ -279,8 +281,14 @@ export class TAA implements EnginePlugin {
   // Halton offsets in uv of this frame and of the last resolved one; `vectors.jitter` is their difference.
   private readonly offset = new Float32Array(2);
   private readonly lastOffset = new Float32Array(2);
-  private readonly vectors: { texture: GPUTexture; jitter: Float32Array; resolved?: GPUTexture } = {
+  private readonly vectors: {
+    texture: GPUTexture;
+    expectedDepth: GPUTexture;
+    jitter: Float32Array;
+    resolved?: GPUTexture;
+  } = {
     texture: undefined!,
+    expectedDepth: undefined!,
     jitter: new Float32Array(2),
   };
   private originalCamera?: Context['camera'];
@@ -391,7 +399,12 @@ export class TAA implements EnginePlugin {
       this.reset();
     };
   }
-  reset(): void {
+  /** Discards history for every view, or only the named engine view when viewId is supplied. */
+  reset(viewId?: string): void {
+    if (viewId !== undefined) {
+      this.views.find(viewId)?.reset();
+      return;
+    }
     this.valid = false;
     for (const view of this.views.values()) view.reset();
   }
@@ -718,7 +731,11 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     camera.end();
     // Every object draw's camera rows: this frame's matrix, the previous one (into the target) and the size and history
     // flag, written once a frame.
-    this.objectCamera ??= c.device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.objectCamera ??= c.device.createBuffer({
+      label: 'TAA object camera',
+      size: 160,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     const block = this.cameraRows;
     block.set(c.camera.matrix);
     block.set(this.valid ? this.previous : c.camera.matrix, 16);
@@ -726,6 +743,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     block[32] = c.width;
     block[33] = c.height;
     block[34] = +this.valid;
+    const rect = viewRect(c);
+    block.set(rect ? [rect[2] / c.width, rect[3] / c.height, rect[0] / c.width, rect[1] / c.height] : [1, 1, 0, 0], 36);
     c.device.queue.writeBuffer(this.objectCamera, 0, block as Float32Array<ArrayBuffer>);
     const pending: { r: Draw; p: VelocityPrimitive }[] = [],
       submitted = new Map<Mesh, Set<object>>(),
@@ -1104,7 +1123,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (drawers.length) {
       const frame: TAAVelocityFrame = {
         context: c,
-        camera: this.cameraRows,
+        camera: this.cameraRows.subarray(0, 36),
         key: this,
         targets: [{ format: 'rg16float' }, { format: 'r32float' }],
         depthStencil: { format: c.descriptor.depthStencil!.format, depthWriteEnabled: false, depthCompare: 'equal' },
@@ -1164,6 +1183,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const only = this.options.velocityOnly;
     if (!this.velocityTarget || (!only && !this.histories.length) || !this.frame) return undefined;
     this.vectors.texture = this.velocityTarget;
+    this.vectors.expectedDepth = this.expected!;
     this.vectors.resolved = only ? undefined : this.histories[this.front];
     return this.vectors;
   }

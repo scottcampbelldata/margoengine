@@ -26,7 +26,8 @@
   "scripts": {
     "test": "node --test ../../tests/modern-temporal*.test.js ../../tests/deep-render-jitter.test.js ../../tests/deep-render-taa-failures.test.js test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/taa/test/upscale-browser.mjs && node packages/taa/test/velocity-only-browser.mjs && node packages/taa/test/reactive-browser.mjs && node packages/taa/test/rejection-browser.mjs && node packages/taa/test/sharpen-browser.mjs && node packages/taa/test/xr-browser.mjs && node packages/taa/test/deform-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/taa/test/upscale-browser.mjs && node packages/taa/test/velocity-only-browser.mjs && node packages/taa/test/reactive-browser.mjs && node packages/taa/test/rejection-browser.mjs && node packages/taa/test/sharpen-browser.mjs && node packages/taa/test/xr-browser.mjs && node packages/taa/test/deform-browser.mjs && node packages/taa/test/upscale-velocity-browser.mjs",
+    "test:gpu:compat": "cd ../.. && node packages/taa/test/upscale-velocity-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
@@ -41,6 +42,10 @@
     "./sharpen": {
       "types": "./dist/sharpen.d.ts",
       "import": "./dist/sharpen.js"
+    },
+    "./upscale-velocity": {
+      "types": "./dist/upscale-velocity.d.ts",
+      "import": "./dist/upscale-velocity.js"
     }
   },
   "files": [

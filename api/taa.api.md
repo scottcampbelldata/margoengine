@@ -12,7 +12,7 @@ export class TAA implements EnginePlugin {
     constructor(options?: TAAOptions);
     static attach(instance: EngineKernel, options?: TAAOptions): TAA;
     add(source: VelocitySource | TAAVelocityPass): () => void;
-    reset(): void;
+    reset(viewId?: string): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -48,6 +48,7 @@ export interface TAAPresent {
 
 export interface TAAVelocity {
     readonly texture: GPUTexture;
+    readonly expectedDepth: GPUTexture;
     readonly jitter: Float32Array;
     readonly resolved?: GPUTexture;
 }

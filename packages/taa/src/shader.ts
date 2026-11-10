@@ -30,27 +30,33 @@ export function objectVelocity(
   before?: { move: readonly string[]; binding: number },
 ): string {
   let code = `${opacity ? opacityCode(0, 5) : ''}
-struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f}
+struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f,viewport:vec4f}
 struct ObjectFrame {model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> f:ObjectFrame;
 @group(0) @binding(4) var<uniform> camera:ObjectCamera;
 ${pbr ? '@group(0) @binding(1) var<storage,read> previousVertices:array<vec4f>;\n@group(0) @binding(2) var alphaMap:texture_2d<f32>;\n@group(0) @binding(3) var alphaSampler:sampler;' : ''}
 struct Input {@location(0) position:${pbr ? 'vec4f' : 'vec3f'}${pbr ? ',@location(1) uv:vec4f,@location(2) color:vec4f' : ''}}
-struct Out {@builtin(position) clip:vec4f,@location(0) previous:vec4f${pbr ? ',@location(1) uv:vec4f,@location(2) alpha:f32' : ''}}
+struct Out {@builtin(position) clip:vec4f,@location(4) current:vec4f,@location(0) previous:vec4f${pbr ? ',@location(1) uv:vec4f,@location(2) alpha:f32' : ''}}
 @vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)->Out {var o:Out;let p=vec4f(i.position.xyz,1);let valid=f.settings.z*camera.settings.z>0;${pbr ? 'let world=f.model*p;o.clip=camera.current*world;' : 'o.clip=camera.current*f.model*p;'}
   ${pbr ? 'let old=select(p,vec4f(previousVertices[index*5].xyz,1),valid);' : 'let old=p;'}
-  o.previous=camera.previous*f.previousModel*old;if(!valid){o.previous.w=-1;}
+  o.current=o.clip;o.previous=camera.previous*f.previousModel*old;if(!valid){o.previous.w=-1;}
   ${pbr ? 'o.uv=i.uv;o.alpha=i.color.a;' : ''}return o;}
 ${motion}
 @fragment fn fragment(i:Out)->Motion {${pbr ? 'var uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);' + (transformed ? 'uv=vec2f(dot(f.alphaUV0.xy,uv)+f.alphaUV0.z,dot(f.alphaUV1.xy,uv)+f.alphaUV1.z);' : '') + `let alpha=textureSample(alphaMap,alphaSampler,uv).a*${opacity ? 'margoOpacityAt(i.uv)*' : ''}i.alpha*f.alpha.x;if(alpha<f.alpha.y){discard;}` : ''}
-  return motion(i.clip.xy/camera.settings.xy,i.previous);}`;
+  // Both positions use the same perspective interpolation. Fragment position includes raster subpixel snapping,
+  // which otherwise appears as false velocity even when the surface has only projection jitter.
+  let current=(i.current.xy/i.current.w*vec2f(0.5,-0.5)+0.5)*camera.viewport.xy+camera.viewport.zw;
+  return motion(current,i.previous);}`;
   if (solid) code = solidVertexDepth(code);
   // The previous frame's vertex moves by the same amount: a map or scale changing moves a surface without any velocity.
   if (graph)
     code = graph(
       code
         .replace(',@location(1) uv:vec4f,', ',@location(3) normal:vec4f,@location(1) uv:vec4f,')
-        .replace('let p=vec4f(i.position.xyz,1);', 'let shift=margoPosition-i.position.xyz;let p=vec4f(margoPosition,1);')
+        .replace(
+          'let p=vec4f(i.position.xyz,1);',
+          'let shift=margoPosition-i.position.xyz;let p=vec4f(margoPosition,1);',
+        )
         .replace('vec4f(previousVertices[index*5].xyz,1)', 'vec4f(previousVertices[index*5].xyz+shift,1)'),
       1,
     );
