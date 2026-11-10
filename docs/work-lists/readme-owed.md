@@ -1549,3 +1549,4 @@ in the post README during the README phase (2026-11-10); all 28 runtime examples
 - @margoengine/text batch 169 job 2: DONE; deterministic custom-measurer README example covers per-call pair/prefix reuse, checked by check:readme-run. Existing unrelated text README debts remain separate.
 
 - @margoengine/sciviz (batch 182): runnable isotropic volume, bench helper and rival-comparison sections completed in the README phase (2026-11-10); examples checked with check:readme-run before the push.
+- @margoengine/mesh-edit batch 169 job 3: DONE; subdivideMesh README notes numeric edge indexing, Blender position match and the planar face-count difference, with a runnable example checked by check:readme-run.

@@ -4716,6 +4716,14 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 mesh-edit subdivision work (2026-11-10)
+
+`subdivideMesh` parses no string edge IDs: three cube levels need 0 parses instead of
+1260, with identical output bytes over 20 subdivisions. Blender 5.3's Subdivision
+Surface modifier gives the same vertices within 1.52e-7. Regression:
+`packages/mesh-edit/tests/subdivide-workcount.test.js`; [oracle and
+sources](batch-169.md#job-3-mesh-edit-subdivision-edges). No timing claim.
+
 ### Batch 169 text measurement work (2026-11-10)
 
 Text layout reuses already measured logical kerning and shaped prefix advances.

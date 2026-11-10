@@ -1,6 +1,6 @@
 import type { MutableVec2, MutableVec3 } from '@margoengine/math';
 import { assertOptions } from './edit-support.js';
-import { assertPolygonMesh, collectPolygonEdges, edgeId, faceGeometryError } from './polygon.js';
+import { assertPolygonMesh, collectPolygonEdges, faceGeometryError } from './polygon.js';
 import { loopFaces } from './polygon-split.js';
 import { createMeshEditResult, faceIdFactory } from './result.js';
 import type { MeshEditOptions, MeshEditResult, PolygonFace, PolygonMesh } from './types.js';
@@ -98,68 +98,87 @@ interface Loops {
 /** One Catmull-Clark step over position loops and their face-varying UVs. */
 function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smooth' | 'pinned'): Loops {
   const P = mesh.vertices,
-    V = P.length;
-  // Edges: faces on each, keyed by canonical ID.
-  const edgeFaces = new Map<string, number[]>();
-  mesh.faces.forEach((face, f) =>
+    V = P.length,
+    F = mesh.faces.length;
+  // Edges in first-use order with numeric canonical endpoints (lower index first) and their faces. Each corner keeps
+  // the index of the edge leaving it, so no string edge ID is built or parsed back into numbers.
+  const edgeIndex = new Map<number, number>(),
+    edgeA: number[] = [],
+    edgeB: number[] = [],
+    edgeFaces: number[][] = [],
+    cornerBase: number[] = [],
+    cornerEdge: number[] = [];
+  mesh.faces.forEach((face, f) => {
+    cornerBase.push(cornerEdge.length);
     face.vertices.forEach((a, c) => {
-      const id = edgeId(a, face.vertices[(c + 1) % face.vertices.length]),
-        list = edgeFaces.get(id);
-      if (list) list.push(f);
-      else edgeFaces.set(id, [f]);
-    }),
-  );
+      const b = face.vertices[(c + 1) % face.vertices.length],
+        id = a < b ? a * V + b : b * V + a; // Exact: V stays far below 2 ** 26 under the face limit.
+      let e = edgeIndex.get(id);
+      if (e === undefined) {
+        e = edgeA.length;
+        edgeIndex.set(id, e);
+        edgeA.push(a < b ? a : b);
+        edgeB.push(a < b ? b : a);
+        edgeFaces.push([f]);
+      } else edgeFaces[e].push(f);
+      cornerEdge.push(e);
+    });
+  });
+  const E = edgeA.length,
+    other = (e: number, v: number) => (edgeA[e] === v ? edgeB[e] : edgeA[e]);
   const facePoint = mesh.faces.map((face) => average(face.vertices.map((v) => P[v])) as MutableVec3),
     out: MutableVec3[] = P.map((p) => [...p] as MutableVec3);
-  // New vertex layout: old vertices, then face points, then edge points.
+  // New vertex layout: old vertices, then face points, then edge points (edge e at V + F + e).
   for (const point of facePoint) out.push(point);
-  const edgePoint = new Map<string, number>();
-  for (const [id, faces] of edgeFaces) {
-    const [a, b] = id.split(':').map(Number),
-      point =
-        faces.length === 2 ? average([P[a], P[b], facePoint[faces[0]], facePoint[faces[1]]]) : average([P[a], P[b]]);
-    edgePoint.set(id, out.length);
-    out.push(point as MutableVec3);
+  for (let e = 0; e < E; e++) {
+    const a = edgeA[e],
+      b = edgeB[e],
+      faces = edgeFaces[e];
+    out.push(
+      (faces.length === 2
+        ? average([P[a], P[b], facePoint[faces[0]], facePoint[faces[1]]])
+        : average([P[a], P[b]])) as MutableVec3,
+    );
   }
   // Vertex points.
   const incidentFaces: number[][] = Array.from({ length: V }, () => []),
-    incidentEdges: string[][] = Array.from({ length: V }, () => []);
+    incidentEdges: number[][] = Array.from({ length: V }, () => []);
   mesh.faces.forEach((face, f) => {
     for (const v of face.vertices) incidentFaces[v].push(f);
   });
-  for (const id of edgeFaces.keys()) for (const v of id.split(':').map(Number)) incidentEdges[v].push(id);
+  for (let e = 0; e < E; e++) {
+    incidentEdges[edgeA[e]].push(e);
+    incidentEdges[edgeB[e]].push(e);
+  }
   for (let v = 0; v < V; v++) {
     const edges = incidentEdges[v];
     if (!edges.length) continue;
-    const border = edges.filter((id) => edgeFaces.get(id)!.length === 1);
+    const border = edges.filter((e) => edgeFaces[e].length === 1);
     if (border.length) {
       if (boundary === 'pinned' || border.length !== 2 || edges.length === 2) continue;
-      const [a, b] = border.map((id) => other(id, v));
+      const [a, b] = border.map((e) => other(e, v));
       out[v] = P[v].map((x, axis) => (P[a][axis] + 6 * x + P[b][axis]) / 8) as MutableVec3;
       continue;
     }
     const n = edges.length,
       Q = average(incidentFaces[v].map((f) => facePoint[f])),
-      R = average(edges.map((id) => average([P[v], P[other(id, v)]])));
+      R = average(edges.map((e) => average([P[v], P[other(e, v)]])));
     out[v] = P[v].map((x, axis) => (Q[axis] + 2 * R[axis] + (n - 3) * x) / n) as MutableVec3;
   }
   // Face-varying UVs: corners join a UV vertex when their faces share an edge with equal UVs at both ends.
-  const cornerBase: number[] = [];
-  let corners = 0;
-  for (const face of mesh.faces) {
-    cornerBase.push(corners);
-    corners += face.vertices.length;
-  }
-  const parent = Array.from({ length: corners }, (_, i) => i),
+  const corners = cornerEdge.length,
+    parent = Array.from({ length: corners }, (_, i) => i),
     find = (i: number): number => {
       while (parent[i] !== i) i = parent[i] = parent[parent[i]];
       return i;
     },
     same = (x: readonly number[], y: readonly number[]) => x[0] === y[0] && x[1] === y[1],
-    uvSeam = new Set<string>();
-  for (const [id, faces] of edgeFaces) {
+    uvSeam: boolean[] = new Array(E).fill(false);
+  for (let e = 0; e < E; e++) {
+    const faces = edgeFaces[e];
     if (faces.length !== 2) continue;
-    const [a, b] = id.split(':').map(Number),
+    const a = edgeA[e],
+      b = edgeB[e],
       [f, g] = faces,
       cf = (face: number, v: number) => mesh.faces[face].vertices.indexOf(v),
       fa = cf(f, a),
@@ -170,7 +189,7 @@ function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smoo
     if (uvMode === 'smooth' && same(U(f, fa), U(g, ga)) && same(U(f, fb), U(g, gb))) {
       parent[find(cornerBase[f] + fa)] = find(cornerBase[g] + ga);
       parent[find(cornerBase[f] + fb)] = find(cornerBase[g] + gb);
-    } else uvSeam.add(id);
+    } else uvSeam[e] = true;
   }
   // Per UV vertex: its corners, and whether it sits on a UV border (seam or open edge).
   const uvAt = (f: number, c: number) => mesh.faces[f].uv[c],
@@ -195,8 +214,8 @@ function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smoo
       const interior =
         edges.length > 0 &&
         edges.every((id) => {
-          const faces = edgeFaces.get(id)!;
-          return faces.length === 2 && !uvSeam.has(id) && faces.every((g) => list.some((item) => item.f === g));
+          const faces = edgeFaces[id];
+          return faces.length === 2 && !uvSeam[id] && faces.every((g) => list.some((item) => item.f === g));
         });
       if (!interior) {
         smoothUV.set(root, [...here] as MutableVec2);
@@ -221,21 +240,19 @@ function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smoo
       centerUV = faceUV[f] as MutableVec2;
     for (let c = 0; c < n; c++) {
       const v = face.vertices[c],
-        next = face.vertices[(c + 1) % n],
-        prev = face.vertices[(c + n - 1) % n],
-        nextId = edgeId(v, next),
-        prevId = edgeId(prev, v),
+        nextId = cornerEdge[cornerBase[f] + c],
+        prevId = cornerEdge[cornerBase[f] + ((c + n - 1) % n)],
         uvHere = uvMode === 'smooth' ? smoothUV.get(find(cornerBase[f] + c))! : uvAt(f, c),
-        edgeUV = (a: number, b: number, id: string): MutableVec2 => {
-          const faces = edgeFaces.get(id)!,
+        edgeUV = (a: number, b: number, id: number): MutableVec2 => {
+          const faces = edgeFaces[id],
             mid = average([uvAt(f, a), uvAt(f, b)]);
-          if (uvMode !== 'smooth' || faces.length !== 2 || uvSeam.has(id)) return mid as MutableVec2;
+          if (uvMode !== 'smooth' || faces.length !== 2 || uvSeam[id]) return mid as MutableVec2;
           const g = faces[0] === f ? faces[1] : faces[0];
           return average([uvAt(f, a), uvAt(f, b), centerUV, faceUV[g]]) as MutableVec2;
         };
       faces.push({
         source: face.source,
-        vertices: [v, edgePoint.get(nextId)!, center, edgePoint.get(prevId)!],
+        vertices: [v, V + F + nextId, center, V + F + prevId],
         uv: [
           [...uvHere] as MutableVec2,
           edgeUV(c, (c + 1) % n, nextId),
@@ -248,10 +265,6 @@ function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smoo
   return { vertices: out, faces };
 }
 
-const other = (id: string, v: number) => {
-  const [a, b] = id.split(':').map(Number);
-  return a === v ? b : a;
-};
 
 function average<T extends readonly number[]>(points: readonly T[]): number[] {
   const sum = new Array(points[0].length).fill(0);

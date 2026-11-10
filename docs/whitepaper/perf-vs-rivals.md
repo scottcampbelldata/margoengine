@@ -197,6 +197,15 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 mesh-edit: work counts, 2026-11-10
+
+| Work | Before | After | Output | Black-box oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| Cube, three Catmull-Clark levels | 1260 edge-ID parses | 0 parses | 20 subdivisions, 482650 identical bytes | Blender 5.3 Subdivision Surface: every vertex matches, max 1.52e-7 (Float32); Blender keeps curved quads, Margo splits them into planar triangle pairs (2x faces) | `perf(mesh-edit): index subdivision edges numerically`; timing pending the quiet rerun |
+
+The face-count difference is an accepted work difference (planar faces). Values and
+commands: [batch-169.md](batch-169.md#job-3-mesh-edit-subdivision-edges). No rival timing.
+
 ## Batch 169 text: work counts, 2026-11-10
 
 | Work | Before | After | Output | Status |

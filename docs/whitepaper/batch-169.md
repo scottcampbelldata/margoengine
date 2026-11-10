@@ -6,11 +6,53 @@ No wall-clock benchmarks or budget changes. Timing pending the quiet rerun.
 | --- | --- | --- | --- |
 | 1 | ui | DONE in `perf(ui): memoize intrinsic layout per call` | 24 to 2 leaf measurements; identical layout bytes; five Yoga oracle fixtures |
 | 2 | text | DONE in `perf(text): reuse logical kerning and shaped prefix advances` | 1198 to 599 pair calls; 35 to 18 prefix calls; 35 byte-identical layouts; Canvas/Troika value oracle |
-| 3 | mesh-edit | Pending | Subdivision oracle and work count |
+| 3 | mesh-edit | DONE in `perf(mesh-edit): index subdivision edges numerically` | 1260 to 0 edge-ID parses; 482650 identical bytes; Blender 5.3 vertices match within Float32 |
 | 4 | splines | Pending | Curve values and work count |
 | 5 | terrain | Pending | Source-height and clipmap error |
 | 6 | wfc | Pending | Constraint satisfaction and work count |
 | 7 | procedural | Pending | Published noise values, Poisson spacing and work count |
+
+## Job 3: mesh-edit subdivision edges
+
+Cause: each Catmull-Clark level keyed edges by canonical string IDs (`"a:b"`), then parsed
+those strings back into numbers for every edge point, every vertex-edge incidence, every
+UV seam test and every neighbor lookup, and rebuilt two IDs per corner to find the new
+quad's edge points. Three cube levels parsed 1260 IDs. The change indexes each edge once
+per level by numeric endpoints (lower index first, the same canonical order), keeps the
+edge leaving each corner and uses edge indices for seams and edge points. Edge, vertex
+and incidence orders are unchanged, so every sum runs in the original order. No export,
+option, core/stage byte or optional import changes.
+
+`packages/mesh-edit/tests/subdivide-workcount.test.js` requires zero `":"` parses (parent
+1260) and hashes 20 subdivisions (cube, plane, cylinder, wedge and a folded strip with a
+UV seam; levels 1 to 3; smooth/linear UVs; smooth/pinned borders). Positions, UVs, face
+IDs, loops, face maps and created vertices retain 482650 bytes, SHA-256
+`ce11636eb6f157726d6ec7155b57c1d390d10f9563b38ba7c30bc73d7d2433b1`, captured on the parent.
+
+Black-box oracle: Blender 5.3.0 Beta (`C:/blender`, driven through its documented Python
+API) applies the Subdivision Surface modifier, Catmull-Clark, limit surface off, creases
+off, boundary smooth `PRESERVE_CORNERS`. All vertices of cube, cylinder, wedge and an
+open 2x2 grid at levels 1 and 2 match one to one: 26/98, 50/194, 20/74, 25/81 vertices.
+Largest coordinate differences are 1.66e-8, 6.29e-8, 5.10e-8, 1.52e-7, 3.20e-8, 6.73e-8,
+0 and 0, within Blender's Float32 storage. Face counts differ by design: Margo keeps
+faces planar and splits each curved quad into two triangles (cube L1: 48 against 24),
+so a curved result holds twice Blender's faces; flat results (open grid: 16 and 64) are
+equal. This is an accepted work difference recorded in limits.md, not a speed claim.
+
+Reproduce after `npm run build:packages`:
+`node --test packages/mesh-edit/tests/subdivide-workcount.test.js` and
+`node scripts/bp-169-mesh-oracle.mjs --blender=<path to blender.exe>`. The runner writes
+its Python script and data to a temporary folder outside the repository and measures
+no time.
+
+Research: E. Catmull and J. Clark, *Recursively generated B-spline surfaces on arbitrary
+topological meshes*, Computer-Aided Design 10(6), 1978,
+https://doi.org/10.1016/0010-4485(78)90110-0; T. DeRose, M. Kass and T. Truong,
+*Subdivision Surfaces in Character Animation*, SIGGRAPH 1998,
+https://doi.org/10.1145/280814.280826 (boundary and face-varying rules); Blender Manual,
+*Subdivision Surface Modifier* (accessed 2026-11-10),
+https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/subdivision_surface.html.
+The rules are unchanged; only the edge bookkeeping changed. No Blender source was read.
 
 ## Job 1: UI intrinsic measurements
 

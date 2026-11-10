@@ -3300,6 +3300,14 @@ No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.
 
 `perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.
 
+### Batch 169 job 3: mesh-edit subdivision edges (2026-11-10)
+
+`perf(mesh-edit): index subdivision edges numerically` replaces string edge IDs inside
+each Catmull-Clark level with numeric edge indices. Three cube levels fall from 1260
+edge-ID parses to 0; 20 subdivisions keep all 482650 output bytes. Blender 5.3 matches
+every vertex within Float32. [Methods](batch-169.md#job-3-mesh-edit-subdivision-edges).
+Timing pending the quiet rerun; no runtime speed claim.
+
 ### Batch 169 job 2: text measurement reuse (2026-11-10)
 
 `perf(text): reuse logical kerning and shaped prefix advances` reduces the pair

@@ -6654,6 +6654,15 @@ Batch 162 lathe/tube angular reuse: per-call Float64 tables add 16 bytes per ang
 
 Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
 
+### Subdivision face counts against Blender (batch 169, 2026-11-10)
+
+`subdivideMesh` keeps every face planar, so each curved quad of the result is stored as
+two triangles; Blender's Subdivision Surface modifier keeps curved quads. Vertex positions
+match Blender 5.3 within its Float32 storage (largest 1.52e-7 on the tested cube, cylinder,
+wedge and open grid), but curved results hold twice Blender's faces (cube level 1: 48
+against 24). Flat results are equal. Accepted work difference: planar faces are a
+mesh-edit invariant. [Values](whitepaper/batch-169.md#job-3-mesh-edit-subdivision-edges).
+
 ### Text measurement reuse and oracle scope (batch 169, 2026-11-10)
 
 `layoutText` reuses logical kerning only when visual neighbors retain their original

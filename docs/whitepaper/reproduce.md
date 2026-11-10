@@ -3973,6 +3973,13 @@ This checks seven parent geometry stream digests and exact angular call counts.
 
 [Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.
 
+### Batch 169 mesh-edit subdivision work count
+
+After build:packages run `node --test packages/mesh-edit/tests/subdivide-workcount.test.js`
+and, with Blender installed outside the repository,
+`node scripts/bp-169-mesh-oracle.mjs --blender=<path to blender.exe>`; see
+[batch-169.md](batch-169.md#job-3-mesh-edit-subdivision-edges). Timing pending the quiet rerun.
+
 ### Batch 169 text measurement work count
 
 [Text commands and sources](batch-169.md#job-2-reproduction-and-research) include the

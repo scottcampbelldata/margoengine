@@ -158,6 +158,18 @@ console.log(triangles.length, pieces.length, imported.mesh.faces.length, cut.cut
   face-varying mesh: smoothed inside each island, linear on seams and island corners (`'linear'` interpolates each
   face). Because faces stay planar, curved quads are split into two triangles; flat areas keep quads. Up to 4 levels
   and 200000 output faces.
+  Each level indexes every edge once by its numeric endpoints, so no string edge ID is parsed during subdivision.
+  Positions match Blender 5.3's Subdivision Surface modifier (limit surface off, corners kept) within its Float32
+  storage; Blender keeps curved quads whole, so it reports half Margo's face count on curved results:
+
+```ts
+import { createPrimitiveMesh } from '@margoengine/mesh-edit';
+import { subdivideMesh } from '@margoengine/mesh-edit/modeling';
+
+let id = 0;
+const once = subdivideMesh(createPrimitiveMesh('cube', 'box'), { createId: () => `s${id++}` }).mesh;
+console.log(once.vertices.length, once.faces.length); // 26 48: 24 curved quads, each as two planar triangles
+```
 ## Smooth and relax
 
 Clean a scan or soften a blocky edit without losing size:
