@@ -4889,4 +4889,4 @@ Build-phase follow-up outside batch 176 job 1: legacy parseVTKXML mislabels mixe
 
 The lane rebase helper counted only @margoengine rows when rebuilding the shared API summary, omitting margoengine kits from its header. The next full api:update regenerates the header and table from emitted declarations, and api:check requires exact agreement. No public implementation changed; future shared-doc merges include the umbrella row before the normal generated check.
 
-
+Batch 177 job 2: no open correctness defect after statistical formula, missing-step, constant-axis, input-code and hash regressions. LOESS confidence coverage is an explicitly approximate conditional model, documented in limits.md; simultaneous/prediction intervals are outside this job's mean-band claim. NASA live TAP returned HTTP 503 on both official hosts; the demo's pinned public table snapshot avoids a runtime network dependency and records its date and source.

@@ -14,6 +14,16 @@ export interface Bins {
     readonly counts: Float64Array;
 }
 
+export interface BoxSummary {
+    readonly count: number;
+    readonly q1: number;
+    readonly median: number;
+    readonly q3: number;
+    readonly lower: number;
+    readonly upper: number;
+    readonly outliers: readonly number[];
+}
+
 export const CORNERS: readonly (readonly [number, number, number])[];
 
 export const EDGES: readonly (readonly [number, number])[];
@@ -44,6 +54,34 @@ export type SelectRegion = {
 } | {
     readonly polygon: ArrayLike<number>;
 };
+
+export interface StatisticalErrors {
+    readonly xMinus?: ArrayLike<number>;
+    readonly xPlus?: ArrayLike<number>;
+    readonly yMinus?: ArrayLike<number>;
+    readonly yPlus?: ArrayLike<number>;
+}
+
+export interface StatisticalHexbin {
+    readonly center: StatisticalPoint;
+    readonly vertices: readonly StatisticalPoint[];
+    readonly indices: readonly number[];
+    readonly count: number;
+}
+
+export type StatisticalPoint = readonly [number, number];
+
+export interface StatisticalStack {
+    readonly lower: Float64Array;
+    readonly upper: Float64Array;
+}
+
+export interface StatisticalTrendPoint {
+    readonly x: number;
+    readonly y: number;
+    readonly lower: number;
+    readonly upper: number;
+}
 
 export interface StreamlineOptions {
     readonly step?: number;
@@ -78,6 +116,8 @@ export function barRects(x: ArrayLike<number>, y: ArrayLike<number>, options?: {
     readonly base?: number;
 }): Float32Array;
 
+export function boxSummary(values: ArrayLike<number>, whisker?: number): BoxSummary;
+
 export function caseTriangles(mask: number): number[][];
 
 export function cubeTables(): {
@@ -87,6 +127,12 @@ export function cubeTables(): {
 };
 
 export function dateTicks(min: number, max: number, count?: number): Ticks;
+
+export function density2D(x: ArrayLike<number>, y: ArrayLike<number>, gridX: ArrayLike<number>, gridY: ArrayLike<number>, bandwidth?: readonly [number, number]): Float64Array;
+
+export function empiricalCDF(values: ArrayLike<number>): StatisticalPoint[];
+
+export function errorBarSegments(x: ArrayLike<number>, y: ArrayLike<number>, errors: StatisticalErrors): readonly (readonly [StatisticalPoint, StatisticalPoint])[];
 
 export function formatDate(ms: number, step: number, months?: number): string;
 
@@ -100,9 +146,30 @@ export function heatmapRects(values: ArrayLike<number>, nx: number, ny: number, 
 
 export function heightAt(grid: HeightGrid, x: number, y: number): number;
 
+export function hexbin2D(x: ArrayLike<number>, y: ArrayLike<number>, radius: number): StatisticalHexbin[];
+
 export function histogram(values: ArrayLike<number>, options?: BinOptions): Bins;
 
 export function inRegion(x: number, y: number, region: SelectRegion): boolean;
+
+export function kernelDensity(values: ArrayLike<number>, at: ArrayLike<number>, bandwidth?: number): StatisticalPoint[];
+
+export function linearTrend(x: ArrayLike<number>, y: ArrayLike<number>, options?: {
+    readonly at?: ArrayLike<number>;
+    readonly confidence?: number;
+}): {
+    readonly slope: number;
+    readonly intercept: number;
+    readonly points: readonly StatisticalTrendPoint[];
+    readonly residualVariance: number;
+};
+
+export function loessTrend(x: ArrayLike<number>, y: ArrayLike<number>, options?: {
+    readonly at?: ArrayLike<number>;
+    readonly span?: number;
+    readonly iterations?: number;
+    readonly confidence?: number;
+}): StatisticalTrendPoint[];
 
 export function logTicks(min: number, max: number, count?: number): Ticks;
 
@@ -114,6 +181,8 @@ export function nearestPoint(matrix: ArrayLike<number>, positions: ArrayLike<num
 export function niceNumber(x: number, round: boolean): number;
 
 export function pointInPolygon(x: number, y: number, polygon: ArrayLike<number>): boolean;
+
+export function quantilePairs(values: ArrayLike<number>, reference: ArrayLike<number>, count?: number): StatisticalPoint[];
 
 export function rayHeightField(origin: readonly [number, number, number], direction: readonly [number, number, number], grid: HeightGrid): {
     x: number;
@@ -133,10 +202,18 @@ export function screenRay(matrix: ArrayLike<number>, width: number, height: numb
 
 export function selectPoints(matrix: ArrayLike<number>, positions: ArrayLike<number>, width: number, height: number, region: SelectRegion): Uint32Array;
 
+export function silvermanBandwidth(values: ArrayLike<number>): number;
+
+export function stackSeries(series: readonly ArrayLike<number>[], normalize?: boolean): StatisticalStack[];
+
+export function stepSeries(x: ArrayLike<number>, y: ArrayLike<number>, mode?: 'pre' | 'post' | 'mid'): StatisticalPoint[];
+
 export function streamline(grid: VectorGrid, seed: readonly [number, number, number], options?: StreamlineOptions): {
     positions: Float64Array;
     speeds: Float64Array;
 };
+
+export function studentTCritical(df: number, confidence?: number): number;
 
 export function ticks(min: number, max: number, count?: number): Ticks;
 ```

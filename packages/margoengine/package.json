@@ -3430,6 +3430,10 @@
       "types": "./dist/sciviz/datasets.d.ts",
       "import": "./dist/sciviz/datasets.js"
     },
+    "./sciviz/stats": {
+      "types": "./dist/sciviz/stats.d.ts",
+      "import": "./dist/sciviz/stats.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

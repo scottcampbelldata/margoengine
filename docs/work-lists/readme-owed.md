@@ -1007,3 +1007,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 176 job 1): document generated sciviz/datasets forwarding after the build phase.
 - @margoengine/cutscene (batch 217 job 3): document scroll RangePlayback/ScrollPlayback, ranges/directions/iteration counts, update ownership, event endpoints, cancellation, scrub defaults, source bounds and disposal; examples deferred.
 - margoengine (batch 217 job 3): document generated cutscene/scroll alias.
+
+- @margoengine/sciviz and margoengine/sciviz/stats (batch 177 job 2): all statistical charts, /maths exports, confidence/robustness assumptions, defaults, missing values and real GHCN/NASA vector demo.

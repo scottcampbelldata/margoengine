@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "file": "ghcn.json",
+      "source": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/all/USW00094728.dly",
+      "license": "US government public domain",
+      "reduction": "Central Park NYC USW00094728, 2020 paired TMIN/TMAX; tenths C to C, missing -9999 and nonblank quality flags omitted",
+      "sourceSHA256": "39c442076805892c60f5b131232ca98dbf9f9bbf7c28d3848fe6da2d52c78445",
+      "sha256": "a6da53e575d0f8075db187f83bba88d8f7ec8edcf799215d3c8855d77fa58358"
+    },
+    {
+      "file": "exoplanets.json",
+      "source": "https://raw.githubusercontent.com/hannahrvs/Planetary-Composite-Data/a0d5fee61a002a349ea9d72fa450d5310b7c5947/Planetary%20Data%20Composite%20Data%20-%20PSCompPars_2026.05.30_18.25.02.csv",
+      "license": "Public NASA Exoplanet Archive data; acknowledge NASA Exoplanet Archive / NExScI / Caltech",
+      "reduction": "First 80 alphabetically named composite planet rows with 0<radius<10 Earth radii, 0<period<100 days; supplied signed measurement errors retained",
+      "sourceSHA256": "d7a5234aa0b3552506498113b9424a09f69a4e6861be648ad1b997bfb10d24b1",
+      "sha256": "2149f475dbd71665140e0eedb290a748ec1d15e4f3d21b03a9406e37411d479b"
+    }
+  ],
+  "nasaPolicy": "https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html",
+  "ghcnFormat": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/readme.txt"
+}

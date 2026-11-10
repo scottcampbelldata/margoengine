@@ -3627,3 +3627,7 @@ After npm run build:packages, run node --test packages/sciviz/tests/datasets.tes
 ### Batch 217 job 3: scroll and ranges
 
 After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/scroll.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-scroll --wait-max=60 --max=2 -- node packages/cutscene/tests/scroll-browser.mjs for browser interactions. The package test:gpu includes all cutscene proofs; repeat with MARGO_COMPAT=1 for compatibility rendering. Scroll/range logic is DOM/CPU only and identical on both backends. All comparisons are correctness assertions; no benchmark or timing budget runs.
+
+## Batch 177 job 2
+
+Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/stats.test.js`. Browser proof: `node scripts/gpu-lock.mjs run --owner=codex-batch177 --wait-max=60 --max=3 -- node packages/sciviz/tests/stats-browser.mjs`. Open `/examples/sciviz-stats.html` for thirteen vector charts and SVG downloads; the page shows units, data dates and missing-error policy. `node packages/sciviz/scripts/prepare-stats.mjs` reproduces the frozen reductions from NOAA GHCN and a commit-pinned public NASA-table mirror. No rival source is used. Timing benchmarks are deferred during the build phase.

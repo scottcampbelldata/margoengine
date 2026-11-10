@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14173274,
+  "total": 14183410,
   "history": [
     {
       "date": "2026-10-24",
@@ -7507,6 +7507,12 @@
       "commit": "b1290e7f2",
       "reason": "Batch 217 job 3: new optional cutscene/scroll entry, 0 to 2048 B gzip, ceiling 2304 B. Range repetition and scroll scrubbing share one clock owner and cleanup; core and stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3efc31f94",
+      "reason": "Batch 177 statistical charts: maths 5703 B to 8854 B, ceiling 5959 B to 9120 B; new stats 6719 B, ceiling 6975 B gzip. Shared transforms, fractional-df confidence bands and SVG keep one math implementation. Core+stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8343,7 +8349,7 @@
     "@margoengine/sciviz/grids": 25269,
     "@margoengine/sciviz/labels": 6548,
     "@margoengine/sciviz/lic": 24165,
-    "@margoengine/sciviz/maths": 5959,
+    "@margoengine/sciviz/maths": 9120,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/sciviz/pipeline": 2086,
@@ -8866,6 +8872,7 @@
     "@margoengine/sciviz/export-vector": 4213,
     "@margoengine/staging/backdrop": 1588,
     "@margoengine/sciviz/datasets": 13423,
-    "@margoengine/cutscene/scroll": 2304
+    "@margoengine/cutscene/scroll": 2304,
+    "@margoengine/sciviz/stats": 6975
   }
 }

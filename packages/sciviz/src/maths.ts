@@ -19,3 +19,4 @@ export { axisScale, dateTicks, formatDate, logTicks } from './scales.js';
 export type { Scale, ScaleType } from './scales.js';
 export { arrowSegments, gridSpacing, sampleField, streamline } from './fields.js';
 export type { StreamlineOptions, VectorGrid } from './fields.js';
+export * from './stats-maths.js';

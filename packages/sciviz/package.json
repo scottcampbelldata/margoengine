@@ -151,6 +151,10 @@
     "./datasets": {
       "types": "./dist/datasets.d.ts",
       "import": "./dist/datasets.js"
+    },
+    "./stats": {
+      "types": "./dist/stats.d.ts",
+      "import": "./dist/stats.js"
     }
   },
   "files": [
@@ -188,6 +192,7 @@
     "test:webgl2": "npm run build && node tests/webgl2-browser.mjs",
     "test:browser:atmosphere": "node tests/atmosphere-browser.mjs",
     "test:browser:contour2d": "node tests/contour2d-browser.mjs",
-    "test:browser:export-vector": "node tests/export-vector-browser.mjs"
+    "test:browser:export-vector": "node tests/export-vector-browser.mjs",
+    "test:browser:stats": "node tests/stats-browser.mjs"
   }
 }

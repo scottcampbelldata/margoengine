@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'examples/assets/sciviz/stats/source.json',
+    'Batch 177 statistical charts: NOAA GHCN Central Park USW00094728 daily TMIN/TMAX for 2020, US government public domain (https://www.ncei.noaa.gov/pub/data/ghcn/daily/all/USW00094728.dly). NASA Exoplanet Archive public PSCompPars table snapshot 2026-05-30, pinned data-only mirror hannahrvs/Planetary-Composite-Data commit a0d5fee61a002a349ea9d72fa450d5310b7c5947; source and reduction hashes in source.json. NASA TAP returned HTTP 503 on both official hosts, so no live-result claim is made. Credit NASA Exoplanet Archive / NExScI / Caltech, https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html. Only reduced standard scientific data are included under the standard-file exception; no notebook or implementation files were read/copied. Excluded from package tarballs.',
+  ],
+  [
     'examples/assets/sciviz/contour2d/source.json',
     'Batch 177 climate contour demo: reduced NOAA OISST 2024-01-01 (US government public domain, https://www.ncei.noaa.gov/products/optimum-interpolation-sst) and ECMWF ERA5 500 hPa geopotential 2020-01-01 via WeatherBench 2 (https://weatherbench2.readthedocs.io/en/latest/data-guide.html, Copernicus terms https://storage.googleapis.com/weatherbench2/datasets/era5/LICENSE, CC BY 4.0 https://apps.ecmwf.int/datasets/licences/general/). Frozen JSON hashes, units, source URLs, transformations and the required Copernicus attribution are beside the data. No implementation files copied; reduced standard scientific data only, excluded from package tarballs.',
   ],
