@@ -66,6 +66,7 @@ export interface MapObject {
     readonly gid?: number;
     readonly width?: number;
     readonly height?: number;
+    readonly text?: MapText;
     readonly shape?: MapShape;
     readonly properties?: Properties;
 }
@@ -104,6 +105,21 @@ export type MapShape = {
     readonly rotation?: number;
 };
 
+export interface MapText {
+    readonly text: string;
+    readonly fontFamily: string;
+    readonly pixelSize: number;
+    readonly color: string;
+    readonly bold: boolean;
+    readonly italic: boolean;
+    readonly underline: boolean;
+    readonly strikeout: boolean;
+    readonly kerning: boolean;
+    readonly wrap: boolean;
+    readonly horizontalAlign: 'left' | 'center' | 'right' | 'justify';
+    readonly verticalAlign: 'top' | 'center' | 'bottom';
+}
+
 export interface MapTileset {
     readonly name: string;
     readonly firstGid: number;
@@ -122,6 +138,7 @@ export interface MapTileset {
     };
     readonly tiles?: readonly TileDef[];
     readonly properties?: Properties;
+    readonly wangSets?: readonly WangRuleSet[];
 }
 
 export interface ObjectLayer extends LayerBase {
@@ -274,4 +291,30 @@ export function tilesetForGid(map: TileMapData, value: number): MapTileset | und
 export function validateTileMap(map: TileMapData): void;
 
 export function visibleChunks(originX: number, originY: number, zoom: number, targetWidth: number, targetHeight: number, cellWidth: number, cellHeight: number, chunksWide: number, chunksHigh: number, reach: TileReach, out?: ChunkRange): ChunkRange;
+
+// Not exported from this entry, but used by the exports above:
+
+interface WangColor {
+    readonly name: string;
+    readonly color: string;
+    readonly tile: number;
+    readonly probability: number;
+    readonly properties?: Properties;
+}
+
+interface WangRuleSet {
+    readonly mode: 'wang';
+    readonly name: string;
+    readonly type: 'edge' | 'corner' | 'mixed';
+    readonly colors: readonly WangColor[];
+    readonly tiles: readonly WangTile[];
+    readonly properties?: Properties;
+}
+
+interface WangTile {
+    readonly tile: number;
+    readonly colors: readonly [number, number, number, number, number, number, number, number];
+    readonly weight?: number;
+    readonly flags?: number;
+}
 ```

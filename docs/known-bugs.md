@@ -4492,3 +4492,5 @@ Batch 206 implicit shapes: no open defect in 22 OpenUSD extent cases, analytic n
 Batch 205 large: existing default byte-budget errors retain their exact wording, while enabled custom caps report the configured range. packages/fbx/test/errors.test.js and worker.test.js retain page/worker error identity; large.test.js covers caps without reducing imported geometry.
 
 Batch 207 meshopt: no open defect found in the requested compression row. Existing synchronous codec calls only observe cancellation between sections; files need the optional reader, with bounds/stream regressions in meshopt.test.js.
+
+Batch 246 job 2 closes the importer gaps for skipped image layers, text and templates, plus sparse image-collection gid spans. Reproductions and root-cause checks are in tiled-full.test.js. Existing unregistered browser-inventory drivers remain owned by their lanes.

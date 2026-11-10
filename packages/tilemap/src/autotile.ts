@@ -1,4 +1,112 @@
-import { GID_MASK, type TileLayer } from './index.js';
+import { GID_MASK, type TileLayer, type Properties } from './index.js';
+
+/** Tiled Wang colour metadata. Array index plus one is the colour id; zero means no terrain. */
+export interface WangColor {
+  readonly name: string;
+  readonly color: string;
+  readonly tile: number;
+  readonly probability: number;
+  readonly properties?: Properties;
+}
+
+/** Edge/corner colours clockwise: N, NE, E, SE, S, SW, W, NW. */
+export interface WangTile {
+  readonly tile: number;
+  readonly colors: readonly [number, number, number, number, number, number, number, number];
+  readonly weight?: number;
+  /** Global-id flip bits carried by older Tiled Wang entries. Default zero. */
+  readonly flags?: number;
+}
+
+/** Imported Wang rules, including multi-colour edge, corner and mixed sets. */
+export interface WangRuleSet {
+  readonly mode: 'wang';
+  readonly name: string;
+  readonly type: 'edge' | 'corner' | 'mixed';
+  readonly colors: readonly WangColor[];
+  readonly tiles: readonly WangTile[];
+  readonly properties?: Properties;
+}
+
+/** Shared lattice values make neighbouring Wang cells agree on edges and corners. */
+export interface WangGrid {
+  /** (width + 1) * (height + 1) corner colours. Missing means unconstrained. -1 is a wildcard. */
+  readonly vertices?: ArrayLike<number>;
+  /** width * (height + 1) horizontal edges, row-major. */
+  readonly horizontal?: ArrayLike<number>;
+  /** (width + 1) * height vertical edges, row-major. */
+  readonly vertical?: ArrayLike<number>;
+}
+
+/** Match imported Wang rules against a shared lattice, with seeded weighted variants. Unmatched cells are zero. */
+export function resolveWang(
+  grid: WangGrid,
+  width: number,
+  height: number,
+  set: WangRuleSet,
+  options: TerrainOptions = {},
+): Uint32Array {
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 0 ||
+    height < 0 ||
+    width * height > 16777216
+  )
+    throw new RangeError('Wang grid dimensions must be non-negative integers up to 16777216 cells; reduce the grid.');
+  const stride = width + 1;
+  for (const [values, length] of [
+    [grid.vertices, stride * (height + 1)],
+    [grid.horizontal, width * (height + 1)],
+    [grid.vertical, stride * height],
+  ] as const) {
+    if (
+      values &&
+      (values.length !== length ||
+        Array.from(values).some((v) => !Number.isInteger(v) || v < -1 || v > set.colors.length))
+    )
+      throw new RangeError(
+        'Wang lattice size or colour id is invalid; match the grid size and use -1 or a defined colour id.',
+      );
+  }
+  for (const t of set.tiles)
+    if (
+      t.colors.length !== 8 ||
+      !Number.isInteger(t.tile) ||
+      t.tile < 0 ||
+      t.colors.some((v) => !Number.isInteger(v) || v < 0 || v > set.colors.length) ||
+      !(Number.isFinite(t.weight ?? 1) && (t.weight ?? 1) >= 0)
+    )
+      throw new RangeError(
+        'Invalid Wang tile; supply a non-negative tile id, eight defined colours and a non-negative finite weight.',
+      );
+  const result = new Uint32Array(width * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const target = [
+        grid.horizontal?.[y * width + x] ?? -1,
+        grid.vertices?.[y * stride + x + 1] ?? -1,
+        grid.vertical?.[y * stride + x + 1] ?? -1,
+        grid.vertices?.[(y + 1) * stride + x + 1] ?? -1,
+        grid.horizontal?.[(y + 1) * width + x] ?? -1,
+        grid.vertices?.[(y + 1) * stride + x] ?? -1,
+        grid.vertical?.[y * stride + x] ?? -1,
+        grid.vertices?.[y * stride + x] ?? -1,
+      ];
+      const candidates = set.tiles.filter(
+        (t) => (t.weight ?? 1) > 0 && t.colors.every((c, i) => target[i] < 0 || target[i] === c),
+      );
+      let pick = hash(x, y, options.seed ?? 0) * candidates.reduce((n, t) => n + (t.weight ?? 1), 0);
+      for (const t of candidates) {
+        pick -= t.weight ?? 1;
+        if (pick < 0) {
+          result[y * width + x] = ((options.firstGid ?? 1) + t.tile) | (t.flags ?? 0);
+          break;
+        }
+      }
+    }
+  return result;
+}
 
 function reduceBlob(mask: number): number {
   let m = mask & 255;

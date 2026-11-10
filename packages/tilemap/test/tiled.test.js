@@ -196,15 +196,16 @@ test('group layers pass offset, opacity, visibility and parallax down to their c
     }),
     { onWarning: (m) => warnings.push(m) },
   );
-  assert.equal(map.layers.length, 1);
+  assert.equal(map.layers.length, 2);
   const deep = map.layers[0];
   assert.equal(deep.name, 'deep');
   assert.deepEqual([...deep.offset], [11, 20]);
   assert.equal(deep.opacity, 0.25);
   assert.equal(deep.visible, false);
   assert.deepEqual([...deep.parallax], [0.5, 1]);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /"sky" is a imagelayer; skipped/);
+  assert.equal(map.layers[1].type, 'image');
+  assert.equal(map.layers[1].image.source, 'sky.png');
+  assert.deepEqual(warnings, []);
 });
 
 test('layer tint, id and custom properties (list form) are kept; __proto__ stays an own property', async () => {
@@ -235,7 +236,7 @@ test('layer tint, id and custom properties (list form) are kept; __proto__ stays
   assert.equal(Object.getPrototypeOf(layer.properties), Object.prototype);
 });
 
-test('object layers: shapes, tile objects, class, visibility and warnings', async () => {
+test('object layers: shapes, tile objects, class, visibility, text and templates', async () => {
   const warnings = [];
   const map = await parseTiled(
     baseMap({
@@ -284,7 +285,7 @@ test('object layers: shapes, tile objects, class, visibility and warnings', asyn
         },
       ],
     }),
-    { onWarning: (m) => warnings.push(m) },
+    { onWarning: (m) => warnings.push(m), resolve: async () => ({ object: { name: 'enemy', point: true } }) },
   );
   const layer = map.layers[0];
   assert.equal(layer.type, 'object');
@@ -314,9 +315,9 @@ test('object layers: shapes, tile objects, class, visibility and warnings', asyn
   assert.equal(tile.type, 'Tree');
   assert.equal(tile.visible, false);
   assert.equal(text.shape.kind, 'rect');
-  assert.equal(warnings.length, 2);
-  assert.match(warnings[0], /object 7 is a text object/);
-  assert.match(warnings[1], /object 8 uses a template/);
+  assert.equal(text.text.text, 'hi');
+  assert.equal(layer.objects[7].name, 'enemy');
+  assert.deepEqual(warnings, []);
   validateTileMap(map);
 });
 
@@ -414,7 +415,7 @@ test('an external tileset is loaded through options.resolve with the path writte
   assert.equal(asBytes.tilesets[0].columns, 3);
   await rejects(parseTiled(map), 'missing');
   await assert.rejects(parseTiled(map), /tilesets\/rocks\.tsj.*options\.resolve/);
-  await rejects(parseTiled(map, { resolve: async () => '<tileset name="rocks"/>' }), 'unsupported');
+  await rejects(parseTiled(map, { resolve: async () => '<tileset name="rocks"/>' }), 'syntax');
   await rejects(parseTiled(map, { resolve: async () => 'not json' }), 'syntax');
 });
 

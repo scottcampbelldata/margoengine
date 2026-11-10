@@ -3687,3 +3687,6 @@ With exact coplanar patch coverage, the same job 1 scene now keeps 1 of 81 rows 
 
 ## Batch 207 job 3: lossless .margo meshopt
 The optional meshopt entry compresses geometry with Margo's existing encoder and reads it with its existing decoder. Static, compact, uint16, animated, object hierarchy, curves and lightmap fixtures preserve every section byte and scene value. Download bytes are never increased; the animated fixture saves 9408 of 28924 bytes. Corrupt streams and decoded-size bombs reject before GPU upload. Original/compressed static and animated rendering is byte-identical across both GPU backends, including animation deformation, with no validation errors and released mesh handles. No throughput, quantization or comparison-engine timing claim.
+
+### Batch 246 job 2: Tiled import parity row
+Templates, image layers, text objects and Wang sets are imported rather than warned away. Tests cover XML/JSON, template-only and existing tileset remapping, instance overrides, relative resources, cached loads, pending abort, cycles, sparse images, style defaults and exact eight-slot mixed Wang matching. Imported image/template output has exact GPU readback on native WebGPU and WebGL2 compatibility. Proof: packages/tilemap/test/tiled-full.test.js, tiled.test.js and objects-check.mjs. No speed claim or claim that fromTMX can restore data its input omitted.

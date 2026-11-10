@@ -513,3 +513,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/blender (batch 207 job 3): document meshopt compression/expansion and loaders, lossless index order, no-growth fallback, flags/section bounds, AbortSignal and options.parse for other entries.
 - margoengine (batch 207 job 3): document blender/meshopt alias.
+
+| @margoengine/tilemap | tiled: XML/JSON templates/maps/tilesets, baseUrl/resolve/cancellation, gid remapping, image and text layers, inherited tint, sparse collections; autotile: WangGrid, WangRuleSet and resolveWang | batch-246 job 2 |

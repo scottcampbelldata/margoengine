@@ -32,6 +32,36 @@ export interface TerrainTile {
     readonly weight?: number;
 }
 
+export interface WangColor {
+    readonly name: string;
+    readonly color: string;
+    readonly tile: number;
+    readonly probability: number;
+    readonly properties?: Properties;
+}
+
+export interface WangGrid {
+    readonly vertices?: ArrayLike<number>;
+    readonly horizontal?: ArrayLike<number>;
+    readonly vertical?: ArrayLike<number>;
+}
+
+export interface WangRuleSet {
+    readonly mode: 'wang';
+    readonly name: string;
+    readonly type: 'edge' | 'corner' | 'mixed';
+    readonly colors: readonly WangColor[];
+    readonly tiles: readonly WangTile[];
+    readonly properties?: Properties;
+}
+
+export interface WangTile {
+    readonly tile: number;
+    readonly colors: readonly [number, number, number, number, number, number, number, number];
+    readonly weight?: number;
+    readonly flags?: number;
+}
+
 export function autotile(layer: TileLayer, rules: AutotileRuleSet, options?: AutotileOptions & {
     readonly matches?: (value: number) => boolean;
 }): TileLayer;
@@ -45,6 +75,8 @@ export function blobMask(n: unknown, ne: unknown, e: unknown, se: unknown, s: un
 export function cardinalMask(n: unknown, e: unknown, s: unknown, w: unknown): number;
 
 export function resolveTerrain(vertices: ArrayLike<number>, width: number, height: number, set: TerrainSet, options?: TerrainOptions): Uint32Array;
+
+export function resolveWang(grid: WangGrid, width: number, height: number, set: WangRuleSet, options?: TerrainOptions): Uint32Array;
 
 export function verticesFromCells(cells: ArrayLike<number>, width: number, height: number): Uint8Array;
 

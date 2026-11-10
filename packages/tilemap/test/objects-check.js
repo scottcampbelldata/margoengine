@@ -1,6 +1,7 @@
 import { EngineKernel } from '/packages/core/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
 import { ObjectTileMap, buildMapQuads } from '/packages/tilemap/dist/objects.js';
+import { parseTiled } from '/packages/tilemap/dist/tiled.js';
 import { createTileLayer, FLIP_D, FLIP_H, FLIP_V } from '/packages/tilemap/dist/index.js';
 
 const W = 64,
@@ -87,6 +88,37 @@ window.check = {
   async run() {
     engine.gpu.pushErrorScope('validation');
     const results = [];
+    const imported = await parseTiled(
+      {
+        width: 1,
+        height: 1,
+        tilewidth: 4,
+        tileheight: 4,
+        tilesets: [
+          {
+            firstgid: 1,
+            name: 'collection',
+            tilewidth: 4,
+            tileheight: 8,
+            columns: 0,
+            tilecount: 1,
+            tiles: [{ id: 0, image: 'red', imagewidth: 4, imageheight: 8 }],
+          },
+        ],
+        layers: [
+          { type: 'imagelayer', name: 'image', image: 'mist', imagewidth: 3, imageheight: 2, repeatx: true },
+          { type: 'objectgroup', name: 'template', objects: [{ id: 1, x: 4, y: 8, template: 'tile.tx' }] },
+        ],
+      },
+      { resolve: async () => '<template><object gid="1" width="8" height="16" rotation="90"/></template>' },
+    );
+    const importedTiles = ObjectTileMap.attach(instance, { map: imported, atlases: {}, images });
+    const importedFrame = frame(),
+      importedExpected = reference(imported, { x: 0, y: 0, zoom: 1 }, 0);
+    let importedWrong = 0;
+    for (let i = 0; i < importedFrame.length; i++) if (importedFrame[i] !== importedExpected[i]) importedWrong++;
+    results.push({ wrong: importedWrong, imported: true });
+    importedTiles.dispose();
     for (const renderOrder of ['right-down', 'left-up']) {
       const map = {
         width: 8,

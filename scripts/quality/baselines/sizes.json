@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13060038,
+  "total": 13063463,
   "history": [
     {
       "date": "2026-10-24",
@@ -6550,6 +6550,12 @@
       "commit": "72aab5dfe",
       "reason": "environment/probes addCapture replays plugin passes in probe captures",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-246-job-2",
+      "reason": "Optional tilemap/tiled 4264 to 7227 B min+gzip; ceiling 4540 to 7483 B. Autotile 1349 to 1831 B; ceiling 1605 to 2087 B. Templates, XML and JSON share semantic validation/resource resolution; Wang matching belongs beside terrain rules. Splitting would duplicate these boundaries. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7440,14 +7446,14 @@
     "@margoengine/text/msdf": 4502,
     "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,
-    "@margoengine/tilemap/autotile": 1605,
+    "@margoengine/tilemap/autotile": 2087,
     "@margoengine/tilemap/fov": 1843,
     "@margoengine/tilemap/hex": 2287,
     "@margoengine/tilemap/iso": 6635,
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/objects": 7294,
     "@margoengine/tilemap/path": 2842,
-    "@margoengine/tilemap/tiled": 4540,
+    "@margoengine/tilemap/tiled": 7483,
     "@margoengine/tiles": 16288,
     "@margoengine/tiles/fade": 2015,
     "@margoengine/tiles/features": 9837,

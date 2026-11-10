@@ -3157,3 +3157,6 @@ shared with job 1. No timing test or benchmark is needed for these claims.
 
 ## Batch 207 job 3
 After build: node --test --test-timeout=120000 packages/blender/tests/meshopt.test.js. GPU: node scripts/gpu-lock.mjs run --owner=meshopt --max=3 --wait-max=60 -- node packages/blender/tests/meshopt-browser.mjs, then the same script with --compat. It compresses the own fixtures at runtime and compares every decoded RGBA pixel with the original static/animated load. The CPU suite compares every original binary section and manifest, validates unchanged triangle order and checks decoder corruption/size/abort rejection. No wall-clock assertions.
+
+### Batch 246 job 2
+After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/tiled*.test.js packages/tilemap/test/autotile.test.js`. The job 1 objects-check.mjs command on both backends now also reads imported XML template and image-layer pixels. Documents and texels are deterministic in-test fixtures.

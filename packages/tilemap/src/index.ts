@@ -1,4 +1,5 @@
 import type { Vec2 } from '@margoengine/math';
+import type { WangRuleSet } from './autotile.js';
 
 export {
   TileMap,
@@ -130,6 +131,8 @@ export interface MapTileset {
   readonly image?: { readonly source: string; readonly width: number; readonly height: number };
   readonly tiles?: readonly TileDef[];
   readonly properties?: Properties;
+  /** Imported edge, corner or mixed Wang rules, consumed by resolveWang of the autotile entry. */
+  readonly wangSets?: readonly WangRuleSet[];
 }
 
 /** Fields every layer shares. */
@@ -174,9 +177,27 @@ export interface MapObject {
   /** Tile-object display size in map pixels. Default the tile image's size. */
   readonly width?: number;
   readonly height?: number;
+  /** Tiled text and complete style data, for a text renderer. */
+  readonly text?: MapText;
   /** Outline for non-tile objects. Its own `x`/`y` are 0 here: the object carries the position. */
   readonly shape?: MapShape;
   readonly properties?: Properties;
+}
+
+/** Tiled text-object content and style, with editor defaults applied during import. */
+export interface MapText {
+  readonly text: string;
+  readonly fontFamily: string;
+  readonly pixelSize: number;
+  readonly color: string;
+  readonly bold: boolean;
+  readonly italic: boolean;
+  readonly underline: boolean;
+  readonly strikeout: boolean;
+  readonly kerning: boolean;
+  readonly wrap: boolean;
+  readonly horizontalAlign: 'left' | 'center' | 'right' | 'justify';
+  readonly verticalAlign: 'top' | 'center' | 'bottom';
 }
 
 /** A layer of objects. */

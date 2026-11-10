@@ -5,6 +5,7 @@ import {
   FLIP_V,
   type MapLayer,
   type MapObject,
+  type MapText,
   type MapShape,
   type MapTileset,
   type Properties,
@@ -13,6 +14,8 @@ import {
   type TileDef,
   type TileMapData,
 } from './index.js';
+import type { WangRuleSet, WangTile } from './autotile.js';
+import { mapColor } from './chunks.js';
 import {
   MAX_TILES,
   MapImportError,
@@ -36,11 +39,164 @@ const fail = (code: ConstructorParameters<typeof MapImportError>[1], message: st
 
 /** Options of `parseTiled`. */
 export interface TiledOptions {
-  /** Loads an external tileset (`.tsj`) by the `source` path written in the map. Needed only when the map has one. */
+  /** Load a tileset or template. Paths are relative to baseUrl, including references inside external files. */
   readonly resolve?: (source: string, signal?: AbortSignal) => Promise<string | Uint8Array | object>;
-  /** Called once per skipped thing (image layers, text, object templates). */
+  /** Map document path or URL, used to resolve relative resources. Default empty. */
+  readonly baseUrl?: string;
+  /** Called for unknown layer types. Supported Tiled features are never skipped. */
   readonly onWarning?: (message: string) => void;
   readonly signal?: AbortSignal;
+}
+
+function pathFrom(base: string, source: string): string {
+  if (/^[a-z][\w+.-]*:/i.test(source)) return source;
+  if (/^[a-z][\w+.-]*:/i.test(base)) return new URL(source, base).href;
+  if (source.startsWith('/')) return source;
+  const parts: string[] = [];
+  for (const part of (base.slice(0, base.lastIndexOf('/') + 1) + source).split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..' && parts.length && parts[parts.length - 1] !== '..') parts.pop();
+    else parts.push(part);
+  }
+  return parts.join('/');
+}
+
+function multiplyTint(parent?: string, child?: string): string | undefined {
+  if (!parent) return child;
+  if (!child) return parent;
+  const a = mapColor(parent),
+    b = mapColor(child);
+  if (!a || !b) return fail('syntax', 'invalid layer tint; use Tiled hexadecimal colours.');
+  const c = a.map((v, i) =>
+    Math.round(v * b[i] * 255)
+      .toString(16)
+      .padStart(2, '0'),
+  );
+  return '#' + c[3] + c[0] + c[1] + c[2];
+}
+
+async function document(input: string | Uint8Array | object): Promise<Obj> {
+  const text = input instanceof Uint8Array ? new TextDecoder().decode(input) : input;
+  if (
+    (typeof text === 'string' && text.trimStart().startsWith('<')) ||
+    (input instanceof Uint8Array &&
+      ((input[0] === 0xff && input[1] === 0xfe) || (input[0] === 0xfe && input[1] === 0xff)))
+  ) {
+    try {
+      return (await import('./tiled-xml.js')).tiledXML(input as string | Uint8Array);
+    } catch (error) {
+      if (error instanceof MapImportError) throw error;
+      return fail(
+        'syntax',
+        `invalid Tiled XML (${error instanceof Error ? error.message : String(error)}); re-save the file.`,
+      );
+    }
+  }
+  return parseJson(F, input);
+}
+
+async function resource(path: string, options: TiledOptions): Promise<Obj> {
+  throwIfAborted(F, options.signal);
+  if (!options.resolve)
+    return fail('missing', `resource "${path}" is external; pass options.resolve to load it by path.`);
+  const signal = options.signal;
+  let abort: (() => void) | undefined;
+  try {
+    const loaded = options.resolve(path, signal);
+    const input = signal
+      ? await Promise.race([
+          loaded,
+          new Promise<never>((_resolve, reject) => {
+            abort = () => reject(new MapImportError(F, 'aborted', 'the import was aborted by its signal.'));
+            signal.addEventListener('abort', abort, { once: true });
+            if (signal.aborted) abort();
+          }),
+        ])
+      : await loaded;
+    throwIfAborted(F, signal);
+    return await document(input);
+  } finally {
+    if (abort) signal!.removeEventListener('abort', abort);
+  }
+}
+
+function readText(text: Obj): MapText {
+  const h = str(text, 'halign') ?? 'left',
+    v = str(text, 'valign') ?? 'top';
+  if (
+    !['left', 'center', 'right', 'justify'].includes(h) ||
+    !['top', 'center', 'bottom'].includes(v) ||
+    !(num(text, 'pixelsize', 16) > 0)
+  )
+    return fail('syntax', 'text style is invalid; use a positive font size and Tiled alignments.');
+  return {
+    text: str(text, 'text') ?? '',
+    fontFamily: str(text, 'fontfamily') ?? 'sans-serif',
+    pixelSize: num(text, 'pixelsize', 16),
+    color: str(text, 'color') ?? '#000000',
+    bold: text.bold === true,
+    italic: text.italic === true,
+    underline: text.underline === true,
+    strikeout: text.strikeout === true,
+    kerning: text.kerning !== false,
+    wrap: text.wrap === true,
+    horizontalAlign: h as MapText['horizontalAlign'],
+    verticalAlign: v as MapText['verticalAlign'],
+  };
+}
+
+function readWang(set: Obj): WangRuleSet[] {
+  return list(set, 'wangsets')
+    .filter(isObj)
+    .map((w) => {
+      const colors = list(w, 'colors')
+        .filter(isObj)
+        .map((c) => ({
+          name: str(c, 'name') ?? '',
+          color: str(c, 'color') ?? '#000000',
+          tile: num(c, 'tile', -1),
+          probability: num(c, 'probability', 1),
+          properties: readProperties(c.properties),
+        }));
+      const tiles: WangTile[] = list(w, 'wangtiles')
+        .filter(isObj)
+        .map((t) => {
+          const pattern = list(t, 'wangid');
+          if (
+            pattern.length !== 8 ||
+            pattern.some((c) => typeof c !== 'number' || !Number.isInteger(c) || c < 0 || c > colors.length)
+          )
+            return fail('syntax', 'a Wang tile needs eight defined colour ids; re-save the tileset.');
+          const id = num(t, 'tileid'),
+            weight = num(
+              list(set, 'tiles')
+                .filter(isObj)
+                .find((d) => num(d, 'id') === id) ?? {},
+              'probability',
+              1,
+            );
+          if (!Number.isInteger(id) || id < 0 || weight < 0)
+            return fail('syntax', 'a Wang tile has an invalid id or probability; re-save the tileset.');
+          return {
+            tile: id,
+            colors: pattern as unknown as WangTile['colors'],
+            weight,
+            flags: (t.hflip ? FLIP_H : 0) | (t.vflip ? FLIP_V : 0) | (t.dflip ? FLIP_D : 0),
+          };
+        });
+      const type =
+        str(w, 'type') ?? (tiles.some((t) => t.colors.some((v, i) => i % 2 === 0 && v)) ? 'mixed' : 'corner');
+      if (!['edge', 'corner', 'mixed'].includes(type))
+        return fail('syntax', 'unknown Wang set type; use edge, corner or mixed.');
+      return {
+        mode: 'wang',
+        name: str(w, 'name') ?? '',
+        type: type as WangRuleSet['type'],
+        colors,
+        tiles,
+        properties: readProperties(w.properties),
+      };
+    });
 }
 
 function readProperties(v: unknown): Properties | undefined {
@@ -71,11 +227,8 @@ function collisionShape(o: Obj): MapShape {
   return rotation && shape.kind !== 'point' ? { ...shape, rotation } : shape;
 }
 
-function readObject(o: Obj, warn: (m: string) => void): MapObject {
-  if (o.template !== undefined)
-    warn(`object ${num(o, 'id')} uses a template; Tiled templates are not read, save the map with templates detached`);
-  if (isObj(o.text)) warn(`object ${num(o, 'id')} is a text object; drawn as its rectangle`);
-  const gid = typeof o.gid === 'number' ? cleanGid(o.gid) : undefined;
+function readObject(o: Obj, hex = false): MapObject {
+  const gid = typeof o.gid === 'number' ? cleanGid(o.gid, hex) : undefined;
   const type = str(o, 'class') || str(o, 'type');
   const rotation = num(o, 'rotation');
   const name = str(o, 'name');
@@ -86,6 +239,9 @@ function readObject(o: Obj, warn: (m: string) => void): MapObject {
     ...(type ? { type } : {}),
     x: num(o, 'x'),
     y: num(o, 'y'),
+    ...(typeof o.width === 'number' ? { width: num(o, 'width') } : {}),
+    ...(typeof o.height === 'number' ? { height: num(o, 'height') } : {}),
+    ...(isObj(o.text) ? { text: readText(o.text) } : {}),
     ...(rotation ? { rotation } : {}),
     ...(o.visible === false ? { visible: false } : {}),
     ...(gid !== undefined ? { gid } : { shape: outline(o) }),
@@ -115,18 +271,14 @@ async function readTileset(ref: Obj, options: TiledOptions): Promise<MapTileset>
   let set: Obj = ref;
   const source = str(ref, 'source');
   if (source !== undefined) {
-    if (!options.resolve)
-      return fail('missing', `tileset "${source}" is a separate file; pass options.resolve to load it by its path.`);
-    const got = await options.resolve(source, options.signal);
-    throwIfAborted(F, options.signal);
-    if (typeof got === 'string' && got.trimStart().startsWith('<'))
-      return fail(
-        'unsupported',
-        `tileset "${source}" is TSX (XML); export it as .tsj JSON, or load the map with parseTMX and fromTMX.`,
-      );
-    set = parseJson(F, got);
+    set = await resource(pathFrom(options.baseUrl ?? '', source), options);
   }
-  const tiles = list(set, 'tiles').filter(isObj).map(readTile);
+  const base = source === undefined ? (options.baseUrl ?? '') : pathFrom(options.baseUrl ?? '', source);
+  if (!(num(set, 'tilewidth') > 0 && num(set, 'tileheight') > 0))
+    return fail('syntax', 'tileset tilewidth and tileheight must be positive; re-save the tileset.');
+  const tiles = list(set, 'tiles')
+    .filter(isObj)
+    .map((t) => readTile({ ...t, ...(typeof t.image === 'string' ? { image: pathFrom(base, t.image) } : {}) }));
   const image = str(set, 'image');
   const spacing = num(set, 'spacing');
   const margin = num(set, 'margin');
@@ -137,13 +289,19 @@ async function readTileset(ref: Obj, options: TiledOptions): Promise<MapTileset>
     firstGid: num(ref, 'firstgid', 1),
     tileWidth: num(set, 'tilewidth'),
     tileHeight: num(set, 'tileheight'),
-    tileCount: num(set, 'tilecount', tiles.length),
+    tileCount: Math.max(num(set, 'tilecount', tiles.length), ...tiles.map((t) => t.id + 1)),
     columns: num(set, 'columns'),
+    ...(typeof set.objectalignment === 'string'
+      ? { objectAlignment: set.objectalignment as MapTileset['objectAlignment'] }
+      : {}),
     ...(spacing ? { spacing } : {}),
     ...(margin ? { margin } : {}),
     ...(offset && (offset[0] || offset[1]) ? { tileOffset: offset } : {}),
-    ...(image ? { image: { source: image, width: num(set, 'imagewidth'), height: num(set, 'imageheight') } } : {}),
+    ...(image
+      ? { image: { source: pathFrom(base, image), width: num(set, 'imagewidth'), height: num(set, 'imageheight') } }
+      : {}),
     ...(tiles.length ? { tiles } : {}),
+    ...(Array.isArray(set.wangsets) ? { wangSets: readWang(set) } : {}),
     ...(properties ? { properties } : {}),
   };
 }
@@ -233,6 +391,7 @@ interface Inherited {
   visible: boolean;
   px: number;
   py: number;
+  tint?: string;
 }
 
 /**
@@ -244,7 +403,8 @@ export async function parseTiled(
   input: string | Uint8Array | object,
   options: TiledOptions = {},
 ): Promise<TileMapData> {
-  const root = parseJson(F, input);
+  throwIfAborted(F, options.signal);
+  const root = await document(input);
   const warn = options.onWarning ?? (() => {});
   if (!Array.isArray(root.layers) || !Array.isArray(root.tilesets))
     return fail(
@@ -292,10 +452,60 @@ export async function parseTiled(
     return fail('limit', `the map is ${mapWidth} x ${mapHeight} tiles; the limit is ${MAX_TILES} cells per layer.`);
 
   const tilesets: MapTileset[] = [];
+  const references = new Map<string, MapTileset>();
   for (const ref of root.tilesets) {
     throwIfAborted(F, options.signal);
-    if (isObj(ref)) tilesets.push(await readTileset(ref, options));
+    if (isObj(ref)) {
+      const set = await readTileset(ref, options);
+      tilesets.push(set);
+      if (typeof ref.source === 'string') references.set(pathFrom(options.baseUrl ?? '', ref.source), set);
+    }
   }
+
+  const templates = new Map<string, Promise<Obj>>();
+  const expandObject = async (o: Obj, base = options.baseUrl ?? '', stack: readonly string[] = []): Promise<Obj> => {
+    if (typeof o.template !== 'string') return o;
+    const path = pathFrom(base, o.template);
+    if (stack.includes(path) || stack.length >= 32)
+      return fail('limit', `template cycle or nesting past 32 at "${path}"; detach the cyclic reference.`);
+    let loading = templates.get(path);
+    if (!loading) {
+      loading = resource(path, options);
+      templates.set(path, loading);
+    }
+    const doc = await loading;
+    if (!isObj(doc.object)) return fail('syntax', `template "${path}" needs an object; re-save it in Tiled.`);
+    let inherited = await expandObject(doc.object, path, [...stack, path]);
+    if (o.gid === undefined && typeof doc.object.gid === 'number' && isObj(doc.tileset)) {
+      const ref = doc.tileset;
+      if (typeof ref.source !== 'string')
+        return fail('syntax', `template "${path}" needs an external tileset reference.`);
+      const source = pathFrom(path, ref.source);
+      let set = references.get(source);
+      if (!set) {
+        const firstGid = Math.max(1, ...tilesets.map((s) => s.firstGid + s.tileCount));
+        set = await readTileset({ ...ref, source, firstgid: firstGid }, { ...options, baseUrl: '' });
+        tilesets.push(set);
+        references.set(source, set);
+      }
+      const raw = cleanGid(doc.object.gid, hex),
+        local = (raw & 0x0fffffff) - num(ref, 'firstgid', 1);
+      if (local < 0 || local >= set.tileCount)
+        return fail('syntax', `template "${path}" tile id is outside its tileset; re-save the template.`);
+      inherited = { ...inherited, gid: ((raw & 0xf0000000) | (set.firstGid + local)) >>> 0 };
+    }
+    const merged = {
+      ...inherited,
+      ...o,
+      template: undefined,
+      properties: { ...readProperties(inherited.properties), ...readProperties(o.properties) },
+      ...(isObj(inherited.text) || isObj(o.text)
+        ? { text: { ...(isObj(inherited.text) ? inherited.text : {}), ...(isObj(o.text) ? o.text : {}) } }
+        : {}),
+    };
+    if (o.type !== undefined && o.class === undefined) delete (merged as Record<string, unknown>).class;
+    return merged;
+  };
 
   const layers: MapLayer[] = [];
   let width = mapWidth;
@@ -311,17 +521,18 @@ export async function parseTiled(
         visible: up.visible && l.visible !== false,
         px: up.px * num(l, 'parallaxx', 1),
         py: up.py * num(l, 'parallaxy', 1),
+        tint: multiplyTint(up.tint, str(l, 'tintcolor')),
       };
       const type = str(l, 'type');
       if (type === 'group') {
         await walk(list(l, 'layers'), ctx);
         continue;
       }
-      if (type !== 'tilelayer' && type !== 'objectgroup') {
+      if (type !== 'tilelayer' && type !== 'objectgroup' && type !== 'imagelayer') {
         warn(`layer "${str(l, 'name') ?? ''}" is a ${type ?? 'layer of unknown type'}; skipped`);
         continue;
       }
-      const tint = str(l, 'tintcolor');
+      const tint = ctx.tint;
       const properties = readProperties(l.properties);
       const common = {
         name: str(l, 'name') ?? '',
@@ -334,14 +545,32 @@ export async function parseTiled(
       };
       const offset = (x: number, y: number) =>
         ctx.ox + x || ctx.oy + y ? { offset: [ctx.ox + x, ctx.oy + y] as const } : {};
+      if (type === 'imagelayer') {
+        const source = str(l, 'image');
+        if (!source) return fail('missing', `image layer "${common.name}" needs its image path.`);
+        layers.push({
+          type: 'image',
+          ...common,
+          ...offset(num(l, 'x'), num(l, 'y')),
+          image: {
+            source: pathFrom(options.baseUrl ?? '', source),
+            ...(num(l, 'imagewidth') > 0 ? { width: num(l, 'imagewidth') } : {}),
+            ...(num(l, 'imageheight') > 0 ? { height: num(l, 'imageheight') } : {}),
+          },
+          ...(l.repeatx === true ? { repeatX: true } : {}),
+          ...(l.repeaty === true ? { repeatY: true } : {}),
+        });
+        continue;
+      }
       if (type === 'objectgroup') {
+        const objects: MapObject[] = [];
+        for (const o of list(l, 'objects').filter(isObj)) objects.push(readObject(await expandObject(o), hex));
         layers.push({
           type: 'object',
           ...common,
           ...offset(0, 0),
-          objects: list(l, 'objects')
-            .filter(isObj)
-            .map((o) => readObject(o, warn)),
+          ...(l.draworder === 'index' ? { drawOrder: 'index' } : {}),
+          objects,
         });
         continue;
       }
@@ -405,6 +634,7 @@ export async function parseTiled(
     tileWidth,
     tileHeight,
     ...layout,
+    ...(typeof root.renderorder === 'string' ? { renderOrder: root.renderorder as TileMapData['renderOrder'] } : {}),
     tilesets,
     layers,
     ...(background ? { backgroundColor: background } : {}),
