@@ -76,6 +76,12 @@ export function treeWeights(
 ): { clips: string[]; weights: ArrayLike<number> } {
   if (typeof tree === 'string') return { clips: [tree], weights: [1] };
   const clips = tree.samples.map((sample) => sample.clip);
+  if ('weights' in tree) {
+    const weights = tree.weights(parameters);
+    if (weights.length !== clips.length || Array.from(weights).some((w) => !Number.isFinite(w) || w < 0))
+      throw new RangeError('Compiled tree needs one finite nonnegative weight per clip; correct the weight evaluator');
+    return { clips, weights };
+  }
   if ('parameter' in tree)
     return {
       clips,

@@ -131,6 +131,12 @@ export interface AnimatorTransition {
 }
 
 export type BlendTree = string | {
+    parameters: readonly string[];
+    samples: readonly {
+        clip: string;
+    }[];
+    weights: (parameters: Readonly<Record<string, number>>) => ArrayLike<number>;
+} | {
     parameter: string;
     samples: readonly {
         value: number;

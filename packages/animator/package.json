@@ -69,6 +69,10 @@
     "./layers": {
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
+    },
+    "./blend-trees": {
+      "types": "./dist/blend-trees.d.ts",
+      "import": "./dist/blend-trees.js"
     }
   },
   "files": [

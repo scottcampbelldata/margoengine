@@ -26,6 +26,14 @@ export type { FootPlacement, FootPlacementHandle, PlacedLeg } from './foot-place
  */
 export type BlendTree =
   | string
+  | {
+      /** Numeric parameters read by an optional compiled blend tree. */
+      parameters: readonly string[];
+      /** All leaf clips, used to validate assets and determine state duration. */
+      samples: readonly { clip: string }[];
+      /** Returns one nonnegative finite weight per sample; all zero selects the rest pose. */
+      weights: (parameters: Readonly<Record<string, number>>) => ArrayLike<number>;
+    }
   | { parameter: string; samples: readonly { value: number; clip: string }[] }
   | { parameters: readonly [string, string]; samples: readonly { value: readonly [number, number]; clip: string }[] };
 /**
@@ -287,7 +295,18 @@ export class Animator implements EnginePlugin {
       if (!name) throw new TypeError('Empty animator state; give every state a non-empty name');
       if (name === '*') throw new TypeError("Animator state '*' is reserved for any-state transitions; rename it");
       if (typeof tree === 'string') this.clip(tree);
-      else if ('parameter' in tree) {
+      else if ('weights' in tree) {
+        if (
+          typeof tree.weights !== 'function' ||
+          !tree.samples.length ||
+          !Array.isArray(tree.parameters) ||
+          tree.parameters.some((p) => typeof p !== 'string' || !p)
+        )
+          throw new TypeError(
+            'Compiled blend tree needs clips, numeric parameter names and a weights function; use createBlendTree',
+          );
+        for (const sample of tree.samples) this.clip(sample.clip);
+      } else if ('parameter' in tree) {
         blend1D(
           tree.samples.map((s) => s.value),
           0,

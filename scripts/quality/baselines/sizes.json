@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13121533,
+  "total": 13123686,
   "history": [
     {
       "date": "2026-10-24",
@@ -6591,6 +6591,16 @@
       "commit": "batch-202",
       "reason": "Optional loader entries loaders:threemf-lattice, loaders:threemf-materials, selection:highlight preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-211-job2",
+      "reason": "Optional animator/blend-trees: 0 to 1585 B gzip, ceiling 1841 B. Nested compilation and normalized Cartesian/polar gradient bands stay outside the animator root."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-211-job2",
+      "reason": "Graph compiled-tree bridge: artifact 9719 B gzip exceeds prior 9699 B ceiling by 20 B; raise to 10011. Controlled source bundles: parent 9325 B -> current 9483 B. Keeping validation shared avoids separate incompatible graph and root samplers."
     }
   ],
   "items": {
@@ -6609,7 +6619,7 @@
     "@margoengine/animation/vat": 8800,
     "@margoengine/animator": 20643,
     "@margoengine/animator/fbik": 5618,
-    "@margoengine/animator/graph": 9699,
+    "@margoengine/animator/graph": 10011,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7250,
@@ -7804,6 +7814,7 @@
     "@margoengine/loaders/threemf-lattice": 12644,
     "margoengine/loaders/threemf-lattice": 326,
     "margoengine/loaders/threemf-materials": 328,
-    "margoengine/selection/highlight": 322
+    "margoengine/selection/highlight": 322,
+    "@margoengine/animator/blend-trees": 1841
   }
 }

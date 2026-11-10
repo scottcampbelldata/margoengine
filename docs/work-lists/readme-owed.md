@@ -535,3 +535,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/rigging (batch 213 job 2): MToon attachment, VRM 0.x migration, authored lighting/UV/outline controls, expressions, lifecycle and accepted integration limits.
 - @margoengine/gltf-pro (batch 213 job 2): /material-draw synchronous source/replica adapters and optional decoded-image lookup.
 - margoengine (batch 213 job 2): rigging/mtoon and gltf-pro/material-draw aliases.
+- @margoengine/animator (batch 211 job 2): document /blend-trees RichBlendTree schemas, createBlendTree, gradient modes, direct zero/negative weights, nesting, graph/layer/sync/root-motion integration and limits; examples deferred.
+- margoengine (batch 211 job 2): document generated animator/blend-trees alias.

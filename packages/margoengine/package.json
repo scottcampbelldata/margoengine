@@ -142,6 +142,10 @@
       "types": "./dist/animator/layers.d.ts",
       "import": "./dist/animator/layers.js"
     },
+    "./animator/blend-trees": {
+      "types": "./dist/animator/blend-trees.d.ts",
+      "import": "./dist/animator/blend-trees.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

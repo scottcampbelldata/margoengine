@@ -10,6 +10,7 @@ try {
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { Animator } = await import('/packages/animator/dist/index.js');
     const { addStateLayer } = await import('/packages/animator/dist/layers.js');
+    const { createBlendTree } = await import('/packages/animator/dist/blend-trees.js');
     const canvas = document.createElement('canvas');
     document.body.replaceChildren(canvas);
     const engine = await EngineKernel.create(canvas, {
@@ -20,7 +21,30 @@ try {
     const model = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb');
     const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
     const upper = addStateLayer(animator, {
-      graph: { initial: 'survey', states: { survey: 'Survey', run: 'Run' } },
+      graph: {
+        initial: 'survey',
+        parameters: { a: { type: 'float', default: 1 }, b: { type: 'float', default: 1 }, x: 'float', y: 'float' },
+        states: {
+          survey: createBlendTree({
+            type: 'direct',
+            children: [
+              { parameter: 'a', tree: 'Survey' },
+              {
+                parameter: 'b',
+                tree: {
+                  type: 'directional',
+                  parameters: ['x', 'y'],
+                  samples: [
+                    { value: [0, 0], tree: 'Walk' },
+                    { value: [0, 1], tree: 'Run' },
+                  ],
+                },
+              },
+            ],
+          }),
+          run: 'Run',
+        },
+      },
       weight: 0.5,
       mask: model.nodes.map((_, id) => id),
     });
