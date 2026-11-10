@@ -177,12 +177,13 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
 - Fresh (`freshness: 'http'`, the default, as RFC 9111 has a private cache do): for `Cache-Control: max-age`, else
   `Expires` minus `Date`, less the age the file already had when it arrived: the larger of its `Age` header plus the
   request's round trip and how far its `Date` lies behind the local clock. A 304 refreshes it the same way.
-  `no-cache`, no lifetime, an invalid `Expires` (such as `0`) or a file already older than its lifetime means
-  "revalidate". `s-maxage` is for shared caches and is ignored. `freshness: 'max-age'` uses `max-age` alone and
+  `no-cache`, no lifetime, an invalid `Expires` (such as `0`, or anything but the three HTTP-date forms of RFC 9110
+  section 5.6.7, read as UTC) or a file already older than its lifetime means "revalidate". `s-maxage` is for shared caches and is ignored. `freshness: 'max-age'` uses `max-age` alone and
   ignores `Expires` and `Age`, as before 2026-11-07. `RangeCache` computes freshness as `'http'` does.
 - `version`: the database stores the version it was filled with; opening with another one deletes every file.
 - Range requests (`Range: bytes=a-b`, `a-`, `-n`): a hit is answered 206 from the stored whole file (416 when
-  unsatisfiable; a multi-range request gets the whole file). A miss goes to the network unchanged and downloads the
+  unsatisfiable; a multi-range request, or an `If-Range` that is not the stored strong ETag or exact
+  `Last-Modified`, gets the whole file). A miss goes to the network unchanged and downloads the
   whole file once in the background, so the next visit (or the offline one) has it. Cold, that costs the range bytes
   plus the whole file. To store only the ranges read, use `margoengine/cache/ranges` (above).
 
@@ -360,11 +361,13 @@ prefetch.cancel('level2'); // the player turned back: drop what waits, abort wha
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write unless `eviction: evictionIndex()` is set
   (above): fine for thousands of files.
-- Prefetcher and throttle: proved in Node with stand-in servers and a stand-in `requestIdleCallback`; not yet run in a
-  browser. `throttle` paces how fast bodies are read, so the bytes already in the browser's buffers when the limit
+- Prefetcher and throttle: proved in Node with stand-in servers and a stand-in `requestIdleCallback`, and in Chromium
+  by `npm run test:browser` (test/browser-prefetch.js). `throttle` paces how fast bodies are read, so the bytes already in the browser's buffers when the limit
   applies arrive at full speed.
-- RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server; not yet
-  run in a browser or service worker, and not timed. Eviction reads every file's record (one per file, not per block)
+- RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server, and in
+  Chromium, page and service worker, by `npm run test:browser`; not timed. An `If-Range` that does not name the stored
+  file goes to the server unchanged. Blocks are combined under any matching validator, weak or none included, where
+  RFC 9111 section 3.4 asks for one strong validator (open, docs/known-bugs.md). Eviction reads every file's record (one per file, not per block)
   before each write. Two requests in flight at once that share a block both fetch it (it is stored once).
 - Measured in a real browser (DamagedHelmet, the earlier test model, and a 62 MB GLB, online, throttled and DevTools offline):
   `examples/package-benchmarks/cache/offline-gpu.mjs`, results in `examples/package-benchmarks/cache/results.json`.

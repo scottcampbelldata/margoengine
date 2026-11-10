@@ -1440,3 +1440,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/save: add J6 game Works with line for the integration group in docs/integration-everything.md after the build phase.
 
 - @margoengine/taa: document that reset() and reset(viewId) restart jitter as well as discard history; see docs/taa-reset.md.
+- @margoengine/cache: the two service worker examples are ```js but contain TypeScript (type FetchEvent, as); no sections for ./stream and ./decoded (batch 132 audit).

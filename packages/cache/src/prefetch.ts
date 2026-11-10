@@ -179,11 +179,10 @@ export class Prefetcher {
   }
 
   private pump(): void {
+    // Settled first: the last file can end while paused or held, and settle() waits for nothing then.
+    if (!this.queue.length && !this.running.size) for (const resolve of this.settled.splice(0)) resolve();
     if (this.scheduled || this.paused || this.holds || this.disposed) return;
-    if (!this.queue.length || this.running.size >= this.concurrency) {
-      if (!this.queue.length && !this.running.size) for (const resolve of this.settled.splice(0)) resolve();
-      return;
-    }
+    if (!this.queue.length || this.running.size >= this.concurrency) return;
     this.scheduled = true;
     this.whenIdle(() => {
       this.scheduled = false;
@@ -277,15 +276,17 @@ export function throttle(
     const delay = paid - now;
     if (delay <= 0) return;
     return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, delay);
-      signal?.addEventListener(
-        'abort',
-        () => {
+      if (signal?.aborted) return reject(signal.reason);
+      // One listener per delayed chunk, removed when the delay ends, so a long download leaves none on the signal.
+      const abort = () => {
           clearTimeout(timer);
-          reject(signal.reason);
+          reject(signal?.reason);
         },
-        { once: true },
-      );
+        timer = setTimeout(() => {
+          signal?.removeEventListener('abort', abort);
+          resolve();
+        }, delay);
+      signal?.addEventListener('abort', abort, { once: true });
     });
   };
   return async (input, init) => {

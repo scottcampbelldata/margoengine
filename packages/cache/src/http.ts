@@ -19,6 +19,61 @@ export function contentRange(header: string | null): [number, number, number] | 
 }
 
 /**
+ * Whether a request's `If-Range` lets a stored copy answer its `Range` (RFC 9110 section 13.1.5): true when absent; an
+ * entity tag must equal the stored strong ETag (strong comparison, so a weak one never matches); a date must equal the
+ * stored Last-Modified exactly. False sends the whole file.
+ */
+export function ifRange(header: string | null, etag: string | null, modified: string | null): boolean {
+  if (header === null) return true;
+  const value = header.trim();
+  if (value.startsWith('"')) return etag !== null && etag === value;
+  return modified !== null && !value.startsWith('W/') && modified.trim() === value;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DATES = [
+  // IMF-fixdate: Sun, 06 Nov 1994 08:49:37 GMT
+  /^(?:mon|tue|wed|thu|fri|sat|sun), (\d{2}) ([a-z]{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) gmt$/,
+  // rfc850-date: Sunday, 06-Nov-94 08:49:37 GMT
+  /^(?:mon|tues|wednes|thurs|fri|satur|sun)day, (\d{2})-([a-z]{3})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) gmt$/,
+  // asctime-date: Sun Nov  6 08:49:37 1994 (its fields come in another order, so it is read apart below)
+  /^(?:mon|tue|wed|thu|fri|sat|sun) ([a-z]{3}) ( \d|\d{2}) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/,
+];
+
+/**
+ * An HTTP-date (RFC 9110 section 5.6.7: IMF-fixdate, the RFC 850 form and asctime, all UTC) in ms since the epoch,
+ * matched case-insensitively as RFC 9111 section 4.2 asks of a cache; NaN for anything else, which a cache takes as
+ * already expired (RFC 9111 section 5.3). A two-digit year more than 50 years ahead is the century before.
+ */
+export function httpDate(value: string | null, now = Date.now()): number {
+  const text = value?.trim().toLowerCase() ?? '';
+  let day: string, month: string, year: number, time: string[];
+  let match = DATES[0].exec(text) ?? DATES[1].exec(text);
+  if (match) {
+    [, day, month] = match;
+    year = +match[3];
+    time = match.slice(4, 7);
+    if (match[3].length === 2) {
+      const current = new Date(now).getUTCFullYear();
+      year += Math.floor(current / 100) * 100;
+      if (year > current + 50) year -= 100;
+    }
+  } else if ((match = DATES[2].exec(text))) {
+    [, month, day] = match;
+    year = +match[6];
+    time = match.slice(3, 6);
+  } else return Number.NaN;
+  const m = MONTHS.findIndex((name) => name.toLowerCase() === month),
+    [h, min, s] = time.map(Number),
+    d = +day.trim(),
+    // A leap second (60) counts as the next second; Date.UTC would also roll a day or month over, so check it did not.
+    ms = Date.UTC(year, m, d, h, min, s);
+  return m < 0 || h > 23 || min > 59 || s > 60 || new Date(ms - (s === 60 ? 1000 : 0)).getUTCDate() !== d
+    ? Number.NaN
+    : ms;
+}
+
+/**
  * Until when (ms since the epoch) a response is fresh, as a private cache computes it (RFC 9111 sections 4.2.1 and
  * 4.2.3): its lifetime is `Cache-Control: max-age`, else `Expires` minus `Date`; its age when received is the larger of
  * `Age` plus the request's round trip and how far `Date` lies behind the clock. 0 (revalidate) for `no-cache`, no
@@ -31,10 +86,10 @@ export function freshUntil(headers: Headers, received: number, sent = received, 
     maxAge = /(?:^|[,\s])max-age\s*=\s*"?(\d+)/i.exec(control);
   if (/no-cache/i.test(control)) return 0;
   if (maxAgeOnly) return maxAge ? received + +maxAge[1] * 1e3 : 0;
-  const date = Date.parse(headers.get('date') ?? ''),
+  const date = httpDate(headers.get('date'), received),
     origin = Number.isNaN(date) ? received : date,
     expires = headers.get('expires'),
-    lifetime = maxAge ? +maxAge[1] * 1e3 : expires === null ? Number.NaN : Date.parse(expires) - origin,
+    lifetime = maxAge ? +maxAge[1] * 1e3 : expires === null ? Number.NaN : httpDate(expires, received) - origin,
     age = /^\d+$/.test(headers.get('age')?.trim() ?? '') ? +headers.get('age')! * 1e3 : 0,
     initial = Math.max(0, received - origin, age + received - sent);
   return lifetime > initial ? received + lifetime - initial : 0;

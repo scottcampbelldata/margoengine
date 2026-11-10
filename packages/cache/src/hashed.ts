@@ -37,7 +37,8 @@ export class HashedAssets {
       hash = this.manifest[url];
     if (!hash) return this.cache.fetch(input, init);
     const name = versioned(url, hash),
-      response = await this.cache.fetch(name, init);
+      // A Request keeps its signal, headers and credentials on the versioned URL.
+      response = await this.cache.fetch(input instanceof Request ? new Request(name, input) : name, init);
     if (!response.ok || this.checked.has(name)) return response;
     const actual = await hashBytes(await response.clone().arrayBuffer());
     if (actual !== hash) {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14654942,
+  "total": 14657448,
   "history": [
     {
       "date": "2026-10-24",
@@ -8015,6 +8015,12 @@
       "commit": "466c979cc",
       "reason": "R5 video demux fixes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c562eaf7c",
+      "reason": "batch 132 cache audit: strict RFC 9110 HTTP-date parser and If-Range check in every cache entry (correctness, about 300-500 B gzip each)",
+      "grew": 4
     }
   ],
   "items": {
@@ -8130,15 +8136,15 @@
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 10524,
-    "@margoengine/cache": 3034,
+    "@margoengine/cache": 3801,
     "@margoengine/cache/bundles": 1883,
-    "@margoengine/cache/decoded": 4540,
+    "@margoengine/cache/decoded": 5069,
     "@margoengine/cache/eviction": 793,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
-    "@margoengine/cache/ranges": 3986,
-    "@margoengine/cache/stream": 3654,
+    "@margoengine/cache/ranges": 4654,
+    "@margoengine/cache/stream": 4196,
     "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,

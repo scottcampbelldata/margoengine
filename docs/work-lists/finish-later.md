@@ -95,3 +95,4 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | R5 | video | Run demux-real.test.js, demux-check and playback-check on the Mac once engine-bench has video/flower.webm (node scripts/reference-rendering/fetch-skip-assets.mjs; not fetched by lane D) |
 | R5 | selection | Deeper correctness read of highlight.ts (glow/fill) and spatial.ts (XR mesh pointers); only skimmed in R5 lane E |
 | R5 | viewcube | Correctness read of compass.ts (compass ring, context menu) and fit.ts (fit bounds through transitions); R5 lane E checked up.ts and ran the sweep only |
+| 132 | cache | Open audit findings in docs/known-bugs.md (batch 132 cache): evictionIndex totals on multi-key delete, blind serve() put, 304 lifetime merge, RangeCache strong-validator rule, request cache modes, stale-serving rows in limits.md, RangeCache round trip, help links on 27 throws, duplicate helpers. RFC 9110 and 9111 read only in the sections cited, not end to end |

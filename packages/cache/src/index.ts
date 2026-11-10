@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { defaultFetch, freshUntil } from './http.js';
+import { defaultFetch, freshUntil, ifRange } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -228,8 +228,10 @@ export class AssetCache {
   /** Fetch-compatible: pass it as a loader's `fetch` option. GET over HTTP(S) is cached; anything else goes to the network. */
   readonly fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = new Request(input, init),
-      url = request.url.replace(/#.*/, ''),
-      range = request.headers.get('range');
+      url = request.url.replace(/#.*/, '');
+    let range = request.headers.get('range');
+    // Fetch rejects at once on a signal that is already aborted, a stored answer included.
+    request.signal.throwIfAborted();
     if (request.method !== 'GET' || !/^https?:/i.test(url)) return this.network(request);
     const key = this.keys ? await this.keys.lookup(request, url, (k) => this.read(k)) : url;
     if (key === undefined) return this.network(request);
@@ -246,9 +248,11 @@ export class AssetCache {
     }
     const [entry, blob] = hit,
       fresh = entry.fresh > Date.now() || this.checked.has(key);
+    request.signal.throwIfAborted();
+    // RFC 9110 section 13.1.5: an If-Range that does not name the stored copy asks for the whole file.
+    if (!ifRange(request.headers.get('if-range'), entry.etag, entry.modified)) range = null;
     if (fresh || globalThis.navigator?.onLine === false)
       return this.serve(entry, blob, range, fresh ? undefined : 'offline');
-    request.signal.throwIfAborted();
     this.checked.add(key);
     const headers = new Headers(request.headers),
       controller = new AbortController(),
@@ -392,6 +396,16 @@ export class AssetCache {
     );
   }
 
+  /**
+   * Runs `work` after the writes queued so far and rejects with its error: delete and clear, so a file whose write was
+   * queued before them (a miss answered just before) is not stored again after them.
+   */
+  private serial(work: () => Promise<unknown>): Promise<void> {
+    const run = this.writes.then(work).then(() => {});
+    this.track((this.writes = run.catch(() => {})));
+    return run;
+  }
+
   /** Writes run one at a time so eviction sees every earlier write. */
   private queue(work: () => Promise<unknown>): void {
     this.track(
@@ -507,27 +521,31 @@ export class AssetCache {
     const key = new URL(url, globalThis.location?.href).href.replace(/#.*/, ''),
       mine = (k: unknown) => k === key || String(k).startsWith(`${key}\n`);
     for (const k of this.checked) if (mine(k)) this.checked.delete(k);
-    await this.tx('readwrite', (meta, data) => {
-      meta.getAllKeys().onsuccess = (event) => {
-        for (const k of (event.target as IDBRequest<IDBValidKey[]>).result)
-          if (mine(k) && this.eviction) this.eviction.remove(meta, data, k);
-          else if (mine(k)) {
-            meta.delete(k);
-            data.delete(k);
-          }
-      };
-    });
+    await this.serial(() =>
+      this.tx('readwrite', (meta, data) => {
+        meta.getAllKeys().onsuccess = (event) => {
+          for (const k of (event.target as IDBRequest<IDBValidKey[]>).result)
+            if (mine(k) && this.eviction) this.eviction.remove(meta, data, k);
+            else if (mine(k)) {
+              meta.delete(k);
+              data.delete(k);
+            }
+        };
+      }),
+    );
   }
 
   /** Removes every stored file (the version is kept). */
   async clear(): Promise<void> {
     this.checked.clear();
-    await this.tx('readwrite', (meta, data) => {
-      data.clear();
-      meta.getAllKeys().onsuccess = (event) => {
-        for (const key of (event.target as IDBRequest<IDBValidKey[]>).result) if (key !== VERSION) meta.delete(key);
-      };
-    });
+    await this.serial(() =>
+      this.tx('readwrite', (meta, data) => {
+        data.clear();
+        meta.getAllKeys().onsuccess = (event) => {
+          for (const key of (event.target as IDBRequest<IDBValidKey[]>).result) if (key !== VERSION) meta.delete(key);
+        };
+      }),
+    );
   }
 
   /** Closes the database after pending writes; `fetch` then goes straight to the network. */

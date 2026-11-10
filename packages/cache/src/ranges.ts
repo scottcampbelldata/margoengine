@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { byteRange, contentRange, defaultFetch, freshUntil, transact } from './http.js';
+import { byteRange, contentRange, defaultFetch, freshUntil, ifRange, transact } from './http.js';
 
 /** Options for `new RangeCache(...)`. A negative or NaN `maxBytes` or `timeout`, or a `block` under 1, throws a RangeError. */
 export interface RangeCacheOptions {
@@ -177,9 +177,13 @@ export class RangeCache {
   };
 
   private async answer(request: Request, url: string): Promise<Response> {
+    // Fetch rejects at once on a signal that is already aborted, stored blocks included.
+    request.signal.throwIfAborted();
     const header = request.headers.get('range'),
       file = await this.record(url);
     if (!file) return this.miss(request, url, header);
+    // RFC 9110 section 13.1.5: an If-Range that does not name the stored file is the server's to answer.
+    if (header && !ifRange(request.headers.get('if-range'), file.etag, file.modified)) return this.network(request);
     const range = header ? byteRange(header, file.size) : ([0, file.size - 1] as [number, number]);
     if (range === 'unsatisfiable')
       return new Response(null, { status: 416, headers: { 'content-range': `bytes */${file.size}` } });
@@ -207,6 +211,7 @@ export class RangeCache {
       this.stats.hits++;
       if (reason) this.stats[reason]++;
     }
+    request.signal.throwIfAborted();
     return this.assemble(request, file, start, end, !!header, fetched);
   }
 
@@ -345,7 +350,9 @@ export class RangeCache {
       if (!range) return response;
       [offset, , size] = range;
     } else if (response.status !== 200) return response;
-    if (/no-store/i.test(control)) return response;
+    // no-store: nothing is kept, but a range widened to whole blocks is still cut back to the range asked for below.
+    const keep = !/no-store/i.test(control);
+    if (!keep && forward === request) return response;
     const blob = await response.blob(),
       now = Date.now();
     size = response.status === 200 ? blob.size : size!;
@@ -362,10 +369,12 @@ export class RangeCache {
       bytes: 0,
     };
     const got = new Map<number, Blob>();
-    this.split(blob, offset, size, got);
-    this.checked.add(url);
     this.stats.misses++;
-    this.queue((db) => this.write(db, file, got));
+    if (keep) {
+      this.split(blob, offset, size, got);
+      this.checked.add(url);
+      this.queue((db) => this.write(db, file, got));
+    }
     const range = header ? byteRange(header, size) : ([0, size - 1] as [number, number]);
     if (range === 'unsatisfiable')
       return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
@@ -546,14 +555,22 @@ export class RangeCache {
   /** Removes every stored block (the version is kept). */
   async clear(): Promise<void> {
     this.checked.clear();
-    const db = await this.db;
-    if (db)
-      await transact(db, [M, D], 'readwrite', (meta, data) => {
-        data.clear();
-        meta.getAllKeys().onsuccess = (event) => {
-          for (const k of (event.target as IDBRequest<IDBValidKey[]>).result) if (k !== VERSION) meta.delete(k);
-        };
-      });
+    // After the writes queued so far, as drop: a range answered just before is not stored again after the clear.
+    const run = this.writes
+      .then(() => this.db)
+      .then(
+        (db) =>
+          db &&
+          transact(db, [M, D], 'readwrite', (meta, data) => {
+            data.clear();
+            meta.getAllKeys().onsuccess = (event) => {
+              for (const k of (event.target as IDBRequest<IDBValidKey[]>).result) if (k !== VERSION) meta.delete(k);
+            };
+          }),
+      )
+      .then(() => {});
+    this.track((this.writes = run.catch(() => {})));
+    await run;
   }
 
   /** Closes the database after pending writes; `fetch` then goes straight to the network. */

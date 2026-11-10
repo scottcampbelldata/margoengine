@@ -147,10 +147,13 @@ export class AssetBundles {
     const queue = this.files(name),
       total = queue.length;
     let loaded = 0;
+    // The first failure stops the other workers and their downloads, as the caller's abort does.
+    const failed = new AbortController(),
+      stop = signal ? AbortSignal.any([signal, failed.signal]) : failed.signal;
     const worker = async () => {
       for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
-        signal?.throwIfAborted();
-        const response = await this.assets.fetch(url, { signal });
+        stop.throwIfAborted();
+        const response = await this.assets.fetch(url, { signal: stop });
         if (!response.ok) {
           void response.body?.cancel().catch(() => {});
           throw margoError(
@@ -162,14 +165,18 @@ export class AssetBundles {
         onProgress?.({ bundle: name, url, loaded: ++loaded, total });
       }
     };
-    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, total)) }, worker));
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, total)) }, worker)).catch((error) => {
+      failed.abort(error);
+      throw error;
+    });
     await this.cache.flush();
   }
 
   /** Fetch-compatible: a file a bundle lists is answered from its hashed copy; anything else passes through. */
   readonly fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = input instanceof Request ? input.url : this.resolve(String(input));
-    return this.assets.fetch(this.hashes[url] ? url : input, init);
+    // A listed Request goes on as it is (its URL is already absolute), so its signal and headers are kept.
+    return this.assets.fetch(this.hashes[url] && !(input instanceof Request) ? url : input, init);
   };
 
   /**

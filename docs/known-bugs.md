@@ -5259,3 +5259,36 @@ of along it; `orbit(0.3, 0)` from `[0, -5, 2]` changes the height along Z from 2
 Cause: packages/stage/src/controls.ts `orbit` and `pan` work in Y-up spherical coordinates and read `camera.up` only for
 a view along Y. The README does not say Y up. Fix to build: build the orbit frame from `camera.up` (or document Y up
 and refuse another up).
+
+## Batch 132 audit: cache (fixed and open)
+
+Fixed in this commit (regressions in packages/cache/test/audit-132.test.js, each failing before its fix): `delete`
+and `clear` of AssetCache and `clear` of RangeCache ran before writes already queued, so a file answered just before
+was stored again after them (and a HashedAssets mismatch left the bad copy stored); a signal already aborted did not
+reject a stored answer (Fetch); a RangeCache `no-store` miss returned the whole widened block (`bytes=10-19` gave
+`bytes 0-63/200`); `Expires` and `Date` went through `Date.parse`, so `Expires: 2100` was fresh until the year 2100 and
+asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range` was ignored (RFC 9110 13.1.5);
+`Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
+and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
+
+### Open: cache findings not fixed in the audit
+
+- evictionIndex `remove()` per key in one transaction reads the totals before any put lands: deleting a URL with two
+  `Vary` entries leaves `usage()` at `{bytes: 100, files: 1}` with nothing stored (packages/cache/src/eviction.ts
+  `remove`, called per key from index.ts `delete`). Fix: one read and one put of the totals for all keys.
+- `serve()` puts the entry back blind: a hit looked up before a queued write evicts it brings back a record without
+  bytes (maxBytes 150, two 100-byte files: usage 200 bytes, 2 files). Fix: get then put in one transaction, only if the
+  record exists, as RangeCache `touch` does.
+- A 304 without `Cache-Control` or `Expires` drops the stored lifetime instead of keeping it (RFC 9111 4.3.4; only
+  non-conforming servers, as RFC 9110 15.4.5 makes servers send them).
+- RangeCache combines blocks under a weak ETag or no validator at all; RFC 9111 3.4 allows it only under one strong
+  validator. Same size, new bytes, same weak tag: one answer mixes two versions. Fix: combine only under a strong
+  validator and send `If-Range` with it on block requests.
+- Request cache modes (`cache: 'reload'`, `'no-store'`, `'no-cache'`, request `Cache-Control: no-cache`) are ignored;
+  the stored copy answers.
+- Stale copies are served on any non-200 answer and on a timeout, also for `no-cache` and `must-revalidate` files
+  (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play, but not in limits.md.
+- RangeCache freshness ignores the request's round trip (`freshUntil(headers, now)` without `sent`).
+- Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
+  duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
+  evicted; 27 throws carry no help link.
