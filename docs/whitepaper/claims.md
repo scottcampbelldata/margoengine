@@ -2902,3 +2902,6 @@ The browser check renders the moved globe on both WebGPU and WebGL2 and checks
 the projected anchor as well as actual foreground pixels and validation errors.
 Reference behavior is the public Cesium controller description; this claim is
 limited to this batch row, not all Cesium navigation, terrain or scene modes.
+
+### FSM event payload delivery (batch 250 job 1)
+EventMachine delivers the same data object to guards, exit/entry hooks and EventTrace, including ancestor fallback and captured plan actions. packages/fsm/test/events.test.js verifies refusal, payload identity, delayed isolation and exception cleanup. Reference: W3C SCXML event data and Stately guard documentation cited in docs/clean-room.md.

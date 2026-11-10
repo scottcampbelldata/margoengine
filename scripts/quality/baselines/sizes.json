@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12039072,
+  "total": 12041690,
   "history": [
     {
       "date": "2026-10-24",
@@ -5300,6 +5300,12 @@
       "commit": "batch-197-job2",
       "reason": "New optional controls/globe entry: 0 to 3646 B gzip; 3902 B ceiling. Ellipsoid navigation and floating-origin support share the controls lifecycle; core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-250",
+      "reason": "New optional fsm/events: 0 to 2362 B gzip, includes complete runtime and validation; splitting would add indirection",
+      "grew": 1
     }
   ],
   "items": {
@@ -6301,6 +6307,7 @@
     "@margoengine/react/instances": 2928,
     "margoengine/react/instances": 318,
     "@margoengine/controls/transitions": 14087,
-    "@margoengine/controls/globe": 3902
+    "@margoengine/controls/globe": 3902,
+    "@margoengine/fsm/events": 2618
   }
 }

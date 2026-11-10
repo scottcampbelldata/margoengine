@@ -3451,3 +3451,8 @@ to 1% of altitude and twice the horizon distance plus altitude; disable
 `clipPlanes` to own them. Core/stage unchanged at 23,950 B gzip.
 
 Entry measurement: controls/globe 0 to 3646 B min+gzip; ceiling 3902 B.
+
+### FSM event payload entry (batch 250 job 1)
+Optional fsm/events preserves data by reference for guards, enter/exit hooks, nested plans and EventTrace. Initial entry, goto and delays have undefined data. Update hooks retain the seconds argument. No payload serialization or cloning; caller owns payload lifetime. Root FSM, core and stage sources unchanged.
+
+Batch 250 job 1: fsm/events 0 to 2362 B min+gzip, ceiling 2618 B. Optional runtime is not loaded by the FSM root or core/stage.

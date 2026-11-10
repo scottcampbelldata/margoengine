@@ -37,6 +37,10 @@
     "./trace": {
       "types": "./dist/trace.d.ts",
       "import": "./dist/trace.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
     }
   },
   "files": [

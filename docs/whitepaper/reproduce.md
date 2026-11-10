@@ -2470,3 +2470,5 @@ The browser script checks both real backends and writes
 `packages/controls/test-results/globe-browser.json`. Run the controls README
 examples through `npm run check:readme-run -- --packages=controls`. No speed
 measurement, benchmark or exclusive GPU lease is required.
+
+FSM payload proof: build fsm, then node --test --test-timeout=120000 packages/fsm/test/events.test.js. No GPU or timing measurement is involved.

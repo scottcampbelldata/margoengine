@@ -610,6 +610,10 @@
       "types": "./dist/controls/walk.d.ts",
       "import": "./dist/controls/walk.js"
     },
+    "./controls/globe": {
+      "types": "./dist/controls/globe.d.ts",
+      "import": "./dist/controls/globe.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
@@ -1113,6 +1117,10 @@
     "./fsm/trace": {
       "types": "./dist/fsm/trace.d.ts",
       "import": "./dist/fsm/trace.js"
+    },
+    "./fsm/events": {
+      "types": "./dist/fsm/events.d.ts",
+      "import": "./dist/fsm/events.js"
     },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
@@ -3681,10 +3689,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./controls/globe": {
-      "types": "./dist/controls/globe.d.ts",
-      "import": "./dist/controls/globe.js"
     }
   },
   "dependencies": {
