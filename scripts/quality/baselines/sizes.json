@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14726807,
+  "total": 14727068,
   "history": [
     {
       "date": "2026-10-24",
@@ -8183,6 +8183,12 @@
       "commit": "750fed14f",
       "reason": "scatter batch 132 audit",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "bc5d6f52b",
+      "reason": "batch 164: SceneTarget.resolve depth flag in shared msaa (+5 B transitions)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9299,7 +9305,7 @@
     "@margoengine/toon/hatch-models": 4558,
     "@margoengine/toon/models": 4843,
     "@margoengine/toon/screen-outline": 6077,
-    "@margoengine/transitions": 4563,
+    "@margoengine/transitions": 4824,
     "@margoengine/transitions/custom": 5466,
     "@margoengine/transitions/glsl": 16190,
     "@margoengine/transitions/live": 4988,

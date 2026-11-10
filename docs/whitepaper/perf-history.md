@@ -3587,3 +3587,7 @@ rules (no `git stash` and no `npx` in any form). None changed the repository.
 ## Batch 164 screen effect descriptors (2026-11-10)
 
 `perf(shader): reuse NodePass render pass descriptors` makes 3 render pass descriptors instead of 30 in the 10-frame pixelate, rgbShift and vignette story at 1x and 4x, with identical GPU commands. The three effect passes remain (accepted difference: fusion would drop the stored display-precision intermediates). Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md#row-1319-screen-effect-passes).
+
+## Batch 164 Tonemap capture resolve (2026-11-10)
+
+`perf(tonemap): skip the unread depth copy in the final capture resolve` removes one render pass and one draw per 4x frame (four depth samples read, one written, per pixel), with every other GPU command identical at 1x and 4x. Row 13.17's velocity-only path is recorded as its like-for-like row. Batch 164 is complete. Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).

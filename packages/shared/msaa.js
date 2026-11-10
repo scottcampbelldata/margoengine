@@ -142,9 +142,10 @@ export class SceneTarget {
     }
     pass.end();
   }
-  resolve(encoder, final = false) {
+  resolve(encoder, final = false, depth = true) {
     if (this.samples === 1) return;
-    this.copyDepth(encoder, this.resolvedDepthView, 1);
+    // depth false: the caller reads no 1x depth after this resolve (only a final one may skip it).
+    if (depth) this.copyDepth(encoder, this.resolvedDepthView, 1);
     if (final) {
       // A later view loads these samples before resolving the full HDR target.
       // Standalone captures still retire both attachments after their final use.

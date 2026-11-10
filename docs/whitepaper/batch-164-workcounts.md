@@ -77,3 +77,37 @@ so the separate passes are an accepted workload difference. Jimenez (SIGGRAPH 20
 https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/)
 motivates fusion only where the intermediate values stay exact. No rival source
 was read.
+
+## Rows 9.7 and 13.15: Tonemap capture resolve
+
+Change: `perf(tonemap): skip the unread depth copy in the final capture resolve`.
+At 4x MSAA the final resolve of Tonemap's scene capture copied the multisampled
+depth into Tonemap's private 1x depth texture every frame. Nothing reads that
+texture afterwards: depth readers of a 4x capture bind its multisampled depth, a
+mid-frame reader resolves first, and the capture ends right after the
+presentation pass. `SceneTarget.resolve` takes a third argument, `depth`, and
+Tonemap passes `false` for its final resolve. Per frame at 4x this removes one
+render pass and one draw that read four depth samples and write one per pixel
+(20 logical bytes per pixel with depth32float). At 1x nothing changes. In the
+steady frame every other command is identical, and no bind group made since setup
+or command in the frame references the skipped texture.
+
+Reproduce after `npm run build:packages`:
+
+```sh
+node --test --test-timeout=120000 packages/tonemap/tests/capture-resolve.test.js
+npm run check:readme-run -- --packages=tonemap
+```
+
+Left, as accepted differences: the colour resolve runs as its own pass because
+core's scene pass (frozen for v1.0.0) ends without a resolve target, and the
+`acescg` curve is the fitted AP1 RRT/ODT, not ACESFilmic. No speed claim.
+
+## Row 13.17: velocity without TAA
+
+`new TAA({velocityOnly: true, depth})` from `@margoengine/taa` draws motion
+vectors with no jitter, capture, history or resolve; `MotionBlur` reads
+`taa.velocity`. `p-motion-blur-velocity` measures that path as the like-for-like
+row, and `p-motion-blur` keeps its full TAA workload. The velocity draw remains a
+separate geometry pass because core's frozen scene pass has no velocity output.
+Timing pending the quiet rerun.

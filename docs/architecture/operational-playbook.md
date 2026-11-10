@@ -7327,3 +7327,5 @@ once with equal draw-call counts. Quiet timings remain open. [Adapter, scope and
 Section 5, batch 164 fog: four full command tapes match the parent byte for byte while numeric grid comparison removes per-frame serialization. The two dispatches, all shader text, uniform bytes and composite remain unchanged. [Sources, workload difference and reproduction](../whitepaper/batch-164-workcounts.md).
 
 Section 5, batch 164 screen effects: NodePass reuses one render pass descriptor per pass; full command tapes match the parent at 1x and 4x. The separate display-precision passes remain by design. [Evidence](../whitepaper/batch-164-workcounts.md#row-1319-screen-effect-passes).
+
+Section 5, batch 164 Tonemap: `SceneTarget.resolve(encoder, final, depth)` lets a final resolve skip the 1x depth copy when its caller reads none; Tonemap uses it, one depth pass fewer per 4x frame with the rest of the tape identical. The separate colour resolve pass remains while core's scene pass is frozen. [Evidence](../whitepaper/batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).

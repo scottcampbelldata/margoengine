@@ -32,6 +32,8 @@ tonemap.dispose();
 stage.dispose();
 ```
 
+With 4x MSAA, Tonemap captures the scene, resolves its colour and restores the canvas depth for later passes; its final resolve copies no depth it does not read (batch 164).
+
 `Tonemap` detaches from its owning scene on disposal, preserving same-name
 effects in other scenes. Use `scene.use()` for a secondary scene:
 

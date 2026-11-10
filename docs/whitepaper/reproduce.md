@@ -4110,3 +4110,5 @@ Follow [the complete external-install and three-scene commands](../sciviz-rivals
 Batch 164 fog: [full command-tape and real-GPU commands, preserved workloads and clean-room sources](batch-164-workcounts.md#row-95-froxel-preparation).
 
 Batch 164 screen effects: [descriptor work count and preserved passes](batch-164-workcounts.md#row-1319-screen-effect-passes).
+
+Batch 164 Tonemap and velocity: [capture resolve work count and the velocity-only row](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).

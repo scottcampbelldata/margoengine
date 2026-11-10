@@ -374,7 +374,9 @@ export class Tonemap implements EnginePlugin {
     this.captureTarget!.begin(c);
   }
   private grade(c: Context): void {
-    if (!this.source) this.captureTarget!.resolve(c.encoder, true);
+    // The capture's 1x depth is private and unread from here on: depth readers of a 4x capture bind its multisampled
+    // depth, a mid-frame reader resolves first, and restore() ends the capture. Only colour and the outer depth remain.
+    if (!this.source) this.captureTarget!.resolve(c.encoder, true, false);
     const texture = this.source ? this.source() : this.scene;
     if (
       !texture ||

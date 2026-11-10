@@ -9,7 +9,8 @@ export class SceneTarget {
   readonly resolvedDepth: GPUTexture;
   readonly depthSource?: GPUTextureView;
   begin(context: Context): void;
-  resolve(encoder: GPUCommandEncoder, final?: boolean): void;
+  /** Resolves colour and, unless `depth` is false (a final resolve whose caller reads no 1x depth afterwards), depth. */
+  resolve(encoder: GPUCommandEncoder, final?: boolean, depth?: boolean): void;
   /** Copies reversed-Z depth; format defaults to the capture depth format. */
   copyDepth(encoder: GPUCommandEncoder, view: GPUTextureView, count: number, format?: GPUTextureFormat): void;
   restore(context: Context): void;

@@ -4814,3 +4814,5 @@ Every batch 182 scene draws a non-empty image that repeats byte for byte on Marg
 Batch 164 froxel preparation removes grid serialization with four byte-identical full GPU-command tapes against the parent. This is an operation-count claim only. [Scope, workloads, sources and reproduction](batch-164-workcounts.md#row-95-froxel-preparation).
 
 Batch 164 screen effects: `NodePass` reuses one render pass descriptor per pass, 3 instead of 30 in a 10-frame three-effect story, with byte-identical full GPU-command tapes against the parent. Operation count only. [Scope and reproduction](batch-164-workcounts.md#row-1319-screen-effect-passes).
+
+Batch 164 Tonemap: the final 4x capture resolve skips a depth copy that nothing reads, one render pass and one draw fewer per frame, with every other GPU command identical. Operation count only. [Scope and reproduction](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).

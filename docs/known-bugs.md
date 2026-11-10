@@ -2456,6 +2456,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Fixed for effects that need no anti-aliasing:** `TAA`'s `velocityOnly` option runs the velocity pass with no jitter,
   capture, history or resolve: `p-motion-blur-velocity` 0.48 ms GPU and 1.2 ms CPU, against 0.63 and 2.8 for
   `p-motion-blur` in the same run (busy machine, diagnostic). `p-motion-blur` keeps its full TAA frame.
+- **Batch 164 (2026-11-10):** the velocity pass without TAA is `velocityOnly`; `p-motion-blur-velocity` is the like-for-like row. The separate velocity geometry pass stays while core's scene pass is frozen (limits.md).
 - **Still open:** three's WebGPU took 0.66 ms in that busy run against 0.25 in the ledger, so whether 0.48 still loses needs
   a quiet run. three has no `p-motion-blur-velocity` scene yet, so that row compares with `p-motion-blur`'s three column.
   `p-motion-blur`'s image has not matched three's since its first run (SSIM 0.656, delta E 13.2); the cause is not known.
