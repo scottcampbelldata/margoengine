@@ -128,3 +128,30 @@ test('fallback exhaustion preserves causes and abort never starts the next candi
   assert.equal(calls, 1);
   listener.dispose();
 });
+
+test('stopAll releases fire-and-forget instances; created clips survive natural ends and replay', () => {
+  const context = new FakeAudioContext(),
+    listener = new AudioListener({ context }),
+    buffer = context.createBuffer(1, 48000, 48000);
+  const bank = new AudioSpriteBank(listener, buffer, { shot: { offset: 0, duration: 0.1 }, hit: { offset: 0.2, duration: 0.1 } });
+  const shots = Array.from({ length: 8 }, () => bank.play('shot'));
+  let ended = 0;
+  const owned = bank.create('hit', { onEnded: () => ended++ });
+  owned.play();
+  bank.stopAll();
+  assert.ok(shots.every((s) => s.isDisposed));
+  assert.equal(owned.isDisposed, false);
+  assert.equal(owned.isPlaying, false);
+  assert.equal(bank.sounds.size, 1);
+  owned.play();
+  context.bufferSources.at(-1).end();
+  assert.equal(ended, 1);
+  assert.equal(owned.isDisposed, false);
+  owned.play();
+  assert.equal(owned.isPlaying, true);
+  owned.dispose();
+  bank.update();
+  assert.equal(bank.sounds.size, 0);
+  bank.dispose();
+  listener.dispose();
+});

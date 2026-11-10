@@ -146,3 +146,17 @@ test('validation and disposed/duplicate/source ownership errors', () => {
   );
   s.listener.dispose();
 });
+
+test('seeking an ended one-shot keeps the seek for the next play', () => {
+  const s = setup({ maxVoices: 0 });
+  const voice = s.manager.add(s.sound({ loop: false, offset: 1, duration: 2 })).play();
+  s.context.currentTime = 3;
+  s.manager.update();
+  assert.equal(voice.isPlaying, false);
+  voice.seek(1.5).play();
+  near(voice.currentTime, 1.5);
+  s.context.currentTime = 3.5;
+  near(voice.currentTime, 2);
+  assert.equal(voice.isPlaying, true);
+  s.listener.dispose();
+});

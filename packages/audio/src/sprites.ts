@@ -21,6 +21,8 @@ export type AudioSpritePlayOptions = Omit<
 export class AudioSpriteBank {
   private readonly sprites = new Map<string, Readonly<AudioSprite>>();
   private readonly sounds = new Set<Audio>();
+  /** Instances started by play(): released by the bank on natural end or stopAll. */
+  private readonly oneShots = new WeakSet<Audio>();
   private disposed = false;
 
   constructor(
@@ -54,7 +56,10 @@ export class AudioSpriteBank {
     return [...this.sprites.keys()];
   }
 
-  /** Create a stopped clip with its authored loop bounds, owned until disposed or the bank is disposed. */
+  /**
+   * Create a stopped clip with its authored loop bounds. The caller owns it: it can be played again after it ends or
+   * is stopped, until the caller or the bank disposes it.
+   */
   create(name: string, options: AudioSpritePlayOptions = {}): Audio {
     if (this.disposed) throw fault('disposed', 'AudioSpriteBank is disposed; create a new bank');
     const sprite = this.sprites.get(name);
@@ -71,23 +76,34 @@ export class AudioSpriteBank {
         try {
           options.onEnded?.(audio);
         } finally {
-          this.sounds.delete(audio);
-          audio.dispose();
+          if (this.oneShots.has(audio)) this.release(audio);
         }
       },
     }).setBuffer(this.buffer);
     this.sounds.add(sound);
     return sound;
   }
-  /** Create and start an independent instance; delay defaults to 0 audio-clock seconds. */
+  /**
+   * Create and start an independent fire-and-forget instance; delay defaults to 0 audio-clock seconds. The bank
+   * releases it when it ends naturally or {@link stopAll} stops it; dispose one you stop yourself.
+   */
   play(name: string, options: AudioSpritePlayOptions = {}, delay = 0): Audio {
     if (!Number.isFinite(delay) || delay < 0)
       throw rangeError('Sprite delay must be finite and nonnegative; use seconds', 'state');
-    return this.create(name, options).play(delay);
+    const sound = this.create(name, options);
+    this.oneShots.add(sound);
+    return sound.play(delay);
   }
-  /** Stop every instance while preserving their buffers and the sprite map. */
+  /** Stop every instance. play() instances are released; create() clips stay owned and can play again. */
   stopAll(): void {
-    for (const sound of this.sounds) if (!sound.isDisposed) sound.stop();
+    for (const sound of this.sounds)
+      if (sound.isDisposed) this.sounds.delete(sound);
+      else if (this.oneShots.has(sound)) this.release(sound);
+      else sound.stop();
+  }
+  private release(sound: Audio): void {
+    this.sounds.delete(sound);
+    sound.dispose();
   }
   /** @internal Forget caller-disposed sounds on listener updates. */
   update(): void {

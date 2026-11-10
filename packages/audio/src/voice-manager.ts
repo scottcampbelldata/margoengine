@@ -250,6 +250,8 @@ export class AudioManagedVoice {
     this.advance();
     this.physical(false);
     this.phase = this.wrap(seconds);
+    // A seek moves an ended one-shot off its end, so the next play() starts from here instead of rewinding.
+    if (this.status === 'ended') this.status = 'stopped';
     this.clock = this.sound.context.currentTime;
     this.manager.update();
     return this;
