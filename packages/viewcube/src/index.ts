@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
-import type { FrameGraph } from '@margoengine/core/extension';
+import type { EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 
 /** One of the six cube faces. */
@@ -212,6 +212,8 @@ export class ViewCube {
   /** See ViewCubeOptions.drag. */
   drag: boolean;
   readonly name = 'margoengine-viewcube:' + count++;
+  /** The engine plugin it registered, to remove from the scene it went into. */
+  private plugin: EnginePlugin | undefined;
   private readonly cube: HTMLDivElement;
   private readonly buttons: [HTMLElement, V3][] = [];
   private readonly toggle?: HTMLButtonElement;
@@ -350,16 +352,18 @@ export class ViewCube {
     this.position = container.style.position;
     if (!this.position && doc.defaultView?.getComputedStyle(container).position === 'static')
       container.style.position = 'relative';
-    engine.use({
-      name: this.name,
-      setup() {},
-      onPreUpdate: (delta: number) => this.update(delta),
-      // After every control has moved the camera, so the cube never lags a frame.
-      registerPasses: (graph: FrameGraph) => {
-        graph.add({ name: this.name + ':sync', order: 10000, execute: () => this.sync() });
-      },
-      dispose: () => this.dispose(),
-    } as Parameters<EngineKernel['use']>[0]);
+    engine.use(
+      (this.plugin = {
+        name: this.name,
+        setup() {},
+        onPreUpdate: (delta: number) => this.update(delta),
+        // After every control has moved the camera, so the cube never lags a frame.
+        registerPasses: (graph: FrameGraph) => {
+          graph.add({ name: this.name + ':sync', order: 10000, execute: () => this.sync() });
+        },
+        dispose: () => this.dispose(),
+      } as Parameters<EngineKernel['use']>[0]),
+    );
     this.sync();
   }
 
@@ -567,7 +571,8 @@ export class ViewCube {
     this.grab = undefined;
     this.element.remove();
     this.container.style.position = this.position;
-    if (!this.engine.disposed && this.engine.hasPlugin(this.name)) this.engine.removePlugin(this.name);
+    // The scene the cube was added to, which need not be the active one by now.
+    if (!this.engine.disposed && this.plugin) this.engine.sceneOf(this.plugin)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -578,13 +583,11 @@ export class ViewCube {
   private place(theta: number, phi: number, r: number): V3 {
     const p = this.camera.target,
       pole = phi < POLE ? 1 : phi > Math.PI - POLE ? -1 : 0;
-    const d = this.world(pole
-      ? [0, pole * r, 0]
-      : [
-          r * Math.sin(phi) * Math.sin(theta),
-          r * Math.cos(phi),
-          r * Math.sin(phi) * Math.cos(theta),
-        ]);
+    const d = this.world(
+      pole
+        ? [0, pole * r, 0]
+        : [r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.cos(theta)],
+    );
     return (this.camera.position = d.map((x, i) => p[i] + x) as V3);
   }
   /**

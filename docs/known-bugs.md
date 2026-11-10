@@ -5619,3 +5619,10 @@ as unsupported by the light loader.
 - Open (Mac bug, M6, MARGO_COMPAT=1): `node packages/sky/test/browser-check.mjs` fails at "meadow 4x frame 1 scene vs
   narrow: differing 2, max 0.0009765625" every run, also on the source before the dispose fix; native passes. The full
   `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels; root cause not found.
+
+## Batch 132 audit: viewcube (fixed)
+
+- Fixed: `ViewCube.dispose` (packages/viewcube/src/index.ts:570) and `ViewCompass.dispose` (compass.ts:333) did
+  `engine.hasPlugin(name) && engine.removePlugin(name)`, both on the active scene. Input: create the cube, make another
+  scene active, dispose. Wrong output: the cube's plugin stayed in its own scene and kept calling `update` and `sync`
+  on a removed element. Regressions packages/viewcube/test/audit-132.test.js.

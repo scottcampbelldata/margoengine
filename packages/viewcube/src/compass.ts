@@ -1,4 +1,4 @@
-import type { FrameGraph } from '@margoengine/core/extension';
+import type { EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { ViewCube } from './index.js';
 
@@ -49,6 +49,8 @@ export class ViewCompass {
   /** Context menu root, or undefined with menu:false. */
   readonly menu?: HTMLDivElement;
   private readonly buttons: HTMLButtonElement[] = [];
+  /** The engine plugin it registered, to remove from the scene it went into. */
+  private plugin: EnginePlugin | undefined;
   private readonly items: HTMLButtonElement[] = [];
   private readonly name: string;
   private readonly previousDispose: ViewCube['dispose'];
@@ -170,14 +172,16 @@ export class ViewCompass {
     };
     cube.dispose = this.disposeCube;
     instances.set(cube, this);
-    cube.engine.use({
-      name: this.name,
-      setup() {},
-      registerPasses: (graph: FrameGraph) => {
-        graph.add({ name: this.name, order: 10001, execute: () => this.sync() });
-      },
-      dispose: () => this.dispose(),
-    } as Parameters<ViewCube['engine']['use']>[0]);
+    cube.engine.use(
+      (this.plugin = {
+        name: this.name,
+        setup() {},
+        registerPasses: (graph: FrameGraph) => {
+          graph.add({ name: this.name, order: 10001, execute: () => this.sync() });
+        },
+        dispose: () => this.dispose(),
+      } as Parameters<ViewCube['engine']['use']>[0]),
+    );
     this.sync();
   }
   /** North heading in radians. Updating it changes both labels and click directions. */
@@ -330,7 +334,7 @@ export class ViewCompass {
     [c.element.style.marginLeft, c.element.style.marginRight, c.element.style.marginBottom] = this.margins;
     if (c.dispose === this.disposeCube) c.dispose = this.previousDispose;
     instances.delete(c);
-    if (!c.engine.disposed && c.engine.hasPlugin(this.name)) c.engine.removePlugin(this.name);
+    if (!c.engine.disposed && this.plugin) c.engine.sceneOf(this.plugin)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

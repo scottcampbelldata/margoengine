@@ -7,11 +7,27 @@ export function setup(options = {}) {
     plugins = new Map(),
     passes = [];
   const engine = {
-    canvas, camera: new Camera({ position: [0, 0, 10], target: [0, 0, 0], ...options }), plugins,
-    use(p) { plugins.set(p.name, p); p.setup(engine); p.registerPasses?.({ add: (pass) => passes.push(pass) }); return engine; },
+    canvas,
+    camera: new Camera({ position: [0, 0, 10], target: [0, 0, 0], ...options }),
+    plugins,
+    use(p) {
+      plugins.set(p.name, p);
+      p.setup(engine);
+      p.registerPasses?.({ add: (pass) => passes.push(pass) });
+      return engine;
+    },
     hasPlugin: (name) => plugins.has(name),
-    removePlugin(name) { const p = plugins.get(name); plugins.delete(name); p?.dispose?.(); },
-    frame(dt = 1 / 60) { for (const p of plugins.values()) p.onPreUpdate?.(dt); engine.camera.update(4 / 3, true); for (const p of passes) p.execute({}); },
+    sceneOf: (p) => (plugins.get(p.name) === p ? engine : undefined),
+    removePlugin(name) {
+      const p = plugins.get(name);
+      plugins.delete(name);
+      p?.dispose?.();
+    },
+    frame(dt = 1 / 60) {
+      for (const p of plugins.values()) p.onPreUpdate?.(dt);
+      engine.camera.update(4 / 3, true);
+      for (const p of passes) p.execute({});
+    },
   };
   return { engine, dom };
 }

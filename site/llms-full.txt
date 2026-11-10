@@ -9460,6 +9460,8 @@ The optional cache/eviction index coalesces removals in the same object-store tr
 
 # Known bugs and unverified features
 
+Lane B README runtime gate (2026-11-10): concurrent check:readme-run commands in distinct worktrees serialize as one lane because scripts/run-readme-examples.mjs passes the constant owner check-readme-run and scripts/support/gpu-admission.mjs sameLane compares owner-derived lane names across worktrees. Repro: start the full local CI README runner, then a narrowed runner elsewhere while another GPU slot is free. Run a narrowed command under scripts/gpu-lock.mjs run --owner=lane-B-readme so nested locking retains a real lane identity; fix the runner owner at its owning lane in the fix phase.
+
 Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/check-example-types.test.js` fails its cameras-scoped expectation because cameras now reaches 14 packages, above the unchanged 12-package full-run threshold; the planner correctly selects all projects but the fixture expects a named subset. Outside the API-record classification job; reconcile the fixture in the fix phase without weakening closure coverage.
 
 Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/no-private-paths.test.js` finds 12 tracked files with references to excluded local paths (clean-room, known-bugs, limits, sciviz-a11y, whitepaper claims/reproduce/atmosphere result, netcode lobby test, accessibility audit, two sciviz preparation scripts and llms-full). Cause: producers committed machine-local evidence pointers unavailable in a clone; replace at the owning producers in the fix phase. No classification or assertion change.
@@ -15078,6 +15080,13 @@ as unsupported by the light loader.
   narrow: differing 2, max 0.0009765625" every run, also on the source before the dispose fix; native passes. The full
   `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels; root cause not found.
 
+## Batch 132 audit: viewcube (fixed)
+
+- Fixed: `ViewCube.dispose` (packages/viewcube/src/index.ts:570) and `ViewCompass.dispose` (compass.ts:333) did
+  `engine.hasPlugin(name) && engine.removePlugin(name)`, both on the active scene. Input: create the cube, make another
+  scene active, dispose. Wrong output: the cube's plugin stayed in its own scene and kept calling `update` and `sync`
+  on a removed element. Regressions packages/viewcube/test/audit-132.test.js.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -19831,6 +19840,26 @@ settled run creates a fresh finished promise; save or await the promise for that
 An already-aborted signal also cancels a replay. Playback callbacks run during update,
 not during seek. Cancelling pauses the timeline and leaves sampled values in place.
 
+
+```ts
+import {AsyncTween, AsyncTimeline} from '@margoengine/tween/async';
+const target = {x: 0};
+const driver = new AsyncTween();
+const task = driver.to(target, 'x', 10, {duration: 1});
+driver.update(1); // Application clock, seconds. Await alone does not advance it.
+await task;
+if (target.x !== 10) throw new Error('Tween did not finish');
+const timeline = new AsyncTimeline().to(target, 'x', 20, {duration: 1}).play();
+timeline.update(1);
+await timeline.finished;
+const controller = new AbortController();
+const cancelled = driver.to(target, 'x', 30, {duration: 1, signal: controller.signal});
+const observed = cancelled.finished.catch(reason => console.log(reason.name));
+controller.abort();
+await observed;
+driver.clear();
+```
+
 ## Multiple properties and keyframes
 
 The `props` entry's `to(target, values, options)`, `from(target, values, options)` and
@@ -19839,23 +19868,6 @@ including a Vector3's x/y/z. Destinations may be numbers or relative strings usi
 +=, -=, *= or /=. Relative scalars resolve against the captured starting value;
 relative entries in a keyframe value list resolve against the preceding value.
 Nonfinite arithmetic, including division by zero, rejects.
-
-`from` and `fromTo` write their starts immediately. An explicit property keyframe list
-also writes its first value immediately, including during a delay; a scalar `to` waits
-for update. Lists need at least two values and distribute offsets evenly.
-`keyframes(target, frames, options)` accepts frames with values, optional offset in
-0..1 and optional per-segment easing. Missing first/last offsets default to 0/1;
-interior omissions distribute between explicit offsets. Offsets must be nondecreasing.
-Omitted properties carry their previous value; values outside the explicit offset
-range hold the corresponding endpoint. Easing defaults to operation easing or linear.
-
-Each result exposes target, keys, duration and finished, plus update, pause, play,
-cancel and Symbol.dispose. Its speed defaults to 1 and accepts finite nonnegative
-values; zero freezes the clock. Advance it with update even when awaiting completion.
-Options include the async timing options and AbortSignal. Cancellation rejects the
-completion promise and leaves current property values intact.
-
-## Mixed clips and nested timelines
 
 [README continues: https://margoengine.com/llms/packages/tween.md]
 
