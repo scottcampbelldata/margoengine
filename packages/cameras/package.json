@@ -49,6 +49,10 @@
     "./wide-cube": {
       "types": "./dist/wide-cube.d.ts",
       "import": "./dist/wide-cube.js"
+    },
+    "./panorama": {
+      "types": "./dist/panorama.d.ts",
+      "import": "./dist/panorama.js"
     }
   },
   "files": [

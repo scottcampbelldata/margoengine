@@ -530,6 +530,10 @@
       "types": "./dist/cameras/wide-cube.d.ts",
       "import": "./dist/cameras/wide-cube.js"
     },
+    "./cameras/panorama": {
+      "types": "./dist/cameras/panorama.d.ts",
+      "import": "./dist/cameras/panorama.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"

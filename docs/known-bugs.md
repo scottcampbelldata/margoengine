@@ -4632,3 +4632,7 @@ Batch 248 job 2: selection rectangles built; no new open defect identified in th
 The edge-directed 3x/4x scaler is built with analytic and GPU oracle regressions. No open defect identified in this job's scope; algorithm ambiguity and external-variant differences are documented in limits.
 
 Batch 244 landing repair: the existing umbrella generated-file regression exposed manually appended culling/depth and scatter/occlusion exports with missing generated banners and noncanonical manifest order. Regenerated with scripts/umbrella.mjs, preserving both exports; tests/umbrella.test.js is the existing regression.
+
+### Batch 196 panorama
+
+No known open defect in the completed panorama entry; cancellation observes the pending map rejection before unmapping, covered by panorama-browser.mjs.

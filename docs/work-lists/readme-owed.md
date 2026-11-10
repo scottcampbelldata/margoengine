@@ -698,3 +698,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/pixel (batch 244 job 2): document scale xbr3/xbr4 filters, edge-directed 3x/4x reconstruction, shallow/steep slopes, single-pixel and alpha preservation, fractional coverage, native-factor fallback and unchanged defaults.
 
 - margoengine (batch 244 job 2): generated culling/depth and scatter/occlusion facades restored to generator output; existing exports retained, no new example work.
+
+| @margoengine/cameras | panorama: capturePanorama, borrowed cubes, RGBA8/linear output, panoramaPNG, orientation, limits and AbortSignal | batch-196 job 1 |
+| margoengine | cameras/panorama alias | batch-196 job 1 |

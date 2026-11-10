@@ -3331,3 +3331,7 @@ After build:packages, run `node --test --test-timeout=120000 packages/lod/test/m
 Batch 248 job 2: `node --test --test-timeout=240000 packages/text/tests/selection.test.js`; existing text browser commands in job 1 cover real-font measurements on native and full compatibility backends. No timing proof required.
 
 Batch 244 xBR-style modes: after building packages, run `node --test --test-timeout=60000 packages/pixel/tests/xbr.test.js`, then `node scripts/gpu-lock.mjs run --owner=pixel-scale --max=2 --wait-max=60 -- node packages/pixel/tests/scale-check.mjs` and repeat with `--compat`. The original diagonal, colored-block and half-alpha fixture is reused, with integer 3x/4x, noninteger, stretch and below-room cases. All output pixels are checked; smoothing may differ from other xBR variants.
+
+### Batch 196 panorama
+
+Build packages, run node --test packages/cameras/test/*.test.js, then under the shared GPU lock run node packages/cameras/test/panorama-browser.mjs and the same command with --compat. The analytic primary-colour scene verifies full-sphere orientation, unaligned output rows, PNG dimensions, exact HDR/sRGB, abort and camera/canvas preservation. Existing cameras/test/browser-check.mjs also runs on both backends. No benchmark is required during build phase.

@@ -3876,3 +3876,7 @@ The optional text/selection entry covers the Troika getSelectionRects row: local
 
 ### Batch 244 job 2: xBR-style 3x/4x modes
 PixelScale now supplies both requested edge-directed enlargement factors beside Scale2x edge. Hand-computed half-plane cases, constant/isolated/checkerboard invariants, reflection symmetry and premultiplied alpha are in xbr.test.js. Six additional scale-check cases compare GPU readback with a float64 oracle, including fractional stretch and below-factor fallback. This proves the requested behavior class, not identical outputs to a particular external xBR revision or universal visual superiority. No extra pass, intermediate texture, core change or measured timing claim.
+
+### Batch 196 panorama output
+
+Claim: cameras/panorama captures a complete sphere into equirectangular viewer PNG or linear HDR pixels without changing the user's camera or canvas dimensions. Proof: cameras/test/panorama.test.js and panorama-browser.mjs, including six rendered directions and exact baked-cube colour references on both backends. The projection and colour references are cited in docs/clean-room.md. No speed claim.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13422126,
+  "total": 13424868,
   "history": [
     {
       "date": "2026-10-24",
@@ -6918,6 +6918,12 @@
       "commit": "05a866cce",
       "reason": "batch-244-scale-3111-to-3932B-gzip-for-3x-4x-edge-directed-reconstruction-one-pass-no-intermediate-splitting-would-duplicate-filter-plumbing",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-196",
+      "reason": "Panorama optional entry: 0 to 2486 B gzip; cube resampling, linear baking, sRGB PNG and abortable padded readback belong together. No core or stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8173,6 +8179,7 @@
     "margoengine/web": 577,
     "@margoengine/lod/msft": 2266,
     "@margoengine/rigging/vrma": 6295,
-    "@margoengine/text/selection": 958
+    "@margoengine/text/selection": 958,
+    "@margoengine/cameras/panorama": 2742
   }
 }
