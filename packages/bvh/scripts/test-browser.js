@@ -20,6 +20,11 @@ await build({
   build: { outDir: consumerOut, emptyOutDir: true },
 });
 const emitted = await readdir(resolve(consumerOut, 'assets'));
+for (const name of ['parallel.worker', 'parallel-leaf.worker'])
+  assert.ok(
+    emitted.some((file) => file.startsWith(`${name}-`)),
+    `Missing production worker asset: ${name}`,
+  );
 assert.ok(
   emitted.some((file) => /^bvh\.worker-.*\.js$/.test(file)),
   `consumer build did not emit the worker: ${emitted.join(', ')}`,

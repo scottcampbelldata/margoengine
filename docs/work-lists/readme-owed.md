@@ -287,3 +287,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/splines (batch 225 offset): signed exact point offsets, bounded cubic approximation, source ranges and bevel joins, explicit singular/limit errors, closure and exact reverse; margoengine/splines/offset mirrors the entry.
 - margoengine (batch 225 query/offset): generated splines/query and splines/offset imports and result contracts, with examples deferred until the README phase.
 - `@margoengine/exporters/materials`: document glTF-shaped KHR material payloads, TextureData-backed extension maps and per-primitive named variants, with defaults and UV requirements.
+
+| @margoengine/bvh | buildParallel options/defaults, nested worker assets, shared/cloned memory costs, cancellation/deadline, serial-byte parity and existing index-preserving default. | Batch 221 |
+| margoengine | Generated bvh/parallel alias, reviewed with the owning bvh example in the README phase. | Batch 221 |

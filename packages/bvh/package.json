@@ -80,6 +80,10 @@
     "./alpha-triangles": {
       "types": "./dist/alpha-triangles.d.ts",
       "import": "./dist/alpha-triangles.js"
+    },
+    "./parallel": {
+      "types": "./dist/parallel.d.ts",
+      "import": "./dist/parallel.js"
     }
   },
   "files": [

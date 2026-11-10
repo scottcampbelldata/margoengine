@@ -384,3 +384,5 @@ Batch 252 job 4: quiet-machine end-to-end navmesh build and tiled build worker s
 
 Batch 171 atmosphere: NOAA globe with 2048 wind particles and 32 history samples, scalar shell and 100 km glyphs; 24-step data aerial segments, 32-step background, cached 256x64 transmittance and 32x32 multiple-scattering tables. No wall-clock budget is invented during build; establish the quiet-machine tier budget and compare equal-work variants before release. No timing or speed assertion ran in this job.
 | Worker page/worker independence budgets, at least 10 page ticks and 5 worker frames during 400 ms opposing-thread blocks | packages/worker/tests/browser-check.mjs | Existing assertions retained behind speedEnabled(); run in the quiet speed phase. RPC and rendered-pixel correctness run now. |
+
+Batch 221: quiet-machine single-worker versus multi-worker BVH construction (one-million-triangle mesh), worker startup/position sharing or cloning/transfer/packing costs, same packed buffers and queries. Compare worker counts under equal work; no speedup claim or timing budget during build phase.

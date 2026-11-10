@@ -178,7 +178,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 25 entry points
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 8 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 8 entry points
-- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 43 entry points
+- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 44 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 7 entry points
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 8 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 9 entry points
@@ -226,7 +226,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 9 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 14 entry points
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 10 entry points
-- [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 8 entry points
+- [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 9 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 13 entry points
 - [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 9 entry points
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 3 entry points
@@ -253,7 +253,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 4 entry points
 - [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 18 entry points
 - [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 10 entry points
-- [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 12 entry points
+- [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 13 entry points
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 16 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 9 entry points
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 3 entry points
@@ -280,6 +280,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Demo cold-load measurements](https://margoengine.com/llms/docs/demo-loading.md): Scope: all seven pages shipped by `scripts/build-site.js`, including both robot entry points. The phased startup and 180 ms effect…
 - [Deploying a Margo app](https://margoengine.com/llms/docs/deploying.md): A Margo app is static files: HTML, JavaScript, CSS, a few `.wasm` files and your assets. Any static host works. Three things decide…
 - [Desktop frame-rate investigation](https://margoengine.com/llms/docs/desktop-frame-rate.md): The earlier sections record successive historical checks. Current results are in Second deep package pass; the shared…
+- [Data-scene material extensions](https://margoengine.com/llms/docs/exporter-materials.md): `@margoengine/exporters/materials` exports `exportMaterialGLB`. A MaterialScene uses the ordinary data scene's geometry, hierarchy, skins…
 - [Animation](https://margoengine.com/llms/docs/guides/animation.md): You will load an animated character, play one of its clips, switch clips with buttons, and pause or scrub it. This takes about five minutes.
 - [Build a small interactive game with Blender and Margo](https://margoengine.com/llms/docs/guides/blender-game.md): A how-to for a small third-person game: you model the level and the character in Blender, export glTF, and write the game in TypeScript…
 - [Camera and controls](https://margoengine.com/llms/docs/guides/camera-and-controls.md): You will place the camera, let people orbit around a scene with the mouse and touch, and switch the mouse to the layout of a modelling…

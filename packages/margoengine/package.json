@@ -418,6 +418,10 @@
       "types": "./dist/bvh/alpha-triangles.d.ts",
       "import": "./dist/bvh/alpha-triangles.js"
     },
+    "./bvh/parallel": {
+      "types": "./dist/bvh/parallel.d.ts",
+      "import": "./dist/bvh/parallel.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"
