@@ -5390,7 +5390,9 @@ See whitepaper/results/batch-137-quality-r10.json and basis-zstd.test.js.
 
 Base dab36e5f9, M6 Mac mini. Core CPU 90/90 and `core test:gpu` (native, WebGL2 compat and preview) pass on Metal.
 
-### Open: core Euler lanes lose the orientation at pitch +-90 degrees
+### Fixed: core Euler lanes lose the orientation at pitch +-90 degrees
+
+Fixed in e8f3decf6 `fix(core): keep roll at pitch +-90 degrees, keep aspect past 4096, fit boxes past near` (lane J, 2026-11-10). At the pole X is 0 and Z takes 2 atan2(qz, qw); regression in tests/modern-quaternion.test.js.
 
 Repro: `mesh.setQuaternion([0.5, 0.5, 0.5, 0.5])` (pitch exactly 90 degrees), then the no-op write
 `mesh.rotation.x = mesh.rotation.x`. The stored quaternion becomes `[0, 0.707107, 0, 0.707107]`: the mesh turns 90
@@ -5403,7 +5405,9 @@ Fix to build: at |sinPitch| near 1 set X to 0 and Z to the combined angle `2 ata
 -90 degrees (Shoemake, "Euler Angle Conversion", Graphics Gems IV, 1994), then check `setQuaternion` then a no-op
 `rotation` write keeps every quaternion of a 90 degree pitch.
 
-### Open: core backbuffer clamp changes the aspect ratio of a wide canvas
+### Fixed: core backbuffer clamp changes the aspect ratio of a wide canvas
+
+Fixed in e8f3decf6 `fix(core): keep roll at pitch +-90 degrees, keep aspect past 4096, fit boxes past near` (lane J, 2026-11-10). Both sides scale by min(1, 4096 / longer side); regression rows in tests/modern-resolution.test.js.
 
 Repro: an engine on a canvas with `clientWidth 5120, clientHeight 1440` at device pixel ratio 1 (a 32:9 monitor, or
 any canvas wider than 4096 backing pixels). `resize()` sets the backbuffer to 4096 x 1440 and the camera uses its
@@ -5413,7 +5417,9 @@ Cause: packages/core/src/engine.ts `resize()` clamps width and height to 4096 on
 most 4096 per side" but not the distortion. Fix to build: scale both by `min(1, 4096 / max(w, h))`, or keep the
 camera aspect at the CSS aspect.
 
-### Open: core `fitToBoundingBox` frames small parts 11x too far and clips large ones at a wide field of view
+### Fixed: core `fitToBoundingBox` frames small parts 11x too far and clips large ones at a wide field of view
+
+Fixed in e8f3decf6 `fix(core): keep roll at pitch +-90 degrees, keep aspect past 4096, fit boxes past near` (lane J, 2026-11-10). Distance is max(radius / sin(half angle), radius + near) * padding; a part whose sphere fit falls inside near still sits at (radius + near) * padding (0.13 for the 2 cm part at near 0.1). Regression in tests/modern.test.js.
 
 Repro 1: `new Camera({fov: 120, position: [1, 1, 1]}).fitToBoundingBox([-0.175, -0.175, -0.175], [0.175, 0.175,
 0.175], {duration: 0})`: the eye ends 0.385 from the centre, so the nearest corner is 0.082 away, inside `near = 0.1`;
@@ -5435,7 +5441,9 @@ height-correlated form changes WebGL, gltf-pro and core pixels together and is S
 Base dab36e5f9, M6 Mac mini. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
 MARGO_COMPAT=1), `test:gpu:gltf`, `test:gpu:lights` and `test:gpu:viewer-extras` (both modes inside) pass on Metal.
 
-### Open: stage `addScene` and `addLights` remove each other's clustered lights
+### Fixed: stage `addScene` and `addLights` remove each other's clustered lights
+
+Fixed in c6dd876b1 `fix(stage): scene and addLights share lights, scene cameras keep up, CAD controls orbit about camera.up` (lane J, 2026-11-10). Regression in packages/stage/tests/lights.test.js.
 
 Repro: `addLights(stage, [{type: 'point', position: [0, 1, 0], range: 5}])`, then `addScene` of a document with one
 point light: `lights.clustered.list` holds only the scene's light. The other order: `addScene`, then `addLights`, then
@@ -5445,7 +5453,9 @@ while packages/stage/src/lights.ts `contribute()` appends to the current list. T
 each dispose takes its own. Fix to build: `hold()` appends its own lights to `list.list` and removes only its own, as
 `contribute()` does.
 
-### Open: stage scene camera ignores the entity's up and throws looking straight down
+### Fixed: stage scene camera ignores the entity's up and throws looking straight down
+
+Fixed in c6dd876b1 `fix(stage): scene and addLights share lights, scene cameras keep up, CAD controls orbit about camera.up` (lane J, 2026-11-10). Each camera carries the entity's world +Y as `up` (its -Z when the target lies along +Y). Regression in packages/stage/tests/scene.test.js.
 
 Repro: `addScene` of a floor plus `{id: 'top', transform: {position: [0, 10, 0]}, components: {camera: {target: [0, 0,
 0]}}}`: every frame throws `Vertical camera`. With a -90 degree X rotation instead of a target it renders only because
@@ -5454,7 +5464,9 @@ axis renders unrolled.
 Cause: packages/stage/src/scene.ts builds `cameras` from position and target only and never sets `camera.up` from the
 entity's world +Y. Fix to build: store the entity's world up with each camera and assign it with the switch.
 
-### Open: stage `CADCameraControls` orbit and pan assume Y up
+### Fixed: stage `CADCameraControls` orbit and pan assume Y up
+
+Fixed in c6dd876b1 `fix(stage): scene and addLights share lights, scene cameras keep up, CAD controls orbit about camera.up` (lane J, 2026-11-10). Orbit and pan work in a frame built from `camera.up`; Y up gives the same numbers. Regression in tests/modern.test.js.
 
 Repro: a camera with `up: [0, 0, 1]` at `[3, -5, 2]`: `pan(-0.1, 0)` moves at cos 0.476 to the screen's right instead
 of along it; `orbit(0.3, 0)` from `[0, -5, 2]` changes the height along Z from 2 to 1.911.
