@@ -2669,3 +2669,10 @@ Batch 254 pan: build packages, run node --test --test-timeout=60000 packages/aud
 ### Batch 197 device orientation
 
 After build:packages, run node --test --test-timeout=30000 packages/controls/tests/device-orientation.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js device-orientation. Read packages/controls/test-results/device-orientation-browser.json for both backends' replay pixel and cleanup checks. Permission abort/timeout tests cover clock correctness, not a speed assertion.
+
+
+
+### Batch 171 job 6: geographic atmosphere
+
+Build sky and sciviz, then run node --test --test-timeout=120000 packages/sciviz/tests/atmosphere.test.js packages/sky/test/planet.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=4 -- node packages/sciviz/tests/atmosphere-browser.mjs for both GPU backends. It uses the official sciviz-atmosphere NOAA demo and writes test-results/sciviz-atmosphere/gpu.json. Existing sciviz GPU suites check unchanged flat/Cartesian paths. No speed suite, full verify or README example command is part of the lane gate.
+

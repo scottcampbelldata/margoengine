@@ -154,6 +154,10 @@
       "types": "./dist/audio/ambisonics.d.ts",
       "import": "./dist/audio/ambisonics.js"
     },
+    "./audio/pan": {
+      "types": "./dist/audio/pan.d.ts",
+      "import": "./dist/audio/pan.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -2710,6 +2714,10 @@
       "types": "./dist/sciviz/derive.d.ts",
       "import": "./dist/sciviz/derive.js"
     },
+    "./sciviz/atmosphere": {
+      "types": "./dist/sciviz/atmosphere.d.ts",
+      "import": "./dist/sciviz/atmosphere.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -2881,6 +2889,10 @@
     "./sky/presets": {
       "types": "./dist/sky/presets.d.ts",
       "import": "./dist/sky/presets.js"
+    },
+    "./sky/planet": {
+      "types": "./dist/sky/planet.d.ts",
+      "import": "./dist/sky/planet.js"
     },
     "./splats": {
       "types": "./dist/splats.d.ts",

@@ -29,13 +29,14 @@ export class TileLayer implements Drawable {
     restore(): void;
     setModel(model: Float32Array): void;
     center(): readonly [number, number, number];
-    prepare(): void;
+    prepare(context?: GpuContext): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
 
 export interface TileLayerOptions {
+    readonly appearance?: LayerAppearance;
     readonly tiles: TileSource;
     readonly projection?: Projection;
     readonly zoom?: number;
@@ -332,6 +333,15 @@ interface IsosurfaceLayerOptions {
 }
 
 type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
+
+interface LayerAppearance {
+    readonly surface?: boolean;
+    prepare?(context: import('./render.js').GpuContext): void;
+    readonly key: string;
+    readonly shader: string;
+    readonly layout: GPUBindGroupLayout;
+    readonly group: GPUBindGroup;
+}
 
 class Legend {
     readonly canvas: HTMLCanvasElement;

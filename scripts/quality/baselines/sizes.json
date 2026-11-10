@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12250165,
+  "total": 12288701,
   "history": [
     {
       "date": "2026-10-24",
@@ -5563,6 +5563,12 @@
       "commit": "batch-197",
       "reason": "New optional controls/device-orientation: 0 to 3514 B min+gzip, ceiling 3770 B. Includes quaternion frame conversion, relative recentering, screen compensation and bounded/abortable permission lifecycle. No core/stage changes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-171-atmosphere",
+      "grew": 3,
+      "reason": "Atmosphere globe retains one physical sky owner and existing tile/mesh/GPU-flow owners. New sciviz/atmosphere 0 to 32092 B and sky/planet 0 to 4687 B; flow recorded ceiling 8854 to measured 9118 B for optional draw projection/transport. The atmosphere entry includes the exact existing colormaps and composed geometry/flow APIs; splitting would duplicate owners or make a usable globe require manual transport binding. Core/stage unchanged."
     }
   ],
   "items": {
@@ -6208,7 +6214,7 @@
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/colormaps": 17381,
     "@margoengine/sciviz/fallback": 2258,
-    "@margoengine/sciviz/flow": 8854,
+    "@margoengine/sciviz/flow": 9392,
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/graph": 23118,
@@ -6614,6 +6620,8 @@
     "@margoengine/inspector/gizmo": 2143,
     "leak @margoengine/inspector/gizmo -> @margoengine/controls/transform": 1,
     "@margoengine/audio/pan": 933,
-    "@margoengine/controls/device-orientation": 3770
+    "@margoengine/controls/device-orientation": 3770,
+    "@margoengine/sciviz/atmosphere": 33055,
+    "@margoengine/sky/planet": 4943
   }
 }

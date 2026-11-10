@@ -91,6 +91,10 @@
     "./derive": {
       "types": "./dist/derive.d.ts",
       "import": "./dist/derive.js"
+    },
+    "./atmosphere": {
+      "types": "./dist/atmosphere.d.ts",
+      "import": "./dist/atmosphere.js"
     }
   },
   "files": [
@@ -113,7 +117,8 @@
     "@margoengine/loaders": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/points": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/sky": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
@@ -124,6 +129,7 @@
     "build:flow": "node scripts/build-flow.mjs",
     "test:flow-kernel": "node scripts/build-flow.mjs --test",
     "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
-    "test:webgl2": "npm run build && node tests/webgl2-browser.mjs"
+    "test:webgl2": "npm run build && node tests/webgl2-browser.mjs",
+    "test:browser:atmosphere": "node tests/atmosphere-browser.mjs"
   }
 }

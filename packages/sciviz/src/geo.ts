@@ -9,6 +9,7 @@
 // map. Each tile draws as a 16 x 16 grid whose vertices the shader projects, so the globe is round and seams close.
 import { rangeError, typeError } from '../../shared/errors.js';
 import type { Bounds } from './layer.js';
+import type { LayerAppearance } from './appearance.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Figure } from './figure.js';
 
@@ -113,6 +114,8 @@ export type TileSource =
 
 /** Options for a tile layer. */
 export interface TileLayerOptions {
+  /** Optional physical appearance, supplied by sciviz/atmosphere. Default headlight. */
+  readonly appearance?: LayerAppearance;
   /** Where the tiles come from. Required. */
   readonly tiles: TileSource;
   /** The figure's projection. Default `'mercator'`. */
@@ -200,6 +203,7 @@ async function pixelsOf(image: Blob | ImageBitmap | ImageData): Promise<ImageDat
  * `'globe'`. Create it with {@link tileLayer}, which resolves once the tiles are in.
  */
 export class TileLayer implements Drawable {
+  readonly #appearance: LayerAppearance | undefined;
   visible = true;
   readonly transparent = false;
   readonly projection: Projection;
@@ -221,6 +225,7 @@ export class TileLayer implements Drawable {
   /** @internal Use {@link tileLayer}. */
   constructor(renderer: SciRenderer, options: TileLayerOptions) {
     this.#renderer = renderer;
+    this.#appearance = options.appearance;
     this.projection = options.projection ?? 'mercator';
     if (!['mercator', 'plate', 'globe'].includes(this.projection))
       throw rangeError(`Unknown projection ${this.projection}`, 'sciviz');
@@ -363,7 +368,8 @@ export class TileLayer implements Drawable {
   }
 
   /** @internal */
-  prepare(): void {
+  prepare(context?: GpuContext): void {
+    if (context) this.#appearance?.prepare?.(context);
     const mode = this.projection === 'mercator' ? 0 : this.projection === 'plate' ? 1 : 2;
     for (const t of this.#tiles) {
       const v = this.#values;
@@ -377,11 +383,11 @@ export class TileLayer implements Drawable {
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#tiles.length) return;
-    const pipeline = renderer.pipeline('geo-tiles', context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: tileShader, label: 'sciviz tiles' });
+    const pipeline = renderer.pipeline(`geo-tiles:${this.#appearance?.key ?? ''}`, context, (target) => {
+      const module = renderer.device!.createShaderModule({ code: this.#appearance ? tileShader.replace('shade(albedo, in.normal, normalize(frame.eye.xyz - in.world))', 'planetSurface(in.world, albedo)') + this.#appearance.shader : tileShader, label: 'sciviz tiles' });
       return {
         label: 'sciviz tiles',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout] }),
+        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: target.format }] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
@@ -390,6 +396,7 @@ export class TileLayer implements Drawable {
       };
     });
     pass.setPipeline(pipeline);
+    if (this.#appearance) pass.setBindGroup(2, this.#appearance.group);
     for (const t of this.#tiles) {
       pass.setBindGroup(1, t.group);
       pass.draw(SEGMENTS * SEGMENTS * 6);

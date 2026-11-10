@@ -4164,3 +4164,5 @@ packages/inspector/test/gizmo.test.js fails without it and proves both the owner
 cleanup and the default inspector's survival.
 
 Outside batch 262: tests/api-conventions.test.js:72 falsely rejects controls.globe.api.md GlobeControls. Its classes map reads exported declarations only, but GlobeControls inherits static attach from the unexported Controls declaration retained in that report. Repro: node --test tests/api-conventions.test.js. The runtime class has the inherited factory; the report scanner must include local bases while checking exported classes.
+
+Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional demo UTC datetime input passes an invalid Date from its change handler to globe.setDate, which correctly rejects but leaves the event unhandled. Repro: clear Sun (UTC) in examples/sciviz-atmosphere.html. Cause: the demo does not validate the empty datetime value before calling the typed solar API. The default valid date, API input checks and complete globe feature pass.

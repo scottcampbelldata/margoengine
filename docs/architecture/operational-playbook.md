@@ -5519,3 +5519,11 @@ rendered handles, selection retention, camera suspension and whole-drag undo.
 The owner-scene regression now prevents inspector cleanup from removing a
 same-named plugin in the default scene. Every gizmo plugin is attached in the
 inspector's scene and is removed on abort, engine disposal or inspector removal.
+
+
+### Batch 171 geographic atmosphere evidence
+
+The optional sky/planet owner reuses AtmosphereTables and Hillaire transport for a supplied world-to-planet transform and observer. The sciviz facade inverts Figure.model, supplies ECEF solar direction from sky/astro, and shares an optional fragment appearance with geo tiles, scalar/point meshes and GPU flow. A type-only interface keeps sky out of existing root/feature imports. Each data fragment gets its own aerial segment rather than sampling an opaque globe depth at the wrong elevation. Earth polar stretch, chordal ground lighting and camera domain are explicit in limits.md.
+
+Evidence is packages/sciviz/tests/atmosphere.test.js (independent NREL solar fixture, geodetic heights, curvature conversion and cancellation), packages/sky/test/planet.test.js (arbitrary observer, medium work caching and disposal), and packages/sciviz/tests/atmosphere-browser.mjs (NOAA flow, solar time, elevated glyphs, zero/nonzero clouds and actual device replacement on both backends). No measurement accuracy or speed claim is made. README work is deferred in readme-owed.md.
+

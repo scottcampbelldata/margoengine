@@ -1,0 +1,10 @@
+{
+  "title": "NOAA North Atlantic wind on the WGS84 globe",
+  "sourceManifest": "wind.json",
+  "dataFile": "wind.bin",
+  "sha256": "e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd",
+  "source": "NOAA PSL NCEP-NCAR Reanalysis 1, daily sigma 0.995 east/north wind, January 1-8 2024",
+  "license": "US government public domain",
+  "url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+  "placement": "Wind 20000 m, speed layer 1000 m, reference glyphs 100000 m above WGS84 ellipsoid; display placements only. Sigma is not altitude. No inferred vertical wind."
+}

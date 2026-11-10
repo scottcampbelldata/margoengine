@@ -96,7 +96,9 @@ fn sample(p: vec3f, weight: f32) -> vec4f {
 export const flowDraw = /* wgsl */ `${frameWGSL}
 ${config.replace('@group(0)', '@group(1)')}
 @group(1) @binding(1) var<storage, read> history: array<vec4f>;
-struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32 }
+FLOW_PROJECT
+FLOW_APPEARANCE
+struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32, @location(1) world: vec3f }
 @vertex fn vertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) instance: u32) -> Out {
   let segment = instance % flow.info.y;
   let particle = instance / flow.info.y;
@@ -106,14 +108,17 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32 }
   let b = history[particle * flow.info.y + end];
   let dataA = mix(flow.low.xyz, flow.high.xyz, a.xyz);
   let dataB = mix(flow.low.xyz, flow.high.xyz, b.xyz);
-  let clipA = frame.clip * flow.model * vec4f(dataA, 1.0);
-  let clipB = frame.clip * flow.model * vec4f(dataB, 1.0);
+  let clipA = frame.clip * flow.model * vec4f(flowProject(dataA), 1.0);
+  let clipB = frame.clip * flow.model * vec4f(flowProject(dataB), 1.0);
   var out: Out;
   out.clip = vec4f(2.0, 2.0, 2.0, 1.0);
   out.alpha = 0.0;
+  out.world = vec3f(0.0);
   if (segment == flow.info.y - 1u) {
     let head = history[particle * flow.info.y + flow.info.z];
-    let clip = frame.clip * flow.model * vec4f(mix(flow.low.xyz, flow.high.xyz, head.xyz), 1.0);
+    let world = flow.model * vec4f(flowProject(mix(flow.low.xyz, flow.high.xyz, head.xyz)), 1.0);
+    let clip = frame.clip * world;
+    out.world = world.xyz;
     if (head.w == 0.0 || clip.w <= 0.0) { return out; }
     let x = select(-1.0, 1.0, vertexIndex == 1u || vertexIndex == 2u || vertexIndex == 4u);
     let y = select(-1.0, 1.0, vertexIndex == 2u || vertexIndex == 4u || vertexIndex == 5u);
@@ -129,6 +134,7 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32 }
   let atEnd = vertexIndex == 1u || vertexIndex == 2u || vertexIndex == 4u;
   let positive = vertexIndex == 2u || vertexIndex == 4u || vertexIndex == 5u;
   let clip = select(clipA, clipB, atEnd);
+  out.world = (flow.model * vec4f(flowProject(select(dataA, dataB, atEnd)), 1.0)).xyz;
   let offset = side * select(-1.0, 1.0, positive) * flow.life.y / frame.viewport.xy;
   out.clip = vec4f(clip.xy + offset * clip.w, clip.zw);
   let age = f32(segment) + select(1.0, 0.0, atEnd);
@@ -136,6 +142,6 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32 }
   return out;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  return vec4f(toOutput(flow.colour.rgb), in.alpha);
+  return vec4f(toOutput(FLOW_COLOUR), in.alpha);
 }
 `;

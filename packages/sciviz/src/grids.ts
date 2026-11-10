@@ -13,6 +13,7 @@ import { colormapTexture, resolveColormap, type Bounds, type ColormapSource } fr
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Colormap } from './colormaps.js';
 import type { Figure } from './figure.js';
+import type { LayerAppearance } from './appearance.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -634,6 +635,10 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
 
 /** Options for a mesh layer. */
 export interface MeshLayerOptions {
+  /** Optional atmospheric transport. Default camera headlight. */
+  readonly appearance?: LayerAppearance;
+  /** Multiply opacity by the scalar clamped to [0,1], for density shells. Default false. */
+  readonly scalarOpacity?: boolean;
   /** Colour map. Default `'aurora'`. */
   readonly colormap?: ColormapSource;
   /** Value range the colour map spans. Default the values' min and max. */
@@ -670,7 +675,7 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
   var n = in.normal;
   if (dot(n, n) < 1e-12) { n = vec3f(0.0, 1.0, 0.0); }
   let colour = shade(albedo, normalize(n), normalize(frame.eye.xyz - in.world));
-  return vec4f(toOutput(colour), mesh.style.z);
+  return vec4f(toOutput(colour), mesh.style.z * select(1.0, select(0.0, clamp(in.value, 0.0, 1.0), !isNan(in.value)), mesh.style.w > 0.5));
 }`;
 
 /**
@@ -679,6 +684,8 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
  * triangles (a new slice position).
  */
 export class MeshLayer implements Drawable {
+  readonly #appearance: LayerAppearance | undefined;
+  readonly #scalarOpacity: boolean;
   /** False hides the layer. */
   visible = true;
   readonly colormap: Colormap;
@@ -704,6 +711,8 @@ export class MeshLayer implements Drawable {
   /** @internal Use {@link meshLayer}. */
   constructor(renderer: SciRenderer, set: TriangleSet, options: MeshLayerOptions = {}) {
     this.#renderer = renderer;
+    this.#appearance = options.appearance;
+    this.#scalarOpacity = options.scalarOpacity ?? false;
     this.colormap = resolveColormap(options.colormap);
     this.#opacity = options.opacity ?? 1;
     if (!(this.#opacity >= 0 && this.#opacity <= 1)) throw rangeError('Mesh opacity must be in [0, 1]', 'sciviz');
@@ -845,14 +854,15 @@ export class MeshLayer implements Drawable {
   }
 
   /** @internal */
-  prepare(): void {
+  prepare(context?: GpuContext): void {
+    if (context) this.#appearance?.prepare?.(context);
     const v = this.#values;
     v.set(this.#model, 0);
     const inverse = new Float32Array(16);
     invertMatrix(this.#model, inverse);
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) v[16 + c * 4 + r] = inverse[r * 4 + c];
     v[31] = 1;
-    v.set([this.#range[0], this.#range[1], this.#opacity, 0], 32);
+    v.set([this.#range[0], this.#range[1], this.#opacity, this.#scalarOpacity ? 1 : 0], 32);
     v.set([...this.#missing, 1], 36);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
   }
@@ -861,11 +871,11 @@ export class MeshLayer implements Drawable {
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#count || !this.#group) return;
     const blend = this.transparent;
-    const pipeline = renderer.pipeline(blend ? 'mesh-blend' : 'mesh', context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: meshShader, label: 'sciviz mesh' });
+    const pipeline = renderer.pipeline(`${blend ? 'mesh-blend' : 'mesh'}:${this.#appearance?.key ?? ''}`, context, (target) => {
+      const module = renderer.device!.createShaderModule({ code: this.#appearance ? meshShader.replace('shade(albedo, normalize(n), normalize(frame.eye.xyz - in.world))', this.#appearance.surface ? 'planetSurface(in.world, albedo)' : 'planetAerial(in.world, albedo)') + this.#appearance.shader : meshShader, label: 'sciviz mesh' });
       return {
         label: 'sciviz mesh',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
+        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -888,6 +898,7 @@ export class MeshLayer implements Drawable {
       };
     });
     pass.setPipeline(pipeline);
+    if (this.#appearance) pass.setBindGroup(2, this.#appearance.group);
     pass.setBindGroup(1, this.#group);
     pass.draw(this.#count);
   }

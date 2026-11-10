@@ -7,6 +7,12 @@
 
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
+  { id:'sky',title:'@margoengine/sky: physical planet atmosphere',kind:'family',messages:[
+      "Planet atmosphere needs a GPUDevice; use WebGPU or webgl2-compat",
+      "Planet atmosphere is disposed; create a new instance",
+      "Planet camera lies below ground; keep the observer outside the planet",
+      "Planet atmosphere needs radii at most 100000 km and vertical scattering depth at most 6; reduce the medium",
+      "Planet frame needs finite transforms, nonzero sun, illuminance 0..1000000 and exposure -20..20",],cause:'The planet frame or medium is outside its physical numeric domain, or its resources were disposed.',fix:'Use a WebGPU or compatibility GPUDevice, finite kilometre transforms, an observer outside ground, nonzero sun and bounded atmosphere parameters. Recreate disposed resources.' },
   {
     id: 'csp',
     title: 'Content Security Policy and WebAssembly',
@@ -607,6 +613,16 @@ export const entries = [
     title: '@margoengine/sciviz: figures, layers and colour maps',
     kind: 'family',
     messages: [
+      "Geographic flow needs ascending longitude/latitude degrees within the open poles and nonnegative metre heights",
+      "Geographic flow exceeds 8000000 samples; reduce dimensions",
+      "Geographic flow needs one east/north/up value per grid sample",
+      "Atmosphere needs an invertible figure model; use nonzero aspect",
+      "Atmospheric globe needs a perspective camera; choose perspective projection",
+      "Globe disposed during flow creation; keep it alive until settlement",
+      "Globe points need lon/lat/height triples, one value each and radius 0..1000000 m",
+      "Atmospheric globe disposed; create a new one",
+      "Flow draw projection must be globe or omitted",
+      "Flow velocities must be finite or NaN; remove infinite samples",
       "maxBytes must be an integer of at least 32",
       "File response has an incorrect Content-Range",
       "File response has no body",

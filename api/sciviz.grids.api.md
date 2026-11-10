@@ -36,13 +36,15 @@ export class MeshLayer implements Drawable {
     update(set: TriangleSet): void;
     setModel(model: Float32Array): void;
     center(): readonly [number, number, number];
-    prepare(): void;
+    prepare(context?: GpuContext): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
 
 export interface MeshLayerOptions {
+    readonly appearance?: LayerAppearance;
+    readonly scalarOpacity?: boolean;
     readonly colormap?: ColormapSource;
     readonly range?: readonly [number, number];
     readonly opacity?: number;
@@ -360,6 +362,15 @@ interface IsosurfaceLayerOptions {
 }
 
 type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
+
+interface LayerAppearance {
+    readonly surface?: boolean;
+    prepare?(context: import('./render.js').GpuContext): void;
+    readonly key: string;
+    readonly shader: string;
+    readonly layout: GPUBindGroupLayout;
+    readonly group: GPUBindGroup;
+}
 
 class Legend {
     readonly canvas: HTMLCanvasElement;

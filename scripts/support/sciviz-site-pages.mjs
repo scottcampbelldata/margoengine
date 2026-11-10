@@ -12,4 +12,5 @@ export const scientificPages = [
   'sciviz-formats',
 
   'sciviz-derive',
+  'sciviz-atmosphere',
 ];

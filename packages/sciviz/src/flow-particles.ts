@@ -1,6 +1,7 @@
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
+import type { LayerAppearance } from './appearance.js';
 import { toScene, type Bounds } from './layer.js';
 import type { FlowGrid } from './flow.js';
 import { flowSeeds, validateFlowGrid, type FlowSeeding } from './flow-seeds.js';
@@ -13,6 +14,10 @@ declare const GPUMapMode: { READ: number };
 
 /** Controls for GPU-resident moving-flow particles. All distances/times use the field's units. */
 export interface FlowParticlesOptions {
+  /** Optional draw-only WGS84 longitude/latitude/metre projection. Default Cartesian. */
+  readonly projection?: 'globe';
+  /** Optional physical transport from sciviz/atmosphere. Default unchanged radiance. */
+  readonly appearance?: LayerAppearance;
   /** Particle count, 1..1000000. Default 1024. */
   readonly count?: number;
   /** Seed placement. Default uniform; fixed seeds are reused on respawn. */
@@ -56,6 +61,8 @@ function fail(message: string): never { throw rangeError(message, 'sciviz'); }
  * Create with `flowParticles`, then `advance` explicitly; rendering never advances time.
  */
 export class FlowParticles implements Drawable {
+  readonly #appearance: LayerAppearance | undefined;
+  readonly #globe: boolean;
   visible = true;
   readonly transparent = true;
   readonly count: number;
@@ -86,6 +93,7 @@ export class FlowParticles implements Drawable {
 
   private constructor(figure: Figure, grid: FlowGrid, seeds: Float32Array, velocities: Float32Array, maximumVelocity: number, options: FlowParticlesOptions) {
     this.#renderer = figure.renderer;
+    this.#appearance = options.appearance;this.#globe = options.projection === 'globe';
     this.#times = grid.frames.map((frame) => frame.time);
     this.#bounds = [...grid.bounds];
     this.#seeds = seeds;
@@ -110,6 +118,7 @@ export class FlowParticles implements Drawable {
   static async create(figure: Figure, grid: FlowGrid, options: FlowParticlesOptions = {}): Promise<FlowParticles> {
     const signal = options.signal;
     signal?.throwIfAborted();
+    if (options.projection !== undefined && options.projection !== 'globe') fail('Flow draw projection must be globe or omitted');
     requireGPU(figure.renderer);
     const size = validateFlowGrid(grid), count = options.count ?? 1024, trails = options.trails ?? 32;
     const from = options.from ?? grid.frames[0].time, maxSteps = options.maxSteps ?? 10000;
@@ -176,7 +185,7 @@ export class FlowParticles implements Drawable {
   }
 
   /** Independent data bounds for the figure's axes. */
-  get bounds(): Bounds { return [...this.#bounds]; }
+  get bounds(): Bounds { const r = 1 + Math.max(0, this.#bounds[5]) / 6378137; return this.#globe ? [-r,r,-r,r,-r,r] : [...this.#bounds]; }
   /** Time of the last submitted substep, or initial time before the first step. */
   get time(): number { return this.#time; }
   /** Accepted substeps, also the deterministic recovery work count. */
@@ -185,7 +194,7 @@ export class FlowParticles implements Drawable {
   setModel(model: Float32Array): void { this.#values.set(model, 0); }
   /** @internal */
   center(): readonly [number, number, number] {
-    const b = this.#bounds;
+    const b = this.bounds;
     return toScene(this.#values, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2);
   }
 
@@ -346,13 +355,13 @@ export class FlowParticles implements Drawable {
   }
 
   /** @internal */
-  prepare(): void { this.#device.queue.writeBuffer(this.#buffers[0], 0, this.#values); }
+  prepare(context?: GpuContext): void { if(context)this.#appearance?.prepare?.(context);this.#device.queue.writeBuffer(this.#buffers[0], 0, this.#values); }
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
-    const pipeline = renderer.pipeline('flow-particles', context, (target) => {
-      const module = this.#device.createShaderModule({ code: flowDraw, label: 'sciviz flow trails' });
+    const pipeline = renderer.pipeline(`flow-particles:${this.#globe}:${this.#appearance?.key ?? ''}`, context, (target) => {
+      const module = this.#device.createShaderModule({ code: flowDraw.replace('FLOW_PROJECT', this.#globe ? "fn flowProject(p:vec3f)->vec3f {\n let phi=p.y*0.0174532925199433;let lon=p.x*0.0174532925199433;let s=sin(phi);let n=1.0/sqrt(1.0-0.0066943799901413165*s*s);let h=p.z/6378137.0;\n return vec3f((n+h)*cos(phi)*cos(lon),(n+h)*cos(phi)*sin(lon),(n*(1.0-0.0066943799901413165)+h)*s);\n}" : 'fn flowProject(p:vec3f)->vec3f{return p;}').replace('FLOW_APPEARANCE', this.#appearance?.shader ?? '').replace('FLOW_COLOUR', this.#appearance ? 'planetAerial(in.world, flow.colour.rgb)' : 'flow.colour.rgb'), label: 'sciviz flow trails' });
       return {
-        layout: this.#device.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#drawLayout] }),
+        layout: this.#device.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#drawLayout, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: target.format, blend: {
           color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
@@ -364,6 +373,7 @@ export class FlowParticles implements Drawable {
       };
     });
     pass.setPipeline(pipeline);
+    if (this.#appearance) pass.setBindGroup(2, this.#appearance.group);
     pass.setBindGroup(1, this.#drawGroup);
     pass.draw(6, this.count * this.trails);
   }

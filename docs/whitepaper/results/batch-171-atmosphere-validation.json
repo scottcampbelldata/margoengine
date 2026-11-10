@@ -1,0 +1,314 @@
+{
+  "status": "DONE",
+  "integrationBase": "ee81945cacc1cb925c9e216b40eba4e308b8fcb6",
+  "sources": {
+    "packages/sciviz/src/atmosphere.ts": "afe15d024d37a9fda944350f214bb18c16aef654c50b4f58f72fbc73655484c0",
+    "packages/sciviz/src/appearance.ts": "b92788a06da211e3e4bd56215ee22cdd6bc995efb901bad68b0f5e633b450d20",
+    "packages/sciviz/src/geo.ts": "1b6c9931eee3421330d84f606e70fa3ce40a805713827a358fac22c5450aa68c",
+    "packages/sciviz/src/grids.ts": "a555b24d8d9cf89674af38993bde00a0755d0d7036433659e0073a94e5d2ce1f",
+    "packages/sciviz/src/flow-particles.ts": "700a3e3790d85e4cb105e09f207b470d953ef102fbdd58e131413e5eb22b62dc",
+    "packages/sciviz/src/flow-shaders.ts": "940a259de3890029adef1f6464aaf832a8acc77ebfab2fef0e16b15822309d18",
+    "packages/sky/src/planet.ts": "88c1a751473b6de811948c464e85c2f7186971a04d8df137f68f51888d8fdae1"
+  },
+  "build": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 37.4
+  },
+  "cpu": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 30.5,
+    "tests": 1095,
+    "pass": 1095,
+    "selection": "test-results/sciviz-fixes/atmosphere-cpu-selection.json",
+    "README": "Explicitly deferred by user; no README test or example work."
+  },
+  "checks": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 95,
+    "metadataTests": 36
+  },
+  "gpu": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 590.4,
+    "leaves": [
+      {
+        "name": "atmosphere",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 52
+      },
+      {
+        "name": "root",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.6
+      },
+      {
+        "name": "root-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.4
+      },
+      {
+        "name": "bricks",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 12
+      },
+      {
+        "name": "entries",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 22.7
+      },
+      {
+        "name": "restoration",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 12.5
+      },
+      {
+        "name": "demos",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 122.6
+      },
+      {
+        "name": "webgl2",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 7.1
+      },
+      {
+        "name": "derive",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 42.4
+      },
+      {
+        "name": "formats",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.5
+      }
+    ]
+  },
+  "newEntryGPU": [
+    {
+      "compat": false,
+      "result": {
+        "initial": {
+          "hash": 911733302,
+          "lit": 45578,
+          "sum": 24170521
+        },
+        "ground": {
+          "hash": 669912445,
+          "lit": 42810,
+          "sum": 21950474
+        },
+        "midnight": {
+          "hash": 687699974,
+          "lit": 5638,
+          "sum": 2880022
+        },
+        "elevated": {
+          "hash": -1357726073,
+          "lit": 42824,
+          "sum": 21950165
+        },
+        "flowBefore": {
+          "hash": -500101574,
+          "lit": 45230,
+          "sum": 24403397
+        },
+        "flowAfter": {
+          "hash": -402590920,
+          "lit": 45079,
+          "sum": 24293983
+        },
+        "zeroImage": {
+          "hash": 669912445,
+          "lit": 42810,
+          "sum": 21950474
+        },
+        "cloudImage": {
+          "hash": 1594815391,
+          "lit": 42810,
+          "sum": 22097077
+        },
+        "beforeRestore": {
+          "hash": -1817553063,
+          "lit": 45440,
+          "sum": 24064512
+        },
+        "afterRestore": {
+          "hash": -1817553063,
+          "lit": 45440,
+          "sum": 24064512
+        },
+        "restored": true,
+        "hiddenBackground": {
+          "hash": -2112019177,
+          "lit": 42363,
+          "sum": 72251609
+        },
+        "remaining": 1
+      },
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      }
+    },
+    {
+      "compat": true,
+      "result": {
+        "initial": {
+          "hash": 1360616121,
+          "lit": 45581,
+          "sum": 24116186
+        },
+        "ground": {
+          "hash": 1630307923,
+          "lit": 42813,
+          "sum": 21889081
+        },
+        "midnight": {
+          "hash": -1626152207,
+          "lit": 5644,
+          "sum": 2878392
+        },
+        "elevated": {
+          "hash": -1621094479,
+          "lit": 42827,
+          "sum": 21888768
+        },
+        "flowBefore": {
+          "hash": -1849270186,
+          "lit": 45236,
+          "sum": 24347227
+        },
+        "flowAfter": {
+          "hash": -1078969658,
+          "lit": 45081,
+          "sum": 24238197
+        },
+        "zeroImage": {
+          "hash": 1630307923,
+          "lit": 42813,
+          "sum": 21889081
+        },
+        "cloudImage": {
+          "hash": 28685646,
+          "lit": 42813,
+          "sum": 22036483
+        },
+        "beforeRestore": {
+          "hash": -975829982,
+          "lit": 45444,
+          "sum": 24010912
+        },
+        "afterRestore": {
+          "hash": -975829982,
+          "lit": 45444,
+          "sum": 24010912
+        },
+        "restored": true,
+        "hiddenBackground": {
+          "hash": -1844795437,
+          "lit": 42638,
+          "sum": 72384679
+        },
+        "remaining": 1
+      },
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      }
+    }
+  ],
+  "sizes": [
+    {
+      "entry": "@margoengine/sciviz/flow",
+      "previousCeiling": 8854,
+      "gzip": 9118,
+      "ceiling": 9392
+    },
+    {
+      "entry": "@margoengine/sciviz/atmosphere",
+      "previousCeiling": 0,
+      "gzip": 32092,
+      "ceiling": 33055
+    },
+    {
+      "entry": "@margoengine/sky/planet",
+      "previousCeiling": 0,
+      "gzip": 4687,
+      "ceiling": 4943
+    }
+  ],
+  "coreStage": {
+    "gzip": 23950,
+    "limit": 25000,
+    "sourceChanged": false
+  },
+  "numerical": {
+    "solar": "Independent NREL example, geometric zenith and azimuth within 0.03 degrees; existing Meeus solar owner.",
+    "geometry": "Geodetic heights 1000 m match the existing WGS84 projection within 1e-8 m in CPU fixtures.",
+    "medium": "Exact WGS84 reference ground maps to a sphere; singular-value distance distortion below 0.3365 percent.",
+    "wind": "WGS84 curvature conversion at grid samples, time and vertical units retained; GPU RK4/history and exact device replay retained."
+  },
+  "limits": "docs/limits.md, Batch 171 atmosphere on the globe",
+  "research": "docs/clean-room.md, Batch 171 job 6",
+  "remaining": "Small quality follow-ups in private/handoffs/finish-later.md; explicit model limits are not hidden accuracy claims.",
+  "policy": "Fast gate only. No full verify, README examples, speed benchmark, core/stage/physics source change, force push or shared browser-helper edit.",
+  "validatedBase": "df87a1f6dccc16cdfd07e0aa60a6f378fa051ebc",
+  "sourceHashMethod": "UTF-8 with LF newlines; all owning sources unchanged across the final documentation/metadata rebase."
+}

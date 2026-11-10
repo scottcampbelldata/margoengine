@@ -3159,3 +3159,10 @@ Batch 254 stereo pan: @margoengine/audio/pan uses native StereoPannerNode for no
 ### Batch 197 device orientation camera
 
 The optional device-orientation entry converts standard device poses into a roll-aware Y-up camera frame, including screen rotation, relative recentering, yaw offset and quaternion smoothing. packages/controls/tests/device-orientation.test.js checks 120 poses against independent scalar matrix transforms, exact cardinal directions, finite vertical views, frame-rate agreement, nullable samples and permission lifecycles. device-orientation-browser.js replays native DOM events and checks north/west target pixels and listener cleanup on WebGPU and WebGL2. Evidence is deterministic replay rather than physical sensor accuracy or OS-dialog interaction.
+
+
+
+### Batch 171 job 6: atmosphere in a geographic frame
+
+sciviz/atmosphere adds a date-driven solar globe using sky's existing Hillaire tables and transport, including an atmospheric limb, per-fragment aerial perspective and optional density shells. Geographic wind remains GPU-resident after a one-time physical-unit conversion; scalar meshes and physical-size point glyphs use the existing WGS84 projection at metre heights. The source/manifests and numerical/GPU tests are named in the operational playbook and reproduce.md. Existing entries have no static sky import. This claim includes the documented polar-stretch approximation and perspective/exterior camera domain, not exact ellipsoidal or spectral radiometry, meteorological altitude inference or a performance result.
+
