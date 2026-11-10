@@ -122,7 +122,7 @@ export async function bundleSplit(entry, lazy, external = bare) {
   };
 }
 
-export async function measureCoreStage() {
+async function bundleEntry(entry, externals) {
   const output = await build({
     configFile: false,
     publicDir: false,
@@ -131,19 +131,30 @@ export async function measureCoreStage() {
       write: false,
       minify: true,
       target: 'es2022',
-      lib: { entry: 'packages/stage/dist/index.js', formats: ['es'] },
-      rollupOptions: {
-        external: external.filter((name) => typeof name !== 'string' || !name.startsWith('@margoengine/core')),
-        output: compactOutput,
-      },
+      lib: { entry, formats: ['es'] },
+      rollupOptions: { external: externals, output: compactOutput },
     },
   });
   const chunks = output[0].output.filter((item) => item.type === 'chunk');
   const code = chunks.map((chunk) => chunk.code).join('\n');
-  const gzip = gzipSync(code).length;
-  checkCoreBudget(gzip);
-  return { raw: Buffer.byteLength(code), gzip, modules: chunks.flatMap((chunk) => Object.keys(chunk.modules)) };
+  return {
+    raw: Buffer.byteLength(code),
+    gzip: gzipSync(code).length,
+    modules: chunks.flatMap((chunk) => Object.keys(chunk.modules)),
+  };
 }
+
+export async function measureCoreStage() {
+  const measured = await bundleEntry(
+    'packages/stage/dist/index.js',
+    external.filter((name) => typeof name !== 'string' || !name.startsWith('@margoengine/core')),
+  );
+  checkCoreBudget(measured.gzip);
+  return measured;
+}
+
+/** Core alone, measured the way build-modern measures it (its core-only ceiling lives there). */
+export const measureCore = () => bundleEntry('packages/core/dist/index.js', external);
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const { raw, gzip } = await measureCoreStage();

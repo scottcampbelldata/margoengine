@@ -1081,7 +1081,7 @@ native mesh. Use one plain PBR material and one core geometry per provider; rich
 the native materials instancing API. Named Scenes and RenderViews preserve scene ownership and pointer identity.
 A shared geometry can merge with other same-geometry meshes in the same scene; the total draw count is still one.
 
-Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
+Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 24,432 B gzip.
 
 
 ## Frame priorities and adaptive resolution

@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,209 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,432 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -271,7 +271,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,209 B | 59,802 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,432 B | 60,314 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -3554,7 +3554,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 24,209 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,584 B of its 21,587 B cap (2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 24,432 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,828 B of its 21,829 B cap (2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -15819,7 +15819,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,209 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,432 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
