@@ -3929,3 +3929,6 @@ The local evidence uses NVIDIA RTX A6000 driver 617.42. No benchmark or physical
 headset is required for this bounded, simulated-session correctness claim.
 [Methods, oracle values and limits](../integration-composition.md) specify the
 common infrastructure and everything outside the claim.
+
+### J6 product viewer and sampler diagnosis
+Run npm run build:packages, npm run test:integration:browser -- --scene=product and npm run check:examples-types -- --projects=integration-product. Run node scripts/integration-product-trace.mjs for before/after restoration pass-centre bytes on native WebGPU and ANGLE D3D11/Vulkan; it writes test-results/integration-product-trace.json and retains every scene assertion. Run node packages/webgl2-compat/test/features-browser.mjs for implicitFootprint and the unchanged explicit mip/argument checks. The old emitter can be reproduced by removing only name !== 'textureSample' from exactMip in packages/webgl2-compat/src/glsl/emit.ts and rebuilding the compatibility package; the new CPU and GPU regressions then fail. Restore that condition and rebuild before use. Numeric evidence and limits: ../integration-product.md and results/integration-j6-product-diagnosis.json.

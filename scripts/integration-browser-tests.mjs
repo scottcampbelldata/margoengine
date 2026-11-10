@@ -4,7 +4,7 @@ import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { runScene } from './support/composition-run.mjs';
 
-const scenes = ['game', 'sciviz', 'engineering'];
+const scenes = ['game', 'sciviz', 'engineering', 'product'];
 const given = process.argv.find((arg) => arg.startsWith('--scene='))?.slice(8);
 assert.ok(!given || scenes.includes(given), `unknown integration scene ${given}`);
 const results = [];

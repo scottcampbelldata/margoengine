@@ -8,6 +8,16 @@ import { glslFloat, glslName, translateStage, translateWGSL } from '../dist/glsl
 const V =
   '@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i), 0.0, 0.0, 1.0); }';
 
+test('implicit texture sampling keeps hardware footprint selection instead of recomputing LOD', () => {
+  const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+    @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSample(t,s,p.xy*0.123);}`;
+  const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  assert.equal(f.textures.length, 1);
+  assert.equal(f.textures[0].mipFilter, undefined);
+  assert.match(f.source, /texture\(/);
+  assert.doesNotMatch(f.source, /log2\(|textureLod\(/);
+});
+
 test('isotropic sampling carries the live sampler mip state and blends integer-level samples', () => {
   const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
     @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(t,s,p.xy,2.125);}`;

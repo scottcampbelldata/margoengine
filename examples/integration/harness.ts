@@ -1,5 +1,5 @@
 import { Engine } from '@margoengine/core';
-import { engineRuntime } from '@margoengine/core/extension';
+import { engineRuntime, type EngineOptions } from '@margoengine/core/extension';
 import { waitForPipelines } from '../../scripts/support/gpu-ready.js';
 import { resourceLedger } from './resources.mjs';
 
@@ -8,11 +8,15 @@ export function check(value: unknown, message: string): asserts value {
 }
 export type IntegrationScene = {
   tick?: (delta: number) => void;
+  ready?: () => boolean;
+  beforeSnapshot?: () => void;
   assert: () => unknown | Promise<unknown>;
   dispose: () => void | Promise<void>;
   assertDisposed?: () => void;
 };
-export function expose(id: string, build: (engine: Engine) => Promise<IntegrationScene>) {
+type EngineOwner = { engine: Engine; dispose: () => void };
+type CreateOwner = (canvas: HTMLCanvasElement, options: EngineOptions) => Promise<EngineOwner>;
+export function expose(id: string, build: (engine: Engine) => Promise<IntegrationScene>, createOwner?: CreateOwner) {
   const errors: string[] = [];
   const rejection = (event: PromiseRejectionEvent) => errors.push(String(event.reason));
   addEventListener('unhandledrejection', rejection);
@@ -21,13 +25,16 @@ export function expose(id: string, build: (engine: Engine) => Promise<Integratio
     const adapter = await navigator.gpu.requestAdapter();
     check(adapter, 'adapter required');
     const ledger = resourceLedger(GPUDevice.prototype);
-    const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
-    const engine = await Engine.create(canvas, {
+    const placeholder = document.querySelector<HTMLCanvasElement>('canvas')!;
+    const options: EngineOptions = {
       exactSize: [256, 192],
       backend: 'webgpu',
       signal: AbortSignal.timeout(60_000),
       camera: { position: [0, 3, 8], target: [0, 0.5, 0], near: 0.1, far: 100 },
-    });
+    };
+    const owner = createOwner ? await createOwner(placeholder, options) : undefined;
+    const engine = owner?.engine ?? (await Engine.create(placeholder, options));
+    const canvas = engine.canvas;
     engine.onError = (error) => errors.push(String(error));
     engine.scene.background = '#101820';
     const watch = (device: GPUDevice) =>
@@ -39,9 +46,10 @@ export function expose(id: string, build: (engine: Engine) => Promise<Integratio
       engine.render({ delta });
       await engine.gpu!.queue.onSubmittedWorkDone();
     };
-    const settle = () => waitForPipelines(() => draw(), { timeoutMs: 60_000 });
+    const settle = () => waitForPipelines(() => draw(), { timeoutMs: 60_000, ready: () => scene?.ready?.() ?? true });
     const pixels = async () => {
       await settle();
+      scene?.beforeSnapshot?.();
       // Sample in the same task as the render, before the canvas presentation buffer is discarded.
       engine.render({ delta: 0 });
       const copy = document.createElement('canvas');
@@ -84,6 +92,7 @@ export function expose(id: string, build: (engine: Engine) => Promise<Integratio
       await scene.dispose();
       scene.assertDisposed?.();
       scene = undefined;
+      owner?.dispose();
       engine.dispose();
       check(engineRuntime(engine).meshes.size === 0, `${id}: meshes retained`);
       check(engine.scene.plugins.size === 0, `${id}: plugins retained`);
@@ -96,6 +105,7 @@ export function expose(id: string, build: (engine: Engine) => Promise<Integratio
       return { id, before, after, draws, state, resources, errors, restored: true, disposed: true };
     } finally {
       await scene?.dispose();
+      owner?.dispose();
       engine.dispose();
       ledger.restore();
     }

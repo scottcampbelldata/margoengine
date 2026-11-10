@@ -1,0 +1,221 @@
+[
+  {
+    "backend": "webgpu",
+    "result": {
+      "id": "product",
+      "before": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "after": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "draws": 4,
+      "state": {
+        "primitives": 3,
+        "reactMesh": true,
+        "viewCube": true,
+        "taa": true,
+        "dof": true
+      },
+      "resources": {
+        "created": 208,
+        "live": []
+      },
+      "errors": [],
+      "restored": true,
+      "disposed": true
+    }
+  },
+  {
+    "backend": "webgl2-d3d11",
+    "result": {
+      "id": "product",
+      "before": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "after": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "draws": 4,
+      "state": {
+        "primitives": 3,
+        "reactMesh": true,
+        "viewCube": true,
+        "taa": true,
+        "dof": true
+      },
+      "resources": {
+        "created": 218,
+        "live": []
+      },
+      "errors": [],
+      "restored": true,
+      "disposed": true
+    }
+  },
+  {
+    "backend": "webgl2-vulkan",
+    "result": {
+      "id": "product",
+      "before": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "after": [
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          121,
+          33,
+          32,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ],
+        [
+          43,
+          67,
+          83,
+          255
+        ]
+      ],
+      "draws": 4,
+      "state": {
+        "primitives": 3,
+        "reactMesh": true,
+        "viewCube": true,
+        "taa": true,
+        "dof": true
+      },
+      "resources": {
+        "created": 218,
+        "live": []
+      },
+      "errors": [],
+      "restored": true,
+      "disposed": true
+    }
+  }
+]

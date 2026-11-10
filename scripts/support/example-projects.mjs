@@ -71,4 +71,9 @@ export const PROJECTS = [
     config: 'examples/integration/engineering/tsconfig.json',
     entries: () => ['examples/integration/engineering.ts'],
   },
+  {
+    id: 'integration-product',
+    config: 'examples/integration/product/tsconfig.json',
+    entries: () => ['examples/integration/product.ts'],
+  },
 ];

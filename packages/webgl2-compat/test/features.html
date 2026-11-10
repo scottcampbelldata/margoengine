@@ -151,7 +151,26 @@ const cases = {
     texture.destroy();
     return results;
   },
-  /** Linear mip weights against an unfiltered native oracle, including small weights drivers can erase. */
+  /** Implicit footprints belong to the hardware sampler, including oblique, non-axis-aligned derivatives. */
+  async implicitFootprint(device) {
+    const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
+    for (let m = 0; m < 5; m++) {
+      const n = 16 >> m;
+      device.queue.writeTexture({ texture, mipLevel: m }, new Uint8Array(n * n * 4).fill([0, 255, 64, 0, 255][m]), { bytesPerRow: n * 4 }, [n, n]);
+    }
+    const sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear', mipmapFilter: 'linear' });
+    try {
+      return await shade(device, { w: 4, h: 4,
+        code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+          @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
+            let uv=vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y;
+            return textureSample(t,s,uv);
+          }`,
+        entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
+      });
+    } finally { texture.destroy(); }
+  },
+  /** Explicit mip weights use an unfiltered oracle; implicit requests use the native hardware sampler. */
   async mipFiltering(device) {
     const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
     for (let m = 0; m < 5; m++) {
@@ -176,13 +195,15 @@ const cases = {
         // These mips are spatially constant. The specified footprints give LOD 2 + bias, or 2.5
         // for implicit sampling; the explicit-level and explicit-gradient requests span 2..3.
         const oracleLod = mode === 'implicit' ? '2.5' : lod;
-        const expr = device.gl ? sample : `oracle(${oracleLod})`;
+        // Hardware implicit LOD has finite fraction precision; the layer must match native sampling.
+        // Keep the analytic oracle for explicit levels, bias and gradients.
+        const expr = device.gl || mode === 'implicit' ? sample : `oracle(${oracleLod})`;
         results[`${filter}/${mode}`] = await shade(device, { w: 9, h: 2,
           code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
             fn oracle(lod:f32)->vec4f {let m=i32(floor(lod));let w=lod-floor(lod);
               return textureLoad(t,vec2i(0),m)*(1.0-w)+textureLoad(t,vec2i(0),m+1)*w;}
             @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return ${expr};}`,
-          entries: [{ binding: 0, resource: texture.createView() }, ...(device.gl ? [{ binding: 1, resource: sampler }] : [])],
+          entries: [{ binding: 0, resource: texture.createView() }, ...(device.gl || mode === 'implicit' ? [{ binding: 1, resource: sampler }] : [])],
         });
       }
     }

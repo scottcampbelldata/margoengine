@@ -1,0 +1,5900 @@
+{
+  "date": "2026-11-10",
+  "device": "NVIDIA RTX A6000",
+  "before": [
+    {
+      "backend": "webgpu",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 208,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "passes": [
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            41,
+            51,
+            67,
+            42,
+            39,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3329",
+            "2a43",
+            "2a27",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            0,
+            0,
+            128,
+            191
+          ],
+          "words": [
+            "bf800000"
+          ],
+          "sourceSha256": "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            41,
+            51,
+            67,
+            42,
+            39,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3329",
+            "2a43",
+            "2a27",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            81,
+            34,
+            85,
+            62,
+            46,
+            94,
+            215,
+            62
+          ],
+          "words": [
+            "3e552251",
+            "3ed75e2e"
+          ],
+          "sourceSha256": "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            28,
+            16,
+            39,
+            190
+          ],
+          "words": [
+            "be27101c"
+          ],
+          "sourceSha256": "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            81,
+            34,
+            85,
+            62,
+            46,
+            94,
+            215,
+            62
+          ],
+          "words": [
+            "3e552251",
+            "3ed75e2e"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            41,
+            51,
+            67,
+            42,
+            39,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3329",
+            "2a43",
+            "2a27",
+            "0000"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            81,
+            34,
+            85,
+            62,
+            46,
+            94,
+            215,
+            62
+          ],
+          "words": [
+            "3e552251",
+            "3ed75e2e"
+          ],
+          "sourceSha256": "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            41,
+            51,
+            67,
+            42,
+            39,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3329",
+            "2a43",
+            "2a27",
+            "3c00"
+          ],
+          "sourceSha256": "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            28,
+            16,
+            39,
+            190
+          ],
+          "words": [
+            "be27101c"
+          ],
+          "sourceSha256": "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            41,
+            51,
+            67,
+            42,
+            39,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3329",
+            "2a43",
+            "2a27",
+            "0000"
+          ],
+          "sourceSha256": "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "bgra8unorm",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            32,
+            33,
+            121,
+            255
+          ],
+          "words": [
+            "20",
+            "21",
+            "79",
+            "ff"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            143,
+            48,
+            218,
+            40,
+            104,
+            40,
+            0,
+            60
+          ],
+          "words": [
+            "308f",
+            "28da",
+            "2868",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            13,
+            155,
+            114,
+            62
+          ],
+          "words": [
+            "3e729b0d"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            30,
+            50,
+            201,
+            35,
+            101,
+            35,
+            0,
+            60
+          ],
+          "words": [
+            "321e",
+            "23c9",
+            "2365",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            48,
+            168,
+            114,
+            62
+          ],
+          "words": [
+            "3e72a830"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        }
+      ],
+      "shaderSha256": [
+        "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+        "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+        "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+        "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+        "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+        "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+        "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+        "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+        "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+        "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+        "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+        "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+        "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+        "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+        "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+        "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+        "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+        "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+        "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+        "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+        "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+        "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+        "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+        "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+        "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+        "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+        "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+        "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+        "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+        "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+        "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+        "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+        "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+        "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+        "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+        "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+        "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+        "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+      ]
+    },
+    {
+      "backend": "webgl2-d3d11",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            120,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            120,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 218,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "passes": [
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            0,
+            0,
+            128,
+            191
+          ],
+          "words": [
+            "bf800000"
+          ],
+          "sourceSha256": "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            222,
+            6,
+            43,
+            190
+          ],
+          "words": [
+            "be2b06de"
+          ],
+          "sourceSha256": "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "0000"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            222,
+            6,
+            43,
+            190
+          ],
+          "words": [
+            "be2b06de"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "0000"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba8unorm",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            120,
+            33,
+            32,
+            255
+          ],
+          "words": [
+            "78",
+            "21",
+            "20",
+            "ff"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            88,
+            48,
+            212,
+            39,
+            153,
+            39,
+            0,
+            60
+          ],
+          "words": [
+            "3058",
+            "27d4",
+            "2799",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            13,
+            155,
+            114,
+            62
+          ],
+          "words": [
+            "3e729b0d"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            2,
+            50,
+            201,
+            35,
+            101,
+            35,
+            0,
+            60
+          ],
+          "words": [
+            "3202",
+            "23c9",
+            "2365",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            48,
+            168,
+            114,
+            62
+          ],
+          "words": [
+            "3e72a830"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginRenderPass",
+          "textureLabel": "canvas texture",
+          "format": "rgba8unorm",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            120,
+            33,
+            32,
+            255
+          ],
+          "words": [
+            "78",
+            "21",
+            "20",
+            "ff"
+          ]
+        }
+      ],
+      "shaderSha256": [
+        "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+        "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+        "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+        "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+        "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+        "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+        "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+        "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+        "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+        "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+        "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+        "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+        "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+        "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+        "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+        "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+        "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+        "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+        "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+        "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+        "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+        "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+        "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+        "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+        "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+        "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+        "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+        "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+        "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+        "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+        "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+        "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+        "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+        "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+        "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f",
+        "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52",
+        "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3",
+        "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+        "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+        "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+        "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+      ]
+    },
+    {
+      "backend": "webgl2-vulkan",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            120,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            120,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 218,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "passes": [
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            0,
+            0,
+            128,
+            191
+          ],
+          "words": [
+            "bf800000"
+          ],
+          "sourceSha256": "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            222,
+            6,
+            43,
+            190
+          ],
+          "words": [
+            "be2b06de"
+          ],
+          "sourceSha256": "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "0000"
+          ],
+          "sourceSha256": "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rg32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            133,
+            30,
+            85,
+            62,
+            251,
+            93,
+            215,
+            62
+          ],
+          "words": [
+            "3e551e85",
+            "3ed75dfb"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            60
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "3c00"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 32,
+          "height": 24,
+          "bytes": [
+            222,
+            6,
+            43,
+            190
+          ],
+          "words": [
+            "be2b06de"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 128,
+          "height": 96,
+          "bytes": [
+            33,
+            51,
+            63,
+            42,
+            36,
+            42,
+            0,
+            0
+          ],
+          "words": [
+            "3321",
+            "2a3f",
+            "2a24",
+            "0000"
+          ],
+          "sourceSha256": "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3"
+        },
+        {
+          "kind": "beginRenderPass",
+          "format": "rgba8unorm",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            120,
+            33,
+            32,
+            255
+          ],
+          "words": [
+            "78",
+            "21",
+            "20",
+            "ff"
+          ]
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            88,
+            48,
+            212,
+            39,
+            152,
+            39,
+            0,
+            60
+          ],
+          "words": [
+            "3058",
+            "27d4",
+            "2798",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            13,
+            155,
+            114,
+            62
+          ],
+          "words": [
+            "3e729b0d"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "rgba16float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            2,
+            50,
+            201,
+            35,
+            101,
+            35,
+            0,
+            60
+          ],
+          "words": [
+            "3202",
+            "23c9",
+            "2365",
+            "3c00"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginComputePass",
+          "format": "r32float",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            48,
+            168,
+            114,
+            62
+          ],
+          "words": [
+            "3e72a830"
+          ],
+          "sourceSha256": "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201"
+        },
+        {
+          "kind": "beginRenderPass",
+          "textureLabel": "canvas texture",
+          "format": "rgba8unorm",
+          "width": 256,
+          "height": 192,
+          "bytes": [
+            120,
+            33,
+            32,
+            255
+          ],
+          "words": [
+            "78",
+            "21",
+            "20",
+            "ff"
+          ]
+        }
+      ],
+      "shaderSha256": [
+        "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+        "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+        "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+        "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+        "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+        "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+        "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+        "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+        "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+        "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+        "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+        "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+        "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+        "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+        "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+        "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+        "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+        "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+        "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+        "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+        "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+        "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+        "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+        "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+        "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+        "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+        "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+        "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+        "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+        "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+        "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+        "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+        "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+        "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+        "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f",
+        "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52",
+        "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3",
+        "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+        "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+        "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+        "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+      ]
+    }
+  ],
+  "after": [
+    {
+      "backend": "webgpu",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 208,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "trace": {
+        "sources": [
+          "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+          "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+          "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+          "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+          "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+          "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+          "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+          "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+          "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+          "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+          "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+          "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+          "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+          "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+          "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+          "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+          "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+          "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+          "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+          "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+          "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+          "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+          "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+          "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+          "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+          "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+          "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+          "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+          "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+          "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+          "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+          "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+          "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+          "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+          "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+          "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+          "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+          "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+        ],
+        "samplers": [
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {},
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {}
+        ],
+        "snapshots": [
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  7
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  7
+                ],
+                "bytes": [
+                  28,
+                  16,
+                  39,
+                  190
+                ],
+                "words": [
+                  "be27101c"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  28,
+                  16,
+                  39,
+                  190
+                ],
+                "words": [
+                  "be27101c"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "bgra8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  32,
+                  33,
+                  121,
+                  255
+                ],
+                "words": [
+                  "20",
+                  "21",
+                  "79",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  143,
+                  48,
+                  218,
+                  40,
+                  104,
+                  40,
+                  0,
+                  60
+                ],
+                "words": [
+                  "308f",
+                  "28da",
+                  "2868",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  13,
+                  155,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e729b0d"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "de8b294fddabf1d075a22c389b2be9c701d3079afbdf00b3641310bf3bee9fcb"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              }
+            ]
+          },
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  7
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  7
+                ],
+                "bytes": [
+                  28,
+                  16,
+                  39,
+                  190
+                ],
+                "words": [
+                  "be27101c"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  81,
+                  34,
+                  85,
+                  62,
+                  46,
+                  94,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e552251",
+                  "3ed75e2e"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  28,
+                  16,
+                  39,
+                  190
+                ],
+                "words": [
+                  "be27101c"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  8
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  39,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a27",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "bgra8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  32,
+                  33,
+                  121,
+                  255
+                ],
+                "words": [
+                  "20",
+                  "21",
+                  "79",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  22,
+                  46,
+                  112,
+                  32,
+                  36,
+                  32,
+                  0,
+                  60
+                ],
+                "words": [
+                  "2e16",
+                  "2070",
+                  "2024",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  144,
+                  119,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e727790"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "de8b294fddabf1d075a22c389b2be9c701d3079afbdf00b3641310bf3bee9fcb"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "backend": "webgl2-d3d11",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 218,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "trace": {
+        "sources": [
+          "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+          "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+          "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+          "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+          "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+          "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+          "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+          "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+          "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+          "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+          "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+          "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+          "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+          "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+          "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+          "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+          "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+          "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+          "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+          "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+          "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+          "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+          "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+          "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+          "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+          "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+          "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+          "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+          "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+          "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+          "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+          "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+          "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+          "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+          "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f",
+          "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52",
+          "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3",
+          "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+          "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+          "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+          "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+        ],
+        "samplers": [
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {},
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {}
+        ],
+        "snapshots": [
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  34
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  89,
+                  48,
+                  218,
+                  39,
+                  157,
+                  39,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3059",
+                  "27da",
+                  "279d",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  13,
+                  155,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e729b0d"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "label": "canvas texture",
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "2f09f4ce56da8c3bc6d06479dd6e4521ae731c606278863794ccedb4047aeb1e"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              }
+            ]
+          },
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  34
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  149,
+                  46,
+                  221,
+                  34,
+                  244,
+                  34,
+                  0,
+                  60
+                ],
+                "words": [
+                  "2e95",
+                  "22dd",
+                  "22f4",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  117,
+                  207,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72cf75"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "label": "canvas texture",
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "2f09f4ce56da8c3bc6d06479dd6e4521ae731c606278863794ccedb4047aeb1e"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "backend": "webgl2-vulkan",
+      "result": {
+        "id": "product",
+        "before": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "after": [
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            121,
+            33,
+            32,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ],
+          [
+            43,
+            67,
+            83,
+            255
+          ]
+        ],
+        "draws": 4,
+        "state": {
+          "primitives": 3,
+          "reactMesh": true,
+          "viewCube": true,
+          "taa": true,
+          "dof": true
+        },
+        "resources": {
+          "created": 218,
+          "live": []
+        },
+        "errors": [],
+        "restored": true,
+        "disposed": true
+      },
+      "trace": {
+        "sources": [
+          "15469199b846456629412fad81743712ce83c31232f5b83864f892f6dd77c629",
+          "c63aeab10f6d61354b7804e27b074d44b80921ff82ac34cade0db6a9040815f1",
+          "a88a9921778ea7e8c520fa5ac3d212a083c3ded3c8193d5deb6d693c7b09ebae",
+          "35ea84e77209af5928950b669409f49ac86a1ed8979c7cf5f35ff59ca588e47d",
+          "9cb231c5320d4bdb83cdceb47ec89493b015479b3410eb7d36b62311db8ce0f7",
+          "cdaebc458e908f6aeacb4da2c837ba168096eeffeec5398aa266794b8fadc321",
+          "324faa507a38a1328c38627fc7d5603ff6e9d172df164219347828436cfdb46c",
+          "d7550a2632e7069d5748d7c6dd7f1cb79190d5256631fba19795164b53d48bfa",
+          "f53196cbd80412bdee9ae48f2ad7e7af068fa5c085221acee8d08a2e2d02919c",
+          "ff9dd7adf7ec381d3dad6688430505a19c85daf15df358cc86192f9cef9d7422",
+          "76c4bfccb059b46c409688aa69097a89f7819107b59c080c618630c06ccb355e",
+          "26e547b895fa207990265bae1138c0f59cc97bc192542c9b993420aa27ac1323",
+          "850e7fd58bd8f23e9984a5313840dc79499c222b567c427c917c067cf13bd1db",
+          "5ede50b8dd1bb4c3b8129ea0e8ff5f56ac3b8c3b579dfba0fa0da1d42aadb201",
+          "06636d5301c73d00564368310caf6a8ad29f8558cf00d9662fb5e6657621a20a",
+          "9a31d4352b8696554a9017fdfb259c03df78ab8866219e93b2c9558c5d8888ae",
+          "ee4636fc334f1e25446f9b5eb00e9d79bfd0fb2637c49d924fe2e59b71a2b6c1",
+          "e6ddc605fa1bc204062f06a5f284c3ee8fae6b7764056425bca15b68f79cf1c0",
+          "4869bb0c577f70b4b1e985423160c7fb3afb1524f112aa1807af6490f6c12ab5",
+          "ce64c1326536b244029032ebc1a70727f0dcf8664fb09e5e686f1b0cba11a4d7",
+          "25c8c56691bad3e33a02d5ef805d0ec560b746e80e0979c6ea457957cdba7bc5",
+          "82317f90c1d821c8864445fe54d42c54530d9be8b1562abfa5259a0f07c2d41a",
+          "ec42593c170b71feab7889766fc39b95fc713439d9b088817df9621cc180b611",
+          "4f4c3d3bacaebbbfb2c4cc48e8701b8a69130a1005f5f5c5695959858b8a4d27",
+          "136216844795520b0b72d21124eadd690ee9d7f390706b1862f4516684bcf8c6",
+          "c91c8619a5dfc5967d0a0d3e8aeb94da2f84dec264e30623bce01a8276494cf4",
+          "3d44361f8fff75fc37a64c1dd0f0c5a6f849e0a1fe45803a272f88e7e5346009",
+          "8916e7ea7b3c2c2a6facae18a7c8bc63d76c3c659ab3ec42825a45bc99572958",
+          "7817f87a9044b5398561b5149a99f9ef9565b53ea79ecd738ac3f9fb1a1f6439",
+          "9a82d18723bda22b432e80294b822afa95a0285c06f7f2031ef34d95dc2dec3d",
+          "64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448",
+          "eb4506dadf5edb1fe77d9b8690d7f80abe7ae11bb55eb541287550f685b5c29e",
+          "aa3b8b023727daa0a98a5a6fb823e7804e1cb9515d55a50436bf0e8014ebec5b",
+          "545df7ccd8c94507fb4d76ef89730a447eade844a67a0001aacd8c0f597999ad",
+          "f0c1858b80a23fd1655115310c9e9748ca218d5620e5144c8d3f8967e6a4237f",
+          "b498fc394e99f27e4db26f655d2768e407e6c33ed4893880e26d802d9d917c52",
+          "30a42b243d5cf737398d2587d789c50a670037773e990b6e77f732c142d4b4b3",
+          "ca7ef3936435f0273f2b6fa5f5b7aef545c144f63ed513f74e2bab3fb434c48b",
+          "67557fb6e6bce6d71939e57e2c90a40a9f7f2fc673429308a4cd15a863b24eea",
+          "c8018edd3489b753a365b5656f8e9adacdc6364df3deca68cc126bf937769c92",
+          "044ab4db1bcdb61753f23907a804e0f26f72e49572fb5d0a3fb5f0aac6221c00"
+        ],
+        "samplers": [
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {},
+          {
+            "minFilter": "linear",
+            "magFilter": "linear"
+          },
+          {
+            "addressModeU": "repeat",
+            "addressModeV": "repeat",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear",
+            "lodMaxClamp": 32
+          },
+          {
+            "label": "environment",
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "mipmapFilter": "linear"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear",
+            "addressModeU": "repeat"
+          },
+          {
+            "magFilter": "linear",
+            "minFilter": "linear"
+          },
+          {}
+        ],
+        "snapshots": [
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  34
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  89,
+                  48,
+                  218,
+                  39,
+                  157,
+                  39,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3059",
+                  "27da",
+                  "279d",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  13,
+                  155,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e729b0d"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "label": "canvas texture",
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "2f09f4ce56da8c3bc6d06479dd6e4521ae731c606278863794ccedb4047aeb1e"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              }
+            ]
+          },
+          {
+            "passes": [
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rg16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "words": [
+                  "0000",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  15
+                ],
+                "bytes": [
+                  0,
+                  0,
+                  128,
+                  191
+                ],
+                "words": [
+                  "bf800000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  34
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  35
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  9
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rg32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  133,
+                  30,
+                  85,
+                  62,
+                  251,
+                  93,
+                  215,
+                  62
+                ],
+                "words": [
+                  "3e551e85",
+                  "3ed75dfb"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  60
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 32,
+                "height": 24,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  222,
+                  6,
+                  43,
+                  190
+                ],
+                "words": [
+                  "be2b06de"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 128,
+                "height": 96,
+                "shaders": [
+                  36
+                ],
+                "bytes": [
+                  41,
+                  51,
+                  67,
+                  42,
+                  40,
+                  42,
+                  0,
+                  0
+                ],
+                "words": [
+                  "3329",
+                  "2a43",
+                  "2a28",
+                  "0000"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  149,
+                  46,
+                  221,
+                  34,
+                  244,
+                  34,
+                  0,
+                  60
+                ],
+                "words": [
+                  "2e95",
+                  "22dd",
+                  "22f4",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  117,
+                  207,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72cf75"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "rgba16float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  30,
+                  50,
+                  201,
+                  35,
+                  101,
+                  35,
+                  0,
+                  60
+                ],
+                "words": [
+                  "321e",
+                  "23c9",
+                  "2365",
+                  "3c00"
+                ]
+              },
+              {
+                "kind": "beginComputePass",
+                "format": "r32float",
+                "width": 256,
+                "height": 192,
+                "shaders": [
+                  13
+                ],
+                "bytes": [
+                  48,
+                  168,
+                  114,
+                  62
+                ],
+                "words": [
+                  "3e72a830"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "r8unorm",
+                "width": 256,
+                "height": 192,
+                "shaders": [],
+                "bytes": [
+                  0
+                ],
+                "words": [
+                  "00"
+                ]
+              },
+              {
+                "kind": "beginRenderPass",
+                "format": "rgba8unorm",
+                "width": 256,
+                "height": 192,
+                "label": "canvas texture",
+                "shaders": [],
+                "bytes": [
+                  121,
+                  33,
+                  32,
+                  255
+                ],
+                "words": [
+                  "79",
+                  "21",
+                  "20",
+                  "ff"
+                ]
+              }
+            ],
+            "uniforms": [
+              {
+                "size": 128,
+                "sha256": "cd1e4b69cbbec3149c8ead950fac41c020291ae461b07469e689e62f400d9341"
+              },
+              {
+                "size": 65536,
+                "sha256": "bc946826868cbdcbd47e2eab395ebb508e5d6ad66f2f28a344d776a141f333fc"
+              },
+              {
+                "size": 512,
+                "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+              },
+              {
+                "size": 16,
+                "sha256": "2e74c8afcdbf199e0f33c5b208357420945224f56c79a26039abceec8abae178"
+              },
+              {
+                "size": 16,
+                "sha256": "cb57b96f331808c70efc538fc000aa3fa4d57a7b6c72aa560746c59fec423e8e"
+              },
+              {
+                "size": 272,
+                "sha256": "d523d861d2f0bb23f3e100ef6ce694fce931f147922be61bb78b3b81e2a56593"
+              },
+              {
+                "size": 272,
+                "sha256": "b219abe50127bb39a6be689bd7e441689cfaf315f6ceb96faf864854dec90426"
+              },
+              {
+                "size": 160,
+                "sha256": "5b8b2c162e4413af413472849b33cdc844584960d50c556501f7ef367b1038c6"
+              },
+              {
+                "size": 48,
+                "sha256": "2f09f4ce56da8c3bc6d06479dd6e4521ae731c606278863794ccedb4047aeb1e"
+              },
+              {
+                "size": 64,
+                "sha256": "ab499dd06e10bec201c2a2cb9a60f2d9c96606e80888704e5fbad92529c32988"
+              },
+              {
+                "size": 208,
+                "sha256": "46f531b7ea0428fbf2c3ca2b60e8dc33d6bbfa000e0fd1b489c5e39140a47006"
+              },
+              {
+                "size": 32,
+                "sha256": "5bb536be60c51b8460f6e7f580757808debe7b8a0e57ed3aff62ded7e503acb1"
+              },
+              {
+                "size": 208,
+                "sha256": "62c433d3c779b58232d2245f2264cd76df064f4c99149816bb42f6f2539fbba0"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 176,
+                "sha256": "d65ba756874c6922e329206eb6893f50f608b383f1d0d3e7b37d47e01f02c118"
+              },
+              {
+                "size": 144,
+                "sha256": "03bf7f5e2588597f49cc4428d5602bb7ae449e75bf75bde0d691c838a49ed6d6"
+              },
+              {
+                "size": 16,
+                "sha256": "da0756ac859d0a1a38bea2e62a87e5ba31c9d525b796edaf32fcc2c3af1fbcaa"
+              },
+              {
+                "size": 160,
+                "sha256": "62f3b03a6585d22c166fe0ca43a633e1526ddb67d80d62d06f7d5f734f2a920a"
+              },
+              {
+                "size": 160,
+                "sha256": "23c91227b14759e2229ab842cc0f6bde8eabd586a2f04d2e3d8342176adfb454"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 192,
+                "sha256": "7bf770fce79471050d193aac766a34b8212c8791739c4839c3bc30099206877e"
+              },
+              {
+                "size": 160,
+                "sha256": "a2e67cc0283c1dd08fc87fed60a028267cf110de6ecdac071d1e574fd92b724e"
+              },
+              {
+                "size": 16,
+                "sha256": "3c79f1b5ca0a59275ca1b3236f81b5547ddc9dfca6a21236d85ef63060aaccaf"
+              },
+              {
+                "size": 16,
+                "sha256": "02c75b9703b2bba7438368af386588470281f02e7d07a75b95f94826f3e7d184"
+              },
+              {
+                "size": 16,
+                "sha256": "1349a3998807d01fb1bb740088944fed74363d610079605f89fdb9db35e395fe"
+              },
+              {
+                "size": 16,
+                "sha256": "e6525ba6cc636e73aeaeed22dc8091a705155755497952a5f150b5a508e00a86"
+              },
+              {
+                "size": 16,
+                "sha256": "85b724e3f6e2dd2648a696595eb637b234dcecc5cb770a5afbf0926341ebdfb4"
+              },
+              {
+                "size": 16,
+                "sha256": "6b6f14e6af2627186bf8a55e474dcf6ef3f6ce81af560da871ec51eb670171a9"
+              },
+              {
+                "size": 16,
+                "sha256": "b1535c7783ea8829b6b0cf67704539798b4d16c39bf0bfe09494c5d9f12eee30"
+              },
+              {
+                "size": 16,
+                "sha256": "4cbbd8ca5215b8d161aec181a74b694f4e24b001d5b081dc0030ed797a8973e0"
+              },
+              {
+                "size": 192,
+                "sha256": "5a6e86c89415794b19f37cad4c0d3dd3d32bee38ffbc70cee43a28b6b5579012"
+              },
+              {
+                "size": 3072,
+                "sha256": "ba479b372c46c2b07c21fc1030fe5cdd12b02af9e0465a3d5c07ed75f9760ef4"
+              },
+              {
+                "size": 16,
+                "sha256": "00ac5e20870ce32cab6bab45344bc3b1f91408b84f57ef93ad267bb495a9b7df"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "operationBefore": [
+    {
+      "backend": "native-d3d11",
+      "values": [
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977
+      ],
+      "bits": [
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a"
+      ]
+    },
+    {
+      "backend": "compat-d3d11",
+      "values": [
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248225688934326,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.4248223900794983,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.42482247948646545,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998,
+        0.4248226583003998
+      ],
+      "bits": [
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98258",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98252",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed98255",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b",
+        "3ed9825b"
+      ]
+    }
+  ],
+  "operationAfter": [
+    {
+      "backend": "native-d3d11",
+      "values": [
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977
+      ],
+      "bits": [
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a"
+      ]
+    },
+    {
+      "backend": "compat-d3d11",
+      "values": [
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977
+      ],
+      "bits": [
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a"
+      ]
+    },
+    {
+      "backend": "compat-vulkan",
+      "values": [
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977,
+        0.3007248044013977
+      ],
+      "bits": [
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a",
+        "3e99f89a"
+      ]
+    }
+  ],
+  "limits": [
+    "Centre copies are exact stored bits, not full-image equality.",
+    "The oblique-footprint operation fixture isolates implicit sampling; it is not a replay of one ToyCar fragment.",
+    "Intermediate HDR values can still differ after the repair; the shared RGBA8 probes and same-backend restoration remain exact."
+  ]
+}

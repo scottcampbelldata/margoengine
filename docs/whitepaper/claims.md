@@ -4634,3 +4634,6 @@ J6 public CAD-format viewer (2026-11-10): the public calls in docs/integration-e
 
 ### Notebook/share backend ownership
 Sciviz notebook/share source imports and its manifest have no compatibility-layer dependency. Host adapters supply deferred, abortable setup. Evidence: unchanged webgl2-compat/test/isolation.test.js and sciviz/tests/backend-isolation.test.js; native/compat share and notebook browser controls. No speed or universal host claim. Reproduction and standards: ../sciviz-host-backends.md.
+
+### J6 product viewer
+On the recorded RTX A6000, the public product scene combines gltf-pro, materials, environment, staging, post, DOF, tonemap, TAA, selection, ViewCube and React. Four RGBA8 probes and four draws survive actual device replacement, match across native and both ANGLE paths and dispose with zero tracked ownership. The implicit-footprint emitter regression is independently reproduced with an oblique mip fixture. No full-image, HDR-bit, speed or other-GPU claim. Methods: ../integration-product.md; proof: results/integration-j6-product.json and results/integration-j6-product-diagnosis.json.

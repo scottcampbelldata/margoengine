@@ -48,6 +48,7 @@ test('everything test pages and their imports enter the GPU footprint', { timeou
   assert.ok(footprint.files.has('examples/test-pages/integration-game.html'));
   assert.ok(footprint.files.has('examples/test-pages/integration-sciviz.html'));
   assert.ok(footprint.files.has('examples/test-pages/integration-engineering.html'));
+  assert.ok(footprint.files.has('examples/test-pages/integration-product.html'));
   for (const name of [
     'gltf',
     'animation',
@@ -76,6 +77,14 @@ test('everything test pages and their imports enter the GPU footprint', { timeou
     'lod',
     'culling',
     'exporters',
+    'materials',
+    'environment',
+    'staging',
+    'tonemap',
+    'taa',
+    'dof',
+    'viewcube',
+    'react',
   ])
     assert.ok(footprint.packages.has(`@margoengine/${name}`), name);
 });

@@ -1486,3 +1486,27 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/exporters: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
 - @margoengine/sciviz: host-owned prepareBackend for notebook/share, native-only bypass, aborts and the bundled AFM/offline defaults.
+
+- @margoengine/gltf-pro: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/materials: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/environment: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/staging: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/post: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/tonemap: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/taa: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/dof: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/selection: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/viewcube: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/react: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+
+- @margoengine/webgl2-compat: document hardware implicit sampler footprints and the J6 product composition proof in docs/integration-product.md during the README phase.

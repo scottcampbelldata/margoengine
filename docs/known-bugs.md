@@ -5440,3 +5440,6 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 - Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
   duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
   evicted; 27 throws carry no help link.
+
+### Fixed: J6 product implicit-sampler footprint
+The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
