@@ -9579,6 +9579,7 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | Owner | Class | What changed on the small preview | Evidence |
 |---|---|---|---|
 | clustered `CubeProjectorLights` | WebGPU-only | Refuses in its own setup (`unsupported`, help link); it already refused through `ProjectorLights` with the parent's name | `packages/clustered/test/cube-projector.test.js` |
+| culling `FrontToBack`, `WebGL2Culling` | WebGPU-only | Refuse through `requireWebGPU` (`unsupported`, help link); before, `unsupported` without a link | `packages/culling/test/preview.test.js` |
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

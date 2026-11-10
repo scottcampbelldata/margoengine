@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { CulledInstances } from './index.js';
 import type { CullableModel, CullablePrimitive } from './models.js';
 import { localBox } from './software-depth.js';
@@ -301,11 +302,8 @@ export class FrontToBack implements EnginePlugin {
     this.live.clear();
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu)
-      throw new MargoError(
-        this.disposed ? 'disposed' : 'unsupported',
-        'Front-to-back sorting needs native WebGPU or the full WebGL2 layer; create a new plugin on a supported engine',
-      );
+    if (this.disposed) throw new MargoError('disposed', 'FrontToBack is disposed; create a new plugin');
+    requireWebGPU(engine, 'FrontToBack');
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {

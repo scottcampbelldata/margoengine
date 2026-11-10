@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { exactShader } from './pyramid.js';
 import { localBox, SoftwareDepthBuffer } from './software-depth.js';
 export { SoftwareDepthBuffer } from './software-depth.js';
@@ -43,11 +44,8 @@ export class WebGL2Culling implements EnginePlugin {
     return plugin;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu)
-      throw new MargoError(
-        this.disposed ? 'disposed' : 'unsupported',
-        'Software culling needs native WebGPU or the full WebGL2 layer; create a new plugin on a supported engine',
-      );
+    if (this.disposed) throw new MargoError('disposed', 'WebGL2Culling is disposed; create a new plugin');
+    requireWebGPU(engine, 'WebGL2Culling');
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {

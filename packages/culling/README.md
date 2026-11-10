@@ -507,3 +507,5 @@ replacing geometry through the entry's existing update/reconstruction contract.
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+`FrontToBack` (`@margoengine/culling/sort`) and `WebGL2Culling` (`@margoengine/culling/webgl2`) refuse the small preview through the shared `requireWebGPU` (`<Name> needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 both threw `unsupported` without a help link, so the preview-contract gate counted them as silent skips and `npm run verify` failed. Despite its name, `WebGL2Culling` runs on the full WebGL2 compatibility layer, not the small preview. A disposed plugin still throws `disposed` first. Regression: `test/preview.test.js`.
