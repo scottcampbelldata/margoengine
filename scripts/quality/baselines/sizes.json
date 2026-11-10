@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14664791,
+  "total": 14669318,
   "history": [
     {
       "date": "2026-10-24",
@@ -8075,6 +8075,12 @@
       "commit": "9cb969edd",
       "reason": "HTMLBlend explicit camera/viewport/scissor correction: measured parent 3111 to current 3442 B gzip; ceiling 3303 to 3698 B. Keep coherent mask/DOM ownership and backend state; a split would duplicate lifecycle or require callers to coordinate drawing state. Scott optional-package size rule, 2026-11-10.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "77347d462",
+      "reason": "Review5 live volume correctness: pointer 6988 to 7164 gzip bytes; usdz worker 135931 to 136160. Coherent animated/public attenuation and retained underflow precision are synchronous parse/draw state; splitting would add an async boundary or another public state API. No core/stage or eager optional dependency growth.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8090,7 +8096,7 @@
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/playback": 2073,
     "@margoengine/animation/point-cache": 1241,
-    "@margoengine/animation/pointer": 7146,
+    "@margoengine/animation/pointer": 7420,
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,
     "@margoengine/animation/vat": 8800,
@@ -9219,7 +9225,7 @@
     "@margoengine/ui/world": 9836,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 13126,
-    "@margoengine/usdz dist/workers/usdz.js": 135992,
+    "@margoengine/usdz dist/workers/usdz.js": 140245,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/clips": 23845,
     "@margoengine/usdz/compose": 19970,

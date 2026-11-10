@@ -1,5 +1,8 @@
 # README work owed
 
+- @margoengine/animation: document coherent volume pointer attenuation and optical depth, including underflow and backward seeks (review5).
+- @margoengine/gltf-pro: document live attenuation edits, precise optical depth invalidation and progressive material preservation (review5).
+
 - @margoengine/sciviz: document raw notebook/share prepareBackend requirements and explicit WebGL2 errors; shipped Python/offline hosts provide automatic lazy fallback (review5).
 
 | Package | Completed README validation | Status |

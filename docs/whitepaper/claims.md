@@ -4659,3 +4659,7 @@ The encoder checks the complete u32 KTX2 key/value length before source mip acce
 ### Indexed cache variant deletion (2026-11-10)
 
 Deleting a URL with multiple Vary representations leaves the indexed byte and file totals equal to the retained contents. Evidence: packages/cache/test/eviction.test.js covers two and five variants, unrelated data and repeated deletion; packages/cache/scripts/test-browser.js checks five variants on real IndexedDB. Reproduce after build with node --test packages/cache/test/eviction.test.js and npm run test:browser --workspace @margoengine/cache. The browser suite needs no graphics backend; no rendering or speed claim is added. Sources: docs/clean-room.md, Cache eviction removal totals.
+
+### Review 5 live volume state (2026-11-10)
+
+Claim: KHR_animation_pointer volume color, thickness and distance reach the native tint uniforms, and editing parsed attenuation invalidates the corresponding cached optical depth. Evidence: animation/tests/volume-pointer.test.js and gltf-pro/tests/attenuation-live.test.js fail on the parent and check state plus uploaded lanes; gltf-pro/tests/progressive.test.js checks in-place edits across texture arrival. The existing native-volume browser oracle now checks 48 authored 1x1 slabs, including 20 live edit/animation cases, exactly on native WebGPU and WebGL2 compatibility. This does not certify arbitrary mesh thickness, hook extreme-range equivalence or speed. Same-value writes are not observable. Methods, sources and commands: [live volume materials](../live-volume-materials.md).

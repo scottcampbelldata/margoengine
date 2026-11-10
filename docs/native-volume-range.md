@@ -49,3 +49,5 @@ Reproduce after building packages: run the three named CPU test files with
 `node --test --test-timeout=300000`, then run
 `node packages/gltf-pro/scripts/test-native-volume.mjs`, and again with
 `--compat`, each under the shared GPU lock.
+
+Live attenuation updates (review5, 2026-11-10): parsed optical depth now invalidates when public attenuation changes, while animation updates both transmittance and authored depth. Progressive material copies preserve the derived accessor. See [live-volume-materials.md](live-volume-materials.md) for cache semantics, regression tests, additional exact slab cases and reproducible commands.

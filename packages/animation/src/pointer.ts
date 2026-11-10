@@ -546,6 +546,12 @@ function tint({ mats, atten, thickness, distance }: MaterialState): void {
   for (const m of mats) {
     if (!m.tint || !m.physical) continue;
     for (let c = 0; c < 3; c++) m.tint[c] = m.base[c] * m.physical[3] * attenuationPower(atten[c], depth);
+    if (m.attenuation) {
+      for (let c = 0; c < 3; c++) m.attenuation[c] = attenuationPower(atten[c], depth);
+      // Read after transmittance edits so the owner's derived cache observes the new source before retaining precision.
+      const depths = m.opticalDepth ?? (m.opticalDepth = [0, 0, 0]);
+      for (let c = 0; c < 3; c++) depths[c] = atten[c] === 1 || depth === 0 ? 0 : -Math.log(atten[c]) * depth;
+    }
     if (m.volume) {
       m.volume[0] = thickness;
       for (let c = 0; c < 3; c++) m.volume[1 + c] = attenuationPower(atten[c], 1 / distance);

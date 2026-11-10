@@ -6601,3 +6601,5 @@ The optional environment/prefiltered encoder refuses KTX2 key/value data above 4
 ### Indexed cache variant deletion (2026-11-10)
 
 The optional cache/eviction index coalesces removals in the same object-store transaction: each key is counted once, and byte/file totals are read and written once for the batch. AssetCache.delete(url) removes all Vary representations and associated records while preserving unrelated entries and exact usage. Repeated deletion does not subtract absent entries. Public interfaces and cache schema/version are unchanged. Evidence: packages/cache/test/eviction.test.js and the real IndexedDB evictionVariants browser case.
+
+Live volume materials (review5, 2026-11-10): attenuation edits invalidate parsed optical-depth caches per channel; replacing the array invalidates all channels. Equal numeric assignments are not observable, so replacing an underflowed zero with explicit opacity requires array replacement or explicit infinite optical depth. Pointer animation retains authored logarithmic precision. Exact slab evidence and the unchanged mesh-slab/range limitations are documented in live-volume-materials.md.

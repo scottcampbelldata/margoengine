@@ -24,7 +24,7 @@ await runSuite(
       const picture = await decodePNG(Buffer.from(row.png.split(',')[1], 'base64'));
       delete row.png;
       row.actual = Array.from(picture.data);
-      row.expected = [0.25, 0.5, 1].map((c) => Math.round(255 * encode(c ** (row.scale * row.thickness)))).concat(255);
+      row.expected = row.color.map((c) => Math.round(255 * encode(c ** (row.scale * row.thickness / row.distance)))).concat(255);
       assert.equal(picture.width, 1);
       assert.equal(picture.height, 1);
     }

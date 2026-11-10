@@ -18,6 +18,8 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { snapshot } from '../../../tests/support/pbr-snapshot.js';
 import { assertSameBytes, bytes } from '../../../tests/support/parse-worker.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
+import { extendedMaterials } from '../dist/extended.js';
+import { atlas } from '../../exporters/tests/material-animation-fixture.js';
 
 const asset = (name) => readFile(new URL(`../../../examples/assets/${name}`, import.meta.url));
 // A GLB split into .gltf JSON + external .bin (and the BIN chunk dropped), for the external-buffer path.
@@ -56,6 +58,15 @@ function editedGLB(edit) {
   return out;
 }
 const files = {
+  '/volume.glb': editedGLB((doc) => {
+    doc.images = [{ uri: `data:image/png;base64,${Buffer.from(atlas.image).toString('base64')}` }];
+    doc.textures = [{ source: 0 }];
+    doc.materials[0].pbrMetallicRoughness.baseColorTexture = { index: 0 };
+    doc.materials[0].extensions = {
+      KHR_materials_transmission: { transmissionFactor: 1 },
+      KHR_materials_volume: { thicknessFactor: 1200, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 1 },
+    };
+  }),
   // A POSITION accessor and its bufferView reaching past the end of the glTF buffer.
   '/past-end.glb': editedGLB((doc) => {
     const position = doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
@@ -292,6 +303,24 @@ test('progressive textured materials retain live wireframe through the internal 
       model.primitives.every((primitive) => primitive.material.wireframe === true),
       'a streamed texture must preserve the live wireframe choice',
     );
+  }));
+
+test('progressive factor-only materials preserve attenuation coherence before and after texture arrival', (t) =>
+  withGlobals(false, async () => {
+    const { engine } = await gpuEngine(),
+      load = loadGLTFProgressive(engine, base + '/volume.glb', { decoders: { materials: extendedMaterials } }),
+      model = await load.ready,
+      material = model.primitives[0].material;
+    t.after(() => engine.dispose());
+    assert.ok(material.maps.every((map) => !map));
+    material.attenuation[1] = 0.125;
+    assert.deepEqual(material.opticalDepth, [Math.log(4) * 1200, Math.log(8), 0]);
+    await load.complete;
+    const restored = model.primitives[0].material;
+    assert.ok(restored.maps.some(Boolean));
+    assert.deepEqual(restored.opticalDepth, [Math.log(4) * 1200, Math.log(8), 0]);
+    restored.attenuation[0] = 1;
+    assert.deepEqual(restored.opticalDepth, [0, Math.log(8), 0]);
   }));
 
 test('progressive wireframe replacement releases both edge and replacement resources after a disposal error', (t) =>

@@ -488,7 +488,9 @@ export function loadGLTFProgressive(
         stripped.set(
           m,
           Object.defineProperties(
-            { ...m, maps: m.maps.map(() => undefined) },
+            Object.assign(Object.create(Object.getPrototypeOf(m), Object.getOwnPropertyDescriptors(m)), {
+              maps: m.maps.map(() => undefined),
+            }),
             {
               side: Object.getOwnPropertyDescriptor(m, 'side')!,
               wireframe: {

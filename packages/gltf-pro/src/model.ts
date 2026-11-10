@@ -1014,7 +1014,7 @@ export interface PBRMaterial extends GLTFMaterial {
   tint?: number[];
   /** Volume attenuation at the thickness factor, for a tint draw that reads the rest from the surface (surfaceTintPBR). */
   attenuation?: number[];
-  /** Natural optical depth at mesh thickness, before world scaling. Parsed volumes retain this to avoid premature transmittance underflow. Default undefined derives it from attenuation. */
+  /** Natural optical depth at mesh thickness, before world scaling. Parsed volumes retain precision until an attenuation channel changes; replacing attenuation invalidates all channels. Default undefined derives it from attenuation. */
   opticalDepth?: number[];
   volume?: number[];
   renderState?: PBRRenderState;
@@ -1715,6 +1715,44 @@ export function textureTransform(x: TextureTransform = {}, texCoord = 0): number
 }
 // `extended`: decoders.materials (@margoengine/gltf-pro/extended), which reads iridescence, anisotropy and diffuse
 // transmission; without it they are ignored, as glTF allows for an optional extension.
+const volumeDepthKey = Symbol('volume-depth');
+interface VolumeDepthState {
+  depth?: number[];
+  source: number[];
+  samples: number[];
+}
+type VolumeMaterial = PBRMaterial & { [volumeDepthKey]: VolumeDepthState };
+// Shared accessors preserve the material record's stable shape. Descriptor copies carry the private cache too.
+const opticalDepthProperty: PropertyDescriptor = {
+  configurable: true,
+  enumerable: true,
+  get(this: VolumeMaterial): number[] | undefined {
+    const state = this[volumeDepthKey], source = this.attenuation;
+    if (state.depth && source) {
+      for (let c = 0; c < 3; c++) {
+        if (source !== state.source || source[c] !== state.samples[c])
+          state.depth[c] = source[c] === 1 ? 0 : -Math.log(source[c]);
+        state.samples[c] = source[c];
+      }
+      state.source = source;
+    }
+    return state.depth;
+  },
+  set(this: VolumeMaterial, value: number[] | undefined) {
+    const state = this[volumeDepthKey];
+    state.depth = value;
+    state.source = this.attenuation!;
+    state.samples = state.source?.slice() ?? [];
+  },
+};
+function retainOpticalDepth(material: PBRMaterial): PBRMaterial {
+  if (!material.attenuation) return material;
+  Object.defineProperty(material, volumeDepthKey, {
+    value: { depth: material.opticalDepth, source: material.attenuation, samples: material.attenuation.slice() },
+    configurable: true,
+  });
+  return Object.defineProperty(material, 'opticalDepth', opticalDepthProperty);
+}
 function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBRMaterial {
   def = extended?.convert?.(def) ?? def;
   const p = def.pbrMetallicRoughness ?? {},
@@ -1750,6 +1788,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
         ? Infinity
         : scalar(vo.attenuationDistance, Number.MIN_VALUE, Infinity, 'attenuation distance'),
     depth = thickness / distance;
+  const transmittance = transmission ? attenuation.map((c) => attenuationPower(c, depth)) : undefined;
   // Extended materials: thin film, anisotropy, diffuse transmission, bump or volume scatter in use; maps 13-20 and six more uniform rows.
   const x = extended?.parse(e),
     physical = !!(x || cc || tr || sh || sp || vo || e.KHR_materials_ior || e.KHR_materials_dispersion);
@@ -1775,7 +1814,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
   ].map((t) =>
     t?.extensions?.KHR_texture_transform === undefined ? t : { ...t, texCoord: textureCoordinates(t).texCoord },
   );
-  return {
+  return retainOpticalDepth({
     ...def,
     base,
     factors: [
@@ -1824,11 +1863,11 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
     tint: transmission
       ? base.slice(0, 3).map((v, i) => v * transmission * attenuationPower(attenuation[i], depth))
       : undefined,
-    attenuation: transmission ? attenuation.map((c) => attenuationPower(c, depth)) : undefined,
+    attenuation: transmittance,
     opticalDepth: transmission ? attenuation.map((c) => (c === 1 || depth === 0 ? 0 : -Math.log(c) * depth)) : undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
     volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
-  };
+  });
 }
 /** Main-thread packings per asset and primitive definition, kept as long as the asset is. */
 const assetPacks = new WeakMap<GLTFAsset, WeakMap<object, PreparedGeometry>>();
@@ -4599,9 +4638,10 @@ export class PBRModel implements EnginePlugin {
     // Physical rows follow 26 UV rows (42 for extended materials); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
-      const volume = surfaceTint(m), lanes = volume ? m.attenuation! : m.tint;
+      const volume = surfaceTint(m), lanes = volume ? m.attenuation! : m.tint,
+        depths = volume ? m.opticalDepth : undefined;
       for (let c = 0; c < 3; c++) {
-        const depth = volume ? (m.opticalDepth?.[c] ?? (lanes[c] === 1 ? 0 : -Math.log(lanes[c]))) : lanes[c];
+        const depth = volume ? (depths?.[c] ?? (lanes[c] === 1 ? 0 : -Math.log(lanes[c]))) : lanes[c];
         // An opaque channel is a limit, not an infinite shader operand (including at a grazing ray).
         v[c < 2 ? 98 + c : 102] = volume && depth === Infinity ? -1 : depth;
       }
