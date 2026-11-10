@@ -2700,3 +2700,5 @@ Batch 257 job 1: after npm run build:packages, run node --test --test-timeout=20
 ### Batch 239 job 3: terrain and imagery protocols
 
 Build packages and run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run packages/tiles/tests/tiles-browser.mjs under the shared GPU lock on WebGPU and with --compat. The imagery case checks ordered WMS/WMTS alpha composition and a Mercator terrain draw using the Apache-2.0 sample in examples/assets/terrain/NOTICE.md. The CPU tests append an extension-4 availability control to the real tile and prove unavailable children are never emitted/requested. No speed-phase benchmark is needed.
+
+Batch 253 keyboard labels: build packages/input, then node --test --test-timeout=30000 packages/input/test/layout.test.js. For native browser integration, run the package input-browser.mjs GPU fixture and --compat variant under a shared lock; the prompt matches the native Keyboard Map when exposed/allowed and the standard code label otherwise. Layout mocks assert AZERTY and QWERTZ independently of the development machine's layout.

@@ -138,3 +138,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 257 job 1): cover the generated worker/rpc alias with the worker RPC documentation.
 | @margoengine/tiles | tiles/imagery terrain source, Mercator/metadata availability, WMS/WMTS/XYZ layers, matrix configuration, opacity and source disposal | batch 239 job 3 |
 | margoengine | tiles/imagery generated optional re-export | batch 239 job 3 |
+| @margoengine/input | layout: KeyboardLabels refresh/label/change/error, map support and permissions fallback, race/cancellation/disposal, Unicode key prompts | batch-253 job 4 |
+| margoengine | Generated input/layout alias | batch-253 job 4 |

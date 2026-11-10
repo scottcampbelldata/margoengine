@@ -1398,6 +1398,10 @@
       "types": "./dist/input/lock.d.ts",
       "import": "./dist/input/lock.js"
     },
+    "./input/layout": {
+      "types": "./dist/input/layout.d.ts",
+      "import": "./dist/input/layout.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

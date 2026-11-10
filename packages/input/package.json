@@ -57,6 +57,10 @@
     "./lock": {
       "types": "./dist/lock.d.ts",
       "import": "./dist/lock.js"
+    },
+    "./layout": {
+      "types": "./dist/layout.d.ts",
+      "import": "./dist/layout.js"
     }
   },
   "files": [

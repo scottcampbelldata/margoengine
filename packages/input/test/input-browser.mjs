@@ -11,6 +11,15 @@ try {
     const { box } = await import('/packages/core/dist/extension.js');
     const { VectorInput, wasd } = await import('/packages/input/dist/vector.js');
     const { PointerLock } = await import('/packages/input/dist/lock.js');
+    const { KeyboardLabels } = await import('/packages/input/dist/layout.js');
+    const labels = new KeyboardLabels();
+    await labels.refresh();
+    const prompt = document.createElement('output');
+    prompt.dataset.keyPrompt = '';
+    prompt.textContent = labels.label({ type: 'key', code: 'KeyQ' });
+    document.body.append(prompt);
+    const mapped = labels.map?.get('KeyQ');
+    const expectedPrompt = mapped?.trim() ? (/^[a-z]$/.test(mapped) ? mapped.toUpperCase() : mapped) : 'Q';
     const canvas = document.createElement('canvas');
     canvas.width = 192;
     canvas.height = 128;
@@ -36,6 +45,8 @@ try {
       input,
       lock,
       error: null,
+      labels,
+      expectedPrompt,
       async tick() {
         lock.update();
         input.update();
@@ -50,6 +61,11 @@ try {
       });
     await window.inputCheck.tick();
   });
+  assert.equal(
+    await page.locator('[data-key-prompt]').textContent(),
+    await page.evaluate(() => window.inputCheck.expectedPrompt),
+    'prompt uses the native keyboard map where available and a physical-code label otherwise',
+  );
   const centroid = async () => {
     const image = await decodePNG(await page.locator('canvas').screenshot({ timeout: 10000 }));
     let count = 0,
@@ -86,6 +102,7 @@ try {
   assert.ok(Math.abs(reset - before) < 1, `release/key-up returns geometry: ${before} -> ${reset}`);
   await page.evaluate(() => {
     window.inputCheck.lock.dispose();
+    window.inputCheck.labels.dispose();
     window.inputCheck.input.dispose();
     window.inputCheck.engine.dispose();
   });
