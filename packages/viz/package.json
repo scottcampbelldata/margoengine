@@ -1707,6 +1707,10 @@
       "types": "./dist/sciviz/provenance.d.ts",
       "import": "./dist/sciviz/provenance.js"
     },
+    "./sciviz/amr": {
+      "types": "./dist/sciviz/amr.d.ts",
+      "import": "./dist/sciviz/amr.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

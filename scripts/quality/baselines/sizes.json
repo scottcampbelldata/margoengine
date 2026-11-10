@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15253594,
+  "total": 15284049,
   "history": [
     {
       "date": "2026-10-24",
@@ -7880,6 +7880,12 @@
       "commit": "30c8a02db",
       "reason": "Batch 179 provenance: 0 to 24854 B gzip, ceiling 25600 B, for portable numeric/GPU decoding, bounded history and integrity metadata containers. Core and stage remain 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "401c2e032",
+      "reason": "AMR optional entry: new 0 to 30067 B gzip, ceiling 30374 B. Native AMReX/Enzo/FLASH readers, HDF5, exact masks, k-d ray casting and analysis form one coherent entry; splitting adds mandatory companion wiring and fragments resource lifetime. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8633,7 +8639,7 @@
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
     "@margoengine/react": 10888,
-    "@margoengine/react-kit": 414,
+    "@margoengine/react-kit": 485,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/controls": 4346,
@@ -8736,6 +8742,7 @@
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 61750,
+    "@margoengine/sciviz/amr": 30374,
     "@margoengine/sciviz/annotate": 7680,
     "@margoengine/sciviz/atmosphere": 35321,
     "@margoengine/sciviz/bricks": 29625,
@@ -8763,7 +8770,7 @@
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
     "@margoengine/sciviz/geo-time": 41056,
-    "@margoengine/sciviz/geo-vector": 27652,
+    "@margoengine/sciviz/geo-vector": 27662,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 25036,
     "@margoengine/sciviz/grids": 27050,

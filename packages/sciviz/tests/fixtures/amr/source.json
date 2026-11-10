@@ -1,0 +1,82 @@
+{
+  "dataset": "Nyx pure hydro Sedov, nyx_sedov_plt00086",
+  "source": "https://yt-project.org/data/nyx_sedov_plt00086.tgz",
+  "catalogue": "https://yt-project.org/data/",
+  "permission": "Publisher makes these datasets publicly available for experimentation and testing. This demonstration and fixtures use that express purpose grant; no CC0 or unrestricted redistribution licence is asserted.",
+  "attribution": "Nyx collaboration, hosted by the yt Project",
+  "time": 0.01,
+  "files": {
+    "enzo-fields.h5": {
+      "bytes": 12056,
+      "sha256": "11ef49effc2f455679eb965ca6e271336972ac97df8be4b716e5cfd081f5b723"
+    },
+    "enzo-hierarchy.h5": {
+      "bytes": 10200,
+      "sha256": "b74224800a91065f40bbf14570c3b438b3f750663e2b7dbfb3abdf28f8627719"
+    },
+    "enzo.hierarchy": {
+      "bytes": 322,
+      "sha256": "2f2ef7ec27ae6f78a839a149e654d2a668facffcc764133d7361bdd40b508eb1"
+    },
+    "expected.json": {
+      "bytes": 6149,
+      "sha256": "d7c3dda00bb714ae16fdeaa225f87a4278b0bbea38c87b978b90f5fbf7e8519d"
+    },
+    "flash.h5": {
+      "bytes": 8472,
+      "sha256": "dc3a17090b5ca24125ba5c5e74ee5426f0edc7c1342b407d6c3f33926051f329"
+    },
+    "nyx/comoving_a": {
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    "nyx/Header": {
+      "bytes": 950,
+      "sha256": "a55035cea85e603b9e6dae42243a84dfb54aca7334a49763fbfb470e8a4a0d39"
+    },
+    "nyx/job_info": {
+      "bytes": 2723,
+      "sha256": "aaf3ab30947384c73dd2b842225c50a7462e32e062e29ff048ef958448c85627"
+    },
+    "nyx/Level_0/Cell_D_00000.bin": {
+      "bytes": 8912986,
+      "sha256": "97277ffc1d6159974697cfdc1efc1a82c07d2f30f2580348b2c6221dc4fa55d7"
+    },
+    "nyx/Level_0/Cell_H": {
+      "bytes": 1667,
+      "sha256": "614da15bca0db3bf1ac10335029abdeebf6b21c52fb11daf2ead5bdc636dcd69"
+    },
+    "nyx/Level_1/Cell_D_00000.bin": {
+      "bytes": 14032057,
+      "sha256": "1c1b7b58719cec6721e701350ac4f7fa82ead02a23324a970b6dd5392f27a82b"
+    },
+    "nyx/Level_1/Cell_H": {
+      "bytes": 21429,
+      "sha256": "272778cd9a30771cc49ba6f7f40009c1c0e3144de8c34728a84e192c40961218"
+    },
+    "nyx/the_parameters": {
+      "bytes": 665,
+      "sha256": "57974114491565a28c63381d23623fe7808522d42845fd523031c0a4254a4f97"
+    },
+    "osc-cylinder/Header": {
+      "bytes": 1200987,
+      "sha256": "34bf0180555c5516784f7e6401c72064b7dbf2e3a67eb7fbae9cf6fe81674294"
+    },
+    "osc-cylinder/region-0.f64.gz": {
+      "bytes": 995463,
+      "sha256": "2cf61858a5cb8357c736f82f096eb54629c5a3e012197a436851e576e69f86c6"
+    },
+    "osc-cylinder/region-1.f64.gz": {
+      "bytes": 156152,
+      "sha256": "2bfea4e0e99d13a764e977664ee09ce635c34222530a44e8287d174d4f6e84d2"
+    },
+    "osc-cylinder/region-2.f64.gz": {
+      "bytes": 355361,
+      "sha256": "4ad5ec4cdd8d5e5e8dbbf6e8dc331233929c59e57b259635fd385e9a0415f24f"
+    },
+    "osc-cylinder/region-3.f64.gz": {
+      "bytes": 1175467,
+      "sha256": "c4cd1a450254bb57a5b7b8a1490aba9a70c5c513cd1f88aa0e7fa48de74b41f3"
+    }
+  }
+}

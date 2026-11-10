@@ -279,6 +279,10 @@
     "./provenance": {
       "types": "./dist/provenance.d.ts",
       "import": "./dist/provenance.js"
+    },
+    "./amr": {
+      "types": "./dist/amr.d.ts",
+      "import": "./dist/amr.js"
     }
   },
   "files": [
@@ -341,6 +345,7 @@
     "test:browser:colors": "node scripts/browser-root.mjs tests/colors-browser.mjs",
     "test:browser:pick-gpu": "node scripts/browser-root.mjs tests/pick-gpu-browser.mjs",
     "test:browser:annotate": "node scripts/browser-root.mjs tests/annotate-browser.mjs",
-    "test:browser:provenance": "node scripts/browser-root.mjs tests/provenance-browser.mjs"
+    "test:browser:provenance": "node scripts/browser-root.mjs tests/provenance-browser.mjs",
+    "test:browser:amr": "node scripts/browser-root.mjs tests/amr-browser.mjs"
   }
 }

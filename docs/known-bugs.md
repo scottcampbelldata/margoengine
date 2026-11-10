@@ -4998,3 +4998,6 @@ Review 3 SV4 (61928c3a0): bindTransfer checks signal before its initial apply(),
 
 
 - Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.
+Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
+
+Batch 176 inspection: node scripts/gpu-package-tests.mjs --only=sciviz --no-build --list fails before selection because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script. Cause: global discovery validates an unregistered upstream stage test before applying --only. Outside this job; the AMR suite runs directly with the shared GPU lock on both backends.

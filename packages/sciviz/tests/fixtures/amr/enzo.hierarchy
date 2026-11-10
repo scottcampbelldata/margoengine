@@ -1,0 +1,15 @@
+Grid = 1
+GridDimension = 4 4 4
+GridStartIndex = 1 1 1
+GridEndIndex = 2 2 2
+GridLeftEdge = 0 0 0
+GridRightEdge = 1 1 1
+BaryonFileName = enzo-fields.h5
+
+Grid = 2
+GridDimension = 2 2 2
+GridStartIndex = 0 0 0
+GridEndIndex = 1 1 1
+GridLeftEdge = 0 0 0
+GridRightEdge = 0.5 0.5 0.5
+BaryonFileName = enzo-fields.h5

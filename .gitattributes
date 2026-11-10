@@ -93,3 +93,6 @@ examples/assets/sciviz/geo-vector/*.geojson text eol=lf
 examples/assets/sciviz/geo-vector/*.json text eol=lf
 examples/assets/sciviz/geo-time/*.json text eol=lf
 packages/sciviz/tests/fixtures/sgp4-vallado.json text eol=lf
+
+# Native AMR headers and hash-pinned numerical samples retain exact bytes.
+packages/sciviz/tests/fixtures/amr/** -text

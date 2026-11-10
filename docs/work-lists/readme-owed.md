@@ -1276,3 +1276,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/react-kit: standalone install, root and member subpaths, model-loading entry, optional peers, and adding a package at the shared release version.
 
 - margoengine: lead with core/stage alone, domain install profiles, or the full umbrella; preserve legacy kit subpaths.
+
+- @margoengine/sciviz, batch 176 job 4: document /amr block snapshots/masks, AMReX/Enzo/FLASH readers, direct k-d volume, slices, contours and level outlines with defaults and cancellation.
+- margoengine, batch 176 job 4: document the generated /sciviz/amr alias.
+- @margoengine/viz, batch 176 job 4: document the generated /sciviz/amr install-profile alias.

@@ -1,0 +1,94 @@
+===============================================================================
+ Nyx Job Information
+===============================================================================
+inputs file: inputs.3d.sph
+
+number of MPI processes: 1
+
+CPU time used since start of simulation (CPU-hours): 0.0155041
+
+===============================================================================
+ Plotfile Information
+===============================================================================
+output data / time: Mon Apr  3 11:22:37 2017
+output dir:         /home/zingale/development/Nyx/Exec/HydroTests/Sedov
+
+
+===============================================================================
+ Cosmology Information
+===============================================================================
+Omega_m (comoving):      1
+Omega_lambda (comoving): 0
+h (comoving):            0
+
+
+===============================================================================
+ Build Information
+===============================================================================
+build date:    2017-04-03 09:25:51.056713
+build machine: Linux inf.astro.sunysb.edu 4.9.13-101.fc24.x86_64 #1 SMP Tue Mar 7 23:48:32 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux
+build dir:     /home/zingale/development/Nyx/Exec/HydroTests/Sedov
+BoxLib dir:    /home/zingale/development/BoxLib/
+
+COMP:          gcc
+COMP version:  6.3.1
+
+Nyx    git hash: 16.10-22-g5e000a3
+BoxLib git hash: 16.12.2-33-gcdc790a
+
+
+===============================================================================
+ Grid Information
+===============================================================================
+ level: 0
+   number of boxes = 1
+   maximum zones   = 32 32 32 
+
+ level: 1
+   number of boxes = 13
+   maximum zones   = 64 64 64 
+
+ Boundary conditions
+   -x: outflow
+   +x: outflow
+   -y: outflow
+   +y: outflow
+   -z: outflow
+   +z: outflow
+
+
+===============================================================================
+ Inputs File Parameters
+===============================================================================
+max_step = 5000
+stop_time = 0.01
+geometry.is_periodic = 0 0 0
+geometry.coord_sys = 0
+geometry.prob_lo = 0 0 0
+geometry.prob_hi = 1 1 1
+amr.n_cell = 32 32 32
+nyx.lo_bc = 2 2 2
+nyx.hi_bc = 2 2 2
+nyx.do_hydro = 1
+nyx.do_react(nvals = 1)  :: [0]
+nyx.ppm_type = 0
+nyx.initial_z = 0.
+nyx.dt_cutoff = 5.e-20
+nyx.cfl = 0.5
+nyx.init_shrink = 0.01
+nyx.change_max = 1.1
+nyx.sum_interval = 1
+nyx.v = 1
+amr.v = 1
+amr.max_level = 0
+amr.ref_ratio = 2 2 2 2
+amr.regrid_int = 2
+amr.blocking_factor = 4
+amr.max_grid_size = 32
+amr.check_file = chk
+amr.check_int = 200
+amr.plot_file = plt
+amr.plot_int = 200
+amr.derive_plot_vars = ALL
+amr.probin_file = probin.3d.sph
+amr.max_level = 1
