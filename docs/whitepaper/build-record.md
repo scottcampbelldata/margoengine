@@ -3259,14 +3259,18 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Erosion in the relief | SKIPPED | | `/erosion` exists (`erode`, `erodeRelief`) | |
-| 2 | Flowing rivers in the view | WAITS for lane J batch 66 | | | |
+| 2 | Flowing rivers in the view | DONE (list 2, Mac lane K) | see note | `/view` `water.flow`, `/rivers` `riverSources` | |
 | 3 | Road and settlement layout | DONE | `b4b690d1b` | `/settlements` (`layoutSettlements`) | LIM-524 |
 | 4 | Rule graph for placement | DONE | `f564b5990` | `/graph` (`definePlacementGraph`, `evaluateGraph`) | LIM-539 |
 | 5 | Ecosystem growth simulation | DONE | `5c20844dc` | `/ecosystem` (`growEcosystem`, `plantsFromTile`) | LIM-544 |
 | 6 | Smaller worker file | PARTIAL | this commit | `dist/workers/biomes.js` (no new entry) | none |
 
-- **Job 2:** waits for lane J batch 66 jobs 2 and 8 (water flow maps and flowing rivers): water has no flow source or
-  flow map yet, so the view has nothing to drive. Redo it as a flow option of `/view` once those land.
+- **Job 2:** waited for batch 66 jobs 2 and 8, then done on the M6 Mac mini (2026-11-10) after water/rivers landed
+  (f677f5975): `water: { rivers, flow: true | { discharge, substeps } }` attaches water/rivers (loaded with import()
+  only when set) with one inflow per river line at its high end (`riverSources`). Proof: the biomes water GPU check on
+  Metal WebGPU (90 frames: the still river is bit-identical, the flowing one changes 3,646 cells and holds 61 m^3 more
+  than the same flow with no inflow, 60 m^3 expected). It also fixed water/rivers: a source narrower than a cell off
+  its centre fed nothing (regression in packages/water/test/rivers.test.js and rivers.browser.mjs). Row 63 is done.
 - **Built from:** least-cost roads on the site grid (S73); a topological-order density graph (S77); an individual
   forest gap model after Botkin, Janak and Wallis 1972 and Pacala et al. 1996, with shading by taller overlapping
   crowns only (Weiner 1990, Bella 1971) and Clark's 2Dt dispersal kernel (Clark et al. 1999) (S80). Rows in

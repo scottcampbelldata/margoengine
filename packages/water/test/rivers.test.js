@@ -91,3 +91,23 @@ test('the surface-driven coast pipe exceeds the Courant bound over the same fall
   // Water's own pipe accelerates with the full 10 m drop; the reconstructed pipe above stays within 0.5 / dt.
   assert.ok(peak > 0.5 / dt, `surface pipe peak ${peak}`);
 });
+
+test('a source narrower than a cell feeds the one cell under it', () => {
+  // Regression (batch 63 job 2): radius 0 off a cell centre gave an empty footprint, so the default source added nothing.
+  for (const [position, radius, cell] of [
+    [[5.3, 3.7], 0, 3 * 24 + 5],
+    [[5.3, 3.7], 0.2, 3 * 24 + 5],
+    [[5.5, 3.5], 0, 3 * 24 + 5],
+  ]) {
+    const m = fall(),
+      dt = 1 / 240;
+    riverStep(m, dt, [{ position, discharge: 6, radius }]);
+    const fed = Array.from(m.depth.keys()).filter((i) => m.depth[i] > 0);
+    assert.deepEqual(fed, [3 * 24 + 5], `${position} radius ${radius}`);
+    assert.ok(Math.abs(m.depth[3 * 24 + 5] - 6 * dt) < 1e-12);
+  }
+  // A source off the map feeds nothing.
+  const m = fall();
+  riverStep(m, 1 / 240, [{ position: [-50, 4], discharge: 6 }]);
+  assert.ok(m.depth.every((d) => d === 0));
+});

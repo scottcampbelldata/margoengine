@@ -4968,3 +4968,7 @@ Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative del
 ### Open: Water's own coast flow is unbounded on steep falls (list 3 batch 66 job 8)
 
 Water's built-in surface-driven pipe drives each pipe with the full surface difference, so water over a 10 m fall reaches 240 m/s (one cell per step, 1/dt at 240 steps per second) and can overshoot the Courant bound. It stays as it is for coasts and gentle beds; for rivers over falls and steep chutes attach @margoengine/water/rivers, which caps the same fall at 6.75 m/s. Regression: packages/water/test/rivers.test.js "the surface-driven coast pipe exceeds the Courant bound over the same fall" records both.
+
+### Fixed: water/rivers sources narrower than a cell fed nothing (list 3 batch 63 job 2)
+
+A Rivers source with radius 0 (the default) or below half a cell, off a cell centre, had an empty footprint, so it added no water. The footprint now always includes the cell under the position (a position off the map still feeds nothing), in the shader and the float64 model. Regression: packages/water/test/rivers.test.js "a source narrower than a cell feeds the one cell under it", and a radius-0 source in rivers.browser.mjs.

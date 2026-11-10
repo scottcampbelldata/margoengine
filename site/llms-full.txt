@@ -8844,6 +8844,21 @@ Rivers options: substeps integer 1..64 (default 8); maxFroude 0.1..20 (default 4
 ### Rain ripples (batch 67 job 3)
 water/rain WaterRain draws rain rings on one Water: rain 0 to 1 (or a weather's, read every frame from `rain` or a WeatherMachine's `state.rain`), cell 0.05 to 5 m (default 0.4), lifetime 0.1 to 10 s (default 0.8), strength 0 to 1 (default 0.35). At most one ring per cell in each of three grids at a time; a ring spreads to a quarter of its cell. Rings fade out where a pixel covers more than 0.2 of a cell. Rings shade only (normals); optional splashes put real drops into a Ripples field: rate 0 to 1000 per second at full rain (default 20), at most 32 a frame, inside a square of side area (default 16 m) around the camera, radius default 0.5 m and depth default 0.02 m. The splash radius must cover one cell of the field, or Ripples rejects the drop when the frame renders. One rain per Water. Optional entry, so the water root entry does not grow.
 
+## Astronomy and microscopy import, batch 176 job 3
+- Optional sciviz/fits reads primary/IMAGE HDUs, all FITS BITPIX types, BSCALE/BZERO/BLANK and BINTABLE L/X/B/I/J/K/A/E/D/C/M plus single P/Q variable descriptors. Physical integers stay exact for unscaled 64-bit values; rendering explicitly converts to floating point. Cells retain vector/complex arrays, nulls, dimensions and units. ASCII tables, random groups, compressed-image table conventions and multiple P/Q descriptors per cell reject explicitly.
+- WCS retains primary or A..Z axes, units, CRPIX/CRVAL, CD or PC/CDELT and legacy CROTA, with zero-based pixel input. Linear axes, SIP forward polynomials and TAN/SIN/ARC/STG/ZEA sky projections have independent WCSLIB tests. Other projection/rotation/spectral algorithms are outside this entry's current world() projection support; original cards and linear metadata remain available. No all-projections claim.
+- sciviz/mrc reads MRC/CCP4 little/big endian modes 0/1/2/3/4/6/12/101, complex selection, labels and opaque extended headers, MAPC/MAPR/MAPS, starts, origin and triclinic unit-cell geometry. Storage order is never silently flipped; file handedness cannot be inferred from this standard. Vendor extended headers and crystallographic symmetry operators are retained as bytes rather than interpreted. ORIGIN is applied as the translation plus the indexed starts; Fourier phase origins remain metadata, not an inverse FFT.
+- sciviz/ometiff reads classic/BigTIFF Z/C/T stacks through decoders/tiff. Quantitative uint8/int8/uint16/int16/uint32/int32/float32/float64 samples remain unscaled. LZW, deflate, PackBits and uncompressed tiles/strips, chunky/planar samples and integer/floating predictors are supported. Explicit TiffData, series selection and multi-file FileName/UUID resolution are supported; unspecified planes reject on access. Metadata and individual planes are lazy after bounded full-file acquisition. SubIFD pyramids, BinaryOnly companion XML, JPEG/JPEG2000 microscopy payloads and vendor annotations are outside the requested lossless stack projection. The real IDR fixture is an explicitly identified, native-pixel, lossless crop of the original JPEG2000 image, not a claim that the runtime decodes JPEG2000 TIFF.
+- Default per-file/per-read maxBytes is 64 MiB; TIFF default maxPixels is 2^26 and safe integer 64-bit offsets are required. The OME loader bounds each volume by maxBytes and planes conservatively by maxBytes/8 pixels. FITS and MRC accept gzip; FITS also bzip2. Non-axis-aligned/celestial world() coordinates are preserved exactly within supported transforms; generic grid/volume helpers display an axis-aligned envelope of the storage grid, without physical resampling. Readers retain full precision independently of Float32 renderer grids. Scientific volume helpers do not imply celestial reprojection or an affine/sheared volume renderer.
+
+Scientific entry gzip (bare package imports external): TIFF 4401 -> 6064 B; new sciviz/fits 4908 B, /mrc 2906 B, /ometiff 3207 B. Their optional budgets are raised in the same change. Quantitative BigTIFF addressing, lazy pages, signed/floating samples and full plane mappings justify these bytes; splitting TIFF would duplicate directory or codec infrastructure. Core + stage root remains 24209 B.
+
+Landing accounting for upstream tiled export (batch 178): shared tile-aware line-batch uniforms also grew optional lines/debug from 9549 to 9874 B gzip, above its old 9836 B ceiling. The ceiling is 10171 B; tile-aware debug geometry is retained. A split would duplicate batch viewport uniforms and shader state. No additional line source change or core/stage bytes.
+
+### List 3 batch 63 job 2: flowing rivers in the view
+
+BiomeView `water.flow`: true or { discharge 0..100000 m^3/s per line (default 20), substeps integer 1..64 (default 8) }; needs river lines (`rivers`). Only the first 16 lines get an inflow (water/rivers takes at most 16 sources), each at its higher end over one view texel or the coast cell under it. With flow the filled channel also drains toward the sea, so a river with too little discharge empties; steep-bed limits are water/rivers' (list 3 batch 66 job 8).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -13816,6 +13831,10 @@ Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative del
 ### Open: Water's own coast flow is unbounded on steep falls (list 3 batch 66 job 8)
 
 Water's built-in surface-driven pipe drives each pipe with the full surface difference, so water over a 10 m fall reaches 240 m/s (one cell per step, 1/dt at 240 steps per second) and can overshoot the Courant bound. It stays as it is for coasts and gentle beds; for rivers over falls and steep chutes attach @margoengine/water/rivers, which caps the same fall at 6.75 m/s. Regression: packages/water/test/rivers.test.js "the surface-driven coast pipe exceeds the Courant bound over the same fall" records both.
+
+### Fixed: water/rivers sources narrower than a cell fed nothing (list 3 batch 63 job 2)
+
+A Rivers source with radius 0 (the default) or below half a cell, off a cell centre, had an empty footprint, so it added no water. The footprint now always includes the cell under the position (a position off the map still feeds nothing), in the shader and the float64 model. Regression: packages/water/test/rivers.test.js "a source narrower than a cell feeds the one cell under it", and a radius-0 source in rivers.browser.mjs.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

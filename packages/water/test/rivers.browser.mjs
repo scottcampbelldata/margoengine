@@ -13,7 +13,11 @@ const width = 24,
 for (let z = 0; z < height; z++)
   for (let x = 0; x < width; x++)
     ground[z * width + x] = (z === 0 || z === height - 1 ? 30 : 0) + (x < 12 ? 20 : 10 - (x - 12) * 0.5);
-const sources = [{ position: [9.5, 4], discharge: 6, radius: 1 }],
+// The second source is narrower than a cell and off its centre: it must feed the cell under it (batch 63 job 2 fix).
+const sources = [
+    { position: [9.5, 4], discharge: 6, radius: 1 },
+    { position: [5.3, 3.7], discharge: 1 },
+  ],
   frames = 240,
   substeps = 8;
 const model = riverModel({ ground, width, height, cell: 1 });

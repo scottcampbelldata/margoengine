@@ -70,6 +70,18 @@ await runSuite(
     assert.ok(lakes.lake.share > 0.01, `lake pixels from above: ${lakes.lake.share}`);
     assert.ok(lakes.river > 0.002, `hydrology river pixels from above: ${lakes.river}`);
     assert.deepEqual(pageErrors, []);
+    // List 3 batch 63 job 2: with flow the river moves (cells change over 3 s, the inflow keeps more water than none); without
+    // flow it stands.
+    const flowing = r.flowing;
+    assert.deepEqual(flowing.errors, []);
+    assert.equal(flowing.still.changed, 0, `still river cells that changed: ${flowing.still.changed}`);
+    assert.ok(flowing.moving.changed > 10, `flowing river cells that changed by over 1 cm: ${flowing.moving.changed}`);
+    assert.ok(flowing.unfed.changed > 10, `river cells that drained without inflow: ${flowing.unfed.changed}`);
+    // 3 s of 20 m^3/s per line is 60 m^3 per line; volumes are in m^3.
+    assert.ok(
+      flowing.moving.volume[1] - flowing.unfed.volume[1] > 30,
+      `the inflow adds water: ${flowing.moving.volume[1]} m^3 against ${flowing.unfed.volume[1]} m^3 without it`,
+    );
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-water-check.json', JSON.stringify({ hardware, result: r }, null, 1));
     console.log(

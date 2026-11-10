@@ -10,7 +10,7 @@ import { queryStates, riverKernels, type RiverKernels } from './query-state.js';
 import { fault, rangeError } from '../../shared/errors.js';
 
 /** A square inflow footprint: `discharge` cubic metres per second spread over the cells whose centres lie within
- * `radius` metres (per axis) of `position`. */
+ * `radius` metres (per axis) of `position`, and always the cell under `position`; a position off the map feeds nothing. */
 export interface RiverSource {
   /** World [x, z] in metres, finite. */
   position: readonly [number, number];
@@ -57,7 +57,8 @@ const inflow = `
 fn inflow(p:vec2i,size:vec2i)->f32 {
  let cell=frame.coast.zw/vec2f(size);var rate=0.0;
  for(var i=0u;i<u32(sources[0].x);i++){let s=sources[i+1u];
-  let lo=max(ceil((s.xy-s.w-frame.coast.xy)/cell-0.5),vec2f(0));let hi=min(floor((s.xy+s.w-frame.coast.xy)/cell-0.5),vec2f(size-1));
+  let c=floor((s.xy-frame.coast.xy)/cell);
+  let lo=max(min(ceil((s.xy-s.w-frame.coast.xy)/cell-0.5),c),vec2f(0));let hi=min(max(floor((s.xy+s.w-frame.coast.xy)/cell-0.5),c),vec2f(size-1));
   let at=vec2f(p);if(all(at>=lo)&&all(at<=hi)){rate+=s.z/((hi.x-lo.x+1.0)*(hi.y-lo.y+1.0)*cell.x*cell.y);}
  }return rate;
 }`;

@@ -184,6 +184,12 @@ export type BiomeWaterSettings = Omit<
   readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];
   /** `'auto'`: still lakes at the fill level of the world's hydrology pits (`lakeLevels`). Default none. */
   readonly lakes?: 'auto' | false;
+  /**
+   * Rivers that flow downstream instead of standing still (`@margoengine/water/rivers`, loaded with import() only when
+   * set): `true`, or the volume each river line takes in at its higher end, 0..100000 m^3/s (default 20), and the
+   * solver substeps per frame (default 8). Applies to the first 16 lines. Needs `rivers`. Default false: still water.
+   */
+  readonly flow?: boolean | { readonly discharge?: number; readonly substeps?: number };
 };
 
 /** What `BiomeViewOptions.shadows` needs: a `Shadows` (`@margoengine/shadows`), of which only `add` is used. */
@@ -736,6 +742,7 @@ export class BiomeView implements Disposable {
   #objects?: import('@margoengine/biomes/objects').BiomeObjects;
   #water?: Water;
   #river?: { dispose(): void };
+  #rivers?: { dispose(): void };
   #disposed = false;
 
   private constructor(
@@ -906,7 +913,21 @@ export class BiomeView implements Disposable {
       sky = options.sky;
     if (water !== true && water !== false && water !== 'auto' && (typeof water !== 'object' || water === null))
       throw typeError("BiomeView water must be true, false, 'auto' or Water settings", 'biomes');
-    const { rivers, lakes, ...waterSettings } = typeof water === 'object' ? water : ({} as BiomeWaterSettings);
+    const { rivers, lakes, flow, ...waterSettings } = typeof water === 'object' ? water : ({} as BiomeWaterSettings);
+    if (flow !== undefined && typeof flow !== 'boolean' && (typeof flow !== 'object' || flow === null))
+      throw typeError('BiomeView water flow must be true, false or { discharge, substeps }', 'biomes');
+    const discharge = typeof flow === 'object' ? (flow.discharge ?? 20) : 20,
+      substeps = typeof flow === 'object' ? flow.substeps : undefined;
+    if (
+      !Number.isFinite(discharge) ||
+      discharge < 0 ||
+      discharge > 100000 ||
+      (substeps !== undefined && (!Number.isInteger(substeps) || substeps < 1 || substeps > 64))
+    )
+      throw rangeError(
+        'BiomeView water flow needs discharge 0..100000 m^3/s and substeps an integer 1..64 (default 20 and 8)',
+        'biomes',
+      );
     if (
       (rivers !== undefined && rivers !== 'auto' && rivers !== 'hydrology' && !Array.isArray(rivers)) ||
       (lakes !== undefined && lakes !== 'auto' && lakes !== false)
@@ -1008,10 +1029,24 @@ export class BiomeView implements Disposable {
           ...(sky ? { reflection: () => sky.reflectionTexture, lights: sky.lights } : {}),
           ...waterSettings,
           ...river?.options,
+          ...(flow && river?.lines.length ? { still: false } : {}),
           size: [side(x0, x1), side(z0, z1)],
           height: sea,
           horizon: true,
         });
+      if (flow && river?.lines.length && view.#water && !view.#disposed) {
+        const [{ Rivers }, { riverSources }] = await Promise.all([
+            import('@margoengine/water/rivers'),
+            import('@margoengine/biomes/rivers'),
+          ]),
+          cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth); // float division: metres per cell
+        // dispose() may have run while the solver loaded; the water it disposed takes no Rivers.
+        if (!view.#disposed)
+          view.#rivers = Rivers.attach(view.#water, {
+            sources: riverSources(river.lines, (x, z) => world.heightAt(x, z), discharge, cell).slice(0, 16),
+            ...(substeps !== undefined ? { substeps } : {}),
+          });
+      }
     }
     if (options.signal?.aborted) {
       view.dispose();
@@ -1584,6 +1619,7 @@ export class BiomeView implements Disposable {
     if (this.#name) this.#engine.removePlugin(this.#name);
     this.terrain.dispose();
     this.#objects?.dispose();
+    this.#rivers?.dispose();
     this.#water?.dispose();
     this.#river?.dispose();
     this.#placement?.dispose();

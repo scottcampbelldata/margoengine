@@ -158,7 +158,10 @@ class Heap {
 
 function check(world: SettlementWorld, o: SettlementOptions) {
   if (!world || typeof world.heightAt !== 'function' || !Array.isArray(world.bounds) || world.bounds.length !== 4)
-    throw typeError('layoutSettlements needs a world with bounds [x0, z0, x1, z1] and heightAt(x, z), such as a BiomeWorld', 'biomes');
+    throw typeError(
+      'layoutSettlements needs a world with bounds [x0, z0, x1, z1] and heightAt(x, z), such as a BiomeWorld',
+      'biomes',
+    );
   const [x0, z0, x1, z1] = world.bounds;
   if (![x0, z0, x1, z1].every(finite) || !(x1 > x0) || !(z1 > z0))
     throw rangeError('layoutSettlements needs finite world bounds with x1 > x0 and z1 > z0', 'biomes');
@@ -173,7 +176,8 @@ function check(world: SettlementWorld, o: SettlementOptions) {
       !o.sites.every((p) => Array.isArray(p) && p.length === 2 && inRange(p[0], x0, x1) && inRange(p[1], z0, z1)))
   )
     throw bad('sites list', 'up to 64 [x, z] points in metres inside the world bounds');
-  if (o.spacing !== undefined && !inRange(o.spacing, 50, 100000)) throw bad('spacing', 'a number of metres, 50..100,000');
+  if (o.spacing !== undefined && !inRange(o.spacing, 50, 100000))
+    throw bad('spacing', 'a number of metres, 50..100,000');
   if (o.houses !== undefined && !int(o.houses, 0, 256)) throw bad('houses count', 'an integer 0..256');
   if (o.cell !== undefined && !inRange(o.cell, 2, 256)) throw bad('cell', 'a number of metres, 2..256');
   if (o.maxGrade !== undefined && !inRange(o.maxGrade, 0.02, 1)) throw bad('maxGrade', 'a rise over run, 0.02..1');
@@ -397,7 +401,10 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
         links.push([a, b]);
         for (let s = 0; s < v; s++)
           for (let t = 0; t < v; t++) {
-            const via = Math.min(way[s * v + a] + d2(a, b) + way[b * v + t], way[s * v + b] + d2(a, b) + way[a * v + t]);
+            const via = Math.min(
+              way[s * v + a] + d2(a, b) + way[b * v + t],
+              way[s * v + b] + d2(a, b) + way[a * v + t],
+            );
             if (via < way[s * v + t]) way[s * v + t] = via;
           }
       }
@@ -510,7 +517,8 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
         return true;
       }) &&
       rays.every(
-        (ray, j) => j === skip || ray.along || segment2(x, z, cx, cz, cx + ray.ux * radius, cz + ray.uz * radius) >= keep * keep,
+        (ray, j) =>
+          j === skip || ray.along || segment2(x, z, cx, cz, cx + ray.ux * radius, cz + ray.uz * radius) >= keep * keep,
       );
     rays.forEach(({ ux, uz, along, keep }, j) => {
       let end = 0;
@@ -539,7 +547,13 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
             floor = world.heightAt(hx, hz);
           if ((Math.max(...ys, floor) - Math.min(...ys, floor)) / Math.max(w, depth) > siteGrade) continue; // float division: grade over the lot
           const reach = Math.sqrt(w * w + depth * depth) / 2 + 1;
-          if (houses.some((o) => (o.centre[0] - hx) ** 2 + (o.centre[1] - hz) ** 2 < (reach + Math.sqrt(o.size[0] ** 2 + o.size[1] ** 2) / 2) ** 2))
+          if (
+            houses.some(
+              (o) =>
+                (o.centre[0] - hx) ** 2 + (o.centre[1] - hz) ** 2 <
+                (reach + Math.sqrt(o.size[0] ** 2 + o.size[1] ** 2) / 2) ** 2,
+            )
+          )
             continue;
           const house: House = { centre: [hx, hz], size: [w, depth], along: [ux, uz], floor, corners };
           mine.push(house);
@@ -547,7 +561,14 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
           end = t + w / 2;
         }
       // A lane along a road is the road itself; the others run from the centre past their last house.
-      if (end > 0 && !along) lanes.push({ ...lane, points: [[cx, cz], [cx + ux * (end + 4), cz + uz * (end + 4)]] });
+      if (end > 0 && !along)
+        lanes.push({
+          ...lane,
+          points: [
+            [cx, cz],
+            [cx + ux * (end + 4), cz + uz * (end + 4)],
+          ],
+        });
     });
     villages.push({ centre: [cx, cz], height: h[c], radius, houses: mine });
   });
@@ -560,7 +581,13 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
 }
 
 /** Whether a road line leaves the village `(cx, cz)` in the direction `(ux, uz)`. */
-function dirsMatch(line: readonly (readonly [number, number])[], cx: number, cz: number, ux: number, uz: number): boolean {
+function dirsMatch(
+  line: readonly (readonly [number, number])[],
+  cx: number,
+  cz: number,
+  ux: number,
+  uz: number,
+): boolean {
   for (const [e, next] of [
     [line[0], line[1]],
     [line[line.length - 1], line[line.length - 2]],

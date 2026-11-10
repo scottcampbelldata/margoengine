@@ -1213,3 +1213,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 176 job 3): document /fits images/cubes/binary cells/WCS and scaling, /mrc cell geometry/complex modes, /ometiff series/ZCT/multifile planes, bounds/cancellation, exact sample types and storage-grid rendering limits; examples deferred.
 - @margoengine/decoders (batch 176 job 3): document openTIFF lazy classic/BigTIFF IFDs, descriptions, quantitative sample storage, predictors/limits/cancellation and unchanged parseTIFF display API; examples deferred.
 - margoengine (batch 176 job 3): document generated sciviz/fits, /mrc and /ometiff aliases and additive decoders/tiff API; examples deferred.
+
+- @margoengine/biomes (list 3 batch 63 job 2): document /view `water.flow` (true or { discharge, substeps }) with `rivers`, and /rivers `riverSources`; examples deferred.

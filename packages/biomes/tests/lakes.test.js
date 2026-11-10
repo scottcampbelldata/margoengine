@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { hydrology, hydrologyOf, riversOf } from '../dist/hydrology.js';
 import { BiomeView } from '../dist/view.js';
-import { lakeLevels, NO_LAKE, riverWater, viewWater } from '../dist/rivers.js';
+import { lakeLevels, NO_LAKE, riverSources, riverWater, viewWater } from '../dist/rivers.js';
 
 // A 7 x 7 grid 1 m apart: low border, a rim at 20 m with one spill corner at 12 m, a pit of 3 x 3 inside it at 0 m with
 // one corner at 11.5 m (filled only 0.5 m, under the 1 m lake depth, but on the same flat fill).
@@ -148,4 +148,28 @@ test('view: bad lakes are a TypeError before anything loads', async () => {
   await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: { lakes: 'yes' } }), TypeError);
   await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: { rivers: 'channels' } }), TypeError);
   world.dispose();
+});
+
+test('view flow: bad flow settings are rejected before anything loads; riverSources feeds each line at its high end', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] });
+  await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: { flow: 'yes' } }), TypeError);
+  await assert.rejects(
+    BiomeView.attach({ backend: 'webgpu' }, world, { water: { flow: { discharge: -1 } } }),
+    RangeError,
+  );
+  await assert.rejects(
+    BiomeView.attach({ backend: 'webgpu' }, world, { water: { flow: { substeps: 0 } } }),
+    RangeError,
+  );
+  world.dispose();
+  // Two lines in millimetres; the ground falls to +x, so the first line starts and the second ends upstream.
+  const lines = [Int32Array.of(0, 0, 50000, 0, 100000, 0), Int32Array.of(90000, 10000, 10000, 10000)],
+    heightAt = (x) => 100 - x;
+  assert.deepEqual(riverSources(lines, heightAt, 20, 4), [
+    { position: [0, 0], discharge: 20, radius: 4 },
+    { position: [10, 10], discharge: 20, radius: 4 },
+  ]);
+  assert.deepEqual(riverSources([Int32Array.of(5)], heightAt, 20, 4), []);
+  assert.throws(() => riverSources(lines, heightAt, Number.NaN, 4), RangeError);
+  assert.throws(() => riverSources(lines, 3, 20, 4), TypeError);
 });

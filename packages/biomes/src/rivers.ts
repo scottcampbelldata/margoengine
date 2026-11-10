@@ -126,7 +126,7 @@ export async function viewWater(
   choice: ViewWaterChoice,
   source: Omit<RiverWaterSource, 'lines' | 'lakes'>,
   device: () => GPUDevice | undefined,
-): Promise<ReturnType<typeof riverWaterOptions> | undefined> {
+): Promise<(ReturnType<typeof riverWaterOptions> & { readonly lines: readonly Int32Array[] }) | undefined> {
   const { rivers, lakes } = choice;
   let lines = rivers === 'auto' ? world.rivers : rivers === 'hydrology' ? [] : (rivers ?? []),
     levels: LakeLevels | undefined;
@@ -136,7 +136,35 @@ export async function viewWater(
     if (rivers === 'hydrology') lines = riversOf(world, h).lines;
     if (lakes === 'auto' && h.lake.includes(1)) levels = lakeLevels(h);
   }
-  return lines.length || levels ? riverWaterOptions({ ...source, lines, lakes: levels }, device) : undefined;
+  return lines.length || levels
+    ? { ...riverWaterOptions({ ...source, lines, lakes: levels }, device), lines }
+    : undefined;
+}
+
+/**
+ * Inflows that make river water flow (`RiverSource` of `@margoengine/water/rivers`): one per line, at its higher end,
+ * `discharge` m^3/s over a square of half side `radius` metres. Lines are `[x, z, ...]` millimetres.
+ * @example
+ * Rivers.attach(water, { sources: riverSources(world.rivers, (x, z) => world.heightAt(x, z), 20, 8) });
+ */
+export function riverSources(
+  lines: readonly Int32Array[],
+  heightAt: (x: number, z: number) => number,
+  discharge: number,
+  radius: number,
+): { position: [number, number]; discharge: number; radius: number }[] {
+  if (!Array.isArray(lines) || typeof heightAt !== 'function')
+    throw typeError('riverSources needs the river lines (world.rivers) and a heightAt(x, z) function', 'biomes');
+  if (!Number.isFinite(discharge) || discharge < 0 || discharge > 100000 || !Number.isFinite(radius) || radius < 0)
+    throw rangeError('riverSources needs discharge 0..100000 m^3/s and a finite radius >= 0 metres', 'biomes');
+  const sources: { position: [number, number]; discharge: number; radius: number }[] = [];
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    const a: [number, number] = [line[0] / 1000, line[1] / 1000], // float division: mm to metres
+      b: [number, number] = [line[line.length - 2] / 1000, line[line.length - 1] / 1000]; // float division: mm to metres
+    sources.push({ position: heightAt(...a) >= heightAt(...b) ? a : b, discharge, radius });
+  }
+  return sources;
 }
 
 /** The result of {@link riverWater}: the ground and the surface for a `Water`'s `terrain` and `fill`. */

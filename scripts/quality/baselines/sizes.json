@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14553987,
+  "total": 14554488,
   "history": [
     {
       "date": "2026-10-24",
@@ -7775,6 +7775,12 @@
       "commit": "9b2973b29",
       "reason": "Batch 176 landing: upstream tiled-export uniforms in lines/batch grew lines/debug from 9549 to 9874 B after batch 178 media landed. Preserve tile-aware debug rendering and raise its optional ceiling from 9836 to 10171 B. Splitting the shared line batch would duplicate viewport uniforms and shader state. No source change or core/stage growth.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "644750be2",
+      "reason": "list 3 batch 63 job 2: biomes/view water.flow attaches water/rivers",
+      "grew": 1
     }
   ],
   "items": {
@@ -7863,7 +7869,7 @@
     "@margoengine/biomes/splines": 2870,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
-    "@margoengine/biomes/view": 10645,
+    "@margoengine/biomes/view": 11146,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4596,
@@ -8646,6 +8652,7 @@
     "@margoengine/sciviz/export-media": 7250,
     "@margoengine/sciviz/export-vector": 4212,
     "@margoengine/sciviz/fallback": 2258,
+    "@margoengine/sciviz/fits": 5164,
     "@margoengine/sciviz/flow": 9392,
     "@margoengine/sciviz/format": 7562,
     "@margoengine/sciviz/formats": 14262,
@@ -8662,8 +8669,10 @@
     "@margoengine/sciviz/math": 5002,
     "@margoengine/sciviz/maths": 9119,
     "@margoengine/sciviz/monitor": 2714,
+    "@margoengine/sciviz/mrc": 3162,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/nrrd": 1216,
+    "@margoengine/sciviz/ometiff": 3463,
     "@margoengine/sciviz/omezarr": 21492,
     "@margoengine/sciviz/openfoam": 10883,
     "@margoengine/sciviz/parcoords": 9555,
@@ -9180,9 +9189,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/fits": 5164,
-    "@margoengine/sciviz/mrc": 3162,
-    "@margoengine/sciviz/ometiff": 3463
+    "margoengine/web": 577
   }
 }

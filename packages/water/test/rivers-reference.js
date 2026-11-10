@@ -69,9 +69,13 @@ export function riverStep(m, dt, sources = [], pipe = 'reconstructed') {
       let v = d[i] + (dt * flow) / l;
       for (const s of sources) {
         const r = s.radius ?? 0;
-        const lo = [0, 1].map((a) => Math.max(Math.ceil((s.position[a] - r - m.origin[a]) / l - 0.5), 0));
+        // Cells whose centres lie within r, and always the cell under the position.
+        const c = [0, 1].map((a) => Math.floor((s.position[a] - m.origin[a]) / l));
+        const lo = [0, 1].map((a) =>
+          Math.max(Math.min(Math.ceil((s.position[a] - r - m.origin[a]) / l - 0.5), c[a]), 0),
+        );
         const hi = [0, 1].map((a, k) =>
-          Math.min(Math.floor((s.position[a] + r - m.origin[a]) / l - 0.5), [w, h][k] - 1),
+          Math.min(Math.max(Math.floor((s.position[a] + r - m.origin[a]) / l - 0.5), c[a]), [w, h][k] - 1),
         );
         if (x >= lo[0] && x <= hi[0] && y >= lo[1] && y <= hi[1])
           v += (dt * s.discharge) / ((hi[0] - lo[0] + 1) * (hi[1] - lo[1] + 1) * l * l);

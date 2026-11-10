@@ -78,6 +78,35 @@ async function river(){
  sky.dispose();e.dispose();world.dispose();c2.remove();
  return {points,share:changed/(c2.width*c2.height),errors};
 }
+// List 3 batch 63 job 2: rivers that flow. The same coast world's river with `flow: true`: water/rivers takes in
+// 20 m^3/s at each line's high end and moves the river state from frame to frame (the filled channel drains to the
+// sea, and the inflow keeps more water in it than the same flow with no inflow); without flow it stands exactly still.
+async function flowing(){
+ const c2=document.createElement('canvas');c2.className='sea';c2.width=360;c2.height=225;document.body.append(c2);
+ const world=await BiomeWorld.create({biomes:[presets.temperate],climate:{latitude:46,rainfall:1200},height:{relief:{seed:3,relief:900,base:300,rivers:1,coast:'south'}}});
+ const line=world.rivers[0],[mx,mz]=[line[8]/1000,line[9]/1000];
+ const e=await Engine.create(c2,{backend:'webgpu',camera:{position:[mx-30,world.heightAt(mx,mz)+420,mz+260],target:[mx,world.heightAt(mx,mz),mz],near:0.5,far:20000}});
+ const errors=[];e.gpu.addEventListener('uncapturederror',ev=>errors.push(ev.error.message));
+ const frame=async()=>{e.render({delta:1/30});await e.gpu.queue.onSubmittedWorkDone();};
+ const state=async(view)=>{
+  const texture=view.water.coastalDepthTexture,w=texture.width,h=texture.height,read=e.gpu.createBuffer({size:w*h*16,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),enc=e.gpu.createCommandEncoder();
+  enc.copyTextureToBuffer({texture},{buffer:read,bytesPerRow:w*16},[w,h]);e.gpu.queue.submit([enc.finish()]);await read.mapAsync(GPUMapMode.READ);
+  const all=new Float32Array(read.getMappedRange()).slice();read.unmap();read.destroy();
+  // Depths in metres and each cell's area in m^2 over the world's bounds (the river terrain covers them).
+  const [x0,z0,x1,z1]=world.bounds,depth=new Float64Array(w*h);for(let i=0;i<w*h;i++)depth[i]=all[i*4];return {depth,area:((x1-x0)/w)*((z1-z0)/h)};
+ };
+ async function run(flow){
+  const view=await BiomeView.attach(e,world,{objects:false,water:{rivers:'auto',flow}});
+  await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();
+  const a=await state(view);for(let i=0;i<90;i++)await frame();const b=await state(view);
+  let volume=[0,0],changed=0;for(let i=0;i<a.depth.length;i++){volume[0]+=a.depth[i]*a.area;volume[1]+=b.depth[i]*a.area;if(Math.abs(a.depth[i]-b.depth[i])>0.01)changed++;}
+  view.dispose();return {volume,changed,cells:a.depth.length,area:a.area};
+ }
+ const still=await run(false),moving=await run(true),unfed=await run({discharge:0});
+ e.dispose();world.dispose();c2.remove();
+ return {still,moving,unfed,errors};
+}
+
 // Job E: lakes and hydrology rivers on the default world (no sea, no relief rivers). Before, its lakes lived in the
 // hydrology's data only and no view drew them. Over its deepest lake the state the water stands on is at the fill level
 // (`h.filled`), and from above `water: { lakes: 'auto' }` changes pixels that `water: {}` (a sea hidden under land) does
@@ -143,6 +172,7 @@ window.check={
   out.sea=await sea();
   out.river=await river();
   out.lakes=await lakes();
+  out.flowing=await flowing();
   return out;
  }
 };

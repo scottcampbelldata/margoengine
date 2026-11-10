@@ -6172,3 +6172,7 @@ water/rain WaterRain draws rain rings on one Water: rain 0 to 1 (or a weather's,
 Scientific entry gzip (bare package imports external): TIFF 4401 -> 6064 B; new sciviz/fits 4908 B, /mrc 2906 B, /ometiff 3207 B. Their optional budgets are raised in the same change. Quantitative BigTIFF addressing, lazy pages, signed/floating samples and full plane mappings justify these bytes; splitting TIFF would duplicate directory or codec infrastructure. Core + stage root remains 24209 B.
 
 Landing accounting for upstream tiled export (batch 178): shared tile-aware line-batch uniforms also grew optional lines/debug from 9549 to 9874 B gzip, above its old 9836 B ceiling. The ceiling is 10171 B; tile-aware debug geometry is retained. A split would duplicate batch viewport uniforms and shader state. No additional line source change or core/stage bytes.
+
+### List 3 batch 63 job 2: flowing rivers in the view
+
+BiomeView `water.flow`: true or { discharge 0..100000 m^3/s per line (default 20), substeps integer 1..64 (default 8) }; needs river lines (`rivers`). Only the first 16 lines get an inflow (water/rivers takes at most 16 sources), each at its higher end over one view texel or the coast cell under it. With flow the filled channel also drains toward the sea, so a river with too little discharge empties; steep-bed limits are water/rivers' (list 3 batch 66 job 8).

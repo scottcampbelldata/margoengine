@@ -39,6 +39,12 @@ export interface ViewWaterChoice {
 
 export function lakeLevels(h: LakeHydrology): LakeLevels;
 
+export function riverSources(lines: readonly Int32Array[], heightAt: (x: number, z: number) => number, discharge: number, radius: number): {
+    position: [number, number];
+    discharge: number;
+    radius: number;
+}[];
+
 export function riverWater(source: RiverWaterSource): RiverWater;
 
 export function riverWaterOptions(source: RiverWaterSource, device: () => GPUDevice | undefined): {
@@ -56,7 +62,9 @@ export function riverWaterOptions(source: RiverWaterSource, device: () => GPUDev
 
 export function viewWater(world: HydrologyWorld & {
     readonly rivers: readonly Int32Array[];
-}, choice: ViewWaterChoice, source: Omit<RiverWaterSource, 'lines' | 'lakes'>, device: () => GPUDevice | undefined): Promise<ReturnType<typeof riverWaterOptions> | undefined>;
+}, choice: ViewWaterChoice, source: Omit<RiverWaterSource, 'lines' | 'lakes'>, device: () => GPUDevice | undefined): Promise<(ReturnType<typeof riverWaterOptions> & {
+    readonly lines: readonly Int32Array[];
+}) | undefined>;
 
 // Not exported from this entry, but used by the exports above:
 
