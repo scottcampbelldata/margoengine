@@ -73,8 +73,11 @@ fn at(p: vec3i) -> f32 {
   let q = clamp(p, vec3i(0), vec3i(i32(grid.nx) - 1, i32(grid.ny) - 1, i32(grid.nz) - 1));
   return field[(u32(q.z) * grid.ny + u32(q.y)) * grid.nx + u32(q.x)];
 }
+// Central differences inside, one-sided at the grid's faces, each scaled to the two samples a central one spans.
 fn gradient(p: vec3i) -> vec3f {
-  return vec3f(at(p + vec3i(1, 0, 0)) - at(p - vec3i(1, 0, 0)), at(p + vec3i(0, 1, 0)) - at(p - vec3i(0, 1, 0)), at(p + vec3i(0, 0, 1)) - at(p - vec3i(0, 0, 1)));
+  let top = vec3i(i32(grid.nx) - 1, i32(grid.ny) - 1, i32(grid.nz) - 1);
+  let span = max(vec3f(min(p + vec3i(1), top) - max(p - vec3i(1), vec3i(0))), vec3f(1.0));
+  return vec3f(at(p + vec3i(1, 0, 0)) - at(p - vec3i(1, 0, 0)), at(p + vec3i(0, 1, 0)) - at(p - vec3i(0, 1, 0)), at(p + vec3i(0, 0, 1)) - at(p - vec3i(0, 0, 1))) * (2.0 / span);
 }
 fn corner(c: u32) -> vec3i { return vec3i(i32(c & 1u), i32((c >> 1u) & 1u), i32((c >> 2u) & 1u)); }
 fn edgeCorners(e: u32) -> vec2u {

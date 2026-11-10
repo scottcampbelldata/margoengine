@@ -26,7 +26,9 @@ function reference(data, dims, level) {
         b = [...p];
       a[axis]++;
       b[axis]--;
-      return f(at(a) - at(b));
+      // One-sided at a face: scaled to the two samples a central difference spans (batch 132 audit).
+      const span = Math.max(1, Math.min(dims[axis] - 1, a[axis]) - Math.max(0, b[axis]));
+      return f(f(at(a) - at(b)) * f(2 / span));
     });
   const mix = (a, b, t) => f(f(a * f(1 - t)) + f(b * t));
   for (let z = 0; z < nz - 1; z++)
@@ -157,7 +159,9 @@ test('the real head MRI extracts the native review triangle count with pinned sc
   assert.equal(result.vertices.length, 216_150 * 24);
   assert.equal(
     createHash('sha256').update(new Uint8Array(result.vertices.buffer)).digest('hex'),
-    '57d02c9bce60a0d5e342b0551244d6bb12a597802945020f2b62ff60e6475cb9',
+    // Re-pinned in the batch 132 audit: normals of vertices on the grid's faces now use one-sided differences scaled
+    // like central ones; positions and every interior normal are unchanged (the scalar reference above checks both).
+    '6b6d7424cf450f79e3c33d387628921d4f8da3a4567fbf18b963426360f2e549',
   );
 });
 

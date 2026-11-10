@@ -11,7 +11,7 @@ import {
   type EngineeringOptions,
 } from './engineering-common.js';
 import type { ElementShape } from './datasets-elements.js';
-import type { FileInput } from './file-source.js';
+import { byteLimit, type FileInput } from './file-source.js';
 export type { EngineeringOptions } from './engineering-common.js';
 /** Selected Gold time index and binary byte order. Defaults: first step, little endian. */
 export interface EnSightOptions extends EngineeringOptions {
@@ -149,7 +149,7 @@ function gold(bytes: Uint8Array, little: boolean): Gold {
   }
   return new Gold(bytes, little);
 }
-function geometry(g: Gold, time: number): Part[] {
+function geometry(g: Gold, time: number, maxBytes: number): Part[] {
   if (g.binary) g.line();
   if (g.peek() === 'BEGIN TIME STEP') {
     for (let i = 0; i < time; i++) {
@@ -186,6 +186,8 @@ function geometry(g: Gold, time: number): Part[] {
         n = dims.reduce((a, b) => a * b, 1);
       p.dimensions = dims;
       if (mode.includes('uniform')) {
+        // Uniform points are generated, not read, so the input length does not bound them: maxBytes does.
+        if (n * 3 * 8 > maxBytes) bad('EnSight uniform block exceeds maxBytes');
         const o = g.values(3),
           delta = g.values(3);
         p.points = new Float64Array(n * 3);
@@ -327,7 +329,7 @@ export async function readEnSight(input: FileInput, options: EnSightOptions = {}
       ),
     geometryBytes = await resolve(model),
     geomBinary = gold(geometryBytes, little).binary,
-    parts = geometry(gold(geometryBytes, little), time);
+    parts = geometry(gold(geometryBytes, little), time, byteLimit(options.maxBytes));
   for (const variable of variables) {
     const g = gold(await resolve(variable.file), little);
     // Variable binary files omit the initial C Binary marker; geometry determines the encoding.

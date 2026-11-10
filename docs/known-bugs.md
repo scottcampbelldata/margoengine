@@ -136,6 +136,56 @@ Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
 
+### Fixed 2026-11-10: batch 132 sciviz audit, seven colour, isosurface and reader defects
+
+- `diverging` compared Lab hues without wrapping, so endpoints 43 degrees apart across +-180 degrees went through
+  white; hues now compare and blend the short way round.
+- Isosurface normals at the grid's faces used an unscaled one-sided difference (up to 11 degrees off on a planar
+  field), in both the CPU Wasm kernel and the WGSL; one-sided differences are now scaled like central ones.
+- An HDF5 enumeration took byte order and sign from its member count; they now come from its base type.
+- FITS rejected HISTORY and COMMENT cards with '=' in column 9 and complex values, and read a blank value as 0; a zero-
+  width binary table row count looped to out-of-memory. Commentary is skipped, complex values keep their text, a blank
+  value reads as absent and the row count is bounded by maxBytes.
+- Xdmf polyhedron face counts and CoRectMesh Dimensions, and EnSight uniform blocks, looped or allocated without bound;
+  they are now checked against the data left and maxBytes before any allocation.
+- Regression: packages/sciviz/tests/audit-132.test.js (every case fails on the old code).
+
+### Open from the batch 132 sciviz audit (2026-11-10): GPU volume defects
+
+Found by reading the shaders against Max 1995 and the package's own docs; each needs a GPU check on both backends,
+so they wait for the fix phase. Line numbers are at the audit commit.
+
+- **Absorption follows the box shape.** `src/volume.ts` (step setup and opacity correction) and `src/multivolume.ts`
+  measure the step in unit-box coordinates against 1 / max(dims), so a ray along a short axis absorbs as if it crossed
+  the longest one. Repro: dims [64, 64, 8], constant field, alpha 0.1: a ray along z gives about 1 - 0.9^64 instead of
+  1 - 0.9^7. `volume-quality-shader.ts` already uses physical length.
+- **Voxel centres are offset by half a voxel.** `volume.ts` and `multivolume.ts` sample at texture coordinate p while the
+  docs say bounds are voxel centres; the coordinate should be (p (n - 1) + 0.5) / n, as the quality shader does.
+  Multivolume channels of different resolutions are offset from each other. bricks.ts and cinematic-shader.ts share it.
+- **Lighting view direction uses the normal matrix.** `volume.ts` maps the box-space ray direction by the inverse
+  transpose instead of the model matrix; with non-cubic bounds the normal flip and specular are wrong.
+- **`density` means two things.** `volume.ts` and `multivolume.ts` scale opacity (min(alpha density, 0.999)) on one
+  path and extinction (1 - (1 - alpha)^density) on the other, so the quality wrapper changes the picture.
+- **The quality wrapper fails with a colorScale map.** `volume-quality.ts` binds the transfer texture as filterable
+  float but a colorScale map makes it rgba32float, so bind-group creation fails; the shader also reads row 0.5 of a
+  4-row table.
+- **Jittered preintegration spans the wrong length.** `volume-quality-shader.ts` takes front at t + ds jitter and back
+  at t + ds but applies opacity for the full ds; back should be front + ds.
+- **Preintegration uses the transfer function's range, not the layer's.** `transfer.ts` builds the table over
+  tf.state.range while the shader normalises by the layer range; `bindTransfer` uses layer.range.
+- **Multivolume culls back faces and ignores scene depth.** `multivolume.ts` always uses cullMode 'back' (nothing draws
+  with the camera inside the box) and never clips rays against opaque geometry, unlike `volume.ts`.
+- **Cyclic tables are read half an entry off.** `colormaps.ts` places entries at k / 256 and `color-lookup.ts` reads
+  t 255, so the GPU shows sample(t 255 / 256).
+
+### Open from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
+
+- **Dense attributes are not read.** `src/hdf5.ts` reads attribute messages (type 12) only; an object with more than 8
+  attributes stores them in a fractal heap (attribute info message, type 21) and `attributes()` returns none or some.
+  Repro needs a file written with h5py and 9 or more attributes on one object; no fixture has one yet.
+- **The implicit chunk index walks every chunk.** `src/hdf5.ts` loops over all chunks of a dataset with an implicit
+  index whatever the selection, with no abort check, so a large shape with chunk size 1 takes very long.
+
 ### Fixed 2026-11-10: blender parseMargoPBR leaked decoded images when the physical shader failed to load
 
 - **What:** `parseMargoPBR` (`@margoengine/blender/pbr-ext`) awaited the physical shader import and the PNG decode with

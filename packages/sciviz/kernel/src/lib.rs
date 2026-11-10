@@ -127,7 +127,9 @@ fn gradient(field: &[f32], p: [i32; 3], dims: [usize; 3]) -> [f32; 3] {
         let mut minus = p;
         plus[a] += 1;
         minus[a] -= 1;
-        at(field, plus, dims) - at(field, minus, dims)
+        // Central inside, one-sided at the grid's faces: scale each to the two samples a central difference spans.
+        let span = (plus[a].min(dims[a] as i32 - 1) - minus[a].max(0)).max(1) as f32;
+        (at(field, plus, dims) - at(field, minus, dims)) * (2.0 / span)
     })
 }
 

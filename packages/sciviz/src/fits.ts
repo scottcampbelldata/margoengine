@@ -84,7 +84,8 @@ export function parseFITS(bytes: Uint8Array, options: FITSOptions = {}): FITSFil
         ended = true;
         continue;
       }
-      if (card[8] !== '=') continue;
+      // COMMENT, HISTORY and blank keywords are commentary even with '=' in column 9 (FITS 4.0 section 4.4.2.4).
+      if (card[8] !== '=' || key === 'COMMENT' || key === 'HISTORY' || key === '') continue;
       const value = card.slice(10).trimStart();
       if (value[0] === "'") {
         let s = '',
@@ -101,7 +102,13 @@ export function parseFITS(bytes: Uint8Array, options: FITSOptions = {}): FITSFil
         header[key] = s.trimEnd();
       } else {
         const token = value.split('/')[0].trim();
-        if (token === 'T' || token === 'F') header[key] = token === 'T';
+        // A blank value field is an undefined value (FITS 4.0 section 4.2.1): the keyword reads as absent.
+        if (token === '') continue;
+        // A complex value "(re, im)" keeps its text: no image or table keyword this reader uses is complex.
+        if (token[0] === '(') {
+          if (!/^\(\s*[^,()]+,\s*[^,()]+\)$/.test(token)) bad(`invalid header ${key}`);
+          header[key] = token;
+        } else if (token === 'T' || token === 'F') header[key] = token === 'T';
         else {
           const n = Number(token.replace(/[dD]/, 'E'));
           if (!Number.isFinite(n)) bad(`invalid header ${key}`);
@@ -142,6 +149,8 @@ export function parseFITS(bytes: Uint8Array, options: FITSOptions = {}): FITSFil
         columns: FITSColumn[] = [],
         heap = start + integer(header.THEAP ?? rows * rowBytes, 'THEAP');
       if (heap < start + rows * rowBytes || heap > start + size) bad('heap offset');
+      // Zero-width rows take no bytes, so bound the row count as if each row took one: every row becomes cells.
+      if (rows > (options.maxBytes ?? 64 * 1024 * 1024)) bad('binary table rows exceed maxBytes');
       let offset = 0;
       for (let f = 1; f <= integer(header.TFIELDS, 'TFIELDS'); f++) {
         const format = String(header[`TFORM${f}`] ?? ''),

@@ -12,7 +12,11 @@ export const product = (s: readonly number[]): number => {
 /** Little-endian metadata cursor. Undefined addresses are represented by -1, never rounded. */
 export class Cursor {
   at = 0;
-  constructor(readonly bytes: Uint8Array) {}
+  readonly bytes: Uint8Array;
+  // A plain field, not a parameter property, so tests can import this file with Node's type stripping.
+  constructor(bytes: Uint8Array) {
+    this.bytes = bytes;
+  }
   take(n: number): Uint8Array {
     if (!Number.isSafeInteger(n) || n < 0 || this.at + n > this.bytes.length) hdfError('truncated metadata');
     const out = this.bytes.subarray(this.at, this.at + n);
@@ -47,6 +51,12 @@ export function datatype(b: Uint8Array): HDFType {
     size = c.uint(4),
     kind = tag & 15;
   if (tag >> 4 < 1 || tag >> 4 > 4 || size < 1) hdfError('invalid datatype');
+  // An enumeration's class bits hold its member count; byte order and sign are its base type's, which follows.
+  if (kind === 8) {
+    const base = datatype(b.subarray(8));
+    if (base.kind !== 0 || base.size !== size) hdfError('enumeration base type must be an integer of its size');
+    return { ...base, kind };
+  }
   let offset = 0,
     bits = size * 8;
   if (kind === 0 || kind === 1 || kind === 4) {

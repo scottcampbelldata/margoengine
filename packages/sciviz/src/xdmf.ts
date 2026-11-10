@@ -232,6 +232,9 @@ export async function readXDMF(input: FileInput, options: XDMFOptions = {}): Pro
       const axes = [0, 1, 2].map((d) => {
         if (/CoRectMesh/.test(top)) {
           if (!gd[0] || !gd[1]) bad('origin-spacing geometry needs two DataItems');
+          // The axes are generated from the topology's Dimensions, so they obey the same byte limit as a DataItem.
+          if (!Number.isInteger(dims[d]) || dims[d] < 1 || dims[d] * 8 > (options.maxBytes ?? 64 * 1024 * 1024))
+            bad('Xdmf CoRectMesh dimensions exceed maxBytes');
           const rank = gd[0].length;
           return Float64Array.from(
             { length: dims[d] },
@@ -268,8 +271,11 @@ export async function readXDMF(input: FileInput, options: XDMFOptions = {}): Pro
           if (code === 16) {
             const nf = conn[at++],
               faces = [nf];
+            // Each face takes at least its count entry, so the counts are checked against what is left.
+            if (!Number.isInteger(nf) || nf < 1 || at + nf > conn.length) bad('invalid Xdmf polyhedron face count');
             for (let f = 0; f < nf; f++) {
               const n = conn[at++];
+              if (!Number.isInteger(n) || n < 1 || at + n > conn.length) bad('invalid Xdmf polyhedron face width');
               faces.push(n, ...conn.subarray(at, (at += n)));
             }
             cells.push({ type: 'polyhedron', faces });

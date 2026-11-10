@@ -195,7 +195,7 @@ const fromMsh = ([M, s, h]: Msh): SRGB =>
 function adjustHue([M, s, h]: Msh, unsaturatedM: number): number {
   if (M >= unsaturatedM - 0.1) return h;
   const spin = (s * Math.sqrt(unsaturatedM ** 2 - M ** 2)) / (M * Math.sin(s));
-  return h > -Math.PI / 3 ? h + spin : h - spin;
+  return Math.atan2(Math.sin(h), Math.cos(h)) > -Math.PI / 3 ? h + spin : h - spin;
 }
 
 /** Moreland's diverging interpolation between two sRGB endpoints at fraction `t` (0.5 is the white midpoint). */
@@ -203,6 +203,9 @@ export function diverging(t: number, low: SRGB, high: SRGB): SRGB {
   let a = toMsh(low),
     b = toMsh(high),
     x = clamp01(t);
+  // Hue is an angle: take b's hue within pi of a's, so the test and the blend use the short way round.
+  const turn = b[2] - a[2];
+  b = [b[0], b[1], a[2] + turn - 2 * Math.PI * Math.round(turn / (2 * Math.PI))];
   // Both saturated and far apart in hue: go through an unsaturated midpoint.
   if (a[1] > 0.05 && b[1] > 0.05 && Math.abs(a[2] - b[2]) > Math.PI / 3) {
     const middle = Math.max(a[0], b[0], 88);
