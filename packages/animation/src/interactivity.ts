@@ -121,6 +121,7 @@ export class GLTFInteractivity implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    if (this.disposed) throw new MargoError('disposed', 'GLTFInteractivity is disposed; create a new graph before attaching');
     this.engine = engine;
     const { graph } = this,
       doc = this.model.asset.doc as Record<string, any>;
@@ -286,7 +287,7 @@ export class GLTFInteractivity implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     for (const remove of this.removers.splice(0)) remove();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

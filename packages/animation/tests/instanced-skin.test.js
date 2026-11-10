@@ -161,6 +161,7 @@ test('SkinnedCrowd draws every member in one indexed call, and a member takes it
     crowd = new SkinnedCrowd(bake),
     host = {
       gpu: gpu.device,
+      sceneOf() { return undefined; },
       lighting: { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.2]) },
       stats: { visible: 0, drawCalls: 0 },
     };

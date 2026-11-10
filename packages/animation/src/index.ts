@@ -736,7 +736,7 @@ export class Animation implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {
     if (this.model.disposed) {
-      this.model.root.engine.removePlugin(this.name);
+      this.model.root.engine.sceneOf(this)?.removePlugin(this.name);
       return;
     }
     this.validate();
@@ -910,7 +910,7 @@ export class Animation implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.model.root.engine.removePlugin(this.name);
+    this.model.root.engine.sceneOf(this)?.removePlugin(this.name);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.release();

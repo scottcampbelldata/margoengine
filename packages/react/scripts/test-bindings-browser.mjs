@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
 
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const browser = await openBrowser({ port: 'free', startPath: '/packages/react/tests/bindings-browser.html' });
 const { page } = browser,
   errors = [],

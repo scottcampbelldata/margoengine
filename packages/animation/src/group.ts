@@ -171,7 +171,7 @@ export class AnimationGroup implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.members.length = 0;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

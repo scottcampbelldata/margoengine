@@ -2,7 +2,7 @@
 // Geometry cache playback: baked vertex animation from DCC tools (cloth, destruction, fluids) streamed in chunks. Each
 // chunk carries its own topology, so a mesh may change vertex count as it plays. Only a few chunks are held at a time.
 import type { EngineKernel } from '@margoengine/core';
-import type { Engine, EnginePlugin } from '@margoengine/core/extension';
+import type { Engine, EnginePlugin, Scene } from '@margoengine/core/extension';
 import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf-pro/model';
 import { MargoError } from '@margoengine/math/errors';
 
@@ -407,18 +407,39 @@ export class GeometryCachePlayer implements EnginePlugin {
       throw new MargoError('unsupported', 'GeometryCachePlayer needs WebGPU; create the engine with the webgpu backend');
     const abort = new AbortController(),
       stop = () => abort.abort(signal!.reason);
+    const runtime = engine as Engine;
+    let scene!: Scene;
+    // Snapshot the active registry before reading yields, without adding a core API.
+    const scope: EnginePlugin = { name: 'geometry-cache:load:' + serial++, setup() { scene = runtime.sceneOf(scope)!; } };
+    while (runtime.plugins.has(scope.name)) scope.name += ':';
+    runtime.use(scope);
+    scene.removePlugin(scope.name);
+    const unlisten = () => signal?.removeEventListener('abort', stop);
     if (signal?.aborted) stop();
     else signal?.addEventListener('abort', stop, { once: true });
     const open = () => readGeometryCache(bytes(source, abort.signal), { signal: abort.signal, maxChunkBytes }),
-      iterator = open(),
-      first = await iterator.next();
-    if (first.done) throw bad('holds no chunks');
-    const rewinds =
-      typeof source === 'string' ||
-      typeof source === 'function' ||
-      source instanceof URL ||
-      source instanceof Uint8Array;
-    return new GeometryCachePlayer(engine as Engine, first.value, iterator, open, abort, options, rewinds);
+      iterator = open();
+    try {
+      const first = await iterator.next();
+      if (first.done) throw bad('holds no chunks');
+      const rewinds =
+        typeof source === 'string' ||
+        typeof source === 'function' ||
+        source instanceof URL ||
+        source instanceof Uint8Array;
+      let player!: GeometryCachePlayer;
+      const create: EnginePlugin = { name: scope.name, setup() {
+        player = new GeometryCachePlayer(runtime, first.value, iterator, open, abort, options, rewinds, unlisten);
+      } };
+      try { scene.use(create); }
+      finally { if (scene.plugins.get(create.name) === create) scene.removePlugin(create.name); }
+      return player;
+    } catch (error) {
+      unlisten();
+      abort.abort(error);
+      await iterator.return();
+      throw error;
+    }
   }
   private constructor(
     engine: Engine,
@@ -428,6 +449,7 @@ export class GeometryCachePlayer implements EnginePlugin {
     private readonly abort: AbortController,
     { ahead = 2, speed = 1, loop = true, material }: GeometryCachePlayerOptions,
     private readonly rewinds: boolean,
+    private readonly unlisten: () => void,
   ) {
     this.ahead = ahead;
     this.speed = speed;
@@ -457,9 +479,14 @@ export class GeometryCachePlayer implements EnginePlugin {
       this.settle = (error) => (error === undefined ? resolve() : reject(error));
     });
     this.done.catch(() => {});
-    engine.use(this.model);
-    engine.use(this);
-    void this.pump(iterator, this.reader);
+    try {
+      engine.use(this.model);
+      engine.use(this);
+      void this.pump(iterator, this.reader);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
   setup(engine: Engine): void {
     this.engine = engine;
@@ -528,11 +555,12 @@ export class GeometryCachePlayer implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.unlisten();
     this.reader++;
     this.abort.abort(new MargoError('disposed', 'GeometryCachePlayer is disposed; attach the cache again'));
     this.wake?.();
     this.settle();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.model.primitives[0].deformed = undefined;
     this.buffer?.destroy();
     this.buffer = undefined;

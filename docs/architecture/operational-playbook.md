@@ -5733,3 +5733,11 @@ The optional sciviz/pipeline entry changes no GPU math or rendering backend. Its
 ### Section 5 evidence: inspector camera/capture tools, batch 263
 
 The tools entry preserves the engine camera identity, delegates loaded projection maths to the existing glTF camera helper and restores the initial projection on disposal. It changes no rendering backend, core or stage code. CPU evidence covers application and loaded orthographic cameras, model removal during an asynchronous switch, camera replacement, screenshot cancellation/failure/timeout, and actual glTF encoding. Native WebGPU and preview WebGL2 browser checks decode screenshots and recordings and exercise PNG/GLB download actions. Heavy modules remain lazy; the compatibility launch runs the same checks.
+### Section 5 evidence: animation owner lifetime and dependent browser invocation
+
+Animation's package-local scene tests cover registered-identity removal,
+asynchronous geometry-cache ownership, signal cleanup and terminal disposal.
+The same-name sentinel implements EnginePlugin.setup so those assertions run.
+The dependent React bindings browser proof selects its repository root before
+starting Vite; a subprocess regression reproduces npm's package working
+directory without a GPU. No rendering algorithms or tolerances change.

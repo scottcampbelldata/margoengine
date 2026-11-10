@@ -4297,3 +4297,13 @@ Batch 172 pipeline entry: 1830 B gzip (new, previously absent), ceiling 2086 B; 
 - Inspector `/tools`: application cameras are registered explicitly; live glTF model cameras are discovered automatically. Switching preserves the engine camera object and disposal restores its original pose/projection. Screenshots serialize the canvas only, excluding DOM overlays, and default to PNG with a 10000 ms timeout. Browser recording uses video/record, defaults to WebM/30 fps and retains the encoded file in memory until stop. glTF export defaults to scene GLB; selected loaded models use the full model exporter and attached animation clips. Exporter, video and glTF camera code load only on their respective actions. Origin/codec constraints remain the browser APIs' constraints.
 
 - Batch 263 job 3 entry: inspector/tools 3,184 B min+gzip, ceiling 3,440 B. Video, exporter and loaded-camera dependencies are lazy. Core/stage bytes added: zero.
+Animation disposal removes the actual scene registration, including inherited
+SkinnedCrowd cleanup. GeometryCachePlayer captures the loading scene before the
+first read and releases its external signal subscription on failure or disposal.
+These package fixes do not claim a complete owner-lifetime audit.
+
+Terminal VATCrowd, SkinnedCrowd, AnimationLOD, MorphWeightPlayer and
+GLTFInteractivity reattachment rejects with code disposed before registration.
+Five package-local regressions cover these terminal transitions.
+
+Animation owner fixes optional bytes: vat 8413 -> 8543 B gzip, ceiling 8512 -> 8800 B; instanced-skin 9501 -> 9647 B gzip, ceiling 9634 -> 9937 B. These bytes enforce terminal disposal and explicit scene ownership; splitting the guards would duplicate lifecycle state. The final rebased build measures core + stage at 24209 B, including the upstream version guard; this animation job changes neither package.

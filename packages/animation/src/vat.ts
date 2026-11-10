@@ -491,6 +491,7 @@ export class VATCrowd implements EnginePlugin {
     this.n = n;
   }
   setup(engine: Engine): void {
+    if (this.disposed) throw new MargoError('disposed', 'VATCrowd is disposed; create a new crowd before attaching');
     requireWebGPU(engine, 'VATCrowd');
     this.engine = engine;
   }
@@ -769,7 +770,9 @@ export class VATCrowd implements EnginePlugin {
     this.dirty = true;
   }
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.lighting.clear();
     this.release();
     this.engine = undefined;

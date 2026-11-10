@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12591237,
+  "total": 12591828,
   "history": [
     {
       "date": "2026-10-24",
@@ -6202,6 +6202,12 @@
       "commit": "7ca894c1b",
       "reason": "lightmap/directional: new entry, directional lightmaps for triangle meshes (batch 54 job 6)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "animation-scene-owner",
+      "reason": "vat: 8413 -> 8543 B gzip; ceiling 8512 -> 8800; instanced-skin: 9501 -> 9647 B gzip; ceiling 9634 -> 9937. Terminal disposal and captured scene ownership prevent stale updates and removal of another scene plugin. Splitting lifetime guards would duplicate cleanup semantics; optional bytes preserve correctness.",
+      "grew": 2
     }
   ],
   "items": {
@@ -6209,7 +6215,7 @@
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/dqs": 3792,
     "@margoengine/animation/geometry-cache": 4645,
-    "@margoengine/animation/instanced-skin": 9634,
+    "@margoengine/animation/instanced-skin": 9937,
     "@margoengine/animation/interactivity": 25733,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
@@ -6217,7 +6223,7 @@
     "@margoengine/animation/pointer": 7146,
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,
-    "@margoengine/animation/vat": 8512,
+    "@margoengine/animation/vat": 8800,
     "@margoengine/animator": 20643,
     "@margoengine/animator/fbik": 5618,
     "@margoengine/animator/graph": 9699,

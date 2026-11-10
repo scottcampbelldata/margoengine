@@ -6145,3 +6145,26 @@ Fixture preservation: Git contributors, gitattributes documentation (2026 access
 Compared Richard Hartley and Andrew Zisserman, *Multiple View Geometry in Computer Vision*, second edition (2004), https://robots.ox.ac.uk/~vgg/hzbook/ (camera pose/projection separation); Martin Thomson, Miguel Casas-Sanchez and Emircan Uysaler (editors), *Media Capture from DOM Elements*, W3C Working Draft (2025), https://www.w3.org/TR/mediacapture-fromelement/; Miguel Casas-Sanchez (editor), *MediaStream Recording*, W3C Working Draft (2026), https://www.w3.org/TR/mediastream-recording/; WHATWG contributors, *HTML Living Standard*, canvas bitmap serialization (2026), https://html.spec.whatwg.org/multipage/canvas.html#dom-canvas-toblob; and the Khronos 3D Formats Working Group, *glTF 2.0.1* (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html. Combined design keeps the engine camera identity, copies a selected live camera pose/projection, delegates loaded cameras to viewGLTFCamera, wraps canvas serialization with abort/timeout cleanup, and lazily loads the existing video/record and exporter APIs. No external source or companion code was used.
 
 Public behaviour reference is the Babylon.js Inspector Tools tab, https://doc.babylonjs.com/legacy/inspector/: camera switching and screenshot/video/export actions. This row adds live application cameras, automatic loaded-camera discovery, PNG download, canvas video, scene GLB/embedded glTF and full selected-model PBR export with attached animations. The native/compatibility tests display the existing CC0 BoxVertexColors geometry by Marco Hutter (source/licence: examples/assets/khronos/manifest.json). Browser checks decode actual PNG/WebM outputs, exercise real downloads and inspect exported glTF. The recording fixture uses 1.2 seconds of media, like video/test/record-check.html, with no timing performance assertion.
+### Animation scene ownership and asynchronous cache lifetime
+
+Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with Algebraic
+Effects* (2017), https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+and Ecma International, *ECMAScript 2026 Language Specification* (2026),
+https://262.ecma-international.org/17.0/. The design inference is to resolve the
+actual registration, capture the scene before an asynchronous read and release
+the external signal subscription with the player. Existing EnginePlugin APIs
+hold the scope; no core API or rendering math changes. No companion code read.
+
+The same ownership and explicit disposal sources motivate terminal setup guards:
+an idempotently disposed controller must refuse reattachment before changing
+the engine. Five constructor regressions exercise this behavioral state edge.
+
+The dependent React browser invocation repair follows Node.js contributors,
+*Process API: process.chdir()* (2026), https://nodejs.org/api/process.html#processchdirdirectory,
+and Vite contributors, *Shared Options: root* (2026),
+https://vite.dev/config/shared-options#root . Both define the current working
+directory as the relevant process/server boundary. The script resolves its
+repository from import.meta.url before serving repository-relative URLs; the
+regression probes npm's package directory without launching a browser.

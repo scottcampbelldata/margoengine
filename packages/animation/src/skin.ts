@@ -497,7 +497,7 @@ export class Skin implements EnginePlugin {
     this.release();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.mesh?.root.engine.removePlugin(this.name);
+    this.mesh?.root.engine.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

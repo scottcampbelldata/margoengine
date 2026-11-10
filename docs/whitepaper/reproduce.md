@@ -2898,3 +2898,12 @@ Batch 208 job 1: build cache with npm run build --workspace=@margoengine/cache, 
 Build packages, then run node --test --test-timeout=120000 packages/sciviz/tests/pipeline.test.js. Run node scripts/gpu-lock.mjs run --owner=sciviz-pipeline --wait-max=60 --max=3 -- node packages/sciviz/tests/pipeline-browser.mjs for the real NASA solution on both backends. Serve examples/sciviz-pipeline.html to change the cutoff and save the graph JSON. No benchmarks or README checks are required.
 
 - Batch 263 tools: build packages; run `node --test --test-timeout=30000 packages/inspector/test/tools.test.js`. Under the shared GPU lock run `node packages/inspector/test/tools-browser.mjs` and the same command with `--compat`. Tests use the existing CC0 BoxVertexColors geometry, check camera state, real downloads, encoded image signatures, glTF scene contents and decoded video dimensions.
+### Animation scene registration and terminal disposal
+
+After `npm run build:packages`, run
+`node --test --test-timeout=120000 packages/animation/tests/scene-owner.test.js packages/animation/tests/disposed-owner.test.js tests/animation-owner-contract.test.js`.
+The same-name sentinel implements EnginePlugin.setup, so registration succeeds
+before the identity assertions. The scene fixtures also suspend the first cache
+read and dispose its originating scene, and count external abort listeners.
+The dependent React browser working-directory regression runs without a GPU:
+`node --test --test-timeout=30000 packages/react/tests/browser-working-directory.test.js`.

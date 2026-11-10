@@ -4189,7 +4189,7 @@ Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the 
 Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
 `scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
 
-React test:browser:bindings and test:browser:instances scripts assume repository-root cwd in scripts/browser.js startDevServer, but their package commands run in packages/react and request /packages/react/tests/*.html, producing HTTP 404. Repro: run the package scripts; both scripts pass from the repository root on WebGPU and --compat. Fix phase: correct owning package commands and add a cwd regression.
+Fixed with animation landing: React bindings/instances browser scripts now select repository-root cwd. The package-cwd CPU regression covers every React browser leaf; native/compat GPU checks retain their assertions.
 Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
 Compensated normalized accumulation fixes the cause; the unchanged analytical
 fixture now passes. No open defect found by fuzzy.test.js.
@@ -4350,3 +4350,27 @@ The same baseline merge lost water 20817 B (batch-225), XR 9158 B (version-guard
 
 The final dependent umbrella test also found the already-landed exporters/materials entry absent from the generated umbrella map. Regenerate with scripts/umbrella.mjs, preserving the sciviz pipeline facade; tests/umbrella.test.js exercises both current generation and binding identity. No exporter source changes.
 - Outside batch 263: video/record can resolve a header-only WebM when stopped before Chromium encodes its first frame. Repro: record a native WebGPU canvas at 30 fps, render 12 requestAnimationFrame ticks, then stop; observed 110-byte video/webm;codecs=vp8, decoder rejects DEMUXER_ERROR_COULD_NOT_OPEN. Cause: recordCanvas validates only nonzero Blob size, which also accepts container headers. A 1.2-second recording decodes correctly on WebGPU and preview WebGL2. Fix phase should add first-encoded-frame readiness or structural stream validation in video/record with a short-recording regression.
+### Animation scene ownership repaired
+
+Animation plugins now detach by registered identity, preserving same-name plugins
+in other scenes. GeometryCachePlayer retains its originating scene through the
+first asynchronous read and releases the external abort listener on failure or
+disposal. Package-local scene-owner regressions exercise every affected class
+and factory without the parked owner-lifetime harness.
+
+Disposed crowds, LOD, morph and interactivity controllers now reject subsequent
+setup, preventing a new registration that idempotent disposal could not release.
+
+### Fixed: dependent React bindings browser working directory
+
+The package bindings GPU script used npm's package working directory as the
+Vite root, so `/packages/react/tests/bindings-browser.html` answered an HTTP
+error before any assertion ran. It now selects the repository root like the
+adjacent React browser suites. `packages/react/tests/browser-working-directory.test.js`
+reproduces the package invocation with a mocked browser entry and no GPU.
+
+Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. LOD also reaches its 600-second hard limit on clean origin/main b47fdef13, with that commit fully built before the run: `node scripts/gpu-lock.mjs run --owner=lane-P-animation-baseline --gpu=16384-pick-grid-readback --wait-max=60 --max=10 -- node packages/lod/test/imposter-check.mjs main-animation-baseline --compat` exits 124 in the unchanged 16384-pick grid (test-results/animation-clean-main-lod-compat.log). Compatibility mapAsync waits on device.idle(), then polls readback/query readiness through nested 1 ms timers; browser timer nesting/clamping compounds serial pick waits. This is a source-level candidate cause, not a GPU-proved repair. Neither dependent GPU issue is caused by the animation ownership change; both wait for the owning packages in the fix phase.
+
+GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
+
+Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.

@@ -174,6 +174,7 @@ export class AnimationLOD implements EnginePlugin {
     return this.members.get(animation)?.tier;
   }
   setup(engine: Engine): void {
+    if (this.disposed) throw new MargoError('disposed', 'AnimationLOD is disposed; create a new controller before attaching');
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {
@@ -258,7 +259,7 @@ export class AnimationLOD implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     for (const animation of [...this.members.keys()]) this.remove(animation);
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
