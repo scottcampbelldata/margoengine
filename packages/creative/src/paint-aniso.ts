@@ -59,7 +59,7 @@ fn tensorAt(p:vec2i)->vec3f {return textureLoad(tensor,coord(p),0).rgb;}
  if(trace>1e-8){angle=0.5*atan2(2.0*t.y,t.x-t.z)+1.57079632679;adaptation=clamp(gap/trace,0.0,1.0)*paint.parameters.z;}
  let tangent=vec2f(cos(angle),sin(angle));let normal=vec2f(-tangent.y,tangent.x);
  let radius=paint.parameters.x;let a=radius*(1.0+adaptation);let b=radius/(1.0+adaptation);
- let bound=i32(ceil(a));let zeta=2.0/radius;let eta=2.0*(zeta+0.70710678118);
+ let bound=i32(ceil(a));let zeta=2.0/radius;let eta=(zeta+0.83146961230)/0.30865828382;
  let dirs=array<vec2f,8>(vec2f(1,0),vec2f(0.70710678118,0.70710678118),vec2f(0,1),vec2f(-0.70710678118,0.70710678118),vec2f(-1,0),vec2f(-0.70710678118,-0.70710678118),vec2f(0,-1),vec2f(0.70710678118,-0.70710678118));
  var sums:array<vec3f,8>;var squares:array<vec3f,8>;var weights:array<f32,8>;
  for(var y=-bound;y<=bound;y++){for(var x=-bound;x<=bound;x++){

@@ -1,3 +1,9 @@
+/**
+ * Kyprianidis, Semmo, Kang and Dollner 2010 (polynomial weighting functions, Figure 8): eta = (zeta + cos(gamma)) / sin^2(gamma), where gamma is the
+ * angle at which a sector's zero-crossing meets the unit circle; the paper uses gamma = 3 pi / (2 N), for N = 8 sectors
+ * 3 pi / 16 (eta = 3.77 at zeta = 1/3, its printed value).
+ */
+export const sectorEta = (zeta) => (zeta + Math.cos((3 * Math.PI) / 16)) / Math.sin((3 * Math.PI) / 16) ** 2;
 // Independent scalar oracle: RGB Sobel tensor, separable binomial smoothing, eigensystem and eight sectors.
 export function anisoReference(data, width, height, options = {}, rect = [0, 0, width, height]) {
   const [left, top, w, h] = rect,
@@ -65,7 +71,7 @@ export function anisoReference(data, width, height, options = {}, rect = [0, 0, 
         b = r / (1 + A),
         bound = Math.ceil(a),
         zeta = 2 / r,
-        eta = 2 * (zeta + Math.SQRT1_2);
+        eta = sectorEta(zeta);
       const sums = Array.from({ length: 8 }, () => [0, 0, 0]),
         squares = Array.from({ length: 8 }, () => [0, 0, 0]),
         weights = Array(8).fill(0);

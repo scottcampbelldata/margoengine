@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AnisotropicPainterly } from '../dist/paint-aniso.js';
 import { harness } from '../../post/test/support.js';
-import { anisoReference } from './paint-aniso-reference.js';
+import { anisoReference, sectorEta } from './paint-aniso-reference.js';
 
 test('anisotropic controls reject invalid values and preserve terminal lifecycle', () => {
   for (const options of [
@@ -50,4 +51,14 @@ test('the scalar tensor oracle preserves flat RGBA, copies exactly when disabled
     out = anisoReference(noisy, 13, 11);
   assert.notDeepEqual(out, noisy);
   for (let i = 3; i < out.length; i += 4) assert.equal(out[i], noisy[i]);
+});
+
+test('sector polynomial uses the paper\'s eta: 3.77 for eight sectors at zeta 1/3, zero-crossing at 3 pi / 16', () => {
+  assert.ok(Math.abs(sectorEta(1 / 3) - 3.77) < 0.005, `eta ${sectorEta(1 / 3)}`);
+  const zeta = 2 / 3,
+    eta = sectorEta(zeta),
+    g = (3 * Math.PI) / 16;
+  assert.ok(Math.abs(Math.cos(g) + zeta - eta * Math.sin(g) ** 2) < 1e-12);
+  const shader = readFileSync(new URL('../dist/paint-aniso.js', import.meta.url), 'utf8');
+  assert.match(shader, /eta=\(zeta\+0\.83146961230\)\/0\.30865828382;/);
 });
