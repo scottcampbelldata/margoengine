@@ -126,7 +126,7 @@ export class ScatterInstances implements EnginePlugin {
   disposed = false;
   /** Multiplies all batch emission; a callback is sampled each render. */
   emissiveIntensity: number | (() => number) = 1;
-  private engine?: Engine;
+  protected engine?: Engine;
   private resources: Batch[] = [];
   private uniform?: GPUBuffer;
   private readonly values = new Float32Array(36);
@@ -250,7 +250,7 @@ export class ScatterInstances implements EnginePlugin {
         this.resources.push({ vertex: buffers[0], index: buffers[1], instance: buffers[2], command: buffers[3] });
         this.batches.push({ name: b.name, vertices: count, indices: b.indices.length, instances });
       }
-      const module = d.createShaderModule({ code: shadowShader });
+      const module = d.createShaderModule({ code: this.appearanceCode(shadowShader, true) });
       this.shadowPipeline = d.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex', buffers: vertexLayouts },
@@ -334,7 +334,7 @@ export class ScatterInstances implements EnginePlugin {
               ? 'let linear=$1+foliageTranslucency(n,v,l,i.occlusion,i.translucency)*i.color*frame.radiance.xyz*frame.light.w+i.emissive;'
               : 'let linear=$1+i.emissive;',
           );
-      const module = c.device.createShaderModule({ code: positiveColor(code) });
+      const module = c.device.createShaderModule({ code: this.appearanceCode(positiveColor(code), false) });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex', buffers: lucent ? translucentLayouts : vertexLayouts },
@@ -367,7 +367,7 @@ export class ScatterInstances implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, this.group!);
-    this.drawBatches(pass);
+    this.drawBatches(pass, this.pipeline!);
     pass.end();
   }
   drawShadow({
@@ -386,19 +386,26 @@ export class ScatterInstances implements EnginePlugin {
     context.device.queue.writeBuffer(this.shadowUniforms[cascade], 0, this.shadowValues as Float32Array<ArrayBuffer>);
     pass.setPipeline(this.shadowPipeline!);
     pass.setBindGroup(0, this.shadowGroups[cascade]);
-    this.drawBatches(pass);
+    this.drawBatches(pass, this.shadowPipeline!);
   }
-  private drawBatches(pass: GPURenderPassEncoder): void {
+  /** Optional entries add per-instance shader inputs to both colour and shadow modules. */
+  protected appearanceCode(code: string, _shadow: boolean): string {
+    return code;
+  }
+  /** Per-batch optional bindings, after the shared frame bindings. */
+  protected bindBatch(_pass: GPURenderPassEncoder, _batch: number, _pipeline: GPURenderPipeline): void {}
+  private drawBatches(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline): void {
     // shortcut: draws every fixed instance, add GPU culling for large populations.
     for (let i = 0; i < this.resources.length; i++) {
       const b = this.resources[i];
+      this.bindBatch(pass, i, pipeline);
       pass.setVertexBuffer(0, b.vertex);
       pass.setVertexBuffer(1, b.instance);
       pass.setIndexBuffer(b.index, 'uint32');
       pass.drawIndexedIndirect(b.command, 0);
     }
   }
-  private release(): void {
+  protected release(): void {
     for (const b of this.resources) {
       b.vertex.destroy();
       b.index.destroy();

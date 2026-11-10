@@ -1,0 +1,37 @@
+<!doctype html><html><meta charset="utf-8"><title>Scatter instance attributes</title>
+<style>body{margin:0}canvas{width:256px;height:256px;display:block}</style><body>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {ScatterInstances} from '/packages/scatter/dist/index.js';
+import {AttributedScatter} from '/packages/scatter/dist/attributes.js';
+import {teapotGeometry} from '/packages/geometry/dist/teapot.js';
+import {toGeometry} from '/packages/geometry/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+// Utah Teapot, Martin Newell (1975): existing clean-room patch data, THIRD-PARTY-NOTICES.md.
+const shape=toGeometry(teapotGeometry(0.35,5)),vertices=new Float32Array(shape.vertices.length/6*20);
+for(let i=0;i<shape.vertices.length/6;i++){vertices.set(shape.vertices.subarray(i*6,i*6+3),i*20);vertices.set(shape.vertices.subarray(i*6+3,i*6+6),i*20+4);vertices.fill(1,i*20+16,i*20+20);}
+const matrix=x=>[1,0,0,0,0,1,0,0,0,0,1,0,x,0,0,1];
+const shader='fn scatterAppearance(position:vec3f,color:vec3f,data:ScatterAttributeData)->ScatterAppearance{return ScatterAppearance(position+data.custom[0].xyz,color*vec3f(1,1-data.custom[1].x,1));}';
+let engine,canvas,scatter;const errors=[];
+window.check={async show({reference=false,samples=1,edited=false,restore=false,custom=true,multi=false}={}){
+ engine?.dispose();canvas?.remove();globalThis.margoLow=samples===1?1:undefined;
+ canvas=document.body.appendChild(document.createElement('canvas'));
+ engine=await Engine.create(canvas,{backend:'webgpu',preserveDrawingBuffer:true,camera:{position:[2,1.8,4],target:[0,0.2,0],near:0.01,far:30}});
+ engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.onError=e=>errors.push(String(e));engine.lighting.direction.set([-1,1,0.3,3]);
+ engine.createMesh().setGeometry(box(8,0.05,8)).setMaterial(new PbrMaterial({color:'#999999',roughness:1})).setPosition([0,-0.25,0]);
+ const colours=edited?[[0.15,0.8,0.2],[0.7,0.3,0.15]]:[[0.6,0.25,0.2],[0.2,0.4,0.8]],offsets=edited?[[0,0.3,0],[0,0.15,0]]:[[0,0,0],[0,0,0]],wet=edited?[0.5,0.25]:[0,0];
+ const make=(x,v=vertices,color=[1,1,1])=>({name:'teapot',vertices:v,indices:shape.indices,transforms:new Float32Array(matrix(x)),material:new PbrMaterial({color,roughness:0.7,doubleSided:true}),wind:[1,0,0.06],windDetail:0.1,translucency:0.2});
+ if(reference){scatter=ScatterInstances.attach(engine,()=>colours.map((color,i)=>{const v=vertices.slice();if(custom)for(let k=0;k<v.length;k+=20)for(let j=0;j<3;j++)v[k+j]+=offsets[i][j];return make(i===0?-0.65:0.65,v,[color[0],color[1]*(custom?1-wet[i]:1),color[2]]);}));}
+ else{
+  const generate=()=>{const b=make(0);b.transforms=new Float32Array([...matrix(-0.65),...matrix(0.65)]);return multi?[make(-0.65),make(0.65)]:[b];};
+  scatter=AttributedScatter.attach(engine,generate,custom?{attributes:{offset:3,wetness:1},shader}:{});
+  for(let i=0;i<2;i++)scatter.setColorAt(multi?0:i,edited?[[0.6,0.25,0.2],[0.2,0.4,0.8]][i]:colours[i],multi?i:0);
+  if(edited){engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();for(let i=0;i<2;i++){scatter.setColorAt(multi?0:i,colours[i],multi?i:0);if(custom)scatter.setAttributeAt(multi?0:i,'offset',offsets[i],multi?i:0).setAttributeAt(multi?0:i,'wetness',[wet[i]],multi?i:0);}}
+ }
+ const shadows=Shadows.attach(engine,{resolution:512,cascades:1,distance:8});shadows.add(scatter);
+ if(restore)await engine.rebootDevice();
+ await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});
+ return {errors:errors.splice(0)};
+}};window.ready=true;
+</script></body></html>

@@ -3335,3 +3335,7 @@ Batch 244 xBR-style modes: after building packages, run `node --test --test-time
 ### Batch 196 panorama
 
 Build packages, run node --test packages/cameras/test/*.test.js, then under the shared GPU lock run node packages/cameras/test/panorama-browser.mjs and the same command with --compat. The analytic primary-colour scene verifies full-sphere orientation, unaligned output rows, PNG dimensions, exact HDR/sRGB, abort and camera/canvas preservation. Existing cameras/test/browser-check.mjs also runs on both backends. No benchmark is required during build phase.
+
+### Batch 231 instance attributes
+After build:packages run `node --test packages/scatter/test/attributes.test.js`, then in separate shared GPU runs `node packages/scatter/test/attributes.browser.mjs` and the same with `--compat`. The GPU matrix covers default colour, custom tint/translation, live edits, device restoration, multiple batches and 1x/4x MSAA against independent instances. Existing edges.browser.mjs covers the default fixed-instance renderer. No wall-clock assertion is used.
+>>>>>>> d70b0d2eb (feat(scatter): add live per-instance colour and shader attributes)

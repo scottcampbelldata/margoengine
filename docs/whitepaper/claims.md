@@ -3880,3 +3880,9 @@ PixelScale now supplies both requested edge-directed enlargement factors beside 
 ### Batch 196 panorama output
 
 Claim: cameras/panorama captures a complete sphere into equirectangular viewer PNG or linear HDR pixels without changing the user's camera or canvas dimensions. Proof: cameras/test/panorama.test.js and panorama-browser.mjs, including six rendered directions and exact baked-cube colour references on both backends. The projection and colour references are cited in docs/clean-room.md. No speed claim.
+>>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
+>>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+### Batch 231 job 4: live shader-consumed instance attributes
+AttributedScatter supports per-instance RGB and named scalar/vector updates, with custom WGSL consumption in both colour and shadow geometry. Proof: attributes.test.js checks exact rows, unchanged allocations, validation and restoration; attributes.browser.mjs compares exact rendered pixels against separately prepared instances with the equivalent tint and translation, including wind/translucency, 1x/4x, multiple batches and both backends. CPU storage alone is not the claim; the pixel oracle changes when custom values change. No speed or arbitrary-shader quality claim.
+>>>>>>> d70b0d2eb (feat(scatter): add live per-instance colour and shader attributes)

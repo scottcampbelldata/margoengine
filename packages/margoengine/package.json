@@ -4569,6 +4569,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./scatter/attributes": {
+      "types": "./dist/scatter/attributes.d.ts",
+      "import": "./dist/scatter/attributes.js"
     }
   },
   "dependencies": {

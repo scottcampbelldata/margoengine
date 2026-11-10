@@ -701,3 +701,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/cameras | panorama: capturePanorama, borrowed cubes, RGBA8/linear output, panoramaPNG, orientation, limits and AbortSignal | batch-196 job 1 |
 | margoengine | cameras/panorama alias | batch-196 job 1 |
+>>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
+>>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+- @margoengine/scatter (batch 231 job 4): document AttributedScatter, initial batch arrays, set/getColorAt, set/getAttributeAt, attributeIndex, custom WGSL appearance contract and restoration/memory limits.
+- margoengine (batch 231 job 4): document scatter/attributes alias.
+>>>>>>> d70b0d2eb (feat(scatter): add live per-instance colour and shader attributes)

@@ -104,6 +104,7 @@ export class ScatterInstances implements EnginePlugin {
     }[];
     disposed: boolean;
     emissiveIntensity: number | (() => number);
+    protected engine?: Engine;
     constructor(generate: () => readonly ScatterBatch[]);
     static attach(engine: EngineKernel, generate: () => readonly ScatterBatch[]): ScatterInstances;
     setup(engine: Engine): void;
@@ -115,6 +116,9 @@ export class ScatterInstances implements EnginePlugin {
         matrix: Float32Array;
         cascade: number;
     }): void;
+    protected appearanceCode(code: string, _shadow: boolean): string;
+    protected bindBatch(_pass: GPURenderPassEncoder, _batch: number, _pipeline: GPURenderPipeline): void;
+    protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
