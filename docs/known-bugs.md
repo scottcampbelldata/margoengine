@@ -4557,3 +4557,7 @@ Batch 213 landing correction: the job 2 local rebase helper took maxima for unre
 
 
 Batch 216 job 1: no open physical-lens defect found. Invalid constructor settings, live edits and tracked focus reject before camera/DOF output writes; physical-lens.test.js covers this contract.
+
+
+
+- Batch 207 live-node quality follow-up: Noise uses an independent Margo hash/gradient ordering, so the same Blender settings produce different stochastic texels; socket curves are sampled per frame and interpolate linearly between samples. Reproduce by comparing the nodes fixture with Cycles noise or seeking halfway between non-linear keys. All requested node families and live controls are built; exact stochastic and subframe curve matching remain finish-phase quality work (also in private/handoffs/finish-later.md).

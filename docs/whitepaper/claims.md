@@ -3796,3 +3796,8 @@ Cluster LOD GPU proof (batch 222): on the existing CC0 FlightHelmet primitive, b
 
 ### Cinematic physical lens (batch 216 job 1)
 The optional lens uses focal length and fitted sensor size in millimetres for vertical FOV and sends f-number, focus and sensor fit to existing DOF. Proof: cinematic/test/physical-lens.test.js covers 192 sensor/focal/aspect/fit combinations, focus tracking and atomic validation. physical-lens-browser.mjs renders the same diagnostic card at f/1 and f/16 on native WebGPU and WebGL2 compatibility, checking changed blur width, physical focal length and unchanged FOV. No speed claim or compound-lens simulation claim.
+
+
+
+## Batch 207 job 4: live node graphs
+The optional Blender nodes entry keeps common Mix, Color Ramp, Noise and Math graphs procedural and socket-animatable. The own CC0 fixture contains all four families, no image sections and an animated Value socket sampled at three frames. A separate Cycles emission bake supplies independent RGB oracles for the connected Math -> Ramp -> Mix chain. GPU checks compare the displayed three frames and runtime override/rewind on native and compatibility backends, numerically exercise all 41 scalar operations, and render every listed blend, ramp color/interpolation and noise dimension/fractal variant. Noise W changes the image and restoring it restores identical pixels. These tests prove live behavior and bounded numerical agreement on that chain; they do not claim exact stochastic noise correspondence or full material-system parity. Surface resources belong to the existing PBRModel; disposal is checked after rendering.

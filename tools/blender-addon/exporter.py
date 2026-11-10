@@ -17,15 +17,15 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False, lightmap_size=0):
+def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False, lightmap_size=0, live_nodes=False):
     if lightmap_size:
         from .lightmaps import lightmaps
         with lightmaps(context, lightmap_size) as records:
-            return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, records)
-    return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation)
+            return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, records, live_nodes)
+    return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, live_nodes=live_nodes)
 
 
-def _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, lightmap_records=None):
+def _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, lightmap_records=None, live_nodes=False):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
     bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
@@ -40,6 +40,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
     nodes, geometry, materials, textures, images, samplers = [], [], [], [], [], []
     material_ids, texture_ids, mesh_ids, mesh_cache = {}, {}, {}, {}
     baked = {}  # (material key, original mesh name) -> bake_material() result
+    live_materials = {}
 
     def failure(material, detail, bake=False):
         hint = "; it needs baking, so export with baking on" if bake else ""
@@ -274,14 +275,17 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
 
     def material_id(material, owner=None):
         """The material index of `material` on the object `owner`; a baked material is per mesh (its UV layout)."""
-        key = material_key(material)
+        key = (material_key(material), owner.original.data.name) if live_nodes and material else material_key(material)
         bake_key = (key, owner.original.data.name) if owner is not None and material else None
         if bake_key not in baked:
             bake_key = None
         id_key = ("baked",) + bake_key if bake_key else key
         if id_key in material_ids:
             return material_ids[id_key]
-        result = baked_material(material, baked[bake_key]) if bake_key else direct(material)
+        if live_nodes and material:
+            result = live_materials[key]
+        else:
+            result = baked_material(material, baked[bake_key]) if bake_key else direct(material)
         for value in result["pbrMetallicRoughness"]["baseColorFactor"] + [result["pbrMetallicRoughness"]["metallicFactor"], result["pbrMetallicRoughness"]["roughnessFactor"]]:
             if not math.isfinite(value) or not 0 <= value <= 1:
                 raise ValueError("PBR material factors must be finite and in [0,1]")
@@ -439,7 +443,21 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
         return obj.type == "MESH" and instance.show_self and visible.visible_get(view_layer=context.view_layer)
 
-    if bake_size:
+    if live_nodes:
+        # Sampling sockets changes frames. Collect original owners first, outside any depsgraph iterator or mesh lease.
+        from .nodes import live_material
+        pending = {}
+        for instance in depsgraph.object_instances:
+            if exported(instance):
+                obj = instance.object.original
+                for slot in obj.material_slots:
+                    if slot.material:
+                        pending[(material_key(slot.material), obj.data.name)] = (slot.material, obj)
+        for key, (material, owner) in pending.items():
+            live_materials[key] = live_material(context, material, owner)
+        depsgraph = context.evaluated_depsgraph_get()
+
+    if bake_size and not live_nodes:
         # Bake first: baking changes the scene, so it never runs while the depsgraph's instances are iterated.
         pending = {}
         for instance in depsgraph.object_instances:

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13283528,
+  "total": 13293935,
   "history": [
     {
       "date": "2026-10-24",
@@ -6758,6 +6758,11 @@
       "date": "2026-11-10",
       "commit": "batch-216-job-1",
       "reason": "new optional cinematic/physical-lens: 0 to 589 B gzip; physical settings and DOF output share validation; core plus stage 24209 B unchanged"
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-207-job4",
+      "reason": "New blender/nodes: 0 to 10102 gzip B for validated live socket graphs, animated uniforms, all scalar Math and Mix/ramp/noise families. Splitting the connected graph compiler would duplicate validation or add asynchronous shader boundaries. The existing gltf-pro/model is the owning rendering dependency, as in the other Blender loaders. Root 4397 B; core/stage unchanged."
     }
   ],
   "items": {
@@ -7987,6 +7992,8 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/cinematic/physical-lens": 845
+    "@margoengine/cinematic/physical-lens": 845,
+    "@margoengine/blender/nodes": 10406,
+    "leak @margoengine/blender/nodes -> @margoengine/gltf-pro/model": 1
   }
 }

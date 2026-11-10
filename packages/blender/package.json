@@ -66,6 +66,10 @@
     "./meshopt": {
       "types": "./dist/meshopt.d.ts",
       "import": "./dist/meshopt.js"
+    },
+    "./nodes": {
+      "types": "./dist/nodes.d.ts",
+      "import": "./dist/nodes.js"
     }
   },
   "scripts": {
@@ -73,7 +77,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:browser:objects": "node tests/objects-browser.mjs",
     "test:browser:lightmap": "node tests/lightmap-browser.mjs",
-    "test:browser:meshopt": "node tests/meshopt-browser.mjs"
+    "test:browser:meshopt": "node tests/meshopt-browser.mjs",
+    "test:browser:nodes": "node tests/nodes-browser.mjs"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",

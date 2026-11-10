@@ -53,9 +53,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         default=0, min=0, max=4096,
     )
 
+    live_nodes: bpy.props.BoolProperty(
+        name="Live node graphs",
+        description="Keep common Mix, Color Ramp, Noise and Math graphs as animatable shaders; unsupported graphs fail by node name",
+        default=False,
+    )
+
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation, lightmap_size=self.lightmap_size)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation, lightmap_size=self.lightmap_size, live_nodes=self.live_nodes)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

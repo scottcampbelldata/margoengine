@@ -406,6 +406,10 @@
       "types": "./dist/blender/meshopt.d.ts",
       "import": "./dist/blender/meshopt.js"
     },
+    "./blender/nodes": {
+      "types": "./dist/blender/nodes.d.ts",
+      "import": "./dist/blender/nodes.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

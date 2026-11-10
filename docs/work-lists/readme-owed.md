@@ -609,3 +609,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - cinematic: document physical-lens millimetres, fitted sensor, f-stop, stage order and post-brain apply to DOF (batch 216 job 1).
 - margoengine: document cinematic/physical-lens alias (batch 216 job 1).
+
+
+
+- @margoengine/blender (batch 207 job 4): document nodes export toggle, parse/loadMargoNodes, controller parameters/get/set/reset/seek, disposal, node coverage, bounds, cancellation and accepted noise/subframe differences.
+- margoengine (batch 207 job 4): document blender/nodes alias.
