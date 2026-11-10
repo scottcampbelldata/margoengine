@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12460429,
+  "total": 12463577,
   "history": [
     {
       "date": "2026-10-24",
@@ -6001,6 +6001,12 @@
       "commit": "batch-264",
       "reason": "@margoengine/stats/panels: optional Stats parity entry, 0 to 9895 B gzip; full collector ownership and native graphs, separate from root and core/stage.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-263",
+      "reason": "New optional inspector/animation: absent to 2891 B gzip; playback and shared Lines skeleton helpers stay together. Core plus stage 23950 B unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7097,6 +7103,8 @@
     "@margoengine/html/inline": 2744,
     "@margoengine/wfc/assemble": 1721,
     "@margoengine/xr/performance": 1582,
-    "@margoengine/stats/panels": 10192
+    "@margoengine/stats/panels": 10192,
+    "@margoengine/inspector/animation": 3147,
+    "leak @margoengine/inspector/animation -> @margoengine/lines": 1
   }
 }

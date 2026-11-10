@@ -58,6 +58,10 @@
       "types": "./dist/gizmo.d.ts",
       "import": "./dist/gizmo.js"
     },
+    "./animation": {
+      "types": "./dist/animation.d.ts",
+      "import": "./dist/animation.js"
+    },
     "./textures": {
       "types": "./dist/textures.d.ts",
       "import": "./dist/textures.js"
@@ -81,12 +85,18 @@
     "@margoengine/scene": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/animation": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/animation": { "optional": true }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js inspector",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
+    "test:browser:animation": "node test/animation-browser.mjs",
+    "test:browser:animation:compat": "node test/animation-browser.mjs --compat",
     "test:browser": "node test/parity-browser.mjs",
     "test:browser:compat": "node test/parity-browser.mjs --compat",
     "test:browser:gizmo": "node test/gizmo-browser.mjs",

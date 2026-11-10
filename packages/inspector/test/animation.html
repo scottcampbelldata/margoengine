@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Animation panel real model</title>
+<canvas width="600" height="400" style="width:600px;height:400px"></canvas><main></main>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {engineRuntime} from '@margoengine/core/extension';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
+import {AnimationPanel} from '@margoengine/inspector/animation';
+window.setup=async()=>{
+  const engine=window.engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[200,100,250],target:[0,50,0]}});
+  const model=window.model=await loadGLTF(engine,'/examples/assets/khronos/Fox/Fox.glb');
+  const animation=window.animation=Animation.attach(model);
+  window.panel=AnimationPanel.attach(engine,[animation],{parent:document.querySelector('main')});
+  engine.render();
+  window.pose=()=>{const t=engineRuntime(engine).store.transforms;return model.nodes.flatMap(n=>[t.x[n.id],t.y[n.id],t.z[n.id],t.qx[n.id],t.qy[n.id],t.qz[n.id],t.qw[n.id]]);};
+  return animation.clips.map(c=>c.name);
+};
+</script>

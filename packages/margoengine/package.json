@@ -1474,6 +1474,10 @@
       "types": "./dist/inspector/gizmo.d.ts",
       "import": "./dist/inspector/gizmo.js"
     },
+    "./inspector/animation": {
+      "types": "./dist/inspector/animation.d.ts",
+      "import": "./dist/inspector/animation.js"
+    },
     "./inspector/textures": {
       "types": "./dist/inspector/textures.d.ts",
       "import": "./dist/inspector/textures.js"

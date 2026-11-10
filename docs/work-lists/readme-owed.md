@@ -231,3 +231,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | water/caustics optional facade | Batch 234 caustics |
 
 - @margoengine/worker (batch 257 job 4): document Firefox WebGL2 worker evidence, browser-matrix and strict browser selection, default-profile WebGPU gaps and the distinction between Windows WebKit fallback and unproved native Safari.
+| @margoengine/inspector | animation: AnimationPanel.attach, per-clip set/state, play/pause/scrub/weights, skeleton, ownership and disposal | batch-263 job 1 |
+| margoengine | Generated inspector/animation alias | batch-263 job 1 |
