@@ -208,6 +208,16 @@ export async function installCompat(options: InstallOptions = {}): Promise<Insta
     };
     restore.push(() => (proto.getContext = original));
   }
+  // toDataURL and toBlob read a canvas the layer shows through a 2D copy (CompatCanvasContext.uprightCopy).
+  const page = (globalThis as { HTMLCanvasElement?: { prototype: HTMLCanvasElement } }).HTMLCanvasElement?.prototype;
+  if (page)
+    for (const name of ['toDataURL', 'toBlob'] as const) {
+      const original = page[name] as (...a: unknown[]) => unknown;
+      (page as unknown as Record<string, unknown>)[name] = function (this: HTMLCanvasElement, ...rest: unknown[]) {
+        return original.apply(contexts.get(this)?.uprightCopy() ?? this, rest);
+      };
+      restore.push(() => ((page as unknown as Record<string, unknown>)[name] = original));
+    }
   for (const [name, value] of Object.entries(FLAGS))
     if (!(name in globalThis)) {
       Object.defineProperty(globalThis, name, {

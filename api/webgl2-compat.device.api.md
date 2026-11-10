@@ -148,6 +148,7 @@ export class CompatCanvasContext {
     unconfigure(): void;
     getConfiguration(): GPUCanvasConfiguration | null;
     getCurrentTexture(): CompatTexture;
+    uprightCopy(): HTMLCanvasElement | null;
     present(): void;
     keepFrame(): void;
 }

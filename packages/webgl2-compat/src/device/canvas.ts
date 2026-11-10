@@ -73,6 +73,21 @@ export class CompatCanvasContext {
     return t;
   }
 
+  /**
+   * A 2D copy of the page canvas for toDataURL and toBlob while it shows an ImageBitmap of the layer's WebGL2 context,
+   * or null when it does not. Chrome on macOS shows and draws such an image upright but encodes it upside down; a 2D
+   * copy made with drawImage encodes upright.
+   */
+  uprightCopy(): HTMLCanvasElement | null {
+    const { canvas, output } = this;
+    if (!output || !('transferFromImageBitmap' in output) || typeof document === 'undefined') return null;
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    copy.getContext('2d')?.drawImage(canvas, 0, 0);
+    return copy;
+  }
+
   /** Shows the canvas texture on the page (the device calls this at the end of a task that rendered into it). */
   present(): void {
     const t = this.texture,
