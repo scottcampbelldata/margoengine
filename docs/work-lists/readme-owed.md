@@ -1529,3 +1529,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/environment: document prefiltered KTX2 metadata capacity, early RangeError and the embedded-source 4096-edge maximum in the README phase.
 
 - @margoengine/cache: document exact indexed usage after deleting all Vary representations and repeated deletion during the README phase.
+
+- @margoengine/cache: document RangeCache freshness including request transit and Age after a miss or 304 in the README phase.

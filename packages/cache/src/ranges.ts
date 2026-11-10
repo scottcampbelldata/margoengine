@@ -250,7 +250,8 @@ export class RangeCache {
     if (file.etag) headers.set('if-none-match', file.etag);
     if (file.modified) headers.set('if-modified-since', file.modified);
     request.signal.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => controller.abort(), this.timeout);
+    const timer = setTimeout(() => controller.abort(), this.timeout),
+      sent = Date.now();
     let response: Response;
     try {
       response = await this.network(new Request(request, { headers, signal: controller.signal }));
@@ -263,7 +264,7 @@ export class RangeCache {
     }
     void response.body?.cancel().catch(() => {});
     if (response.status === 304) {
-      const fresh = freshUntil(response.headers, Date.now());
+      const fresh = freshUntil(response.headers, Date.now(), sent);
       if (fresh) this.queue((db) => this.touch(db, file.url, fresh));
       return 'revalidated';
     }
@@ -341,7 +342,8 @@ export class RangeCache {
       headers.set('range', `bytes=${lo}-${hi}`);
       forward = new Request(request, { headers });
     }
-    const response = await this.network(forward),
+    const sent = Date.now(),
+      response = await this.network(forward),
       control = response.headers.get('cache-control') ?? '';
     let offset = 0,
       size: number;
@@ -363,7 +365,7 @@ export class RangeCache {
       etag: response.headers.get('etag'),
       modified: response.headers.get('last-modified'),
       final: response.url || url,
-      fresh: freshUntil(response.headers, now),
+      fresh: freshUntil(response.headers, now, sent),
       used: now,
       blocks: [],
       bytes: 0,

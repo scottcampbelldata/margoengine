@@ -100,3 +100,41 @@ test('RangeCache honours Expires and Age the same way', async () => {
   await read(await second.fetch(base + 'aged', { headers: { range: 'bytes=0-9' } }));
   assert.equal(network.log.length, before + 1, 'aged blocks are revalidated');
 });
+
+for (const revalidated of [false, true])
+  test(`RangeCache counts request transit against freshness after ${revalidated ? 'a 304' : 'a miss'}`, async (t) => {
+    let now = 100_000;
+    t.mock.method(Date, 'now', () => now);
+    for (const age of [3, 8]) {
+      globalThis.indexedDB = fakeIndexedDB();
+      now = 100_000;
+      const files = { '/a': file({ 'cache-control': revalidated ? 'max-age=0' : 'max-age=10', age: String(age) }) };
+      const network = server(files);
+      const options = {
+        name: `transit-${revalidated}-${age}`,
+        block: 16,
+        fetch: async (input, init) => {
+          const response = await network(input, init);
+          now += 4000; // A controlled clock, without a real wait or a speed assertion.
+          return response;
+        },
+      };
+      const fetchSession = async () => {
+        const cache = new RangeCache(options);
+        assert.deepEqual(await read(await cache.fetch(base + 'a')), bytes(20));
+        cache.dispose();
+        await cache.flush();
+      };
+      await fetchSession();
+      if (revalidated) {
+        files['/a'] = file({ 'cache-control': 'max-age=10', age: String(age) });
+        await fetchSession();
+        assert.equal(network.log.at(-1).etag, '"e"');
+      }
+      // Age 3 plus four seconds in transit leaves three seconds; Age 8 leaves none.
+      now += age === 3 ? 3001 : 1;
+      const before = network.log.length;
+      await fetchSession();
+      assert.equal(network.log.length, before + 1, 'expired blocks must revalidate in the next session');
+    }
+  });

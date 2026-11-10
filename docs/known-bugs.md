@@ -5440,7 +5440,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
   the stored copy answers.
 - Stale copies are served on any non-200 answer and on a timeout, also for `no-cache` and `must-revalidate` files
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play, but not in limits.md.
-- RangeCache freshness ignores the request's round trip (`freshUntil(headers, now)` without `sent`).
+- Fixed, lane S (2026-11-10): RangeCache captures request start time for a miss and a 304 revalidation and passes it to the existing RFC 9111 freshness calculation. Age plus transit now consumes the correct lifetime. Two controlled-clock regressions in packages/cache/test/freshness.test.js fail on the parent and cover both partly consumed and entirely expired responses without real waits or speed assertions.
 - Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
   duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
   evicted; 27 throws carry no help link.

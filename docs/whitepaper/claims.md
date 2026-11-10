@@ -4663,3 +4663,7 @@ Deleting a URL with multiple Vary representations leaves the indexed byte and fi
 ### Review 5 live volume state (2026-11-10)
 
 Claim: KHR_animation_pointer volume color, thickness and distance reach the native tint uniforms, and editing parsed attenuation invalidates the corresponding cached optical depth. Evidence: animation/tests/volume-pointer.test.js and gltf-pro/tests/attenuation-live.test.js fail on the parent and check state plus uploaded lanes; gltf-pro/tests/progressive.test.js checks in-place edits across texture arrival. The existing native-volume browser oracle now checks 48 authored 1x1 slabs, including 20 live edit/animation cases, exactly on native WebGPU and WebGL2 compatibility. This does not certify arbitrary mesh thickness, hook extreme-range equivalence or speed. Same-value writes are not observable. Methods, sources and commands: [live volume materials](../live-volume-materials.md).
+
+### Range-cache response transit age (2026-11-10)
+
+Initial and 304 response freshness account for Age plus elapsed request time through the existing RFC 9111 helper. Evidence: the two parent-failing controlled-clock regressions in packages/cache/test/freshness.test.js cover a partly consumed lifetime and expiry during transit, without sleeping or timing budgets. Reproduce after build: node --test packages/cache/test/freshness.test.js. Sources and formula: docs/clean-room.md, Range-cache response transit age.
