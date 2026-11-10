@@ -74,6 +74,7 @@ export class Caustics implements EnginePlugin {
   private project?: GPURenderPipeline;
   private readonly copies = new Map<string, GPURenderPipeline>();
   private beamShadow = '';
+  private beamShader = '';
   private projectKey = '';
   private prepared?: GPUCommandEncoder;
 
@@ -177,7 +178,7 @@ export class Caustics implements EnginePlugin {
       );
   }
   private buildBeams(c: Context, state: QueryState, shadow: string): void {
-    if (this.token === state.token && this.beamShadow === shadow) return;
+    if (this.token === state.token && this.beamShadow === shadow && this.beamShader === state.shader) return;
     this.coordinates?.destroy();
     this.coordinates = undefined;
     if (state.positions) {
@@ -204,6 +205,7 @@ export class Caustics implements EnginePlugin {
     });
     this.token = state.token;
     this.beamShadow = shadow;
+    this.beamShader = state.shader;
     this.range?.destroy();
     this.range = c.device.createBuffer({
       size: Math.ceil((state.segments ** 2 * 2) / 64) * 4,
@@ -258,6 +260,7 @@ export class Caustics implements EnginePlugin {
             { binding: 0, resource: { buffer: state.token } },
             { binding: 3, resource: state.resources![3] },
             { binding: 7, resource: state.resources![7] },
+            ...(state.extraBindings ?? []),
           ]
         : [
             { binding: 0, resource: { buffer: state.token } },
@@ -397,6 +400,7 @@ export class Caustics implements EnginePlugin {
     this.uniform = this.coordinates = this.token = undefined;
     this.sampler = this.beam = this.project = undefined;
     this.projectKey = '';
+    this.beamShader = '';
     this.copies.clear();
     this.prepared = undefined;
   }

@@ -16,6 +16,7 @@ try {
     const { Water } = await import('/packages/water/dist/index.js');
     const { FFTOcean } = await import('/packages/water/dist/fft.js');
     const { Caustics } = await import('/packages/water/dist/caustics.js');
+    const { Ripples } = await import('/packages/water/dist/ripples.js');
     const { PostStack } = await import('/packages/post/dist/stack.js');
     const { invertMatrixStable } = await import('/packages/math/dist/mat4.js');
     const { CameraProjection } = await import('/packages/cameras/dist/index.js');
@@ -275,10 +276,38 @@ fn shadowLit(color:vec3f,p:vec3f,n:vec3f)->f32{return select(1.0,0.0,(p.x<0.0)&&
     fftStack.dispose();
     fftCaustics.dispose();
     fft.dispose();
+    // Ripple bindings must reach both beam and range pipelines, including when
+    // vertex effects are attached or removed after the first caustics frame.
+    const rippleWater = Water.attach(engine, {
+      size: [32, 32], segments: 32,
+      waves: [{ direction: [1, 0], amplitude: 0, wavelength: 12 }],
+    });
+    const attachRipple = () => Ripples.attach(engine, {
+      surface: rippleWater, size: 32, resolution: 32, followCamera: false,
+    });
+    const initialRipple = attachRipple();
+    const rippleCaustics = new Caustics({ ...options, surface: rippleWater, size: 32, resolution: 32, layers: 2 });
+    const rippleStack = PostStack.attach(engine, [rippleCaustics]);
+    await frame(0);
+    const initialRippleMap = await read(rippleCaustics.maps[0]);
+    initialRipple.dispose();
+    await frame(0);
+    const noRippleMap = await read(rippleCaustics.maps[0]);
+    const laterRipple = attachRipple();
+    laterRipple.disturb(0.5, 0.5, 5, 0.4);
+    await frame(0);
+    const disturbedRippleMap = await read(rippleCaustics.maps[0]);
+    const rippleMapsFinite = [initialRippleMap, noRippleMap, disturbedRippleMap].every(a => a.every(Number.isFinite));
+    const rippleFluxChanges = disturbedRippleMap.some((value, i) => i % 4 === 1 && Math.abs(value - noRippleMap[i]) > 0.01);
+    laterRipple.dispose();
+    rippleStack.dispose();
+    rippleWater.dispose();
     projection.dispose();
     const validation = await d.popErrorScope();
     engine.dispose();
     return {
+      rippleMapsFinite,
+      rippleFluxChanges,
       layerWorst,
       absorptionWorst,
       shadowRows,
@@ -312,6 +341,8 @@ fn shadowLit(color:vec3f,p:vec3f,n:vec3f)->f32{return select(1.0,0.0,(p.x<0.0)&&
     assert.ok(row.receiverWorst < 0.003, `receiver shadow ${row.mode}: ${row.receiverWorst}`);
     assert.ok(row.receiverProbes > 1000);
   }
+  assert.equal(result.rippleMapsFinite, true);
+  assert.equal(result.rippleFluxChanges, true);
   assert.equal(result.restoredSame, true);
   assert.deepEqual(result.resized, [160, 96]);
   assert.ok(result.brightened > 1000);
