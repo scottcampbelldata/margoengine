@@ -4408,9 +4408,6 @@ All values below are gzip bytes. The optional table includes every ceiling chang
 | `@margoengine/biomes/view` | 10454 | 10517 | 10454 | 10645 |
 | `@margoengine/clustered/area` | 10445 | 10526 | 10461 | 10652 |
 | `@margoengine/core` | 21584 | 21775 | 21630 | 21775 |
-
-Core 2026-11-10 (Scott approved): 21775 -> 21812 B gzip (+37 B), build ceiling 21813 B, for the three core
-correctness fixes in e8f3decf6; the reason and the measurements are in docs/core-version-guard.md.
 | `@margoengine/creative` | 19172 | 19244 | 19177 | 19368 |
 | `@margoengine/environment/cube-camera` | 5688 | 5756 | 5691 | 5882 |
 | `@margoengine/lines` | 19635 | 19703 | 19671 | 19862 |
@@ -4431,6 +4428,10 @@ correctness fixes in e8f3decf6; the reason and the measurements are in docs/core
 | `@margoengine/text` | 16395 | 16494 | 16406 | 16597 |
 | `@margoengine/transitions/mask` | 5460 | 5536 | 5522 | 5713 |
 | `@margoengine/transitions/custom` | 5234 | 5305 | 5275 | 5466 |
+
+Core 2026-11-10 (Scott approved): 21775 -> 21828 B gzip (+53 B), build ceiling 21829 B, for the three core
+correctness fixes in e8f3decf6 (first recorded as 21812 B, a figure no build gives); the reason and the measurements
+are in docs/core-version-guard.md.
 
 The same authorized 191 B allowance applies to these additional package unit ceilings. Shader
 minimal stays below 9000 B, its 60% ratio stays unchanged, and viewcube axes stays below 1200 B.

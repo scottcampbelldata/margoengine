@@ -52,14 +52,20 @@ Before the repair, the packed duplicate-path case failed with "Missing expected 
 the old engine silently accepted the foreign plugin. Build-transform tests cover aliases, local
 shadowing, object plugins, static attach and preserving a bundled dependency's own version.
 
-Core growth, 2026-11-10 (Scott approved): 21775 -> 21812 B gzip (+37 B), build ceiling 21776 -> 21813 B. Three
+Core growth, 2026-11-10 (Scott approved): 21775 -> 21828 B gzip (+53 B), build ceiling 21776 -> 21829 B. Three
 correctness fixes found by the batch 132 audit, each with a regression test that fails without it (e8f3decf6):
 `storeQuaternion` lost roll at pitch +-90 degrees (both Euler atan2 pairs are (0,0) there; X is now 0 and Z takes
 2 atan2(qz, qw), as Shoemake resolves the gimbal case); `resize()` clamped width and height to 4096 independently, so
 5120x1440 rendered at 4096x1440 with the wrong aspect (both now scale by one factor); `fitToBoundingBox` padded the
 radius to 2 near and never kept the box past the near plane (a 2 cm part sat 11x too far away, and at fov 120 near cut
 the box). These are wrong results, not features, and none could move out of core: each sits on the engine's own
-transform, backbuffer or camera path. No quality was traded for the bytes.
+transform, backbuffer or camera path. No quality was traded for the bytes. e8f3decf6 first recorded 21812 B and a
+ceiling of 21813 B, which no build of its sources gives, so `build:packages` failed on main. Measured by building
+only `packages/core` and `packages/shared` from each commit with `node scripts/build-modern.js --precompiled`
+(Node 26.12.0, zlib 1.3.2.1-motley, rolldown 1.2.13): 21775 B at e8f3decf6^, 21828 B at e8f3decf6 and on main after
+it, the same in two worktrees. Scott's 2026-11-07 ruling (a core bug fix passes the cap by what it measures) and his
+2026-11-10 ruling (the approved core fixes keep their measured cost) set the ceiling at 21829 B; a later core shrink
+pass ratchets it back down.
 
 Scott's later 2026-11-09 ruling retains a core-only ratchet at the final measured 21775 B. The build
 uses a strict ceiling of 21776 B, and the quality entry is capped inclusively at 21775 B. The 26

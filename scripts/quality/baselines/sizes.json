@@ -8127,7 +8127,7 @@
     {
       "date": "2026-11-10",
       "commit": "e8a17cea0",
-      "reason": "stage fixes (shared lights, camera up, controls about camera.up) and core e8f3decf6's fixes (roll at pitch 90, aspect past 4096, fit past near); core cap 21813 B approved by Scott 2026-11-10",
+      "reason": "stage fixes (shared lights, camera up, controls about camera.up) and core e8f3decf6's fixes (roll at pitch 90, aspect past 4096, fit past near); core cap 21829 B (measured 21828 B) approved by Scott 2026-11-10",
       "grew": 2
     },
     {

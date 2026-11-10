@@ -312,10 +312,13 @@ for (const name of packages) {
 // for stable instance rows with changed-row uploads (+382 B) and Engine.writePoses (+231 B): core 21,285 B. Not raised.
 // Scott's later 2026-11-09 version-guard ruling keeps this ratchet: 21584 -> 21775 B (+191 B),
 // shrunk from the 238 B draft. Strict ceiling is one byte above the final measured core, with no growth headroom.
-// 2026-11-10, approved by Scott (see docs/core-version-guard.md): the batch 132 audit's
-// three core fixes (pitch +-90 degree Euler lanes, an aspect-keeping 4096 backbuffer clamp, fitToBoundingBox past near)
-// took core 21,775 -> 21,812 B (+37 B).
-const CORE_ONLY_CEILING = 21_813;
+// 2026-11-10, approved by Scott (see docs/core-version-guard.md) under his 2026-11-07 ruling (a core bug fix passes the
+// cap by what it measures) and his 2026-11-10 ruling (the approved core fixes keep their measured cost): the batch 132
+// audit's three core fixes in e8f3decf6 (pitch +-90 degree Euler lanes, an aspect-keeping 4096 backbuffer clamp,
+// fitToBoundingBox past near) took core 21,775 -> 21,828 B (+53 B). e8f3decf6 recorded 21,812 B, a figure no build of
+// its sources gives: this build of packages/core and packages/shared at e8f3decf6^ measures 21,775 B and at e8f3decf6
+// 21,828 B (Node 26.12.0, zlib 1.3.2.1-motley, rolldown 1.2.13), and nothing core bundles changed after it.
+const CORE_ONLY_CEILING = 21_829;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();
