@@ -8235,7 +8235,7 @@
     {
       "date": "2026-11-10",
       "commit": "8239215b3",
-      "reason": "batch 132 audit: FITS commentary cards, complex and blank values, and a bounded zero-width table row count (+33 B)",
+      "reason": "batch 132 audit: FITS commentary cards, complex and blank values, and a bounded zero-width table row count (+73 B gzip measured, 5124 to 5197)",
       "grew": 1
     }
   ],

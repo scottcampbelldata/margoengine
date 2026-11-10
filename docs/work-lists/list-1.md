@@ -22,7 +22,7 @@ CPU profiles and native API counts. Missing adapters/APIs, reference failures,
 Draco/KTX2 export scenes and matched controls remain build jobs. No new timed
 numbers or speed verdicts were published. [Evidence and exact remaining work](../whitepaper/parity-diagnoses.md).
 
-**After every list is done, in this order:** batch 120 kit packages, AVIF decoder, app origin check, batches 133, 134, 136, 137 clean-room codecs, batch 121 second pass, batch 132 research and quality audit, leftovers of batches 19 and 21, then npm and PyPI only on Scott's word.
+**After every list is done, in this order:** batch 120 kit packages, AVIF decoder, app origin check, batches 133, 134, 136, 137 clean-room codecs, batch 121 second pass, batch 132 research and quality audit (DONE 2026-11-10: 99 of 102 packages audited in [package-audit.md](../whitepaper/package-audit.md); physics, physics2d and ragdoll excluded by Scott's physics hold), leftovers of batches 19 and 21, then npm and PyPI only on Scott's word.
 
 **Rust candidates (Scott, 2026-11-09):** move convex decomposition (batch 129), Draco and Basis decoders (batches 133, 134) and encoders (136, 137), then navmesh build after profiling confirms the CPU loops. Measure first: splat sort, dense marching cubes and voxel mesher. Not Rust: the math library, GPU-bound rows and picking. Keep the same work and output, prove the gain by a work count or paired A/B, and check each entry's gzip size.
 
