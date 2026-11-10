@@ -18,6 +18,7 @@ export class GPULightmapBaker {
     readonly width: number;
     readonly height: number;
     readonly samples: number;
+    readonly radiometry?: 'physical';
     private constructor();
     static create(target: GPUTarget, mesh: LightmapMesh, options?: GPULightmapOptions): Promise<GPULightmapBaker>;
     get passes(): number;

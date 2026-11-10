@@ -5216,3 +5216,12 @@ SplatLod structural nodes have count 0 and refine unconditionally; the renderer 
 SOG v3 preserves exponential-map rotations, squared opacity through 1.5625, 24-bit labels and SH degree 4 (25 RGB coefficients including DC). Unused blind attributes are ignored as permitted by the format. Images use the existing lossless WebP decoder. Extended opacity is retained until the existing fragment alpha cap min(0.99, opacity*Gaussian), preserving extra off-center coverage. Colours retain the existing first-order display/linear SH conversion. encodeSog chooses v3 for extended opacity or degree 4, otherwise v2. SPZ v3, .splat and Gaussian PLY reject opacity above 1 rather than wrapping/clipping; SPZ v3 rejects degree 4. Standard PLY now carries degree 4.
 
 Batch 238 job 3 minified gzip: lod-sog new 0 to 20,369 B (ceiling 20,981 B). Shared degree-4/v3 support takes data to 22,273 B (prior ceiling 22,135 B, raised to 22,942 B) and animate to 20,381 B (prior ceiling 20,263 B, raised to 20,993 B). The bytes retain a single validated data representation and codec instead of splitting degree/opacity formats. Root splats 32,073 B; lod 30,582 B; progressive 31,464 B; formats 20,705 B. Core plus stage remains 24,209 B.
+
+## Lightmaps drawn at draw time (batch 54)
+
+`@margoengine/lightmap/apply` adds the bake as indirect light (diffuse reflectance times occlusion times the bake),
+the way `Material.lightMap` does; it does not turn off live lights the bake already holds. A glTF-pro material record
+that already has a material extension (clearcoat, a custom one) is refused, since a record holds one extension. A core
+mesh needs its lightmap UVs passed (`uv1`), is drawn by a materials stand-in in the engine's default scene, and its
+stand-in copies colour, roughness, metalness and sidedness only (no core textures). A live GPU baker must share the
+model's GPU device. WebGPU only for glTF-pro models.

@@ -145,6 +145,29 @@ order-3 spherical harmonics (27 floats, `SH3` layout) of the shadowed direct lig
 room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the ambient lights where they escape.
 `probeIrradiance(grid, position, normal)` reads the irradiance trilinearly, in the same units as a physical lightmap.
 
+## Drawing a bake: `@margoengine/lightmap/apply`
+
+`applyLightmap(target, baked, options)` draws a bake at draw time on a materials `Material` or `createMesh` mesh, a loaded glTF-pro model or a
+core mesh, read on UV1 (glTF `TEXCOORD_1`). The bake can be `bakeLightmap`, `bakeGlobalLightmap`, `bakeMeshLightmap`
+or a live `GPULightmapBaker`, whose texture is drawn as it improves.
+
+- **The light added.** Diffuse reflectance (base colour times 1 minus metalness) times occlusion times the baked
+  value times its scale, added to the live lighting as `Material.lightMap` adds it. A `radiometry: 'physical'` bake
+  uses the Lambertian response (divided by pi); a legacy one multiplies. `intensity` (default 1) scales either;
+  `response` overrides the choice. Turn off live lights the bake already holds.
+- **Materials and `createMesh` meshes.** Sets `lightMap`, `lightMapIntensity` and `lightMapResponse` on each material.
+  `dispose()` puts back the values it found, unless something has set another `lightMap` since.
+- **glTF-pro models.** Each primitive (or those in `primitives`) draws a copy of its material record with a material
+  extension that adds the light; colours, factors and maps stay shared, so live edits show. A record that already has a
+  material extension (clearcoat from `@margoengine/materials` `install`, or your own) is refused.
+- **Core meshes.** Core's shader has no UV1 or lightmap, so pass the lightmap UVs as `uv1`: a materials mesh with the
+  core mesh's geometry and colour, roughness, metalness and sidedness draws in its place, parented to it (it follows
+  the core mesh's transform). The core mesh draws nothing until `dispose()` gives its geometry back.
+- **Textures.** `lightmapTexture(baked)` returns the linear `Texture` (RGBA8 for a CPU bake, the live `rgba16float`
+  texture of a GPU baker) and the `lightMapIntensity` that decodes it, without mipmaps, for your own materials.
+
+A runnable example comes in the README phase.
+
 ## More light: `@margoengine/lightmap/global`
 
 `bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:

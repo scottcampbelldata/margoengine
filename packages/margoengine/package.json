@@ -1778,6 +1778,10 @@
       "types": "./dist/lightmap/denoise.d.ts",
       "import": "./dist/lightmap/denoise.js"
     },
+    "./lightmap/apply": {
+      "types": "./dist/lightmap/apply.d.ts",
+      "import": "./dist/lightmap/apply.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"

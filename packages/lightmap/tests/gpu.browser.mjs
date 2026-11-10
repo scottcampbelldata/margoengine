@@ -1,5 +1,5 @@
 // GPU progressive baking (./gpu) on a real WebGPU device, checked against the CPU baker (./mesh) and an exact
-// form factor. Run with `npm run test:gpu` (after the package build); it takes a GPU lock slot through gpu-package-tests.
+// form factor; then ./apply drawing a bake on materials, glTF-pro and core meshes. Run with `npm run test:gpu` (after the package build); it takes a GPU lock slot through gpu-package-tests.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -188,6 +188,178 @@ try {
   assert.equal(r.refused, 'TypeError');
   assert.match(r.disposed, /disposed/);
   console.log('lightmap GPU bake: ok', JSON.stringify(r));
+
+  // ./apply: one lightmap drawn on a materials mesh, a loaded glTF-pro model, a core mesh and from the live GPU baker,
+  // with every live light off, so all the light on screen is the lightmap's.
+  const drawn = await page.evaluate(async () => {
+    const { Engine, Geometry, PbrMaterial: CoreMaterial } = await import('/packages/core/dist/index.js');
+    const { PbrMaterial, createMesh } = await import('/packages/materials/dist/index.js');
+    const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { applyLightmap } = await import('/packages/lightmap/dist/apply.js');
+    const { GPULightmapBaker } = await import('/packages/lightmap/dist/gpu.js');
+    const size = 64,
+      canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+        backend: 'webgpu',
+        camera: { position: [0, 0, 3], target: [0, 0, 0], fov: 60 },
+      }),
+      errors = [];
+    engine.stop();
+    engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    engine.lighting.direction[3] = 0;
+    engine.lighting.radiance.set([0, 0, 0, 0]);
+    // The red channel's mean over the left and the right quarter of the middle rows, 0 to 255.
+    const halves = async () => {
+      for (let i = 0; i < 2; i++) {
+        engine.render({ delta: 1 / 60 });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      }
+      // Copy the canvas in the task that rendered it: once the frame is presented a WebGPU canvas may read back blank
+      // (it did, at random, on Metal when read after an await).
+      const c = new OffscreenCanvas(size, size),
+        x = c.getContext('2d', { willReadFrequently: true });
+      engine.render({ delta: 1 / 60 });
+      x.drawImage(canvas, 0, 0);
+      const data = x.getImageData(0, 0, size, size).data,
+        mean = (from, to) => {
+          let sum = 0,
+            n = 0;
+          for (let y = 24; y < 40; y++)
+            for (let px = from; px < to; px++) {
+              sum += data[(y * size + px) * 4];
+              n++;
+            }
+          return sum / n;
+        };
+      return [mean(14, 24), mean(40, 50)];
+    };
+    // A 2 x 2 quad facing the camera (it fills the middle 37 of 64 pixels), lightmap U along +x.
+    const positions = [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],
+      normals = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      uv1 = [0, 1, 1, 1, 1, 0, 0, 0],
+      indices = [0, 1, 2, 0, 2, 3];
+    // Left half lit (255 decodes to the scale, 0.75), right half dark.
+    const baked = { width: 4, height: 1, lightmap: new Uint8Array(16), lightmapScale: 0.75 };
+    for (const i of [0, 1]) baked.lightmap.set([255, 255, 255, 255], i * 4);
+    for (const i of [2, 3]) baked.lightmap[i * 4 + 3] = 255;
+    const out = {};
+    // A materials mesh.
+    const material = new PbrMaterial({ color: [0.5, 0.5, 0.5], roughness: 1, metalness: 0 }),
+      mesh = createMesh(engine, { positions, normals, uvs1: uv1, indices }, material);
+    out.meshOff = await halves();
+    let app = applyLightmap(mesh, baked);
+    out.meshOn = await halves();
+    app.dispose();
+    out.meshBack = await halves();
+    mesh.destroy();
+    // The same quad as a glTF file with TEXCOORD_1, loaded by glTF-pro.
+    const bytes = new Float32Array([...positions, ...normals, ...uv1]),
+      index = new Uint16Array(indices),
+      buffer = new Uint8Array(bytes.byteLength + index.byteLength);
+    buffer.set(new Uint8Array(bytes.buffer), 0);
+    buffer.set(new Uint8Array(index.buffer), bytes.byteLength);
+    const model = parseGLTF(
+      engine,
+      {
+        asset: { version: '2.0' },
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_1: 2 }, indices: 3, material: 0 }] }],
+        materials: [
+          { pbrMetallicRoughness: { baseColorFactor: [0.5, 0.5, 0.5, 1], metallicFactor: 0, roughnessFactor: 1 } },
+        ],
+        buffers: [{ byteLength: buffer.byteLength }],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: 48 },
+          { buffer: 0, byteOffset: 48, byteLength: 48 },
+          { buffer: 0, byteOffset: 96, byteLength: 32 },
+          { buffer: 0, byteOffset: 128, byteLength: 12 },
+        ],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0] },
+          { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+          { bufferView: 2, componentType: 5126, count: 4, type: 'VEC2' },
+          { bufferView: 3, componentType: 5123, count: 6, type: 'SCALAR' },
+        ],
+      },
+      [buffer.buffer],
+    );
+    out.modelOff = await halves();
+    const own = model.primitives[0].material;
+    app = applyLightmap(model, baked);
+    out.modelCopied = model.primitives[0].material !== own && model.primitives[0].material.extension !== undefined;
+    out.modelOn = await halves();
+    app.dispose();
+    out.modelRestored = model.primitives[0].material === own;
+    out.modelBack = await halves();
+    model.destroy();
+    // A core mesh: core geometry has no UV1, so a materials stand-in draws it.
+    const core = engine.createMesh(),
+      geometry = new Geometry(positions, normals, indices);
+    core.setGeometry(geometry);
+    core.material = new CoreMaterial({ color: [0.5, 0.5, 0.5], roughness: 1, metalness: 0 });
+    out.coreOff = await halves();
+    app = applyLightmap(core, baked, { uv1 });
+    out.coreHidden = core.geometry === null && app.mesh.root.engine === engine;
+    out.coreOn = await halves();
+    // The stand-in follows the core mesh: moved right by a quarter of the quad, the lit left half moves right.
+    core.position.x = 0.5;
+    out.coreMoved = await halves();
+    core.position.x = 0;
+    app.dispose();
+    out.coreRestored = core.geometry === geometry;
+    out.coreBack = await halves();
+    // The live GPU bake of a lit floor drawn straight from the baker's texture, before and after more passes.
+    const quad = {
+        positions: new Float32Array(positions),
+        uv1: new Float32Array(uv1),
+        indices: new Uint32Array(indices),
+      },
+      baker = await GPULightmapBaker.create(engine.gpu, quad, {
+        width: 16,
+        lights: [{ type: 'directional', direction: [-1, 0, 1], intensity: 1 }],
+      });
+    await baker.step(8);
+    const liveMaterial = new PbrMaterial({ color: [0.5, 0.5, 0.5], roughness: 1, metalness: 0 }),
+      liveMesh = createMesh(engine, { positions, normals, uvs1: uv1, indices }, liveMaterial);
+    app = applyLightmap(liveMesh, baker);
+    out.live = await halves();
+    app.dispose();
+    liveMesh.destroy();
+    baker[Symbol.dispose]();
+    core.dispose();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    out.errors = errors;
+    engine.dispose();
+    return out;
+  });
+  console.log('apply', JSON.stringify(drawn));
+  assert.deepEqual(drawn.errors, []);
+  // With no live light every target is black but where the lightmap lights it.
+  for (const k of ['meshOff', 'meshBack', 'modelOff', 'modelBack', 'coreOff', 'coreBack'])
+    assert.ok(drawn[k][0] < 1 && drawn[k][1] < 1, `${k} is dark: ${drawn[k]}`);
+  // The lit left half shows, the dark right half adds nothing.
+  for (const k of ['meshOn', 'modelOn', 'coreOn']) {
+    assert.ok(drawn[k][0] > 40, `${k} shows the lightmap: ${drawn[k]}`);
+    assert.ok(drawn[k][1] < 1, `${k} adds nothing where the lightmap is dark: ${drawn[k]}`);
+  }
+  // The glTF-pro hook adds the light Material.lightMap adds: same pixels within one 8-bit step.
+  assert.ok(
+    Math.abs(drawn.modelOn[0] - drawn.meshOn[0]) <= 1,
+    `glTF-pro ${drawn.modelOn} vs materials ${drawn.meshOn}`,
+  );
+  assert.ok(Math.abs(drawn.coreOn[0] - drawn.meshOn[0]) <= 1, `core ${drawn.coreOn} vs materials ${drawn.meshOn}`);
+  assert.ok(drawn.modelCopied && drawn.modelRestored, 'the model draws a copy and gets its own record back');
+  assert.ok(drawn.coreHidden && drawn.coreRestored, 'the core mesh draws nothing while lit and gets its geometry back');
+  assert.ok(
+    drawn.coreMoved[1] > 40 && drawn.coreMoved[0] < drawn.coreOn[0] - 40,
+    `the stand-in follows the core mesh: ${drawn.coreMoved}`,
+  );
+  // A light from the left (direction toward it is -x, +z) lights the floor facing +z evenly.
+  assert.ok(drawn.live[0] > 5 && drawn.live[1] > 5, `the live baker's texture is drawn: ${drawn.live}`);
 } finally {
   await closeAll({ browser, servers: [server] });
 }

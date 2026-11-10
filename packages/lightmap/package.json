@@ -57,6 +57,10 @@
     "./denoise": {
       "types": "./dist/denoise.d.ts",
       "import": "./dist/denoise.js"
+    },
+    "./apply": {
+      "types": "./dist/apply.d.ts",
+      "import": "./dist/apply.js"
     }
   },
   "files": [

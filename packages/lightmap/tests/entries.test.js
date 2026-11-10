@@ -22,7 +22,8 @@ test('each entry loads only its own passes', async () => {
     directional = await loaded('directional.js'),
     gpu = await loaded('gpu.js'),
     probes = await loaded('probes.js'),
-    denoise = await loaded('denoise.js');
+    denoise = await loaded('denoise.js'),
+    apply = await loaded('apply.js');
   for (const name of [
     'bakeGlobalLightmap',
     'bakeRefractedLightmap',
@@ -47,4 +48,7 @@ test('each entry loads only its own passes', async () => {
   assert.ok(denoise.includes('denoiseTexels') && !/bake\w*Lightmap\(|packAtlas|raycastFirst|MeshBVH/.test(denoise));
   assert.ok(refracted.includes('bakeRefractedLightmap') && !refracted.includes('bakeGlobalLightmap'));
   assert.ok(gpu.includes('GPULightmapBaker') && !gpu.includes('packAtlas') && !mesh.includes('GPULightmapBaker'));
+  // ./apply draws a bake: it loads none of the package's bakers (no relative import at all; its messages name them).
+  assert.ok(apply.includes('applyLightmap') && !plain.includes('applyLightmap'));
+  assert.ok(!/from\s*["']\.\//.test(apply) && !apply.includes('packAtlas'));
 });

@@ -248,6 +248,8 @@ export class GPULightmapBaker {
   readonly height: number;
   /** Texels baked (covered by a triangle). */
   readonly samples: number;
+  /** 'physical' when baked with `radiometry: 'physical'` (irradiance): `applyLightmap` then draws it Lambertian. */
+  readonly radiometry?: 'physical';
   #passes = 0;
   #disposed = false;
   #bvh: GPUMeshBVH;
@@ -274,6 +276,7 @@ export class GPULightmapBaker {
     this.width = setup.width;
     this.height = setup.height;
     this.samples = setup.covered.length;
+    if (settings.physical) this.radiometry = 'physical';
     const buffer = (data: ArrayBufferView & { byteLength: number }, usage: number) => {
       const b = device.createBuffer({ size: Math.max(16, Math.ceil(data.byteLength / 16) * 16), usage });
       device.queue.writeBuffer(b, 0, data.buffer, data.byteOffset, data.byteLength);

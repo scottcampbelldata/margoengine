@@ -27,3 +27,7 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 | 54.5 | @margoengine/lightmap | path bounces run on the CPU only; move them to the GPU baker (@margoengine/lightmap/gpu, 54.2) once it is on main |
 | 54.5 | @margoengine/lightmap | path bounces for triangle meshes (./mesh) and light through glass on bounce paths are not built |
 | 54.5 | @margoengine/lightmap | path mode not compared with Cycles on the Cornell scene (rival-bench.mjs runs quad mode); Kajiya 1986 not read this job |
+| 54.3 | @margoengine/lightmap | apply: a core mesh in a scene other than the default draws its stand-in in the default scene (createMesh takes no scene); pass the scene through once materials can |
+| 54.3 | @margoengine/lightmap | apply: core mesh textures (base colour, ORM) are not copied to the stand-in; colour, roughness, metalness and sidedness only |
+| 54.3 | @margoengine/lightmap | apply: glTF-pro records with a material extension already (clearcoat) are refused; needs a way to chain two extensions |
+| 54.3 | @margoengine/lightmap | apply: glTF-pro models need WebGPU (the extension hook binds a GPU texture); no WebGL2 path yet |
