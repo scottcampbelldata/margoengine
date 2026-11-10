@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14501554,
+  "total": 14505973,
   "history": [
     {
       "date": "2026-10-24",
@@ -7703,6 +7703,12 @@
       "commit": "808c36400",
       "reason": "landed with push-anyway: feat(scatter): automatic LOD rings from one mesh (new entry @margoengine/scatter/simplify)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "56e1f949e",
+      "reason": "landed with push-anyway: feat(water): add water bodies from outlines and river splines",
+      "grew": 1
     }
   ],
   "items": {
@@ -8935,6 +8941,7 @@
     "@margoengine/voxel/vox": 12969,
     "@margoengine/voxel/wind": 3073,
     "@margoengine/water": 20817,
+    "@margoengine/water/bodies": 4419,
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/flow": 3158,

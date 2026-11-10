@@ -1182,3 +1182,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/scatter (batch 64 job 5): document /simplify scatterLODs ratios, deviation, ringDistance, nested rings, kept normals, optional lod and mesh-edit peers and limits; example deferred.
 - margoengine (batch 64 job 5): document the scatter/simplify forwarding entry.
+
+- @margoengine/water and margoengine (batch 67 job 1): /bodies WaterBodies with outline and river path bodies, levels, waves share, colours, setBodies, sample, bounds, rasterizeWaterBodies and sampleWaterBodies; examples deferred.

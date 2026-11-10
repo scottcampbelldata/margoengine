@@ -330,3 +330,13 @@ the small preview tier cannot render these water sources.
 compare CPU answers to actual GPU raster samples, analytic wave motion to
 GPU finite differences, and coastal velocities to an independent flux oracle.
 Use the shared GPU lock. Sources and evidence: [wave-query record](../../docs/water-query.md).
+
+## Water bodies
+
+`@margoengine/water/bodies` puts lakes, pools and rivers on one `Water`. Each body is a closed XZ `outline` at its own
+`level`, or a river `path` of `[x, level, z]` points with a `width`, smoothed by a uniform Catmull-Rom spline so the
+level falls along it. Each has its own share of the Water's waves (`waves`, 0 for a still pool) and colour. Water is
+drawn only inside the bodies; the body map (signed distance, level, wave share, index per texel) is rasterized on the
+CPU and read with the same bilinear sample by the surface shader, `WaveQuery` heights and `bodies.sample(x, z)`.
+Where bodies overlap the later one covers the earlier. The Water grid stays centred on the world origin: size it to
+cover `bodies.bounds`. Islands (holes), per-body foam and flow, and a grid that follows the bodies are not done yet.
