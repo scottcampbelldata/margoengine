@@ -272,7 +272,7 @@ export interface StandaloneOptions extends ShareOptions {
   /** Enable the iframe API only for this exact parent origin. Default disabled. */
   readonly parentOrigin?: string;
   readonly channel?: string;
-  /** Prefer native WebGPU, with the bundled WebGL2 compatibility layer as fallback. Default auto. */
+  /** Default auto. The bundled runtime prefers native WebGPU and lazily installs WebGL2 as fallback. Custom runtimes supply prepareBackend. */
   readonly backend?: 'auto' | 'webgpu' | 'webgl2';
 }
 /** A single offline HTML document. Data and executable runtime are inline; no CDN or import map is needed. */
@@ -302,7 +302,7 @@ export async function exportStandalone(figure: Figure | FigureSpec, options: Sta
 }
 /** Load options for an offline viewer with host-owned backend setup. */
 export interface StandaloneLoadOptions extends FigureLoadOptions {
-  /** Called for auto/webgl2 only; omit to use the installed backend. */
+  /** Host-owned lazy setup, called for auto/webgl2 only. Required for explicit webgl2. The bundled standalone runtime supplies it by default. */
   readonly prepareBackend?: (options: { force: boolean; signal?: AbortSignal }) => Promise<unknown>;
 }
 /** @internal Entrypoint for the bundled offline viewer. Dispatches margo-ready with the restored figure. */
@@ -312,6 +312,10 @@ export async function startStandalone(options: StandaloneLoadOptions = {}): Prom
   );
   const { prepareBackend, ...load } = options;
   load.signal?.throwIfAborted();
+  if (backend !== undefined && !['auto', 'webgpu', 'webgl2'].includes(backend))
+    throw typeError('Standalone backend must be auto, webgpu or webgl2', 'sciviz');
+  if (backend === 'webgl2' && !prepareBackend)
+    throw fault('unsupported', 'WebGL2 requires prepareBackend; supply an async callback calling the compatibility layer install(options)', 'sciviz');
   if (backend !== 'webgpu') await prepareBackend?.({ force: backend === 'webgl2', signal: load.signal });
   load.signal?.throwIfAborted();
   const figure = await Figure.fromJSON(spec, document.querySelector('canvas')!, load);

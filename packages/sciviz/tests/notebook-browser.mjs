@@ -48,7 +48,9 @@ for (const compat of [false, true]) {
           ++ready;
         });
         const controller = new AbortController();
-        const dispose = await render({ model, el: host, signal: controller.signal });
+        const dispose = await render({ model, el: host, signal: controller.signal,
+          prepareBackend: async (options) => (await import('/packages/webgl2-compat/dist/index.js')).install(options),
+        });
         await figure.ready();
         figure.engine.stop();
         figure.engine.render();

@@ -1,5 +1,7 @@
 # README work owed
 
+- @margoengine/sciviz: document raw notebook/share prepareBackend requirements and explicit WebGL2 errors; shipped Python/offline hosts provide automatic lazy fallback (review5).
+
 | Package | Completed README validation | Status |
 |---|---|---|
 | @margoengine/lightmap | All existing quad, mesh and progressive GPU examples: explicit GPU options typing preserves the direction tuple; `npm run check:readmes` and `npm run check:readme-run -- --packages=lightmap`. Other feature examples listed below remain owed. | DONE (lightmap-readme-fix) |

@@ -7229,3 +7229,7 @@ https://vite.dev/config/dep-optimization-options; React team, *react-dom/test-ut
 ### Review 5: biased implicit sampler footprints (2026-11-10)
 
 webgl2-compat keeps hardware implicit LOD for biased and unbiased sampling. The 20-probe oblique fixture compares 1280 f32 words exactly against native WebGPU on each of ANGLE D3D11 and Vulkan on RTX A6000. Explicit level/gradient interpolation retains its independent oracle. CPU coverage includes all supported sampled dimensions and offsets. Other GPUs and arbitrary filtering states are not certified by this fixture. Methods, sources and reproduction: [review5-compat-bias.md](../review5-compat-bias.md).
+
+### Notebook backend ownership (review5, 2026-11-10)
+
+The sciviz notebook/share libraries remain independent of webgl2-compat. The Python AFM and offline runtime provide a lazy default prepareBackend; imports have no installation side effects and native-only requests bypass it. An isolated host must supply setup for explicit WebGL2 or receives a linked unsupported error before loading. The unchanged backend-isolation tests cover callbacks, cancellation and error propagation; notebook-backend.test.js adds missing-callback refusal and forwarding-entry refusal/host overrides. The notebook browser suite exercises host-owned setup on both backends. Setup and reproduction are in docs/guides/sciviz-notebooks.md, including the W3C WebGPU adapter contract used for this clean-room change. No core or stage code changes.

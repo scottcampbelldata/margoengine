@@ -1,6 +1,6 @@
 import { Figure, validateFigureSpec, type FigureLoadOptions, type FigureSpec } from '@margoengine/sciviz/spec';
 import { applyShareView, type EmbedSelection } from '@margoengine/sciviz/share';
-import { typeError } from '../../shared/errors.js';
+import { fault, typeError } from '../../shared/errors.js';
 
 /** The small AFM model contract implemented by anywidget and native notebook hosts. */
 export interface NotebookModel {
@@ -17,7 +17,7 @@ export interface NotebookRenderOptions {
   readonly signal?: AbortSignal;
   /** Explicit application codecs, pipeline registry or engine. Nothing is fetched from an executable registry. */
   readonly load?: Omit<FigureLoadOptions, 'buffers' | 'signal'>;
-  /** Host-owned backend setup. Called for auto/webgl2 only; omit to use the installed backend. */
+  /** Host-owned lazy backend setup, called for auto/webgl2 only. Required for explicit webgl2. Bundled notebook hosts supply it by default. */
   readonly prepareBackend?: (options: { force: boolean; signal: AbortSignal }) => Promise<unknown>;
 }
 /** Convert comm byte views to a named lookup without copying their storage or losing offsets. */
@@ -134,6 +134,8 @@ export async function render({ model, el, signal, load, prepareBackend }: Notebo
       const backend = model.get('backend') ?? 'auto';
       if (!['auto', 'webgpu', 'webgl2'].includes(String(backend)))
         throw typeError('Notebook backend must be auto, webgpu or webgl2', 'sciviz');
+      if (backend === 'webgl2' && !prepareBackend)
+        throw fault('unsupported', 'WebGL2 requires prepareBackend; supply an async callback calling the compatibility layer install(options)', 'sciviz');
       if (backend !== 'webgpu') await prepareBackend?.({ force: backend === 'webgl2', signal: controller.signal });
       controller.signal.throwIfAborted();
       const next = await Figure.fromJSON(spec, canvas, { ...load, buffers, signal: controller.signal });

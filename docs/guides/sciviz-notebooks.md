@@ -16,6 +16,10 @@ Borrowed arrays must remain stable while a view loads. After in-place mutation, 
 
 `backend` defaults to `auto`: native WebGPU when available, otherwise the bundled WebGL2 compatibility device. Explicit `webgpu` and `webgl2` values select one path. GPU support still depends on the browser and host policy. No CDN, separate Lab extension, Node service or remote renderer is required by this widget.
 
+Custom JavaScript hosts using the isolated `@margoengine/sciviz/notebook` and `/share` entries, including forwarding entries in `margoengine` and `@margoengine/viz`, supply `prepareBackend: async options => (await import('@margoengine/webgl2-compat')).install(options)` to retain automatic fallback. These libraries do not import or depend on a compatibility package. Without setup, `auto` uses the installed backend and explicit `webgl2` rejects with `MargoError` code `unsupported` naming `prepareBackend`, before a figure loads. The callback receives `force: true` for `webgl2`, `false` for `auto`, and the load's cancellation signal. Backend setup failures propagate without retrying another backend. The shipped Python AFM and offline runtime wire this lazy callback by default, so their zero-configuration fallback is unchanged.
+
+Backend selection follows the WebGPU adapter availability contract (Kai Ninomiya, Brandon Jones and Jim Blandy, W3C, 2026, [WebGPU](https://www.w3.org/TR/2026/CRD-webgpu-20260915/)): requesting an adapter may return null. The host-owned lazy installer handles this case; a WebGPU API object alone does not establish availability. No external implementation source was used.
+
 ## Notebook hosts
 
 JupyterLab, VS Code's Jupyter extension and Colab use the normal anywidget display protocol: put the widget at the end of a cell. Install the local wheel in that kernel's environment with the notebook extra. Colab may require `from google.colab import output; output.enable_custom_widget_manager()` before displaying custom widgets. In marimo, use `mo.ui.anywidget(widget)` to expose trait changes as reactive state. These hosts share the same bundled AFM and binary comm contract; no host-specific engine adapter is required.

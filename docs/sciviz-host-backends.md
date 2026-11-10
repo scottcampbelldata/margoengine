@@ -5,12 +5,14 @@ and declared its package as a dependency. That violated the existing isolation
 contract and made backend installation a library responsibility. The owning
 application now supplies prepareBackend to render or startStandalone.
 It receives force (true for webgl2, false for auto) and the load's AbortSignal.
-The webgpu choice never invokes it. Without a callback, these library functions
-use the backend already installed by the application. Setup failures propagate;
+The webgpu choice never invokes it. Without a callback, auto uses the backend
+already installed by the application, while explicit webgl2 rejects with a
+linked MargoError code unsupported naming prepareBackend. Setup failures propagate;
 cancelled notebook views retain their existing disposal semantics.
 
-The Python AFM and the locally bundled standalone application provide this
-callback themselves. They lazily import the compatibility root and call its
+The Python AFM, locally bundled standalone application and umbrella entries
+margoengine/sciviz/notebook and margoengine/sciviz/share provide this callback
+themselves. They lazily import the compatibility root and call its
 abortable install, preserving automatic fallback and forced webgl2 in the
 shipped applications. The public sciviz source graph and dependency manifest no
 longer reach the compatibility package. No root, core, stage, backend or shader
