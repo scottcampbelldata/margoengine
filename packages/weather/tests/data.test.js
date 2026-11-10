@@ -161,3 +161,15 @@ test('every real report reads with nothing left over, and its state is valid and
   assert.ok(stations.size >= 45, `${stations.size} stations`);
   assert.ok(wet > 50 && snowy > 10 && stormy > 10, `rain ${wet}, snow ${snowy}, thunder ${stormy}`);
 });
+
+test('a wind of 100 kt or more (P99KT, P49MPS) reads as its least value, not as an unknown group', () => {
+  // WMO code table 0 08 054: P means the speed is greater than the one written.
+  const a = parseMetar('RJTT 071200Z 240P99KT 9999 FEW020 25/20 Q0990');
+  near(a.wind.speed, 100 * (1852 / 3600));
+  assert.equal(a.wind.from, 240);
+  assert.deepEqual(a.unknown, []);
+  const b = parseMetar('UUEE 071200Z 27045GP49MPS 9999 SCT020 05/01 Q0980');
+  assert.equal(b.wind.speed, 45);
+  assert.equal(b.wind.gust, 50);
+  assert.deepEqual(b.unknown, []);
+});

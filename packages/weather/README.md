@@ -191,7 +191,8 @@ weather.transitionTo(metarState(report), { seconds: 60 }); // blend into what th
 ```
 
 `parseMetar(text)` returns the station, day and UTC time, `auto` and `corrected`, the wind (the direction it blows
-from in degrees, speed and gusts in m/s, the variable sector), the visibility in metres (`10000` for 10 km or more,
+from in degrees, speed and gusts in m/s, the variable sector; a speed written with P, such as `P99KT` for 100 kt or more,
+reads as its least value, 100 kt), the visibility in metres (`10000` for 10 km or more,
 `CAVOK` included), present weather groups (intensity, descriptor, phenomena), cloud layers (cover and base in metres,
 CB or TCU), vertical visibility, temperature and dew point in degrees Celsius, pressure in hectopascals (from QNH or
 the altimeter setting), recent weather, the trend and the remarks as written. A group it does not know goes to

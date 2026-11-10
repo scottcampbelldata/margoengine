@@ -174,12 +174,14 @@ export function parseMetar(text: string): Metar {
     else if (g === 'NOSIG' || g === 'BECMG' || g === 'TEMPO') {
       report.trend = groups.slice(i).join(' ');
       break;
-    } else if ((m = /^(\d{3}|VRB|\/\/\/)(\d{2,3}|\/\/)(?:G(\d{2,3}))?(KT|MPS|KMH)$/.exec(g))) {
+    } else if ((m = /^(\d{3}|VRB|\/\/\/)(P?\d{2,3}|\/\/)(?:G(P?\d{2,3}))?(KT|MPS|KMH)$/.exec(g))) {
       if (m[2] === '//') continue;
+      // P marks a speed above the one written (WMO code table 0 08 054): P99KT is 100 kt or more, read as its least, 100.
+      const value = (v: string) => (v.startsWith('P') ? Number(v.slice(1)) + 1 : Number(v));
       report.wind = {
         from: m[1] === 'VRB' || m[1] === '///' ? undefined : Number(m[1]) % 360,
-        speed: speed(Number(m[2]), m[4]),
-        gust: m[3] === undefined ? undefined : speed(Number(m[3]), m[4]),
+        speed: speed(value(m[2]), m[4]),
+        gust: m[3] === undefined ? undefined : speed(value(m[3]), m[4]),
       };
     } else if ((m = /^(\d{3})V(\d{3})$/.exec(g)) && report.wind) report.wind.variable = [Number(m[1]), Number(m[2])];
     else if (g === 'CAVOK') (report.cavok = true), (report.visibility = 10000);
