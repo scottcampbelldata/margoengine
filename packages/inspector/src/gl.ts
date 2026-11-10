@@ -12,7 +12,6 @@ import {
 import { Line, BoxHelper, VertexNormalsHelper, LightsHelper } from '@margoengine/lines';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { GLStats } from '@margoengine/stats/gl';
-import { glProgram, glRenderer } from '@margoengine/webgl2-compat/preview';
 import { fault } from '../../shared/errors.js';
 import { inView } from '../../shared/view-rect.js';
 import { meshData, wireframe } from './debug-geometry.js';
@@ -71,16 +70,14 @@ function records(graph: FrameGraph): RecordPass[] {
 /** Captures an existing preview frame, including already-registered passes. Wrappers are removed after that frame. */
 export async function captureGLFrame(handle: EngineKernel, options: GLCaptureOptions = {}): Promise<GLFrameReport> {
   const engine = engineRuntime(handle),
-    renderer = glRenderer(engine.canvas),
+    gl = engine.backend === 'webgl2' ? engine.canvas.getContext('webgl2') : null,
     timeout = options.timeout ?? 5000;
   options.signal?.throwIfAborted();
-  if (!renderer || engine.backend !== 'webgl2')
-    throw fault('unsupported', 'Use the WebGL2 preview backend for captureGLFrame');
+  if (!gl) throw fault('unsupported', 'Use the WebGL2 preview backend for captureGLFrame');
   if (!Number.isFinite(timeout) || timeout <= 0) throw new RangeError('Use a positive finite GL capture timeout');
   if (pending.has(engine)) throw fault('state', 'Await the current GL capture before starting another');
   pending.add(engine);
-  const gl = renderer.gl,
-    timer = new GLStats(),
+  const timer = new GLStats(),
     passes: GLFramePassReport[] = [],
     restore: (() => void)[] = [],
     ids = new WeakMap<object, number>();
@@ -258,6 +255,39 @@ const vertex = `#version 300 es
 precision highp float;layout(location=0) in vec3 position;uniform mat4 camera;uniform mat4 model;void main(){gl_Position=camera*model*vec4(position,1.0);}`;
 const fragment = `#version 300 es
 precision highp float;uniform vec3 color;out vec4 outputColor;void main(){outputColor=vec4(color,1.0);}`;
+// This overlay owns its two fixed shaders. No preview renderer or compatibility-device implementation is loaded.
+function debugProgram(gl: WebGL2RenderingContext): WebGLProgram {
+  const program = gl.createProgram();
+  if (!program) throw fault('failed', 'Cannot allocate the GL debug program; restore the context and reattach');
+  const shaders: WebGLShader[] = [];
+  try {
+    [vertex, fragment].forEach((source, index) => {
+      const shader = gl.createShader(index === 0 ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
+      if (!shader) throw fault('failed', 'Cannot allocate a GL debug shader; restore the context and reattach');
+      shaders.push(shader);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+        throw fault(
+          'failed',
+          `GL debug shader failed: ${gl.getShaderInfoLog(shader) ?? 'unknown compiler error'}; check the driver`,
+        );
+      gl.attachShader(program, shader);
+    });
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw fault(
+        'failed',
+        `GL debug program failed: ${gl.getProgramInfoLog(program) ?? 'unknown linker error'}; check the driver`,
+      );
+    return program;
+  } catch (error) {
+    gl.deleteProgram(program);
+    throw error;
+  } finally {
+    for (const shader of shaders) gl.deleteShader(shader);
+  }
+}
 let serial = 0;
 /** Wireframe, world normals, bounds, light helpers and one-frame capture for the WebGL2 preview backend. */
 export class GLInspector implements EnginePlugin {
@@ -332,7 +362,7 @@ export class GLInspector implements EnginePlugin {
     engine.canvas.addEventListener('webglcontextlost', this.lost);
   }
   setup(): void {
-    this.gl = glRenderer(this.engine.canvas)?.gl;
+    this.gl = this.runtime.backend === 'webgl2' ? (this.engine.canvas.getContext('webgl2') ?? undefined) : undefined;
     if (!this.gl || this.runtime.backend !== 'webgl2')
       throw fault('unsupported', 'GLInspector requires the WebGL2 preview backend');
   }
@@ -422,7 +452,7 @@ export class GLInspector implements EnginePlugin {
       flags = [gl.DEPTH_TEST, gl.BLEND, gl.CULL_FACE].map((flag) => [flag, gl.isEnabled(flag)] as const);
     try {
       if (!this.program) {
-        this.program = glProgram(gl, vertex, fragment);
+        this.program = debugProgram(gl);
         this.buffer = gl.createBuffer() ?? undefined;
         this.vao = gl.createVertexArray() ?? undefined;
         if (!this.buffer || !this.vao)

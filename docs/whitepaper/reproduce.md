@@ -2907,3 +2907,7 @@ before the identity assertions. The scene fixtures also suspend the first cache
 read and dispose its originating scene, and count external abort listeners.
 The dependent React browser working-directory regression runs without a GPU:
 `node --test --test-timeout=30000 packages/react/tests/browser-working-directory.test.js`.
+
+Batch 220 job 2: build packages and run node --test --test-timeout=120000 packages/math/test/*.test.js. curve.test.js imports the public optional entry, compares independent polynomial/table values and boundary derivatives, and checks editing, ownership, output reuse, channel sampling and invalid inputs. This is CPU mathematics and has no GPU test. Research and public-contract comparison are in docs/clean-room.md.
+
+Batch 220 inspector repair: build inspector, run node --test --test-timeout=120000 packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js; run packages/inspector/test/gl-browser.mjs with and without --compat under a shared GPU lock. No isolation assertion is weakened.

@@ -316,3 +316,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated inspector/tools alias | batch-263 job 3 |
 - @margoengine/animation: document registered-scene disposal, terminal controller lifetime and asynchronous geometry-cache scene/signal ownership.
 - @margoengine/react: document browser script repository-root invocation.
+
+- @margoengine/math (batch 220 job 2): document /curve scalar/keyed APIs, four modes and string constants, tension and boundary policies, copied/normalized keys, channel editing, reusable packed interpolants, sampling, limits and a tuning-table example.
+- margoengine (batch 220 job 2): document generated math/curve alias and regenerated bridges to the already-built exporters/optimize-extra and exporters/splats entries.
+
+- @margoengine/inspector (batch 220 landing repair): document native-context capture/overlay ownership, removal of the compatibility-package peer dependency and coded shader failure cleanup.

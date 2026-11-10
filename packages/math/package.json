@@ -155,6 +155,10 @@
     "./compat": {
       "types": "./dist/compat.d.ts",
       "import": "./dist/compat.js"
+    },
+    "./curve": {
+      "types": "./dist/curve.d.ts",
+      "import": "./dist/curve.js"
     }
   },
   "files": [

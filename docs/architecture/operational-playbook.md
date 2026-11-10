@@ -5741,3 +5741,5 @@ The same-name sentinel implements EnginePlugin.setup so those assertions run.
 The dependent React bindings browser proof selects its repository root before
 starting Vite; a subprocess regression reproduces npm's package working
 directory without a GPU. No rendering algorithms or tolerances change.
+
+Batch 220 section 5 landing repair: inspector GL capture/overlays borrow the native canvas WebGL2 context directly and own their fixed shaders. The optional inspector entry has no compatibility-package import/dependency. Existing isolation guards stay unchanged; additional native-context and shader-error regressions prove the boundary and cleanup. Affected GL browser checks cover overlays, captured shaders/draw state, restoration and visibility on native WebGL2 and the compatibility run. No core or stage change.

@@ -3408,3 +3408,7 @@ reject reattachment. Proof: `packages/animation/tests/scene-owner.test.js`,
 `disposed-owner.test.js` and `tests/animation-owner-contract.test.js`; the
 fixtures use the real engine registry with a recording GPU. These repairs do
 not claim a complete engine-wide lifetime audit or any speed improvement.
+
+- Batch 220 job 2: math/curve supplies linear, held-step, smoothstep and nonuniform cubic scalar interpolation, editable keyed curves, channel sets and packed sample interpolants. packages/math/test/curve.test.js proves analytic values, random seeking, exact keys, endpoint clamps/derivatives, nonlinear nonuniform first-derivative joins, independent copies, edits, clamped sample tables and invalid inputs. The existing small-import tests remain unchanged. No monotonic-cubic, looping-animation, zero-allocation or elapsed-speed claim.
+
+- Batch 220 inspector boundary repair: optional GL inspection uses the native context without loading the compatibility layer. Unchanged isolation.test.js passes; inspector gl.test.js proves registry-independent capture and resource/state cleanup after shader compilation/link failures. Existing GL browser checks retain exact restored pixels and captured draw/shader assertions.

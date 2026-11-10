@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 import { Engine, TransformStore, box } from '@margoengine/core/extension';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { GLInspector, captureGLFrame } from '../dist/gl.js';
-async function fixture(t) {
+async function fixture(t, independent = false) {
   const dom = new JSDOM('<body><canvas width="200" height="160"></canvas></body>'),
     canvas = dom.window.document.querySelector('canvas');
   let constant = 1;
@@ -64,7 +64,10 @@ async function fixture(t) {
   values.set(gl.LINE_WIDTH, 1);
   values.set(gl.DEPTH_WRITEMASK, true);
   values.set(gl.COLOR_WRITEMASK, [true, true, true, true]);
-  const engine = new Engine(canvas, await TransformStore.create(16), webglRenderer(canvas), undefined, null),
+  const renderer = webglRenderer(canvas);
+  const target = independent ? canvas.cloneNode() : canvas;
+  target.getContext = () => gl;
+  const engine = new Engine(target, await TransformStore.create(16), renderer, undefined, null),
     mesh = engine.createMesh().setGeometry(box()),
     panel = GLInspector.attach(engine, { parent: dom.window.document.body });
   t.after(() => {
@@ -113,4 +116,29 @@ test('failed frames, timeout, cancellation and reentrant captures unwind wrapper
   remove();
   assert.equal(gl.drawArrays, original);
   assert.ok((await captureGLFrame(engine)).drawCalls > 0);
+});
+
+test('GL inspector borrows the native canvas context without preview registry membership', async (t) => {
+  const { panel } = await fixture(t, true);
+  panel.setDebug('wireframe', true);
+  assert.ok((await panel.capture()).drawCalls > 0);
+});
+
+test('debug shader failures release every shader and program and preserve GL state', async (t) => {
+  for (const fail of ['compile', 'link']) {
+    const { panel, gl } = await fixture(t);
+    await panel.capture();
+    const program = gl.getParameter(gl.CURRENT_PROGRAM);
+    let shaders = 0,
+      programs = 0;
+    gl.deleteShader = () => shaders++;
+    gl.deleteProgram = () => programs++;
+    gl.getShaderParameter = () => fail !== 'compile';
+    gl.getProgramParameter = () => fail !== 'link';
+    panel.setDebug('wireframe', true);
+    await assert.rejects(panel.capture(), { code: 'failed' });
+    assert.equal(shaders, fail === 'compile' ? 1 : 2);
+    assert.equal(programs, 1);
+    assert.equal(gl.getParameter(gl.CURRENT_PROGRAM), program);
+  }
 });

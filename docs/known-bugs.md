@@ -4374,3 +4374,9 @@ Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-brows
 GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
 
 Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
+
+Batch 220 job 2: the requested scalar interpolants/keyed-curve gap is implemented in math/curve; no open defect found by its analytic and ownership tests. Cubic overshoot and clamped time evaluation are explicit contracts in limits, not monotonic or periodic interpolation claims.
+
+Batch 220 umbrella generation also supplies missing exporter aliases for entries already present on main: optimize-extra during the initial gate and splats during the final rebase. Cause: its exports map had not been regenerated into the umbrella; tests/umbrella.test.js requires exact generator agreement and now passes all eight checks. No exporter implementation changed.
+
+Fixed during batch 220 landing: inspector/gl imported the compatibility preview registry/compiler and declared its package as a peer, violating packages/webgl2-compat/test/isolation.test.js. Native canvas access and locally owned fixed overlay compilation remove both edges. packages/inspector/test/gl.test.js covers registry independence, failed compile/link cleanup and state restoration; isolation tests pass unchanged.

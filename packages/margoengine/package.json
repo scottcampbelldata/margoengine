@@ -1934,6 +1934,10 @@
       "types": "./dist/math/compat.d.ts",
       "import": "./dist/math/compat.js"
     },
+    "./math/curve": {
+      "types": "./dist/math/curve.d.ts",
+      "import": "./dist/math/curve.js"
+    },
     "./mcp": {
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"
