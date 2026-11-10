@@ -2705,3 +2705,7 @@ Batch 253 keyboard labels: build packages/input, then node --test --test-timeout
 Batch 255 materials: after build:packages, run node --test packages/save/tests/materials.test.js packages/materials/test/serialization.test.js packages/shader/test/serialization.test.js. Through the shared GPU lock run node packages/save/tests/browser/materials-check.mjs, then the same with MARGO_COMPAT=1. Browser material fixtures are deterministic own texels/shader expressions; the separate scene-state proof uses the existing licensed Khronos Fox.glb. No timing suite.
 ### Batch 260 HTML preview texture
 Build packages, then run `node scripts/gpu-lock.mjs run --owner=html-check --max=5 --wait-max=60 -- node packages/html/scripts/test-browser.js`, followed by the same command with `--compat` after test-browser.js. Reports: packages/html/test-results/html-browser.json and html-browser-compat.json. CPU: `node --test --test-timeout=120000 packages/html/test/*.test.js`. No benchmark or timing-only assertion.
+
+### XR smooth movement and comfort
+
+Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/xr/tests/xr.test.js`, then run `node scripts/gpu-lock.mjs run --owner=lane-P-xr --wait-max=60 --max=3 -- node packages/xr/tests/locomotion.browser.mjs`. The stereo check uses the existing licensed Khronos/Cesium Box fixture and writes test-results/xr-locomotion-browser.json. It covers native/compat, engine/separate routes and both eye textures. Quest/Android evidence is still required separately.

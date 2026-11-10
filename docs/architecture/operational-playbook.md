@@ -5559,3 +5559,7 @@ The optional tiles/imagery entry uses lazy external branch tilesets, avoiding th
 Batch 255 job 1 evidence (section 5): material serialization does not alter shader algorithms. Exact compiled stage/declaration preservation is covered by CPU tests and native/compatibility material pixels. GPU-only resources require explicit application bindings rather than inference from opaque handles. The core/stage entry is unchanged.
 ### Section 5 evidence: batch 260 HTML texture preview
 HTMLTextureGL in html/texture-gl shares rasterization and interaction with HTMLTexture and uses a native depth-writing GL pass only on preview. Browser pixels prove panel/button colours and partial geometry occlusion on WebGPU, full WebGL2 compatibility and native preview; pointer hit testing, redraw and disposal run on each. GL blending uses premultiplied source-over, the preview camera's ordinary depth and restored draw/upload state. Core and stage source are unchanged. No timing claim.
+
+### 5. XR locomotion eye overlays
+
+The optional XR package now provides an eye callback after scene/depth rendering and before submission on its separate and engine routes. The comfort overlay uses each projection and viewport with load/store blending and no depth writes. CPU coverage proves stable view indices, ordering, unsubscribe and disposal during a callback; a stereo pixel comparison exercises both backends/routes/eyes. Physical headset evidence remains absent. No core or stage changes or speed claims accompany this feature.

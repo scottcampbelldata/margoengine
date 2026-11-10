@@ -29,7 +29,8 @@
     "build": "node ../../scripts/build-optional.js xr",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu:pointers": "cd ../.. && node packages/xr/tests/pointer.browser.mjs"
+    "test:gpu:pointers": "cd ../.. && node packages/xr/tests/pointer.browser.mjs",
+    "test:gpu:locomotion": "cd ../.. && node packages/xr/tests/locomotion.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -60,6 +61,10 @@
     "./pointer": {
       "types": "./dist/pointer.d.ts",
       "import": "./dist/pointer.js"
+    },
+    "./locomotion": {
+      "types": "./dist/locomotion.d.ts",
+      "import": "./dist/locomotion.js"
     }
   },
   "files": [
@@ -80,7 +85,8 @@
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
-      "test:gpu:pointers": 3
+      "test:gpu:pointers": 3,
+      "test:gpu:locomotion": 3
     }
   }
 }

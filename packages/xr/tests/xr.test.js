@@ -801,3 +801,28 @@ test('createXREngine without WebGPU says what is needed', async () => {
     else delete globalThis.navigator;
   }
 });
+
+
+test('eye effects run per eye before submission and unsubscribe deterministically', async (t) => {
+  const f=await fixture(t),xr=await XR.create(f.engine),seen=[];
+  await xr.requestSession();
+  const stop=xr.onEye(target=>seen.push({eye:target.view.eye,index:target.index,submits:f.device.submitted??0}));
+  const viewer={...pose(0),views:['left','right'].map(eye=>({eye,projectionMatrix:identity(),transform:pose(0).transform}))};
+  f.session.tick(10,viewer);
+  assert.deepEqual(seen.map(x=>[x.eye,x.index]),[['left',0],['right',1]]);
+  assert.equal(seen[0].submits,seen[1].submits);
+  assert.ok(f.device.submitted>seen[0].submits);
+  stop();f.session.tick(20,viewer);assert.equal(seen.length,2);
+  assert.throws(()=>xr.onEye(null),TypeError);
+  xr.dispose();assert.throws(()=>xr.onEye(()=>{}),/disposed/);
+});
+
+test('disposing XR in an eye hook stops later hooks and GPU submission', async (t) => {
+  const f=await fixture(t),xr=await XR.create(f.engine),seen=[];
+  await xr.requestSession();
+  xr.onEye(()=>{seen.push('dispose');xr.dispose();});
+  xr.onEye(()=>seen.push('later'));
+  const viewer={...pose(0),views:['left','right'].map(eye=>({eye,projectionMatrix:identity(),transform:pose(0).transform}))};
+  f.session.tick(10,viewer);
+  assert.deepEqual(seen,['dispose']);assert.deepEqual(f.errors,[]);
+});

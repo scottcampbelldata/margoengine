@@ -11,6 +11,8 @@ import { MargoError } from '@margoengine/math/errors';
 import { COMPAT_VENDOR } from '../../shared/compat.js';
 import { StereoRenderer } from './renderer.js';
 import { EyeViews } from './eyes.js';
+import type { XREyeTarget } from './eye-target.js';
+export type { XREyeTarget } from './eye-target.js';
 import { XRController } from './controller.js';
 export { XRController } from './controller.js';
 export { HitTest, type Hit, type HitTestHost, type HitTestOptions } from './hit-test.js';
@@ -231,6 +233,21 @@ export class XR implements EnginePlugin {
     this.listeners.add(callback);
     return () => void this.listeners.delete(callback);
   }
+  private readonly eyeListeners = new Set<(target: XREyeTarget) => void>();
+  /** Runs for each immersive eye after its scene renders and before GPU submission. Returns an unsubscribe function. */
+  onEye(callback: (target: XREyeTarget) => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('xr.onEye needs a function; pass (target) => {...}');
+    if (this.disposed) throw new MargoError('disposed', 'XR is disposed; create a new XR before adding an eye effect');
+    this.eyeListeners.add(callback);
+    return () => void this.eyeListeners.delete(callback);
+  }
+  private readonly drawEye = (target: XREyeTarget): boolean => {
+    for (const listener of this.eyeListeners) {
+      listener(target);
+      if (this.disposed) return false;
+    }
+    return !this.disposed;
+  };
   /** The session's reference space (the space of frame poses and hit results); undefined without a session. */
   get referenceSpace(): XRSpace | undefined {
     return this.space;
@@ -410,7 +427,7 @@ export class XR implements EnginePlugin {
       // shortcut: keep the canvas mirror and duplicate GPU buffers, upgrade when shared XR device hooks are available.
       if (this.mode !== 'inline' && this.eyes) {
         if (viewer)
-          this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough);
+          this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
       } else if (this.mode !== 'inline') {
         this.renderOptions.delta = delta;
         this.engine.render(this.renderOptions);
@@ -421,6 +438,7 @@ export class XR implements EnginePlugin {
             this.layer!,
             viewer,
             this.mode === 'immersive-ar' || this.seeThrough,
+            this.drawEye,
           );
       }
       if (this.session === frame.session && !this.disposed)
@@ -478,6 +496,7 @@ export class XR implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.eyeListeners.clear();
     const session = this.session;
     this.ended();
     this.device.removeEventListener('uncapturederror', this.uncaptured);

@@ -55,6 +55,7 @@ export class XR implements EnginePlugin {
     private constructor();
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;
+    onEye(callback: (target: XREyeTarget) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     useReferenceSpace(space: XRSpace): void;
     get layerBinding(): {
@@ -100,6 +101,14 @@ export class XRController {
     axisCount: number;
     constructor(source: XRInputSource);
     update(frame: XRNativeFrame, space: XRSpace): void;
+}
+
+export interface XREyeTarget {
+    readonly index: number;
+    readonly device: GPUDevice;
+    readonly encoder: GPUCommandEncoder;
+    readonly image: XRSubImage;
+    readonly view: XRView;
 }
 
 export interface XRFrameState {
@@ -153,6 +162,7 @@ class XR implements EnginePlugin {
     private constructor();
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;
+    onEye(callback: (target: XREyeTarget) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     useReferenceSpace(space: XRSpace): void;
     get layerBinding(): {

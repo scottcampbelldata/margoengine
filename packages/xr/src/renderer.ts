@@ -1,3 +1,4 @@
+import type { XREyeTarget } from './eye-target.js';
 import type { Engine, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { XRBinding, XRProjectionLayer, XRViewerPose } from './types.js';
@@ -60,6 +61,7 @@ export class StereoRenderer {
     layer: XRProjectionLayer,
     viewer: XRViewerPose,
     transparent: boolean,
+    onEye?: (target: XREyeTarget) => boolean | void,
   ): void {
     const device = this.device,
       pipeline = this.pipeline!;
@@ -305,6 +307,8 @@ export class StereoRenderer {
         })
         .end();
     }
+    if (onEye) for (const [index, view] of viewer.views.entries())
+      if (onEye({ index, device, encoder, image: binding.getViewSubImage(layer, view), view }) === false) return;
     device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }

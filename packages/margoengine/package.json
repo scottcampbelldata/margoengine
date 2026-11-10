@@ -3881,6 +3881,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./xr/locomotion": {
+      "types": "./dist/xr/locomotion.d.ts",
+      "import": "./dist/xr/locomotion.js"
     }
   },
   "dependencies": {

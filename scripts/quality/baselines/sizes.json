@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12381839,
+  "total": 12385229,
   "history": [
     {
       "date": "2026-10-24",
@@ -5634,6 +5634,12 @@
       "commit": "batch-260",
       "reason": "HTML texture preview: coherent optional GL pass with shared rasterization and state restoration; no artificial split",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-268-locomotion",
+      "reason": "New optional stereo locomotion entry, 0 to 3134 B gzip. Shared eye hooks stay in the optional XR root; no core/stage growth.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6707,6 +6713,7 @@
     "leak @margoengine/shader/serialization -> @margoengine/materials": 1,
     "leak @margoengine/shader/serialization -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/shader/serialization -> @margoengine/materials/serialization": 1,
-    "@margoengine/html/texture-gl": 6494
+    "@margoengine/html/texture-gl": 6494,
+    "@margoengine/xr/locomotion": 3390
   }
 }

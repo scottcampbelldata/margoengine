@@ -3206,3 +3206,7 @@ Batch 255 job 1: full built-in mesh material parameter capture is optional and o
 Additional material proof: distinct typed views preserve backing-buffer aliasing and byte offsets; alphaHash removal preserves whether it originally supplied the alpha cutoff (owner attachment-state regression).
 ### HTML texture preview (batch 260 job 1)
 The optional html/texture-gl entry draws the existing live HTML textures on native WebGL2 preview and retains the WebGPU path. Evidence: packages/html/test/html-browser.js textureScenario checks opaque panel/button pixels, a partial foreground occluder, native DOM hit routing, invalidation, idle draw counts and disposal on all three routes. No claim that scene occlusion blocks pointer routing; that remains the existing texture contract.
+
+### XR smooth movement evidence
+
+The optional xr/locomotion entry adds planar smooth motion, smooth yaw and a movement-driven per-eye angular vignette. Proof: packages/xr/tests/locomotion.test.js covers axis mapping, dead zones, speed, frame delta, teleport, lost input and session/abort cleanup; packages/xr/tests/locomotion.browser.mjs compares both eyes, both XR routes and native WebGPU with the WebGL2 bridge. These checks establish rendering and input behavior, not sickness mitigation or headset validation.

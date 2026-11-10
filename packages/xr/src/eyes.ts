@@ -1,3 +1,4 @@
+import type { XREyeTarget } from './eye-target.js';
 // Both eyes through the engine's own frame graph. With an engine made by `createXREngine`, the XR binding shares the
 // engine's GPU device (WebXR/WebGPU binding draft, section 2.2: the device of an XR-compatible adapter), so each eye is
 // one view of `engine.render({views})` drawn into a texture: every package pass (lines, points, terrain, shadows, post
@@ -163,7 +164,7 @@ export class EyeViews {
   }
 
   /** Draws this frame's eyes and puts them in `layer`. `delta` in seconds; `ar` keeps the real world behind the scene. */
-  render(binding: XRBinding, layer: XRProjectionLayer, viewer: XRViewerPose, delta: number, ar: boolean): void {
+  render(binding: XRBinding, layer: XRProjectionLayer, viewer: XRViewerPose, delta: number, ar: boolean, onEye?: (target: XREyeTarget) => boolean | void): void {
     const views = this.views,
       images = [];
     views.length = 0;
@@ -231,6 +232,8 @@ export class EyeViews {
       depth.draw(3);
       depth.end();
     }
+    if (onEye) for (let i = 0; i < images.length; i++)
+      if (onEye({ index: i, device: this.device, encoder, image: images[i], view: viewer.views[i] }) === false) return;
     this.device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }

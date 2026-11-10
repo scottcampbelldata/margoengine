@@ -146,3 +146,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/save: document optional materials capture/restore, assigning restored slots, lazy shader codecs, aborts and resource resolvers.
 | @margoengine/html | texture-gl: portable HTMLTextureGL, both rasterizers, WebGPU/preview depth, input, disposal and resource lifetime. | Batch 260 job 1 |
 | margoengine | Generated html/texture-gl alias. | Batch 260 job 1 |
+- @margoengine/xr: document xr/locomotion SmoothLocomotion.attach after requestSession, thumbstick options, teleport/turn, stereo comfort defaults, onEye and disposal.
