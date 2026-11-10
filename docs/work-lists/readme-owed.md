@@ -955,3 +955,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/vfx (batch 270 manifest correction): document separate test:gpu and test:gpu:parity commands and automatic CI discovery without duplicate execution; examples deferred.
 - @margoengine/post: document Stylize controls, explode and world/screen epicentres, explicit clocks, RGB bit counts, deterministic noise, scanline scrolling and LDR order.
 
+
+
+- @margoengine/quality and margoengine (batch 195 job 3): document /events adaptiveEvents run/regress/setMoving/flush, finite and Infinity policies, defaults, coalesced promises, async nonoverlap, direct clicks, source events and owner AbortSignal; examples deferred.

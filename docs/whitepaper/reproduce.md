@@ -3573,3 +3573,7 @@ Batch 270 recurring suite: under the shared GPU lock run npm run test:gpu --work
 
 Build packages, run the clustered CPU tests, then run `node scripts/gpu-lock.mjs run --owner=codex-batch186 --max=4 --wait-max=60 -- node scripts/clustered-area-shapes-gpu.mjs` and the same command with `--compat` after the script. The procedural scene has an emitter at y=3, a block from y=1 to 1.5, and floor probes at x=0 and x=3. Blocked visibility must be below 0.05, clear visibility within 0.02 of 1, and core/probe shaders must compile without errors or warnings. No benchmarks are run in the build phase.
 Batch 191 job 5: node --test --test-timeout=120000 packages/post/test/stylize.test.js after build; node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/stylize-browser.mjs, repeated with --compat. All visual fixtures are original analytic bars.
+
+
+### Batch 195 job 3
+Build packages, run node --test --test-timeout=120000 packages/quality/test/events.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch195 --max=3 --wait-max=60 -- node packages/quality/test/events-browser.mjs. The fixture uses original box geometry, a control-like change event and real engine.pick on native WebGPU then full WebGL2 compatibility. The 200-to-1 assertion counts work and has no timing budget.

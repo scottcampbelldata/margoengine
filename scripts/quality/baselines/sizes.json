@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14003300,
+  "total": 14004523,
   "history": [
     {
       "date": "2026-10-24",
@@ -7412,6 +7412,12 @@
       "commit": "batch-191-job-5",
       "reason": "New optional post/stylize: 0 to 6946 B gzip. A single LDR owner combines four independent controls and bounded backward sampling; splitting would duplicate input capture and lifecycle logic. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-195",
+      "reason": "New optional adaptive event task: 0 to 967 B gzip, 1223 B ceiling; coalescing, cancellation and async serialization stay together. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8757,6 +8763,7 @@
     "@margoengine/sciviz/volume-quality": 8765,
     "@margoengine/quality/demand": 1184,
     "@margoengine/clustered/area-shapes": 13202,
-    "@margoengine/post/stylize": 7202
+    "@margoengine/post/stylize": 7202,
+    "@margoengine/quality/events": 1223
   }
 }

@@ -626,6 +626,10 @@
       "types": "./dist/clustered/stochastic.d.ts",
       "import": "./dist/clustered/stochastic.js"
     },
+    "./clustered/area-shapes": {
+      "types": "./dist/clustered/area-shapes.d.ts",
+      "import": "./dist/clustered/area-shapes.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
@@ -2754,6 +2758,10 @@
       "types": "./dist/post/halftone.d.ts",
       "import": "./dist/post/halftone.js"
     },
+    "./post/stylize": {
+      "types": "./dist/post/stylize.d.ts",
+      "import": "./dist/post/stylize.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
@@ -2841,6 +2849,10 @@
     "./quality/demand": {
       "types": "./dist/quality/demand.d.ts",
       "import": "./dist/quality/demand.js"
+    },
+    "./quality/events": {
+      "types": "./dist/quality/events.d.ts",
+      "import": "./dist/quality/events.js"
     },
     "./ragdoll": {
       "types": "./dist/ragdoll.d.ts",
@@ -4885,10 +4897,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./clustered/area-shapes": {
-      "types": "./dist/clustered/area-shapes.d.ts",
-      "import": "./dist/clustered/area-shapes.js"
     }
   },
   "dependencies": {
