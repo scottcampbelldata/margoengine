@@ -1734,6 +1734,10 @@
       "types": "./dist/kinematics-constraints/sdf.d.ts",
       "import": "./dist/kinematics-constraints/sdf.js"
     },
+    "./kinematics-constraints/multi-goal": {
+      "types": "./dist/kinematics-constraints/multi-goal.d.ts",
+      "import": "./dist/kinematics-constraints/multi-goal.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
@@ -2721,6 +2725,10 @@
     "./post/selective-bloom": {
       "types": "./dist/post/selective-bloom.d.ts",
       "import": "./dist/post/selective-bloom.js"
+    },
+    "./post/mask": {
+      "types": "./dist/post/mask.d.ts",
+      "import": "./dist/post/mask.js"
     },
     "./procedural": {
       "types": "./dist/procedural.d.ts",

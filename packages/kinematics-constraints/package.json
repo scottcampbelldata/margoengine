@@ -42,6 +42,10 @@
     "./sdf": {
       "types": "./dist/sdf.d.ts",
       "import": "./dist/sdf.js"
+    },
+    "./multi-goal": {
+      "types": "./dist/multi-goal.d.ts",
+      "import": "./dist/multi-goal.js"
     }
   },
   "files": [

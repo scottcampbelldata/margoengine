@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13880992,
+  "total": 13884623,
   "history": [
     {
       "date": "2026-10-24",
@@ -7310,6 +7310,12 @@
       "commit": "batch-184",
       "reason": "New optional transmission background list, before 0 B; 4937 B gzip including the bounds cache. 5500 B ceiling retains capture, lifecycle and sorted/OIT integration in one entry. Materials batched measured 37459 to 37641 B for the direct compressed colour-space upload repair; ceiling 37624 to 38771 B. The 182 B preserves both cached interpretations without a package split or backend change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "bc76eff07",
+      "reason": "Batch 214 job 3 adds an isolated multi-goal IK entry, 0 to 3375 gzip bytes, for simultaneous goals, closed loops and bounded revolute/prismatic joints. Core and stage stay unchanged at 24209 bytes; splitting the dense solve would complicate a single optional feature.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8636,6 +8642,7 @@
     "@margoengine/voxel-edit/formats-extra": 5190,
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/post/mask": 6262,
-    "@margoengine/materials/transmission-layers": 5500
+    "@margoengine/materials/transmission-layers": 5500,
+    "@margoengine/kinematics-constraints/multi-goal": 3631
   }
 }

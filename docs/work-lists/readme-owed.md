@@ -898,3 +898,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated materials/transmission-layers optional alias.
 
 - materials: explain that compressed KTX2 used as both colour and data needs two cached direct uploads on WebGL2 compatibility, with native one-copy behaviour retained.
+
+- @margoengine/kinematics-constraints (batch 214 job 3): document /multi-goal MultiGoalIKSolver, joint forests and rest frames, simultaneous weighted/masked goals, point/full-pose closures, scalar bounds and DOF composition, warm starts, physical error/status outputs, cancellation and bounded-search limits.
+- margoengine (batch 214 job 3): document generated kinematics-constraints/multi-goal forwarding.
