@@ -45,6 +45,7 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 | 52.4 | @margoengine/clustered | Shadow atlas: GPU timing of cached against full redraws with many still lights on this Mac and the dev PC; only work counts are claimed. |
 | 64.5 | @margoengine/scatter | simplify: lock the blade root and tip so a collapse can never lower a grass mesh's top (Scatter blades need it above the root); pick ring ratios from a target on-screen error instead of fixed fractions; GPU picture proof of the rings in a Scatter. |
 | 67.1 | @margoengine/water | Bodies: holes and islands in an outline; per-body foam, flow and coastal settings; a Water grid that centres on `bodies.bounds` (needs a grid origin shared with WaveQuery's capture); river ends are round caps, not authored mouths; GPU time per body count not measured. |
+| 64.6 | @margoengine/scatter | grass: picture proof of the shadow pass and the WebGL2 compatibility backend; GrassScatter with the interact (trampling) and imposter entries in one class; per-blade tip shade from each blade's own height; shape uniforms so the shape can change without new pipelines. |
 
 Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, one line each, what it left unfinished.
 

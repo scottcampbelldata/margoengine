@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14519416,
+  "total": 14521711,
   "history": [
     {
       "date": "2026-10-24",
@@ -7727,6 +7727,12 @@
       "commit": "39cd8a1cf",
       "reason": "Batch 67 job 2: new water/scatter entry (WaterScatter, backlit crest subsurface scattering from Water's directional lights)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e42caa7ce",
+      "reason": "scatter/grass new optional entry (batch 64 job 6): GrassScatter builds blade clumps in the vertex stage from a (side, along, blade) ring mesh. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8552,6 +8558,7 @@
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19518,
     "@margoengine/scatter/attributes": 2319,
+    "@margoengine/scatter/grass": 2295,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/occlusion": 1433,

@@ -23,7 +23,7 @@ For the third account. Starts when Scott is home and opens it.
 | I | sky and land | 61 | terrain | 8 | done |
 | I | sky and land | 62 | terrain | 4 | done |
 | I | sky and land | 63 | biomes | 6 | done, but job 2 waits for batch 66 |
-| I | sky and land | 64 | scatter | 6 | list 2 (Mac, from Beelink) |
+| I | sky and land | 64 | scatter | 6 | done |
 | I | sky and land | 65 | road | 6 | done |
 | J | water, generation, audio | 66 | water | 8 | list 2 (Mac, from Beelink) |
 | J | water, generation, audio | 67 | water | 3 | list 2 (Mac, from Beelink) |

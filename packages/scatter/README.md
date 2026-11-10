@@ -583,6 +583,22 @@ peers: install both with this entry) and takes an `AbortSignal`.
 - A mesh with nothing to spare (a box, a crossed card) keeps its shape, so a ring may keep more than its ratio.
 - Limits: positions and normals only (core Geometry has nothing else); up to 200,000 vertices.
 
+## Procedural grass blades: `@margoengine/scatter/grass`
+
+`GrassScatter` is a `Scatter` that takes no mesh: every instance is a clump of blades the vertex stage builds on the
+GPU, for dense meadows. `GrassScatter.attach(engine, { count, area, lod, grass: { height, blades, width } })` takes
+every `Scatter` option, with `blades` shading on by default.
+
+- Each blade is a quadratic Bezier spine (root, a control point above it, a leaning tip) widened into a strip that
+  tapers to a point. Its root inside the clump disc (`radius`), facing, height (`heightVariance`) and lean come from a
+  hash of the instance's world root and the blade's number, so a blade keeps its shape as the camera moves.
+- The ring meshes hold only (side, along, blade number) per vertex; `segments` sets the steps along a blade in rings
+  0, 1 and 2 (default 5, 3 and 1), so a far blade is one triangle. Distant blades widen across their own width only.
+- Normals turn across the width (`round`) so flat blades shade round; wind, ground alignment and blade shading are the
+  plain `Scatter`'s.
+- The shape is compiled into the shaders: make a new `GrassScatter` to change it.
+- Real-GPU proof: `npm run test:browser:grass --workspace @margoengine/scatter` (build the packages first).
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 

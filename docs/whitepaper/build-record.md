@@ -4739,3 +4739,19 @@ equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
 second full verify or timing benchmark is claimed. Current selection: 20,833 B
 gzip under unchanged 21,142 B ceiling; upstream before our change: 20,772 B.
 Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
+
+## Batch 64: scatter
+
+List 3 batch 64, run on list 2 (Mac mini M6). Every entry is optional and tree-shakable; core and stage source
+are unchanged.
+
+| Job | Status | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Instance picking | DONE | 0262ff06e | scatter/pick; single instances picked by id |
+| 2. Hi-Z occlusion | DONE | a0a01e36c | scatter culls colour instances with shared Hi-Z depth (built as batch 231 job 3) |
+| 3. Grass trampling | DONE | 67b6324ea | scatter/interact |
+| 4. Imposter far ring | DONE | 0cc2c5c08 | scatter/imposter |
+| 5. Automatic LOD rings | DONE | e306a3ab3 | scatter/simplify; three rings from one mesh through lod's simplifier, packages/scatter/test/simplify.test.js |
+| 6. Procedural grass | DONE | this commit | scatter/grass; blade clumps built in the vertex stage, packages/scatter/test/grass.test.js and grass.browser.mjs |
+
+What each job left unfinished is in docs/work-lists/finish-later.md (rows 64.5 and 64.6).

@@ -4379,3 +4379,6 @@ water/bodies draws lakes, pools and rivers on one Water with their own levels, w
 
 ### Batch 67 job 2: wave subsurface scattering
 water/scatter makes backlit wave crests glow with a tint, in shadow-map visibility, without changing geometry. Evidence: packages/water/test/scatter.test.js (atomic validation, copies, dispose) and scatter.browser.mjs (WGSL term matches an independent JavaScript evaluation of the formula within 1e-5; a light ahead of the camera tints the water, a light behind it adds under a quarter of that, strength 0 matches the plain frame within 1, disposing restores the plain frame exactly). Not claimed: physical light transport or measured thickness.
+
+### Batch 64 job 6: procedural grass blades
+scatter/grass draws meadows with no mesh input: the vertex stage builds each blade of an instance's clump from a hashed Bezier spine. Proof: packages/scatter/test/grass.test.js (ring encoding, conservative cull box, shape validation, the pose wrapper) and packages/scatter/test/grass.browser.mjs on real WebGPU (diffuse and PBR shaders compile and draw; 16 blades a clump cover over 3 times the pixels of 1 on identical instance rings; doubled height covers more). Picture stand-in: procedural meadow, no reference image from another tool. No speed claim.

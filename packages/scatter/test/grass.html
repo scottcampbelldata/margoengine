@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter procedural grass check</title><style>body{margin:0}canvas{display:block;width:320px;height:320px}</style></head><body><canvas width="320" height="320"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/scatter/grass (grass.browser.mjs drives it): a meadow of GPU-built blade clumps with
+// the diffuse and the PBR shader, against an empty frame.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {GrassScatter} from '/packages/scatter/dist/grass.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,5,9],target:[0,0,0],near:0.1,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const material=new PbrMaterial({color:[0.2,0.45,0.1],roughness:0.9});
+let current;
+const read=async(buffer)=>{
+ const out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+ const data=Array.from(new Uint32Array(out.getMappedRange().slice(0)));out.destroy();return data;
+};
+window.check={
+ // grass null: no scatter. lit: the PBR material. One frame, after every pipeline is ready.
+ async make(grass,lit){
+  current?.dispose();current=undefined;
+  if(grass)current=GrassScatter.attach(engine,{count:3000,area:[14,14],lod:[3,6,30],lodFade:0,seed:5,grass,...(lit?{material}:{})});
+  device.pushErrorScope('validation');
+  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  return {commands:current?await read(current.commands):null,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>

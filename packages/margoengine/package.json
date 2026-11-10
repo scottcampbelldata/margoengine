@@ -3303,6 +3303,10 @@
       "types": "./dist/scatter/simplify.d.ts",
       "import": "./dist/scatter/simplify.js"
     },
+    "./scatter/grass": {
+      "types": "./dist/scatter/grass.d.ts",
+      "import": "./dist/scatter/grass.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

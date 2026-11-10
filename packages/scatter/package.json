@@ -65,6 +65,10 @@
     "./simplify": {
       "types": "./dist/simplify.d.ts",
       "import": "./dist/simplify.js"
+    },
+    "./grass": {
+      "types": "./dist/grass.d.ts",
+      "import": "./dist/grass.js"
     }
   },
   "files": [
@@ -120,6 +124,7 @@
     "test:browser:textured": "cd ../.. && node packages/scatter/test/textured.browser.mjs",
     "test:browser:surface": "cd ../.. && node packages/scatter/test/surface.browser.mjs",
     "test:browser:occlusion": "cd ../.. && node packages/scatter/test/occlusion.browser.mjs",
-    "test:browser:attributes": "cd ../.. && node packages/scatter/test/attributes.browser.mjs"
+    "test:browser:attributes": "cd ../.. && node packages/scatter/test/attributes.browser.mjs",
+    "test:browser:grass": "cd ../.. && node packages/scatter/test/grass.browser.mjs"
   }
 }
