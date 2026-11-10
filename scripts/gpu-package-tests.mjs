@@ -241,7 +241,9 @@ export function unrunCheckFiles(files, commands, covered = [], exempt = LOOSE_CH
 export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
 
 /** [{ label, cwd, command }] in run order: packages by directory, then ROOT. Throws on an unrun root script. */
-export function plan() {
+export function plan({
+  compositionPackages = process.argv.find((a) => a.startsWith('--composition-packages='))?.slice(23),
+} = {}) {
   const tests = [];
   for (const dir of readdirSync(join(root, 'packages')).sort()) {
     const file = `packages/${dir}/package.json`;
@@ -296,7 +298,16 @@ export function plan() {
     );
   for (const name of Object.keys(ROOT)) {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);
-    tests.push({ label: `root ${name}`, cwd: '.', command: `npm run ${name}`, name, dir: 'root', script: name });
+    const scope =
+      name === 'test:composition:browser' && compositionPackages ? ` -- --packages=${compositionPackages}` : '';
+    tests.push({
+      label: `root ${name}`,
+      cwd: '.',
+      command: `npm run ${name}${scope}`,
+      name,
+      dir: 'root',
+      script: name,
+    });
   }
   const checkFiles = readdirSync(join(root, 'scripts'))
       .filter((file) => file.endsWith('-gpu-check.js'))

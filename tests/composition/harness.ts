@@ -12,7 +12,20 @@ const requireValue = (value: unknown, message: string) => {
   if (!value) throw new Error(message);
 };
 type Scene = { id: string; members: string[] };
-type Constructors = { post?: typeof FXAA; taa?: typeof TAA; dof?: typeof DOF; tonemap?: typeof Tonemap };
+type Constructors = {
+  post?: typeof FXAA;
+  taa?: typeof TAA;
+  dof?: typeof DOF;
+  tonemap?: typeof Tonemap;
+  shadows?: typeof import('@margoengine/shadows').Shadows;
+  clustered?: typeof import('@margoengine/clustered').Clustered;
+  toon?: typeof import('@margoengine/toon').Toon;
+  transitions?: typeof import('@margoengine/transitions').Transitions;
+  lines?: Pick<typeof import('@margoengine/lines'), 'Lines' | 'Line'>;
+  points?: Pick<typeof import('@margoengine/points'), 'PointsPlugin' | 'PointCloud'>;
+  labels?: typeof import('@margoengine/labels').LabelRenderer;
+  text?: Pick<typeof import('@margoengine/text'), 'TextRenderer' | 'Text'>;
+};
 
 export function expose(scene: Scene, constructors: Constructors) {
   const errors: string[] = [];
@@ -55,6 +68,45 @@ export function expose(scene: Scene, constructors: Constructors) {
       const stack = effects.length ? PostStack.attach(engine, effects) : undefined;
       if (constructors.taa)
         engine.use(new constructors.taa({ historyWeight: 0, ...(stack ? { depth: () => stack.depthTexture } : {}) }));
+      if (constructors.shadows) engine.use(new constructors.shadows({ resolution: 32, distance: 15 }));
+      if (constructors.clustered) {
+        const clustered = new constructors.clustered({ maxLights: 4 });
+        engine.use(clustered);
+        clustered.setLights([{ position: [0, 0, 1], range: 0.1, intensity: 1 }]);
+      }
+      if (constructors.toon) engine.use(new constructors.toon({ rim: 0, outline: 0.03 }));
+      const transition = constructors.transitions ? new constructors.transitions() : undefined;
+      if (transition) engine.use(transition);
+      const checks: (() => void)[] = [];
+      if (constructors.lines) {
+        const { Lines, Line } = constructors.lines,
+          lines = Lines.attach(engine);
+        lines.add(new Line({ positions: [0, -0.15, 1, 0, 0.15, 1], color: '#ffffff', width: 3 }));
+        checks.push(() => requireValue(lines.lines.size === 1, 'line lost from renderer'));
+      }
+      if (constructors.points) {
+        const { PointsPlugin, PointCloud } = constructors.points,
+          points = PointsPlugin.attach(engine);
+        const cloud = points.add(
+          new PointCloud({ positions: new Float32Array([0, 0.35, 1]), material: { size: 3, color: '#ffffff' } }),
+        );
+        checks.push(() => requireValue(cloud.stats.pointsDrawn === 1, `points drawn ${cloud.stats.pointsDrawn}`));
+      }
+      if (constructors.labels) {
+        const labels = constructors.labels.attach(engine),
+          element = document.createElement('span');
+        element.textContent = 'C2';
+        const label = labels.add(element, { position: [0, 0, 1] });
+        checks.push(() =>
+          requireValue(label.onScreen && Math.abs(label.screen.x - SIZE / 2) <= 1, 'label projection lost'),
+        );
+      }
+      if (constructors.text) {
+        const { TextRenderer, Text } = constructors.text,
+          text = TextRenderer.attach(engine);
+        text.add(new Text({ text: 'I', font: { family: 'monospace' }, fontSize: 0.2, position: [0, -0.35, 1] }));
+        checks.push(() => requireValue(text.atlas.glyphs === 1, `text glyphs ${text.atlas.glyphs}`));
+      }
       await waitForPipelines(
         async () => {
           engine.render({ delta: 0 });
@@ -62,6 +114,11 @@ export function expose(scene: Scene, constructors: Constructors) {
         },
         { timeoutMs: 60_000 },
       );
+      if (transition) {
+        transition.start('wipe', 1);
+        engine.render({ delta: 0.5 });
+        requireValue(transition.progress === 0.5, `transition progress ${transition.progress}`);
+      }
       // Capture in the render task, before a WebGL drawing buffer may be discarded.
       engine.render({ delta: 0 });
       const bitmap = await createImageBitmap(canvas);
@@ -82,6 +139,7 @@ export function expose(scene: Scene, constructors: Constructors) {
       scoped = false;
       requireValue(!validation, validation?.message ?? '');
       requireValue(errors.length === 0, errors.join('\n'));
+      for (const check of checks) check();
       requireValue(engine.stats.drawCalls === 4, `Expected 4 core batches, got ${engine.stats.drawCalls}`);
       for (let i = 0; i < 4; i++) {
         const expected = [i === 0 || i === 3, i === 1 || i === 3, i === 2];

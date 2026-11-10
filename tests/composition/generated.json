@@ -30,10 +30,18 @@
     "post",
     "taa",
     "dof",
-    "tonemap"
+    "tonemap",
+    "shadows",
+    "clustered",
+    "toon",
+    "transitions",
+    "lines",
+    "points",
+    "labels",
+    "text"
   ],
   "coverage": {
-    "covered": 6,
+    "covered": 66,
     "total": 276
   },
   "rows": [
@@ -43,35 +51,112 @@
         "post",
         "taa",
         "dof",
-        "tonemap"
+        "tonemap",
+        "shadows"
       ]
     },
     {
       "id": "c2-002",
-      "members": []
+      "members": [
+        "post",
+        "clustered",
+        "toon",
+        "transitions",
+        "lines"
+      ]
     },
     {
       "id": "c2-003",
       "members": [
-        "taa"
+        "post",
+        "taa",
+        "points",
+        "labels",
+        "text"
       ]
     },
     {
       "id": "c2-004",
       "members": [
-        "post"
+        "taa",
+        "dof",
+        "clustered",
+        "toon",
+        "points"
       ]
     },
     {
       "id": "c2-005",
       "members": [
-        "dof"
+        "taa",
+        "dof",
+        "transitions",
+        "lines",
+        "labels"
       ]
     },
     {
       "id": "c2-006",
       "members": [
+        "dof",
+        "tonemap",
+        "shadows",
+        "clustered",
+        "text"
+      ]
+    },
+    {
+      "id": "c2-007",
+      "members": [
+        "tonemap",
+        "shadows",
+        "toon",
+        "transitions",
+        "labels"
+      ]
+    },
+    {
+      "id": "c2-008",
+      "members": [
+        "tonemap",
+        "shadows",
+        "transitions",
+        "lines",
+        "points"
+      ]
+    },
+    {
+      "id": "c2-009",
+      "members": [
+        "clustered",
+        "labels"
+      ]
+    },
+    {
+      "id": "c2-010",
+      "members": [
+        "toon",
+        "transitions",
+        "lines",
+        "text"
+      ]
+    },
+    {
+      "id": "c2-011",
+      "members": [
+        "shadows"
+      ]
+    },
+    {
+      "id": "c2-012",
+      "members": [
         "tonemap"
+      ]
+    },
+    {
+      "id": "c2-013",
+      "members": [
+        "lines"
       ]
     }
   ]

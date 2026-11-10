@@ -6964,3 +6964,6 @@ between inventory and detector reads, fails with ENOENT before the change, and
 passes while preserving a new untracked authored test. The gate still propagates
 all source read failures; no detector or baseline is relaxed. Research is in
 clean-room.md, Lane A source inventory and bitmap investigation.
+
+C2 J2 second-set evidence (sections 4.1 and 5): 13 generated rows cover all 66 pairs among 12 members on native WebGPU and full WebGL2 at both MSAA levels. Real shadow, clustered, outline, line, point, text, label and wipe workloads join the first post scenes. Package-only changes automatically select the affected rows; scene code changes retain the suite whole. CPU selection regressions and an independent TypeScript scene check pass. Remaining C2 adapters are explicit in docs/integration-composition.md.
+

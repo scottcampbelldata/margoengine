@@ -52,3 +52,20 @@ lifetime; this suite does not define or import its integration fixtures.
 
 Compared full binary rows, exhaustive pairs and sparse greedy rows; chose sparse
 rows with independent four-state repair. No external implementation was read.
+
+## Second executable set
+
+The executable set now includes shadows, clustered, toon, transitions, lines,
+points, labels and text alongside the first four members. Thirteen sparse rows
+cover all 66 positive pairs among these 12 members on both backends at 1x and 4x.
+Shadows draw a 32-texel cascade atlas. Clustered bins a real finite-range light.
+Toon draws its outline hull. Lines, points and text draw real geometry in the gap
+between the four probes. Labels assert an on-screen centre projection; points
+assert one point drawn; text asserts one allocated glyph. A wipe freezes the
+previous completed image and advances by an explicit simulation delta of 0.5,
+asserting progress 0.5, then the common six-pixel oracle still holds.
+
+Package changes pass the affected package closure through check:merge and the GPU
+runner to select only rows containing those members. Composition source changes
+keep every row. The selection and downstream closure have CPU regressions. The
+scene project also type-checks with `node node_modules/typescript/bin/tsc -p tests/composition/tsconfig.json`.

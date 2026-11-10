@@ -146,7 +146,7 @@ export function changedFiles(cwd = root, base = 'origin/main') {
  * Commands to run, in order: [{ command, skip?: reason }]. `decision` is analyse()'s result; `mode: 'full'` keeps every
  * step as written. `tests` are gpu-package-tests plan() entries; `workspaces` the package graph.
  */
-export function planSteps({ steps, decision, tests, workspaces, testId, scope, kernels = [] }) {
+export function planSteps({ steps, decision, tests, workspaces, testId, scope, kernels = [], files = [] }) {
   if (decision.mode === 'full') return steps.map((command) => ({ command }));
   const hit = new Set(decision.hits);
   return steps.flatMap((command) => {
@@ -170,7 +170,16 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope, k
         return hit.has('no-webgpu') ? [{ command }] : skip(none);
       case 'check:gpu-packages': {
         const ids = tests.map(testId).filter((id) => hit.has(`gpu/${id}`));
-        return ids.length ? [{ command: `${command} --select=${ids.join(',')}` }] : skip(none);
+        // Package-only changes select the generated composition rows containing an affected member. A scene or
+        // harness edit keeps the suite whole, including the binary absence rows.
+        const composition =
+          ids.includes('root/test:composition:browser') &&
+          decision.affected.length &&
+          files.length &&
+          files.every((file) => /^(packages\/|docs\/|api\/)|\.test\.[cm]?js$/.test(file))
+            ? ` --composition-packages=${decision.affected.join(',')}`
+            : '';
+        return ids.length ? [{ command: `${command} --select=${ids.join(',')}${composition}` }] : skip(none);
       }
       case 'check:wgsl': {
         if (hit.has('wgsl')) return [{ command }];
@@ -262,7 +271,7 @@ export function planFiles(ctx, files, env = {}) {
 function planDecision(ctx, decision, files) {
   const { steps, workspaces, tests, testId, browserFiles, matrix, examples, kernels } = ctx;
   const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix, examples });
-  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope, kernels }) };
+  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope, kernels, files }) };
 }
 
 /**

@@ -25,7 +25,20 @@ export const C2 = [
   'lighting2d',
   'xr',
 ];
-export const implementedC2 = ['post', 'taa', 'dof', 'tonemap'];
+export const implementedC2 = [
+  'post',
+  'taa',
+  'dof',
+  'tonemap',
+  'shadows',
+  'clustered',
+  'toon',
+  'transitions',
+  'lines',
+  'points',
+  'labels',
+  'text',
+];
 export const pairKey = (a, b) => JSON.stringify([a, b].sort());
 
 export function missingTuples(members, rows) {

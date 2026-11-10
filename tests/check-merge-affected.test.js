@@ -17,7 +17,7 @@ import {
 } from '../scripts/check-merge.mjs';
 import { MATRIX_DIRS, packageScopes } from '../scripts/support/affected-packages.mjs';
 import { PARALLEL, SERIAL, TEST_CONCURRENCY, TEST_TIMEOUT_MS } from '../scripts/verify.mjs';
-import { PREPARE, RUNNER_SMOKE, splitSteps, testId } from '../scripts/gpu-package-tests.mjs';
+import { PREPARE, RUNNER_SMOKE, splitSteps, testId, plan as gpuPlan } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
   closure as fileClosure,
@@ -861,6 +861,17 @@ test('C2 generated scenes register explicit package and file footprints', () => 
   assert.ok(footprint.files.has('tests/composition/generated.json'));
   const { planned } = planFor(['tests/composition/c2-001.ts']);
   assert.ok(selected(planned).includes('root/test:composition:browser'));
+});
+
+test('package changes scope C2 rows while composition code changes keep every row', () => {
+  const { planned } = planFor(['packages/taa/src/index.ts']);
+  assert.match(command(planned, 'check:gpu-packages').command, /--composition-packages=[^ ]*@margoengine\/taa/);
+  const broad = planFor(['packages/taa/src/index.ts', 'tests/composition/harness.ts']);
+  assert.doesNotMatch(command(broad.planned, 'check:gpu-packages').command, /--composition-packages/);
+  const suite = gpuPlan({ compositionPackages: '@margoengine/taa,@margoengine/dof' }).find(
+    (t) => t.name === 'test:composition:browser',
+  );
+  assert.equal(suite.command, 'npm run test:composition:browser -- --packages=@margoengine/taa,@margoengine/dof');
 });
 
 test('combined voxel and triangle-integrator changes retain the unchanged full-run safety threshold', () => {
