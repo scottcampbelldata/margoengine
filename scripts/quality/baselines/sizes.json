@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14252346,
+  "total": 14257319,
   "history": [
     {
       "date": "2026-10-24",
@@ -7537,6 +7537,12 @@
       "commit": "batch-188",
       "reason": "New optional environment/exr-codecs: 0 to 1473 B gzip; worker 0 to 1579 B. Complete requested codec coverage via the standard prebuilt OpenEXR exception (467081 B raw Wasm / 161371 B gzip), isolated and lazy, preserves quality instead of partial host codecs.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "aa3e347da",
+      "reason": "Batch 201 optional audio entry: draft emitter readers, safe byte/PCM/source budgets, weighted playback and animation synchronization. Audio peer stays external and caller-owned. Core and stage unchanged; measured figures in docs/limits.md.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8902,6 +8908,7 @@
     "@margoengine/compute/cpu-wasm": 41443,
     "@margoengine/quality/knobs": 2437,
     "@margoengine/environment/exr-codecs": 1729,
-    "@margoengine/environment dist/workers/exr-codecs.js": 1835
+    "@margoengine/environment dist/workers/exr-codecs.js": 1835,
+    "@margoengine/gltf-pro/audio": 4973
   }
 }

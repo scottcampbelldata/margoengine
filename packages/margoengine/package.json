@@ -1150,6 +1150,10 @@
       "types": "./dist/environment/reflector-pbr.d.ts",
       "import": "./dist/environment/reflector-pbr.js"
     },
+    "./environment/exr-codecs": {
+      "types": "./dist/environment/exr-codecs.d.ts",
+      "import": "./dist/environment/exr-codecs.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
@@ -1601,6 +1605,10 @@
     "./gltf-pro/dds": {
       "types": "./dist/gltf-pro/dds.d.ts",
       "import": "./dist/gltf-pro/dds.js"
+    },
+    "./gltf-pro/audio": {
+      "types": "./dist/gltf-pro/audio.d.ts",
+      "import": "./dist/gltf-pro/audio.js"
     },
     "./headless": {
       "types": "./dist/headless.d.ts",

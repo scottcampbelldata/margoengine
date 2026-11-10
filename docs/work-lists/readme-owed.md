@@ -1023,3 +1023,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/environment (batch 188 job 4): document /exr-codecs decodeEXR/loadEXR, supported codecs, Node/browser workers, data windows and layer selection, limits/cancellation, emitted assets/CSP and the standard prebuilt decoder provenance; root parseEXR remains the small loader.
+
+- @margoengine/gltf-pro (batch 201 job 3): document applyGLTFAudio, both draft dialects, caller-owned listener, weighted/event sync controls, audio-only scenes, budgets, cancellation and optional audio peer.
+- margoengine (batch 201 job 3): include the gltf-pro/audio alias in loader coverage after the build phase.
+- @margoengine/audio (batch 201 inherited documentation): panningModel defaults to HRTF in code; reconcile the stale equalpower type comment during the documentation phase.

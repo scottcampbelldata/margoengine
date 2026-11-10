@@ -2243,7 +2243,12 @@ export class PBRModel implements EnginePlugin {
             (made.topology ? this.pointsAndLines : this.primitives).push(made);
           }
         }
-      if (!this.primitives.length && !this.pointsAndLines.length && !this.splatPrimitives.length)
+      const audioOnly = ['KHR_audio_emitter', 'MSFT_audio_emitter'].some(
+        (name) =>
+          doc.extensions?.[name] &&
+          (doc.nodes?.some((node) => node.extensions?.[name]) || doc.scenes?.some((scene) => scene.extensions?.[name])),
+      );
+      if (!this.primitives.length && !this.pointsAndLines.length && !this.splatPrimitives.length && !audioOnly)
         throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });

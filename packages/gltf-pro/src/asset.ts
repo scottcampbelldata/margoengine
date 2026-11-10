@@ -215,6 +215,9 @@ const supported = new Set([
   'EXT_lights_image_based',
   // Data until @margoengine/gltf-pro/physics builds them.
   'KHR_physics_rigid_bodies',
+  // Audio metadata until the optional audio entry attaches it to a caller-owned listener.
+  'KHR_audio_emitter',
+  'MSFT_audio_emitter',
   // Data until @margoengine/gltf-pro/interactivity runs them.
   'KHR_interactivity',
   'KHR_node_selectability',

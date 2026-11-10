@@ -162,6 +162,7 @@ async function buildPackage(name) {
           '@margoengine/core',
           '@margoengine/core/extension',
           '@margoengine/animation',
+          '@margoengine/audio',
           '@margoengine/animation/sampling',
           '@margoengine/animation/skeleton-utils',
           '@margoengine/clustered',
