@@ -40,3 +40,5 @@ grew to 14, above the existing 12-package safety threshold. It now proves the sa
 and additionally asserts the correct full selection for cameras; the threshold and selection code are unchanged.
 
 The scientific dashboard scene is documented in [integration-sciviz.md](integration-sciviz.md); run with --scene=sciviz. It composes sciviz, points, lines, labels, compute, loaders, video and html on the same engine.
+
+The public CAD-format scene is documented in [integration-engineering.md](integration-engineering.md); run with --scene=engineering. It imports only public mesh-format, editing, camera/navigation, selection, LOD, culling and export APIs.

@@ -1459,3 +1459,23 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/video: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
 
 - @margoengine/html: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/loaders: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/usdz: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/fbx: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/mesh-edit: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/selection: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/cameras: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/controls: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/lod: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/culling: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/exporters: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.

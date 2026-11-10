@@ -7170,3 +7170,6 @@ TAA keeps its Halton sample phase separate from motion frame identity. Explicit 
 
 ### Sections 4.1 and 5: J6 scientific dashboard
 The integration ROOT footprint now includes sciviz, points, lines, labels, compute, loaders, video and html. Native and compatibility probes, parser/compute values, point/line draw counters, DOM removal and device-resource teardown are checked. The shared readiness helper's boolean predicate type has a failing-before-fix TypeScript regression; its runtime wait is unchanged. Reproduction, authored-input scope and device limits: docs/integration-sciviz.md.
+
+### Sections 4.1 and 5: J6 public CAD-format viewer
+The ROOT integration footprint now includes public format loading, polygon mesh editing, orthographic cameras/navigation profiles, selection, LOD, frustum culling and exports. STL preserves 20 triangles, USDZ creates two primitives, FBX creates one, one of two culled instances draws, and GLB header/mesh values are checked. Both backends keep four exact probes and five draws through replacement and dispose to zero tracked ownership. Sources, reproduction and boundaries: docs/integration-engineering.md.

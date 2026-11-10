@@ -66,4 +66,9 @@ export const PROJECTS = [
     config: 'examples/integration/sciviz/tsconfig.json',
     entries: () => ['examples/integration/sciviz.ts'],
   },
+  {
+    id: 'integration-engineering',
+    config: 'examples/integration/engineering/tsconfig.json',
+    entries: () => ['examples/integration/engineering.ts'],
+  },
 ];

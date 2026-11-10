@@ -1,0 +1,152 @@
+[
+  {
+    "backend": "webgpu",
+    "id": "engineering",
+    "before": [
+      [
+        188,
+        108,
+        108,
+        255
+      ],
+      [
+        107,
+        188,
+        164,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "after": [
+      [
+        188,
+        108,
+        108,
+        255
+      ],
+      [
+        107,
+        188,
+        164,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "draws": 5,
+    "state": {
+      "stlTriangles": 20,
+      "usdPrimitives": 2,
+      "fbxPrimitives": 1,
+      "culledCounts": [
+        1
+      ],
+      "meshEdit": true,
+      "orthographic": true,
+      "navigationProfile": "SOLIDWORKS"
+    },
+    "resources": {
+      "created": 122,
+      "live": []
+    },
+    "errors": [],
+    "restored": true,
+    "disposed": true
+  },
+  {
+    "backend": "webgl2-compat",
+    "id": "engineering",
+    "before": [
+      [
+        188,
+        108,
+        108,
+        255
+      ],
+      [
+        107,
+        188,
+        164,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "after": [
+      [
+        188,
+        108,
+        108,
+        255
+      ],
+      [
+        107,
+        188,
+        164,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "draws": 5,
+    "state": {
+      "stlTriangles": 20,
+      "usdPrimitives": 2,
+      "fbxPrimitives": 1,
+      "culledCounts": [
+        1
+      ],
+      "meshEdit": true,
+      "orthographic": true,
+      "navigationProfile": "SOLIDWORKS"
+    },
+    "resources": {
+      "created": 124,
+      "live": []
+    },
+    "errors": [],
+    "restored": true,
+    "disposed": true
+  }
+]
