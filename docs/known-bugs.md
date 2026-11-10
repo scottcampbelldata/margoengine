@@ -4185,3 +4185,7 @@ Fixed in batch 262: the React after-scene readiness fixture counted historical p
 - Batch 255 follow-up (rule 21): save/scene-state shadow restoration uses Object.assign on bound settings. Repro: an unsigned snapshot with an own __proto__ key changes the settings prototype; cause is the assignment setter. Use own data-property definitions in the fix phase, with a regression test. Playback and light lists are unaffected.
 
 Batch 267 job 1: no open live-bridge defect found in CPU or both-backend browser correctness checks; origin-clean capture and dev-only deployment limits are documented in docs/limits.md.
+
+
+### Batch 254 audio voice completion
+Resolved while building the manager: a physical source that had already fired onEnded could otherwise notify again when logical phase reached its end. voice-manager.test.js covers physical and virtual completion exactly once. No open defect from this job.

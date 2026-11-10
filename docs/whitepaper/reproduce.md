@@ -2713,3 +2713,6 @@ Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/x
 Batch 267 job 1: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/live.test.js; GPU proof: node scripts/gpu-lock.mjs run --owner=live-proof --max=4 --wait-max=60 -- node packages/mcp/tests/live-browser.mjs. Both backends list the scene, hide its mesh through inspector setters, assert the PNG changes, read a diagnostic and receive native MCP image content.
 
 Batch 257 job 2: build packages, then node --test --test-timeout=20000 packages/worker/tests/auto.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The browser test renders the same scene URL through worker, page and a capability-denied fallback for each backend; it checks transfer ownership, original canvas identity, pixels and disposal.
+
+
+Batch 254 voices: after build:packages run node --test --test-timeout=60000 packages/audio/tests/voice-manager.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs voice-manager-browser.js and records cap=1, handoff times, virtual detune and PCM error in the voices report. The reference schedules native source segments without using manager code; the stimulus is the existing CC BY 4.0 rain fixture.

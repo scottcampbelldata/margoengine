@@ -66,6 +66,10 @@
     "./binaural": {
       "types": "./dist/binaural.d.ts",
       "import": "./dist/binaural.js"
+    },
+    "./voices": {
+      "types": "./dist/voice-manager.d.ts",
+      "import": "./dist/voice-manager.js"
     }
   },
   "files": [

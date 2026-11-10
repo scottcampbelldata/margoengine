@@ -153,3 +153,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document generated mcp/live and mcp/live-host aliases (batch 267 job 1).
 
 - @margoengine/worker and margoengine (batch 257 job 2): cover /auto runScene, shared createScene context/attach and SceneInstance, emitted module URL, default lazy worker/CSP factory, modes, backend probe, transfer ownership, AbortSignal/deadlines and await using disposal.
+
+
+- @margoengine/audio/voices: AudioVoiceManager.add returns transport handles; shared cap, priority, distance/cone/custom gain, virtual phase including pitch, caller ownership and raw-control exclusions.
