@@ -7255,3 +7255,17 @@ Section 5 evidence: the parity harness now has a correctness-only single-call pa
 with native API work counts and outputs kept apart from timing and speed verdicts.
 The initial two-case, three-engine check passed six calls. Full-matrix readiness
 and quiet timings are separate remaining work. [Method and sources](../whitepaper/parity-preflight.md).
+### Section 5 evidence: batch 164 depth-only AO extraction
+
+The post package resolves only coverage depth before SSAO/GTAO extraction.
+Scene colour still resolves after the replays, through its existing capture
+owner. No shared, core, stage, shader arithmetic or public API changes. The
+package CPU regression compares pass counts, draws, bind groups, dispatches and
+uniform bytes; its registered GPU check compares exact canvas bytes against the
+old scheduling on both backends at 1x/4x and after resize. Native and ANGLE Vulkan
+pass. Default ANGLE D3D11 varies even with unchanged historical-control frames
+(59 channels, at most two display levels); the exact assertion remains red and
+is recorded under Scott's control-variance ruling; native and Vulkan supply the exact-output evidence. The historical
+post-stack tape retains every call except the explicitly counted unused early
+resolve and the equivalent depth attachment view. Physical bandwidth and rival
+speed gains remain unmeasured. [Reproduction and research](../whitepaper/reproduce.md#batch-164-ssao-resolve-work).

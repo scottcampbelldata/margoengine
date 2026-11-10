@@ -181,7 +181,7 @@ fetched for the scene.
 | 12.8 | IK (CCDIKSolver) | faster | faster | `p-ik` |  |
 | 13.1 | EffectComposer, or the WebGPU PostProcessing node chain | faster | faster | `p-composer` |  |
 | 13.2 | UnrealBloomPass | faster | faster | `p-bloom` |  |
-| 13.3 | SSAOPass, SAOPass | slower | slower | `p-ssao` |  |
+| 13.3 | SSAOPass, SAOPass | slower | slower | `p-ssao` | Batch 164: SSAO resolved scene colour before extraction, although extraction and ambient replay only read depth. Depth-only extraction removes one unused 4x HDR colour resolve (40 logical B/pixel: four rgba16float source samples read and one destination written), with identical draws, bind groups, dispatches and uniform bytes. Exact native and ANGLE Vulkan pixels pass at 1x/4x and after resize. Default ANGLE D3D11 also varies unchanged control frames (59 channels, up to two levels); recorded under Scott's control-variance ruling, with native and Vulkan supplying exact-output evidence. Timing pending the quiet rerun; historical loss retained. [Reproduce](reproduce.md#batch-164-ssao-resolve-work). |
 | 13.4 | GTAOPass | faster | faster | `p-gtao` |  |
 | 13.5 | SSRPass | faster | faster | `p-ssr` |  |
 | 13.6 | SSGI, denoise | faster | faster | `p-ssgi` |  |

@@ -136,8 +136,28 @@ stack.dispose(); // also disposes its effects
 
 When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed:
 `examples/package-benchmarks/proofs/post-stack.proof.js` checks 12,378 recorded calls across 12 single-effect stories,
-`5b1fe66^` against `5b1fe66`. With `--current` it checks the working tree: 13,056 calls against `e2cc4c5` (Bloom, FXAA and
-SSAO keep the canvas alpha; the last intentional change to an effect).
+`5b1fe66^` against `5b1fe66`. With `--current` it checks the working tree against its stored historical tape, accounting
+for exactly 23 unused SSAO resolves removed across its two stories (which switch between 1x and 4x).
+Every other call and shader byte is compared. Bloom, FXAA and SSAO keep the canvas alpha.
+
+## Ambient occlusion: `SSAO`
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {SSAO} from 'margoengine/post/ssao';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#8090a0'}));
+const ao = SSAO.attach(engine, {radius: 0.5, samples: 32});
+// Or put new SSAO() first in a PostStack, before the display effect.
+ao.options.radius = 0.8;
+```
+
+At 4x MSAA, SSAO and GTAO resolve depth before extracting normals and replaying
+ambient light. Scene colour resolves after these replays, before composition.
+This removes one unused early HDR colour resolve per frame. At 1x no resolve
+is needed. Sampling, ambient-only darkening, blur and display transforms are
+unchanged. The work-count and exact-pixel checks are documented in
+[the reproduction guide](../../docs/whitepaper/reproduce.md#batch-164-ssao-resolve-work).
 
 ## Screen-space reflections: `SSR`
 

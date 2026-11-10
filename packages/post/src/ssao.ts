@@ -543,8 +543,13 @@ export class SSAO implements EnginePlugin {
     pass.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     pass.end();
   }
+  private extractDepth(c: PostPassContext): void {
+    // Extraction and the ambient replay read depth, not scene colour. The capture's owner resolves colour
+    // after the replays, before composition; resolving it here would write the same HDR target twice.
+    if (this.captureTarget!.samples === 4) this.captureTarget!.copyDepth(c.encoder, this.depth!, 1);
+  }
   private extractScene(c: PostPassContext): void {
-    this.captureTarget!.resolve(c.encoder);
+    this.extractDepth(c);
     this.dispatch(c, this.extract!, this.viewGroups!.get(this.slice)[0]);
     const gbuffer = this.replayViews[0] ?? this.gbuffer!,
       ambient = this.replayViews[1] ?? this.ambient!;

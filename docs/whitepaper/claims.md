@@ -4699,3 +4699,13 @@ One `arrange` call on the documented eight-parent row chain invokes the leaf
 measurer twice instead of 24 times, preserving the layout-byte hash across 64 mixed
 trees. Proof: `packages/ui/tests/layout-workcount.test.js`; [reproduction and limits](batch-169.md).
 This is a deterministic callback count, not a speed or full Yoga-conformance claim.
+### Batch 164 SSAO resolve work
+
+At 4x MSAA SSAO and GTAO remove exactly one unused pre-extraction scene-colour
+resolve. The changed entry keeps the same draws, bind groups, dispatches and
+uniform upload bytes. This is a deterministic work-count claim, not a speed
+claim or a claim to close row 13.3's measured rival loss. Exact canvas comparisons
+run separately on native WebGPU and WebGL2 compatibility, at 1x/4x and after an
+odd-size resize. Native and ANGLE Vulkan pass; default ANGLE D3D11 varies even
+between unchanged historical-control frames and is not certified byte-stable.
+[Sources and checks](reproduce.md#batch-164-ssao-resolve-work).

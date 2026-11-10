@@ -106,6 +106,41 @@ const cases = {
   ],
 };
 let calls = 0;
+// Batch 164 deliberately removes the unused pre-extraction colour resolve. Keep the historical tape intact and
+// account for exactly that pass and its equivalent depth attachment view in current-mode SSAO stories only.
+// The adjacent views are made by SceneTarget and SSAO from the same resolved depth texture; shaders and bindings
+// remain byte-for-byte checked. The package regression separately checks the pass counts and exact GPU pixels.
+function depthOnlyExtraction(log, samples) {
+  const result = structuredClone(log);
+  let removed = 0;
+  for (let i = 0; i < result.length; i++) {
+    const [op, descriptor] = result[i],
+      attachments = descriptor?.colorAttachments;
+    if (
+      op !== 'beginRenderPass' ||
+      descriptor.depthStencilAttachment ||
+      attachments?.length !== 1 ||
+      !attachments[0].resolveTarget ||
+      attachments[0].storeOp !== 'store'
+    )
+      continue;
+    assert.equal(result[i + 1][0], 'pass.end');
+    assert.equal(result[i + 2][0], 'beginComputePass', 'only the resolve immediately before extraction is removed');
+    assert.equal(result[i - 1][0], 'pass.end');
+    assert.equal(result[i - 2][0], 'pass.draw');
+    assert.equal(result[i - 5][0], 'beginRenderPass');
+    const depth = result[i - 5][1].depthStencilAttachment;
+    const made = result.findIndex((entry) => entry[0] === 'view' && entry[1] === depth.view);
+    assert.ok(made >= 0);
+    assert.equal(result[made + 1][0], 'view', 'SSAO makes its resolved-depth attachment view next');
+    depth.view = result[made + 1][1];
+    result.splice(i, 2);
+    removed++;
+    i--;
+  }
+  assert.equal(removed, samples === 1 ? 11 : 12, 'every valid 4x frame, including the sample-count switch');
+  return result;
+}
 for (const [label, [make, edit, module]] of Object.entries(cases))
   for (const samples of [1, 4]) {
     const base = module === creative ? before : ref;
@@ -146,7 +181,9 @@ for (const [label, [make, edit, module]] of Object.entries(cases))
       expected.length > 300 && expected.some((entry) => entry[0] === 'throw'),
       `${label} story must exercise the GPU and an error path`,
     );
-    assert.deepEqual(actual, expected, `${label} GPU calls differ at ${samples}x`);
+    const currentExpected =
+      process.argv.includes('--current') && label === 'post SSAO' ? depthOnlyExtraction(expected, samples) : expected;
+    assert.deepEqual(actual, currentExpected, `${label} GPU calls differ at ${samples}x`);
     calls += expected.length;
   }
 // The documented DOF -> Tonemap({source}) chain, both packages at once.
@@ -168,5 +205,5 @@ for (const samples of [1, 4]) {
   calls += expected.length;
 }
 console.log(
-  `Single-effect GPU call sequences identical, ${ref} -> ${pin ?? 'working tree'} (creative: ${before} -> 3319317): ${calls} recorded calls across 12 stories.`,
+  `Single-effect GPU sequences match the historical tape${process.argv.includes('--current') ? ' with exactly 23 unused SSAO resolves removed' : ''}, ${ref} -> ${pin ?? 'working tree'} (creative: ${before} -> 3319317): ${calls} control calls across 12 stories.`,
 );

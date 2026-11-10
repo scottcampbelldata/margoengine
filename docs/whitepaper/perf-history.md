@@ -7,6 +7,24 @@ allocated a new carried-object list on every move. The work-count regressions re
 zero and 200 list replacements to zero. All replayed raw camera/transform bytes match the parent. Fix commit subject:
 `perf(controls): avoid consumed-motion and carried-list work`. Timing pending the quiet rerun; historical slower
 rows are retained. [Research, counts, fixture scope and reproduction](batch-170-controls.md).
+## Batch 164: SSAO pre-extraction colour resolve (2026-11-10)
+
+Row 13.3 (`p-ssao`): extraction needs resolved depth, while the ambient replay
+reads the scene's coverage depth. Neither reads resolved scene colour. SSAO now
+copies only depth there. Standalone SSAO and PostStack still resolve scene colour
+after the replays. GTAO shares the repair. At 4x this removes one render pass per
+frame, a logical 32 B/pixel resolve source read and 8 B/pixel destination write
+for rgba16float (36,864,000 B at 1280x720). These are format-derived texel counts,
+not measured physical bandwidth; compression, attachment loads/stores and driver
+implementation are outside that count. Draws, bind groups, compute dispatches
+and uniform bytes are identical; 1x is unchanged. Native WebGPU and ANGLE Vulkan
+compatibility pass all 12 exact image pairs each. Default ANGLE D3D11 fails;
+three unchanged historical-control frames also vary, with 59 differing channels
+and a maximum of two display levels after an odd-size resize. The assertion is
+unchanged; Scott's control-variance ruling accepts native and Vulkan as the exact-output evidence, with D3D11 recorded separately.
+The controls cover standalone SSAO, stacked SSAO and GTAO at 1x/4x.
+Timing pending the quiet rerun; the
+historical rival loss is retained. [Reproduce](reproduce.md#batch-164-ssao-resolve-work).
 
 ## Verify cache metadata work
 

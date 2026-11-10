@@ -3970,3 +3970,57 @@ Run `npm run build:packages`, then
 `node --test --test-timeout=120000 packages/ui/tests/layout-workcount.test.js`.
 The [batch record](batch-169.md#reproduce) gives the separate external Yoga 3.2.1
 installation and value-only harness command. Timings await the quiet campaign.
+## Batch 164 SSAO resolve work
+
+Build from this repository with `npm ci` and `npm run build:packages`, then run:
+
+```sh
+node --test --test-timeout=120000 packages/post/test/ssao-resolve.test.js
+node scripts/gpu-package-tests.mjs --no-build --select=post/test:gpu:ssao-resolve
+```
+
+Run the second command again with `MARGO_COMPAT=1` in the environment for the
+WebGL2 compatibility backend. The test uses the GPU lock. Six CPU cases compare
+the actual encoder calls with the previous resolve path. Twelve image pairs per
+backend compare every canvas byte, with zero tolerance: standalone/stacked SSAO
+and stacked GTAO, 1x/4x MSAA, initial and resized frames. The old path is injected
+only at the pre-extraction resolve; both paths run the same shipped shaders and
+scene. The existing post-stack proof retains its historical tape and accounts
+for exactly one removed resolve in each valid 4x SSAO frame, including sample
+count changes. It still compares every other call and shader byte.
+
+Recorded result: native WebGPU and ANGLE Vulkan each pass all 12 exact pairs.
+To select Vulkan, also set `BROWSER_ARGS` to `["--use-angle=vulkan"]`. Default
+ANGLE D3D11 fails the exact check: one recorded resized standalone pair differs
+in 59 channels by at most two display levels. The test captures three unchanged
+historical-control frames on failure; one or more of these give the same
+59-channel, two-level difference. The original stacked failure differed by one
+level. This is consistent with the recorded D3D resolve defect in
+[known bugs](../known-bugs.md), but a raw GL command replay has not isolated this
+SSAO fixture. The exact assertion and scene remain unchanged.
+No default-D3D11 byte-stability claim.
+
+Clean-room sources compared before implementation:
+
+- Morgan McGuire, Brian Osman, Michael Bukowski and Padraic Hennessy, *The Alchemy
+  Screen-Space Ambient Obscurance Algorithm*, HPG 2011,
+  https://research.nvidia.com/publication/2011-08_alchemy-screen-space-ambient-obscurance-algorithm.
+  AO samples depth and normals, not the resolved lighting colour.
+- Morgan McGuire, Michael Mara and David Luebke, *Scalable Ambient Obscurance*,
+  HPG 2012, https://research.nvidia.com/publication/2012-06_scalable-ambient-obscurance.
+  Architecture-aware buffer and integration work motivates removing unused
+  traffic without altering the existing kernel or blur.
+- Jorge Jimenez, *Next Generation Post Processing in Call of Duty: Advanced
+  Warfare*, SIGGRAPH 2014,
+  https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/.
+  Compare pass scheduling and intermediate traffic; pass fusion that changes
+  intermediate quantization is outside this byte-identical change.
+- W3C GPU for the Web Working Group, *WebGPU*, Candidate Recommendation Draft,
+  2026, https://www.w3.org/TR/2026/CRD-webgpu-20260915/#render-pass-encoding.
+  Resolve targets are written by render-pass completion even without draws.
+
+No companion implementation was read. The source-read count is 4 samples times
+8 bytes per pixel and the resolved write is 8 bytes per pixel, so the removed
+logical resolve traffic is 40 times width times height. This excludes physical
+compression and attachment load/store traffic. No timings or rival numbers are
+regenerated here. Timing pending the quiet rerun.
