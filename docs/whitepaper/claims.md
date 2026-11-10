@@ -3977,3 +3977,6 @@ Batch 201 real-asset comparison: the standard file's two independently authored 
 
 
 - Batch 242 job 1: optional voxel-net/rooms provides isolated same-process worlds, lobby snapshots, join codes, atomic reserved capacity and single-use shard tickets. Proof: packages/voxel-net/tests/rooms.test.js; scope and defaults: docs/limits.md. No distributed matchmaking or speed claim.
+
+### Batch 214 limit-aware swivel
+Claim: clear swivel candidates that violate any supplied Euler, hinge or cone/twist limit are rejected inside the existing search, before acceptance and history commit. Evidence: packages/kinematics-constraints/tests/limits.test.js includes independent quaternion composition, equivalent Euler branches and gimbal lock, hinge-axis rejection, cone/twist rejection, NaN/missing rotations, copied limits, obstacle-plus-limit search, history preservation and hostile scratch mutation. limits-browser.mjs renders accepted legal poses on WebGPU and WebGL2 compatibility. The root entry imports no limits implementation.

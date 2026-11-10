@@ -1694,6 +1694,10 @@
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"
     },
+    "./kinematics-constraints/joint-limits": {
+      "types": "./dist/kinematics-constraints/joint-limits.d.ts",
+      "import": "./dist/kinematics-constraints/joint-limits.js"
+    },
     "./kinematics-constraints/chain": {
       "types": "./dist/kinematics-constraints/chain.d.ts",
       "import": "./dist/kinematics-constraints/chain.js"

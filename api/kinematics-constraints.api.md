@@ -97,6 +97,8 @@ export interface PoleClearanceResult {
     iterations: number;
 }
 
+export type PosePredicate = (root: Vec3View, elbow: Vec3View, target: Vec3View, poleAngle: number) => boolean;
+
 export interface SegmentDistanceResult {
     pointA: MutableVec3View;
     pointB: MutableVec3View;
@@ -106,6 +108,7 @@ export interface SegmentDistanceResult {
 }
 
 export interface SolveOptions {
+    acceptPose?: PosePredicate;
     swivelSpeedLimit?: number;
     reachMargin?: number;
     foldMargin?: number;

@@ -18,6 +18,8 @@ export enum SolveStatus {
 
 /** Per-solve options: swivel speed limit, reach and fold margins and the angular search budget. */
 export interface SolveOptions {
+  /** Optional pure legal-pose test, before obstacle acceptance. Default none. Rejection continues the swivel search. */
+  acceptPose?: PosePredicate;
   /** Maximum swivel speed, radians/second. Defaults to 2 PI. */
   swivelSpeedLimit?: number;
   /** Distance excluded at full extension. Defaults to 1e-5 scene units. */
@@ -101,6 +103,9 @@ export interface PoleClearanceResult {
 
 /** Writes the elbow position for a root, a target and a pole angle into `outElbow`. */
 export type ElbowEvaluator = (root: Vec3View, target: Vec3View, poleAngle: number, outElbow: Float32Array) => void;
+
+/** Pure test of one candidate pose. Inputs are borrowed scratch copies; return false to reject its joint limits. */
+export type PosePredicate = (root: Vec3View, elbow: Vec3View, target: Vec3View, poleAngle: number) => boolean;
 
 const EMPTY_SOLVE_OPTIONS: SolveOptions = Object.freeze({});
 
@@ -209,6 +214,8 @@ export class AvoidanceSolver {
   private readonly point = new Float64Array(3);
   private readonly previousTarget = new Float32Array(3);
   private readonly candidate = new Float32Array(3);
+  private readonly filterElbow = new Float32Array(3);
+  private poseFilter?: PosePredicate;
   private readonly callbackRoot = new Float64Array(3);
   private readonly callbackTarget = new Float32Array(3);
   private readonly bestElbow = new Float32Array(3);
@@ -636,6 +643,12 @@ export class AvoidanceSolver {
     const lengthTolerance = Math.min(this.tolerance * 4, Math.min(upper, lower) * 1e-5);
     this.poseDistance[0] = -Infinity;
     if (Math.abs(upperActual - upper) > lengthTolerance || Math.abs(lowerActual - lower) > lengthTolerance) return;
+    if (this.poseFilter) {
+      this.callbackRoot.set(this.root);
+      this.callbackTarget.set(this.target);
+      this.filterElbow.set(this.candidate);
+      if (!this.poseFilter(this.callbackRoot, this.filterElbow, this.callbackTarget, angle)) return;
+    }
     this.poseClearanceInto(this.root, this.candidate, this.target, radius, forearmRadius, upper);
   }
 
@@ -715,6 +728,9 @@ export class AvoidanceSolver {
           'An elbow evaluator is required; pass an evaluator to the constructor or use the two-bone solver',
         );
       const speed = options.swivelSpeedLimit ?? Math.PI * 2;
+      if (options.acceptPose !== undefined && typeof options.acceptPose !== 'function')
+        throw typeError('Supply a function for acceptPose to test each candidate', 'kinematics');
+      this.poseFilter = options.acceptPose;
       const fold = options.foldMargin ?? 1e-5,
         reach = options.reachMargin ?? 1e-5;
       const budget = options.searchBudget ?? 32;

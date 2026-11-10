@@ -27,6 +27,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./joint-limits": {
+      "types": "./dist/joint-limits.d.ts",
+      "import": "./dist/joint-limits.js"
+    },
     "./chain": {
       "types": "./dist/chain.d.ts",
       "import": "./dist/chain.js"
@@ -52,6 +56,7 @@
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
+    "test:limits:browser": "node tests/limits-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {

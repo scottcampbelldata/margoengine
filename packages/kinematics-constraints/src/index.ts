@@ -12,4 +12,5 @@ export type {
   TargetResult,
   PoleClearanceResult,
   ElbowEvaluator,
+  PosePredicate,
 } from './AvoidanceSolver.js';

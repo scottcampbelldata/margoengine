@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13651263,
+  "total": 13652731,
   "history": [
     {
       "date": "2026-10-24",
@@ -7103,6 +7103,12 @@
       "date": "2026-11-10",
       "commit": "batch-242",
       "reason": "New optional voxel-net/rooms: absent (0 B) -> 19384 B gzip; includes lazily loaded independent authoritative servers and existing shard ticket signing. Splitting the lobby from its world factory would add configuration without reducing world bytes."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "31be4102f",
+      "reason": "Batch 214 job 2: new optional limits entry, absent to 1212 B gzip for Euler, hinge and cone/twist legality. Root 11567 to 11687 B remains within its 11751 B ceiling. Core plus stage remains 24209 B. Splitting this small standalone validator would add loading complexity without improving isolation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8388,6 +8394,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/voxel-net/rooms": 19966
+    "@margoengine/voxel-net/rooms": 19966,
+    "@margoengine/kinematics-constraints/joint-limits": 1468
   }
 }

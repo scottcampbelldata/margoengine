@@ -3425,3 +3425,6 @@ Batch 201 spec/gloss: after build:packages, run `node --test --test-timeout=1200
 
 
 - Batch 242 rooms: build packages, then node --test --test-timeout=30000 packages/voxel-net/tests/rooms.test.js. Uses real loopback WebSockets and authored flat-world fixtures; no GPU or downloaded demo asset.
+
+### Batch 214 joint-limit correctness
+After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/limits.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch214 --max=3 --wait-max=60 -- node packages/kinematics-constraints/tests/limits-browser.mjs for rendered native/compat checks. Test quaternions are independently composed from axis rotations; box acceptance covers 300 deterministic poses and exact singular branches. No speed measurement.

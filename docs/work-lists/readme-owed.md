@@ -794,3 +794,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-net: document /rooms VoxelLobby creation, room lists and join codes, reserved capacity, signed shard ticket URLs, authentication identities, joinOrCreate and async disposal.
 
 - margoengine: document generated voxel-net/rooms alias alongside the owning optional entry.
+
+- @margoengine/kinematics-constraints (batch 214 job 2): document /joint-limits, JointLimitSet, local/rest-relative rotations, Euler order, hinge/cone bounds, jointLimitPredicate and SolveOptions.acceptPose.
+- margoengine (batch 214 job 2): document kinematics-constraints/joint-limits alias.
