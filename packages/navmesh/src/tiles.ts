@@ -18,6 +18,7 @@ import {
 } from './pipeline.js';
 import {
   CorridorSearch,
+  heuristicScale,
   checkFilter,
   copy,
   cross,
@@ -140,6 +141,8 @@ export class TiledNavMesh implements NavSurface {
   private readonly free: number[] = [];
   private count = 0;
   private linkTotal = 0;
+  /** {@link heuristicScale} of every off-mesh link, sleeping ones included. */
+  private scale = 1;
   private changes = 0;
   private nextId = 1;
   private disposed = false;
@@ -627,7 +630,7 @@ export class TiledNavMesh implements NavSurface {
       costs = filter ? this.applyFilter(filter) : this.costs;
     if (from < 0 || to < 0 || !(costs[to] < Infinity)) return null;
     if (from === to) return { points: [copy(start), copy(end)], offMesh: [] };
-    const corridor = this.search.find(from, to, start, end, this.count, this.adjacency, costs);
+    const corridor = this.search.find(from, to, start, end, this.count, this.adjacency, costs, this.scale);
     return corridor && routeThrough(corridor, start, end);
   }
   private applyFilter(filter: NavFilter): Float64Array {
@@ -661,6 +664,7 @@ export class TiledNavMesh implements NavSurface {
       };
     this.offMesh.set(id, link);
     this.attach(id, link);
+    this.scale = Math.min(this.scale, heuristicScale([link]));
     this.search.reserve(this.count, this.linkTotal);
     this.changes++;
     return id;
@@ -672,6 +676,7 @@ export class TiledNavMesh implements NavSurface {
     if (!link) return false;
     this.detach(id, link);
     this.offMesh.delete(id);
+    this.scale = heuristicScale(this.offMesh.values());
     this.changes++;
     return true;
   }
@@ -717,6 +722,8 @@ export class TiledNavMesh implements NavSurface {
     adjacency: readonly (readonly Link[])[];
     costs: ArrayLike<number>;
     owners: readonly ({ x: number; z: number } | null)[];
+    /** The A* estimate scale for this graph's off-mesh links. */
+    scale: number;
   } {
     this.check();
     return {
@@ -724,6 +731,7 @@ export class TiledNavMesh implements NavSurface {
       adjacency: this.adjacency,
       costs: filter ? this.applyFilter(filter) : this.costs,
       owners: this.owners,
+      scale: this.scale,
     };
   }
   /** @internal Everything `./codec` saves, with the level when `level` is set. */
@@ -771,6 +779,7 @@ export class TiledNavMesh implements NavSurface {
       this.offMesh.set(id, link);
       this.attach(id, link);
     }
+    this.scale = heuristicScale(this.offMesh.values());
     this.nextId = state.nextId;
     this.search.reserve(this.count, this.linkTotal);
     this.changes++;

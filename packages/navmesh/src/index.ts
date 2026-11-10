@@ -3,6 +3,7 @@ import {
   CorridorSearch,
   checkFilter,
   copy,
+  heuristicScale,
   cross,
   distance,
   point,
@@ -58,6 +59,8 @@ export class NavMesh implements NavSurface {
   private readonly edgeStart: Int32Array;
   private readonly edges: Float64Array;
   private readonly search = new CorridorSearch();
+  /** {@link heuristicScale} of the off-mesh links, so cheap links keep routes the cheapest. */
+  private scale = 1;
   private readonly adjacency: Link[][];
   /** Area number per polygon. */
   private readonly areas: Uint8Array;
@@ -313,6 +316,7 @@ export class NavMesh implements NavSurface {
     };
     add(from, to, start, end);
     if (options.bidirectional ?? true) add(to, from, end, start);
+    this.scale = Math.min(this.scale, heuristicScale([{ start, end, cost }]));
     this.search.reserve(this.polygons.length, this.linkCount());
     this.changes++;
     return id;
@@ -326,7 +330,10 @@ export class NavMesh implements NavSurface {
           links.splice(i, 1);
           found = true;
         }
-    if (found) this.changes++;
+    if (found) {
+      this.scale = heuristicScale(this.offMeshLinks());
+      this.changes++;
+    }
     return found;
   }
   /** Area costs with `filter` applied, in a buffer kept for the next route. */
@@ -336,6 +343,12 @@ export class NavMesh implements NavSurface {
       { areas } = this;
     for (let p = 0; p < costs.length; p++) costs[p] = this.costs[p] * (filter[areas[p]] ?? 1);
     return costs;
+  }
+  private *offMeshLinks(): Generator<{ start: Vec3; end: Vec3; cost: number }> {
+    for (const { links } of this.polygons)
+      for (const link of links)
+        if (link.offMesh !== undefined && link.start && link.end)
+          yield { start: link.start, end: link.end, cost: link.cost ?? 0 };
   }
   private linkCount(): number {
     let links = 0;
@@ -395,7 +408,7 @@ export class NavMesh implements NavSurface {
       costs = filter ? this.filter(filter) : this.costs;
     if (from < 0 || to < 0 || !(costs[to] < Infinity)) return null;
     if (from === to) return { points: [copy(start), copy(end)], offMesh: [] };
-    const corridor = this.search.find(from, to, start, end, this.polygons.length, this.adjacency, costs);
+    const corridor = this.search.find(from, to, start, end, this.polygons.length, this.adjacency, costs, this.scale);
     return corridor && routeThrough(corridor, start, end);
   }
 }

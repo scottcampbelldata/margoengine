@@ -3,7 +3,17 @@ import type { NavFilter, NavMesh, NavSurface, Vec3 } from './index.js';
 import { createRandom } from '@margoengine/math/mathutils';
 import { MargoError } from '@margoengine/math/errors';
 import type { TiledNavMesh } from './tiles.js';
-import { CorridorSearch, checkFilter, copy, cross, point, routeThrough, type NavRoute } from './search.js';
+import {
+  CorridorSearch,
+  checkFilter,
+  copy,
+  cross,
+  heuristicScale,
+  point,
+  routeThrough,
+  type Link,
+  type NavRoute,
+} from './search.js';
 
 /** Meshes supported by the optional surface queries. Tile polygon ids are valid only until a rebuild. */
 export type QueryMesh = NavMesh | TiledNavMesh;
@@ -207,13 +217,26 @@ export class NavMeshQuery implements NavSurface {
           : mesh.graph().adjacency,
       costs = new Float64Array(adjacency.length).fill(Infinity);
     let links = 0;
+    const offMesh: { start: Vec3; end: Vec3; cost: number }[] = [];
     for (const p of queue) {
       costs[p] = mesh.areaCost(p) * (filter?.[mesh.polygonArea(p)] ?? 1);
       links += adjacency[p].length;
+      for (const link of adjacency[p] as readonly Link[])
+        if (link.offMesh !== undefined && link.start && link.end)
+          offMesh.push({ start: link.start, end: link.end, cost: link.cost ?? 0 });
     }
     const search = new CorridorSearch();
     search.reserve(adjacency.length, links);
-    const found = search.find(from, last, this.project(from, start), best, adjacency.length, adjacency, costs)!;
+    const found = search.find(
+      from,
+      last,
+      this.project(from, start),
+      best,
+      adjacency.length,
+      adjacency,
+      costs,
+      heuristicScale(offMesh),
+    )!;
     return { ...routeThrough(found, this.project(from, start), best), partial, polygon: last };
   }
   /** Complete or partial route waypoints, or null without an allowed starting polygon. */

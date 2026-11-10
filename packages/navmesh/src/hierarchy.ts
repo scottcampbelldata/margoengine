@@ -83,6 +83,8 @@ export class NavHierarchy {
   private readonly free: number[] = [];
   private ones = new Float64Array(1024).fill(1);
   private version = -1;
+  /** The world's A* estimate scale, so cheap off-mesh links keep local and coarse searches the cheapest. */
+  private scale = 1;
   private owners: readonly ({ x: number; z: number } | null)[] = [];
 
   /**
@@ -286,7 +288,9 @@ export class NavHierarchy {
       b = cluster.local.get(to) as number;
     if (!(cluster.costs[b] < Infinity)) return null;
     const corridor =
-      a === b ? [] : this.local.find(a, b, start, target, cluster.polygons.length, cluster.adjacency, cluster.costs);
+      a === b
+        ? []
+        : this.local.find(a, b, start, target, cluster.polygons.length, cluster.adjacency, cluster.costs, this.scale);
     if (!corridor) return null;
     const rate = cluster.costs[b] < Infinity ? cluster.costs[b] : 1;
     return {
@@ -307,8 +311,9 @@ export class NavHierarchy {
     const world = this.world;
     if (world.version === this.version) return 0;
     this.version = world.version;
-    const graph = world.graph(this.filter),
-      size = this.size,
+    const graph = world.graph(this.filter);
+    this.scale = graph.scale;
+    const size = this.size,
       owners = (this.owners = graph.owners),
       groups = new Map<string, { x: number; z: number; polygons: number[] }>(),
       clusterOf = new Map<number, string>();
@@ -461,7 +466,7 @@ export class NavHierarchy {
         added.push(node);
       }
     }
-    const found = this.coarse.find(0, 1, start, end, none, this.steps, this.ones);
+    const found = this.coarse.find(0, 1, start, end, none, this.steps, this.ones, this.scale);
     for (const node of added) this.steps[node.id].pop();
     if (!found) return null;
     const corridor: Link[] = [];

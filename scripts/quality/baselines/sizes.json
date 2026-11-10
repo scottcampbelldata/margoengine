@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14765787,
+  "total": 14766002,
   "history": [
     {
       "date": "2026-10-24",
@@ -8255,6 +8255,12 @@
       "commit": "d70738bb7",
       "reason": "GLB BIN chunk padding check (glTF 2.0 4.4.3.3, validator parity) with a coded error",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "3a1c72440",
+      "reason": "navmesh/tiles +27 B: A* estimate scale keeps routes cheapest with off-mesh links cheaper than their length (rust port R1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8892,7 +8898,7 @@
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/obstacles": 1814,
     "@margoengine/navmesh/queries": 4729,
-    "@margoengine/navmesh/tiles": 15113,
+    "@margoengine/navmesh/tiles": 15595,
     "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16031,
     "@margoengine/navmesh/wasm": 17808,
@@ -9401,7 +9407,7 @@
     "@margoengine/ui/world": 9836,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 13126,
-    "@margoengine/usdz dist/workers/usdz.js": 144917,
+    "@margoengine/usdz dist/workers/usdz.js": 144650,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/clips": 23845,
     "@margoengine/usdz/compose": 19970,

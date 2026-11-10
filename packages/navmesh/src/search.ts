@@ -49,6 +49,22 @@ export function checkFilter(filter: ArrayLike<number>): void {
       throw new RangeError('A route filter cost must not fall below 1; use 1 or more, or Infinity to forbid an area.');
 }
 
+/**
+ * The A* estimate scale that keeps the straight-line estimate a lower bound with off-mesh links: walks cost at least
+ * their length (area costs are 1 or more), but a link may cost less than the straight line between its ends (a
+ * teleporter, a cheap jump). Scaling the estimate by k = min(1, min over links of cost / length) keeps it admissible
+ * and consistent (Hart, Nilsson, Raphael 1968), so the first closed path to a polygon stays the cheapest; k is 0, plain
+ * Dijkstra, when a link is free. Pass every link a search may cross.
+ */
+export function heuristicScale(links: Iterable<{ start: Vec3; end: Vec3; cost: number }>): number {
+  let scale = 1;
+  for (const { start, end, cost } of links) {
+    const length = distance(start, end);
+    if (cost < length * scale) scale = cost / length;
+  }
+  return scale;
+}
+
 /** A* state reused by every path call; the heap holds one entry per improved polygon cost. */
 export class CorridorSearch {
   private g = new Float64Array(0);
@@ -82,7 +98,8 @@ export class CorridorSearch {
    * null. A polygon's cost is the walk from where the search entered it to the middle of the portal it leaves by,
    * times `costs[p]` (Infinity blocks it); off-mesh links cost what they say. Measuring from the portals and not the
    * polygon centres keeps routes straight when polygons differ in size, as they do at a tile line. `polygons` is the
-   * used length of `adjacency`.
+   * used length of `adjacency`. `scale` multiplies the straight-line estimate: {@link heuristicScale} of the links in
+   * `adjacency` (default 1, right when no link costs less than its length).
    */
   find(
     from: number,
@@ -92,6 +109,7 @@ export class CorridorSearch {
     polygons: number,
     adjacency: readonly (readonly Link[])[],
     costs: ArrayLike<number>,
+    scale = 1,
   ): Link[] | null {
     const { g, f, parent, parentLink, state, entry, heapKey, heapNode } = this,
       gx = end[0],
@@ -100,7 +118,7 @@ export class CorridorSearch {
     g.fill(Infinity, 0, polygons);
     state.fill(0, 0, polygons);
     g[from] = 0;
-    f[from] = distance(start, end);
+    f[from] = scale * distance(start, end);
     state[from] = 1;
     entry[from * 3] = start[0];
     entry[from * 3 + 1] = start[1];
@@ -161,7 +179,7 @@ export class CorridorSearch {
           nz = landing ? landing[2] : mz,
           candidate = g[current] + Math.hypot(mx - ex, my - ey, mz - ez) * rate + (link.cost ?? 0);
         if (candidate < g[next]) {
-          const key = candidate + Math.hypot(nx - gx, ny - gy, nz - gz);
+          const key = candidate + scale * Math.hypot(nx - gx, ny - gy, nz - gz);
           entry[next * 3] = nx;
           entry[next * 3 + 1] = ny;
           entry[next * 3 + 2] = nz;
