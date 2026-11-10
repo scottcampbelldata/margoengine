@@ -7,7 +7,8 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { ordinaryWeightBuffer } from './weight-buffer.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
-import { sampleTrackInto, type Interpolation } from './sampling.js';
+import type { Interpolation } from './sampling.js';
+import { sampleCursor } from './key-cursor.js';
 import { DeformArena, weightRegion, type DispatchCache, type Slot, type SlotSpec } from './batch.js';
 import type { SkinningMode } from './shader.js';
 import type { PointerChannels, PointerPlan } from './pointer.js';
@@ -74,6 +75,8 @@ interface Track {
   interpolation: Interpolation;
   sample: Float32Array;
   rotation?: number[];
+  /** The key the previous frame's sample found (key-cursor.ts). */
+  cursor: number;
 }
 interface Clip {
   name: string;
@@ -307,6 +310,12 @@ export class Animation implements EnginePlugin {
   private readonly workspace = new Float64Array(52);
   private readonly quaternion: number[] = [0, 0, 0, 1];
   private disposed = false;
+  /**
+   * The model's primitives grouped by node: node n's are `primitives[groupItems[k]]` for k from groupStart[n] to
+   * groupStart[n + 1]. Built by validate(); each frame re-checks it and the morph widths without allocating.
+   */
+  private groupStart = new Int32Array(1);
+  private groupItems = new Int32Array(0);
   private unsubscribe?: () => void;
   /** The model whose nodes are the joints: this one, or `options.skeleton`. */
   private readonly joints: PBRModel;
@@ -403,6 +412,7 @@ export class Animation implements EnginePlugin {
           interpolation,
           sample: new Float32Array(width),
           ...(path === 'rotation' ? { rotation: [0, 0, 0, 1] } : {}),
+          cursor: 0,
         };
       };
       const tracks: Track[] = plan.ordinary.map((value) => {
@@ -430,15 +440,51 @@ export class Animation implements EnginePlugin {
     return animation;
   }
   private validate(): void {
-    const widths = new Map<number, number>();
-    for (const primitive of this.model.primitives) {
-      const width = widths.get(primitive.nodeIndex);
-      if (width !== undefined && width !== primitive.weights.length)
-        throw new RangeError(
-          "Morph target counts must match across a node's primitives; give every primitive of the mesh the same targets",
-        );
-      widths.set(primitive.nodeIndex, primitive.weights.length);
-    }
+    this.groupPrimitives();
+    this.checkWidths();
+    this.checkOptions();
+  }
+  /** Groups the primitives by node (once, and again only if `model.primitives` changes). */
+  private groupPrimitives(): void {
+    const primitives = this.model.primitives,
+      start = new Int32Array(this.model.nodes.length + 1),
+      items = new Int32Array(primitives.length);
+    for (const primitive of primitives) start[primitive.nodeIndex + 1]++;
+    for (let n = 0; n < start.length - 1; n++) start[n + 1] += start[n];
+    const fill = start.slice(0, -1);
+    primitives.forEach((primitive, i) => (items[fill[primitive.nodeIndex]++] = i));
+    this.groupStart = start;
+    this.groupItems = items;
+  }
+  /** True when the grouping still names every primitive of the model under its current node. */
+  private grouped(): boolean {
+    const primitives = this.model.primitives,
+      start = this.groupStart,
+      items = this.groupItems;
+    if (primitives.length !== items.length || start.length !== this.model.nodes.length + 1) return false;
+    for (let n = 0; n + 1 < start.length; n++)
+      for (let k = start[n]; k < start[n + 1]; k++) if (primitives[items[k]]?.nodeIndex !== n) return false;
+    return true;
+  }
+  /** Every primitive of a node has as many morph weights as the node's first. */
+  private checkWidths(): void {
+    const primitives = this.model.primitives,
+      start = this.groupStart,
+      items = this.groupItems;
+    for (let n = 0; n + 1 < start.length; n++)
+      for (let k = start[n] + 1; k < start[n + 1]; k++)
+        if (primitives[items[k]].weights.length !== primitives[items[start[n]]].weights.length)
+          throw new RangeError(
+            "Morph target counts must match across a node's primitives; give every primitive of the mesh the same targets",
+          );
+  }
+  /** The per-frame form of validate(): the same checks and errors, with no allocation unless the primitives changed. */
+  private checkFrame(): void {
+    if (!this.grouped()) this.groupPrimitives();
+    this.checkWidths();
+    this.checkOptions();
+  }
+  private checkOptions(): void {
     if (
       (this.options.loop !== undefined && typeof this.options.loop !== 'boolean') ||
       !Number.isFinite(this.options.speed ?? 1) ||
@@ -554,29 +600,33 @@ export class Animation implements EnginePlugin {
     const clip = this.clips[this.clip];
     if (!clip) return;
     const t = (this.options.loop ?? true) && clip.duration > 0 ? time % clip.duration : Math.min(time, clip.duration);
+    if (!this.grouped()) this.groupPrimitives();
     for (let i = 0; i < clip.tracks.length; i++) {
       const track = clip.tracks[i];
-      const value = sampleTrackInto(
-          track.times,
-          track.values,
-          track.width,
-          t,
-          track.interpolation,
-          track.path === 'rotation',
-          // Each track carries its own scratch, so filtering or reordering a clip's tracks keeps it allocation-free.
-          track.sample,
-        ),
+      // Each track carries its own scratch, so filtering or reordering a clip's tracks keeps it allocation-free.
+      const value = sampleCursor(track, t, track.path === 'rotation', track.sample),
         node = this.model.nodes[track.node];
-      node.check();
-      if (track.path === 'translation') node.setPosition(value as unknown as [number, number, number]);
-      else if (track.path === 'scale') node.setScale(value as unknown as [number, number, number]);
-      else if (track.path === 'rotation') {
+      // The transform refs check the node and the values (the sampler leaves only finite Float32 values); their
+      // setters write the same lanes as setPosition and setScale without those methods' per-call array scan.
+      if (track.path === 'translation') node.position.set(value[0], value[1], value[2]);
+      else if (track.path === 'scale') {
+        // A zero scale gets core's own error from setScale.
+        if (Math.fround(value[0]) === 0 || Math.fround(value[1]) === 0 || Math.fround(value[2]) === 0)
+          node.setScale(value as unknown as [number, number, number]);
+        else node.scale.set(value[0], value[1], value[2]);
+      } else if (track.path === 'rotation') {
         if (value.length !== 4) node.setQuaternion(Array.from(value));
         else {
           for (let c = 0; c < 4; c++) this.quaternion[c] = value[c];
           node.setQuaternion(this.quaternion);
         }
-      } else for (const p of this.model.primitives) if (p.nodeIndex === track.node) p.weights.set(value);
+      } else {
+        node.check();
+        const primitives = this.model.primitives,
+          items = this.groupItems;
+        for (let k = this.groupStart[track.node]; k < this.groupStart[track.node + 1]; k++)
+          primitives[items[k]].weights.set(value);
+      }
     }
     if (clip.bind) applyKeyframeClip((clip.bound ??= clip.bind()), t);
   }
@@ -739,7 +789,7 @@ export class Animation implements EnginePlugin {
       this.model.root.engine.sceneOf(this)?.removePlugin(this.name);
       return;
     }
-    this.validate();
+    this.checkFrame();
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
     if (this.playing) {

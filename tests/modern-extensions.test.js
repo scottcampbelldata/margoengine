@@ -4,7 +4,7 @@ import { GLTFAsset, PBRModel, parseGLTF } from '../packages/gltf-pro/dist/index.
 import { Animation } from '../packages/animation/dist/index.js';
 import { SSAO } from '../packages/post/dist/index.js';
 import { SceneFade } from '../packages/post/dist/scene-fade.js';
-import { sampleTrack } from '../packages/animation/src/sampling.ts';
+import { sampleTrack } from '../packages/animation/dist/sampling.js';
 import { multiplyMatrices } from '../packages/math/src/mat4.ts';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';

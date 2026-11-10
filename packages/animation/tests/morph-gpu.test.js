@@ -45,6 +45,8 @@ function harness() {
           setPosition() {
             return this;
           },
+          position: { set() {} },
+          scale: { set() {} },
           setScale() {
             return this;
           },

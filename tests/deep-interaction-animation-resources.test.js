@@ -24,6 +24,11 @@ test('animation retains inverse bind views through 120 moving frames and recreat
       this.matrix[12] = value[0];
       return this;
     },
+    // The frame path writes through the transform refs, as on a core Mesh.
+    get position() {
+      return { set: (x) => (this.matrix[12] = x) };
+    },
+    scale: { set() {} },
     setScale() {
       return this;
     },
@@ -118,6 +123,8 @@ test('Animations of one engine deform in one compute pass and one dispatch a fra
       setPosition() {
         return this;
       },
+      position: { set() {} },
+      scale: { set() {} },
       setScale() {
         return this;
       },

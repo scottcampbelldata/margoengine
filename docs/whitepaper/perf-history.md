@@ -3266,3 +3266,22 @@ profiled once. All 36 formerly empty slower-row causes now identify their code
 paths and work counts with lane ownership. First-call counts include initialization
 and do not replace steady-state timing attribution. No speed verdict changed; batch
 159 remains open. [Evidence, remaining gaps and reproduction](parity-diagnoses.md).
+
+### Batch 161 job 1: animation frame path (rows 12.1, 12.3, 12.5)
+
+- Cause, read from the code: each Animation ran its constructor validation every frame (a new `Map` and a loop over
+  the model's primitives), sampled every track through the checked `sampleTrackInto` with a binary search from key 0,
+  and wrote nodes through `setPosition` and `setScale` (core `setScale` scans its argument with a closure each call) plus
+  an extra `check()` per track.
+- Fix: the primitives are grouped by node once into two `Int32Array`s; each frame re-checks the grouping, the morph
+  widths and the options with no allocation and the same errors. An internal cursor sampler (ACL's per-track sorted key
+  cursors, Frechette, GDC 2017) walks on from the previous key and searches only after a seek back or a loop wrap; it
+  shares one interpolation function with `sampleTrackInto`. Translations and scales go through `node.position.set` and
+  `node.scale.set`; a zero scale still reaches core `setScale` for its error.
+- Work counts (`packages/animation/tests/frame-path.test.js`, both fail on the parent): key-time reads per track sample on
+  forward Walking playback at 60 Hz at most 3 (parent: 7, the 24-key binary search plus the pair); `setPosition` and
+  `setScale` calls per frame 0; `validate()` calls per frame 0 with the group table kept across frames.
+- Identical output: 600 seeks of Walking (forward, backward, looped) and every RobotExpressive clip forward and back give
+  the same transform and rotation lanes, bit for bit, as `sampleTrackInto` plus the setters driven by hand.
+- No timing was taken: timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer,p-morph
+  --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).

@@ -53,6 +53,11 @@ function harness(f = fixture8(), mixed = false) {
       this.matrix[12] = value[0];
       return this;
     },
+    // The frame path writes through the transform refs, as on a core Mesh.
+    get position() {
+      return { set: (x) => (this.matrix[12] = x) };
+    },
+    scale: { set() {} },
     setScale() {
       return this;
     },

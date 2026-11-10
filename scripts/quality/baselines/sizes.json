@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14670546,
+  "total": 14672224,
   "history": [
     {
       "date": "2026-10-24",
@@ -8093,16 +8093,22 @@
       "commit": "39ffe8bbf",
       "reason": "culling LodInstances ordered compaction (three kernels)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "5ecb5ab1a",
+      "reason": "batch 161 job 1: per-track key cursor and the per-node primitive group table replace per-frame validation and binary search (+167 B animation root, +29 B interactivity)",
+      "grew": 2
     }
   ],
   "items": {
-    "@margoengine/animation": 23438,
+    "@margoengine/animation": 24314,
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 3792,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9937,
-    "@margoengine/animation/interactivity": 25733,
+    "@margoengine/animation/interactivity": 26535,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
     "@margoengine/animation/morph-gpu": 3265,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MargoError } from '@margoengine/math/errors';
-import { sampleTrack } from '../src/sampling.ts';
+import { sampleTrack } from '../dist/sampling.js';
 import { animationPath, animationInterpolation, animationIndex, skinDefinition } from '../src/gltf.ts';
 
 const times = new Float32Array([0, 1]);

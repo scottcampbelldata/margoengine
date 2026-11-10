@@ -2355,6 +2355,9 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 - **Cause of what is left:** the 200 draws' rows, uniform writes and bindings, and the 100 Animations' own work
   (`setMorph`, validation, weight writes, `upload`, `deformAll`). A multi-primitive model joining a run would not help this
   scene: deformed primitives cannot join an instanced batch (`batchable`).
+- **Batch 161 job 1:** the per-frame validation pass (a `Map` and a primitives loop per Animation per frame) is gone:
+  primitives are grouped by node once and re-checked without allocating (`packages/animation/tests/frame-path.test.js`).
+  Timing pending the quiet rerun.
 - **Plan:** write the weights of every Animation of a device in one upload (`packages/animation/src/index.ts`, `upload`),
   then profile again. No core change. For copies playing one clip, `MorphWeightPlayer`
   (`@margoengine/animation/morph-gpu`, 2026-11-06) samples and writes the weights on the GPU; its effect on `p-morph`
@@ -5660,3 +5663,12 @@ Scott's coordinator ruling (2026-11-10) accepts the identical-stream and backend
 ### Batch 159 matrix preflight gaps (2026-11-10)
 
 Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
+
+### hygiene gate 6: TypeScript async API threw "getNodeId requires a RemoteNode" once (2026-11-10)
+
+`npm run hygiene` in the lane-P worktree (bp-161, branch from 5ecb5ab1a, packages freshly built) failed once at
+`scripts/hygiene.js` gate 6 (`checker.getSymbolAtLocation(await program.getSourceFile(dts))`) with
+`Error: getNodeId requires a RemoteNode` while 14 packages' CPU tests ran beside it; the rerun on the same files passed,
+and a standalone pass over all 1,312 entry `.d.ts` files found every source file. Cause not found yet: a
+`getSourceFile` that resolves to a non-remote node under load in `typescript/unstable/async`. Repro attempt: run
+`npm run hygiene` while `npm test` runs in several packages.

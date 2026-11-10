@@ -431,3 +431,13 @@ UI has no like-for-like three.js flex layout row. Its Yoga comparison and call-s
 measurement fix are [recorded with the other rivals](perf-vs-rivals.md#batch-169-ui-work-counts-2026-11-10).
 The nested fixture falls from 24 measurements to 2 with identical layout bytes; fix
 commit: `perf(ui): memoize intrinsic layout per call`. Timing pending the quiet rerun.
+
+## Animation frame path (batch 161 job 1)
+
+Rows 12.1 and 12.3 (`p-mixer`) and 12.5 (`p-morph`) stay slower until the quiet rerun. Diagnosed from the code: every
+Animation re-ran its constructor validation each frame (a `Map` per Animation per frame), binary-searched every track
+from scratch and wrote nodes through setters that scan their arguments. Now the morph widths are grouped once and
+re-checked without allocating, each track continues from last frame's key (at most 3 key-time reads a sample on forward
+playback, 7 before) and nodes are written through the transform refs. Parent-failing work counts and a bit-for-bit
+transform store comparison are in `packages/animation/tests/frame-path.test.js`; perf-history "Batch 161 job 1".
+Timing pending the quiet rerun.
