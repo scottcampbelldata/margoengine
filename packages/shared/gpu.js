@@ -52,14 +52,17 @@ export function dispatch(c, pipeline, bindGroup, x, y = 1) {
   pass.dispatchWorkgroups(x, y);
   pass.end();
 }
-const key = Symbol.for('margoengine.optional.scene-depth');
-/** Shared across independently bundled optional packages on the same engine. */
+/**
+ * One scene-depth capture per scene, shared by the optional packages in it however they are bundled: found by its
+ * plugin name in the scene being set up or drawn (`engine.plugins` is that scene's), because its passes draw only in
+ * that scene's views. Released from the scene it was attached to.
+ */
 export function acquireDepth(engine) {
   if (!engine.gpu)
     throw margoError('unsupported', 'Scene depth requires WebGPU; see https://margoengine.com/errors#webgpu');
   if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
     throw margoError('state', 'Another effect owns scene capture; use its depth texture');
-  let value = engine[key];
+  let value = engine.plugins.get('optional:scene-depth');
   if (!value) {
     value = {
       name: 'optional:scene-depth',
@@ -147,11 +150,9 @@ export function acquireDepth(engine) {
       },
       dispose() {
         this.onDeviceRestored();
-        delete engine[key];
       },
     };
     engine.use(value);
-    engine[key] = value;
   }
   value.references++;
   let released = false;
@@ -160,7 +161,7 @@ export function acquireDepth(engine) {
     release() {
       if (released) return;
       released = true;
-      if (--value.references === 0) engine.removePlugin(value.name);
+      if (--value.references === 0) engine.sceneOf(value)?.removePlugin(value.name);
     },
   };
 }
