@@ -936,3 +936,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/environment (batch 188 job 2): document /prefiltered save/load, KTX2 metadata, upload-only restore, cancellation, cube background mode and paused dynamic capture; correct the stale multiple-scattering limit when README work resumes.
 - materials: document fur/FurMaterial/createFur controls and defaults, shared textures, explicit setTime, atomic setOptions, shell-root parenting, caster support, two-shell sampling and integration limits.
 - margoengine: document the generated materials/fur alias and post/mask mapping repair.
+- @margoengine/post: document Halftone and DotScreen, four shapes, degree angles, pixel origin, frequency, RGB/grayscale, scatter/blend/intensity and LDR ordering.
