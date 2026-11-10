@@ -214,8 +214,7 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
     height = Number.parseFloat(root.getAttribute('height') ?? '') || view[3];
   if (!(width > 0 && height > 0 && Number.isFinite(width + height))) fail('SVG needs finite positive dimensions.');
   const pageWidth = options.widthMM === undefined ? width * 0.75 : (options.widthMM * 72) / 25.4;
-  if (!(pageWidth > 0 && Number.isFinite(pageWidth)))
-    throw rangeError('Use a positive finite PDF widthMM.', 'sciviz');
+  if (!(pageWidth > 0 && Number.isFinite(pageWidth))) throw rangeError('Use a positive finite PDF widthMM.', 'sciviz');
   const scale = pageWidth / width,
     pdf = new PDF(),
     catalog = pdf.reserve(),
@@ -282,7 +281,7 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
     )
       fail('Gradient stop opacity is not emitted by figures.');
     for (let i = 1; i < stops.length; i++)
-      if (stops[i].offset <= stops[i - 1].offset) fail('Gradient offsets must increase.');
+      if (stops[i].offset < stops[i - 1].offset) fail('Gradient offsets must not decrease.');
     if (stops[0].offset !== 0) stops.unshift({ ...stops[0], offset: 0 });
     if (stops.at(-1)!.offset !== 1) stops.push({ ...stops.at(-1)!, offset: 1 });
     const xs: number[] = [],
@@ -302,16 +301,17 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
       return user ? v : i % 2 ? ymin + v * bh : xmin + v * bw;
     });
     if (el.hasAttribute('gradientTransform')) fail('Gradient transforms are not emitted by figures.');
-    const functions = stops
-      .slice(1)
-      .map(
-        (s, i) =>
-          `<< /FunctionType 2 /Domain [0 1] /C0 [${stops[i].c.rgb.map(number).join(' ')}] /C1 [${s.c.rgb.map(number).join(' ')}] /N 1 >>`,
-      );
+    // Equal SVG offsets are a colour discontinuity. PDF stitching represents it with
+    // adjacent nonempty domains and independent endpoint colours, never a zero-width function.
+    const segments = stops.slice(1).flatMap((to, i) => (to.offset > stops[i].offset ? [{ from: stops[i], to }] : []));
+    const functions = segments.map(
+      ({ from, to }) =>
+        `<< /FunctionType 2 /Domain [0 1] /C0 [${from.c.rgb.map(number).join(' ')}] /C1 [${to.c.rgb.map(number).join(' ')}] /N 1 >>`,
+    );
     const fn = pdf.add(
-      `<< /FunctionType 3 /Domain [0 1] /Functions [${functions.join(' ')}] /Bounds [${stops
-        .slice(1, -1)
-        .map((s) => number(s.offset))
+      `<< /FunctionType 3 /Domain [0 1] /Functions [${functions.join(' ')}] /Bounds [${segments
+        .slice(0, -1)
+        .map((s) => number(s.to.offset))
         .join(' ')}] /Encode [${functions.map(() => '0 1').join(' ')}] >>`,
     );
     const sh = pdf.add(

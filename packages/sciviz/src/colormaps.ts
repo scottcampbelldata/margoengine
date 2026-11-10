@@ -11,6 +11,10 @@
 import { LinearToSRGB, SRGBToLinear, hexColor } from '@margoengine/math/color';
 import { rangeError, typeError } from '../../shared/errors.js';
 import { TABLES } from './tables.js';
+export { simulateCVD, cvdMatrix } from './cvd.js';
+export type { CVDType } from './cvd.js';
+export { encodingLegend } from './legend.js';
+export type { LegendShape, LegendEntry, EncodingLegendHandle } from './legend.js';
 
 /** An sRGB colour as three numbers in [0, 1]. */
 export type SRGB = readonly [number, number, number];
@@ -28,10 +32,49 @@ export type ColormapName =
   | 'magma'
   | 'inferno'
   | 'plasma'
-  | 'cividis';
+  | 'cividis'
+  | 'lab-linear-blue-yellow'
+  | 'lab-diverging-blue-red'
+  | 'lab-cyclic-diamond'
+  | 'lab-isoluminant-hue';
 
 /** How a map is meant to be read: ordered data, data around a centre, or angles. */
-export type ColormapKind = 'sequential' | 'diverging' | 'cyclic';
+export type ColormapKind = 'sequential' | 'diverging' | 'cyclic' | 'isoluminant' | 'categorical';
+
+/** A scalar colour encoding. Domains are in data units; bin edges are transformed fractions. */
+export interface ColorEncoding {
+  readonly domain: readonly [number, number];
+  readonly scale: 'linear' | 'log' | 'symlog';
+  readonly constant: number;
+  readonly edges: readonly number[];
+  readonly colors: readonly SRGB[];
+  readonly nan: SRGB;
+  readonly under: SRGB;
+  readonly over: SRGB;
+}
+
+/** Options for a colour scale, shared by CPU layers, GPU scalar layers and publication legends. */
+export interface ColorScaleOptions {
+  /** Increasing finite data limits. Pass this same range to the layer and colour bar. */
+  readonly domain: readonly [number, number];
+  /** Mapping of data to colour. Default linear; log requires a positive domain. */
+  readonly scale?: 'linear' | 'log' | 'symlog';
+  /** Positive transition size for sign(x) log(1 + abs(x)/constant). Default 1. */
+  readonly constant?: number;
+  /** Increasing data edges, including both domain endpoints. At most 256 bins. */
+  readonly boundaries?: readonly number[];
+  /** Equal-width bins in transformed coordinates. Alternative to boundaries. Default continuous. */
+  readonly bins?: number;
+  /** One colour per bin. Default samples the source map at bin centres. */
+  readonly colors?: readonly (string | SRGB)[];
+  /** Missing, below-range and above-range colours. Defaults grey and the source endpoints. */
+  readonly nan?: string | SRGB;
+  readonly under?: string | SRGB;
+  readonly over?: string | SRGB;
+}
+
+const transformColor = (x: number, scale: ColorEncoding['scale'], c: number) =>
+  scale === 'log' ? Math.log(x) : scale === 'symlog' ? Math.sign(x) * Math.log1p(Math.abs(x) / c) : x;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -113,7 +156,7 @@ function srgbToLab([r, g, b]: SRGB): [number, number, number] {
   const [fx, fy, fz] = xyz.map(f);
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
-function labToSrgb(L: number, a: number, b: number): SRGB {
+function labLinear(L: number, a: number, b: number): number[] {
   const fy = (L + 16) / 116,
     fx = fy + a / 500,
     fz = fy - b / 200;
@@ -124,7 +167,21 @@ function labToSrgb(L: number, a: number, b: number): SRGB {
     -0.969266 * X + 1.8760108 * Y + 0.041556 * Z,
     0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
   ];
-  return lin.map((v) => clamp01(encodeSRGB(clamp01(v)))) as unknown as SRGB;
+  return lin;
+}
+function labToSrgb(L: number, a: number, b: number): SRGB {
+  return labLinear(L, a, b).map((v) => clamp01(encodeSRGB(clamp01(v)))) as unknown as SRGB;
+}
+// Preserve prescribed L* at the sRGB gamut boundary by reducing chroma, never clipping RGB channels.
+function constructionLab(L: number, a: number, b: number): SRGB {
+  let low = 0,
+    high = 1;
+  for (let i = 0; i < 28; i++) {
+    const mid = (low + high) / 2;
+    if (labLinear(L, a * mid, b * mid).every((v) => v >= 0 && v <= 1)) low = mid;
+    else high = mid;
+  }
+  return labToSrgb(L, a * low, b * low);
 }
 type Msh = [number, number, number];
 const toMsh = (rgb: SRGB): Msh => {
@@ -191,6 +248,54 @@ const table =
   };
 
 const DEFINITIONS: Record<ColormapName, Definition> = {
+  'lab-linear-blue-yellow': {
+    kind: 'sequential',
+    about: 'Kovesi linear-diverging construction; constant CIELAB lightness rate, blue through grey to yellow',
+    sample: (t) => constructionLab(25 + 65 * t, 0, 32 * (2 * t - 1)),
+  },
+  'lab-diverging-blue-red': {
+    kind: 'diverging',
+    about: 'Kovesi symmetric CIELAB diverging path with a Gaussian-smoothed lightness reversal',
+    sample: (t) => {
+      // Convolve the lightness triangle with sigma 6/256, the paper's recommended range.
+      let L = 0,
+        weight = 0;
+      for (let k = -18; k <= 18; k++) {
+        const w = Math.exp((-k * k) / 72);
+        L += w * (90 - 100 * Math.abs(t + k / 256 - 0.5));
+        weight += w;
+      }
+      return constructionLab(L / weight, 32 * (2 * t - 1), 15 * (2 * t - 1));
+    },
+  },
+  'lab-cyclic-diamond': {
+    kind: 'cyclic',
+    about: 'Kovesi four-reference CIELAB diamond, rounded with a periodic cubic spline for C2 seam continuity',
+    sample: (t) => {
+      const corners = [
+        [65, 28, -25],
+        [90, -10, 25],
+        [65, -28, 25],
+        [40, 10, -25],
+      ];
+      const q = t * 4,
+        i = Math.floor(q) % 4,
+        f = q - Math.floor(q);
+      const weights = [(1 - f) ** 3, 3 * f ** 3 - 6 * f * f + 4, -3 * f ** 3 + 3 * f * f + 3 * f + 1, f ** 3].map(
+        (v) => v / 6,
+      );
+      const value = [0, 1, 2].map((c) => weights.reduce((sum, w, k) => sum + w * corners[(i + k + 3) % 4][c], 0));
+      return constructionLab(value[0], value[1], value[2]);
+    },
+  },
+  'lab-isoluminant-hue': {
+    kind: 'isoluminant',
+    about: 'Kovesi relief-shading construction; constant CIELAB L=70, chroma=20, hue 260 to 20 degrees',
+    sample: (t) => {
+      const h = ((260 - 240 * t) * Math.PI) / 180;
+      return constructionLab(70, 20 * Math.cos(h), 20 * Math.sin(h));
+    },
+  },
   aurora: {
     kind: 'sequential',
     about: 'deep violet through blue and green to pale yellow; lightness rises linearly (the default)',
@@ -258,7 +363,12 @@ export class Colormap {
   readonly kind: ColormapKind;
 
   /** @param sample sRGB colour at t in [0, 1]. */
-  constructor(name: string, kind: ColormapKind, sample: (t: number) => SRGB) {
+  constructor(
+    name: string,
+    kind: ColormapKind,
+    sample: (t: number) => SRGB,
+    readonly encoding?: ColorEncoding,
+  ) {
     if (typeof sample !== 'function')
       throw typeError('Colormap needs a sample(t) function returning [r, g, b]', 'sciviz');
     this.name = name;
@@ -268,8 +378,77 @@ export class Colormap {
 
   /** The sRGB colour at `t` (clamped to [0, 1]; a cyclic map wraps). */
   sample(t: number): SRGB {
+    const e = this.encoding;
+    if (e) {
+      if (Number.isNaN(t)) return e.nan;
+      if (t < 0) return e.under;
+      if (t > 1) return e.over;
+      t = this.position(e.domain[0] + t * (e.domain[1] - e.domain[0]));
+      if (e.colors.length) {
+        let i = 0;
+        while (i < e.colors.length - 1 && t >= e.edges[i + 1]) i++;
+        return e.colors[i];
+      }
+    }
     const x = this.kind === 'cyclic' ? t - Math.floor(t) : clamp01(t);
     return this.#sample(Number.isFinite(x) ? x : 0);
+  }
+
+  /** @internal The unscaled source map, for the shared GPU lookup contract. */
+  unscaled(): Colormap {
+    return new Colormap(this.name, this.kind, this.#sample);
+  }
+
+  /** A portable, validated scale recipe, or undefined for a plain map. */
+  scaleOptions(): ColorScaleOptions | undefined {
+    const e = this.encoding;
+    if (!e) return undefined;
+    const a = transformColor(e.domain[0], e.scale, e.constant),
+      b = transformColor(e.domain[1], e.scale, e.constant);
+    const inverse = (p: number) => {
+      const v = a + p * (b - a);
+      return e.scale === 'log'
+        ? Math.exp(v)
+        : e.scale === 'symlog'
+          ? Math.sign(v) * Math.expm1(Math.abs(v)) * e.constant
+          : v;
+    };
+    const boundaries = e.colors.length ? e.edges.map(inverse) : undefined;
+    if (boundaries) {
+      boundaries[0] = e.domain[0];
+      boundaries[boundaries.length - 1] = e.domain[1];
+    }
+    return {
+      domain: e.domain,
+      scale: e.scale,
+      constant: e.constant,
+      boundaries,
+      colors: e.colors.length ? e.colors : undefined,
+      nan: e.nan,
+      under: e.under,
+      over: e.over,
+    };
+  }
+
+  /** Position of a data value on a legend. Plain maps use the supplied linear range. */
+  position(value: number, range: readonly [number, number] = this.encoding?.domain ?? [0, 1]): number {
+    const e = this.encoding,
+      scale = e?.scale ?? 'linear',
+      c = e?.constant ?? 1;
+    const lo = transformColor(range[0], scale, c),
+      hi = transformColor(range[1], scale, c);
+    return (transformColor(value, scale, c) - lo) / (hi - lo);
+  }
+
+  /** Gradient stops in legend coordinates, including exact repeated offsets at bin edges. */
+  gradientStops(n = 32): readonly { readonly offset: number; readonly color: SRGB }[] {
+    const e = this.encoding;
+    if (e?.colors.length)
+      return e.colors.flatMap((color, i) => [
+        { offset: e.edges[i], color },
+        { offset: e.edges[i + 1], color },
+      ]);
+    return Array.from({ length: n }, (_, i) => ({ offset: i / (n - 1), color: this.#sample(i / (n - 1)) }));
   }
 
   /**
@@ -290,14 +469,20 @@ export class Colormap {
 
   /** The same map read backwards. */
   reversed(): Colormap {
-    return new Colormap(`${this.name}-reversed`, this.kind, (t) => this.#sample(1 - t));
+    const e = this.encoding;
+    return new Colormap(
+      `${this.name}-reversed`,
+      this.kind,
+      (t) => this.#sample(1 - t),
+      e ? { ...e, colors: [...e.colors].reverse(), under: e.over, over: e.under } : undefined,
+    );
   }
 
   /** A CSS linear-gradient string (default left to right; `'to top'` for a vertical bar), for colour bars and legends. */
   css(stops = 16, direction = 'to right'): string {
-    const colours = Array.from({ length: stops }, (_, k) => {
-      const [r, g, b] = this.sample(k / (stops - 1)).map((v) => Math.round(v * 255));
-      return `rgb(${r} ${g} ${b}) ${((k / (stops - 1)) * 100).toFixed(1)}%`;
+    const colours = this.gradientStops(stops).map(({ offset, color }) => {
+      const [r, g, b] = color.map((v) => Math.round(v * 255));
+      return `rgb(${r} ${g} ${b}) ${offset * 100}%`;
     });
     return `linear-gradient(${direction}, ${colours.join(', ')})`;
   }
@@ -361,4 +546,125 @@ export function describeColormap(name: ColormapName): { kind: ColormapKind; abou
   const d = DEFINITIONS[name];
   if (!d) throw typeError(`Unknown colour map ${name}`, 'sciviz');
   return { kind: d.kind, about: d.about };
+}
+
+const checkedColor = (value: string | SRGB): SRGB => {
+  const c = typeof value === 'string' ? hex(value) : value;
+  if (c?.length !== 3 || !c.every((v) => Number.isFinite(v) && v >= 0 && v <= 1))
+    throw rangeError('Colour needs three finite sRGB channels in [0,1]; supply #rrggbb or [r,g,b]', 'sciviz');
+  return Object.freeze([...c]) as unknown as SRGB;
+};
+
+/** Make a linear, log, symmetric-log, continuous or binned scale. sample(t) still takes a linear domain fraction. */
+export function colorScale(source: Parameters<typeof colormap>[0], options: ColorScaleOptions): Colormap {
+  if (options?.domain?.length !== 2)
+    throw typeError('Colour scale needs a domain [min,max]; supply two limits', 'sciviz');
+  const map = colormap(source).unscaled(),
+    [lo, hi] = options.domain,
+    scale = options.scale ?? 'linear',
+    c = options.constant ?? 1;
+  if (
+    ![lo, hi, c].every(Number.isFinite) ||
+    !(hi > lo) ||
+    !(c > 0) ||
+    !['linear', 'log', 'symlog'].includes(scale) ||
+    (scale === 'log' && lo <= 0)
+  )
+    throw rangeError(
+      'Colour scale needs increasing finite limits, a positive log domain and constant; correct the options',
+      'sciviz',
+    );
+  if (options.boundaries && options.bins !== undefined)
+    throw rangeError('Choose boundaries or bins, not both', 'sciviz');
+  const a = transformColor(lo, scale, c),
+    b = transformColor(hi, scale, c);
+  const count = options.bins ?? (options.boundaries ? options.boundaries.length - 1 : 0);
+  if (!Number.isInteger(count) || count < 0 || count > 256 || (options.bins !== undefined && count < 1))
+    throw rangeError('Colour bins must be a whole number from 1 to 256; correct bins or boundaries', 'sciviz');
+  const edges = options.boundaries
+    ? options.boundaries.map((v) => (transformColor(v, scale, c) - a) / (b - a))
+    : Array.from({ length: count + 1 }, (_, i) => i / count);
+  if (
+    options.boundaries &&
+    (count < 1 ||
+      options.boundaries[0] !== lo ||
+      options.boundaries[count] !== hi ||
+      edges.some((v, i) => !Number.isFinite(v) || (i > 0 && !(v > edges[i - 1]))))
+  )
+    throw rangeError(
+      'Bin boundaries must strictly increase from domain minimum to maximum; correct the edges',
+      'sciviz',
+    );
+  if (options.colors && (!count || options.colors.length !== count))
+    throw rangeError('Supply exactly one colour per bin', 'sciviz');
+  const colors = Array.from({ length: count }, (_, i) =>
+    checkedColor(options.colors?.[i] ?? map.sample((edges[i] + edges[i + 1]) / 2)),
+  );
+  return new Colormap(
+    map.name,
+    map.kind,
+    (t) => map.sample(t),
+    Object.freeze({
+      domain: Object.freeze([lo, hi]) as readonly [number, number],
+      scale,
+      constant: c,
+      edges: Object.freeze(count ? edges : []),
+      colors: Object.freeze(colors),
+      nan: checkedColor(options.nan ?? '#999999'),
+      under: checkedColor(options.under ?? map.sample(0)),
+      over: checkedColor(options.over ?? map.sample(1)),
+    }),
+  );
+}
+
+/** Paul Tol's published categorical definitions, in the author's default order (2026). */
+export const tolSchemeNames = [
+  'bright',
+  'high-contrast',
+  'vibrant',
+  'muted',
+  'medium-contrast',
+  'dark',
+  'pale',
+  'light',
+] as const;
+/** One of Tol's qualitative schemes. Pale/light are intended for labelled backgrounds. */
+export type TolScheme = (typeof tolSchemeNames)[number];
+const TOL: Record<TolScheme, readonly string[]> = {
+  bright: ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB'],
+  'high-contrast': ['#004488', '#DDAA33', '#BB5566'],
+  vibrant: ['#EE7733', '#0077BB', '#33BBEE', '#EE3377', '#CC3311', '#009988', '#BBBBBB'],
+  muted: ['#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#882255', '#44AA99', '#999933', '#AA4499'],
+  'medium-contrast': ['#6699CC', '#004488', '#EECC66', '#994455', '#997700', '#EE99AA'],
+  dark: [
+    '#4477BB',
+    '#CC4466',
+    '#228833',
+    '#2255AA',
+    '#993366',
+    '#006644',
+    '#117788',
+    '#882288',
+    '#BB4488',
+    '#775500',
+    '#444444',
+  ],
+  pale: ['#AACCEE', '#CCEEFF', '#BBDDBB', '#EEEEBB', '#FFBBCC', '#EEBBDD', '#DDDDDD'],
+  light: ['#77AADD', '#EE8866', '#EEDD88', '#FFAABB', '#99DDFF', '#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD'],
+};
+/** Fresh sRGB triples for a Tol categorical scheme. Colours are never interpolated. */
+export function tolPalette(name: TolScheme = 'bright'): readonly SRGB[] {
+  if (!TOL[name]) throw typeError('Unknown Tol scheme; choose a tolSchemeNames entry', 'sciviz');
+  return TOL[name].map(hex);
+}
+/** A discrete Tol map, with integer categories spanning [0, palette.length]. */
+export function tolColormap(name: TolScheme = 'bright'): Colormap {
+  const colors = tolPalette(name),
+    map = colorScale('gray', { domain: [0, colors.length], bins: colors.length, colors });
+  return new Colormap(
+    `tol-${name}`,
+    'categorical',
+    (t) => colors[Math.min(colors.length - 1, Math.floor(clamp01(t) * colors.length))],
+    map.encoding,
+  );
 }

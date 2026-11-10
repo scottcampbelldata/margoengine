@@ -1,3 +1,4 @@
+import { colorLookupWGSL, colorTextureData } from './color-lookup.js';
 // Volume rendering by ray marching (J. Kruger and R. Westermann, "Acceleration techniques for GPU-based volume
 // rendering", IEEE Visualization 2003; front-to-back compositing with early ray termination). The data lives in a 3D
 // half-float texture normalised to the colour range; a transfer function texture gives colour (from a colour map) and
@@ -77,7 +78,8 @@ export interface VolumeClassification {
   readonly density?: number;
 }
 
-const classifyWGSL = /* wgsl */ `
+const classifyWGSL = /* wgsl */ `${colorLookupWGSL}
+
 fn gradient(p: vec3f, dims: vec3f, spacing: vec3f) -> vec3f {
   let d = 1.0 / dims;
   let low = clamp(p - d, d * 0.5, 1.0 - d * 0.5);
@@ -89,10 +91,28 @@ fn gradient(p: vec3f, dims: vec3f, spacing: vec3f) -> vec3f {
   return g / max((high - low) * dims, vec3f(1.0)) / spacing;
 }
 fn classify(v: f32, y: f32, kind: f32) -> vec4f {
-  if (kind < 0.5) { return textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0); }
+  if (kind < 0.5) { return colourLookup(transfer, v); }
   let n = vec2f(textureDimensions(transfer));
-  return textureSampleLevel(transfer, linearSampler, (vec2f(v, y) * (n - 1.0) + 0.5) / n, 0.0);
+  let p=clamp(vec2f(v,y),vec2f(0.0),vec2f(1.0))*(n-1.0);
+  let i=vec2i(floor(p)); let j=min(i+vec2i(1),vec2i(n)-vec2i(1)); let f=fract(p);
+  return mix(mix(textureLoad(transfer,i,0),textureLoad(transfer,vec2i(j.x,i.y),0),f.x),
+             mix(textureLoad(transfer,vec2i(i.x,j.y),0),textureLoad(transfer,j,0),f.x),f.y);
 }`;
+
+// Plain transfer textures retain hardware filtering. Only opted-in scalar encodings
+// need explicit float-table lookup. Specialize before compilation and key pipelines
+// by this contract, so mixed ordinary/encoded volumes can share a renderer safely.
+function volumeCode(code: string, encoded: boolean): string {
+  if (encoded) return code;
+  return code.replace(
+    colorLookupWGSL,
+    /* wgsl */ `
+fn colourLookup(table:texture_2d<f32>, value:f32)->vec4f {
+  return textureSampleLevel(table,linearSampler,vec2f(value,0.5),0.0);
+}
+`,
+  );
+}
 
 /** WGSL of the volume pipeline. */
 const volumeShader = /* Shader notes kept outside the uploaded source:
@@ -165,6 +185,7 @@ fn kept(p: vec3f) -> bool {
   var colour = vec3f(0.0);
   var alpha = 0.0;
   var peak = 0.0;
+  var hasPeak = false;
   let texel = 1.0 / volume.dims.xyz;
   let toEye = -normalize((volume.normalModel * vec4f(dir, 0.0)).xyz);
   for (var i = 0u; i < count; i++) {
@@ -173,7 +194,12 @@ fn kept(p: vec3f) -> bool {
     t += stride;
     if (!kept(p)) { continue; }
     let v = sample(p);
-    if (volume.params.y > 0.5) { peak = max(peak, v); continue; }
+    if (volume.params.y > 0.5) {
+      if ((bitcast<u32>(v)&0x7fffffffu)<=0x7f800000u) {
+        if(hasPeak){peak=max(peak,v);}else{peak=v;hasPeak=true;}
+      }else if(!hasPeak){peak=v;}
+      continue;
+    }
     var coordinate = 0.5;
     if (volume.classification.x == 1.0) { coordinate = length(gradient(p, volume.dims.xyz, volume.spacing.xyz)) * volume.classification.y; }
     if (volume.classification.x == 2.0) { coordinate = sample(origin + dir * min(t, exit)); }
@@ -242,7 +268,7 @@ function halfVoxels(values: ArrayLike<number>, lo: number, hi: number): Uint16Ar
     scale = 1 / (hi - lo);
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
-    out[i] = f16Bits(v === v ? Math.min(65504, Math.max(-65504, (v - lo) * scale)) : 0);
+    out[i] = f16Bits(v === v ? Math.min(65504, Math.max(-65504, (v - lo) * scale)) : NaN);
   }
   return out;
 }
@@ -261,7 +287,8 @@ const packShader = /* wgsl */ `struct Pack { nx: u32, rows: u32, rowWords: u32, 
   for (var k = 0u; k < 2u; k++) {
     if (i + k < pack.nx) {
       let v = src[row * pack.nx + i + k];
-      pair[k] = select(0.0, clamp((v - pack.lo) * pack.scale, -65504.0, 65504.0), v == v);
+      if((bitcast<u32>(v)&0x7fffffffu)>0x7f800000u){pair[k]=v;}
+      else{pair[k]=clamp((v - pack.lo) * pack.scale, -65504.0, 65504.0);}
     }
   }
   dst[row * pack.rowWords + word] = pack2x16float(pair);
@@ -316,7 +343,9 @@ export class VolumeLayer implements Drawable {
         : [
             this.#uniform,
             ...(this.#texture ? [{ texture: this.#texture, bytesPerTexel: 2 }] : []),
-            ...(this.#transfer ? [{ texture: this.#transfer, bytesPerTexel: 4 }] : []),
+            ...(this.#transfer
+              ? [{ texture: this.#transfer, bytesPerTexel: !this.#classification && this.colormap.encoding ? 16 : 4 }]
+              : []),
           ],
     };
   }
@@ -442,14 +471,21 @@ export class VolumeLayer implements Drawable {
         [nx, ny, nz],
       );
     const classification = this.#classification,
-      size = classification?.size ?? [256, 1];
+      size = classification?.size ?? [256, this.colormap.encoding ? 4 : 1];
     this.#transfer = device.createTexture({
       size: [...size],
-      format: classification ? 'rgba8unorm' : 'rgba8unorm-srgb',
+      format: classification ? 'rgba8unorm' : this.colormap.encoding ? 'rgba32float' : 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     this.#table = new Uint8Array(classification?.rgba ?? transferTable(this.colormap, this.#opacity));
-    device.queue.writeTexture({ texture: this.#transfer }, this.#table, { bytesPerRow: size[0] * 4 }, size);
+    const pixels =
+      !classification && this.colormap.encoding ? colorTextureData(this.colormap, this.#table) : this.#table;
+    device.queue.writeTexture(
+      { texture: this.#transfer },
+      pixels,
+      { bytesPerRow: size[0] * pixels.BYTES_PER_ELEMENT * 4 },
+      size,
+    );
     this.#sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
@@ -469,7 +505,11 @@ export class VolumeLayer implements Drawable {
           visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
           texture: { sampleType: 'float', viewDimension: '3d' },
         },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: this.colormap.encoding ? 'unfilterable-float' : 'float' },
+        },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     });
@@ -517,15 +557,16 @@ export class VolumeLayer implements Drawable {
         );
       this.#classification = { ...value, size: [...size], rgba: new Uint8Array(rgba) };
     } else this.#classification = undefined;
-    const size = value?.size ?? [256, 1],
+    const size = value?.size ?? [256, this.colormap.encoding ? 4 : 1],
       device = this.#renderer.device!;
     const texture = device.createTexture({
       size: [...size],
-      format: value ? 'rgba8unorm' : 'rgba8unorm-srgb',
+      format: value ? 'rgba8unorm' : this.colormap.encoding ? 'rgba32float' : 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     this.#table = new Uint8Array(this.#classification?.rgba ?? transferTable(this.colormap, this.#opacity));
-    device.queue.writeTexture({ texture }, this.#table, { bytesPerRow: size[0] * 4 }, size);
+    const pixels = !value && this.colormap.encoding ? colorTextureData(this.colormap, this.#table) : this.#table;
+    device.queue.writeTexture({ texture }, pixels, { bytesPerRow: size[0] * pixels.BYTES_PER_ELEMENT * 4 }, size);
     this.#transfer?.destroy();
     this.#transfer = texture;
     this.#bind();
@@ -686,8 +727,11 @@ export class VolumeLayer implements Drawable {
       toBox = this.#values.subarray(16, 32),
       p = [0, 1, 2].map((r) => toBox[r] * eye[0] + toBox[4 + r] * eye[1] + toBox[8 + r] * eye[2] + toBox[12 + r]),
       inside = p.every((c) => c > 0 && c < 1);
-    const pipeline = renderer.pipeline(`volume|${inside}`, context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: volumeShader, label: 'sciviz volume' });
+    const pipeline = renderer.pipeline(`volume|${inside}|${!!this.colormap.encoding}`, context, (target) => {
+      const module = renderer.device!.createShaderModule({
+        code: volumeCode(volumeShader, !!this.colormap.encoding),
+        label: 'sciviz volume',
+      });
       return {
         label: 'sciviz volume',
         layout: renderer.device!.createPipelineLayout({
@@ -789,7 +833,11 @@ export class SliceLayer implements Drawable {
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '3d' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: this.#volume.colormap.encoding ? 'unfilterable-float' : 'float' },
+        },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     });
@@ -841,32 +889,39 @@ export class SliceLayer implements Drawable {
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#volume.valid) return;
     const transparent = this.transparent;
-    const pipeline = renderer.pipeline(`slice|${transparent}`, context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: sliceShader, label: 'sciviz slice' });
-      return {
-        label: 'sciviz slice',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: target.format,
-              blend: transparent
-                ? {
-                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                  }
-                : undefined,
-            },
-          ],
-        },
-        primitive: { topology: 'triangle-list', cullMode: 'none' },
-        multisample: target.multisample,
-        depthStencil: { format: target.depth, depthWriteEnabled: !transparent, depthCompare: 'greater-equal' },
-      };
-    });
+    const pipeline = renderer.pipeline(
+      `slice|${transparent}|${!!this.#volume.colormap.encoding}`,
+      context,
+      (target) => {
+        const module = renderer.device!.createShaderModule({
+          code: volumeCode(sliceShader, !!this.#volume.colormap.encoding),
+          label: 'sciviz slice',
+        });
+        return {
+          label: 'sciviz slice',
+          layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [
+              {
+                format: target.format,
+                blend: transparent
+                  ? {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                    }
+                  : undefined,
+              },
+            ],
+          },
+          primitive: { topology: 'triangle-list', cullMode: 'none' },
+          multisample: target.multisample,
+          depthStencil: { format: target.depth, depthWriteEnabled: !transparent, depthCompare: 'greater-equal' },
+        };
+      },
+    );
     pass.setPipeline(pipeline);
     pass.setBindGroup(1, this.#group!);
     pass.draw(6);

@@ -65,7 +65,10 @@ export function scalarMesh(
 ): VectorGeometry {
   const colors = new Float32Array((positions.length / 3) * 4);
   for (let i = 0; i < values.length; i++) {
-    const c = Number.isFinite(values[i]) ? map.sample((values[i] - range[0]) / (range[1] - range[0] || 1)) : missing;
+    const c =
+      map.encoding || Number.isFinite(values[i])
+        ? map.sample((values[i] - range[0]) / (range[1] - range[0] || 1))
+        : missing;
     colors.set([c[0], c[1], c[2], opacity], i * 4);
   }
   return { kind: 'triangles', positions: Float32Array.from(positions), colors };

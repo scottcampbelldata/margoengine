@@ -1,3 +1,4 @@
+import { colorLookupWGSL } from './color-lookup.js';
 import { trackSpecLayer } from './spec-hooks.js';
 // Force-directed graph layout and drawing for networks with millions of edges. The forces are those of T. M. J.
 // Fruchterman and E. M. Reingold, "Graph drawing by force-directed placement", Software: Practice and Experience
@@ -470,6 +471,7 @@ export interface GraphLayerOptions {
 }
 
 const graphShader = /* wgsl */ `${frameWGSL}
+${colorLookupWGSL}
 struct Graph { model: mat4x4f, style: vec4f, edge: vec4f, scale: vec4f }
 @group(1) @binding(0) var<uniform> graph: Graph;
 @group(1) @binding(1) var<storage, read> nodes: array<f32>;
@@ -501,8 +503,8 @@ struct NodeOut { @builtin(position) clip: vec4f, @location(0) corner: vec2f, @lo
 @fragment fn nodeFragment(in: NodeOut) -> @location(0) vec4f {
   let r = dot(in.corner, in.corner);
   if (r > 1.0) { discard; }
-  let t = clamp((in.value - graph.style.x) / max(graph.style.y - graph.style.x, 1e-30), 0.0, 1.0);
-  let albedo = textureSampleLevel(colours, colourSampler, vec2f(t, 0.5), 0.0).rgb;
+  let t = (in.value - graph.style.x) / max(graph.style.y - graph.style.x, 1e-30);
+  let albedo = colourLookup(colours, t).rgb;
   // A darker rim so touching nodes stay apart.
   let rim = select(1.0, 0.55, r > 0.6);
   return vec4f(toOutput(albedo * rim), 1.0);
@@ -524,7 +526,7 @@ export class GraphLayer implements Drawable {
             this.#edgeBuffer,
             this.#valueBuffer,
             this.#uniform,
-            { texture: this.#texture, bytesPerTexel: 4 },
+            { texture: this.#texture, bytesPerTexel: this.colormap.encoding ? 16 : 4 },
           ],
     };
   }
@@ -620,7 +622,7 @@ export class GraphLayer implements Drawable {
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
       ],
     });

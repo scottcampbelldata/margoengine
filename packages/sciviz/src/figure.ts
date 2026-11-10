@@ -342,6 +342,10 @@ function mapColours(values: ArrayLike<number>, map: Colormap, range: readonly [n
     table = map.table(256),
     scale = 255 / (range[1] - range[0] || 1);
   for (let i = 0; i < values.length; i++) {
+    if (map.encoding) {
+      out.set(map.sample((values[i] - range[0]) / (range[1] - range[0] || 1)), i * 3);
+      continue;
+    }
     const v = values[i],
       k = v === v ? Math.min(255, Math.max(0, Math.round((v - range[0]) * scale))) * 4 : 0;
     out[i * 3] = table[k];
@@ -1493,7 +1497,7 @@ export class Figure extends EventTarget {
       y: [number, number] = [fy(dy[0]), fy(dy[1])];
     if (!x.every(Number.isFinite) || !y.every(Number.isFinite))
       throw rangeError('Heatmap x and y must be above 0 on a log axis', 'sciviz');
-    const rects = heatmapRects(v, nx, ny, x, y),
+    const rects = heatmapRects(v, nx, ny, x, y, !!resolveColormap(options.colormap).encoding),
       { colours, swatch } = this.#colours(v.length, v, options, 'heatmap');
     return this.#rects('heatmap', rects, Float32Array.from(v), colours, options.name, swatch);
   }

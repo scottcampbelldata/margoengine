@@ -1,3 +1,4 @@
+import { colorLookupWGSL } from './color-lookup.js';
 // Surface plots: a height field z[j][i] over a regular x-y grid, drawn from a storage buffer (a GpuArray is read in
 // place, so a surface computed on the GPU never comes back to the CPU). The vertex shader builds the grid from the
 // vertex index and takes normals from central differences; the fragment shader colours by height through a colour
@@ -51,6 +52,7 @@ const surfaceShader = /* Shader notes kept outside the uploaded source:
  * Central differences in data units (one-sided at the edges through the clamped reads).
  * Contours: darken within about one pixel of each level.
  */ /* wgsl */ `${frameWGSL}
+${colorLookupWGSL}
 struct Surface { model: mat4x4f, normalModel: mat4x4f, grid: vec4f, size: vec4u, style: vec4f }
 @group(1) @binding(0) var<uniform> surface: Surface;
 @group(1) @binding(1) var<storage, read> heights: array<f32>;
@@ -96,8 +98,8 @@ fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
   return out;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  let t = clamp((in.value - surface.style.x) / max(surface.style.y - surface.style.x, 1e-30), 0.0, 1.0);
-  var albedo = textureSampleLevel(colours, colourSampler, vec2f(t, 0.5), 0.0).rgb;
+  let t = (in.value - surface.style.x) / max(surface.style.y - surface.style.x, 1e-30);
+  var albedo = colourLookup(colours, t).rgb;
   if (surface.style.z > 0.0) {
     let level = t * surface.style.z;
     let width = fwidth(level);
@@ -125,7 +127,7 @@ export class SurfaceLayer implements Drawable {
         : [
             this.#heights?.buffer,
             this.#uniform,
-            ...(this.#texture ? [{ texture: this.#texture, bytesPerTexel: 4 }] : []),
+            ...(this.#texture ? [{ texture: this.#texture, bytesPerTexel: this.colormap.encoding ? 16 : 4 }] : []),
           ],
     };
   }
@@ -218,7 +220,7 @@ export class SurfaceLayer implements Drawable {
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     });

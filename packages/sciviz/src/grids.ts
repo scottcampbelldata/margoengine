@@ -1,3 +1,4 @@
+import { colorLookupWGSL } from './color-lookup.js';
 import { trackSpecLayer } from './spec-hooks.js';
 // Unstructured grids: tetrahedra, hexahedra, wedges and pyramids with point or cell data, in VTK's UnstructuredGrid
 // layout (points, connectivity, offsets, cell types; VTK file formats, Kitware, "VTK User's Guide" chapter 19). The
@@ -651,6 +652,7 @@ export interface MeshLayerOptions {
 }
 
 const meshShader = /* wgsl */ `${frameWGSL}
+${colorLookupWGSL}
 struct Mesh { model: mat4x4f, normalModel: mat4x4f, style: vec4f, missing: vec4f }
 @group(1) @binding(0) var<uniform> mesh: Mesh;
 @group(1) @binding(1) var<storage, read> corners: array<vec4f>;
@@ -670,8 +672,8 @@ struct Out { @builtin(position) clip: vec4f, @location(0) world: vec3f, @locatio
 }
 fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u; }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  let t = clamp((in.value - mesh.style.x) / max(mesh.style.y - mesh.style.x, 1e-30), 0.0, 1.0);
-  var albedo = textureSampleLevel(colours, colourSampler, vec2f(t, 0.5), 0.0).rgb;
+  let t = (in.value - mesh.style.x) / max(mesh.style.y - mesh.style.x, 1e-30);
+  var albedo = colourLookup(colours, t).rgb;
   if (isNan(in.value)) { albedo = mesh.missing.rgb; }
   var n = in.normal;
   if (dot(n, n) < 1e-12) { n = vec3f(0.0, 1.0, 0.0); }
@@ -769,7 +771,7 @@ export class MeshLayer implements Drawable {
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
       ],
     });

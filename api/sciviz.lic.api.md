@@ -105,11 +105,42 @@ interface ColorBarOptions {
     readonly ticks?: number;
 }
 
+interface ColorEncoding {
+    readonly domain: readonly [number, number];
+    readonly scale: 'linear' | 'log' | 'symlog';
+    readonly constant: number;
+    readonly edges: readonly number[];
+    readonly colors: readonly SRGB[];
+    readonly nan: SRGB;
+    readonly under: SRGB;
+    readonly over: SRGB;
+}
+
+interface ColorScaleOptions {
+    readonly domain: readonly [number, number];
+    readonly scale?: 'linear' | 'log' | 'symlog';
+    readonly constant?: number;
+    readonly boundaries?: readonly number[];
+    readonly bins?: number;
+    readonly colors?: readonly (string | SRGB)[];
+    readonly nan?: string | SRGB;
+    readonly under?: string | SRGB;
+    readonly over?: string | SRGB;
+}
+
 class Colormap {
+    readonly encoding?: ColorEncoding | undefined;
     readonly name: string;
     readonly kind: ColormapKind;
-    constructor(name: string, kind: ColormapKind, sample: (t: number) => SRGB);
+    constructor(name: string, kind: ColormapKind, sample: (t: number) => SRGB, encoding?: ColorEncoding | undefined);
     sample(t: number): SRGB;
+    unscaled(): Colormap;
+    scaleOptions(): ColorScaleOptions | undefined;
+    position(value: number, range?: readonly [number, number]): number;
+    gradientStops(n?: number): readonly {
+        readonly offset: number;
+        readonly color: SRGB;
+    }[];
     table(n?: number, options?: {
         readonly linear?: boolean;
     }): Float32Array;
@@ -117,9 +148,9 @@ class Colormap {
     css(stops?: number, direction?: string): string;
 }
 
-type ColormapKind = 'sequential' | 'diverging' | 'cyclic';
+type ColormapKind = 'sequential' | 'diverging' | 'cyclic' | 'isoluminant' | 'categorical';
 
-type ColormapName = 'aurora' | 'ember' | 'glacier' | 'gray' | 'cubehelix' | 'coolwarm' | 'phase' | 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis';
+type ColormapName = 'aurora' | 'ember' | 'glacier' | 'gray' | 'cubehelix' | 'coolwarm' | 'phase' | 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis' | 'lab-linear-blue-yellow' | 'lab-diverging-blue-red' | 'lab-cyclic-diamond' | 'lab-isoluminant-hue';
 
 type ColormapSource = ColormapName | Colormap | readonly (string | SRGB | readonly [number, string | SRGB])[];
 
@@ -377,10 +408,13 @@ class Legend {
 interface LegendEntry {
     readonly name: string;
     readonly color: string;
-    readonly shape: 'line' | 'dot' | 'square';
+    readonly shape: LegendShape;
+    readonly size?: number;
 }
 
 type LegendPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+
+type LegendShape = 'line' | 'dot' | 'square' | 'triangle' | 'diamond' | 'cross' | 'hexagon';
 
 interface LineLayer {
     readonly kind: 'line';

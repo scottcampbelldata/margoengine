@@ -149,6 +149,7 @@ export function textRuns(roots: readonly Element[], origin: DOMRect): TextRun[] 
 
 /** @internal A legend swatch on screen: its box (CSS pixels from the canvas's top-left), colour and roundness. */
 export interface Swatch {
+  readonly points?: readonly number[];
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -171,7 +172,11 @@ export function swatches(roots: readonly Element[], origin: DOMRect): Swatch[] {
         width: r.width,
         height: r.height,
         color: style.backgroundColor,
-        round: style.borderTopLeftRadius === '50%' || Number.parseFloat(style.borderTopLeftRadius) >= r.width / 2,
+        round:
+          element.dataset.scivizShape === 'dot' ||
+          style.borderTopLeftRadius === '50%' ||
+          Number.parseFloat(style.borderTopLeftRadius) >= r.width / 2,
+        points: element.dataset.scivizPolygon?.split(',').map(Number),
       });
     }
   return out;
@@ -190,7 +195,17 @@ export function paintOverlays(
   g.scale(scale, scale);
   for (const box of boxes) {
     g.fillStyle = box.color;
-    if (box.round) {
+    if (box.points) {
+      g.beginPath();
+      for (let i = 0; i < box.points.length; i += 2) {
+        const x = box.x + box.points[i] * box.width,
+          y = box.y + box.points[i + 1] * box.height;
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.closePath();
+      g.fill();
+    } else if (box.round) {
       g.beginPath();
       g.arc(box.x + box.width / 2, box.y + box.height / 2, box.width / 2, 0, Math.PI * 2);
       g.fill();
@@ -202,12 +217,9 @@ export function paintOverlays(
       x = r.left - origin.left,
       y = r.top - origin.top,
       gradient = g.createLinearGradient(0, y + r.height, 0, y),
-      table = map.table(32);
-    for (let k = 0; k < 32; k++)
-      gradient.addColorStop(
-        k / 31,
-        `rgb(${Math.round(table[k * 4] * 255)} ${Math.round(table[k * 4 + 1] * 255)} ${Math.round(table[k * 4 + 2] * 255)})`,
-      );
+      stops = map.gradientStops(32);
+    for (const { offset, color } of stops)
+      gradient.addColorStop(offset, `rgb(${color.map((v) => Math.round(v * 255)).join(' ')})`);
     g.fillStyle = gradient;
     g.fillRect(x, y, r.width, r.height);
     g.strokeStyle = getComputedStyle(bar).borderTopColor;
@@ -266,9 +278,11 @@ export function svgText(runs: readonly TextRun[]): string {
 export function svgSwatches(boxes: readonly Swatch[]): string {
   return boxes
     .map((b) =>
-      b.round
-        ? `<circle cx="${b.x + b.width / 2}" cy="${b.y + b.height / 2}" r="${b.width / 2}" fill="${escape(b.color)}"/>`
-        : `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" fill="${escape(b.color)}"/>`,
+      b.points
+        ? `<polygon points="${Array.from({ length: b.points.length / 2 }, (_, i) => `${b.x + b.points![i * 2] * b.width},${b.y + b.points![i * 2 + 1] * b.height}`).join(' ')}" fill="${escape(b.color)}"/>`
+        : b.round
+          ? `<circle cx="${b.x + b.width / 2}" cy="${b.y + b.height / 2}" r="${b.width / 2}" fill="${escape(b.color)}"/>`
+          : `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" fill="${escape(b.color)}"/>`,
     )
     .join('\n');
 }
@@ -279,12 +293,13 @@ export function svgBars(bars: readonly PaintedBar[], origin: DOMRect): string {
     .filter(({ bar }) => bar.isConnected)
     .map(({ bar, map }, i) => {
       const r = bar.getBoundingClientRect(),
-        table = map.table(16);
-      const stops = Array.from(
-        { length: 16 },
-        (_, k) =>
-          `<stop offset="${k / 15}" stop-color="rgb(${Math.round(table[k * 4] * 255)},${Math.round(table[k * 4 + 1] * 255)},${Math.round(table[k * 4 + 2] * 255)})"/>`,
-      ).join('');
+        entries = map.gradientStops(32);
+      const stops = entries
+        .map(
+          ({ offset, color }) =>
+            `<stop offset="${offset}" stop-color="rgb(${color.map((v) => Math.round(v * 255)).join(',')})"/>`,
+        )
+        .join('');
       return `<linearGradient id="sciviz-bar-${i}" x1="0" y1="1" x2="0" y2="0">${stops}</linearGradient><rect x="${r.left - origin.left}" y="${r.top - origin.top}" width="${r.width}" height="${r.height}" fill="url(#sciviz-bar-${i})" stroke="${escape(getComputedStyle(bar).borderTopColor)}"/>`;
     })
     .join('\n');

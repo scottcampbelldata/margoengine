@@ -1,5 +1,5 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { Colormap } from './colormaps.js';
+import { Colormap, colorScale, type ColorScaleOptions } from './colormaps.js';
 import { isGpuArray } from './layer.js';
 import type { BrickSource } from './bricks-plan.js';
 import { selectionValue } from './spec-hooks.js';
@@ -110,7 +110,10 @@ export function specUnbase64(value: string, maxBytes: number): Uint8Array {
 }
 
 /** Read and verify an external array. Its source is retained for toJSON({ data: 'url' }). */
-export async function loadSpecData(source: SpecDataURL, options: SpecIOOptions = {}): Promise<ArrayBufferView & ArrayLike<number>> {
+export async function loadSpecData(
+  source: SpecDataURL,
+  options: SpecIOOptions = {},
+): Promise<ArrayBufferView & ArrayLike<number>> {
   const io = new ValueIO(options);
   return await io.external(source);
 }
@@ -236,7 +239,12 @@ export class ValueIO {
     }
     if (value instanceof Colormap) {
       // Preserve the exact sampled table used by the GPU, without serializing executable closures.
-      return { $colormap: value.name, kind: value.kind, table: await this.encode(value.table(256)) };
+      return {
+        $colormap: value.name,
+        kind: value.kind,
+        table: await this.encode(value.unscaled().table(256)),
+        ...(value.encoding ? { encoding: await this.encode(value.scaleOptions()) } : {}),
+      };
     }
     if (value instanceof AbortSignal) return { $undefined: true };
     if (value instanceof Date) {
@@ -379,7 +387,7 @@ export class ValueIO {
       const table = (await this.decode(v.table, references, depth + 1)) as Float32Array;
       if (!(table instanceof Float32Array) || table.length !== 1024)
         throw typeError('Invalid colormap table; supply 256 RGBA samples', 'sciviz');
-      return new Colormap(v.$colormap as string, v.kind as 'sequential', (t) => {
+      const base = new Colormap(v.$colormap as string, v.kind as 'sequential', (t) => {
         const x = Math.min(255, Math.max(0, t * (v.kind === 'cyclic' ? 256 : 255))),
           i = Math.min(254, Math.floor(x)),
           f = x - i;
@@ -389,6 +397,9 @@ export class ValueIO {
           number,
         ];
       });
+      return v.encoding
+        ? colorScale(base, (await this.decode(v.encoding, references, depth + 1)) as ColorScaleOptions)
+        : base;
     }
     const out: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(v)) {

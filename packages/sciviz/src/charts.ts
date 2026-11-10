@@ -123,6 +123,7 @@ export function heatmapRects(
   ny: number,
   x: readonly [number, number],
   y: readonly [number, number],
+  showMissing = false,
 ): Float32Array {
   const dx = nx > 1 ? (x[1] - x[0]) / (nx - 1) : 1,
     dy = ny > 1 ? (y[1] - y[0]) / (ny - 1) : 1,
@@ -132,7 +133,7 @@ export function heatmapRects(
       const k = j * nx + i,
         cx = x[0] + i * dx,
         cy = y[0] + j * dy;
-      if (values[k] === values[k]) out.set([cx - dx / 2, cy - dy / 2, cx + dx / 2, cy + dy / 2], k * 4);
+      if (showMissing || values[k] === values[k]) out.set([cx - dx / 2, cy - dy / 2, cx + dx / 2, cy + dy / 2], k * 4);
       else out.set([cx, cy, cx, cy], k * 4);
     }
   return out;

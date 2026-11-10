@@ -1,5 +1,6 @@
 // Pieces the sciviz layers share: data inputs (CPU arrays or compute GpuArrays, read by the GPU where they already
 // live), colour-map textures, and the figure's data-to-scene transform.
+import { colorTextureData } from './color-lookup.js';
 import type { GpuArray } from '@margoengine/compute';
 import { rangeError, typeError } from '../../shared/errors.js';
 import { colormap, type Colormap, type ColormapName, type SRGB } from './colormaps.js';
@@ -55,10 +56,14 @@ export function storageOf(device: GPUDevice, data: DataSource, what: string): { 
 /** A 256 x 1 colour-map texture (sRGB, so sampling filters in linear light). */
 export function colormapTexture(device: GPUDevice, map: Colormap): GPUTexture {
   const texture = device.createTexture({
-    size: [256, 1],
-    format: 'rgba8unorm-srgb',
+    size: [256, map.encoding ? 4 : 1],
+    format: map.encoding ? 'rgba32float' : 'rgba8unorm-srgb',
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });
+  if (map.encoding) {
+    device.queue.writeTexture({ texture }, colorTextureData(map), { bytesPerRow: 4096 }, [256, 4]);
+    return texture;
+  }
   const table = map.table(256),
     bytes = new Uint8Array(1024);
   for (let i = 0; i < 1024; i++) bytes[i] = Math.round(table[i] * 255);

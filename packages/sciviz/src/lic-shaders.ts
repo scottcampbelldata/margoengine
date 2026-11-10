@@ -1,3 +1,4 @@
+import { colorLookupWGSL } from './color-lookup.js';
 // Clean-room equations and trade-offs: docs/clean-room.md, batch 171 LIC.
 import { frameWGSL } from './render.js';
 
@@ -97,7 +98,8 @@ fn weight(s: f32) -> f32 {
 }`;
 
 /** @internal The generated LIC image is sampled on its physical slice, without view-dependent integration. */
-export const licDraw = /* wgsl */ `${frameWGSL}${bindings}
+export const licDraw = /* wgsl */ `${frameWGSL}
+${colorLookupWGSL}${bindings}
 @group(1) @binding(1) var<storage, read> image: array<vec4f>;
 @group(1) @binding(2) var colours: texture_2d<f32>;
 @group(1) @binding(3) var colourSampler: sampler;
@@ -117,7 +119,7 @@ struct Out { @builtin(position) clip: vec4f, @location(0) uv: vec2f }
   let c = image[hi.y * lic.image.x + lo.x]; let d = image[hi.y * lic.image.x + hi.x];
   let value = mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
   if (value.z < 0.999) { discard; }
-  let colour = textureSampleLevel(colours, colourSampler, vec2f(clamp(value.y, 0.0, 1.0), 0.5), 0.0).rgb;
+  let colour = colourLookup(colours, value.y).rgb;
   let rgb = mix(vec3f(1.0), colour, lic.colour.w) * value.x;
   return vec4f(toOutput(rgb), lic.colour.z);
 }`;

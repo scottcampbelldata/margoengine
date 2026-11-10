@@ -1,0 +1,323 @@
+{
+  "date": "2026-11-10",
+  "job": 17804,
+  "cpu": {
+    "tests": 809,
+    "passed": 809
+  },
+  "backendResults": [
+    {
+      "backend": "webgpu",
+      "cases": 20,
+      "scalars": 16,
+      "maxError": 0.00848272788711571,
+      "sliceColors": [
+        [
+          255,
+          0,
+          0,
+          255
+        ],
+        [
+          255,
+          0,
+          255,
+          255
+        ],
+        [
+          99,
+          99,
+          99,
+          255
+        ],
+        [
+          0,
+          255,
+          0,
+          255
+        ]
+      ],
+      "cells": 228,
+      "stars": 20000
+    },
+    {
+      "backend": "webgl2",
+      "cases": 20,
+      "scalars": 16,
+      "maxError": 0.00848272788711571,
+      "sliceColors": [
+        [
+          255,
+          0,
+          0,
+          255
+        ],
+        [
+          255,
+          0,
+          255,
+          255
+        ],
+        [
+          99,
+          99,
+          99,
+          255
+        ],
+        [
+          0,
+          255,
+          0,
+          255
+        ]
+      ],
+      "cells": 228,
+      "stars": 20000
+    }
+  ],
+  "sizes": {
+    "index": {
+      "before": 57066,
+      "after": 60026
+    },
+    "bricks": {
+      "before": 27284,
+      "after": 28762
+    },
+    "colormaps": {
+      "before": 16880,
+      "after": 22069
+    },
+    "geo": {
+      "before": 4228,
+      "after": 4230
+    },
+    "graph": {
+      "before": 22618,
+      "after": 24306
+    },
+    "grids": {
+      "before": 24621,
+      "after": 26262
+    },
+    "maths": {
+      "before": 8853,
+      "after": 8854
+    },
+    "fallback": {
+      "before": 2152,
+      "after": 2135
+    },
+    "webgl2": {
+      "before": 4540,
+      "after": 4527
+    },
+    "flow": {
+      "before": 9231,
+      "after": 9217
+    },
+    "lic": {
+      "before": 23576,
+      "after": 25230
+    },
+    "tubes": {
+      "before": 2538,
+      "after": 2533
+    },
+    "vtk": {
+      "before": 6012,
+      "after": 6490
+    },
+    "atmosphere": {
+      "before": 32587,
+      "after": 34292
+    },
+    "pipeline": {
+      "before": 1835,
+      "after": 1830
+    },
+    "glyph": {
+      "before": 4442,
+      "after": 4430
+    },
+    "probe": {
+      "before": 6604,
+      "after": 6588
+    },
+    "cinematic": {
+      "before": 6463,
+      "after": 6480
+    },
+    "volume-quality": {
+      "before": 8495,
+      "after": 8509
+    },
+    "link": {
+      "before": 5155,
+      "after": 5170
+    },
+    "export-vector": {
+      "before": 3959,
+      "after": 3957
+    },
+    "stats": {
+      "before": 6727,
+      "after": 6719
+    },
+    "omezarr": {
+      "before": 20865,
+      "after": 20866
+    },
+    "curvilinear": {
+      "before": 8226,
+      "after": 8220
+    },
+    "geo-lod": {
+      "before": 7244,
+      "after": 7253
+    },
+    "charts-extra": {
+      "before": 7298,
+      "after": 7292
+    },
+    "table": {
+      "before": 12342,
+      "after": 12324
+    },
+    "pdf": {
+      "before": 5426,
+      "after": 5474
+    },
+    "hdf5": {
+      "before": 8991,
+      "after": 8990
+    },
+    "exodus": {
+      "before": 20028,
+      "after": 20029
+    },
+    "openfoam": {
+      "before": 10582,
+      "after": 10566
+    },
+    "ensight": {
+      "before": 11555,
+      "after": 11539
+    },
+    "pointcloud": {
+      "before": 21062,
+      "after": 22061
+    },
+    "format": {
+      "before": 7322,
+      "after": 7306
+    },
+    "categorical": {
+      "before": 21772,
+      "after": 22726
+    },
+    "tetvolume": {
+      "before": 6316,
+      "after": 6322
+    },
+    "parcoords": {
+      "before": 9305,
+      "after": 9276
+    },
+    "geo-vector": {
+      "before": 25907,
+      "after": 26856
+    },
+    "spec": {
+      "before": 25006,
+      "after": 27106
+    },
+    "export-media": {
+      "before": 6997,
+      "after": 7112
+    }
+  },
+  "ceilings": [
+    {
+      "entry": "@margoengine/lines/debug",
+      "oldCeiling": 9836,
+      "after": 9874,
+      "ceiling": 10171
+    },
+    {
+      "entry": "@margoengine/sciviz",
+      "oldCeiling": 58369,
+      "after": 59951,
+      "ceiling": 61750
+    },
+    {
+      "entry": "@margoengine/sciviz/bricks",
+      "oldCeiling": 27589,
+      "after": 28762,
+      "ceiling": 29625
+    },
+    {
+      "entry": "@margoengine/sciviz/colormaps",
+      "oldCeiling": 17381,
+      "after": 22069,
+      "ceiling": 22732
+    },
+    {
+      "entry": "@margoengine/sciviz/graph",
+      "oldCeiling": 23118,
+      "after": 24306,
+      "ceiling": 25036
+    },
+    {
+      "entry": "@margoengine/sciviz/grids",
+      "oldCeiling": 25269,
+      "after": 26262,
+      "ceiling": 27050
+    },
+    {
+      "entry": "@margoengine/sciviz/lic",
+      "oldCeiling": 24165,
+      "after": 25230,
+      "ceiling": 25987
+    },
+    {
+      "entry": "@margoengine/sciviz/vtk",
+      "oldCeiling": 6201,
+      "after": 6490,
+      "ceiling": 6746
+    },
+    {
+      "entry": "@margoengine/sciviz/atmosphere",
+      "oldCeiling": 33055,
+      "after": 34292,
+      "ceiling": 35321
+    },
+    {
+      "entry": "@margoengine/sciviz/pointcloud",
+      "oldCeiling": 21685,
+      "after": 22061,
+      "ceiling": 22723
+    },
+    {
+      "entry": "@margoengine/sciviz/categorical",
+      "oldCeiling": 22371,
+      "after": 22726,
+      "ceiling": 23408
+    },
+    {
+      "entry": "@margoengine/sciviz/geo-vector",
+      "oldCeiling": 26691,
+      "after": 26856,
+      "ceiling": 27662
+    },
+    {
+      "entry": "@margoengine/sciviz/spec",
+      "oldCeiling": 25645,
+      "after": 27106,
+      "ceiling": 27920
+    }
+  ],
+  "sizeMethod": "minified ES2022 gzip, bare imports external; parent sources rebuilt in an ignored own-worktree snapshot with current build tooling; actual pre-change root log 56915 B, current root 60026 B",
+  "coreStageGzip": 24209,
+  "speedClaim": false
+}

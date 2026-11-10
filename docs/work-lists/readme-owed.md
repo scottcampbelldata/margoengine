@@ -1233,3 +1233,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/weather (review 2): document direct GLTFWeather/PrecipitationCover disposal in secondary scenes and retained caller models; examples deferred.
 - @margoengine/sciviz (batch 174 job 4): document query predicates/reductions and f64/null policy, keyed extraction, sortable virtualised Spreadsheet/keyboard/AbortSignal, selected time-series snapshots and plot lifecycle, native scaled limits in data units and setLimits space: 'plot' for portable windows.
 - margoengine (batch 174 job 4): cover the generated sciviz/query alias and refreshed sciviz/monitor alias.
+- Batch 178 job 4, @margoengine/sciviz (and margoengine/sciviz/colormaps alias): construction names, Tol category domains, Machado diagnostics, colorScale domain/range and bins, exceptional colours, encodingLegend sizes/shapes and export/state parity. README examples deferred during the build phase.

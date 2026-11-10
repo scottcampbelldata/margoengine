@@ -73,6 +73,20 @@ test('font quadratic outlines become equivalent cubic curves and math remains ve
   assert.ok(streams.some((s) => s.includes(' c') && s.includes('f')));
   assert.doesNotMatch(text, /\/Subtype \/Image/);
 });
+
+test('SVG equal-offset stops become discontinuous PDF stitching with no empty domains', async () => {
+  const { text } = await decode(
+    await svgToPDF(
+      svg(
+        '<linearGradient id="g"><stop offset="0" stop-color="#f00"/><stop offset=".1" stop-color="#f00"/><stop offset=".1" stop-color="#0f0"/><stop offset=".5" stop-color="#0f0"/><stop offset=".5" stop-color="#00f"/><stop offset="1" stop-color="#00f"/></linearGradient><rect width="100" height="100" fill="url(#g)"/>',
+      ),
+      { font },
+    ),
+  );
+  assert.match(text, /\/Bounds \[0.1 0.5\]/);
+  assert.equal((text.match(/\/FunctionType 2/g) ?? []).length, 3);
+  for (const c of ['1 0 0', '0 1 0', '0 0 1']) assert.ok(text.includes(`/C0 [${c}] /C1 [${c}]`));
+});
 test('figure adapter, abort identity and explicit rejection of unsupported SVG', async () => {
   const output = await exportPDF({ toSVG: async () => svg('<path d="M0 0Q30 60 60 0Z" fill="#000"/>') }, { font });
   assert.equal(output.type, 'application/pdf');

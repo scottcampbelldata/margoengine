@@ -2,7 +2,8 @@
 // ticks and a title), so it stays crisp at any pixel ratio and needs no text rendering on the GPU.
 import { rangeError } from '../../shared/errors.js';
 import type { Colormap } from './colormaps.js';
-import { ticks } from './ticks.js';
+import { ticks, formatTick } from './ticks.js';
+import { logTicks } from './scales.js';
 import type { Theme } from './axes.js';
 
 /** Options for a colour bar. */
@@ -52,11 +53,25 @@ export class ColorBar {
     bar.style.cssText = `width: 14px; height: 100%; border-radius: 3px; border: 1px solid ${theme.axis}; background: ${map.css(32, 'to top')}`;
     const scale = document.createElement('div');
     scale.style.cssText = 'position: relative; height: 100%; min-width: 3ch; font-variant-numeric: tabular-nums';
-    const t = ticks(lo, hi, options.ticks ?? 5);
+    const e = map.encoding;
+    const values = e?.colors.length
+      ? e.edges.map((p) => {
+          if (e.scale === 'linear') return lo + p * (hi - lo);
+          const transform = (v: number) =>
+            e.scale === 'log' ? Math.log(v) : Math.sign(v) * Math.log1p(Math.abs(v) / e.constant);
+          const x = transform(lo) + p * (transform(hi) - transform(lo));
+          return e.scale === 'log' ? Math.exp(x) : Math.sign(x) * Math.expm1(Math.abs(x)) * e.constant;
+        })
+      : undefined;
+    const t = values
+      ? { values, labels: values.map((v) => formatTick(v, (hi - lo) / 100)) }
+      : e?.scale === 'log'
+        ? logTicks(lo, hi, options.ticks ?? 5)
+        : ticks(lo, hi, options.ticks ?? 5);
     t.values.forEach((v, k) => {
       const tick = document.createElement('span');
       tick.textContent = t.labels[k];
-      tick.style.cssText = `position: absolute; left: 0; bottom: ${((v - lo) / (hi - lo)) * 100}%; transform: translateY(50%); white-space: nowrap`;
+      tick.style.cssText = `position: absolute; left: 0; bottom: ${map.position(v, range) * 100}%; transform: translateY(50%); white-space: nowrap`;
       scale.append(tick);
     });
     body.append(bar, scale);

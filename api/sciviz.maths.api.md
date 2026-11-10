@@ -142,7 +142,7 @@ export function formatValue(value: number, digits?: number): string;
 
 export function gridSpacing(grid: VectorGrid): number;
 
-export function heatmapRects(values: ArrayLike<number>, nx: number, ny: number, x: readonly [number, number], y: readonly [number, number]): Float32Array;
+export function heatmapRects(values: ArrayLike<number>, nx: number, ny: number, x: readonly [number, number], y: readonly [number, number], showMissing?: boolean): Float32Array;
 
 export function heightAt(grid: HeightGrid, x: number, y: number): number;
 

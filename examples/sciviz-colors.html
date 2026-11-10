@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scientific colour encodings | Margo</title>
+<style>
+body{margin:24px;background:#10151d;color:#e3eaf3;font:15px system-ui}h1{font-size:26px}label{margin-right:18px}select,button{font:inherit;padding:6px}main{display:grid;grid-template-columns:1fr 1fr;gap:24px}section{min-width:0}figure{margin:0;position:relative}canvas{display:block;width:100%;height:420px}a{color:#9cdbff}p{max-width:90ch;line-height:1.5}@media(max-width:850px){main{grid-template-columns:1fr}}
+</style>
+<h1>Colour carries a value</h1>
+<p>NOAA OISST daily sea surface temperature and 2MASS stellar colours. Linear, symmetric-log and binned mappings use the same definitions in the plot and exported legend. Grey cells are missing data.</p>
+<p><label>Construction <select id="map"></select></label><label>Scale <select id="scale"><option value="linear">Linear</option><option value="symlog">Symmetric log</option><option value="bins">Temperature bands</option></select></label><button id="export">Export PNG</button></p>
+<main><section><h2>North Atlantic temperature</h2><figure><canvas id="ocean" aria-label="Sea surface temperature in Celsius"></canvas></figure></section><section><h2>Stellar colour and magnitude</h2><figure><canvas id="stars" aria-label="2MASS source colour and magnitude"></canvas></figure></section></main>
+<p id="status" role="status">Loading public data.</p>
+<p>Data: <a href="./assets/sciviz/contour2d/source.json">NOAA OISST provenance</a>; <a href="./assets/sciviz/stars.json">2MASS provenance</a>. Both are US public-domain records. Map construction: Peter Kovesi (2015); categorical keys: Paul Tol (2026). The stellar panel displays the first 20,000 recorded sources.</p>
+<script type="module" src="./sciviz-colors.ts"></script>
+</html>

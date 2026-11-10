@@ -41,4 +41,7 @@ test('heatmapRects puts cell centres on the x and y ranges; NaN cells are empty;
   assert.equal(rectAt(r, 0.1, 0.9), 2);
   assert.equal(rectAt(r, 1, 1), -1, 'nothing in the NaN cell');
   assert.equal(rectAt(r, 3, 3), -1);
+  const coloredMissing = heatmapRects([1, 2, 3, NaN], 2, 2, [0, 1], [0, 1], true);
+  assert.deepEqual([...coloredMissing.slice(12, 16)], [0.5, 0.5, 1.5, 1.5]);
+  assert.equal(rectAt(coloredMissing, 1, 1), 3, 'An explicit missing-data colour retains the cell');
 });
