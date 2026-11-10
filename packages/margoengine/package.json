@@ -558,6 +558,10 @@
       "types": "./dist/cinematic/lens.d.ts",
       "import": "./dist/cinematic/lens.js"
     },
+    "./cinematic/physical-lens": {
+      "types": "./dist/cinematic/physical-lens.d.ts",
+      "import": "./dist/cinematic/physical-lens.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"

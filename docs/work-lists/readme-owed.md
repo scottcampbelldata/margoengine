@@ -604,3 +604,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/lod (batch 222 job 1): document /clusters builder, hierarchy/error model, anchor renderer, meshlet limits, dither band, compatibility support and cancellation.
 - @margoengine/mesh-edit (batch 222 job 1): document simplifyMesh lockedVertices and maxDeviation; chain indices remain local to each invocation.
 - @margoengine/webgl2-compat (batch 222 LOD blocker): explain task-based fence/map readiness and retained async/loss semantics.
+
+
+
+- cinematic: document physical-lens millimetres, fitted sensor, f-stop, stage order and post-brain apply to DOF (batch 216 job 1).
+- margoengine: document cinematic/physical-lens alias (batch 216 job 1).

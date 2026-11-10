@@ -5006,3 +5006,8 @@ Readback entry size evidence (batch 222, same library build settings against the
 occluder, diffuse only; no emissive surfaces, area lights, glass or textures in the path. Ambient lights add their
 irradiance at every path vertex, unoccluded in physical radiometry. The live `texture` is undilated (empty texels stay
 0); `read()` dilates. Lights are point, spot, directional and ambient only. Texel finding runs on the CPU first.
+
+
+
+### Cinematic physical lens
+cinematic/physical-lens is optional: new entry 0 to 589 B minified gzip, budget 845 B. Core plus stage stays 24209 B. Defaults: 50 mm, 36 mm sensor on the longer image axis, f/2.8, focus 5 metres, aspect 16/9. Horizontal and vertical sensor fits are explicit alternatives. Settings must be finite and positive, focus beyond the focal length. Stage update writes FOV and preserves tracked focus; apply sends the focus, f-number and sensor settings to DOF, with focal length converted to metres. Call apply after brain update with its final focusDistance. Exposure and shutter belong to cameras/physical. DOF retains its existing 1-32 pixel radius limit and screen-space occlusion limitations; this entry adds no pass.

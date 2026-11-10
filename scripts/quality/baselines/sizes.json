@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13282683,
+  "total": 13283528,
   "history": [
     {
       "date": "2026-10-24",
@@ -6753,6 +6753,11 @@
       "commit": "373ebb82d",
       "reason": "batch 54 job 2: new @margoengine/lightmap/gpu entry (progressive GPU baker)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-216-job-1",
+      "reason": "new optional cinematic/physical-lens: 0 to 589 B gzip; physical settings and DOF output share validation; core plus stage 24209 B unchanged"
     }
   ],
   "items": {
@@ -7981,6 +7986,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/cinematic/physical-lens": 845
   }
 }
