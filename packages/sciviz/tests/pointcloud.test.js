@@ -41,6 +41,8 @@ function figure() {
       p.setup?.(engine);
     },
     hasPlugin: (name) => plugins.has(name),
+    // As core: the scene holding the plugin, none once removed. Plugin dispose asks it (988f6a3ad).
+    sceneOf: (p) => (plugins.get(p?.name) === p ? engine : undefined),
     removePlugin(name) {
       const p = plugins.get(name);
       plugins.delete(name);
