@@ -65,6 +65,10 @@
     "./nested-editor": {
       "types": "./dist/nested-editor.d.ts",
       "import": "./dist/nested-editor.js"
+    },
+    "./scroll": {
+      "types": "./dist/scroll.d.ts",
+      "import": "./dist/scroll.js"
     }
   },
   "files": [
@@ -82,7 +86,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "npm run build && cd ../.. && node packages/cutscene/tests/render-browser.mjs && node packages/cutscene/tests/vfx-browser.mjs && node packages/cutscene/tests/editor-browser.mjs && node packages/cutscene/tests/curve-browser.mjs && node packages/cutscene/tests/viewport-browser.mjs && node packages/cutscene/tests/nested-browser.mjs",
+    "test:gpu": "npm run build && cd ../.. && node packages/cutscene/tests/render-browser.mjs && node packages/cutscene/tests/vfx-browser.mjs && node packages/cutscene/tests/editor-browser.mjs && node packages/cutscene/tests/curve-browser.mjs && node packages/cutscene/tests/viewport-browser.mjs && node packages/cutscene/tests/nested-browser.mjs && node packages/cutscene/tests/scroll-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {

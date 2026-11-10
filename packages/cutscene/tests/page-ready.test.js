@@ -19,7 +19,7 @@ test('every browser suite in test:gpu finds its page in the folder the dev serve
     if (token === 'cd') dir = resolve(dir, tokens[i + 1]);
     else if (/\.mjs$/.test(token) && tokens[i - 1] === 'node') suites.push({ file: resolve(dir, token), served: dir });
   });
-  assert.equal(suites.length, 6);
+  assert.equal(suites.length, 7);
   for (const { file, served } of suites) {
     const startPath = /startPath: '([^']+)'/.exec(readFileSync(file, 'utf8'))?.[1];
     assert.ok(startPath, `${file} names its page`);

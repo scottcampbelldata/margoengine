@@ -898,6 +898,10 @@
       "types": "./dist/cutscene/nested-editor.d.ts",
       "import": "./dist/cutscene/nested-editor.js"
     },
+    "./cutscene/scroll": {
+      "types": "./dist/cutscene/scroll.d.ts",
+      "import": "./dist/cutscene/scroll.js"
+    },
     "./decoders/ktx2-hdr6": {
       "types": "./dist/decoders/ktx2-hdr6.d.ts",
       "import": "./dist/decoders/ktx2-hdr6.js"

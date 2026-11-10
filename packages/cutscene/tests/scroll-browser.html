@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Cutscene scroll proof</title>
+<div id="scroll" style="height:200px;width:400px;overflow:auto"><div style="height:1200px;width:400px"></div></div>
+<script type="module">
+import{CutscenePlayer}from'../src/index.ts';import{ScrollPlayback}from'../src/scroll.ts';
+const player=new CutscenePlayer({format:'margo-cutscene',version:1,duration:10,tracks:[]});
+const source=document.querySelector('#scroll');const binding=new ScrollPlayback(player,{source,range:[2,8]});
+window.proof={player,binding,source};window.ready=true;
+</script>

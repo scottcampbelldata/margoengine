@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14170970,
+  "total": 14173274,
   "history": [
     {
       "date": "2026-10-24",
@@ -7495,6 +7495,18 @@
       "commit": "76db3f779",
       "reason": "Batch 176 job 1: new optional sciviz/datasets entry 0 to 13072 gzip bytes, ceiling 13423. Scientific topology, finite-element interpolation, nonconvex decomposition and format readers belong together behind this entry; splitting would add cross-entry orchestration without reducing bytes for its users. Core plus stage unchanged at 24209 bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b1290e7f2",
+      "reason": "Batch 217 job 3: new optional cutscene/scroll entry, 0 to 2048 B gzip, ceiling 2304 B. Range repetition and scroll scrubbing share one clock owner and cleanup; core and stage unchanged at 24209 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b1290e7f2",
+      "reason": "Batch 217 job 3: new optional cutscene/scroll entry, 0 to 2048 B gzip, ceiling 2304 B. Range repetition and scroll scrubbing share one clock owner and cleanup; core and stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8853,6 +8865,7 @@
     "@margoengine/post/curvature": 9209,
     "@margoengine/sciviz/export-vector": 4213,
     "@margoengine/staging/backdrop": 1588,
-    "@margoengine/sciviz/datasets": 13423
+    "@margoengine/sciviz/datasets": 13423,
+    "@margoengine/cutscene/scroll": 2304
   }
 }

@@ -1005,3 +1005,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 176 job 1): document /datasets constructors, normalized DataSet filter contract, composites and common arrays, higher-order refinement, face-stream limits, VTK/PLOT3D readers, options, cancellation and the real NASA example; add runnable examples after the build phase.
 - @margoengine/loaders (batch 176 job 1): document lazy VTKXMLPiece coordinates and topology metadata, RectilinearGrid support and unnamed coordinate axis order after the build phase.
 - margoengine (batch 176 job 1): document generated sciviz/datasets forwarding after the build phase.
+- @margoengine/cutscene (batch 217 job 3): document scroll RangePlayback/ScrollPlayback, ranges/directions/iteration counts, update ownership, event endpoints, cancellation, scrub defaults, source bounds and disposal; examples deferred.
+- margoengine (batch 217 job 3): document generated cutscene/scroll alias.
