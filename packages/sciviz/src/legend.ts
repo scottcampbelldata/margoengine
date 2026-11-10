@@ -47,7 +47,7 @@ export class Legend {
     root.setAttribute('role', 'list');
     root.setAttribute('aria-label', 'Legend');
     root.dataset.scivizLegend = '';
-    root.style.cssText = `position: absolute; z-index: 1; display: grid; gap: 3px; padding: 6px 9px; border-radius: 4px; pointer-events: none; font: ${themeFont(theme)}; color: var(--margo-text, ${theme.text}); background: ${theme.background}d9; border: 1px solid ${theme.grid}`;
+    root.style.cssText = `position: absolute; z-index: 1; padding: 6px 9px; border-radius: 4px; pointer-events: none; font: ${themeFont(theme)}; color: var(--margo-text, ${theme.text}); background: ${theme.background}d9; border: 1px solid ${theme.grid}`;
     host.append(root);
     this.element = root;
   }
@@ -62,7 +62,7 @@ export class Legend {
       c = this.canvas;
     root.hidden = entries.length === 0;
     root.replaceChildren(
-      ...entries.map(({ name, color, shape, size: diameter }) => {
+      ...entries.map(({ name, color, shape, size: diameter }, index) => {
         if (diameter !== undefined && (!Number.isFinite(diameter) || diameter <= 0 || diameter > 256))
           throw rangeError('Legend size must be in (0,256] CSS pixels; correct size', 'sciviz');
         if (!['line', 'dot', 'square', ...Object.keys(polygons)].includes(shape))
@@ -70,6 +70,7 @@ export class Legend {
         const row = document.createElement('div');
         row.setAttribute('role', 'listitem');
         row.style.cssText = 'display: flex; align-items: center; gap: 7px; white-space: nowrap';
+        if (index) row.style.marginTop = '3px';
         const swatch = document.createElement('span');
         swatch.dataset.scivizSwatch = '';
         swatch.dataset.scivizShape = shape;
@@ -146,6 +147,7 @@ export function encodingLegend(
     const title = document.createElement('div');
     title.textContent = options.title;
     title.style.fontWeight = '600';
+    title.style.marginBottom = '3px';
     legend.element.prepend(title);
   }
   const remove = registerPublicationLabel(figure, legend.element);

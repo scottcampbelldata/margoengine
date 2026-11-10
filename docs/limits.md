@@ -3957,6 +3957,13 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Figure legend visibility (2026-11-10)
+Legends retain their native hidden-state rendering and three-pixel row/title
+separation. The default Figure hides the legend below two named layers; adding a
+second named layer restores current labels. DOM and spec-browser regressions
+check hidden computed display, empty layout boxes, reappearance and row spacing.
+No layer, numeric or exported-image quality bound changed.
+
 ## Vector parser pre-abort ordering (2026-11-10)
 GeoJSON, GPX, KML, Shapefile and MVT reject a pre-aborted signal with the existing
 LoaderError code aborted before binary conversion, decoding or caller toJSON

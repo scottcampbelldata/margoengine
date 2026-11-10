@@ -97,6 +97,22 @@ for (const compat of [false, true]) {
       await flat.bar({ x: [0, 1, 2], y: [1, 2, 1] });
       await flat.histogram([0, 0.1, 0.2, 1, 1.2, 1.6], { bins: 3 });
       await flat.heatmap(new Float32Array([1, 2, 3, 4]), { nx: 2, ny: 2 });
+      const legendFields = new Float32Array([1, 2, 3, 4]);
+      const firstNamed = await flat.heatmap(legendFields, { nx: 2, ny: 2, name: 'first field' });
+      const secondNamed = await flat.heatmap(legendFields, { nx: 2, ny: 2, name: 'second field' });
+      const legend = flat.legend.element;
+      if (legend.hidden || getComputedStyle(legend).display === 'none') throw new Error('Two named fields need a visible legend');
+      const rows = legend.querySelectorAll('[role=listitem]');
+      if (rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().bottom !== 3)
+        throw new Error('Legend rows lost their three-pixel spacing');
+      flat.remove(firstNamed);
+      if (!legend.hidden || getComputedStyle(legend).display !== 'none' || legend.getClientRects().length !== 0)
+        throw new Error('A single named field retained the stale two-row legend');
+      const thirdNamed = await flat.heatmap(legendFields, { nx: 2, ny: 2, name: 'third field' });
+      if (legend.hidden || getComputedStyle(legend).display === 'none' || legend.textContent !== 'second fieldthird field')
+        throw new Error('Restored legend retained removed field labels');
+      flat.remove(secondNamed);
+      flat.remove(thirdNamed);
       flat.colorbar('viridis', [1, 4]);
       results.push(await compare(flat, 'bar-histogram-heatmap-colorbar'));
       const changed = await make();

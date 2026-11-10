@@ -4553,6 +4553,9 @@ Concurrent tools/call requests cannot overwrite an active direct-server cancella
 ## Scientific picking and transfer initialization (2026-11-10)
 CPU nearestPoint chooses the nearer projected point on its existing half-pixel screen-distance tie, using projectPoint's normalized depth convention. Proof: packages/sciviz/tests/pick.test.js checks an actual perspective camera in both input orders and an independent identity projection. bindTransfer restores its prior classifier and removes listeners if the initial render callback aborts or throws; dual failure reports both errors with code failed. Proof: packages/sciviz/tests/transfer.test.js; all new cases fail on the parent. GPU clip depth, the distance tie rule, default LUT dimensions and numerical acceptance bounds are unchanged.
 
+## Figure legend visibility (2026-11-10)
+The default Figure's legend becomes non-rendered below two named layers and reappears with current labels when another is added. Proof: packages/sciviz/tests/legend.test.js fails on the old inline display override, and spec-browser.mjs reproduces the two-heatmap removal in a real browser on both backends, checking computed display, layout boxes and unchanged three-pixel row spacing. Numerical data, fixture layers and pixel thresholds are unchanged.
+
 ## Vector parser early cancellation (2026-11-10)
 All five vector readers reject an already-aborted caller before converting input. Proof: packages/loaders/tests/geo.test.js checks Shapefile, MVT, GPX and KML with malformed bytes and wrong-shape binary input, and checks that GeoJSON does not invoke a caller's toJSON callback. All five cases fail on the parent. This is cancellation ordering, with the existing coded LoaderError contract; format output and validation are unchanged.
 
