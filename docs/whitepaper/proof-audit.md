@@ -2,7 +2,7 @@
 
 Scott's order of 2026-11-06: passing checks is not the same as working. All 76 USDZ files passed `usdchecker`, and the first iPhone run failed in seconds: Fox stood 79 m tall. This page goes through [claims.md](claims.md) and [limits.md](../limits.md) and lists each claim whose proof is only a validator, our own reader, a stand-in or a built file, what that proof cannot see, and what would really prove it.
 
-Audited at `72ecd93f1`. Rerun it once more after the feature batches end.
+Audited at `72ecd93f1`, and rerun at `c9b0a86ba` on 2026-11-10 for the 369 rows added since (the section "Rows added since the first audit"). Rerun it once more after the feature batches end.
 
 ## Counts
 
@@ -108,6 +108,45 @@ MaterialX and Lottie (`@margoengine/loaders/materialx`, `/lottie`, 2026-11-06); 
 Rows with no LIM row of their own:
 
 - WebXR AR hit testing: says itself it has never run on an AR headset or phone. Needs a headset.
+
+## Rows added since the first audit (rerun of 2026-11-10)
+
+Rerun at `c9b0a86ba` for the 369 LIM rows added after `72ecd93f1` (LIM-293 to LIM-656). Method: each row was sorted by its own words (status, evidence and note: "stand-in", "generated", "synthetic", "fake", "mock", "own reader", "round trip", "no real", "hand-written", "Margo-written"), then each group below was read by hand. A row whose status says STAND-IN counts as whole; a row with real files, a real GPU or a real browser for part and a stand-in for the rest counts as partly.
+
+| Where | Rows | Proved only by a tool or stand-in | Partly | Note |
+| --- | --- | --- | --- | --- |
+| LIM rows added since `72ecd93f1` | 369 | 109 of 361 | 87 of 361 | 8 retired or a decision (LIM-615, React Native dropped). 165 of 361 stand on real files, a real outside tool or a real browser on real content. |
+| Whole claims.md, both audits | 646 live rows | 135 of 646 | 125 of 646 | 26 and 38 from the first audit. |
+| Table rows of claims.md that are not LIM rows | 141 | 6 of 141 | | Batch sections, optimization proofs and measurements; the 6 say stand-in themselves. |
+| limits.md table rows | 819 | 93 of 819 name a stand-in, a synthetic input or no real device | | Most rows state an enforced limit or a method, which the source proves. |
+
+By class, the 109 whole: 0 validator, 0 own reader, 0 built file, 109 stand-in. Of the 87 partly: 4 own reader (LIM-488, 555, 557, 618), 2 built file (LIM-647 multi-level files, LIM-360 pnts), the rest stand-in scenes on a real GPU. No new row rests on a validator alone: the batches after the first iPhone failure wrote their proofs against outside readers.
+
+Not counted as a gap: a generator whose input is a seed (WFC, BSP rooms, caves, space colonisation, Poisson darts, road graphs) proves what it claims by running, as its generated input is the real use. They are listed so the count is honest, and the real proof named for them is a person judging the output.
+
+### Stand-in in whole or in part, by package
+
+| Package and rows | Proof today | What that proof cannot detect | What would really prove it | Real test so far |
+| --- | --- | --- | --- | --- |
+| `@margoengine/xr` LIM-421, 424, 427, 429, 431, 436, 531; `webgl2-compat` LIM-433 | Stand-in `XRSession`, layers and inputs over real WebGPU or a real WebGL framebuffer. `runDeviceCheck` reads NOT RUN on all four routes. | Head tracking, real controllers and hands, real planes and depth, haptics, layer compositing, frame pacing on a headset. | `runDeviceCheck` on a Vision Pro (Safari, WebXR) and a Quest browser. | None. On Scott's list. |
+| `@margoengine/vfx` LIM-485, 489, 492, 496, 505, 508, 509, 511, 569, 581, 590, 594, 595; LIM-576 | One generated particle scene on one GPU, often one particle, compared with maths written beside it. | How an authored effect looks: a real flipbook atlas, a real skinned character, thousands of overlapping particles. | An effect made from a real atlas and a real rigged character, checked by a person and against a reference picture. | WebKit on the M6 (Metal): see "Real tests of 2026-11-10". |
+| `@margoengine/navmesh` LIM-346, 347, 350, 352, 353, 354, 355, 356, 365; `behavior` LIM-368, 371, 382, 385, 392, 404, 415 | Generated levels and scenes. | A real level: thin walls, stairs, overlapping floors, non-manifold meshes from an art tool. | A free real level (a Sponza or a CC0 game level GLB) baked, routes checked, agents watched. | Not run. |
+| `@margoengine/cache` LIM-338 to 343 | In-memory IndexedDB and a stand-in HTTP server in Node. | A browser's real IndexedDB, quota and eviction (Safari evicts script-written storage after 7 days without use), real `Cache-Control` from a real server. | The package's browser suite in Safari and Chromium against a real HTTP server. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| `@margoengine/netcode` LIM-384, 387, 393, 395, 398, 400, 403, 406; `net` LIM-373, 379; `voxel-net` LIM-582, 598, 618 | Stand-in links in one process, or real pages on loopback on one PC. | Real loss, jitter, NAT, HTTP/3 certificates, two machines. | Two machines over a real network, one on Wi-Fi with loss, and a WebTransport server with a real certificate. | Not run. |
+| `@margoengine/audio` LIM-602, 603, 605, 607, 608, 610; `mixer` LIM-583, 586, 589, 591, 596 | Generated tones on a real Edge audio thread. | Real programme material; another browser's Web Audio; a reference meter. | LUFS against a reference meter on real speech and music; the suites in Safari. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| `@margoengine/video` LIM-566, 571, 573; LIM-575, 578 | Generated `VideoFrame`s and canvas streams on Edge. LIM-575 is real CC0 MDN frames against FFprobe. | Real movie content and codecs; whether a recorded file opens outside the browser. | A real film file (Big Buck Bunny, CC BY 3.0) on the material, and a recorded file opened in QuickTime and VLC. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| `@margoengine/tiles` LIM-360, 370, 374; LIM-344, 362, 364 | Real Draco bitstreams in a pnts made here; ion and Google answered by stand-ins; real CesiumJS terrain with stand-in imagery. | A real ion account, a real Draco pnts tileset, deep real zoom. | A live ion asset with a token (Scott's account) and a published Draco point tileset. | Not run. Needs an account. |
+| `@margoengine/usdz` LIM-324; LIM-303, 310, 315, 319, 320, 331 | Real files for the rest; `!resetXformStack!` on a stage OpenUSD wrote, as no real file uses it. | What a DCC writes for it. | A Maya or Houdini USD with a reset transform. | 546 local files scanned, none use it. |
+| `@margoengine/splats` LIM-453, 488, 490, 500, 574, 471 | A procedural 16,777,216-splat cloud; SPZ and SOG read back by Margo only. | Whether another tool opens our SPZ and SOG; a real large capture. | Open written SPZ and SOG in SuperSplat or Niantic's `spz` reader. | Not run. |
+| `@margoengine/voxel-edit` LIM-555, 557 | Round trip through Margo; `.vxm` 4 and 12 on real files. | Whether Goxel and VoxEdit open a written file. | Open a written `.gox` in Goxel and `.vxm` in VoxEdit. | Not run: neither is installed on any machine. |
+| `@margoengine/environment` LIM-493, 498, 504, 543, 545; LIM-644, 647 | Synthetic HDR fields, stand-in scenes; tiled EXR on files Margo wrote from the spec. | A photographed environment; a tiled EXR a studio tool wrote. | Real HDRIs; the OpenEXR project's tiled sample images, values against Apple ImageIO or OpenEXR. | See "Real tests of 2026-11-10". |
+| `@margoengine/cinematic` LIM-308, 312, 313, 316 | Generated curves. | Whether a move reads well in a real scene. | A person watching a shot on a real scene. | Not run. |
+| `@margoengine/post` LIM-434, 441, 442, 446, 455, 459, 472, 474; `taa` LIM-515, 523, 525, 533; `tonemap` LIM-477, 482, 486; `sprites` LIM-475, 476, 478, 480, 484, 487; `tilemap` LIM-491; `cameras` LIM-326, 536 | Real GPU, stand-in scenes, compared with maths written beside the test. | A real scene, and any reference renderer. | A real scene against a path traced or vendor reference. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| `@margoengine/labels` LIM-532, 540, 542, 546; `html` LIM-550, 552, 559 | Fake layout elements in Node for part, a real page for the rest. | Real CSS layout and transforms in every browser. | The browser suites in Safari and Chromium. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| `@margoengine/save` LIM-411, 413, 414; `react` LIM-448, 449, 451; `fsm` LIM-321, 322, 323, 325, 332; `inspector` LIM-570, 649; `mcp` LIM-465 | Stand-in storage, generated machines, fake GPU objects for part. | Real browser storage quota and eviction; a real editor session. | The browser suites in Safari; a person using the inspector. | WebKit on the M6: see "Real tests of 2026-11-10". |
+| Generators: `procedural` LIM-621, 628, 631, 632, 639, 642, 643; `road` LIM-633 to 636, 638, 640; `wfc` LIM-613, 614, 616, 623, 624; `transitions` LIM-625, 627, 629; `creative` LIM-606, 619 | Generated input, which is the use. | Whether the output is good to play or look at. | A person judging the output. WFC: the published sample tile sets. | Not counted as a gap. |
+| Light transport: LIM-617, 622, 626, 630, 637, 641; `clustered` LIM-645, 650, 654; LIM-293 | Real GPU against quadrature and maths written beside it, generated scenes. | Any outside reference picture. | A path traced reference of a real scene (Cycles, as LIM-298 and 318 did). | Not run. |
+| Other partly: LIM-294, 296, 297 (FBX, a stand-in for one case each), 329, 330, 335, 376, 394, 445, 503, 524, 537, 587 | Real files or a real GPU for the claim, a stand-in for one corner each, named in the row. | That corner. | A real file with that corner. | As each row says. |
 
 ## Moved out by real tests
 
