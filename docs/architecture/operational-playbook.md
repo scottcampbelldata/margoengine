@@ -89,6 +89,11 @@ K2 packed React 18 uncovered two real StrictMode resource replays: a portal worl
 
 The test init script wraps requestAdapter and installs counters after its promise resolves, when compatibility has installed its actual GPUDevice, GPUQueue and render-pass classes. A WeakSet prevents repeated requests from wrapping the same prototype twice. Both desktop and mobile contexts use this helper. The frame assertion (more than five frames), readiness budget, allocation assertions, sample-count assertions and cleanup checks are unchanged. tests/meadow-audit.test.js simulates native classes and classes replaced during adapter resolution: the old script records zero compatibility frames; the new helper counts one write, one resource allocation per call, correct bound sample counts and complete destruction. scripts/modern-grass-tests.js passes native and --compat with the original bars. Clean-room standards: W3C GPU for the Web Working Group, WebGPU living specification, https://www.w3.org/TR/webgpu/; Ecma International/TC39, ECMAScript Await specification, https://tc39.es/ecma262/#await (accessed 2026-11-10). No engine or compatibility runtime changed.
 
+
+### Batch 163: retained points frame bytes
+
+The optional points plugin compares the 144 uniform bytes most recently queued to its shared frame buffer. An unchanged view queues no write; changed views and restored buffers retain the original payload. CPU work-count and byte/command regressions plus forced-upload GPU pixel comparison are documented in [the work-count record](../whitepaper/bp-163-workcounts.md). No core/stage changes or timing evidence.
+
 ## Batch 187: opaque visibility in global lightmap bakes (section 5 supplement)
 
 Area shadow segments and quad/path bounce rays test both sides of opaque quads. A back hit terminates a diffuse

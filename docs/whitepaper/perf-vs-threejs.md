@@ -106,7 +106,7 @@ fetched for the scene.
 | 5.7 | MeshMatcapMaterial | slower | faster | `p-matcap` |  |
 | 5.8 | MeshNormalMaterial, MeshDepthMaterial, MeshDistanceMaterial | slower | faster | `p-normal-material` `p-depth-material` |  |
 | 5.9 | ShadowMaterial (shadow catcher) | faster | faster | `p-shadow-catcher` |  |
-| 5.10 | PointsMaterial, SpriteMaterial | slower | slower | `p-points-1000000` `p-sprites` |  |
+| 5.10 | PointsMaterial, SpriteMaterial | slower | slower | `p-points-1000000` `p-sprites` |  Batch 163 job 1: the points plugin rewrote its unchanged 144-byte camera uniform every view. `perf(points): reuse identical frame uniform uploads` removes 100 of 101 writes in the static-frame regression, with exact uniform, command and pixel checks. Points and sprite instance work stays the same. Timing pending the quiet rerun; historical slower classification retained. [Reproduce](bp-163-workcounts.md). |
 | 5.11 | LineBasicMaterial, LineDashedMaterial, Line2's LineMaterial | slower | slower | `p-lines` |  |
 | 5.12 | Transparency, alpha blending, alphaTest | slower | faster | `p-transparency` `p-alpha-test` |  |
 | 5.13 | Order-independent transparency (three.js has none built in; its examples sort pe | no three.js equivalent | no three.js equivalent |  | no three.js equivalent (three.js has no built-in order-independent transparency) |
@@ -212,7 +212,7 @@ fetched for the scene.
 | 17.1 | InstancedMesh | three missing | three missing | `boxes-10000-instanced` | measured by margo-bench (docs/whitepaper/boxes-vs-threejs.md); moving instances against InstancedMesh at 10,000 to 250,000: "Moving instances on the GPU (item 53.2)", DynamicInstances in @margoengine/culling/dynamic, GPU loss open in known-bugs.md |
 | 17.2 | BatchedMesh | faster | faster | `shapes-10000-batched` |  |
 | 17.3 | LOD | faster | faster | `p-lod` |  |
-| 17.4 | Points | slower | slower | `p-points-1000000` |  |
+| 17.4 | Points | slower | slower | `p-points-1000000` |  Batch 163 job 1: the points plugin rewrote its unchanged 144-byte camera uniform every view. `perf(points): reuse identical frame uniform uploads` removes 100 of 101 writes in the static-frame regression, with exact uniform, command and pixel checks. Points and sprite instance work stays the same. Timing pending the quiet rerun; historical slower classification retained. [Reproduce](bp-163-workcounts.md). |
 | 17.5 | Sprite | faster | faster | `p-sprites` |  |
 | 17.6 | Line, LineSegments, LineLoop, Line2 | slower | slower | `p-lines` |  |
 | 17.7 | CSS2DRenderer, CSS3DRenderer | faster | faster | `p-css-labels` |  |

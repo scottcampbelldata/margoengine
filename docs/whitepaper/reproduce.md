@@ -3,6 +3,11 @@
 - Batch 179 provenance: after building packages, run node --test packages/sciviz/tests/provenance.test.js. Browser correctness: node scripts/gpu-lock.mjs run --owner=provenance-review --wait-max=60 --max=8 -- node packages/sciviz/tests/provenance-browser.mjs, with a hard outer process-tree timeout. Default covers all 24 demos on both backends. PROVENANCE_BACKENDS=webgpu or webgl2 and PROVENANCE_DEMOS=head,points select affected cases; PROVENANCE_ARTIFACTS=1 writes MRI PNG/SVG/PDF and the executed ESM trace under test-results/sciviz-provenance. Reports include record data hash counts, package/device identity and exported byte counts, which are file sizes rather than speed measurements. All real inputs retain their existing demo source/licence attribution.
 
 
+
+### Batch 163 job 1: points upload work count
+
+Build with `npm run build:packages`, then run `node --test --test-timeout=120000 packages/points/tests/frame-work.test.js`. Run the GPU-locked points browser commands in [bp-163-workcounts.md](bp-163-workcounts.md) for native and compatibility pixel checks. No benchmark is run in this phase; historical timing rows remain unchanged.
+
 ## Batch 187: global lightmap opaque visibility
 
 Build packages; run node --test --test-timeout=120000 packages/lightmap/tests/global-path.test.js

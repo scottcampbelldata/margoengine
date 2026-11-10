@@ -188,6 +188,14 @@ window.runPointTests = async () => {
   // 1. Pixel sizes: an even-sized square point centered on a pixel corner covers exactly size x size pixels.
   const dot = points.add(new PointCloud({ positions: [0, 0, 0], material: { size: 4 } }));
   let image = await frame();
+  const cachedFrame = await frame();
+  points.frameValid = false; // Negative control: queue the old unconditional frame upload.
+  const uncachedFrame = await frame();
+  assert(
+    cachedFrame.bytes.every((v, i) => v === uncachedFrame.bytes[i]),
+    'Frame upload reuse changed point pixels',
+  );
+  report.checks.push('Cached and unconditional frame uploads produce byte-identical pixels');
   await settle(runtime.gpu);
   const squares = {};
   for (const size of [2, 4, 8, 16]) {

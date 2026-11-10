@@ -234,6 +234,9 @@ export class PointsPlugin implements EnginePlugin {
     height: number;
   };
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
+  private readonly frameBits = new Uint32Array(this.frameData.buffer);
+  private readonly frameWritten = new Uint32Array(FRAME_BYTES / 4);
+  private frameValid = false;
   private fogSource: FogLike | null = null;
   private fogGpu?: {
     buffer: GPUBuffer;
@@ -446,6 +449,7 @@ export class PointsPlugin implements EnginePlugin {
         nearest: device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' }),
         edlParams: buffer(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
       };
+      this.frameValid = false;
     } catch (error) {
       for (const resource of created) resource.destroy();
       throw error;
@@ -1159,7 +1163,14 @@ export class PointsPlugin implements EnginePlugin {
     this.orthographic = fillFrame(f, this.view, context.camera, width, height, context.format);
     // Under a hook, an orthographic camera's near plane view depth, which clip z counts from.
     f[27] = this.transparency.hook ? (orthographicTerms(context.camera.matrix, context.camera.position)?.near ?? 0) : 0;
-    this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
+    // One buffer serves all views. Compare the bytes last queued to that buffer, not a per-view cache.
+    let changed = !this.frameValid;
+    for (let i = 0; !changed && i < this.frameBits.length; i++) changed = this.frameBits[i] !== this.frameWritten[i];
+    if (changed) {
+      this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
+      this.frameWritten.set(this.frameBits);
+      this.frameValid = true;
+    }
     const picked = (this.pickView = this.pickViews.get(context));
     picked.viewProj.set(c);
     picked.rect = [...(viewRect(context) ?? [0, 0, width, height])] as PickView['rect'];

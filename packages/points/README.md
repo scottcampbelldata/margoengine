@@ -31,9 +31,13 @@ const newXyz = new Float32Array(300).map(() => Math.random() * 10);
 cloud.updatePositions(5000, newXyz);
 
 // Thousands of camera-facing sprites in one draw call.
-const atlasImage = await (await fetch('/labels.png')).blob();
-const labels = points.add(new SpriteBatch({material: {map: await createImageBitmap(atlasImage)}}));
+const atlas = new OffscreenCanvas(64, 64);
+const ctx = atlas.getContext('2d')!;
+ctx.fillStyle = 'white';
+ctx.fillRect(0, 0, 64, 64);
+const labels = points.add(new SpriteBatch({material: {map: atlas}}));
 labels.add({position: [0, 2, 0], size: 0.5, uv: atlasRect(3, 4, 4)});
+engine.render();
 
 // CPU picking of the nearest drawn point.
 canvas.addEventListener('click', event => {
@@ -47,6 +51,7 @@ canvas.addEventListener('click', event => {
 - **Blocks.** `new PointCloud()` splits the points into spatially compact blocks of at most `blockSize` points (median splits along the longest axis, like a kd-tree) and records each block's bounds. Each frame the plugin transforms every block's bounds by the model matrix and frustum-culls it on the CPU against `camera.planes`.
 - **Point budget and level of detail.** The points inside each block are shuffled once with a seeded PRNG, so the first `k` slots of a block are an even random sample of it. Visible blocks share `pointBudget` in proportion to their projected screen area, and blocks that need less than their share give the rest to the others. Each block then draws a prefix of its slots: one `draw(4, k, 0, firstSlot)` call per visible block. This is the progressive subsampling Potree uses, without its octree files.
 - **GPU data.** Positions (f32 xyz), packed RGBA8 colors, optional f32 sizes and the shuffled slot order live in storage buffers; the vertex shader expands each point into a quad (a 4-vertex triangle strip per instance). The arrays stay in your order, so `updatePositions`, `updateColors` and `updateSizes` call `writeBuffer` on exactly the changed byte range. Position updates also grow the affected blocks' bounds.
+- **Frame uploads.** Points and sprites share a 144-byte camera uniform. Consecutive views with identical uniform bytes reuse the last upload; camera, viewport, format or projection changes upload again. Device restoration always uploads to the new buffer. This removes one queue write per unchanged view; timing is pending the quiet rerun.
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.

@@ -30,6 +30,11 @@ Claim: native gltf-pro glass on display-encoded scene targets combines transmitt
 
 The packed React 18.3.1 consumer runs its component lifecycle assertions against installed package modules, including portal and decal StrictMode ownership. Tooling-script assertions use the explicit contributor repository and retain every original assertion. Evidence: modern:test:packages -- --packages=react, effects-extra.test.js, portals.test.js and the relocated tooling regression packed-react-repository.test.js. The consumer fixture declares Playwright types and supplies its own JavaScript/image test support; no source tree or new runtime dependency is shipped.
 
+
+### Batch 163 job 1: unchanged camera uniform reuse
+
+PointsPlugin queues no frame uniform write when all 144 bytes equal its last queued write. `packages/points/tests/frame-work.test.js` checks 100 unchanged frames, original bytes, all other commands, changed camera/dimensions/format and restored buffers. `packages/points/tests/points-browser.js` compares cached and forced-upload pixel bytes. This claims fewer queue writes only; timing pending the quiet rerun. [Method and clean-room sources](bp-163-workcounts.md).
+
 ## Batch 187: lightmap visibility
 
 Opaque back faces block area-light visibility and diffuse gathers. Front-side emission cannot pass through their

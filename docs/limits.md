@@ -5,6 +5,9 @@
 - Batch 179 provenance: opt-in /provenance factories or withProvenance() add PNG/SVG records and trace() to an instance. Version 1 records contain the full portable spec, typed-array/source and numeric-JSON hashes, timestamp, exact build-resolved Margo runtime dependency versions, adapter information and browser identity. Browser privacy can leave adapter fields empty; no driver identity is guessed. Compressed PNG iTXt parsing checks every CRC and bounds the input and inflated text to 256 MiB by default. The record SHA-256 detects content changes and is not an authorship signature. Trace defaults to 10000 retained successful calls and a conservative 256 MiB argument budget; exceeding a bound releases history and makes trace() reject, without interrupting figure rendering. Final portable state preserves camera/time, pipeline, selection, callbacks represented as frames and external data writes; application codecs/operator registries remain explicit replay inputs. Returned ESM needs the normal package resolver, bundler or import map. There is no global prototype patch and no core/stage change.
 
 
+
+- Batch 163 points frame reuse retains a 144-byte snapshot per PointsPlugin plus a typed view and flag. It removes unchanged camera uploads only; point culling, sorting, quads and draw counts remain as before. Timing pending the quiet rerun; historical slower rows are not reclassified. See [work-count proof](whitepaper/bp-163-workcounts.md).
+
 ## K2 rendering and test limits
 
 K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass must use a linear HDR target for the exact sum; its display-target snapshot hook remains on the finish-later list. The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.

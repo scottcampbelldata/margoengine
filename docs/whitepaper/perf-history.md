@@ -3200,3 +3200,7 @@ complete historical predictor-3 streams with intact position/float canaries
 are accepted in versions 1.0/1.1/1.2; native rejects method 3. These are
 concrete gaps, not skips or unavailable-feature conclusions. Historical KD
 and the remaining prediction/transform/quantization cross product remain open.
+
+## Batch 163 job 1: identical points frame uploads (2026-11-10)
+
+`perf(points): reuse identical frame uniform uploads` retains the last 144 camera bytes for the GPU buffer. The static-frame regression reduces 101 queue writes to one (14,544 to 144 bytes) with identical uniform bytes and remaining commands. Pixel comparisons use the forced-upload negative control on both backends. This is a work count, not a measured frame-time win; timing pending the quiet rerun. See [sources, limits and commands](bp-163-workcounts.md).
