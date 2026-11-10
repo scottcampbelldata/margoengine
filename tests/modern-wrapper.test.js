@@ -143,7 +143,7 @@ test('model loading fits imports, rolls back failures and aborts on disposal', a
     assert.equal(model.root.visible, false);
     assert.equal(model.bounds[0], 11);
     assert.equal(model.raw.length, 1);
-    assert.ok(model.pbr.primitives.length === 1);
+    assert.equal(model.pbr, undefined, 'plain geometry uses the basic loader');
     assert.equal(model.animation, null);
     model.visible = true;
     assert.throws(() => {

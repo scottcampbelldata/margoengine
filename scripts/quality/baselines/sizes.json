@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15512162,
+  "total": 15514483,
   "history": [
     {
       "date": "2026-10-24",
@@ -7991,6 +7991,12 @@
       "commit": "701ac14ea",
       "reason": "Molecule optional entries: loaders/mmcif new 0 to 3186 B gzip (ceiling 3442 B), sciviz/molecule new 0 to 5163 B (ceiling 5419 B). Complete CIF structures and coherent sphere/cylinder representation/picking belong in their owning optional entries; splitting would duplicate grammar and primitive lifetime wiring. Existing loaders/pdb 2208 to 2269 B remains under its ceiling. Core plus stage stays 24209 B. Preserve every upstream ceiling.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d606ef904",
+      "reason": "Review M3: optional stage/gltf 1660 to 3794 B gzip (ceiling 1729 to 4050). Bounded feature inspection selects basic vs pro/animation without eager optional imports or duplicate network fetches, and retains feature-specific install errors. Splitting this small routing step would add loading/coordination cost without reducing root bytes. Core plus stage root is 24209 B before and after.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9020,7 +9026,7 @@
     "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
-    "@margoengine/stage/gltf": 1729,
+    "@margoengine/stage/gltf": 4050,
     "@margoengine/stage/lights": 1957,
     "@margoengine/stage/particles": 761,
     "@margoengine/stage/physics": 1437,

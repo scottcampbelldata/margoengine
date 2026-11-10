@@ -6405,3 +6405,6 @@ Molecule optional entry sizes: loaders/mmcif new 0 to 3,186 B gzip, ceiling 3,44
 
 
 AVIF review M1 (2026-11-10): the final OBU of an image item may omit its size and consumes the remaining item bytes; av1C configuration OBUs still require sizes. Exact white-sample RGBA and strict configuration regressions: docs/avif-review-fixes.md.
+
+
+Stage glTF review M3: addGLTF uses the basic loader for plain opaque constant-colour triangles; advanced features select gltf-pro, with animation required for skins/morphs/clips. Root download budget remains 64 MiB. Only selected packages load, with a feature-specific coded refusal when missing. Basic results omit pbr. Core plus stage stays 24,209 B gzip. See [stage-gltf-routing.md](stage-gltf-routing.md).

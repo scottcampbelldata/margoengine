@@ -1,6 +1,7 @@
 import type { Stage } from './index.js';
 import type { LoadedModel } from './model.js';
-import { loadTarget, optionalPackage, placeModel, stageSignal } from './feature.js';
+import { loadTarget, placeModel, stageSignal } from './feature.js';
+import { gltfPackage, gltfRoute } from './gltf-route.js';
 
 export type { LoadedModel } from './model.js';
 /** Options for `addGLTF`. */
@@ -12,9 +13,9 @@ export interface AddGLTFOptions {
 }
 
 /**
- * Loads a glTF or GLB file with `@margoengine/gltf-pro`, including textures, skins, morphs and clips, and fits
- * the camera to it. Packages load on first use. Rejects with `Install @margoengine/gltf-pro` when it is
- * missing, and with AbortError, adding nothing, when `signal` aborts or the stage is disposed first.
+ * Loads plain static geometry with `@margoengine/gltf`; textures and advanced features use `@margoengine/gltf-pro`.
+ * Skins, morphs and clips also require `@margoengine/animation`. Only the selected packages load, on first use.
+ * A missing package rejects with a coded feature-specific error. Aborting adds nothing.
  * @example const model = await addGLTF(stage, '/model.glb');
  */
 export async function addGLTF(
@@ -25,20 +26,32 @@ export async function addGLTF(
   const target = loadTarget(url, fit),
     abort = stageSignal(stage, signal);
   abort.throwIfAborted();
-  const { loadGLTF } = await optionalPackage('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'), abort),
-    pbr = await loadGLTF(stage.engine, target, { signal: abort });
+  const route = await gltfRoute(target, abort);
+  if (!route.feature) {
+    const { loadGLTF } = await gltfPackage(
+      '@margoengine/gltf',
+      'static geometry',
+      () => import('@margoengine/gltf'),
+      abort,
+    );
+    return Object.assign(
+      placeModel(stage, await loadGLTF(stage.engine, target, { signal: abort, fetch: route.fetch }), fit, abort),
+      { animation: null },
+    );
+  }
+  const { loadGLTF } = await gltfPackage(
+      '@margoengine/gltf-pro',
+      route.feature,
+      () => import('@margoengine/gltf-pro'),
+      abort,
+    ),
+    animation = route.animation
+      ? await gltfPackage('@margoengine/animation', route.animation, () => import('@margoengine/animation'), abort)
+      : null,
+    pbr = await loadGLTF(stage.engine, target, { signal: abort, fetch: route.fetch });
   try {
     abort.throwIfAborted();
-    const needsAnimation =
-      !!pbr.asset.doc.animations?.length ||
-      pbr.primitives.some(
-        (primitive) => primitive.weights.length > 0 || pbr.asset.doc.nodes?.[primitive.nodeIndex]?.skin !== undefined,
-      );
-    const player = needsAnimation
-      ? (
-          await optionalPackage('@margoengine/animation', () => import('@margoengine/animation'), abort)
-        ).Animation.attach(pbr)
-      : null;
+    const player = animation ? animation.Animation.attach(pbr) : null;
     if (player) player.playing = false;
     return Object.assign(
       placeModel(
