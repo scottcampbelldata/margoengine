@@ -1731,6 +1731,10 @@
       "types": "./dist/sciviz/progressive.d.ts",
       "import": "./dist/sciviz/progressive.js"
     },
+    "./sciviz/temporal": {
+      "types": "./dist/sciviz/temporal.d.ts",
+      "import": "./dist/sciviz/temporal.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

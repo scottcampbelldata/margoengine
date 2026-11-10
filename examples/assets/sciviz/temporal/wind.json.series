@@ -1,0 +1,37 @@
+{
+  "file-series-version": "1.0",
+  "files": [
+    {
+      "name": "wind-0000.json",
+      "time": 0
+    },
+    {
+      "name": "wind-0001.json",
+      "time": 1
+    },
+    {
+      "name": "wind-0002.json",
+      "time": 2
+    },
+    {
+      "name": "wind-0003.json",
+      "time": 3
+    },
+    {
+      "name": "wind-0004.json",
+      "time": 4
+    },
+    {
+      "name": "wind-0005.json",
+      "time": 5
+    },
+    {
+      "name": "wind-0006.json",
+      "time": 6
+    },
+    {
+      "name": "wind-0007.json",
+      "time": 7
+    }
+  ]
+}

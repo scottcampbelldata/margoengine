@@ -1,0 +1,39 @@
+{
+  "noaa": {
+    "title": "NCEP-NCAR Reanalysis 1 daily eastward near-surface wind, January 1-8 2024",
+    "source": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.dailyavgs/surface/uwnd.sig995.2024.nc",
+    "sourceSHA256": "d6e65f8dee2ea1c8b193d252cd468031c6f6553c3f9544170fabad17a9848f8e",
+    "input": "../wind-classic.nc",
+    "inputSHA256": "1bdfb66dc788095208155e2f917d92d340a46700d0b155ec2904b690fa78ae99",
+    "license": "US government public domain, NOAA PSL credit retained",
+    "units": "m/s",
+    "timeUnits": "days since 2024-01-01",
+    "selection": "Unchanged 5x5 native samples: longitude -100 to -90, latitude 20 to 30, x fastest. Split day dimension into JSON files; no scaling or fabricated fields."
+  },
+  "era5": {
+    "title": "ERA5 2 metre temperature, WeatherBench2 six-hour 64x32 conservative grid",
+    "authors": "Copernicus Climate Change Service (C3S), ECMWF; WeatherBench2, Stephan Rasp et al.",
+    "source": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
+    "dataGuide": "https://weatherbench2.readthedocs.io/en/latest/data-guide.html",
+    "license": "CC BY 4.0 (ERA5 producer dataset licence); contains modified Copernicus Climate Change Service information [2024]. Neither the European Commission nor ECMWF is responsible for use of this information.",
+    "licenseURL": "https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview",
+    "selection": "2m_temperature indices time=89124:89132, all 64 longitudes and 32 latitudes; 8 six-hour steps, not hourly interpolation. CDF2 repacking of unchanged float32 values; longitude/latitude standard_name/units/axis metadata added truthfully.",
+    "sourceChunk": "2m_temperature/891.0.0",
+    "sourceChunkSHA256": "af410b32e16bef88d7732c5a4db8b1701ce3b380f8ee25b52a7fc8f9b1f45ae1",
+    "units": "K",
+    "timeUnits": "hours since 1959-01-01",
+    "calendar": "proleptic_gregorian"
+  },
+  "sha256": {
+    "wind-0000.json": "29baa97110ad953a5069c384bb1282619b8acd736504563e854e8ccbcb4d1305",
+    "wind-0001.json": "8a9177866d49641fd00091c58c72017ccd71f2e4385622ad4a5f29c7791bee0c",
+    "wind-0002.json": "746dcf283094367bd9159b08e07c2e6d3b8c243c4d42878ad76ef9456e23d74a",
+    "wind-0003.json": "bf2c4846cb2435111ffe3b4aae931da91ccea8fb3bab5b461a8919692b1ae90d",
+    "wind-0004.json": "fd3ed704574e40477eaee9838c5bfe2661db5a5f3c8388942dd6a31f3e03e6da",
+    "wind-0005.json": "2728cbe82e6f047c6ce802a92e8bc7decd31dc76ce8d7a3ff181885c256d0b2e",
+    "wind-0006.json": "c88785bd1454fddb05a1ac51c830fe482b86fc1bb0003b49d93d08d992206f72",
+    "wind-0007.json": "659352d55be072e5056b1fdbe8e9d95e4c06e6f1b04ddb9ef13ecf5d72c56b08",
+    "wind.json.series": "be32f8343ac5a0ef23f0d90810311f0f5d50bb25ccf5a0337a3fb1780ab1a8a1",
+    "era5.nc": "636a1d0ea6fb6b4f85d964c0d916cdc5955278d94ceea3bf5c27a2a4e47ddf7f"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15335153,
+  "total": 15339221,
   "history": [
     {
       "date": "2026-10-24",
@@ -7915,6 +7915,12 @@
       "commit": "93b4ce4e5",
       "reason": "Batch 181 job 5: new optional sciviz/progressive entry 0 to 4746 B min+gzip, ceiling 5002 B. Scene target/depth reconstruction, latency feedback, per-view refinement and disposal retain one owner; splitting would add orchestration without reducing the complete feature. Existing ceilings are not raised. Core plus stage unchanged 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "97ecaf26f",
+      "reason": "Batch 180 job 5 optional temporal entry: 0 to 3901 B gzip, ceiling 4157 B, for streaming statistics, interpolation, probe charts, file series and units; cohesive optional API avoids extra loader coordination. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8668,7 +8674,7 @@
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
     "@margoengine/react": 10888,
-    "@margoengine/react-kit": 485,
+    "@margoengine/react-kit": 414,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/controls": 4346,
@@ -8799,9 +8805,9 @@
     "@margoengine/sciviz/format": 7826,
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
-    "@margoengine/sciviz/geo-lod": 7517,
+    "@margoengine/sciviz/geo-lod": 7509,
     "@margoengine/sciviz/geo-time": 41056,
-    "@margoengine/sciviz/geo-vector": 27662,
+    "@margoengine/sciviz/geo-vector": 27652,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 25036,
     "@margoengine/sciviz/grids": 27050,
@@ -8832,6 +8838,7 @@
     "@margoengine/sciviz/stats": 6975,
     "@margoengine/sciviz/stream": 4450,
     "@margoengine/sciviz/table": 12694,
+    "@margoengine/sciviz/temporal": 4157,
     "@margoengine/sciviz/tetvolume": 6578,
     "@margoengine/sciviz/transfer": 6252,
     "@margoengine/sciviz/tubes": 2789,

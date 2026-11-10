@@ -303,6 +303,10 @@
     "./progressive": {
       "types": "./dist/progressive.d.ts",
       "import": "./dist/progressive.js"
+    },
+    "./temporal": {
+      "types": "./dist/temporal.d.ts",
+      "import": "./dist/temporal.js"
     }
   },
   "files": [
@@ -373,6 +377,7 @@
     "test:browser:share": "node scripts/browser-root.mjs tests/share-browser.mjs",
     "test:browser:a11y": "node scripts/browser-root.mjs tests/a11y-browser.mjs",
     "audit:a11y": "node scripts/audit-accessibility.mjs",
-    "test:browser:progressive": "node scripts/browser-root.mjs tests/progressive-browser.mjs"
+    "test:browser:progressive": "node scripts/browser-root.mjs tests/progressive-browser.mjs",
+    "test:browser:temporal": "node scripts/browser-root.mjs tests/temporal-browser.mjs"
   }
 }

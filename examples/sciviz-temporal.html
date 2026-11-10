@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Temporal analysis | Margo Engine</title>
+<style>body{margin:0;background:#0f141c;color:#c9d4e3;font:15px system-ui}main{max-width:1100px;margin:28px auto;padding:0 20px}h1{font-size:28px}label{display:inline-flex;align-items:center;gap:8px;margin:8px 16px 8px 0}select,input,button{font:inherit;padding:6px;background:#202d3d;color:inherit;border:1px solid #62758b;border-radius:4px}input[type=number]{width:80px}input[type=range]{width:240px}section{position:relative;margin:18px 0}canvas{width:100%;height:330px;display:block}p{line-height:1.5}a{color:#9bd7ef}output{font-variant-numeric:tabular-nums}</style></head>
+<body><main><h1>Fields through time</h1>
+<label>Dataset <select id="dataset"><option value="noaa">NOAA wind: eight days</option><option value="era5">ERA5 temperature: six-hour samples</option></select></label>
+<label>Field <select id="statistic"><option value="step">Interpolated step</option><option value="mean">Mean</option><option value="minimum">Minimum</option><option value="maximum">Maximum</option><option value="standardDeviation">Standard deviation</option></select></label>
+<div><label>Time <input id="time" type="range" min="0" max="7" step="0.01" value="0"></label><output id="timestamp"></output></div>
+<div><label>Probe longitude <input id="longitude" type="number" step="0.1" value="-95"></label><label>Latitude <input id="latitude" type="number" step="0.1" value="25"></label><button id="probe" type="button">Sample point</button></div>
+<p id="status" role="status">Loading...</p><section><canvas id="field" width="1000" height="330" aria-label="Spatial field over time"></canvas></section>
+<section><canvas id="chart" width="1000" height="330" aria-label="Probe observations over time"></canvas></section>
+<p id="summary"></p><p>NOAA PSL NCEP-NCAR Reanalysis 1: daily eastward near-surface wind, January 1-8 2024, public domain. ERA5: Copernicus Climate Change Service / ECMWF, distributed by WeatherBench2, CC BY 4.0. ERA5 samples are six hours apart; the time slider interpolates between observations. <a href="./assets/sciviz/temporal/source.json">Data sources, transformations and hashes</a>.</p>
+</main><script type="module" src="./sciviz-temporal.ts"></script></body></html>

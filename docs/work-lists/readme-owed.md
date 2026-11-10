@@ -1305,3 +1305,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 181 job 5): document the generated sciviz/progressive alias; README examples deferred.
 
 - @margoengine/viz (batch 181 job 5): document the generated sciviz/progressive profile alias; README examples deferred.
+
+- @margoengine/sciviz: /temporal source contract, streaming reductions and missingness, interpolation, physical probe charts, numbered/.series readers and time units; NOAA daily and ERA5 six-hour demo.
+- margoengine: generated /sciviz/temporal alias and optional source/probe/chart workflow.
+- @margoengine/viz: generated /sciviz/temporal alias and optional temporal analysis workflow.

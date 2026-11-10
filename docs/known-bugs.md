@@ -5022,3 +5022,8 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 
 
 Batch 181 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=sciviz --serial` rejects before filtering because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script on this base. Cause: global unregistered-browser audit precedes package filtering. Own sciviz scripts run directly, each under the existing shared lock and deadline; stage/check tooling left to its owner.
+
+
+- Batch 180 job 5 incidental gate finding (base b4404cddb): node scripts/gpu-package-tests.mjs --no-build --only=sciviz --list rejects packages/stage/test/gpu/viewer-extras-check.mjs because no registered owning GPU script starts it. Cause: global browser-leaf registration validation runs before package selection. Stage registration is outside job 5; sciviz's declared browser leaves are run directly with shared GPU locks and hard limits. Deferred to its owning lane under rule 21.
+
+- Batch 180 job 5 visual review: add two named heatmaps to a default Figure, then remove the first. Figure.#updateLegend sets element.hidden=true when only one remains, but Legend's inline display:grid overrides the browser's hidden rule, leaving both old legend rows visible. Repro: select several field reductions in examples/sciviz-temporal.html; evidence test-results/sciviz-temporal-webgpu.png. Numerical fields and exported pixels without overlays are correct. Small existing legend presentation gap deferred under rules 21/22; fix the owning legend visibility and add its DOM/browser regression in the fix phase.
