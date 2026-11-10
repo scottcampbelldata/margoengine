@@ -24,7 +24,7 @@ const BUFFER_USAGE_STORAGE_COPY_DST =
 
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
 const GLYPH_FLOATS = 12,
-  BLOCK_BYTES = 160;
+  BLOCK_BYTES = 176;
 
 interface Resources {
   uniform: GPUBuffer;
@@ -459,7 +459,8 @@ export class TextRenderer implements EnginePlugin {
       f[38] = 0;
       f[39] = 0;
       let changed = false;
-      for (let i = 0; i < 40; i++)
+      f.set(layout.clipRect ?? [-3.4e38, -3.4e38, 3.4e38, 3.4e38], 40);
+      for (let i = 0; i < 44; i++)
         if (!Object.is(r.last[i], f[i])) {
           changed = true;
           break;

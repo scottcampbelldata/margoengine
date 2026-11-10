@@ -4,7 +4,7 @@
  */
 export const textShader: string = /* wgsl */ `
 struct Frame { viewProj: mat4x4f, right: vec4f, up: vec4f, info: vec4f }
-struct Block { model: mat4x4f, color: vec4f, outline: vec4f, shadow: vec4f, params: vec4f, info: vec4u, sdf: vec4f }
+struct Block { model: mat4x4f, color: vec4f, outline: vec4f, shadow: vec4f, params: vec4f, info: vec4u, sdf: vec4f, clipRect: vec4f }
 struct Glyph { rect: vec4f, uv: vec4f, info: vec4u }
 @group(0) @binding(0) var<uniform> frame: Frame;
 @group(0) @binding(1) var atlasSampler: sampler;
@@ -18,6 +18,7 @@ struct Out {
   @location(0) uv: vec2f,
   @location(1) @interpolate(flat) page: u32,
   @location(2) @interpolate(flat) kind: u32,
+  @location(3) local: vec2f,
 }
 
 @vertex fn vertex(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> Out {
@@ -40,6 +41,7 @@ struct Out {
   var o: Out;
   o.clip = frame.viewProj * world;
   o.uv = vec2f(mix(g.uv.x, g.uv.z, c.x), mix(g.uv.w, g.uv.y, c.y));
+  o.local = local;
   o.page = g.info.x;
   o.kind = kind | (g.info.y << 2u);
   return o;
@@ -55,6 +57,7 @@ fn toLinear(c: vec3f) -> vec3f {
   let w = max(0.5 * (length(dpdx(texels)) + length(dpdy(texels))), 1e-3);
   let texel = textureSampleLevel(sdfAtlas, atlasSampler, i.uv, i.page, 0.0).r;
   var tint = textureSampleLevel(colorAtlas, atlasSampler, i.uv, i.page, 0.0);
+  if (any(i.local < block.clipRect.xy) || any(i.local > block.clipRect.zw)) { discard; }
   let kind = i.kind & 3u;
   // Signed distance in SDF texels, positive outside. Fade out where the field saturates so quad edges never show.
   let d = ((1.0 - texel) - block.sdf.y) * block.sdf.x;

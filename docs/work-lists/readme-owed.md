@@ -650,3 +650,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 217 job 1): document generated cutscene/curve-editor alias.
 
 - @margoengine/gltf (batch 200): scene-data accepts meshless camera/light and empty scenes; allowEmptyScene defaults false; clarify textured WebGL2 compatibility support and preview escalation. Add examples only in the README phase.
+- @margoengine/text (batch 248 job 1): document /fit FittedText and fitText, defaults, source offsets, overflow marker, bounded auto fit and local clip including shadow.
+- margoengine (batch 248 job 1): document text/fit forwarding.

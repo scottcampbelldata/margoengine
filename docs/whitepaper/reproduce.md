@@ -3286,28 +3286,20 @@ The transitions package GPU command documented for job 1 now also runs presets-b
 Build with npm run build:packages. Run node --test --test-timeout=300000 packages/terrain/test/overlays.test.js and the terrain package CPU suite. Render with node scripts/gpu-lock.mjs run --owner=overlays-repro --wait-max=60 --max=4 -- node packages/terrain/test/overlays.browser.mjs; append --compat to repeat on the compatibility layer. test-results/terrain-overlays.json contains coverage probes, exact baseline/restored values, display references and bake work counts. The package test:gpu script includes both imagery and overlay regressions; run it separately on each backend in a shared slot. No wall-clock benchmark, full verify or README gate is used.
 ### Batch 247 job 2
 Use the lighting2d CPU and shared-lock native/--compat browser commands listed for job 1. GI history checks appear as GI temporal, GI resetHistory, GI painted diffuse order and invalidation checks in test-results/lighting2d-browser.json. The test wraps only its own GPU allocations with COPY_SRC to observe cached intervals, then forces fresh computation for comparison. Painted-reflection oracles are independent analytic boundary segments of a generated seven-pixel U-shaped enclosure, not rival source or imported assets. Existing opaque-energy, wall and finite-order fixtures retain their bounds. No speed suite is run during the build phase.
-<<<<<<< HEAD
 
 Batch 216 orthographic: after build:packages, run node --test packages/cinematic/test/ortho.test.js; run node packages/cinematic/test/ortho-browser.mjs under the shared GPU lock, then with --compat. The diagnostic checks the subject at quarter-width/three-quarter-height before and after a depth move, interpolated world height 15 between 10 and 20, and a two-sphere group at height 5.625. No external data or timing run.
-<<<<<<< HEAD
-<<<<<<< HEAD
 ### Batch 266 effect helpers
 After build:packages, run node --experimental-test-module-mocks --test --test-timeout=60000 packages/react/tests/effects-extra.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-effects-extra-browser.mjs, then repeat with --compat appended. All five native pixel oracles must be exact.
 
-=======
-=======
 ## Batch 212 job 1: stereo controls
 Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
->>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
->>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
-=======
 
 
 
 ### Batch 217 job 1: graph authoring
 
 Build packages, then run node --test --test-timeout=120000 packages/cutscene/tests/curve-editor.test.js. For actual mouse/keyboard interactions run node scripts/gpu-lock.mjs run --owner=cutscene-curve --wait-max=60 --max=2 -- node packages/cutscene/tests/curve-browser.mjs. The cutscene package test:gpu also runs this suite; MARGO_COMPAT=1 selects the compatibility backend for rendering suites. No timing assertion or benchmark is used.
->>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)
 
 ### Batch 200 light glTF scenes
 After npm run build:packages, run npm test --workspace @margoengine/gltf. The two meshless tests in packages/gltf/test/scene-data.test.js fail with the old no-renderable guard and pass with sceneExtras opting into allowEmptyScene. They create JSON and a JSON-only GLB locally and verify every loader and rollback with a headless engine. For the existing texture path run node scripts/gpu-lock.mjs run --owner=codex-batch200 --max=4 --wait-max=60 -- node scripts/test-gltf-browser.mjs, then the same command with --compat. Both exercise actual GPU rendering. Size reproduction: import bundleBytes from scripts/measure-size.js, gzipSync each packages/gltf/dist/{index,scene-data,textured}.js bundle; npm run measure:size checks the combined core/stage limit. These are correctness and byte-count checks, not speed benchmarks.
+Batch 248 job 1: build packages, then `node --test --test-timeout=240000 packages/text/tests/fit.test.js`; run `node scripts/gpu-lock.mjs run --owner=codex-batch248 --max=8 --wait-max=60 -- node packages/text/scripts/test-browser.js`, then the same with `--compat` after test-browser.js. Existing Source Sans 3 font data is SIL OFL 1.1 (packages/text/tests/fixtures/fonts/NOTICE.md). No benchmark or timing assertion.

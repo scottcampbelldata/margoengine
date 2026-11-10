@@ -4580,29 +4580,21 @@ The eight requested transition presets and their finite parameter contracts are 
 No open defect identified in the job: the new entry covers metre widths, polygon holes, projection, live updates, imagery ordering and exact restoration on both GPU backends. CPU tests reject coerced numeric strings and preserve old state after malformed/over-budget updates. A draft display-pixel classifier incorrectly assumed that PBR Neutral kept saturated primary channels at zero; the fixture now uses independently rendered primary references through the actual display transform, retaining exact color matching.
 ### Fixed: GI owning-scene disposal; completed painted/temporal coverage (batch 247 job 2)
 GILighting2D previously removed a plugin by name on its saved engine, which can name another active scene. It now resolves its own registration with sceneOf(this) before removal and leaves detached or same-name plugins alone. sdf.test.js contains a regression that fails on the former dispatch. Painted surfaces now carry reflected radiance for every finite bounce order, and exact change detection guards persistent intervals; gi-history-regressions.js compares against independently authored analytic faces, checks cached GPU data remains untouched on static frames, and rejects stale history after scene edits. Earlier GI visibility/energy repairs remain tested without changed tolerances. Historical README correctness exceptions are explicitly owed, with no README edits during build phase.
-<<<<<<< HEAD
 
 Batch 216 job 2: no open defect found in orthographic follow, screen framing, projected-sphere group fit or height blends. Mixed projection transitions switch mode at the endpoint, as documented in limits; continuous interpolation between projection families is outside this orthographic job.
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 Batch 266 effects regressions: explicit Trail target=null stays in native manual mode; new source hooks retain decal parent transforms exactly once. effects-extra.test.js and the native pixel-oracle fixture cover these cases. The kit test fake now declares the existing meshRuntime export used by the new entry; none of its behavior assertions changed.
 
-=======
-=======
 Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
->>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
->>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
-=======
 
 
 
 ### Fixed: batch 217 cutscene compatibility replay fixture
 
 The VFX replay fixture recorded early frames on the CPU fallback while the lazy WebGL2 GPU route was loading, then replayed on that route. Frame 40 differed in 182 particle words by a few float ulps, with identical picture and live count. The fixture now waits for actual route and pipeline readiness before reset and capture. The unchanged exact-byte and pixel assertions in packages/cutscene/tests/vfx-browser.mjs are the regression; no engine arithmetic or tolerance changed.
->>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)
 
 ### Resolved: batch 200 meshless scene refusal
 The light loader rejected every model without a renderable primitive before sceneExtras.finish could expose cameras or lights. The optional scene-data entry now opts into empty scene acceptance through GLTFExtension.allowEmptyScene; strict root behaviour and malformed-file rollback remain. The two meshless tests in packages/gltf/test/scene-data.test.js fail on the parent and pass with this change.
 
 Batch 200 rebase finding: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. Preserve existing content here; owning lanes repair in the fix phase under rule 21.
+Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage; no open defect identified in this job.

@@ -216,6 +216,7 @@ type TextAlign = 'left' | 'center' | 'right' | 'justify';
 type TextDirection = 'ltr' | 'rtl' | 'auto';
 
 interface TextLayout {
+    clipRect?: readonly [number, number, number, number];
     text: string;
     glyphs: LayoutGlyph[];
     lines: LayoutLine[];

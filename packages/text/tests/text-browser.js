@@ -278,6 +278,28 @@ window.runTextTests = async () => {
   report.colors = colors;
   report.checks.push('Fill, outline and drop shadow colors render; opacity blends');
 
+  // Optional fitted text uses the same renderer; clipping must include every style layer.
+  const { FittedText } = await import('@margoengine/text/fit');
+  label.visible = false;
+  const fitted = renderer.add(new FittedText({ text: 'MMMM MMMM MMMM', font, fontSize: 2,
+    maxWidth: 5, maxLines: 1, anchorX: 'center', anchorY: 'middle',
+    outlineWidth: 0.12, outlineColor: '#ffffff', shadowOpacity: 1, shadowOffset: [0.3, -0.3],
+    clipRect: [-0.7, -0.6, 0.7, 0.6] }));
+  image = await frame();
+  const clippedInk = ink(image);
+  assert(clippedInk.count > 20, 'Fitted text must remain visible');
+  assert(clippedInk.minX >= SIZE / 2 - 0.7 * PX - 1 && clippedInk.maxX <= SIZE / 2 + 0.7 * PX + 1 &&
+    clippedInk.minY >= SIZE / 2 - 0.6 * PX - 1 && clippedInk.maxY <= SIZE / 2 + 0.6 * PX + 1,
+    `Clip leaked fill, outline or shadow: ${JSON.stringify(clippedInk)}`);
+  assert(fitted.layout.truncated && fitted.layout.lines.length === 1, 'maxLines must truncate with ellipsis');
+  fitted.autoFit = true; fitted.minFontSize = 0.1; fitted.maxFontSize = 2;
+  fitted.maxHeight = 1; fitted.clipRect = null;
+  image = await frame();
+  assert(fitted.layout.fits && !fitted.layout.truncated && fitted.fontSize < 2, 'Auto fit must retain the complete source');
+  fitted.dispose();
+  label.visible = true;
+  report.checks.push('Fitted text clamps lines, auto fits and clips fill, outline and shadow in local space');
+
   // Rich text: a coloured run and an inline image reach the screen. A prebuilt field: one round glyph from raw pixels.
   const { RichText } = await import('@margoengine/text/rich'),
     { BitmapFont } = await import('@margoengine/text/msdf');

@@ -94,6 +94,8 @@ export interface LayoutLine {
 
 /** Result of `layoutText`: positioned glyphs and lines. Lengths are in world units. */
 export interface TextLayout {
+  /** Optional fragment clip [left, bottom, right, top], supplied by the fit entry. */
+  clipRect?: readonly [number, number, number, number];
   /** The source string. */
   text: string;
   /** Positioned clusters of all lines. */
@@ -576,6 +578,7 @@ function reorder(levels: number[]): number[] {
 /** Caret position in local space for the UTF-16 offset `index` (clamped to the text). */
 export function caretRect(layout: TextLayout, index: number): { x: number; top: number; bottom: number; line: number } {
   if (!Number.isFinite(index)) throw new RangeError('Caret index must be finite');
+  if (!layout.lines.length) return { x: layout.bounds.left, top: layout.bounds.top, bottom: layout.bounds.bottom, line: 0 };
   index = Math.max(0, Math.min(layout.text.length, Math.round(index)));
   let lineIndex = layout.lines.findIndex((line) => index >= line.start && index < line.end);
   if (lineIndex < 0) lineIndex = layout.lines.findIndex((line) => index >= line.start && index <= line.end);
@@ -598,6 +601,7 @@ export function caretRect(layout: TextLayout, index: number): { x: number; top: 
 export function hitTest(layout: TextLayout, x: number, y: number): number {
   if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Hit test point must be finite');
   const lines = layout.lines;
+  if (!lines.length) return 0;
   let lineIndex = lines.findIndex((line) => y <= line.top && y > line.bottom);
   if (lineIndex < 0) lineIndex = y > lines[0].top ? 0 : lines.length - 1;
   const line = lines[lineIndex],

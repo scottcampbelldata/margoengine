@@ -212,6 +212,7 @@ export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 export type TextDirection = 'ltr' | 'rtl' | 'auto';
 
 export interface TextLayout {
+    clipRect?: readonly [number, number, number, number];
     text: string;
     glyphs: LayoutGlyph[];
     lines: LayoutLine[];

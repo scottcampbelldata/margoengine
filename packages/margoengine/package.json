@@ -3686,6 +3686,10 @@
       "types": "./dist/text/extrude.d.ts",
       "import": "./dist/text/extrude.js"
     },
+    "./text/fit": {
+      "types": "./dist/text/fit.d.ts",
+      "import": "./dist/text/fit.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"

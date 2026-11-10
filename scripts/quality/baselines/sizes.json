@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13367482,
+  "total": 13378630,
   "history": [
     {
       "date": "2026-10-24",
@@ -6846,6 +6846,12 @@
       "commit": "829d1245f",
       "reason": "lightmap/refracted: rough glass, dispersion and bounces (batch 54 job 8)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7ec92dd59",
+      "reason": "Batch 248 job 1: new optional text/fit, root rendering clip support and empty-layout caret safety. Measurements recorded in docs/limits.md. Optional root ceiling 16597 to 17109 B; fit ceiling 10636 B. Shared rendering avoids a second renderer; core plus stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7771,7 +7777,7 @@
     "@margoengine/terrain/rvt": 6595,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12291,
-    "@margoengine/text": 16597,
+    "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/extrude": 11160,
     "@margoengine/text/msdf": 4502,
@@ -8089,6 +8095,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/text/fit": 10636
   }
 }

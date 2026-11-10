@@ -21,6 +21,7 @@ await build({
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
+        fit: resolve(root, 'src/fit.ts'),
         rich: resolve(root, 'src/rich.ts'),
         msdf: resolve(root, 'src/msdf.ts'),
         animate: resolve(root, 'src/animate.ts'),
