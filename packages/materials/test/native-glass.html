@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><style>canvas{width:8px;height:8px}</style></head><body><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {extendedMaterials} from '/packages/gltf-pro/dist/extended.js';
+import {instancedGLTF} from '/tests/support/instanced-gltf.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+window.nativeGlass=async()=>{
+ const rows=[];
+ for(const samples of [1,4])for(const layers of [1,2]){
+  const canvas=document.body.appendChild(document.createElement('canvas'));
+  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
+  try{
+   engine.scene.background='#808080';engine.lighting.radiance.fill(0);
+   const input=instancedGLTF(Array.from({length:layers},(_,i)=>({t:[0,0,-i*0.1]})),{instanced:false,material:{
+    emissiveFactor:[0.1,0.15,0.2],extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1}},
+   }});
+   parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+   await waitForPipelines(async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();});
+   const png=canvas.toDataURL('image/png');
+   engine.scene.background='#000000';
+   await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+   rows.push({samples,layers,png,lit:canvas.toDataURL('image/png')});
+  }finally{engine.dispose();canvas.remove();}
+ }
+ return rows;
+};
+</script></body></html>

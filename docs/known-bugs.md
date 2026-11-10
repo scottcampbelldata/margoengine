@@ -1689,23 +1689,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Cause:** the level has no `sample_index` in a fragment shader and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
 - **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
 
-### Native glass on a display-encoded target adds its lit draw in encoded values
+### External PBR display passes
 
-- **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit draw of gltf-pro's native glass blends over
-  the tint draw in display-encoded values. Light adds in linear values, so bright highlights over bright backgrounds
-  come out too bright. `materials` `install` and `Transmission` add in linear light since 2026-11-05; only the native
-  two-draw path is left.
-- **Size:** encoded 0.5 + 0.5 reads 1.0; adding in linear light reads 0.69. Also, the native tint encodes the share and
-  multiplies, which is exact only for a power curve: within 1 step above about 40 of 255, up to 2 steps below it.
-- **Repro:** glass with a strong highlight over a bright background through `loadGLTF`, on a target with no PostStack,
-  against the same scene with `Tonemap`.
-- **Cause:** the blend unit reads the target as it is stored, and core's colour targets are plain `bgra8unorm` or
-  `rgba8unorm`, so no blend state can decode the destination.
-- **Needed to close:** one of two changes, each with a cost that is Scott's to weigh. A scene copy before every native
-  glass draw (the light behind read in the shader, as `install` does) adds a copy and a pass per glass surface to the
-  default path. An `-srgb` view of the target for the glass pass (blending then runs in linear light in hardware) needs
-  core to create its targets with `viewFormats`, a core change for looks, which the freeze rules out. Until then
-  `Tonemap` or any PostStack gives the exact result, and `install(model)` does on any target.
+- K2 external-pass follow-up: PBRModel.draw with a caller-owned already-open external pass on a display-encoded target still uses native tint/add blending; reproduce with bright glass over a bright background via createRenderer. Cause: the caller owns the open pass and the package cannot end it to snapshot its background. Graph-managed Engine scenes are fixed; use a linear HDR external target pending a caller-supplied snapshot hook.
 
 ### Findings of the outside audit (2026-10-28)
 

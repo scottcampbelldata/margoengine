@@ -1,5 +1,9 @@
 # Claims and evidence
 
+### Fixes K2 job 1: linear native display glass
+
+Claim: native gltf-pro glass on display-encoded scene targets combines transmitted and lit light in linear values. The materials adapter snapshots each surface's background, decodes the two light contributions and encodes their sum. Proof: packages/materials/test/native-glass-browser.mjs fails before the fix and checks one/two overlapping surfaces at 1x/4x on both GPU backends against an independent transfer-function reference (one 8-bit quantization step). CPU ownership and shader regressions live in packages/materials/tests/native-glass.test.js. Scope: the native sightline-tint path, preserving its existing tone mapping; no equivalence claim for refracted HDR rendering or measured speed. Research sources and costs are in the operational playbook and limits.
+
 ## Batch 187: lightmap visibility
 
 Opaque back faces block area-light visibility and diffuse gathers. Front-side emission cannot pass through their

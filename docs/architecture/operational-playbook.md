@@ -1,5 +1,15 @@
 
 
+### Section 5 evidence: native display glass, fixes K2 job 1
+
+The internal materials native-glass adapter owns the scene capture, snapshots and transfer-function shader. gltf-pro acquires it for native transmissive models and copies the current scene before each primitive, after settling the renderer's deferred clear and closing the preceding draw pass. The shader decodes both stored light contributions, multiplies the linear transmission share (including the existing Fresnel, coat, sheen and Beer terms), adds, then encodes. Native HDR blending is unchanged. Shared capture ownership ends with the last model; resize and device restoration rebuild its resources. Core and stage are unchanged.
+
+Evidence: packages/materials/tests/native-glass.test.js checks shared ownership, per-surface copies, attachment restoration, HDR bypass and the shader arithmetic. packages/materials/test/native-glass-browser.mjs compares one and two overlapping surfaces against an independent IEC transfer-function sum at 1x and 4x, on native WebGPU and compatibility. It fails on the old two-draw path. No wall-clock claim; other GPU vendors remain unmeasured.
+
+Clean-room sources compared: W3C GPU for the Web Working Group, *WebGPU*, 2026, https://www.w3.org/TR/webgpu/ (plain UNORM has no automatic transfer conversion); Khronos Group, *Data Format Specification v1.4.0*, 2025, https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.inline.html (linear and sRGB transfer functions); Bruce Walter, Stephen R. Marschner, Hongsong Li and Kenneth E. Torrance, *Microfacet Models for Refraction through Rough Surfaces*, 2007, https://doi.org/10.2312/egwr/egsr07/195-206 (reflected and transmitted radiance shares). The standards determine the compositor; the paper supports retaining the existing energy split. No companion code was read.
+
+K2 dependent CPU gate repair: OIT assertions retain every geometry/OIT pass and exact draw counts while identifying the native glass adapter's passes separately; scene color is the capture attachment and the original depth stays in place. The capture registers after its model joins the existing segment, preserving the single HDR model run; the new CPU pass-count regression guards MSAA stores/loads and the exact live-dispersion compatibility case passes.
+
 ## Batch 187: opaque visibility in global lightmap bakes (section 5 supplement)
 
 Area shadow segments and quad/path bounce rays test both sides of opaque quads. A back hit terminates a diffuse

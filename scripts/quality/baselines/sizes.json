@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14560646,
+  "total": 14571465,
   "history": [
     {
       "date": "2026-10-24",
@@ -7787,6 +7787,12 @@
       "commit": "be46a6ad5",
       "reason": "clustered/contact: new entry, contact shadows per local light, batch 53 job 1",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f11511163",
+      "reason": "K2 native glass per-surface copy and linear compositing: gltf-pro 78058 to 79666 B, model 58923 to 60402 B, progressive 86739 to 88346 B, worker 78581 to 80160 B gzip. Keep shared synchronous capture lifecycle together; splitting creates a package cycle or async draw gap. Preserve every upstream budget. Core and stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -8175,7 +8181,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7210,
-    "@margoengine/gltf-pro": 78462,
+    "@margoengine/gltf-pro": 82056,
     "@margoengine/gltf-pro dist/workers/gltf.js": 35732,
     "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
     "@margoengine/gltf-pro/asset": 5754,
@@ -8191,11 +8197,11 @@
     "@margoengine/gltf-pro/model": 60429,
     "@margoengine/gltf-pro/physics": 8977,
     "@margoengine/gltf-pro/prepare": 31610,
-    "@margoengine/gltf-pro/progressive": 87387,
+    "@margoengine/gltf-pro/progressive": 90997,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 10477,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 78950,
+    "@margoengine/gltf-pro/worker": 82565,
     "@margoengine/gltf/auto": 14750,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,

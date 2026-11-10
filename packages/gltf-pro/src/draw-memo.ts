@@ -37,6 +37,7 @@ export interface DrawFrame {
 
 /** A derivation, valid for draws under `frame` (identity: the same call or run); see the file comment. */
 export interface DrawDerivation {
+  nativeGlass?: boolean;
   frame: DrawFrame;
   source: MaterialExtension | undefined;
   instances: PBRInstances | BatchKind | undefined;

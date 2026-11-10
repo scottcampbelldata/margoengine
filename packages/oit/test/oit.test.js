@@ -52,6 +52,9 @@ async function scene(samples = 4) {
   engine.camera.update(4 / 3, true);
   store.tick(false);
   const view = context(gpu, { samples, format: 'bgra8unorm', depthFormat: 'depth32float-stencil8' });
+  Object.defineProperty(view, 'captureColor', {
+    get: () => engine.plugins.get('materials:native-glass')?.colorView ?? view.c.color,
+  });
   const frame = (n) =>
     gpu.record(() => {
       view.begin(n);
@@ -60,7 +63,12 @@ async function scene(samples = 4) {
   return { gpu, engine, model, view, frame, id: (value) => gpu.snap(value) };
 }
 const of = (log, name) => log.filter((e) => e[0] === name);
-const passes = (log) => of(log, 'beginRenderPass').map((e) => e[1]);
+// The native glass adapter owns its copy/resolve/presentation passes, checked in materials' regression.
+// These assertions retain the complete gltf-pro geometry and OIT pass sequence.
+const passes = (log) =>
+  of(log, 'beginRenderPass')
+    .map((e) => e[1])
+    .filter((p) => !p.label?.startsWith('native-glass:'));
 const draws = (log) => of(log, 'pass.drawIndexed').length;
 
 test('precise accumulation keeps all four sums in float32 at 1x and 4x without a hardware resolve', async () => {
@@ -236,7 +244,7 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
     assert.ok(a.resolveTarget, 'MSAA resolves');
   }
   assert.equal(composite.label, 'oit:composite');
-  assert.deepEqual(composite.colorAttachments, [{ view: id(view.c.color), loadOp: 'load', storeOp: 'store' }]);
+  assert.deepEqual(composite.colorAttachments, [{ view: id(view.captureColor), loadOp: 'load', storeOp: 'store' }]);
   assert.equal(composite.depthStencilAttachment, undefined);
   const textures = of(log, 'texture')
     .map((e) => e[2])
@@ -252,8 +260,8 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
   );
   assert.equal(
     draws(log),
-    5,
-    'opaque + transmission (tint, then lit: gltf-pro 5w.f) in beauty, two BLEND primitives accumulated',
+    4,
+    'opaque + one linear-composited native glass draw in beauty, two BLEND primitives accumulated',
   );
   const pipelines = of(log, 'renderPipeline').map((e) => e[2]),
     transparent = pipelines.filter((p) => p.fragment.entryPoint === 'transparent');
@@ -333,13 +341,13 @@ test('1x: targets drawn directly; nothing transparent visible: no OIT passes; di
   for (const i of [1, 3]) model.nodes[i].visible = false;
   const hidden = frame(1);
   assert.equal(passes(hidden).length, 2, 'no accumulate or composite when nothing transparent is drawn');
-  assert.equal(draws(hidden), 3, 'opaque + transmission twice');
+  assert.equal(draws(hidden), 2, 'opaque + one linear-composited native glass draw');
   for (const i of [1, 3]) model.nodes[i].visible = true;
   oit.dispose();
   assert.equal(engine.hasPlugin(oit.name), false);
   const sorted = frame(2);
   assert.equal(passes(sorted).length, 4, 'opaque pass + one pass per blended primitive');
-  assert.equal(draws(sorted), 5, 'transmission draws twice');
+  assert.equal(draws(sorted), 4, 'transmission composites in one draw');
   assert.ok(!passes(sorted).some((p) => p.label), 'no OIT passes');
   assert.throws(() => oit.add(model), /disposed/);
 });
@@ -432,15 +440,19 @@ test('ExactOIT: BLEND primitives go to the list pass with no colour targets, the
   const readOnly = { view: id(view.c.depth), depthReadOnly: true, stencilReadOnly: true };
   assert.deepEqual(fill.depthStencilAttachment, readOnly, 'scene depth, read only');
   assert.equal(resolve.label, 'oit:resolve');
-  assert.deepEqual(resolve.colorAttachments, [{ view: id(view.c.color), loadOp: 'load', storeOp: 'store' }]);
+  assert.deepEqual(resolve.colorAttachments, [{ view: id(view.captureColor), loadOp: 'load', storeOp: 'store' }]);
   assert.deepEqual(resolve.depthStencilAttachment, readOnly, 'the hardware test drops hidden layers');
   const transparent = of(log, 'renderPipeline')
     .map((e) => e[2])
     .filter((p) => p.fragment.entryPoint === 'transparent');
   assert.ok(transparent.length);
   for (const p of transparent) assert.deepEqual(p.fragment.targets, []);
-  const [layerDraw] = of(log, 'pass.draw');
-  assert.deepEqual(layerDraw.slice(1, 3), [3, 5], 'one instance per kept layer');
+  const layerDraws = of(log, 'pass.draw').filter((draw) => draw[2] !== undefined);
+  assert.deepEqual(
+    layerDraws.map((draw) => draw.slice(1, 3)),
+    [[3, 5]],
+    'one instance per kept layer',
+  );
   oit.dispose();
   assert.equal(
     passes(frame(1)).some((p) => p.label?.startsWith('oit:')),
@@ -490,8 +502,8 @@ test('MomentOIT: BLEND primitives draw twice, into the moments and then shaded b
   assert.deepEqual(list[1].depthStencilAttachment, readOnly);
   assert.equal(
     draws(log),
-    7,
-    'opaque + transmission (tint, then lit), then two BLEND primitives in each of two passes',
+    6,
+    'opaque + one linear-composited native glass draw, then two BLEND primitives in each of two passes',
   );
   const formats = of(log, 'texture')
     .map((e) => e[2])
@@ -572,7 +584,7 @@ test('TransparentDepth redraws transparent surfaces, depth only, after the pass 
     depthStoreOp: 'store',
     stencilReadOnly: true,
   });
-  assert.equal(of(frame(1), 'beginRenderPass').length, list.length, 'steady frames keep the same passes');
+  assert.equal(passes(frame(1)).length, list.length, 'steady frames keep the same geometry and OIT passes');
   assert.equal(glass.velocity(model).shadowPrimitives.length, 3, 'two BLEND primitives and the glass');
   remove();
   assert.equal(

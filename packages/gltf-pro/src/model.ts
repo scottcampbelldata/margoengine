@@ -1,4 +1,5 @@
 import { packBaseTextures, type BaseTextureSource, type PackedBaseTextures } from './base-textures.js';
+import { acquireNativeGlass, nativeGlass, nativeGlassShader } from '../../materials/src/native-glass.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import { markedClipDistances } from '../../shared/section.js';
 import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
@@ -374,6 +375,7 @@ function steadyDerivation(
   for (let i = 0; i < list.length; i++) {
     const value = list[i];
     if (
+      !value.nativeGlass &&
       value.version === version &&
       value.complete &&
       value.shading === shading &&
@@ -1994,6 +1996,7 @@ function nodeVisible(engine: Engine, node: Mesh): boolean {
  * A glTF model attached to an engine as a plugin: its nodes, materials, variants, animation targets and picking data. Dispose it to release the GPU resources.
  */
 export class PBRModel implements EnginePlugin {
+  private releaseNativeGlass?: () => void;
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
   static beginOpaquePass(context: Context): void {
     opaquePasses.set(context, new Set());
@@ -2975,6 +2978,15 @@ export class PBRModel implements EnginePlugin {
     });
     models.segment.push(this);
     models.segments.set(this, models.segment);
+    // The capture's non-model passes run outside the model order. Register them after joining this model so merely
+    // owning native glass does not split an existing HDR model run or introduce extra MSAA stores/loads.
+    if (!this.releaseNativeGlass && this.materials.some((m) => m.tint))
+      this.releaseNativeGlass = acquireNativeGlass(
+        this.engine,
+        () =>
+          !this.transmission &&
+          this.primitives.some((p) => transmits(p.material) && !this.takesTransparent(p.material)),
+      );
     models.revision = graph.revision;
   }
   /**
@@ -3771,6 +3783,12 @@ export class PBRModel implements EnginePlugin {
         if (uniform || groups.view !== viewAt)
           frameBindings = copyGroup(c.device, pipeline, r, transmission, section, uniform ?? r.uniform.binding, viewAt);
         let target: GPURenderPassEncoder;
+        if (d.nativeGlass) {
+          pass?.end();
+          pass = undefined;
+          c.settle?.();
+          nativeGlass(c)!.copy(c);
+        }
         if (through || capture) target = shared ??= (through ? oit! : hook!).begin();
         else {
           // A blended primitive drawn on its own ends the pass around itself. A run's blended draws continue its pass:
@@ -4625,7 +4643,7 @@ export class PBRModel implements EnginePlugin {
       if (full) {
         const before = d.effect;
         d.effect = d.effectBindings
-          ? this.effectGroup(d, d.pipeline, c, scratch, shading, false, undefined)
+          ? this.effectGroup(d, d.pipeline, c, scratch, shading, false, undefined, d.nativeGlass)
           : undefined;
         d.tintEffect = tintGroup(d, d.tint, d.mappedTint, d.effect, c.device);
         if (!inst && (!d.group || d.effect !== before)) d.group = drawGroup(draws, d);
@@ -4751,6 +4769,13 @@ export class PBRModel implements EnginePlugin {
     if (m.shading?.texturedTint) code = texturedTintPBR(code);
     else if (!compact && transmits(m) && surfaceTint(m)) code = surfaceTintPBR(code);
     if (through && !transmission && this.transparency!.blends && m.tint) code = transparentTintPBR(code);
+    const native =
+      mode === 'beauty' &&
+      c.format !== 'rgba16float' &&
+      transmits(m) &&
+      m.renderState?.blend === undefined &&
+      !!nativeGlass(c);
+    if (native) code = nativeGlassShader(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);
       // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
@@ -4797,6 +4822,7 @@ export class PBRModel implements EnginePlugin {
       blend = m.settings[0] === 2 || transmit,
       kind = through && !transmission && this.transparency!.blends ? blendKind(m) : 0,
       tinted =
+        !native &&
         transmit &&
         (mode === 'beauty' || mode === 'ambient' || (kind === 3 && !compact && !this.transparency!.depthWrite)) &&
         state?.blend === undefined,
@@ -4889,7 +4915,7 @@ export class PBRModel implements EnginePlugin {
                       blend:
                         state?.blend !== undefined
                           ? (state.blend ?? undefined)
-                          : blend && mode !== 'gbuffer'
+                          : blend && mode !== 'gbuffer' && !native
                             ? {
                                 color: transmit
                                   ? { srcFactor: 'one', dstFactor: 'one' }
@@ -4974,10 +5000,10 @@ export class PBRModel implements EnginePlugin {
       }
     }
     if (scratch.compiling) return undefined!;
-    const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
+    const effectBindings = native || !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
     const effect =
       effectBindings && build
-        ? this.effectGroup(d, pipeline!, c, scratch, shading, lit && lighting, through ? oit : undefined)
+        ? this.effectGroup(d, pipeline!, c, scratch, shading, lit && lighting, through ? oit : undefined, native)
         : undefined;
     const tint = tinted && build ? draws.pipelines.get(key + ':tint')! : undefined,
       mappedTint = !!shading?.texturedTint || surfaceTint(m),
@@ -4986,6 +5012,7 @@ export class PBRModel implements EnginePlugin {
     const group =
       build && !inst ? (d?.group && d.pipeline === pipeline && d.effect === effect ? d.group : undefined) : undefined;
     const out: DrawDerivation = d ?? ({} as DrawDerivation);
+    out.nativeGlass = native;
     out.revision = revision;
     out.plain = plain;
     // The same conditions as keeping the pipeline (above): group 2 then holds only the shading hook's bindings. Read
@@ -5052,6 +5079,7 @@ export class PBRModel implements EnginePlugin {
     shading: PBRMaterialShading | undefined,
     lit: boolean,
     through: { bindings(): readonly GPUBindGroupEntry[] } | undefined,
+    native = false,
   ): DrawDerivation['effect'] {
     const entries = scratch.entries,
       effects = scratch.effects;
@@ -5069,6 +5097,7 @@ export class PBRModel implements EnginePlugin {
       for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
     }
     entries.length = entryCount;
+    if (native) entries.push(...nativeGlass(c)!.entries);
     let cached = d?.effect;
     let changed = !cached || d!.pipeline !== pipeline || entries.length !== cached.entries.length;
     for (let i = 0; !changed && i < entries.length; i++) {
@@ -5357,6 +5386,8 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     const cleanup = new Cleanup();
+    cleanup.run(() => this.releaseNativeGlass?.());
+    this.releaseNativeGlass = undefined;
     for (const node of this.created) {
       clearMeshSource(node);
       Reflect.deleteProperty(node, cpuSource);
