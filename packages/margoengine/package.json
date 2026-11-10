@@ -4425,6 +4425,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./lines/texture": {
+      "types": "./dist/lines/texture.d.ts",
+      "import": "./dist/lines/texture.js"
     }
   },
   "dependencies": {

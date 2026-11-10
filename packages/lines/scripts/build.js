@@ -27,6 +27,7 @@ await build({
         batch: resolve(root, 'src/batch.ts'),
         hidden: resolve(root, 'src/hidden.ts'),
         stroke: resolve(root, 'src/stroke.ts'),
+        texture: resolve(root, 'src/texture.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

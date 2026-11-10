@@ -577,3 +577,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/clustered | shapes: ShapeLights (sphere, disc, tube), setLights validation, MAX_SHAPE_LIGHTS, radianceFromPower and shapeLightArea, Clustered.shapes hook, no shadows | batch-52 job 3 |
 - @margoengine/react and margoengine: portals RenderTexture output/ref/onTexture, isolated Hud cameras, view ordering, physical target sizes and compatibility-device requirement.
+
+
+- @margoengine/lines (batch 227 job 2): document /texture image pixels/loading/cancellation, UV units, alpha, mipmaps, stroke composition and restoration; examples deferred.
+- margoengine (batch 227 job 2): document lines/stroke and lines/texture forwarding entries; examples deferred.

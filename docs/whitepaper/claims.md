@@ -3765,3 +3765,6 @@ The optional cluster layout groups screen-space neighbors and retains exact memb
 
 ### Batch 266 scene portals
 React RenderTexture draws child content to a native material texture; Hud stacks isolated child scenes with independent cameras. Evidence: packages/react/tests/portals.test.js and packages/react/scripts/test-portals-browser.mjs, whose texture and overlay captures use direct native rendering as the exact pixel oracle on both GPU paths. No speed claim.
+
+### Repeated textured strokes (batch 227 job 2)
+Optional textured lines map repeat continuously by world length, with alpha cutouts shared by colour, depth and picking; UV edits and restoration retain Stroke width/progress behavior. Proof: packages/lines/tests/texture.test.js and textured in packages/lines/tests/features-browser.js at 1x/4x samples on both backends. No other material-system or performance parity claim.

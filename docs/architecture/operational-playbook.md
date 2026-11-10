@@ -6163,3 +6163,7 @@ Graph source selection and normalized destination entry are CPU pose controls; G
 Clustering is optional CPU layout over the existing renderer projection; count bubbles are DOM overlays. Radius-graph components have independent all-pairs proof, 100k deterministic coincident-point coverage, renderer camera-zoom splitting and native WebGPU/WebGL2 DOM alignment checks. Core/stage and GPU shaders are unchanged.
 
 Batch 266 section 5 portal evidence: RenderTexture uses existing target-bearing native views before main rendering; Hud uses native Scene views with preserved colour and fresh depth. The new optional React entry adds no core/backend math. portals.test.js checks camera/scene ownership, resize and implicit-view deduplication; test-portals-browser.mjs compares texture, Hud and stacked Hud pixels with direct native calls on WebGPU and compatibility WebGL2.
+
+### Repeated stroke texture evidence (batch 227 job 2)
+Texture extensions append image/sampler/uniform bindings to the same line-owned layout for colour and picking. Shader sampling uses continuous explicit UV gradients before control-flow discard, preserving repeat seams and mip selection. GPU tests exercise colour/alpha picks, UV edits and restoration on WebGPU and compatibility at 1x/4x. Mips use the existing optional-package GPU generator. Core and stage remain unchanged.
+

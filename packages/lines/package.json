@@ -58,6 +58,10 @@
     "./stroke": {
       "types": "./dist/stroke.d.ts",
       "import": "./dist/stroke.js"
+    },
+    "./texture": {
+      "types": "./dist/texture.d.ts",
+      "import": "./dist/texture.js"
     }
   },
   "files": [

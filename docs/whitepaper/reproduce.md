@@ -3234,3 +3234,6 @@ Build packages, then node --test --test-timeout=120000 packages/labels/tests/clu
 
 ### Batch 266 scene portals
 Build packages, then node --test --test-timeout=60000 packages/react/tests/portals.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-portals-browser.mjs ; repeat with --compat appended. Texture, isolated overlay and stacked overlays must match direct native rendering pixel for pixel, with no errors and complete disposal.
+
+### Repeated line textures (batch 227 job 2)
+After build: node --test --test-timeout=120000 packages/lines/tests/texture.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js and repeat with --compat. Build before starting the browser so served dist changes cannot trigger a reload. The textured check exercises unequal segment lengths, image transparency and picks, UV edits, progress, mip/device restoration, and promise image decoding. Authored red/transparent pixels and a generated 1x1 image are synthetic correctness fixtures, not third-party demo assets.

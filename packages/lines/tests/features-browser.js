@@ -2,6 +2,7 @@
 import { Engine, box } from '@margoengine/core';
 import { Lines, Line, ArrowHelper, PlaneHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
+import { TexturedLine, LineTexture, loadLineTexture } from '@margoengine/lines/texture';
 import { Stroke } from '@margoengine/lines/stroke';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
@@ -520,9 +521,60 @@ async function stroke() {
   return 'Stroke per-point widths, arc-length reveal, dashes, depth, picking and device restore';
 }
 
+async function textured() {
+  const { lines, engine, frame, done } = await rig();
+  try {
+    // Each world unit repeats opaque red for half a tile and transparent for the other half.
+    const bytes = new Uint8Array(8 * 4);
+    for (let x = 0; x < 8; x++) bytes.set(x < 4 ? [255, 0, 0, 255] : [0, 0, 0, 0], x * 4);
+    const texture = new LineTexture(8, 1, bytes);
+    const line = lines.add(
+      new TexturedLine({ texture, positions: [-3, 0, 0, -2, 0, 0, 3, 0, 0], width: 16, cap: 'butt', depthWrite: true }),
+    );
+    let image = await frame();
+    const at = (x) => image.at(Math.round(pixel(x, 0, 0)[0]), 128);
+    assert(isRed(at(-2.75)) && !isRed(at(-2.25)), 'Repeated image has colour and alpha gaps');
+    assert(isRed(at(-1.75)) && !isRed(at(-1.25)), 'Repeat continues through unequal segments in world units');
+    const picker = Picking.attach(engine, { capture: false }),
+      picking = LinePicking.attach(picker, lines);
+    assert((await picker.pick(...pixel(-2.75, 0, 0)))?.line === line, 'Opaque texture picks');
+    assert((await picker.pick(...pixel(-2.25, 0, 0)))?.line !== line, 'Transparent texel does not pick');
+    line.offset[0] = 0.5;
+    image = await frame();
+    assert(!isRed(at(-2.75)) && isRed(at(-2.25)), 'Live offset moves the pattern');
+    line.offset[0] = 0;
+    line.progress = 0.25;
+    image = await frame();
+    assert(isRed(at(-2.75)) && !isRed(at(-0.75)), 'Texture composes with draw-on');
+    line.progress = 1;
+    line.repeat = 2;
+    image = await frame();
+    assert(isRed(at(-2.875)) && !isRed(at(-2.625)), 'Live repeat changes tile length');
+    await engine.rebootDevice?.();
+    image = await frame();
+    assert(isRed(at(-2.875)), 'Textured stroke restores its image and mip chain');
+    // Exercise the public promise loader with a browser-generated image, without network dependencies.
+    const canvas = new OffscreenCanvas(1, 1);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, 1, 1);
+    const blob = await canvas.convertToBlob(),
+      url = URL.createObjectURL(blob);
+    try {
+      assert((await loadLineTexture(url)).width === 1, 'Image loader decodes RGBA pixels');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    picking.dispose();
+  } finally {
+    done();
+  }
+  return 'Textured strokes: world-length repeat, alpha colour/depth/picks, live UV, draw-on, mip restore and image loading';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps, stroke])
+  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps, stroke, textured])
     checks.push(await check());
   return checks;
 };
