@@ -433,6 +433,19 @@ Only synthetic geometric inputs are proven; authored mesh placement and spectral
 Every public number should come from one of the commands below. Run them from the repository root on the commit you
 want to check. Status of each claim and which command backs it: [claims.md](claims.md).
 
+## Engine size comparison
+
+The rival engines are installed and measured in a folder outside this repository; no rival code or scene file is ever copied in.
+
+1. Make a folder next to the repository (for example `engine-bench/size-compare`). Run `npm init -y` there and install the exact versions: `three@0.187.0`, `@babylonjs/core@9.35.0`, `playcanvas@2.24.0`, `claygl@1.3.0`, `hilo3d@1.19.1`, `@galacean/engine@1.6.13`, `filament@1.53.4`, `vite@8.3.4`, and pin `rolldown` to 1.2.13 with an npm `overrides` entry.
+2. For each engine write two entries by hand from its public documentation: (a) a renderer, scene, perspective camera, one lit box, one directional light and a render loop; (b) a re-export of everything the package's main entry exports. Margo's entries are `import { createStage } from 'margoengine'; const stage = await createStage('#app'); stage.box({ color: '#84d6bd' });` and `export * from 'margoengine'`.
+3. Bundle each entry with the same build call as `scripts/measure-size.js`: vite `build()` with `configFile: false`, `publicDir: false`, `write: false`, `build.minify: true`, `build.target: 'es2022'`, `build.lib: { entry, formats: ['es'] }`, and `rollupOptions.output` set to `{ minify: { compress: { dropDebugger: true }, mangle: true, codegen: true }, comments: { annotation: true } }`. Rival rows have no externals. Margo rows use the external list in `scripts/measure-size.js` with `@margoengine/core` and the stage bundled.
+4. Join every emitted chunk (static and `import()` chunks) with a newline, gzip it with `zlib.gzipSync` at the default level, and add emitted assets (Wasm) gzipped. The startup figure is the chunks reachable without `import()`.
+5. For Margo run `npm run build:packages` and `npm run measure:size` in the repository first; the comparison reads `packages/stage/dist/index.js` and `packages/margoengine/dist/index.js` from that checkout.
+6. The WebGL2 fallback size comes from `bundleBytes` in `scripts/measure-size.js` on `packages/webgl2-compat/dist/index.js` and `dist/preview.js`, gzipped.
+
+Results of 2026-11-10 and the sizes of every row are in `docs/whitepaper/claims.md`, "Smallest core".
+
 ## Setup (once)
 
 ```sh

@@ -592,12 +592,49 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 23,626 B gzip (58,443 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `f8d15ee8b`, which lags; `npm run measure:size` printed 23,626 B and 58,443 B with the core speed changes of 2026-11-07) | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 24,209 B gzip (59,802 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `f8d15ee8b`, which lags; `npm run measure:size` printed 23,626 B and 58,443 B with the core speed changes of 2026-11-07) | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
 | Relocated (2026-10-29). | - | - | - | relocated |
 | Speed compared with three.js | nowhere | No claim is made. See below. | - | no claim |
+
+## Smallest core (measured 2026-11-10)
+
+Claim: Margo has the smallest core of the measured engines that ship PBR, lights and a scene graph. It is not a claim about every 3D engine.
+
+Inclusion rule: only engines that ship PBR materials, light objects and a scene graph are compared. Thin WebGL wrappers and helper libraries are not in the table.
+
+Sizes are gzip bytes of the bundled, minified output of each engine, installed from npm and used as a black box with the entry its documentation shows. Row (a) is a minimal lit scene: renderer, scene, perspective camera, one lit box, one directional light, a render loop. Row (b) is everything the package's main entry exports.
+
+| Engine | Version | (a) minimal lit-box scene, gzip B | (b) whole package, gzip B | WebGPU / WebGL2 | PBR | Lights |
+| --- | --- | --- | --- | --- | --- | --- |
+| Margo (`createStage` + box) | 1.0.0, main at 7c2d18a60 | 24,130 | 24,204 | WebGPU / fallback is a separate package | yes | yes |
+| ClayGL | 1.3.0 | 81,424 | 113,711 | no / yes (WebGL1 and 2) | yes | yes |
+| Hilo3d | 1.19.1 | 112,039 | 111,842 | no / yes (WebGL1 and 2) | yes | yes |
+| three.js, WebGLRenderer | 0.187.0 | 130,100 | 186,538 | no / yes | yes | yes |
+| three.js, WebGPURenderer | 0.187.0 | 218,343 | 301,596 | yes / yes | yes | yes |
+| Galacean | 1.6.13 | 289,754 | 289,751 | no / yes | yes | yes |
+| PlayCanvas (`AppBase`, 3 component systems) | 2.24.0 | 290,840 | 734,363 | yes / yes | yes | yes |
+| Babylon.js, Engine (WebGL) | 9.35.0 | 427,200 (startup 292,163) | 1,838,354 | no / yes | yes | yes |
+| Babylon.js, WebGPUEngine | 9.35.0 | 497,381 (startup 355,304) | same as above | yes / no | yes | yes |
+| Filament | 1.53.4 | not measured | 35,982 JS + 1,969,736 Wasm | yes / yes | yes | yes |
+
+Margo against the next smallest in row (a): 3.4 times smaller than ClayGL, 5.4 times smaller than three.js WebGLRenderer, 9.0 times smaller than three.js WebGPURenderer.
+
+Margo's own figures on main: `npm run measure:size` prints 24,209 B gzip (59,802 B raw) for core + stage, the number in the README. The comparison script bundles the same stage entry with its own copy of the build call and prints 24,204 B (5 B less, from its separate install), 24,130 B for row (a) and 24,204 B for row (b).
+
+Stated differences:
+
+- Margo's figure is WebGPU only. The WebGL2 fallback is the separate optional `@margoengine/webgl2-compat`, which WebGPU users never download. Its full layer is 106,729 B gzip and its small preview entry is 3,533 B gzip (`bundleBytes` from `scripts/measure-size.js`, bare imports left out). Core + stage + the full layer is about 130,900 B gzip added together, an upper bound because the packages share some code. three.js WebGPURenderer, PlayCanvas and Filament carry their WebGL2 path inside their figures.
+- Margo's row includes camera controls (the stage's CAD camera controls) and the Wasm kernel, inlined and counted. The rival rows have no controls.
+- No row includes shadows.
+- Babylon.js loads shaders through `import()`. Every lazy chunk is counted, as Margo's script counts every chunk; the startup-only (static) figure is given in brackets. luma.gl is not in the table because it ships no PBR material, light objects or scene graph.
+- Filament has no row (a): a minimal scene needs a material compiled with Filament's `matc` tool, and the npm package ships none. Its row (b) is the JavaScript plus the Wasm, which loads at startup.
+- Galacean and Hilo3d do not tree-shake, so their row (a) equals row (b), or nearly so.
+- The bundler version matters at this scale. The comparison pins rolldown 1.2.13, the version the lock file uses with vite 8.3.4; rolldown 1.2.18 gave Margo 97 B more on an earlier build.
+
+Reproduce: `docs/whitepaper/reproduce.md`, section "Engine size comparison".
 
 ## Whitepapers
 
