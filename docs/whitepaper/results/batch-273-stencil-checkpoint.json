@@ -1,5 +1,5 @@
 {
-  "scope": "Failure 10 stencil reference repair; gates pending",
+  "scope": "Failure 10 repaired; original pre-push acceptance passed",
   "base": "a105c063f",
   "corePlusStageGzip": 23950,
   "sourceSizes": {
@@ -82,8 +82,38 @@
     }
   },
   "readmeInitial": "12/13; new snippet lacked pass setup; replaced with a complete executable example",
-  "gates": "Pending final verify and corrected README runner",
-  "openSuites": "23/26; 5, 6, 10 repaired after final acceptance",
+  "gates": {
+    "verify": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1013.4,
+      "tests": 14170,
+      "pass": 14170,
+      "fail": 0,
+      "skipped": 0
+    },
+    "lint": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.7
+    },
+    "hygiene": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 12.9
+    },
+    "readme": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 12.3
+    },
+    "readmeExamples": 14
+  },
+  "openSuites": "23/26; 5, 6 and 10 closed after landing",
   "research": "docs/clean-room.md#batch-273-compatibility-failure-10-stencil-reference-repair",
   "sizeCeilings": "unchanged",
   "speed": "No speed runs or claims"

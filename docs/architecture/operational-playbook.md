@@ -5163,3 +5163,10 @@ at 4x and 1x. No assertion or tolerance changed. Native evidence and remaining
 gates are recorded in whitepaper/results/batch-273-stencil-checkpoint.json.
 This closes only failure 10 once the checkpoint gates land; other failures remain
 open. No speed claim, core/stage runtime or public export change.
+
+Stencil checkpoint acceptance: the one complete verify invocation passes all
+14,170 repository unit tests, zero failures or skips, and every chain. Lint,
+hygiene, all 160 compat units, 199 materials units, both full 616-check GPU grids
+and 14 executable README examples pass. Historical failed README setup and
+negative regression receipts remain retained. Core/stage is 23,950 B after the
+upstream unit-light repair; no core/stage runtime edit belongs to this fix.
