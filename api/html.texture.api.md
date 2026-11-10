@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { FrameGraph } from "@margoengine/core/extension";
+import { Engine, FrameGraph } from "@margoengine/core/extension";
 
 export class HTMLSurface {
     readonly element: HTMLElement;
@@ -46,6 +46,9 @@ export type HTMLSurfaceRasterizer = 'element-image' | 'foreign-object';
 export class HTMLTexture {
     readonly name: string;
     readonly rasterizer: HTMLSurfaceRasterizer;
+    protected runtime?: Engine;
+    protected readonly surfaces: Set<HTMLSurface>;
+    protected readonly preview: boolean;
     constructor(options?: {
         name?: string;
         rasterizer?: HTMLSurfaceRasterizer;
@@ -60,6 +63,8 @@ export class HTMLTexture {
     setup(instance: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     worldMatrix(surface: HTMLSurface): Float32Array;
+    protected refresh(surface: HTMLSurface): void;
+    protected upload(surface: HTMLSurface, source: HTMLCanvasElement, width: number, height: number): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

@@ -1362,6 +1362,10 @@
       "types": "./dist/html/texture.d.ts",
       "import": "./dist/html/texture.js"
     },
+    "./html/texture-gl": {
+      "types": "./dist/html/texture-gl.d.ts",
+      "import": "./dist/html/texture-gl.js"
+    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"

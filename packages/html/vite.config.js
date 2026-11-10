@@ -14,6 +14,7 @@ export default defineConfig({
       { find: /^@margoengine\/labels$/, replacement: resolve(repository, 'packages/labels/dist/index.js') },
       { find: /^@margoengine\/webgl2-compat\/preview$/, replacement: resolve(repository, 'packages/webgl2-compat/dist/preview.js') },
       { find: /^@margoengine\/html\/texture$/, replacement: resolve(root, 'dist/texture.js') },
+      { find: /^@margoengine\/html\/texture-gl$/, replacement: resolve(root, 'dist/texture-gl.js') },
       { find: /^@margoengine\/html$/, replacement: resolve(root, 'dist/index.js') },
     ],
   },

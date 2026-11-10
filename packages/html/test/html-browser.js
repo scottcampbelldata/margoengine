@@ -1,6 +1,7 @@
 import { Engine, PbrMaterial, box as cube } from '@margoengine/core';
 import { HTML } from '@margoengine/html';
 import { HTMLTexture } from '@margoengine/html/texture';
+import { HTMLTextureGL } from '@margoengine/html/texture-gl';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
 const assert = (condition, message) => {
@@ -125,18 +126,19 @@ const project = (engine, [x, y, z]) => {
   return [(m[0] * x + m[4] * y + m[8] * z + m[12]) / w, (m[1] * x + m[5] * y + m[9] * z + m[13]) / w];
 };
 const near = (pixel, expected, tolerance = 12) => expected.every((v, i) => Math.abs(pixel[i] - v) <= tolerance);
-async function textureScenario(rasterizer) {
+async function textureScenario(rasterizer, backend = 'webgpu', Texture = HTMLTexture) {
   const checks = [],
     measurements = {};
   const canvas = freshCanvas(),
     engine = await Engine.create(canvas, {
-      backend: 'webgpu',
+      backend,
+      fallback: webglRenderer,
       camera: { position: [0, 0, 6], target: [0, 0, 0], near: 0.1, far: 100 },
     });
   const gpuErrors = [],
     device = engine.gpu;
-  device.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
-  device.pushErrorScope('validation');
+  device?.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+  device?.pushErrorScope('validation');
   const panel = document.createElement('div'),
     button = document.createElement('button');
   panel.style.cssText = 'position:relative;width:200px;height:100px;margin:0;background:rgb(0,160,255)';
@@ -146,7 +148,7 @@ async function textureScenario(rasterizer) {
   let presses = 0;
   button.addEventListener('pointerdown', () => presses++);
   panel.appendChild(button);
-  const textures = HTMLTexture.attach(engine, { rasterizer });
+  const textures = Texture.attach(engine, { rasterizer });
   const surface = textures.add(panel, { width: 2, height: 1, pixelRatio: 1 });
   engine
     .createMesh()
@@ -216,7 +218,7 @@ async function textureScenario(rasterizer) {
   // fixed-wait: a set number of idle frames is the check itself (no redraw in 10 frames), not a wait for readiness
   for (let i = 0; i < 10; i++) {
     engine.render();
-    await device.queue.onSubmittedWorkDone();
+    await device?.queue.onSubmittedWorkDone();
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
   measurements.idleDraws = surface.draws - settled;
@@ -227,10 +229,11 @@ async function textureScenario(rasterizer) {
   checks.push(`webgpu: ${rasterizer} draws the texture again after the element changes, and not while it does not`);
   textures.dispose();
   assert(!panel.isConnected, `texture (${rasterizer}): dispose leaves the element in the page`);
-  const error = await device.popErrorScope();
+  const error = await device?.popErrorScope();
   if (error) gpuErrors.push(error.message);
   engine.render();
-  await device.queue.onSubmittedWorkDone();
+  await device?.queue.onSubmittedWorkDone();
+  if (backend === 'webgl2') assert(canvas.getContext('webgl2').getError() === 0, 'HTMLTextureGL leaves a GL error');
   assert(gpuErrors.length === 0, `WebGPU validation errors: ${gpuErrors.join('; ')}`);
   engine.dispose();
   return { checks, measurements };
@@ -244,12 +247,17 @@ window.runHTMLTests = async () => {
   if ('drawElementImage' in CanvasRenderingContext2D.prototype) rasterizers.push('element-image');
   const textures = [];
   for (const rasterizer of rasterizers) textures.push(await textureScenario(rasterizer));
+  const previewTextures = [];
+  for (const rasterizer of rasterizers) previewTextures.push(await textureScenario(rasterizer, 'webgl2', HTMLTextureGL));
+  const portableTexture = await textureScenario('foreign-object', 'webgpu', HTMLTextureGL);
   return {
-    checks: [...webgpu.checks, ...webgl2.checks, ...textures.flatMap((t) => t.checks)],
+    checks: [...webgpu.checks, ...webgl2.checks, ...textures.flatMap((t) => t.checks),
+      ...previewTextures.flatMap((t) => t.checks.map((c) => c.replace('webgpu:', 'preview:'))), ...portableTexture.checks],
     measurements: {
       webgpu: webgpu.measurements,
       webgl2: webgl2.measurements,
       texture: Object.fromEntries(rasterizers.map((r, i) => [r, textures[i].measurements])),
+      previewTexture: previewTextures.map((t) => t.measurements),
     },
   };
 };

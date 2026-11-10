@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12375345,
+  "total": 12381839,
   "history": [
     {
       "date": "2026-10-24",
@@ -5628,6 +5628,12 @@
       "commit": "8b5e85718",
       "reason": "Batch 255 job 1: @margoengine/materials/serialization: absent to 37667 B gzip, ceiling 38798 B; @margoengine/save/materials: absent to 205 B gzip, ceiling 461 B; @margoengine/shader/serialization: absent to 19296 B gzip, ceiling 19875 B. Owner codecs retain every built-in mesh kind, feature attachment state, compiled node stages and shared typed buffers. Serialization explicitly uses the material/glTF owner APIs, accounting for six new static reachability rows. Keeping one complete optional codec entry avoids adapter registration/import complexity or duplicated private material/shader logic. Core plus stage unchanged at 23950 B.",
       "grew": 9
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-260",
+      "reason": "HTML texture preview: coherent optional GL pass with shared rasterization and state restoration; no artificial split",
+      "grew": 1
     }
   ],
   "items": {
@@ -6700,6 +6706,7 @@
     "leak @margoengine/save/materials -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/shader/serialization -> @margoengine/materials": 1,
     "leak @margoengine/shader/serialization -> @margoengine/gltf-pro/model": 1,
-    "leak @margoengine/shader/serialization -> @margoengine/materials/serialization": 1
+    "leak @margoengine/shader/serialization -> @margoengine/materials/serialization": 1,
+    "@margoengine/html/texture-gl": 6494
   }
 }

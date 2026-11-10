@@ -29,6 +29,10 @@
     "./texture": {
       "types": "./dist/texture.d.ts",
       "import": "./dist/texture.js"
+    },
+    "./texture-gl": {
+      "types": "./dist/texture-gl.d.ts",
+      "import": "./dist/texture-gl.js"
     }
   },
   "files": [

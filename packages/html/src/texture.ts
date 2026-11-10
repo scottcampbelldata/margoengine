@@ -255,8 +255,10 @@ export class HTMLTexture {
   readonly name: string;
   /** How elements are drawn: the HTML-in-canvas API where the browser has it, else an SVG `foreignObject` image. */
   readonly rasterizer: HTMLSurfaceRasterizer;
-  private runtime?: Engine;
-  private readonly surfaces = new Set<HTMLSurface>();
+  protected runtime?: Engine;
+  protected readonly surfaces = new Set<HTMLSurface>();
+  /** Optional backends opt in without adding their code to this entry. */
+  protected readonly preview: boolean = false;
   private pipelines = new Map<string, GPURenderPipeline>();
   private sampler?: GPUSampler;
   private disposed = false;
@@ -303,7 +305,7 @@ export class HTMLTexture {
   setup(instance: EngineKernel): void {
     if (this.disposed) throw margoError('disposed', 'HTMLTexture is disposed; create a new one');
     const engine = engineRuntime(instance);
-    if (!engine.gpu)
+    if (!engine.gpu && !this.preview)
       throw margoError(
         'unsupported',
         'HTMLTexture requires WebGPU, not the WebGL2 fallback; create the engine where WebGPU is available; see https://margoengine.com/errors#webgpu',
@@ -392,7 +394,7 @@ export class HTMLTexture {
     }
     return pipeline;
   }
-  private refresh(device: GPUDevice, surface: HTMLSurface): void {
+  protected refresh(surface: HTMLSurface): void {
     if (!surface.dirty || surface.busy) return;
     surface.dirty = false;
     surface.busy = true;
@@ -402,19 +404,7 @@ export class HTMLTexture {
     this.rasterize(surface, cssWidth, cssHeight, width, height)
       .then((source) => {
         if (this.disposed || !this.surfaces.has(surface)) return;
-        if (!surface.texture || surface.texture.width !== width || surface.texture.height !== height) {
-          surface.texture?.destroy();
-          surface.texture = device.createTexture({
-            size: [width, height],
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-          });
-          surface.group = undefined;
-        }
-        device.queue.copyExternalImageToTexture({ source }, { texture: surface.texture, premultipliedAlpha: true }, [
-          width,
-          height,
-        ]);
+        this.upload(surface, source, width, height);
         surface.draws++;
       })
       .catch((error: unknown) => {
@@ -426,6 +416,20 @@ export class HTMLTexture {
       .finally(() => {
         surface.busy = false;
       });
+  }
+  /** Upload hook for optional renderer entries; the rasterizer and interaction stay shared. */
+  protected upload(surface: HTMLSurface, source: HTMLCanvasElement, width: number, height: number): void {
+    const device = this.runtime!.gpu!;
+    if (!surface.texture || surface.texture.width !== width || surface.texture.height !== height) {
+      surface.texture?.destroy();
+      surface.texture = device.createTexture({
+        size: [width, height],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      surface.group = undefined;
+    }
+    device.queue.copyExternalImageToTexture({ source }, { texture: surface.texture, premultipliedAlpha: true }, [width, height]);
   }
   private async rasterize(
     surface: HTMLSurface,
@@ -481,7 +485,7 @@ export class HTMLTexture {
     this.sampler ??= c.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
     let pass: GPURenderPassEncoder | undefined;
     for (const surface of this.surfaces) {
-      this.refresh(c.device, surface);
+      this.refresh(surface);
       if (!surface.texture) continue;
       surface.uniform ??= c.device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       surface.group ??= c.device.createBindGroup({

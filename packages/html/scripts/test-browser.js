@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -23,6 +24,8 @@ try {
     args,
   });
   const page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(120000);
+  if (compatRun()) await page.addInitScript(compatShim, compatUrl());
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -37,7 +40,7 @@ try {
   const report = await page.evaluate(() => window.runHTMLTests());
   report.browser = browser.version();
   assert.deepEqual(errors, []);
-  await writeFile(resolve(results, 'html-browser.json'), JSON.stringify(report, null, 2));
+  await writeFile(resolve(results, compatRun() ? 'html-browser-compat.json' : 'html-browser.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
   await closeAll({ browser, servers: [server] });
