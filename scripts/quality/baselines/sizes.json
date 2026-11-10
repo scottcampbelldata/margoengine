@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13352050,
+  "total": 13360437,
   "history": [
     {
       "date": "2026-10-24",
@@ -6816,6 +6816,12 @@
       "date": "2026-11-10",
       "commit": "batch-216-job-2",
       "reason": "optional cinematic/ortho 0 to 2877 B; brain 3089 to 3161 B gzip; retain full world-height blend state in its owning optional brain, with shared orthographic screen-space maths. Splitting would complicate live and interrupted blends. Core plus stage unchanged at 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "099353d5f",
+      "reason": "Batch 266 new optional React effects helpers: 0 to 8131 B gzip, ceiling 8387 B. Native points, lines and geometry remain lazy peers; no core/stage growth.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8056,6 +8062,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/cinematic/ortho": 3133
+    "@margoengine/cinematic/ortho": 3133,
+    "@margoengine/react/effects-extra": 8387
   }
 }

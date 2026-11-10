@@ -37,7 +37,8 @@
     "test:browser:performance": "node scripts/test-performance-browser.mjs",
     "test:browser:textures": "node scripts/test-textures-browser.mjs",
     "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs",
-    "test:browser:portals": "node scripts/test-portals-browser.mjs"
+    "test:browser:portals": "node scripts/test-portals-browser.mjs",
+    "test:browser:effects-extra": "node scripts/test-effects-extra-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -225,6 +226,11 @@
       "types": "./dist/portals.d.ts",
       "react-server": "./dist/rsc/portals.js",
       "import": "./dist/portals.js"
+    },
+    "./effects-extra": {
+      "types": "./dist/effects-extra.d.ts",
+      "react-server": "./dist/rsc/effects-extra.js",
+      "import": "./dist/effects-extra.js"
     }
   },
   "files": [

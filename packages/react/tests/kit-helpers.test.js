@@ -68,7 +68,7 @@ class Node {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement, Engine: {}, Mesh: Node, PbrMaterial: Material, box: () => ({}) },
+    assertCore, coreRequirement, meshRuntime: mesh => mesh, Engine: {}, Mesh: Node, PbrMaterial: Material, box: () => ({}) },
 });
 mock.module('@margoengine/geometry', {
   namedExports: {

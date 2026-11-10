@@ -2858,6 +2858,10 @@
       "types": "./dist/react/portals.d.ts",
       "import": "./dist/react/portals.js"
     },
+    "./react/effects-extra": {
+      "types": "./dist/react/effects-extra.d.ts",
+      "import": "./dist/react/effects-extra.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

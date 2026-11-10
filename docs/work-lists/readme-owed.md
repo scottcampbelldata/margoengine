@@ -636,3 +636,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - cinematic: document ortho camera height, existing rigStage follow, framing/group stages, projection output, size blends, zones and mixed-mode endpoints (batch 216 job 2).
 - margoengine: document cinematic/ortho alias (batch 216 job 2).
+- @margoengine/react and margoengine: effects-extra Stars/Sparkles attributes and seed, native Trail options and explicit target=null manual mode, Edges threshold, Decal projector/material maps and parent-space coordinates.
