@@ -6,7 +6,8 @@ struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec
 @group(${group}) @binding(5) var<storage,read> clusterLights:array<ClusterLight>;
 `;
 // Clustered shading (Olsson, Billeter & Assarsson 2012): exponential depth slices, sphere-AABB and cone-sphere culling.
-// The 1024 indices per cell is Margo's cap.
+// The 1024 indices per cell is Margo's cap; culling stops at it, so a cell reached by more lights (maxLights above 1,024)
+// never writes into the next cell's list.
 export const cullingShader =
   declarations(0) +
   /* wgsl */ `
@@ -36,7 +37,7 @@ export const cullingShader =
       let cosine=light.directionOuter.w;let sine=sqrt(max(0.0,1-cosine*cosine));
       if(axial+radius<0||radial*cosine-axial*sine>radius){continue;}
     }
-    clusterIndices[id*1024u+count]=j;count++;
+    if(count>=1024u){break;}clusterIndices[id*1024u+count]=j;count++;
   }
   clusterCounts[id]=count;
 }`;

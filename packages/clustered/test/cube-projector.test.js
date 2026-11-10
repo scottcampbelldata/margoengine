@@ -53,3 +53,20 @@ test('cubes supplied before attachment respect the eventual device storage limit
  assert.equal(lights.projector,undefined);
  cookies.dispose();lights.dispose();
 });
+
+test('spot images removed while cube cookies keep the hook are cleared on the GPU too (R5)',async()=>{
+ // A spot's image was left in binding 143 when setProjectors([]) ran while a cube kept the shared hook: the upload pass
+ // ran only while spot images existed, so the GPU still projected the old image onto the spot.
+ const {wgsl}=await import('../../core/src/shaders.ts');
+ const h=optionalGPU(),lights=new Clustered({grid:[1,1,1]});h.engine.use(lights);
+ lights.setLights([{position:[0,3,0],range:10,direction:[0,-1,0],outerAngle:0.6},{position:[4,3,0],range:10}]);
+ const cookies=CubeProjectorLights.attach(h.engine,{lights});
+ const frame=()=>{h.context.shader=wgsl;h.context.bindings.length=0;h.engine.frameGraph.execute(h.context);};
+ cookies.setProjectors([{width:1,height:1,data:new Uint8Array([0,255,0,255])}]);cookies.setCubes([null,cube()]);frame();
+ const gpu=()=>new Uint32Array(cookies.bindings().find(b=>b.binding===143).resource.buffer.data);
+ assert.deepEqual([gpu()[0],gpu()[1]],[1,1],'spot image uploaded');
+ cookies.setProjectors([]);frame();
+ assert.equal(lights.projector,cookies,'the cube keeps the hook');
+ assert.deepEqual([gpu()[0],gpu()[1]],[0,0],'no spot entries or images left on the GPU');
+ cookies.dispose();lights.dispose();
+});

@@ -240,7 +240,9 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
       name: this.name,
       order: -3.5,
       execute: (c) => {
-        if (c.backend !== 'webgpu' || !this.buffer || !this.dirty || !this.active) return;
+        // `enabled`, not `active`: a subclass (CubeProjectorLights) keeps the hook with no spot images, and the emptied
+        // spot list must still reach the GPU, or the old image stays projected onto its spot.
+        if (c.backend !== 'webgpu' || !this.buffer || !this.dirty || !this.enabled) return;
         c.device.queue.writeBuffer(this.buffer, 0, this.words as Uint32Array<ArrayBuffer>);
         this.dirty = false;
       },

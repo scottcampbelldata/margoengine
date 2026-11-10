@@ -3,7 +3,7 @@
 // --baseline records the shadow-off scenes (images, lit shader text, probe radiance) with the build in dist; a later run
 // requires them to be identical. That proof is for a change, against the build from before it, so with no baseline on disk
 // the run says so and goes on. It always checks the shadowed scenes against analytic occlusion. Each backend keeps its own
-// baseline (baseline.json on WebGPU, baseline-compat.json on the WebGL2 layer): the two rasterize and round differently,
+// baseline (baseline.json and its images on WebGPU, baseline-compat.json and -compat images on the WebGL2 layer): the two rasterize and round differently,
 // so a WebGPU record compared with a --compat run failed every shadow-off scene by a few hundred bytes.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -36,7 +36,7 @@ try {
     if (!ok) failures.push(`${name}: ${JSON.stringify(detail)}`);
   }
   async function capture(label) {
-    const file = `${folder}/${baseline ? 'baseline-' : ''}${label}.png`;
+    const file = `${folder}/${baseline ? 'baseline-' : ''}${label}${compatRun() ? '-compat' : ''}.png`;
     await page.locator('canvas').screenshot({ path: file });
     return file;
   }
@@ -490,6 +490,16 @@ try {
       'raised caps: light 1,400 and area light 80 light the origin, and only they do',
       pointOnly > 0 && areaOnly > 0 && Math.abs(both - pointOnly - areaOnly) <= 1e-4 * both && none < 1e-6,
       { both, pointOnly, areaOnly, none },
+    );
+    // A cluster lists at most 1,024 lights (the documented cap): 1,100 identical lamps over the origin light it exactly
+    // 1,024 times as much as one. Without the cap in the culling shader the cluster wrote 1,100 indices into its 1,024
+    // slots and the next cluster's, and the probe shaded 1,100.
+    const one = await lit({ maxLights: 1100, points: [lamp] }),
+      crowd = await lit({ maxLights: 1100, points: Array.from({ length: 1100 }, () => lamp) });
+    check(
+      'a cluster reached by 1,100 lights shades the 1,024 it lists',
+      one > 0 && Math.abs(crowd / one - 1024) <= 1024 * 1e-4,
+      { one, crowd, ratio: crowd / one },
     );
   }
   check('no page errors', pageErrors.length === 0, { pageErrors });
