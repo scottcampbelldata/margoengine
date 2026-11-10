@@ -40,12 +40,20 @@ export function snapshot(model) {
   };
 }
 
-/** Node has no GPU and no image decoder: PBRModel setup is a no-op and createImageBitmap returns the encoded bytes. */
+/**
+ * Node has no GPU and no image decoder: PBRModel setup is a no-op and createImageBitmap returns the encoded bytes.
+ * On an engine without a device the real setup refuses before any pass is registered, so registerPasses is skipped
+ * there too; otherwise GPU-only helpers it acquires (the native glass capture) refuse the device-less engine.
+ */
 export async function headlessModels(run) {
   const setup = PBRModel.prototype.setup,
+    registerPasses = PBRModel.prototype.registerPasses,
     bitmap = globalThis.createImageBitmap,
     canvas = globalThis.OffscreenCanvas;
   PBRModel.prototype.setup = () => {};
+  PBRModel.prototype.registerPasses = function (...args) {
+    if (this.engine.gpu) return registerPasses.apply(this, args);
+  };
   globalThis.createImageBitmap = async (source, options) =>
     source instanceof Blob
       ? {
@@ -60,6 +68,7 @@ export async function headlessModels(run) {
     return await run();
   } finally {
     PBRModel.prototype.setup = setup;
+    PBRModel.prototype.registerPasses = registerPasses;
     globalThis.createImageBitmap = bitmap;
     globalThis.OffscreenCanvas = canvas;
   }
