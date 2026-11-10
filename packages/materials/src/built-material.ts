@@ -2,7 +2,7 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { compatTier } from '../../shared/compat.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine } from '@margoengine/core/extension';
+import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import {
   GLTFAsset,
   PBRModel,
@@ -3758,7 +3758,7 @@ function queue(runtime: Engine): MaterialDraws {
     for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
     return true;
   };
-  runtime.use({
+  const plugin: EnginePlugin = {
     name,
     setup(engine) {
       requireWebGPU(engine, 'Material draw queue');
@@ -3826,7 +3826,8 @@ function queue(runtime: Engine): MaterialDraws {
         },
       });
     },
-  });
+  };
+  runtime.use(plugin);
   draws = {
     add(entry) {
       members.push(entry);
@@ -3836,6 +3837,11 @@ function queue(runtime: Engine): MaterialDraws {
       const index = members.indexOf(entry);
       if (index >= 0) members.splice(index, 1);
       arranged = false;
+      // The scene's last material mesh is gone: the queue and its pass leave with it; the next mesh makes a new one.
+      if (!members.length) {
+        queues.delete(graph);
+        runtime.sceneOf(plugin)?.removePlugin(name);
+      }
     },
     reorder() {
       arranged = false;
