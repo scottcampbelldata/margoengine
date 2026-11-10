@@ -5580,3 +5580,12 @@ Fixed with a regression in `packages/gltf/test/audit-132.test.js` (fails on the 
 (accessor.ts:42 before the fix) threw "Invalid glTF bufferView; the file is not valid glTF 2.0". A mesh whose NORMAL
 accessor had no bufferView failed to load. It now reads as zeros; a sparse accessor without a view is still refused
 as unsupported by the light loader.
+
+## Batch 132 audit: oit (fixed and open)
+
+- Fixed: `TransparentPass.dispose` (packages/oit/src/pass.ts:137, so `OIT`, `ExactOIT`, `PeelOIT`, `PreciseOIT`,
+  `MomentOIT`) and `TransparentDepth.dispose` (depth.ts:180) called `engine.removePlugin(this.name)`, which acts on the
+  active scene. Input: `engine.createScene('other').use(new OIT()); oit.dispose()`. Wrong output: the pass stayed in
+  `other.plugins` and `engine.sceneOf(oit)` still returned `other`. Regression packages/oit/test/audit-132.test.js.
+- Open: packages/oit/test/gpu exact-check, vfx-check and real-check fail under MARGO_COMPAT=1 with the coded refusal
+  "ExactOIT needs storage buffers in fragment shaders" (by design of the WebGL2 layer); they have no compat branch.

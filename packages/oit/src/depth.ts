@@ -177,7 +177,7 @@ export class TransparentDepth implements EnginePlugin, PBRTransparency {
     this.models.clear();
     retire(this.device!, this.uniform);
     this.uniform = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -134,7 +134,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
     this.disposed = true;
     for (const release of [...this.models.values(), ...this.effects.values()]) release();
     this.freeDevice();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
