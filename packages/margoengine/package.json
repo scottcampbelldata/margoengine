@@ -2950,6 +2950,10 @@
       "types": "./dist/scatter/imposter.d.ts",
       "import": "./dist/scatter/imposter.js"
     },
+    "./scatter/textured": {
+      "types": "./dist/scatter/textured.d.ts",
+      "import": "./dist/scatter/textured.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

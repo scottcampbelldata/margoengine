@@ -2220,6 +2220,7 @@ regressions cover lifecycle, orientation, phases and occlusion at 1x/4x sampling
 It uses the same optional backdrop on native WebGPU and full WebGL2 compatibility;
 core and stage are unchanged. It makes no calibrated lunar photometry claim.
 
+Batch 231 textured scatter reuses gltf-pro PBR instancing and its MASK depth casters rather than adding a renderer. Native WebGPU and full WebGL2 compatibility compare two real licensed Khronos plants to independent model copies, byte-identical at 1x/4x MSAA, with normal/mask/shadow controls and device restoration. CPU coverage includes affine conjugation with non-dyadic node scales, nested instances, tint/UV retention and disposal. Core/stage and their GPU math are unchanged.
 
 Batch 246 job 3: tilemap/plane composes the active core camera with a map-pixel affine basis and loads/stores the existing reversed-Z scene depth. It adds no core or stage path. Independent all-pixel ray-plane proofs cover perspective, camera movement, ordinary mesh occlusion, alpha holes and distinct view cameras on WebGPU and WebGL2 compatibility. CPU tests validate matrix order, mutation and depth controls. No speed or picking evidence is claimed.
 

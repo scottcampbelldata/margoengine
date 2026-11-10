@@ -4527,3 +4527,8 @@ Batch 266 input helpers: alias-release and modifier-change regressions are cover
 Batch 266 gate finding: gpu-package-tests plan rejects unregistered browser support files in headless, webgl2-compat and worker before React selection. Cause: global loose-browser discovery precedes --only filtering. React registered scripts run directly under shared locks for this job; owning lanes retain planner registration work.
 
 Batch 266 fixed: PresentationControls tested only the root mesh, so local dragging a React group never started. The owning controls entry now tests live descendants, excluding detached or unrelated meshes; controls/tests/presentation.test.js and the local-drag browser fixture cover the cause.
+### Batch 231 textured scatter
+
+Fixed during construction: general 4x4 conjugation can round an affine last-row 1 off unity for non-dyadic node scales. The attachment restores the mathematically exact affine last row before passing it to PBRInstances; textured.test.js retains a non-dyadic scaled-node regression. No open textured-scatter defect remains.
+
+Build-phase tooling gap: node scripts/gpu-package-tests.mjs --no-build --only=scatter --list refuses before selection because headless/tests/gif-gpu.mjs, headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs are not registered by that global plan. Cause: global discovery validates unrelated browser files before applying --only. Batch 231 runs every scatter browser script directly on both backends under the shared GPU lock; owning lanes can register the unrelated files.

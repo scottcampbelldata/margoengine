@@ -45,6 +45,10 @@
     "./imposter": {
       "types": "./dist/imposter.d.ts",
       "import": "./dist/imposter.js"
+    },
+    "./textured": {
+      "types": "./dist/textured.d.ts",
+      "import": "./dist/textured.js"
     }
   },
   "files": [
@@ -57,10 +61,14 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/lod": "^1.0.0"
+    "@margoengine/lod": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/lod": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
       "optional": true
     }
   },
@@ -80,6 +88,7 @@
     "test:browser:variation": "cd ../.. && node packages/scatter/test/variation.browser.mjs",
     "test:browser:interact": "cd ../.. && node packages/scatter/test/interact.browser.mjs",
     "test:browser:imposter": "cd ../.. && node packages/scatter/test/imposter.browser.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:textured": "cd ../.. && node packages/scatter/test/textured.browser.mjs"
   }
 }

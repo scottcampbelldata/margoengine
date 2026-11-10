@@ -73,7 +73,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./autorig` 3, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10, `./vrm0` 10, `./mtoon` 5 | 77 |  | 7,631 |
 | @margoengine/road | `.` 3, `./junctions` 4, `./banking` 2, `./terrain` 3, `./repair` 2, `./markings` 3, `./graph` 3, `./intersections` 3, `./lanes` 6, `./geojson` 6, `./structures` 7 | 8 |  | 1,723 |
 | @margoengine/save | `.` 42, `./node` 1, `./engine` 9, `./slots` 9, `./remote` 6, `./safe` 5, `./opfs` 2, `./signed` 2, `./scene-state` 6, `./materials` 5 | 38 |  | 6,728 |
-| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3, `./pick` 7, `./interact` 5, `./imposter` 3 | 30 |  | 19,135 |
+| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3, `./pick` 7, `./interact` 5, `./imposter` 3, `./textured` 1 | 30 |  | 19,135 |
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2, `./graph` 14, `./clone` 2, `./tags` 11 | 6 |  | 1,718 |
 | @margoengine/scenery | `.` 2, `./sky` 2, `./presets` 10, `./scenes` 6, `./stars` 4, `./aurora` 6, `./moon` 5 | 9 |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./formats` 18, `./geo` 12, `./graph` 8, `./grids` 15, `./maths` 37, `./nrrd` 10, `./fallback` 3, `./webgl2` 2, `./flow` 13, `./lic` 4, `./tubes` 8, `./netcdf` 8, `./vtk` 7, `./derive` 7, `./atmosphere` 5, `./pipeline` 8, `./contour` 7, `./clip` 12, `./calc` 7, `./probe` 16 | 729 | 1 | 50,599 |

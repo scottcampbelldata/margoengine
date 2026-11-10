@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13201691,
+  "total": 13203410,
   "history": [
     {
       "date": "2026-10-24",
@@ -6642,6 +6642,12 @@
       "commit": "batch-205-job3",
       "reason": "Optional legacy entry absent to 6394 B gzip (6650 ceiling); FBX classic worker 98163 to 100787 B (100703 to 103811 ceiling) for name-based 6.x objects, geometry, skins, morphs and mixed scalar Takes keys. Reusing the existing layers evaluator and parser avoids a second importer and worker protocol. Core plus stage 24209 B unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-231",
+      "reason": "scatter/textured new optional whole-model plant instancing entry: 0 to 1463 B gzip, ceiling 1719 B. Conjugated placements preserve node and embedded instance transforms while reusing gltf-pro textures, normals and MASK colour/shadow passes. Splitting this small attachment would add wiring without saving its consumers bytes; core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7865,6 +7871,7 @@
     "@margoengine/culling/sort": 14464,
     "@margoengine/react/controls-extra": 4412,
     "@margoengine/fbx/legacy": 6650,
-    "margoengine/fbx/legacy": 314
+    "margoengine/fbx/legacy": 314,
+    "@margoengine/scatter/textured": 1719
   }
 }

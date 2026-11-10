@@ -560,3 +560,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: react/controls-extra umbrella alias and native SpringOptions naming.
 - @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants.
 - @margoengine/fbx (batch 205 job 3): document legacyFBX opt-in 6.x ASCII/binary, legacy Takes/skin/morph/material semantics, worker composition and supported interpolation/budgets.
+- @margoengine/scatter and margoengine: document /textured TexturedScatter whole-model placements, glTF normal/base MASK materials, shadows.add(scatter.model), embedded instances, node-pose capture, updates, limits and disposal.
