@@ -1280,3 +1280,11 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz, batch 176 job 4: document /amr block snapshots/masks, AMReX/Enzo/FLASH readers, direct k-d volume, slices, contours and level outlines with defaults and cancellation.
 - margoengine, batch 176 job 4: document the generated /sciviz/amr alias.
 - @margoengine/viz, batch 176 job 4: document the generated /sciviz/amr install-profile alias.
+
+
+
+
+- @margoengine/sciviz (batch 175 job 3): document /aggregate glyph coordinate columns, exact binary64 reductions, missing/category/order semantics, separate shading/spreading, figure refresh/hover/cancellation, resource limits and the honest repeated-observation 100M proof; examples wait for the README phase.
+
+- margoengine (batch 175 job 3): document the generated optional sciviz/aggregate alias in the README phase.
+- @margoengine/viz (batch 175 job 3): document the generated sciviz/aggregate optional alias after the build phase.

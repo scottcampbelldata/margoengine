@@ -3639,6 +3639,10 @@
       "types": "./dist/sciviz/amr.d.ts",
       "import": "./dist/sciviz/amr.js"
     },
+    "./sciviz/aggregate": {
+      "types": "./dist/sciviz/aggregate.d.ts",
+      "import": "./dist/sciviz/aggregate.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

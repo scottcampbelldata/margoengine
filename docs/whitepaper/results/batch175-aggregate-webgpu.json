@@ -1,0 +1,83 @@
+{
+  "compat": false,
+  "originalTaxiRows": 4096,
+  "originalGBIFRows": 600,
+  "dispatches": 15,
+  "bufferInventory": [
+    {
+      "glyph": "points",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "lines",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "areas",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "triangles",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "quads",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    }
+  ],
+  "large": {
+    "rows": 100000000,
+    "uniqueObservations": 4096,
+    "inputBytes": 2400000000,
+    "work": {
+      "rows": 100000000,
+      "primitives": 100000000,
+      "contributions": 100000000,
+      "rowBinTests": 1600000000,
+      "dispatches": 1526,
+      "peakStagingBytes": 8442384,
+      "outputBytes": 17920
+    },
+    "counts": [
+      0,
+      219726,
+      48828,
+      2978513,
+      12109367,
+      28076186,
+      268554,
+      0,
+      976562,
+      52026367,
+      3076171,
+      0,
+      0,
+      219726,
+      0,
+      0
+    ],
+    "sums": [
+      0,
+      308837100,
+      53710800,
+      13442344736,
+      14698473100,
+      33044453350,
+      679319550,
+      0,
+      1345215350,
+      57364495750,
+      9163815400,
+      0,
+      0,
+      290526600,
+      0,
+      0
+    ]
+  }
+}

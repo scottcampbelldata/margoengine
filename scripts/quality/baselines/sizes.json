@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15284049,
+  "total": 15313068,
   "history": [
     {
       "date": "2026-10-24",
@@ -7886,6 +7886,12 @@
       "commit": "401c2e032",
       "reason": "AMR optional entry: new 0 to 30067 B gzip, ceiling 30374 B. Native AMReX/Enzo/FLASH readers, HDF5, exact masks, k-d ray casting and analysis form one coherent entry; splitting adds mandatory companion wiring and fragments resource lifetime. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-175-job3",
+      "grew": 1,
+      "reason": "New optional sciviz/aggregate: 0 to 28201 B gzip, ceiling 29019 B. It measured 27207 B before full incoming colour maps; exact physical-bound classification and overflow-safe hover/shading also preserve binary64 decisions. Five glyphs, all reductions and coherent trace ownership justify these optional bytes; splitting would fragment coverage and lifecycle. Core plus stage remains 24209 B."
     }
   ],
   "items": {
@@ -9306,6 +9312,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/aggregate": 29019
   }
 }

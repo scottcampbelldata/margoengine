@@ -4443,3 +4443,9 @@ Proof: scripts/kit-install-check.mjs installs only packed manifests through a re
 
 ### Batch 176 AMR: block ownership and direct rendering
 Claim: sciviz/amr selects the finest valid Cartesian block, masks covered coarse cells, slices original cells and extracts contours across a shared lattice. Direct volume rays traverse a disjoint k-d partition rather than a dense finest-level resample. Proof: packages/sciviz/tests/amr.test.js checks exact Nyx bytes/masks against yt, analytic ray/slice conservation and cross-level contours. packages/sciviz/tests/amr-browser.mjs renders the licensed real AMReX timestep on WebGPU and WebGL2 compatibility, including density/MIP/clipping/restoration. This is a correctness claim; interpolation, format and sample limits are in limits.md, and no performance parity claim is made.
+
+
+
+
+## Batch 175 job 3: exact table raster bins
+The optional aggregate entry rasterises every primitive row for points, segments, areas, triangles and quads on WebGPU or the WebGL2 compatibility GPU, computes count/sum/mean/min/max/first/last and category counts, and has an exact CPU reference. Binary64 superaccumulators preserve cancellation and chunk/order independence; shading and spreading leave original hover statistics unchanged. Proof: packages/sciviz/tests/aggregate.test.js and aggregate-browser.mjs; retained results: results/batch175-aggregate-webgpu.json and results/batch175-aggregate-webgl2.json. WebGL2 records 15 GPU dispatches and zero CPU compute dispatches for five glyphs. WebGPU processes 100000000 physical rows, repeating 4096 original TLC observations; every count and numeric reduction matches an independent original-coordinate/integer-cent oracle. No claim of 100M distinct trips, wall-clock performance, vertex interpolation or fractional coverage. Contract and research: ../sciviz-aggregate.md.

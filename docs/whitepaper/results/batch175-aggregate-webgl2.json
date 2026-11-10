@@ -1,0 +1,38 @@
+{
+  "compat": true,
+  "originalTaxiRows": 4096,
+  "originalGBIFRows": 600,
+  "dispatches": 15,
+  "bufferInventory": [
+    {
+      "glyph": "points",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "lines",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "areas",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "triangles",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    },
+    {
+      "glyph": "quads",
+      "gpuBufferPeak": 36288,
+      "logicalStagingBound": 54544
+    }
+  ],
+  "routes": {
+    "fragment": 0,
+    "scatter": 15,
+    "cpu": 0
+  }
+}

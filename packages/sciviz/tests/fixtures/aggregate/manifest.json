@@ -1,0 +1,29 @@
+{
+  "accessed": "2026-11-10",
+  "sources": [
+    {
+      "file": "tlc-pickups.json",
+      "url": "https://data.cityofnewyork.us/resource/2yzn-sicd.json?%24select=pickup_longitude%2Cpickup_latitude%2Cfare_amount%2Cpayment_type&%24where=pickup_latitude+between+40.6+and+40.9+AND+pickup_longitude+between+-74.1+and+-73.7&%24limit=4096",
+      "rows": 4096,
+      "license": "NYC Open Data terms, public data",
+      "owner": "New York City Taxi and Limousine Commission",
+      "sha256": "6e561f804b9ae5ff4e7b1ee4e5a933203e4304976ff1ec51c21d5ad2bf0be57d"
+    },
+    {
+      "file": "gbif-CC0_1_0.json",
+      "url": "https://api.gbif.org/v1/occurrence/search?hasCoordinate=true&hasGeospatialIssue=false&license=CC0_1_0&limit=300",
+      "rows": 300,
+      "license": "CC0_1_0",
+      "owner": "GBIF-mediated datasets; retained row datasetKey, rightsHolder and recordedBy attribution",
+      "sha256": "95040f4cadf21fa6ea663c38d1ab357c9e7c50d626650483042d48ab788ab0fa"
+    },
+    {
+      "file": "gbif-CC_BY_4_0.json",
+      "url": "https://api.gbif.org/v1/occurrence/search?hasCoordinate=true&hasGeospatialIssue=false&license=CC_BY_4_0&limit=300",
+      "rows": 300,
+      "license": "CC_BY_4_0",
+      "owner": "GBIF-mediated datasets; retained row datasetKey, rightsHolder and recordedBy attribution",
+      "sha256": "f281daa63097602d0476f10350eca7c8513afa794881645f802c46c843292c75"
+    }
+  ]
+}

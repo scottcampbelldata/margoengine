@@ -1,6 +1,6 @@
 {
   "commit": "d4145eda4",
-  "dirty": false,
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59802,
@@ -3714,6 +3714,10 @@
       "./export-media": {
         "raw": 16774,
         "gzip": 6994
+      },
+      "./aggregate": {
+        "raw": 65116,
+        "gzip": 28201
       }
     },
     "@margoengine/selection": {

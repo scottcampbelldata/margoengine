@@ -283,6 +283,10 @@
     "./amr": {
       "types": "./dist/amr.d.ts",
       "import": "./dist/amr.js"
+    },
+    "./aggregate": {
+      "types": "./dist/aggregate.d.ts",
+      "import": "./dist/aggregate.js"
     }
   },
   "files": [
@@ -346,6 +350,7 @@
     "test:browser:pick-gpu": "node scripts/browser-root.mjs tests/pick-gpu-browser.mjs",
     "test:browser:annotate": "node scripts/browser-root.mjs tests/annotate-browser.mjs",
     "test:browser:provenance": "node scripts/browser-root.mjs tests/provenance-browser.mjs",
-    "test:browser:amr": "node scripts/browser-root.mjs tests/amr-browser.mjs"
+    "test:browser:amr": "node scripts/browser-root.mjs tests/amr-browser.mjs",
+    "test:browser:aggregate": "node scripts/browser-root.mjs tests/aggregate-browser.mjs"
   }
 }

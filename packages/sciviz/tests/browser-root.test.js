@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+
+test('the multi-demo GPU suite requests an available port so parallel lanes never wait on its fixed port', () => {
+  const source = readFileSync(new URL('demos-browser.mjs', import.meta.url), 'utf8');
+  assert.match(source, /openBrowser\(\{[^}]*\bport:\s*['"]free['"]/);
+});
 test('browser package commands serve the repository while resolving the package test entry', () => {
   const packageRoot = fileURLToPath(new URL('..', import.meta.url));
   const root = fileURLToPath(new URL('../../..', import.meta.url));

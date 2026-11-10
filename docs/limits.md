@@ -6255,3 +6255,11 @@ Masked slices preserve the original cell values and native resolution. Contours 
 AMR optional entry size: new entry, 0 to 30,067 B gzip; ceiling 30,374 B. The bytes include native solver readers, HDF5 parsing, masks, k-d integration and analysis helpers. Splitting these into mandatory companion entries would complicate one coherent AMR API and its loading contract. Core plus stage remains 24,209 B.
 
 AMR scalar transfer lookup also accepts the shared log/symmetric-log, binned and under/over colour encodings, using unfilterable float textures and explicit lookup. Below-range negative samples remain eligible for MIP; missing NaNs are skipped rather than confused with a numeric sentinel.
+
+
+
+
+### Batch 175 job 3: exact aggregation
+Optional sciviz/aggregate defaults to 256x256 bins, edges 1..4096, at most 1048576 bins and 16777216 bin/category cells. Partial GPU storage is bins*(280+categories)*4 B and must fit maxStorageBufferBindingSize. Chunk rows default to 32768, maximum 65536, with at most 8388608 row/bin tests per dispatch. Finite binary64 values retain all bits; sums and means round once, ties to even. Geometry uses projected f32 coordinates; point bin ownership is corrected at f32 boundaries. Mesh values are cell values, polygons use even/odd pixel-centre coverage and segments use pixel-box intersection. Fractional antialiasing and vertex interpolation are outside this contract. Exhaustive work is O(rows*bins); no throughput claim. The 100M physical-row WebGPU check repeats 4096 original TLC observations, uses 2400000000 B input arrays, 8442384 B peak staging, 17920 B partial output, 1526 dispatches and 1600000000 row/bin tests. All 100M rows contribute. Details and evidence: docs/sciviz-aggregate.md.
+
+Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, ceiling 29019 B. Exact full-range binary64 accumulators, five glyphs, all reductions and one coherent figure/shading lifecycle justify the bytes. Splitting would fragment table/trace ownership. Core + stage remains 24209 B.

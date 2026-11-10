@@ -64,7 +64,7 @@ async function monitor(path) {
 }
 
 async function run(compat) {
-  const context = await openBrowser({ startPath: '/packages/sciviz/tests/sciviz.html', port: 5267, compat });
+  const context = await openBrowser({ startPath: '/packages/sciviz/tests/sciviz.html', port: 'free', compat });
   const { page, hardware } = context;
   // Deterministic deadline expiry: preserve real timers, but retain each timeout's controller in this test page.
   await page.addInitScript(() => {
