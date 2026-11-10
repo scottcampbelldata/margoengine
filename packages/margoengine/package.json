@@ -3587,6 +3587,10 @@
       "types": "./dist/sciviz/monitor.d.ts",
       "import": "./dist/sciviz/monitor.js"
     },
+    "./sciviz/geo-time": {
+      "types": "./dist/sciviz/geo-time.d.ts",
+      "import": "./dist/sciviz/geo-time.js"
+    },
     "./sciviz/geo-vector": {
       "types": "./dist/sciviz/geo-vector.d.ts",
       "import": "./dist/sciviz/geo-vector.js"

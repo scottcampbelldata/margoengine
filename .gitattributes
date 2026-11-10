@@ -91,3 +91,5 @@ packages/decoders/tests/fixtures/tiff-scientific/** -text
 examples/assets/sciviz/pointcloud/*.laz -text
 examples/assets/sciviz/geo-vector/*.geojson text eol=lf
 examples/assets/sciviz/geo-vector/*.json text eol=lf
+examples/assets/sciviz/geo-time/*.json text eol=lf
+packages/sciviz/tests/fixtures/sgp4-vallado.json text eol=lf

@@ -1,6 +1,7 @@
 # Known bugs and unverified features
 
 - Batch 234 outside-scope finding at 2ed6fd460: `node --test tests/modern-extension-suite.test.js` fails three inventory assertions because tracked `packages/stage/test/gpu/viewer-extras-check.mjs` is not named by stage's GPU scripts or the planner. Cause: missing stage test registration, not water. Rule 21 leaves the stage-owner repair for the fix phase; all water leaves are registered and pass both backends.
+Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 
 

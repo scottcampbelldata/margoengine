@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15174277,
+  "total": 15215333,
   "history": [
     {
       "date": "2026-10-24",
@@ -7858,6 +7858,11 @@
       "commit": "batch-234-underwater",
       "reason": "Underwater source gzip 6888 to 9219 B; installed entry 9274 B, ceiling 7161 to 9553 B. Exact underside Fresnel, TIR and Snell transmission, robust pixel-grid depth-plane traces and current opaque snapshots complete the optional entry. A split duplicates source capture ownership. Core plus stage 24209 B unchanged; no speed claim.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "reason": "Batch 180 job 3: geo-time new 0 -> 39860 B gzip, ceiling 41056 B. Full clean-room SGP4 including deep space, trajectory sampling/playback and WMTS time frame lifecycle justify one optional entry. Sharing geo-vector/geo-lod rendering avoids duplicate GPU state; splitting would add loading and lifecycle coordination. Core + stage unchanged 24209 B. Final main colour-scale integration changed the shared rendering closure from 38901 to 39860 B; keep those colours and raise the optional ceiling instead of duplicating or splitting rendering state.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9270,6 +9275,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/geo-time": 41056
   }
 }

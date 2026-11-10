@@ -1254,3 +1254,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (review 3 SV3): document getClassification snapshot ownership and bindTransfer restoration of previous custom gradient/preintegrated tables on disposal or abort; examples deferred.
 - @margoengine/compute (batch 132 audit): runnable example for the new Dense decompositions section (`@margoengine/compute/decomp`).
+- @margoengine/sciviz (batch 180 job 3): document geo-time tracks/keyframes, units, trails/fadeSteps, Timeline, SGP4/TLE/OMM/TEME and satelliteTrack, WMTS time source/raster selection, cache limits, cancellation and retained restore. Build phase: examples owed.

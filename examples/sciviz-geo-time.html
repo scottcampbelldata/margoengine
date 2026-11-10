@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Time-dynamic geography | Margo Engine</title>
+<style>body{margin:0;background:#101820;color:#ecf3f7;font:15px system-ui}main{max-width:1100px;margin:24px auto;padding:0 20px}h1{font-size:28px}label{display:inline-flex;gap:12px;align-items:center}select{font:inherit;padding:6px;background:#1b2b38;color:inherit}canvas{width:100%;height:600px;display:block}#view{position:relative;margin-top:18px}p{line-height:1.5;color:#a8c2d1}</style></head>
+<body><main><h1>Geography through time</h1><label>Dataset <select id="dataset"><option value="ais">NOAA AIS: New York harbour</option><option value="iss">CelesTrak: ISS ground track</option><option value="raster">NASA MODIS: WMTS daily imagery</option></select></label>
+<p id="status" role="status">Loading...</p><div id="view"><canvas id="map" width="1000" height="600" aria-label="Time-dynamic map"></canvas></div>
+<p id="credit">NOAA / BOEM / US Coast Guard observations. CelesTrak / Dr. T. S. Kelso / USSF orbital elements. NASA EOSDIS GIBS / MODIS Terra imagery. Historical data for visualization.</p>
+</main><script type="module" src="/examples/sciviz-geo-time.ts"></script></body></html>

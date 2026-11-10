@@ -232,6 +232,10 @@
       "types": "./dist/monitor.d.ts",
       "import": "./dist/monitor.js"
     },
+    "./geo-time": {
+      "types": "./dist/geo-time.d.ts",
+      "import": "./dist/geo-time.js"
+    },
     "./geo-vector": {
       "types": "./dist/geo-vector.d.ts",
       "import": "./dist/geo-vector.js"
@@ -320,6 +324,7 @@
     "test:browser:chart-polish": "node scripts/browser-root.mjs tests/chart-polish-browser.mjs",
     "test:browser:parcoords": "node scripts/browser-root.mjs tests/parcoords-browser.mjs",
     "test:browser:monitor": "node scripts/browser-root.mjs tests/monitor-browser.mjs",
+    "test:browser:geo-time": "node scripts/browser-root.mjs tests/geo-time-browser.mjs",
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",
     "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json",
     "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs",
