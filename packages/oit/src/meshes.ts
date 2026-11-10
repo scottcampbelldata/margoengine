@@ -1,6 +1,8 @@
-import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { EngineKernel, Mesh, Scene } from '@margoengine/core';
 import { Material, createMesh } from '@margoengine/materials';
 import type { TransparentPass } from './pass.js';
+
+let copies = 0;
 
 /** `addMesh` settings. */
 export interface OITMeshOptions {
@@ -33,18 +35,26 @@ export function addMesh(
       normals[i * 3 + k] = geometry.vertices[i * 6 + 3 + k];
     }
   const data = mesh.material.data,
-    copy = createMesh(
-      engine,
-      { positions, normals, indices: geometry.indices },
-      new Material({
-        color: [data[0], data[1], data[2]],
-        roughness: data[4],
-        metalness: data[5],
-        doubleSided: !!data[6],
-        opacity,
-        transparent: true,
-      }),
-    );
+    material = new Material({
+      color: [data[0], data[1], data[2]],
+      roughness: data[4],
+      metalness: data[5],
+      doubleSided: !!data[6],
+      opacity,
+      transparent: true,
+    }),
+    // The copy, and the draw queue materials makes for it, join the scene of the mesh they follow: core makes meshes
+    // and plugins in the active scene, and a plugin's setup runs with its scene active (a parent must share the scene).
+    scene = (mesh as Mesh & { scene?: Scene }).scene ?? engine.scene,
+    name = `oit-mesh-copy:${++copies}`;
+  let copy!: ReturnType<typeof createMesh<Material>>;
+  scene.use({
+    name,
+    setup() {
+      copy = createMesh(engine, { positions, normals, indices: geometry.indices }, material);
+    },
+  });
+  scene.removePlugin(name);
   copy.root.setParent(mesh as never);
   const remove = oit.add(copy);
   // Not `visible = false`: hiding a mesh hides what is parented to it.
