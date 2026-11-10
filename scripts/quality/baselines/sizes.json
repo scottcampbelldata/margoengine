@@ -7607,6 +7607,11 @@
       "commit": "batch-177-job4",
       "reason": "Optional chart polish/categorical entries and small Figure integration for axis chrome, mappings and native rectangles. Size evidence {\"@margoengine/sciviz\":{\"beforeCeiling\":56635,\"after\":56161},\"@margoengine/sciviz/format\":{\"beforeCeiling\":0,\"after\":7306},\"@margoengine/sciviz/categorical\":{\"beforeCeiling\":0,\"after\":21719}}. Core + stage unchanged 24209 B. Keeping complete controller/data layouts avoids splitting and duplicated SVG helpers.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch173-job6",
+      "reason": "Batch 173 job 6: optional sciviz/tetvolume absent to 6322 B min+gzip, ceiling 6578 B. Direct barycentric ray casting, validated reciprocal adjacency, stackless spatial entry/re-entry, point/cell fields, shared classification/depth, bounded physical metrics and CPU replay form one coherent optional owner. Splitting would duplicate topology and GPU lifecycle. Core + stage remains 24209 B."
     }
   ],
   "items": {
@@ -8992,7 +8997,8 @@
     "@margoengine/sciviz/xdmf": 19832,
     "@margoengine/sciviz/pointcloud": 21685,
     "@margoengine/sciviz/format": 7562,
-    "@margoengine/sciviz/categorical": 22371
+    "@margoengine/sciviz/categorical": 22371,
+    "@margoengine/sciviz/tetvolume": 6578
   },
-  "total": 14479417
+  "total": 14485995
 }

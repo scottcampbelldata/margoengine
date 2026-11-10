@@ -1126,3 +1126,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/worker: document the API conventions lifecycle repair, attachment ownership and disposal.
 
 - @margoengine/sciviz: retain the common browser-root launcher for the engineering and pointcloud fixtures when documenting package test commands.
+- @margoengine/sciviz: document /tetvolume, conforming VTK tetrahedra, opposite-vertex adjacency, point/cell scalars, referenceStep and unit scaling, shared source controls, clipping/depth, immutable masks, lifecycle, accuracy and the declared NASA 2D extension.
+- margoengine: document the generated /sciviz/tetvolume alias in the scientific-volume section.

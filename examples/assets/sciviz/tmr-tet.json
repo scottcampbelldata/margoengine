@@ -1,0 +1,29 @@
+{
+  "title": "NASA TMR CFL3D SA flat-plate eddy viscosity",
+  "source": "https://www.nasa.gov/wp-content/uploads/2025/11/mut-contours-cfl3d-dat.zip",
+  "reference": "https://tmbwg.github.io/turbmodels/flatplate_sa.html",
+  "license": "US Federal Government public-domain NASA data; modified demo, no endorsement.",
+  "originalSHA256": "757bff104c35aa8c1f1bfe89a23919dfe5a604a6bd45131eb12e31d1ea030de5",
+  "nodes": 2146,
+  "cells": 6048,
+  "dimensions": [
+    29,
+    37,
+    2
+  ],
+  "hashes": {
+    "points": {
+      "bytes": 25752,
+      "sha256": "0e9c484b0132434aaba0b8a97bc85b1d43abbb09cddbc223f084570d4d790ab5"
+    },
+    "values": {
+      "bytes": 8584,
+      "sha256": "2246100cd851ac13ec68b72e5f4073e74e335dc2352dfb2628e18524d9473616"
+    },
+    "cells": {
+      "bytes": 96768,
+      "sha256": "f52dd325249017846a7ccdc18b06c9fc92303ce0cd6f77920c3799078ec003d9"
+    }
+  },
+  "processing": "Original cell-centre solution samples treated as reconstruction nodes. X stride 16 downstream of X=0, height stride 8 through row 288, last X column retained. Height exaggerated 12x and a span-invariant field extruded from -0.25 to 0.25. Six conforming tetrahedra per sampled quad prism; scalar values unchanged. This is a 2D solution extruded for display, not a 3D CFD computation."
+}

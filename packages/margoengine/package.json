@@ -3531,6 +3531,10 @@
       "types": "./dist/sciviz/categorical.d.ts",
       "import": "./dist/sciviz/categorical.js"
     },
+    "./sciviz/tetvolume": {
+      "types": "./dist/sciviz/tetvolume.d.ts",
+      "import": "./dist/sciviz/tetvolume.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
