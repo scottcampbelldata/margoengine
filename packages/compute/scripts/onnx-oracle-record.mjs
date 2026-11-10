@@ -20,12 +20,19 @@ for (const c of cases) {
   const ref = oracle.results.find((r) => r.id === c.id);
   if (!ref) throw new Error(`Missing oracle result: ${c.id}`);
   if (ref.error) {
-    if (!['Det-0', 'Binarizer-0'].includes(c.id) || !ref.error.includes('NOT_IMPLEMENTED'))
+    const deprecatedTree =
+      c.domain === 'ai.onnx.ml' &&
+      c.version === 5 &&
+      ['TreeEnsembleClassifier', 'TreeEnsembleRegressor'].includes(c.op) &&
+      ref.error.includes('deprecated');
+    if (!deprecatedTree && (!['Det-0', 'Binarizer-0'].includes(c.id) || !ref.error.includes('NOT_IMPLEMENTED')))
       throw new Error(`${c.id}: ${ref.error}`);
     output.unavailable.push({
       id: c.id,
       reason: ref.error,
-      proof: 'Analytic regression in tests/onnx-operators.test.js',
+      proof: deprecatedTree
+        ? 'Analytic regression in tests/onnx-ml.test.js and onnx-ml-cases.js'
+        : 'Analytic regression in tests/onnx-operators.test.js',
     });
   } else output.cases.push({ ...c, expected: ref.expected });
 }

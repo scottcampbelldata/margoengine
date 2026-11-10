@@ -143,5 +143,230 @@ for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
       ],
       op === 'LinearClassifier' ? 2 : 1,
     );
+// Follow-up original analytic models, compared only through the external public inference API.
+const ta = (name, kind, values) =>
+  p.message(p.field(1, name), p.field(20, 4), p.field(5, p.tensor('', kind, [values.length], values)));
+const tn = (comparison = 'BRANCH_LEQ') => [
+  p.intsAttr('nodes_treeids', [0, 0, 0]),
+  p.intsAttr('nodes_nodeids', [0, 1, 2]),
+  p.intsAttr('nodes_featureids', [0, 0, 0]),
+  p.stringsAttr('nodes_modes', [comparison, 'LEAF', 'LEAF']),
+  p.floatsAttr('nodes_values', [0, 0, 0]),
+  p.intsAttr('nodes_truenodeids', [1, 0, 0]),
+  p.intsAttr('nodes_falsenodeids', [2, 0, 0]),
+];
+for (const version of [1, 3, 5])
+  for (const comparison of ['BRANCH_LEQ', 'BRANCH_LT', 'BRANCH_GTE', 'BRANCH_GT', 'BRANCH_EQ', 'BRANCH_NEQ'])
+    add(
+      'TreeEnsembleRegressor',
+      [f([-1, 0, 1], [3, 1])],
+      [
+        ...tn(comparison),
+        p.attr('n_targets', 1),
+        p.intsAttr('target_treeids', [0, 0]),
+        p.intsAttr('target_nodeids', [1, 2]),
+        p.intsAttr('target_ids', [0, 0]),
+        p.floatsAttr('target_weights', [2, 7]),
+      ],
+      1,
+      version,
+      'ai.onnx.ml',
+    );
+for (const aggregate of ['AVERAGE', 'SUM', 'MIN', 'MAX'])
+  for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
+    add(
+      'TreeEnsembleRegressor',
+      [f([0], [1, 1])],
+      [
+        p.intsAttr('nodes_treeids', [0, 1]),
+        p.intsAttr('nodes_nodeids', [0, 0]),
+        p.intsAttr('nodes_featureids', [0, 0]),
+        p.stringsAttr('nodes_modes', ['LEAF', 'LEAF']),
+        p.floatsAttr('nodes_values', [0, 0]),
+        p.intsAttr('nodes_truenodeids', [0, 0]),
+        p.intsAttr('nodes_falsenodeids', [0, 0]),
+        p.attr('n_targets', 2),
+        p.attr('aggregate_function', aggregate),
+        p.attr('post_transform', post),
+        p.intsAttr('target_treeids', [0, 0, 1, 1]),
+        p.intsAttr('target_nodeids', [0, 0, 0, 0]),
+        p.intsAttr('target_ids', [0, 1, 0, 1]),
+        p.floatsAttr('target_weights', [2, 4, -5, 2]),
+        p.floatsAttr('base_values', [0.25, -0.5]),
+      ],
+      1,
+      3,
+      'ai.onnx.ml',
+    );
+for (const version of [1, 3, 5])
+  for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
+    add(
+      'TreeEnsembleClassifier',
+      [f([-1, 0, 1], [3, 1])],
+      [
+        ...tn(),
+        p.intsAttr('class_treeids', [0, 0, 0, 0]),
+        p.intsAttr('class_nodeids', [1, 1, 2, 2]),
+        p.intsAttr('class_ids', [0, 1, 0, 1]),
+        p.floatsAttr('class_weights', [0.75, 0.25, 0.125, 0.875]),
+        p.stringsAttr('classlabels_strings', ['west', 'east']),
+        p.attr('post_transform', post),
+      ],
+      2,
+      version,
+      'ai.onnx.ml',
+    );
+for (const weights of [
+  [0.2, 0.7],
+  [-2, 3],
+])
+  for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
+    add(
+      'TreeEnsembleClassifier',
+      [f([-1, 0, 1], [3, 1])],
+      [
+        ...tn(),
+        p.intsAttr('class_treeids', [0, 0]),
+        p.intsAttr('class_nodeids', [1, 2]),
+        p.intsAttr('class_ids', [0, 0]),
+        p.floatsAttr('class_weights', weights),
+        p.intsAttr('classlabels_int64s', [10, 20]),
+        p.attr('post_transform', post),
+      ],
+      2,
+      3,
+      'ai.onnx.ml',
+    );
+for (const kind of [1, 11])
+  for (const ag of [0, 1, 2, 3])
+    for (const branch of [0, 1, 2, 3, 4, 5, 6]) {
+      const Type = kind === 1 ? Float32Array : Float64Array;
+      add(
+        'TreeEnsemble',
+        [t(kind, [3, 1], [-1, 0, 1])],
+        [
+          p.attr('n_targets', 1),
+          p.attr('aggregate_function', ag),
+          p.intsAttr('nodes_featureids', [0]),
+          p.intsAttr('nodes_truenodeids', [0]),
+          p.intsAttr('nodes_falsenodeids', [1]),
+          p.intsAttr('nodes_trueleafs', [1]),
+          p.intsAttr('nodes_falseleafs', [1]),
+          ta('nodes_modes', 2, Uint8Array.of(branch)),
+          ta('nodes_splits', kind, Type.of(0)),
+          ta('leaf_weights', kind, Type.of(2, 7)),
+          ...(branch === 6 ? [ta('membership_values', kind, Type.of(0, 1, NaN))] : []),
+          p.intsAttr('leaf_targetids', [0, 0]),
+          p.intsAttr('tree_roots', [0]),
+        ],
+        1,
+        5,
+        'ai.onnx.ml',
+      );
+    }
+for (const kernel of ['LINEAR', 'POLY', 'RBF', 'SIGMOID'])
+  for (const one of [0, 1])
+    add(
+      'SVMRegressor',
+      [f([-1, 0, 1], [3, 1])],
+      [
+        p.attr('n_supports', 2),
+        p.floatsAttr('support_vectors', [-1, 1]),
+        p.floatsAttr('coefficients', [2, 3]),
+        p.floatsAttr('rho', [0.25]),
+        p.attr('kernel_type', kernel),
+        p.floatsAttr('kernel_params', [0.5, 0.25, 2]),
+        p.attr('one_class', one),
+      ],
+      1,
+      1,
+      'ai.onnx.ml',
+    );
+for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
+  add(
+    'SVMRegressor',
+    [f([-1, 0, 1], [3, 1])],
+    [
+      p.floatsAttr('coefficients', [2]),
+      p.floatsAttr('rho', [0.25]),
+      p.floatsAttr('kernel_params', [0, 0, 0]),
+      p.attr('post_transform', post),
+    ],
+    1,
+    1,
+    'ai.onnx.ml',
+  );
+for (const kernel of ['LINEAR', 'POLY', 'RBF', 'SIGMOID'])
+  for (const calibrated of [false, true])
+    for (const classes of [2, 3, 4]) {
+      const pairs = (classes * (classes - 1)) / 2;
+      add(
+        'SVMClassifier',
+        [f([-1, 0, 1], [3, 1])],
+        [
+          p.intsAttr(
+            'classlabels_ints',
+            Array.from({ length: classes }, (_, i) => 10 + i),
+          ),
+          p.intsAttr('vectors_per_class', Array(classes).fill(1)),
+          p.floatsAttr(
+            'support_vectors',
+            Array.from({ length: classes }, (_, i) => i - 1),
+          ),
+          p.floatsAttr(
+            'coefficients',
+            Array.from({ length: (classes - 1) * classes }, (_, i) => ((i % 3) - 1) * 0.5),
+          ),
+          p.floatsAttr('rho', Array(pairs).fill(0.25)),
+          p.attr('kernel_type', kernel),
+          p.floatsAttr('kernel_params', [0.5, 0.25, 2]),
+          ...(calibrated
+            ? [p.floatsAttr('prob_a', Array(pairs).fill(-1)), p.floatsAttr('prob_b', Array(pairs).fill(0))]
+            : []),
+        ],
+        2,
+        1,
+        'ai.onnx.ml',
+      );
+    }
+for (const post of ['NONE', 'LOGISTIC', 'SOFTMAX', 'SOFTMAX_ZERO'])
+  add(
+    'SVMClassifier',
+    [f([-1, 0, 1], [3, 1])],
+    [
+      p.stringsAttr('classlabels_strings', ['a', 'b']),
+      p.floatsAttr('coefficients', [2, -3]),
+      p.floatsAttr('rho', [0.25]),
+      p.floatsAttr('kernel_params', [0, 0, 0]),
+      p.attr('post_transform', post),
+    ],
+    2,
+    1,
+    'ai.onnx.ml',
+  );
+
+// Preserve external outputs unchanged; these independent expectations cover known provider
+// deviations from the top-class and declared post-transform contracts.
+for (const c of cases) {
+  if (c.op === 'TreeEnsembleClassifier' && Number(c.id.split('-')[1]) < 12) {
+    c.normativeReason =
+      'Full class-score vectors select the largest raw score; the external binary shortcut selects east for all these rows.';
+    c.normativeOutputs = { 0: { kind: 8, shape: [3], data: ['west', 'west', 'east'] } };
+  }
+  if (c.op === 'SVMClassifier' && Number(c.id.split('-')[1]) >= 24) {
+    c.normativeReason =
+      'A linear classifier selects the largest raw class score, with first-class ties; external binary shortcut returns b for all rows.';
+    c.normativeOutputs = { 0: { kind: 8, shape: [3], data: ['b', 'a', 'a'] } };
+  }
+  if (['SVMRegressor-9', 'SVMRegressor-10', 'SVMRegressor-11'].includes(c.id)) {
+    const data = c.id === 'SVMRegressor-9' ? [0.14804719803168948, 0.5621765008857981, 0.9046505351008906] : [1, 1, 1];
+    c.normativeReason =
+      'Apply the declared LOGISTIC or single-target SOFTMAX transform; external CPU provider returns raw regression scores.';
+    c.normativeOutputs = {
+      0: { kind: 1, shape: [3, 1], data: Buffer.from(Float32Array.from(data).buffer).toString('base64') },
+    };
+  }
+}
+
 fs.writeFileSync('test-results/batch-274/oracle-cases.json', JSON.stringify(cases));
 console.log({ cases: cases.length });

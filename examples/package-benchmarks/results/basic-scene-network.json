@@ -1,5 +1,5 @@
 {
-  "commit": "09635daca",
+  "commit": "06a742f2c",
   "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
   "buildManifest": {
@@ -396,13 +396,13 @@
       "brotli": 119
     },
     {
-      "path": "assets/texture-D-u4lFVe.js",
+      "path": "assets/asset-ByDCtABg-9ESDVZ7l.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 1007,
-      "raw": 1189,
-      "gzip": 637,
-      "brotli": 553
+      "transferred": 10168,
+      "raw": 30907,
+      "gzip": 9796,
+      "brotli": 8891
     },
     {
       "path": "assets/meshopt-D0I6gboe.js",
@@ -414,15 +414,6 @@
       "brotli": 2705
     },
     {
-      "path": "assets/texture-coordinates-XFsEMdU6-rNEcXW-P.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 1680,
-      "raw": 3127,
-      "gzip": 1310,
-      "brotli": 1189
-    },
-    {
       "path": "assets/shader-DnO9Uahe-CYDstRbv.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -432,13 +423,22 @@
       "brotli": 10059
     },
     {
-      "path": "assets/asset-ByDCtABg-9ESDVZ7l.js",
+      "path": "assets/texture-coordinates-XFsEMdU6-rNEcXW-P.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 10168,
-      "raw": 30907,
-      "gzip": 9796,
-      "brotli": 8891
+      "transferred": 1680,
+      "raw": 3127,
+      "gzip": 1310,
+      "brotli": 1189
+    },
+    {
+      "path": "assets/texture-D-u4lFVe.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1007,
+      "raw": 1189,
+      "gzip": 637,
+      "brotli": 553
     },
     {
       "path": "assets/model-Bl3oDiVr-M7YzGuyO.js",

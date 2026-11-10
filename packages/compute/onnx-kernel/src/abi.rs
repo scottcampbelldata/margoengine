@@ -2,7 +2,8 @@
 // copied by the TS boundary before another call can grow memory or reuse scratch.
 use crate::{
     attrs::Attrs,
-    conversion, element, indexing, linear, loss, misc, ml, ml_linear, normalization,
+    conversion, element, indexing, linear, loss, misc, ml, ml_linear, ml_svm, ml_tree,
+    normalization,
     proto::Parser,
     random, recurrent, resize, schema, shape, signal, spatial,
     store::Store,
@@ -235,7 +236,10 @@ pub unsafe extern "C" fn supported(node_id: usize, version: u32) -> i32 {
     };
     if node.domain == "ai.onnx.ml" {
         return ((1..=5).contains(&version)
-            && (ml::supports(&node.op) || ml_linear::supports(&node.op))) as i32;
+            && (ml::supports(&node.op)
+                || ml_linear::supports(&node.op)
+                || ml_tree::supports(&node.op, version)
+                || ml_svm::supports(&node.op))) as i32;
     }
     if version < schema::minimum(&node.op) || version > 28 {
         return 0;
@@ -312,6 +316,14 @@ pub unsafe extern "C" fn execute(
             if ml_linear::supports(&node.op) {
                 ml_linear::validate(&node.op, inputs.len(), nout, &attrs)?;
                 return ml_linear::execute(&node.op, &inputs, &attrs);
+            }
+            if ml_tree::supports(&node.op, version) {
+                ml_tree::validate(&node.op, version, inputs.len(), nout, &attrs)?;
+                return ml_tree::execute(&node.op, &inputs, &attrs);
+            }
+            if ml_svm::supports(&node.op) {
+                ml_svm::validate(&node.op, inputs.len(), nout, &attrs)?;
+                return ml_svm::execute(&node.op, &inputs, &attrs);
             }
             ml::validate(&node.op, version, inputs.len(), nout, &attrs)?;
             return ml::execute(&node.op, &inputs, &attrs, version);

@@ -8,6 +8,8 @@ mod loss;
 mod misc;
 mod ml;
 mod ml_linear;
+mod ml_tree;
+mod ml_svm;
 mod normalization;
 mod proto;
 mod random;

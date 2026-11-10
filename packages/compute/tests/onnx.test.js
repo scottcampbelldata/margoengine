@@ -205,11 +205,8 @@ test('ONNX load rejects malformed protobuf, unsupported operators, SSA and missi
 
 test('ONNX unbuilt operators fail at load with a coded operator and opset diagnostic', async () => {
   const groups = [
-    [
-      'ai.onnx.ml',
-      5,
-      ['TreeEnsemble', 'TreeEnsembleClassifier', 'TreeEnsembleRegressor', 'SVMClassifier', 'SVMRegressor'],
-    ],
+    ['ai.onnx.ml', 3, ['TreeEnsemble']],
+    ['ai.onnx.ml', 5, ['UnknownML']],
     [
       '',
       28,

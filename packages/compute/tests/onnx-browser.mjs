@@ -45,6 +45,8 @@ try {
     if (!cancelled) throw new Error('browser abort reason was not preserved');
     const { checkOnnxReference } = await import('/packages/compute/tests/onnx-reference-cases.js');
     const reference = await (await fetch('/packages/compute/tests/fixtures/onnx/operators-reference.json')).json();
+    const { mlCases } = await import('/packages/compute/tests/onnx-ml-cases.js');
+    const mlChecks = await mlCases();
     let referenceMaxError = 0;
     for (const c of reference.cases) referenceMaxError = Math.max(referenceMaxError, await checkOnnxReference(c));
     return {
@@ -54,6 +56,7 @@ try {
       retained: result.y.data[0].toString(),
       references: reference.cases.length,
       referenceMaxError,
+      mlChecks,
     };
   });
   assert.equal(result.logits, 10);

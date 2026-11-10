@@ -1343,3 +1343,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 180 job 4): document generated sciviz/cf and sciviz/projections forwarding subpaths during the README phase.
 - @margoengine/viz (batch 180 job 4): document CF climate and Snyder projections through the generated sciviz subpaths during the README phase.
 - @margoengine/sciviz: document directed scientific bounds, physical resampling requirements and unsupported grid transforms (review H2).
+
+
+- @margoengine/compute (batch 274 ONNX follow-up): document TreeEnsemble variants, SVM kernels/calibration, legacy ML5 compatibility, pairwise score shapes and provider differences in the README phase.

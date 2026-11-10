@@ -1,5 +1,5 @@
 {
-  "commit": "09635daca",
+  "commit": "06a742f2c",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -738,6 +738,10 @@
       "./onnx": {
         "raw": 29581,
         "gzip": 10139
+      },
+      "./quant": {
+        "raw": 8929,
+        "gzip": 3927
       }
     },
     "@margoengine/controls": {
@@ -8921,7 +8925,7 @@
     "@margoengine/sciviz": {
       ".": {
         "raw": 172010,
-        "gzip": 61344
+        "gzip": 61345
       },
       "./bricks": {
         "raw": 70532,
@@ -9136,44 +9140,44 @@
         "gzip": 26846
       },
       "./spec": {
-        "raw": 68800,
-        "gzip": 27463
+        "raw": 69161,
+        "gzip": 27563
       },
       "./export-media": {
         "raw": 17017,
-        "gzip": 7110
+        "gzip": 7093
       },
       "./stream": {
         "raw": 11373,
         "gzip": 4262
       },
       "./fits": {
-        "raw": 10908,
-        "gzip": 4908
+        "raw": 11349,
+        "gzip": 5124
       },
       "./mrc": {
-        "raw": 6359,
-        "gzip": 2906
+        "raw": 6882,
+        "gzip": 3171
       },
       "./ometiff": {
-        "raw": 7372,
-        "gzip": 3207
+        "raw": 7813,
+        "gzip": 3438
       },
       "./query": {
         "raw": 19152,
         "gzip": 7125
       },
       "./pick-gpu": {
-        "raw": 15075,
-        "gzip": 5953
+        "raw": 15341,
+        "gzip": 6056
       },
       "./annotate": {
         "raw": 18559,
         "gzip": 7424
       },
       "./provenance": {
-        "raw": 65450,
-        "gzip": 26973
+        "raw": 65811,
+        "gzip": 27076
       },
       "./amr": {
         "raw": 81455,
@@ -9199,9 +9203,29 @@
         "raw": 13541,
         "gzip": 4746
       },
+      "./temporal": {
+        "raw": 9891,
+        "gzip": 3901
+      },
+      "./density": {
+        "raw": 12826,
+        "gzip": 4815
+      },
+      "./notebook": {
+        "raw": 4224,
+        "gzip": 1831
+      },
       "./graph-gpu": {
         "raw": 39713,
         "gzip": 13717
+      },
+      "./cf": {
+        "raw": 37849,
+        "gzip": 14438
+      },
+      "./projections": {
+        "raw": 5483,
+        "gzip": 2328
       }
     },
     "@margoengine/selection": {
@@ -10480,6 +10504,10 @@
       "./compute/onnx": {
         "raw": 39,
         "gzip": 59
+      },
+      "./compute/quant": {
+        "raw": 40,
+        "gzip": 60
       },
       "./controls/transitions": {
         "raw": 47,
@@ -11982,6 +12010,30 @@
         "gzip": 58
       },
       "./sciviz/progressive": {
+        "raw": 45,
+        "gzip": 65
+      },
+      "./sciviz/temporal": {
+        "raw": 42,
+        "gzip": 62
+      },
+      "./sciviz/density": {
+        "raw": 41,
+        "gzip": 61
+      },
+      "./sciviz/notebook": {
+        "raw": 42,
+        "gzip": 62
+      },
+      "./sciviz/graph-gpu": {
+        "raw": 43,
+        "gzip": 63
+      },
+      "./sciviz/cf": {
+        "raw": 36,
+        "gzip": 56
+      },
+      "./sciviz/projections": {
         "raw": 45,
         "gzip": 65
       },
@@ -14823,9 +14875,9 @@
   },
   "lazyFiles": {
     "packages/compute/dist/onnx-kernel.wasm": {
-      "raw": 684541,
-      "gzip": 244935,
-      "brotli": 194402
+      "raw": 753589,
+      "gzip": 270831,
+      "brotli": 212803
     },
     "packages/compute/dist/cpu-kernel.wasm": {
       "raw": 62493,
