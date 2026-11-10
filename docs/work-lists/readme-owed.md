@@ -1313,3 +1313,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: cover optional /density all-point integer count opacity, Gaussian bandwidth and clipping, direct arrays/scatter replacement, readback, restore and exact table aggregation; use the attributed 2MASS/TLC demo. Batch 181 job 4, examples remain deferred during build phase.
 - margoengine: document the generated sciviz/density alias and its optional loading behaviour after the build phase (batch 181 job 4).
 - @margoengine/viz: document the generated sciviz/density alias after the build phase (batch 181 job 4).
+
+- @margoengine/compute: document the optional /onnx loader, owned typed tensors, model inference and disposal, external weights, supported operator/opset catalogue, cancellation and resource limits after batch 274 job 5 is complete.
+- margoengine (batch 274 job 5): document the compute/onnx optional alias after its generated umbrella entry lands; examples remain deferred to the README phase.
+
+- @margoengine/game and @margoengine/viz (batch 274 job 5): document generated compute/onnx profile aliases in the README phase.

@@ -1,0 +1,4481 @@
+{
+  "provenance": {
+    "generator": "packages/compute/scripts/onnx-oracle-cases.mjs",
+    "runner": "packages/compute/scripts/onnx-oracle.py",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.1",
+    "numpy": "2.5.4",
+    "executionProvider": "CPUExecutionProvider",
+    "optimization": "ORT_DISABLE_ALL",
+    "source": "Original Margo analytic inputs serialized through the normative ONNX schema. Unmodified external ONNX Runtime computes reference output only. No external implementation source or runtime ships with Margo."
+  },
+  "cases": [
+    {
+      "id": "Celu-0",
+      "op": "Celu",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6PAoOCgJ4MBICeTAiBENlbHUSEmNsZWFuLXJvb20tZml4dHVyZVoQCgJ4MBIKCggIARIECgIIBWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": [
+            -3,
+            -1,
+            0,
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": "KEFzv6fSIb8AAAAAAACAPwAAQEA="
+        }
+      ]
+    },
+    {
+      "id": "Shrink-0",
+      "op": "Shrink",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6PgoQCgJ4MBICeTAiBlNocmluaxISY2xlYW4tcm9vbS1maXh0dXJlWhAKAngwEgoKCAgBEgQKAggFYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": [
+            -3,
+            -1,
+            0,
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": "AABAwAAAgL8AAAAAAACAPwAAQEA="
+        }
+      ]
+    },
+    {
+      "id": "Swish-0",
+      "op": "Swish",
+      "version": 24,
+      "domain": "",
+      "model": "CAo6PQoPCgJ4MBICeTAiBVN3aXNoEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAESBAoCCAViBAoCeTBCBAoAEBg=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": [
+            -3,
+            -1,
+            0,
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            5
+          ],
+          "data": "OLERvrGyib4AAAAAqCY7P+zkNkA="
+        }
+      ]
+    },
+    {
+      "id": "Unique-0",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bworCgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA2IECgJ5MGIECgJ5MWIECgJ5MmIECgJ5M0IECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "CQAAAAAAAAACAAAAAAAAAAMAAAAAAAAABAAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAAMAAAAAAAAABAAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            6
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAADAAAAAAAAAAIAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "AgAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAQAAAAAAAAA="
+        }
+      ]
+    },
+    {
+      "id": "Unique-1",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6fAo4CgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYACoLCgRheGlzoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANiBAoCeTBiBAoCeTFiBAoCeTJiBAoCeTNCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": "CQAAAAAAAAACAAAAAAAAAAkAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAMAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAABAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "Unique-2",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6fAo4CgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYACoLCgRheGlzoAECGAESEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANiBAoCeTBiBAoCeTFiBAoCeTJiBAoCeTNCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "CQAAAAAAAAACAAAAAAAAAAMAAAAAAAAABAAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AAAAAAAAAAABAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AgAAAAAAAAABAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "Unique-3",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bworCgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYARISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA2IECgJ5MGIECgJ5MWIECgJ5MmIECgJ5M0IECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "AgAAAAAAAAADAAAAAAAAAAQAAAAAAAAACQAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "AQAAAAAAAAADAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            6
+          ],
+          "data": "AwAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAQAAAAAAAAACAAAAAAAAAAEAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            4
+          ],
+          "data": "AQAAAAAAAAACAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAA="
+        }
+      ]
+    },
+    {
+      "id": "Unique-4",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6fAo4CgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYASoLCgRheGlzoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANiBAoCeTBiBAoCeTFiBAoCeTJiBAoCeTNCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": "AwAAAAAAAAAEAAAAAAAAAAMAAAAAAAAACQAAAAAAAAACAAAAAAAAAAkAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAAAAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAAAAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAABAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "Unique-5",
+      "op": "Unique",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6fAo4CgJ4MBICeTASAnkxEgJ5MhICeTMiBlVuaXF1ZSoNCgZzb3J0ZWSgAQIYASoLCgRheGlzoAECGAESEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANiBAoCeTBiBAoCeTFiBAoCeTJiBAoCeTNCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            9,
+            2,
+            9,
+            3,
+            4,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "AgAAAAAAAAAJAAAAAAAAAAQAAAAAAAAAAwAAAAAAAAA="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAAAAAAAAAAAAA=="
+        },
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAA"
+        },
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAACAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReverseSequence-0",
+      "op": "ReverseSequence",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6hgEKQgoCeDAKAngxEgJ5MCIPUmV2ZXJzZVNlcXVlbmNlKhEKCmJhdGNoX2F4aXOgAQIYACoQCgl0aW1lX2F4aXOgAQIYARISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIBFoQCgJ4MRIKCggIBxIECgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            4
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            3,
+            2
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            4
+          ],
+          "data": "AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAFAAAAAAAAAAQAAAAAAAAABgAAAAAAAAAHAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "CenterCropPad-0",
+      "op": "CenterCropPad",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6XwobCgJ4MAoCeDESAnkwIg1DZW50ZXJDcm9wUGFkEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAIKAggFWhAKAngxEgoKCAgHEgQKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            5
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            8
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            8
+          ],
+          "data": "AAAAAAAAAAAAAIA/AAAAQAAAQEAAAIBAAAAAAAAAAAA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceSum-0",
+      "op": "ReduceSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VTdW0qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AADAQAAAcEE="
+        }
+      ]
+    },
+    {
+      "id": "ReduceSum-1",
+      "op": "ReduceSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VTdW0qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "BgAAAAAAAAAPAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMean-0",
+      "op": "ReduceMean",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bQopCgJ4MAoCeDESAnkwIgpSZWR1Y2VNZWFuKg8KCGtlZXBkaW1zoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAgoCCANaEAoCeDESCgoICAcSBAoCCAFiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AAAAQAAAoEA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMean-1",
+      "op": "ReduceMean",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bQopCgJ4MAoCeDESAnkwIgpSZWR1Y2VNZWFuKg8KCGtlZXBkaW1zoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANaEAoCeDESCgoICAcSBAoCCAFiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AgAAAAAAAAAFAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceL1-0",
+      "op": "ReduceL1",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awonCgJ4MAoCeDESAnkwIghSZWR1Y2VMMSoPCghrZWVwZGltc6ABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAIKAggDWhAKAngxEgoKCAgHEgQKAggBYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AADAQAAAcEE="
+        }
+      ]
+    },
+    {
+      "id": "ReduceL1-1",
+      "op": "ReduceL1",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awonCgJ4MAoCeDESAnkwIghSZWR1Y2VMMSoPCghrZWVwZGltc6ABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAcSCAoCCAIKAggDWhAKAngxEgoKCAgHEgQKAggBYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "BgAAAAAAAAAPAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceL2-0",
+      "op": "ReduceL2",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awonCgJ4MAoCeDESAnkwIghSZWR1Y2VMMioPCghrZWVwZGltc6ABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAIKAggDWhAKAngxEgoKCAgHEgQKAggBYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "UXdvQEFmDEE="
+        }
+      ]
+    },
+    {
+      "id": "ReduceL2-1",
+      "op": "ReduceL2",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awonCgJ4MAoCeDESAnkwIghSZWR1Y2VMMioPCghrZWVwZGltc6ABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAcSCAoCCAIKAggDWhAKAngxEgoKCAgHEgQKAggBYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AwAAAAAAAAAIAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceLogSum-0",
+      "op": "ReduceLogSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bworCgJ4MAoCeDESAnkwIgxSZWR1Y2VMb2dTdW0qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "YFjlP7JQLUA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceLogSum-1",
+      "op": "ReduceLogSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bworCgJ4MAoCeDESAnkwIgxSZWR1Y2VMb2dTdW0qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAACAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceLogSumExp-0",
+      "op": "ReduceLogSumExp",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgouCgJ4MAoCeDESAnkwIg9SZWR1Y2VMb2dTdW1FeHAqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "NxZaQBwLzUA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceLogSumExp-1",
+      "op": "ReduceLogSumExp",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgouCgJ4MAoCeDESAnkwIg9SZWR1Y2VMb2dTdW1FeHAqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AwAAAAAAAAAGAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceSumSquare-0",
+      "op": "ReduceSumSquare",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgouCgJ4MAoCeDESAnkwIg9SZWR1Y2VTdW1TcXVhcmUqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AABgQQAAmkI="
+        }
+      ]
+    },
+    {
+      "id": "ReduceSumSquare-1",
+      "op": "ReduceSumSquare",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgouCgJ4MAoCeDESAnkwIg9SZWR1Y2VTdW1TcXVhcmUqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "DgAAAAAAAABNAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMin-0",
+      "op": "ReduceMin",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VNaW4qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AACAPwAAgEA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMin-1",
+      "op": "ReduceMin",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VNaW4qDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AQAAAAAAAAAEAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMax-0",
+      "op": "ReduceMax",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VNYXgqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AABAQAAAwEA="
+        }
+      ]
+    },
+    {
+      "id": "ReduceMax-1",
+      "op": "ReduceMax",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAooCgJ4MAoCeDESAnkwIglSZWR1Y2VNYXgqDwoIa2VlcGRpbXOgAQIYABISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIA1oQCgJ4MRIKCggIBxIECgIIAWIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "AwAAAAAAAAAGAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "ReduceProd-0",
+      "op": "ReduceProd",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bQopCgJ4MAoCeDESAnkwIgpSZWR1Y2VQcm9kKg8KCGtlZXBkaW1zoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAgoCCANaEAoCeDESCgoICAcSBAoCCAFiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AADAQAAA8EI="
+        }
+      ]
+    },
+    {
+      "id": "ReduceProd-1",
+      "op": "ReduceProd",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bQopCgJ4MAoCeDESAnkwIgpSZWR1Y2VQcm9kKg8KCGtlZXBkaW1zoAECGAASEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIBxIICgIIAgoCCANaEAoCeDESCgoICAcSBAoCCAFiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            1
+          ],
+          "data": [
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": "BgAAAAAAAAB4AAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "CumSum-0",
+      "op": "CumSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgo2CgJ4MAoCeDESAnkwIgZDdW1TdW0qEAoJZXhjbHVzaXZloAECGAAqDgoHcmV2ZXJzZaABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAcSBAoCCANaDAoCeDESBgoECAcSAGIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": [
+            2,
+            3,
+            5
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AgAAAAAAAAAFAAAAAAAAAAoAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "CumSum-1",
+      "op": "CumSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgo2CgJ4MAoCeDESAnkwIgZDdW1TdW0qEAoJZXhjbHVzaXZloAECGAAqDgoHcmV2ZXJzZaABAhgBEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAcSBAoCCANaDAoCeDESBgoECAcSAGIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": [
+            2,
+            3,
+            5
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "CgAAAAAAAAAIAAAAAAAAAAUAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "CumSum-2",
+      "op": "CumSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgo2CgJ4MAoCeDESAnkwIgZDdW1TdW0qEAoJZXhjbHVzaXZloAECGAEqDgoHcmV2ZXJzZaABAhgAEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAcSBAoCCANaDAoCeDESBgoECAcSAGIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": [
+            2,
+            3,
+            5
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AAAAAAAAAAACAAAAAAAAAAUAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "CumSum-3",
+      "op": "CumSum",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgo2CgJ4MAoCeDESAnkwIgZDdW1TdW0qEAoJZXhjbHVzaXZloAECGAEqDgoHcmV2ZXJzZaABAhgBEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAcSBAoCCANaDAoCeDESBgoECAcSAGIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": [
+            2,
+            3,
+            5
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "CAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "DFT-0",
+      "op": "DFT",
+      "version": 17,
+      "domain": "",
+      "model": "CAo6UAoaCgJ4MBICeTAiA0RGVCoLCgRheGlzoAECGAESEmNsZWFuLXJvb20tZml4dHVyZVoYCgJ4MBISChAICxIMCgIIAQoCCAUKAggBYgQKAnkwQgQKABAR",
+      "feeds": {
+        "x0": {
+          "kind": 11,
+          "shape": [
+            1,
+            5,
+            1
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            1,
+            5,
+            2
+          ],
+          "data": "AAAAAAAALkAAAAAAAED2PAYAAAAAAATATJaQTxOHC0ACAAAAAAAEwAe6G/pa/uk//f//////A8Amuhv6Wv7pv/b//////wPAWpaQTxOHC8A="
+        }
+      ]
+    },
+    {
+      "id": "STFT-0",
+      "op": "STFT",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6bAoWCgJ4MAoCeDEKAngyEgJ5MCIEU1RGVBISY2xlYW4tcm9vbS1maXh0dXJlWhgKAngwEhIKEAgBEgwKAggBCgIIBgoCCAFaDAoCeDESBgoECAcSAFoQCgJ4MhIKCggIARIECgIIBGIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            6,
+            1
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            2
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            4
+          ],
+          "data": [
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": "AAAgQQAAAAD8//+/AQAAQAAAAMDizQw1AACQQQAAAAD7//+/AgAAQAAAAMB6rGo1"
+        }
+      ]
+    },
+    {
+      "id": "HannWindow-0",
+      "op": "HannWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6Zwo9CgJ4MBICeTAiCkhhbm5XaW5kb3cqDwoIcGVyaW9kaWOgAQIYACoWCg9vdXRwdXRfZGF0YXR5cGWgAQIYCxISY2xlYW4tcm9vbS1maXh0dXJlWgwKAngwEgYKBAgHEgBiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAAAAAAD////////fPwAAAAAAAPA/AQAAAAAA4D8AAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "HannWindow-1",
+      "op": "HannWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6Zwo9CgJ4MBICeTAiCkhhbm5XaW5kb3cqDwoIcGVyaW9kaWOgAQIYASoWCg9vdXRwdXRfZGF0YXR5cGWgAQIYCxISY2xlYW4tcm9vbS1maXh0dXJlWgwKAngwEgYKBAgHEgBiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAAAAAABYC2hkiBzWP1T6y8278ew/VPrLzbvx7D9aC2hkiBzWPw=="
+        }
+      ]
+    },
+    {
+      "id": "HammingWindow-0",
+      "op": "HammingWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6agpACgJ4MBICeTAiDUhhbW1pbmdXaW5kb3cqDwoIcGVyaW9kaWOgAQIYACoWCg9vdXRwdXRfZGF0YXR5cGWgAQIYCxISY2xlYW4tcm9vbS1maXh0dXJlWgwKAngwEgYKBAgHEgBiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAMhCtj8AAACALGThPwAAAAAAAPA/AQAAgCxk4T8AAAAAyEK2Pw=="
+        }
+      ]
+    },
+    {
+      "id": "HammingWindow-1",
+      "op": "HammingWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6agpACgJ4MBICeTAiDUhhbW1pbmdXaW5kb3cqDwoIcGVyaW9kaWOgAQIYASoWCg9vdXRwdXRfZGF0YXR5cGWgAQIYCxISY2xlYW4tcm9vbS1maXh0dXJlWgwKAngwEgYKBAgHEgBiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAMhCtj8aqVIKAsHZP3Kr1rrBNe0/c6vWusE17T8cqVIKAsHZPw=="
+        }
+      ]
+    },
+    {
+      "id": "BlackmanWindow-0",
+      "op": "BlackmanWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awpBCgJ4MBICeTAiDkJsYWNrbWFuV2luZG93Kg8KCHBlcmlvZGljoAECGAAqFgoPb3V0cHV0X2RhdGF0eXBloAECGAsSEmNsZWFuLXJvb20tZml4dHVyZVoMCgJ4MBIGCgQIBxIAYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAAAAUD7///9vj8LVPwAAAAQAAPA/AgAAcI/C1T8AAAAAAABQPg=="
+        }
+      ]
+    },
+    {
+      "id": "BlackmanWindow-1",
+      "op": "BlackmanWindow",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6awpBCgJ4MBICeTAiDkJsYWNrbWFuV2luZG93Kg8KCHBlcmlvZGljoAECGAEqFgoPb3V0cHV0X2RhdGF0eXBloAECGAsSEmNsZWFuLXJvb20tZml4dHVyZVoMCgJ4MBIGCgQIBxIAYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            5
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5
+          ],
+          "data": "AAAAAAAAUD70CZwu1rLJP4P9WCDkLOs/g/1YIOQs6z/2CZwu1rLJPw=="
+        }
+      ]
+    },
+    {
+      "id": "MelWeightMatrix-0",
+      "op": "MelWeightMatrix",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6owEKQQoCeDAKAngxCgJ4MgoCeDMKAng0EgJ5MCIPTWVsV2VpZ2h0TWF0cml4KhYKD291dHB1dF9kYXRhdHlwZaABAhgLEhJjbGVhbi1yb29tLWZpeHR1cmVaDAoCeDASBgoECAcSAFoMCgJ4MRIGCgQIBxIAWgwKAngyEgYKBAgHEgBaDAoCeDMSBgoECAESAFoMCgJ4NBIGCgQIARIAYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            2
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            8
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            8000
+          ]
+        },
+        "x3": {
+          "kind": 1,
+          "shape": [],
+          "data": [
+            0
+          ]
+        },
+        "x4": {
+          "kind": 1,
+          "shape": [],
+          "data": [
+            4000
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 11,
+          "shape": [
+            5,
+            2
+          ],
+          "data": "AAAAAAAA8D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        }
+      ]
+    },
+    {
+      "id": "GridSample-0",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEwoEbW9kZaABAyIIYmlsaW5lYXIqGAoMcGFkZGluZ19tb2RloAEDIgV6ZXJvcxISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAAAAAD8AAGBAAAC4QAAAwD8AAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-1",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tAEKXAoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHYmljdWJpYyoYCgxwYWRkaW5nX21vZGWgAQMiBXplcm9zEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAAAA0D4AAIVAACDOQAAA2D8AAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-2",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tAEKXAoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHbmVhcmVzdCoYCgxwYWRkaW5nX21vZGWgAQMiBXplcm9zEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAAAAgD8AAABAAADAQAAAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-3",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tgEKXgoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEwoEbW9kZaABAyIIYmlsaW5lYXIqGQoMcGFkZGluZ19tb2RloAEDIgZib3JkZXISEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AACAPwAAgD8AAGBAAAC4QAAAwEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-4",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHYmljdWJpYyoZCgxwYWRkaW5nX21vZGWgAQMiBmJvcmRlchISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAA4PwAAaD8AAGBAAOC5QAAAzEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-5",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHbmVhcmVzdCoZCgxwYWRkaW5nX21vZGWgAQMiBmJvcmRlchISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AACAPwAAgD8AAABAAADAQAAAwEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-6",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6ugEKYgoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEwoEbW9kZaABAyIIYmlsaW5lYXIqHQoMcGFkZGluZ19tb2RloAEDIgpyZWZsZWN0aW9uEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAQAAAgD8AAGBAAAC4QAAAwEAAAABA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-7",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6uQEKYQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHYmljdWJpYyodCgxwYWRkaW5nX21vZGWgAQMiCnJlZmxlY3Rpb24SEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAC4PwAAUD8AAGBAAOC5QAAA2EAAALg/"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-8",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6uQEKYQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAAqEgoEbW9kZaABAyIHbmVhcmVzdCodCgxwYWRkaW5nX21vZGWgAQMiCnJlZmxlY3Rpb24SEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAQAAAgD8AAABAAADAQAAAwEAAAABA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-9",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEwoEbW9kZaABAyIIYmlsaW5lYXIqGAoMcGFkZGluZ19tb2RloAEDIgV6ZXJvcxISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAAAA4D8AAGBAAACYQAAAwEAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-10",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tAEKXAoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHYmljdWJpYyoYCgxwYWRkaW5nX21vZGWgAQMiBXplcm9zEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAACA9j8AAIVAADnFQAAAwEAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-11",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tAEKXAoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHbmVhcmVzdCoYCgxwYWRkaW5nX21vZGWgAQMiBXplcm9zEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAAAAAgD8AAABAAADAQAAAwEAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-12",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tgEKXgoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEwoEbW9kZaABAyIIYmlsaW5lYXIqGQoMcGFkZGluZ19tb2RloAEDIgZib3JkZXISEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AACAPwAA4D8AAGBAAACYQAAAwEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-13",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHYmljdWJpYyoZCgxwYWRkaW5nX21vZGWgAQMiBmJvcmRlchISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AACAPwAA1z8AAGBAAECdQAAAwEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-14",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHbmVhcmVzdCoZCgxwYWRkaW5nX21vZGWgAQMiBmJvcmRlchISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAIKAggDWhwKAngxEhYKFAgBEhAKAggBCgIIAgoCCAMKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AACAPwAAgD8AAABAAADAQAAAwEAAAMBA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-15",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6ugEKYgoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEwoEbW9kZaABAyIIYmlsaW5lYXIqHQoMcGFkZGluZ19tb2RloAEDIgpyZWZsZWN0aW9uEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAgoCCANaHAoCeDESFgoUCAESEAoCCAEKAggCCgIIAwoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAQAAA4D8AAGBAAACYQAAAwEAAAABA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-16",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6uQEKYQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHYmljdWJpYyodCgxwYWRkaW5nX21vZGWgAQMiCnJlZmxlY3Rpb24SEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAQAAAvD8AAGBAAACnQAAAwEAAAABA"
+        }
+      ]
+    },
+    {
+      "id": "GridSample-17",
+      "op": "GridSample",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6uQEKYQoCeDAKAngxEgJ5MCIKR3JpZFNhbXBsZSoUCg1hbGlnbl9jb3JuZXJzoAECGAEqEgoEbW9kZaABAyIHbmVhcmVzdCodCgxwYWRkaW5nX21vZGWgAQMiCnJlZmxlY3Rpb24SEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggCCgIIA1ocCgJ4MRIWChQIARIQCgIIAQoCCAIKAggDCgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            2,
+            3,
+            2
+          ],
+          "data": [
+            -2,
+            -1,
+            -1,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.5,
+            1,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "data": "AAAAQAAAgD8AAABAAADAQAAAwEAAAABA"
+        }
+      ]
+    },
+    {
+      "id": "RoiAlign-0",
+      "op": "RoiAlign",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6gAIKnQEKAngwCgJ4MQoCeDISAnkwIghSb2lBbGlnbioOCgRtb2RloAEDIgNhdmcqLwoeY29vcmRpbmF0ZV90cmFuc2Zvcm1hdGlvbl9tb2RloAEDIgpoYWxmX3BpeGVsKhUKDnNhbXBsaW5nX3JhdGlvoAECGAIqFAoNb3V0cHV0X2hlaWdodKABAhgCKhMKDG91dHB1dF93aWR0aKABAhgCEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAwoCCANaFAoCeDESDgoMCAESCAoCCAIKAggEWhAKAngyEgoKCAgHEgQKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            2,
+            4
+          ],
+          "data": [
+            -1,
+            -1,
+            2,
+            2,
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            1,
+            2,
+            2
+          ],
+          "data": "AAAAAAAAwD4AAJA/AABAQAAAAD8AALA/AABIQAAAgEA="
+        }
+      ]
+    },
+    {
+      "id": "RoiAlign-1",
+      "op": "RoiAlign",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6hwIKpAEKAngwCgJ4MQoCeDISAnkwIghSb2lBbGlnbioOCgRtb2RloAEDIgNhdmcqNgoeY29vcmRpbmF0ZV90cmFuc2Zvcm1hdGlvbl9tb2RloAEDIhFvdXRwdXRfaGFsZl9waXhlbCoVCg5zYW1wbGluZ19yYXRpb6ABAhgCKhQKDW91dHB1dF9oZWlnaHSgAQIYAioTCgxvdXRwdXRfd2lkdGigAQIYAhISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAMKAggDWhQKAngxEg4KDAgBEggKAggCCgIIBFoQCgJ4MhIKCggIBxIECgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            2,
+            4
+          ],
+          "data": [
+            -1,
+            -1,
+            2,
+            2,
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            1,
+            2,
+            2
+          ],
+          "data": "AACAPgAAuD8AAHRAAACgQAAAAEAAAEBAAACgQAAAwEA="
+        }
+      ]
+    },
+    {
+      "id": "RoiAlign-2",
+      "op": "RoiAlign",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6gAIKnQEKAngwCgJ4MQoCeDISAnkwIghSb2lBbGlnbioOCgRtb2RloAEDIgNtYXgqLwoeY29vcmRpbmF0ZV90cmFuc2Zvcm1hdGlvbl9tb2RloAEDIgpoYWxmX3BpeGVsKhUKDnNhbXBsaW5nX3JhdGlvoAECGAIqFAoNb3V0cHV0X2hlaWdodKABAhgCKhMKDG91dHB1dF93aWR0aKABAhgCEhJjbGVhbi1yb29tLWZpeHR1cmVaHAoCeDASFgoUCAESEAoCCAEKAggBCgIIAwoCCANaFAoCeDESDgoMCAESCAoCCAIKAggEWhAKAngyEgoKCAgHEgQKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            2,
+            4
+          ],
+          "data": [
+            -1,
+            -1,
+            2,
+            2,
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            1,
+            2,
+            2
+          ],
+          "data": "AAAAAAAAYD8AAChAAABEQAAAQD8AAEA/AAAQQAAAEEA="
+        }
+      ]
+    },
+    {
+      "id": "RoiAlign-3",
+      "op": "RoiAlign",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6hwIKpAEKAngwCgJ4MQoCeDISAnkwIghSb2lBbGlnbioOCgRtb2RloAEDIgNtYXgqNgoeY29vcmRpbmF0ZV90cmFuc2Zvcm1hdGlvbl9tb2RloAEDIhFvdXRwdXRfaGFsZl9waXhlbCoVCg5zYW1wbGluZ19yYXRpb6ABAhgCKhQKDW91dHB1dF9oZWlnaHSgAQIYAioTCgxvdXRwdXRfd2lkdGigAQIYAhISY2xlYW4tcm9vbS1maXh0dXJlWhwKAngwEhYKFAgBEhAKAggBCgIIAQoCCAMKAggDWhQKAngxEg4KDAgBEggKAggCCgIIBFoQCgJ4MhIKCggIBxIECgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            2,
+            4
+          ],
+          "data": [
+            -1,
+            -1,
+            2,
+            2,
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            1,
+            2,
+            2
+          ],
+          "data": "AADAPgAAoD8AAHBAAAB1QAAAEEAAADRAAAB8QAAAkEA="
+        }
+      ]
+    },
+    {
+      "id": "MaxRoiPool-0",
+      "op": "MaxRoiPool",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6fwovCgJ4MAoCeDESAnkwIgpNYXhSb2lQb29sKhUKDHBvb2xlZF9zaGFwZaABB0ACQAISEmNsZWFuLXJvb20tZml4dHVyZVocCgJ4MBIWChQIARIQCgIIAQoCCAEKAggDCgIIA1oUCgJ4MRIOCgwIARIICgIIAQoCCAViBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            5
+          ],
+          "data": [
+            0,
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "data": "AACAQAAAoEAAAOBAAAAAQQ=="
+        }
+      ]
+    },
+    {
+      "id": "Col2Im-0",
+      "op": "Col2Im",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6cgoYCgJ4MAoCeDEKAngyEgJ5MCIGQ29sMkltEhJjbGVhbi1yb29tLWZpeHR1cmVaGAoCeDASEgoQCAESDAoCCAEKAggECgIIBFoQCgJ4MRIKCggIBxIECgIIAloQCgJ4MhIKCggIBxIECgIIAmIECgJ5MEIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            4,
+            4
+          ],
+          "data": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            3,
+            3
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            2,
+            2
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3,
+            3
+          ],
+          "data": "AACAPwAAAEAAAIA/AAAAQAAAgEAAAABAAACAPwAAAEAAAIA/"
+        }
+      ]
+    },
+    {
+      "id": "NonMaxSuppression-0",
+      "op": "NonMaxSuppression",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6kwEKJwoCeDAKAngxCgJ4MgoCeDMSAnkwIhFOb25NYXhTdXBwcmVzc2lvbhISY2xlYW4tcm9vbS1maXh0dXJlWhgKAngwEhIKEAgBEgwKAggBCgIIAwoCCARaGAoCeDESEgoQCAESDAoCCAEKAggBCgIIA1oMCgJ4MhIGCgQIBxIAWgwKAngzEgYKBAgBEgBiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            3,
+            4
+          ],
+          "data": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            2
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            1,
+            3
+          ],
+          "data": [
+            0.9,
+            0.9,
+            0.7
+          ]
+        },
+        "x2": {
+          "kind": 7,
+          "shape": [],
+          "data": [
+            3
+          ]
+        },
+        "x3": {
+          "kind": 1,
+          "shape": [],
+          "data": [
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            2,
+            3
+          ],
+          "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "NegativeLogLikelihoodLoss-0",
+      "op": "NegativeLogLikelihoodLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXwoCeDAKAngxCgJ4MhICeTAiGU5lZ2F0aXZlTG9nTGlrZWxpaG9vZExvc3MqHAoMaWdub3JlX2luZGV4oAECGP///////////wEqFAoJcmVkdWN0aW9uoAEDIgRub25lEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAIKAggCWhAKAngxEgoKCAgHEgQKAggCWhAKAngyEgoKCAgBEgQKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "AGzqxgAAAIA="
+        }
+      ]
+    },
+    {
+      "id": "SoftmaxCrossEntropyLoss-0",
+      "op": "SoftmaxCrossEntropyLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6vQEKYQoCeDAKAngxCgJ4MhICeTASAnkxIhdTb2Z0bWF4Q3Jvc3NFbnRyb3B5TG9zcyocCgxpZ25vcmVfaW5kZXigAQIY////////////ASoUCglyZWR1Y3Rpb26gAQMiBG5vbmUSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAgoCCAJaEAoCeDESCgoICAcSBAoCCAJaEAoCeDISCgoICAESBAoCCAJiBAoCeTBiBAoCeTFCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": "JPbCPgAAAIA="
+        },
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "lx8IwG35Ab7VY6C+9Riovw=="
+        }
+      ]
+    },
+    {
+      "id": "NegativeLogLikelihoodLoss-1",
+      "op": "NegativeLogLikelihoodLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tAEKXgoCeDAKAngxCgJ4MhICeTAiGU5lZ2F0aXZlTG9nTGlrZWxpaG9vZExvc3MqHAoMaWdub3JlX2luZGV4oAECGP///////////wEqEwoJcmVkdWN0aW9uoAEDIgNzdW0SEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAgoCCAJaEAoCeDESCgoICAcSBAoCCAJaEAoCeDISCgoICAESBAoCCAJiBAoCeTBCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [],
+          "data": "AGzqxg=="
+        }
+      ]
+    },
+    {
+      "id": "SoftmaxCrossEntropyLoss-1",
+      "op": "SoftmaxCrossEntropyLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6vAEKYAoCeDAKAngxCgJ4MhICeTASAnkxIhdTb2Z0bWF4Q3Jvc3NFbnRyb3B5TG9zcyocCgxpZ25vcmVfaW5kZXigAQIY////////////ASoTCglyZWR1Y3Rpb26gAQMiA3N1bRISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggCCgIIAloQCgJ4MRIKCggIBxIECgIIAloQCgJ4MhIKCggIARIECgIIAmIECgJ5MGIECgJ5MUIECgAQEg==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [],
+          "data": "JPbCPg=="
+        },
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "lx8IwG35Ab7VY6C+9Riovw=="
+        }
+      ]
+    },
+    {
+      "id": "NegativeLogLikelihoodLoss-2",
+      "op": "NegativeLogLikelihoodLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6tQEKXwoCeDAKAngxCgJ4MhICeTAiGU5lZ2F0aXZlTG9nTGlrZWxpaG9vZExvc3MqHAoMaWdub3JlX2luZGV4oAECGP///////////wEqFAoJcmVkdWN0aW9uoAEDIgRtZWFuEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAIKAggCWhAKAngxEgoKCAgHEgQKAggCWhAKAngyEgoKCAgBEgQKAggCYgQKAnkwQgQKABAS",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [],
+          "data": "AEgcxg=="
+        }
+      ]
+    },
+    {
+      "id": "SoftmaxCrossEntropyLoss-2",
+      "op": "SoftmaxCrossEntropyLoss",
+      "version": 18,
+      "domain": "",
+      "model": "CAo6vQEKYQoCeDAKAngxCgJ4MhICeTASAnkxIhdTb2Z0bWF4Q3Jvc3NFbnRyb3B5TG9zcyocCgxpZ25vcmVfaW5kZXigAQIY////////////ASoUCglyZWR1Y3Rpb26gAQMiBG1lYW4SEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAgoCCAJaEAoCeDESCgoICAcSBAoCCAJaEAoCeDISCgoICAESBAoCCAJiBAoCeTBiBAoCeTFCBAoAEBI=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            10000,
+            10002,
+            10001,
+            10000
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            -1
+          ]
+        },
+        "x2": {
+          "kind": 1,
+          "shape": [
+            2
+          ],
+          "data": [
+            1,
+            3
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [],
+          "data": "bfkBPg=="
+        },
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "lx8IwG35Ab7VY6C+9Riovw=="
+        }
+      ]
+    },
+    {
+      "id": "StringConcat-0",
+      "op": "StringConcat",
+      "version": 20,
+      "domain": "",
+      "model": "CAo6XgoaCgJ4MAoCeDESAnkwIgxTdHJpbmdDb25jYXQSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwICBIICgIIAgoCCAFaEAoCeDESCgoICAgSBAoCCAJiBAoCeTBCBAoAEBQ=",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            2,
+            1
+          ],
+          "data": [
+            "猫",
+            "é"
+          ]
+        },
+        "x1": {
+          "kind": 8,
+          "shape": [
+            2
+          ],
+          "data": [
+            "!",
+            "?"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 8,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            "猫!",
+            "猫?",
+            "é!",
+            "é?"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "StringSplit-0",
+      "op": "StringSplit",
+      "version": 20,
+      "domain": "",
+      "model": "CAo6TQoZCgJ4MBICeTASAnkxIgtTdHJpbmdTcGxpdBISY2xlYW4tcm9vbS1maXh0dXJlWhAKAngwEgoKCAgIEgQKAggDYgQKAnkwYgQKAnkxQgQKABAU",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            3
+          ],
+          "data": [
+            "  one  two  gamma  ",
+            "a,,b",
+            "  "
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 8,
+          "shape": [
+            3,
+            3
+          ],
+          "data": [
+            "one",
+            "two",
+            "gamma",
+            "a,,b",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AwAAAAAAAAABAAAAAAAAAAAAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "StringSplit-1",
+      "op": "StringSplit",
+      "version": 20,
+      "domain": "",
+      "model": "CAo6XgoqCgJ4MBICeTASAnkxIgtTdHJpbmdTcGxpdCoPCghtYXhzcGxpdKABAhgBEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAgSBAoCCANiBAoCeTBiBAoCeTFCBAoAEBQ=",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            3
+          ],
+          "data": [
+            "  one  two  gamma  ",
+            "a,,b",
+            "  "
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 8,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            "one",
+            "two  gamma",
+            "a,,b",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "StringSplit-2",
+      "op": "StringSplit",
+      "version": 20,
+      "domain": "",
+      "model": "CAo6YAosCgJ4MBICeTASAnkxIgtTdHJpbmdTcGxpdCoRCglkZWxpbWl0ZXKgAQMiASwSEmNsZWFuLXJvb20tZml4dHVyZVoQCgJ4MBIKCggICBIECgIIA2IECgJ5MGIECgJ5MUIECgAQFA==",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            3
+          ],
+          "data": [
+            "  one  two  gamma  ",
+            "a,,b",
+            "  "
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 8,
+          "shape": [
+            3,
+            3
+          ],
+          "data": [
+            "  one  two  gamma  ",
+            "",
+            "",
+            "a",
+            "",
+            "b",
+            "  ",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "AQAAAAAAAAADAAAAAAAAAAEAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "id": "Scaler-0",
+      "op": "Scaler",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6ewpJCgJ4MBICeTAiBlNjYWxlcioVCgZvZmZzZXSgAQY6CAAAgD8AAABAKhQKBXNjYWxloAEGOggAAABAAABAQDoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgHEggKAggCCgIIAmIECgJ5MEIECgAQBEIOCgphaS5vbm54Lm1sEAQ=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "AAAAAAAAAAAAAIBAAADAQA=="
+        }
+      ]
+    },
+    {
+      "id": "Normalizer-0",
+      "op": "Normalizer",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6YQovCgJ4MBICeTAiCk5vcm1hbGl6ZXIqDQoEbm9ybaABAyICTDE6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwICxIICgIIAgoCCAJiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 11,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            -3,
+            -4,
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "t23bviVJEr8AAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "Normalizer-1",
+      "op": "Normalizer",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6YQovCgJ4MBICeTAiCk5vcm1hbGl6ZXIqDQoEbm9ybaABAyICTDI6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwICxIICgIIAgoCCAJiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 11,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            -3,
+            -4,
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "mpkZv83MTL8AAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "Normalizer-2",
+      "op": "Normalizer",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6YgowCgJ4MBICeTAiCk5vcm1hbGl6ZXIqDgoEbm9ybaABAyIDTUFYOgphaS5vbm54Lm1sEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAsSCAoCCAIKAggCYgQKAnkwQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 11,
+          "shape": [
+            2,
+            2
+          ],
+          "data": [
+            -3,
+            -4,
+            0,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            2,
+            2
+          ],
+          "data": "AACAP6uqqj8AAAAAAAAAAA=="
+        }
+      ]
+    },
+    {
+      "id": "OneHotEncoder-0",
+      "op": "OneHotEncoder",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6cApCCgJ4MBICeTAiDU9uZUhvdEVuY29kZXIqHQoLY2F0c19pbnQ2NHOgAQdA////////////AUACOgphaS5vbm54Lm1sEhJjbGVhbi1yb29tLWZpeHR1cmVaEAoCeDASCgoICAESBAoCCANiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3
+          ],
+          "data": [
+            2.9,
+            99,
+            -1
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAA"
+        }
+      ]
+    },
+    {
+      "id": "FeatureVectorizer-0",
+      "op": "FeatureVectorizer",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6jQEKRQoCeDAKAngxEgJ5MCIRRmVhdHVyZVZlY3Rvcml6ZXIqGAoPaW5wdXRkaW1lbnNpb25zoAEHQANAAjoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggBCgIIAloUCgJ4MRIOCgwIARIICgIIAQoCCAFiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            1,
+            2
+          ],
+          "data": [
+            2,
+            3
+          ]
+        },
+        "x1": {
+          "kind": 1,
+          "shape": [
+            1,
+            1
+          ],
+          "data": [
+            7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            1,
+            5
+          ],
+          "data": "AAAAQAAAQEAAAAAAAADgQAAAAAA="
+        }
+      ]
+    },
+    {
+      "id": "ArrayFeatureExtractor-0",
+      "op": "ArrayFeatureExtractor",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6bwovCgJ4MAoCeDESAnkwIhVBcnJheUZlYXR1cmVFeHRyYWN0b3I6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoQCgJ4MBIKCggIBxIECgIIA1oQCgJ4MRIKCggIBxIECgIIAmIECgJ5MEIECgAQBEIOCgphaS5vbm54Lm1sEAQ=",
+      "feeds": {
+        "x0": {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": [
+            "9007199254740993",
+            2,
+            3
+          ]
+        },
+        "x1": {
+          "kind": 7,
+          "shape": [
+            2
+          ],
+          "data": [
+            2,
+            0
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            1,
+            2
+          ],
+          "data": "AwAAAAAAAAABAAAAAAAgAA=="
+        }
+      ]
+    },
+    {
+      "id": "LabelEncoder-0",
+      "op": "LabelEncoder",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6hQEKVwoCeDASAnkwIgxMYWJlbEVuY29kZXIqGwoMa2V5c19zdHJpbmdzoAEISgNjYXRKA2RvZyoWCg12YWx1ZXNfaW50NjRzoAEHQAdACDoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhAKAngwEgoKCAgIEgQKAggDYgQKAnkwQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            3
+          ],
+          "data": [
+            "cat",
+            "dog",
+            "none"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAIAAAAAAAAAP//////////"
+        }
+      ]
+    },
+    {
+      "id": "CategoryMapper-0",
+      "op": "CategoryMapper",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6hQEKVwoCeDASAnkwIg5DYXRlZ29yeU1hcHBlciobCgxjYXRzX3N0cmluZ3OgAQhKA2NhdEoDZG9nKhQKC2NhdHNfaW50NjRzoAEHQAdACDoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhAKAngwEgoKCAgIEgQKAggDYgQKAnkwQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 8,
+          "shape": [
+            3
+          ],
+          "data": [
+            "cat",
+            "dog",
+            "none"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAIAAAAAAAAAP//////////"
+        }
+      ]
+    },
+    {
+      "id": "LinearClassifier-0",
+      "op": "LinearClassifier",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo62QEKoAEKAngwEgJ5MBICeTEiEExpbmVhckNsYXNzaWZpZXIqIwoMY29lZmZpY2llbnRzoAEGOhAAAIA/AAAAAAAAAAAAAIA/KhkKCmludGVyY2VwdHOgAQY6CAAAAAAAAAAAKhkKDnBvc3RfdHJhbnNmb3JtoAEDIgROT05FKhkKEGNsYXNzbGFiZWxzX2ludHOgAQdAA0AHOgphaS5vbm54Lm1sEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAMKAggCYgQKAnkwYgQKAnkxQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAHAAAAAAAAAAcAAAAAAAAA"
+        },
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAAAAAgD8AAIC/AAAAQM3MTD4zMzM/"
+        }
+      ]
+    },
+    {
+      "id": "LinearRegressor-0",
+      "op": "LinearRegressor",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6wwEKkAEKAngwEgJ5MCIPTGluZWFyUmVncmVzc29yKiMKDGNvZWZmaWNpZW50c6ABBjoQAACAPwAAAAAAAAAAAACAPyoZCgppbnRlcmNlcHRzoAEGOggAAAAAAAAAACoZCg5wb3N0X3RyYW5zZm9ybaABAyIETk9ORSoOCgd0YXJnZXRzoAECGAI6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAwoCCAJiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAAAAAgD8AAIC/AAAAQM3MTD4zMzM/"
+        }
+      ]
+    },
+    {
+      "id": "LinearClassifier-1",
+      "op": "LinearClassifier",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo63QEKpAEKAngwEgJ5MBICeTEiEExpbmVhckNsYXNzaWZpZXIqIwoMY29lZmZpY2llbnRzoAEGOhAAAIA/AAAAAAAAAAAAAIA/KhkKCmludGVyY2VwdHOgAQY6CAAAAAAAAAAAKh0KDnBvc3RfdHJhbnNmb3JtoAEDIghMT0dJU1RJQyoZChBjbGFzc2xhYmVsc19pbnRzoAEHQANABzoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggDCgIIAmIECgJ5MGIECgJ5MUIECgAQBEIOCgphaS5vbm54Lm1sEAQ=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAHAAAAAAAAAAcAAAAAAAAA"
+        },
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAP6gmOz+xsok+63thP+zBDD9aDis/"
+        }
+      ]
+    },
+    {
+      "id": "LinearRegressor-1",
+      "op": "LinearRegressor",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6xwEKlAEKAngwEgJ5MCIPTGluZWFyUmVncmVzc29yKiMKDGNvZWZmaWNpZW50c6ABBjoQAACAPwAAAAAAAAAAAACAPyoZCgppbnRlcmNlcHRzoAEGOggAAAAAAAAAACodCg5wb3N0X3RyYW5zZm9ybaABAyIITE9HSVNUSUMqDgoHdGFyZ2V0c6ABAhgCOgphaS5vbm54Lm1sEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAMKAggCYgQKAnkwQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAP6gmOz+xsok+63thP+zBDD9aDis/"
+        }
+      ]
+    },
+    {
+      "id": "LinearClassifier-2",
+      "op": "LinearClassifier",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo63AEKowEKAngwEgJ5MBICeTEiEExpbmVhckNsYXNzaWZpZXIqIwoMY29lZmZpY2llbnRzoAEGOhAAAIA/AAAAAAAAAAAAAIA/KhkKCmludGVyY2VwdHOgAQY6CAAAAAAAAAAAKhwKDnBvc3RfdHJhbnNmb3JtoAEDIgdTT0ZUTUFYKhkKEGNsYXNzbGFiZWxzX2ludHOgAQdAA0AHOgphaS5vbm54Lm1sEhJjbGVhbi1yb29tLWZpeHR1cmVaFAoCeDASDgoMCAESCAoCCAMKAggCYgQKAnkwYgQKAnkxQgQKABAEQg4KCmFpLm9ubngubWwQBA==",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAHAAAAAAAAAAcAAAAAAAAA"
+        },
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "sbKJPqgmOz+iQUI95ttzPwNNwT5/WR8/"
+        }
+      ]
+    },
+    {
+      "id": "LinearRegressor-2",
+      "op": "LinearRegressor",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6xgEKkwEKAngwEgJ5MCIPTGluZWFyUmVncmVzc29yKiMKDGNvZWZmaWNpZW50c6ABBjoQAACAPwAAAAAAAAAAAACAPyoZCgppbnRlcmNlcHRzoAEGOggAAAAAAAAAACocCg5wb3N0X3RyYW5zZm9ybaABAyIHU09GVE1BWCoOCgd0YXJnZXRzoAECGAI6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAwoCCAJiBAoCeTBCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "sbKJPqgmOz+iQUI95ttzPwNNwT5/WR8/"
+        }
+      ]
+    },
+    {
+      "id": "LinearClassifier-3",
+      "op": "LinearClassifier",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo64QEKqAEKAngwEgJ5MBICeTEiEExpbmVhckNsYXNzaWZpZXIqIwoMY29lZmZpY2llbnRzoAEGOhAAAIA/AAAAAAAAAAAAAIA/KhkKCmludGVyY2VwdHOgAQY6CAAAAAAAAAAAKiEKDnBvc3RfdHJhbnNmb3JtoAEDIgxTT0ZUTUFYX1pFUk8qGQoQY2xhc3NsYWJlbHNfaW50c6ABB0ADQAc6CmFpLm9ubngubWwSEmNsZWFuLXJvb20tZml4dHVyZVoUCgJ4MBIOCgwIARIICgIIAwoCCAJiBAoCeTBiBAoCeTFCBAoAEARCDgoKYWkub25ueC5tbBAE",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 7,
+          "shape": [
+            3
+          ],
+          "data": "BwAAAAAAAAAHAAAAAAAAAAcAAAAAAAAA"
+        },
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAAAAAgD+iQUI95ttzPwNNwT5/WR8/"
+        }
+      ]
+    },
+    {
+      "id": "LinearRegressor-3",
+      "op": "LinearRegressor",
+      "version": 4,
+      "domain": "ai.onnx.ml",
+      "model": "CAo6ywEKmAEKAngwEgJ5MCIPTGluZWFyUmVncmVzc29yKiMKDGNvZWZmaWNpZW50c6ABBjoQAACAPwAAAAAAAAAAAACAPyoZCgppbnRlcmNlcHRzoAEGOggAAAAAAAAAACohCg5wb3N0X3RyYW5zZm9ybaABAyIMU09GVE1BWF9aRVJPKg4KB3RhcmdldHOgAQIYAjoKYWkub25ueC5tbBISY2xlYW4tcm9vbS1maXh0dXJlWhQKAngwEg4KDAgBEggKAggDCgIIAmIECgJ5MEIECgAQBEIOCgphaS5vbm54Lm1sEAQ=",
+      "feeds": {
+        "x0": {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": [
+            0,
+            1,
+            -1,
+            2,
+            0.2,
+            0.7
+          ]
+        }
+      },
+      "expected": [
+        {
+          "kind": 1,
+          "shape": [
+            3,
+            2
+          ],
+          "data": "AAAAAAAAgD+iQUI95ttzPwNNwT5/WR8/"
+        }
+      ]
+    }
+  ],
+  "unavailable": [
+    {
+      "id": "Det-0",
+      "reason": "[ONNXRuntimeError] : 9 : NOT_IMPLEMENTED : Could not find an implementation for Det(11) node with name ''",
+      "proof": "Analytic regression in tests/onnx-operators.test.js"
+    },
+    {
+      "id": "Binarizer-0",
+      "reason": "[ONNXRuntimeError] : 9 : NOT_IMPLEMENTED : Could not find an implementation for Binarizer(1) node with name ''",
+      "proof": "Analytic regression in tests/onnx-operators.test.js"
+    }
+  ]
+}

@@ -15,6 +15,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/compute',
+    file: 'packages/compute/dist/onnx-kernel.wasm',
+    label: 'onnx-kernel.wasm',
+    kind: 'Rust SIMD ONNX inference',
+    measure: 'file',
+    when: 'loadOnnx(), only from the optional /onnx entry; one isolated instance per model',
+  },
+  {
+    package: '@margoengine/compute',
     file: 'packages/compute/dist/cpu-kernel.wasm',
     label: 'cpu-kernel.wasm',
     kind: 'Rust SIMD CPU backend',

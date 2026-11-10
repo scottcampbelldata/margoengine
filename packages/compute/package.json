@@ -91,6 +91,10 @@
     "./nn-extra": {
       "types": "./dist/nn-extra.d.ts",
       "import": "./dist/nn-extra.js"
+    },
+    "./onnx": {
+      "types": "./dist/onnx.d.ts",
+      "import": "./dist/onnx.js"
     }
   },
   "files": [
@@ -123,6 +127,8 @@
     "build:decomp": "node scripts/build-decomp.mjs",
     "build:cpu-wasm": "node scripts/build-cpu.mjs",
     "test:browser:cpu-wasm": "cd ../.. && node packages/compute/tests/cpu-wasm-browser.mjs",
-    "test:browser:nn-extra": "cd ../.. && node packages/compute/tests/nn-extra-browser.mjs"
+    "test:browser:nn-extra": "cd ../.. && node packages/compute/tests/nn-extra-browser.mjs",
+    "build:onnx": "node scripts/build-onnx.mjs",
+    "test:browser:onnx-wasm": "cd ../.. && node packages/compute/tests/onnx-browser.mjs"
   }
 }

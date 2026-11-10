@@ -1,0 +1,20 @@
+{
+  "source": "https://media.githubusercontent.com/media/onnx/models/main/validated/vision/classification/mnist/model/mnist-12.tar.gz",
+  "description": "Unchanged standard ONNX Model Zoo MNIST-12 model and reference input/output data. No implementation code.",
+  "license": "MIT",
+  "licenseDeclaration": "https://github.com/onnx/models/tree/main/validated/vision/classification/mnist#license",
+  "files": {
+    "input_0.pb": {
+      "bytes": 3157,
+      "sha256": "d44b08082c3ded89e081f699a9d604239818c805ee8b5d03cd80f338e641c720"
+    },
+    "mnist-12.onnx": {
+      "bytes": 26143,
+      "sha256": "5c688690f8bacf667d4c2074af5ad0646ca328d7ab03eccf944a65b320171bdd"
+    },
+    "output_0.pb": {
+      "bytes": 66,
+      "sha256": "153a5b1d96f9a544fc398f8c1837b994bbf5f26d3d12a7eff2ec63f7fb2317e1"
+    }
+  }
+}

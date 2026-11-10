@@ -7926,6 +7926,11 @@
       "commit": "batch181-density",
       "reason": "New optional sciviz/density: absent before (0 B), 4815 B gzip after, ceiling 5071 B. Exact u32 raster accumulation, separable Gaussian, bounded readback and source replacement. Core + stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-274-job5",
+      "reason": "New optional ONNX entry: 0 to 10139 B gzip, isolated lazy Wasm. Keeping graph ownership and schema dispatch together avoids duplicated lifecycle bridges."
     }
   ],
   "items": {
@@ -9353,7 +9358,8 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/sciviz/density": 5071
+    "@margoengine/sciviz/density": 5071,
+    "@margoengine/compute/onnx": 10444
   },
-  "total": 15344292
+  "total": 15354736
 }

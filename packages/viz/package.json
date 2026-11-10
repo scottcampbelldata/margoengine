@@ -227,6 +227,10 @@
       "types": "./dist/compute/nn-extra.d.ts",
       "import": "./dist/compute/nn-extra.js"
     },
+    "./compute/onnx": {
+      "types": "./dist/compute/onnx.d.ts",
+      "import": "./dist/compute/onnx.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"
