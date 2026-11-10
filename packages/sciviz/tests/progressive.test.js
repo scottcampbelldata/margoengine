@@ -87,4 +87,10 @@ test('controller is an optional engine plugin with disposable ownership and no g
   controller.dispose();
   assert.equal(plugin, undefined);
   assert.throws(() => controller.recordFrameTime(1), { code: 'state' });
+  // An engine feature attaches with the static factory, like every other package feature.
+  const attached = ProgressiveRendering.attach({ engine, renderer }, { settleFrames: 1 });
+  assert.ok(attached instanceof ProgressiveRendering);
+  assert.equal(plugin, attached);
+  attached.dispose();
+  assert.equal(plugin, undefined);
 });

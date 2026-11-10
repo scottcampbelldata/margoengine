@@ -22,6 +22,7 @@ export interface ProgressiveOptions {
 
 export class ProgressiveRendering implements EnginePlugin {
     readonly name = "sciviz-progressive";
+    static attach(figure: Figure, options?: ProgressiveOptions): ProgressiveRendering;
     constructor(figure: Figure, options?: ProgressiveOptions);
     get state(): ProgressiveState;
     setup(engine: Engine): void;

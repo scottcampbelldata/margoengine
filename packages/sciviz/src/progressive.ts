@@ -43,6 +43,10 @@ export class ProgressiveRendering implements EnginePlugin {
     dispose: () => this.dispose(),
   };
 
+  /** Creates the controller and attaches it to the figure's engine; same as `new ProgressiveRendering(figure, options)`. */
+  static attach(figure: Figure, options: ProgressiveOptions = {}): ProgressiveRendering {
+    return new this(figure, options);
+  }
   /** Attaches to the figure's engine. Existing layer settings and canvas dimensions are retained. */
   constructor(figure: Figure, options: ProgressiveOptions = {}) {
     requireGPU(figure.renderer);
