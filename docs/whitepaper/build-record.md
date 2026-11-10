@@ -4926,8 +4926,8 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
 - **Review 5:** all 22 list 2 and 3 packages; findings, inputs and fix hashes in
   [review-5.md](../work-lists/review-5.md).
 - **Batch 132, research and quality audit:** [package-audit.md](package-audit.md), one row per package with sources
-  read in full, what was checked, found, fixed and still open. 94 of 102 packages audited; 47 rows are partial and say
-  which files are owed; sciviz, physics, physics2d, ragdoll and the four generated install kits are listed with the
+  read in full, what was checked, found, fixed and still open. 97 of 102 packages audited; 47 rows are partial and say
+  which files are owed; sciviz, physics, physics2d, ragdoll and the game install kit are listed with the
   reason they were not audited.
 - **Mac bug sweep**, folded into batch 132: every audited package's CPU, GPU and browser tests ran on Metal under
   WebGPU and the WebGL2 layer. The Mac-only bugs and their fixes are in the perf-history table above; the Mac-only
