@@ -10,8 +10,7 @@ const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function grid(side) {
   const vertices = new Float32Array((side + 1) * (side + 1) * 6),
     indices = new Uint32Array(side * side * 6);
-  for (let y = 0, v = 0; y <= side; y++)
-    for (let x = 0; x <= side; x++, v += 6) vertices.set([x, 0, y, 0, 1, 0], v);
+  for (let y = 0, v = 0; y <= side; y++) for (let x = 0; x <= side; x++, v += 6) vertices.set([x, 0, y, 0, 1, 0], v);
   for (let y = 0, n = 0; y < side; y++)
     for (let x = 0; x < side; x++, n += 6) {
       const p = y * (side + 1) + x,
@@ -83,6 +82,8 @@ test('bad limits and more than one batch are refused', () => {
 function harness(vendor) {
   const h = optionalGPU();
   if (vendor) h.engine.gpu.adapterInfo = { vendor };
+  h.engine.gpu.createBindGroupLayout = (d) => d;
+  h.engine.gpu.createPipelineLayout = (d) => d;
   globalThis.GPUTextureUsage = { RENDER_ATTACHMENT: 16, TEXTURE_BINDING: 4 };
   h.context.shader = wgsl;
   h.context.descriptor = {
@@ -116,7 +117,7 @@ test('the main pass draws the kept indices; the cone test is on for a single-sid
   assert.equal(coneTest(both), 0, 'a double-sided mesh draws its back faces');
 });
 
-test('the kernel gets the eye in the world and finds it in each part\'s own space', () => {
+test("the kernel gets the eye in the world and finds it in each part's own space", () => {
   const h = harness(),
     m = mesh();
   h.engine.use(m);
@@ -130,11 +131,17 @@ test('parts: one region and one indirect draw each, over the device limit refuse
   const h = harness(),
     geometry = box(),
     material = new PbrMaterial(),
-    m = new MeshletMesh([{ geometry, material, transforms: new Float32Array([...identity, ...identity, ...identity]) }]);
+    m = new MeshletMesh([
+      { geometry, material, transforms: new Float32Array([...identity, ...identity, ...identity]) },
+    ]);
   h.engine.use(m);
   h.engine.frameGraph.execute(h.context);
   assert.equal(m.clusters.kept.size, geometry.indices.length * 3 * 4);
-  assert.equal(m.clusters.args.size, 3 * 20);
+  assert.equal(
+    m.clusters.args.size,
+    3 * 20 + 3 * m.meshlets.count * 4,
+    'draw arguments, then a word per cluster and part',
+  );
   const over = new MeshletMesh([{ geometry, material, transforms: new Float32Array(identity) }]);
   h.engine.use(over);
   const limits = h.engine.gpu.limits;
@@ -176,9 +183,21 @@ test('a shadow frame writes clip-box planes per cascade, and a frame without one
   const scale = new Float32Array([0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0.5, 1]);
   m.prepareShadow({ context: { device: h.engine.gpu, encoder: h.context.encoder }, matrices: scale, cascades: 1 });
   const planes = new Float32Array(m.clusterValues).subarray(0, 24);
-  assert.deepEqual([...planes.subarray(0, 4)].map((v) => +v.toFixed(5)), [1, 0, 0, 2], 'x >= -2');
-  assert.deepEqual([...planes.subarray(16, 20)].map((v) => +v.toFixed(5)), [0, 0, 1, 2], 'depth >= 0');
-  assert.deepEqual([...planes.subarray(20, 24)].map((v) => +v.toFixed(5)), [0, 0, -1, 2], 'depth <= 1');
+  assert.deepEqual(
+    [...planes.subarray(0, 4)].map((v) => +v.toFixed(5)),
+    [1, 0, 0, 2],
+    'x >= -2',
+  );
+  assert.deepEqual(
+    [...planes.subarray(16, 20)].map((v) => +v.toFixed(5)),
+    [0, 0, 1, 2],
+    'depth >= 0',
+  );
+  assert.deepEqual(
+    [...planes.subarray(20, 24)].map((v) => +v.toFixed(5)),
+    [0, 0, -1, 2],
+    'depth <= 1',
+  );
   draws.length = 0;
   m.drawParts(pass, 0);
   assert.ok(draws.includes('clusters') && !draws.includes('whole'));
@@ -212,4 +231,39 @@ test('on the WebGL2 layer the whole mesh draws through its own index buffer', ()
   h.engine.frameGraph.execute(h.context);
   assert.equal(m.clusters, undefined);
   assert.ok(!h.pipelines.some((p) => /fn keep\(n:u32/.test(p.compute?.module.code ?? '')));
+});
+
+// Batch 132 audit: the kept clusters went into each part's region at an atomicAdd slot, so their order, and with it every
+// depth tie between them, changed from frame to frame (meshlets-check redrew the same frame 22 to 33 pixels apart on the
+// M6). The cull now tests, scans and copies, so the kept clusters sit in cluster order.
+test('the cluster cull keeps clusters in cluster order: test, scan, copy, and no atomics', () => {
+  const h = harness(),
+    m = mesh(),
+    order = [];
+  const begin = h.context.encoder.beginComputePass;
+  h.context.encoder.beginComputePass = () => {
+    const pass = begin();
+    pass.setPipeline = (p) => order.push(p.compute.entryPoint);
+    pass.dispatchWorkgroups = (...size) => order.push(size.join('x'));
+    return pass;
+  };
+  h.engine.use(m);
+  h.engine.frameGraph.execute(h.context);
+  const n = m.meshlets.count,
+    start = order.indexOf('test');
+  assert.deepEqual(order.slice(start, start + 6), [
+    'test',
+    `${Math.ceil(n / 64)}x1x1`,
+    'scan',
+    '1',
+    'copy',
+    `${n}x1x1`,
+  ]);
+  const code = h.pipelines.find((p) => p.compute?.entryPoint === 'copy').compute.module.code;
+  assert.doesNotMatch(code, /atomic/);
+  assert.equal(
+    new Uint32Array(m.clusterValues)[32],
+    5,
+    "the clusters' words start after the one part's draw arguments",
+  );
 });

@@ -154,12 +154,16 @@ function clusterBounds(vertices: Float32Array, indices: Uint32Array, from: numbe
   out.push(c[0], c[1], c[2], radius, axis[0], axis[1], axis[2], cosine > 0 ? Math.sqrt(1 - cosine * cosine) : -1);
 }
 
-// One workgroup per cluster and part: its first thread tests the cluster and reserves room in the part's region, then all
-// copy its indices. Local-space tests hold under any affine matrix of positive determinant; a triangle's side of its plane
-// does not change. `live` says which parts run: the camera's kernel reads the count of parts kept, a shadow kernel their
-// hidden words. Each part's indices sit in a region of their own, so a part draws with one indirect call.
+// Three kernels over every cluster and part. `test` writes each cluster's index count if it is kept, else 0, at its own word
+// of `args` after the draw arguments. `scan`, one workgroup per part, turns those words into each kept cluster's place in
+// the part's region (an inclusive scan by doubling in workgroup memory, Hillis and Steele 1986, chunk by chunk; 0xffffffff for a dropped cluster) and writes the
+// part's index count. `copy`, one workgroup per cluster and part, copies a kept cluster's indices to its place. The kept
+// clusters so sit in cluster order every frame: no atomic reservation, so the draw order and with it every depth tie is
+// the same from frame to frame. Local-space tests hold under any affine matrix of positive determinant; a triangle's side
+// of its plane does not change. `live` says which parts run: the camera's kernel reads the count of parts kept, a shadow
+// kernel their hidden words. Each part's indices sit in a region of their own, so a part draws with one indirect call.
 const clusterShader = (shadow: boolean, occlusion: boolean): string => `
-struct Frame {planes:array<vec4f,6>,eye:vec4f,size:vec4u}
+struct Frame {planes:array<vec4f,6>,eye:vec4f,size:vec4u,list:vec4u}
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var<storage,read> parts:array<Record>;
@@ -167,7 +171,7 @@ struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(3) var<storage,read> ranges:array<vec2u>;
 @group(0) @binding(4) var<storage,read> indices:array<u32>;
 @group(0) @binding(5) var<storage,read_write> kept:array<u32>;
-@group(0) @binding(6) var<storage,read_write> args:array<atomic<u32>>;
+@group(0) @binding(6) var<storage,read_write> args:array<u32>;
 @group(0) @binding(7) var<storage,read> live:array<u32>;
 ${
   occlusion
@@ -177,7 +181,7 @@ ${
 ${occlusionCode}`
     : ''
 }
-var<workgroup> base:u32;
+var<workgroup> sums:array<u32,256>;
 fn keep(n:u32,m:mat4x4f)->bool {
   let s=bounds[n*2u];let c=(m*vec4f(s.xyz,1.0)).xyz;
   var r=s.w*sqrt(max(dot(m[0].xyz,m[0].xyz),max(dot(m[1].xyz,m[1].xyz),dot(m[2].xyz,m[2].xyz))));
@@ -197,13 +201,43 @@ fn keep(n:u32,m:mat4x4f)->bool {
   let cosine=sqrt(1.0-cone.w*cone.w);
   return along*cosine-aside*cone.w<=s.w*(1.0+1e-4)+1e-5*l;
 }
-@compute @workgroup_size(64) fn cull(@builtin(workgroup_id) w:vec3u,@builtin(local_invocation_index) l:u32) {
-  let n=w.y*65535u+w.x;let j=w.z;
-  if(n>=f.size.x||${shadow ? 'live[j]!=0u' : 'j>=live[1]'}){return;}
-  let slot=f.size.w+j;let range=ranges[n];
-  if(l==0u){base=0xffffffffu;if(keep(n,parts[j].m)){base=atomicAdd(&args[slot*5u],range.y);}}
-  let at=workgroupUniformLoad(&base);
+// The word of cluster n in list slot s, after every list's draw arguments.
+fn word(s:u32,n:u32)->u32 {return f.list.x+s*f.size.x+n;}
+@compute @workgroup_size(64) fn test(@builtin(workgroup_id) w:vec3u,@builtin(local_invocation_index) l:u32) {
+  let n=(w.y*65535u+w.x)*64u+l;let j=w.z;
+  if(n>=f.size.x){return;}
+  var size=0u;
+  if(${shadow ? 'live[j]==0u' : 'j<live[1]'}&&keep(n,parts[j].m)){size=ranges[n].y;}
+  args[word(f.size.w+j,n)]=size;
+}
+@compute @workgroup_size(256) fn scan(@builtin(workgroup_id) w:vec3u,@builtin(local_invocation_index) l:u32) {
+  let slot=f.size.w+w.x;
+  var carry=0u;
+  for(var first=0u;first<f.size.x;first+=256u){
+    let n=first+l;
+    var v=0u;
+    if(n<f.size.x){v=args[word(slot,n)];}
+    sums[l]=v;
+    for(var d=1u;d<256u;d<<=1u){
+      workgroupBarrier();
+      var t=sums[l];
+      if(l>=d){t+=sums[l-d];}
+      workgroupBarrier();
+      sums[l]=t;
+    }
+    workgroupBarrier();
+    if(n<f.size.x){args[word(slot,n)]=select(0xffffffffu,carry+sums[l]-v,v!=0u);}
+    carry+=sums[255];
+    workgroupBarrier();
+  }
+  if(l==0u){args[slot*5u]=carry;}
+}
+@compute @workgroup_size(64) fn copy(@builtin(workgroup_id) w:vec3u,@builtin(local_invocation_index) l:u32) {
+  let n=w.y*65535u+w.x;
+  if(n>=f.size.x){return;}
+  let slot=f.size.w+w.z;let at=args[word(slot,n)];
   if(at==0xffffffffu){return;}
+  let range=ranges[n];
   for(var k=l;k<range.y;k+=64u){kept[slot*f.size.y+at+k]=indices[range.x+k];}
 }
 `;
@@ -217,6 +251,15 @@ interface ClusterLists {
   args: GPUBuffer;
   /** What `args` starts each frame from: nothing kept, one instance, each part's region. */
   reset: GPUBuffer;
+  /** The word of `args` where the clusters' words start, after every list's draw arguments. */
+  first: number;
+}
+/** The three kernels of one cluster cull and the layout they share. */
+interface Kernels {
+  layout: GPUBindGroupLayout;
+  test: GPUComputePipeline;
+  scan: GPUComputePipeline;
+  copy: GPUComputePipeline;
 }
 
 /**
@@ -235,13 +278,13 @@ export class MeshletMesh extends CulledParts {
     bounds: GPUBuffer;
     ranges: GPUBuffer;
     indices: GPUBuffer;
-    pipeline: GPUComputePipeline;
+    kernels: Kernels;
     group?: GPUBindGroup;
     pyramid?: GPUBuffer;
   };
   private shadowClusters?: ClusterLists & {
     frames: GPUBuffer;
-    pipeline: GPUComputePipeline;
+    kernels: Kernels;
     groups: GPUBindGroup[];
     /** Cascades whose lists this frame's `prepareShadow` wrote. */
     cascades: number;
@@ -306,11 +349,13 @@ export class MeshletMesh extends CulledParts {
     d.queue.writeBuffer(reset, 0, start);
     return {
       kept: d.createBuffer({ size: Math.max(bytes, 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDEX }),
+      // The draw arguments, then one word per cluster and part: its index count, then its place in the region.
       args: d.createBuffer({
-        size: start.byteLength,
+        size: start.byteLength + parts * this.meshlets.count * 4,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       }),
       reset,
+      first: parts * 5,
     };
   }
   private buildClusters(d: GPUDevice): NonNullable<MeshletMesh['clusters']> {
@@ -328,14 +373,28 @@ export class MeshletMesh extends CulledParts {
       bounds: data(b),
       ranges: data(r),
       indices: data(i),
-      pipeline: d.createComputePipeline({
-        layout: 'auto',
-        compute: {
-          module: d.createShaderModule({ code: clusterShader(false, this.culling === 'occlusion') }),
-          entryPoint: 'cull',
-        },
-      }),
+      kernels: this.kernels(d, false, this.culling === 'occlusion'),
     };
+  }
+  /** The test, scan and copy kernels, with one layout for the three so they share a bind group. */
+  private kernels(d: GPUDevice, shadow: boolean, occlusion: boolean): Kernels {
+    const compute = 4, // GPUShaderStage.COMPUTE
+      buffer = (binding: number, type: GPUBufferBindingType) => ({ binding, visibility: compute, buffer: { type } }),
+      layout = d.createBindGroupLayout({
+        entries: [
+          buffer(0, 'uniform'),
+          ...[1, 2, 3, 4].map((b) => buffer(b, 'read-only-storage')),
+          buffer(5, 'storage'),
+          buffer(6, 'storage'),
+          buffer(7, 'read-only-storage'),
+          ...(occlusion ? [buffer(8, 'uniform'), buffer(9, 'read-only-storage')] : []),
+        ],
+      }),
+      module = d.createShaderModule({ code: clusterShader(shadow, occlusion) }),
+      pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
+      kernel = (entryPoint: string) =>
+        d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
+    return { layout, test: kernel('test'), scan: kernel('scan'), copy: kernel('copy') };
   }
   /** The bindings both kernels share. */
   private entries(
@@ -364,7 +423,7 @@ export class MeshletMesh extends CulledParts {
     if (s.group && s.pyramid === pyramid) return s.group;
     s.pyramid = pyramid;
     return (s.group = d.createBindGroup({
-      layout: s.pipeline.getBindGroupLayout(0),
+      layout: s.kernels.layout,
       entries: [
         ...this.entries({ buffer: s.frame }, this.buffers.drawn, this.buffers.args, s),
         ...(pyramid
@@ -376,11 +435,16 @@ export class MeshletMesh extends CulledParts {
       ],
     }));
   }
-  private dispatch(c: GPUCommandEncoder, pipeline: GPUComputePipeline, group: GPUBindGroup): void {
+  private dispatch(c: GPUCommandEncoder, { test, scan, copy }: Kernels, group: GPUBindGroup): void {
     const n = this.meshlets.count,
+      groups = Math.ceil(n / 64),
       pass = c.beginComputePass();
-    pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
+    pass.setPipeline(test);
+    pass.dispatchWorkgroups(Math.min(groups, 65535), Math.ceil(groups / 65535), this.slots);
+    pass.setPipeline(scan);
+    pass.dispatchWorkgroups(this.slots);
+    pass.setPipeline(copy);
     pass.dispatchWorkgroups(Math.min(n, 65535), Math.ceil(n / 65535), this.slots);
     pass.end();
   }
@@ -399,9 +463,10 @@ export class MeshletMesh extends CulledParts {
     w[29] = this.meshlets.indices.length;
     w[30] = this.culling === 'occlusion' && exactShader(c.shader) ? 1 : 0;
     w[31] = 0;
+    w[32] = s.first;
     d.queue.writeBuffer(s.frame, 0, this.clusterValues);
     c.encoder.copyBufferToBuffer(s.reset, 0, s.args, 0, this.slots * 20);
-    this.dispatch(c.encoder, s.pipeline, this.cameraGroup(d));
+    this.dispatch(c.encoder, s.kernels, this.cameraGroup(d));
   }
   protected override drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void {
     const s = this.clusters;
@@ -432,14 +497,11 @@ export class MeshletMesh extends CulledParts {
     let s = this.shadowClusters;
     if (!s) {
       const lists = this.lists(d, 4),
-        pipeline = d.createComputePipeline({
-          layout: 'auto',
-          compute: { module: d.createShaderModule({ code: clusterShader(true, false) }), entryPoint: 'cull' },
-        }),
+        kernels = this.kernels(d, true, false),
         frames = d.createBuffer({ size: 4 * 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
         groups = [0, 1, 2, 3].map((k) =>
           d.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
+            layout: kernels.layout,
             entries: this.entries(
               { buffer: frames, offset: k * 256, size: 144 },
               this.buffers.records,
@@ -448,7 +510,7 @@ export class MeshletMesh extends CulledParts {
             ),
           }),
         );
-      s = this.shadowClusters = { ...lists, frames, pipeline, groups, cascades: 0 };
+      s = this.shadowClusters = { ...lists, frames, kernels, groups, cascades: 0 };
     }
     this.flush(d);
     const f = this.clusterFloats,
@@ -471,8 +533,9 @@ export class MeshletMesh extends CulledParts {
       w[29] = this.meshlets.indices.length;
       w[30] = 0;
       w[31] = k * this.slots;
+      w[32] = s.first;
       d.queue.writeBuffer(s.frames, k * 256, this.clusterValues);
-      this.dispatch(context.encoder, s.pipeline, s.groups[k]);
+      this.dispatch(context.encoder, s.kernels, s.groups[k]);
     }
     s.cascades = cascades;
   }

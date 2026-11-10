@@ -88,7 +88,8 @@ let serial = 0;
  * Instances of one object at several levels of detail. One compute pass tests each instance against the frustum, picks its
  * level by its size on screen and appends it to that level's list, so the frame has no CPU loop over instances. Core draws
  * each list as one batch through `Batch.redirect`, with its own shader and shader patches. Instances of a level draw in no
- * fixed order, which only shows between exactly coplanar faces.
+ * fixed order. That shows between exactly coplanar faces, and on GPUs whose multisampled edges depend on draw order
+ * (the Apple M6) where instances overlap at an edge: known-bugs.md, batch 132 culling.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class LodInstances implements EnginePlugin {

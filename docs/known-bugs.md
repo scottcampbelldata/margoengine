@@ -5496,17 +5496,31 @@ Fixed with regressions in `packages/culling/test/audit-132.test.js` (all 7 fail 
 second scene released its buffers and stayed registered there, its pass drawing a disposed plugin. They now leave
 through `engine.sceneOf(this)`.
 
-Open, found by the Mac sweep (M6, Chromium WebGPU on Metal), not fixed: `MeshletMesh` frames are not deterministic.
-`node packages/culling/test/gpu/meshlets-check.mjs` fails at step 0 ("whole ball: the far side drops") with 69 to 77
-pixels off core by 1 to 3 levels, a different count each run. Redrawing engine A with nothing changed differs from its
-own last frame by 22 to 33 pixels at step 0 and 5 to 15 at the later steps, while core's frames repeat to the byte.
-No pixel is missing or extra (every differing pixel is ball in both frames), and the count stays with
-`maxTriangles: 1` (one triangle per cluster), so the cluster tests are not dropping visible triangles. Cause: the cull
-kernel reserves each kept cluster's room with `atomicAdd` on the part's index count (meshlets.ts clusterShader), so the
-order of clusters in `kept`, and with it the draw order, changes from frame to frame; where two front faces of the
-rippled ball tie in depth under `greater-equal`, the last drawn wins. Core draws in index order. To close it, the kept
-list needs a stable order (a prefix sum over the clusters' keep flags per part, Blelloch 1990, instead of the atomic
-reservation). The check's 0-pixel requirement was not relaxed. The `parts-check.mjs` shadows step 2 1-pixel failure is
-the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it stops `test:gpu` before the
-later scripts, which pass when run one by one.
+Fixed, found by the Mac sweep (M6, Chromium WebGPU on Metal): `MeshletMesh` frames were not deterministic. Redrawing
+engine A with nothing changed differed from its own last frame by 21 to 33 pixels at step 0 of
+`node packages/culling/test/gpu/meshlets-check.mjs`. Cause: the cull kernel reserved each kept cluster's room with
+`atomicAdd` on the part's index count (meshlets.ts clusterShader), so the order of clusters in `kept`, and with it the
+draw order, changed from frame to frame. Fix: three kernels, `test` (each cluster's index count if kept, at its own word),
+`scan` (one workgroup per part, an inclusive scan by doubling in workgroup memory, Hillis and Steele 1986, gives each
+kept cluster its place) and `copy`; the kept clusters sit in cluster order every frame. Regressions: the frame-repeat
+assertion in meshlets-check.mjs (each step redraws and compares A with its last frame to the byte; 21 pixels on the old
+kernel) and "the cluster cull keeps clusters in cluster order" in packages/culling/test/meshlets.test.js.
+
+Open, Scott's call (M6, 4x MSAA): meshlets-check still fails at step 0 against core, 69 pixels off by 1 level, all on
+the ball's silhouette, now the same count every run. It is not the cull: on the M6 core's own MSAA frame changes with the
+primitive stream. A probe page drew the ball with core twice: the same 36,864 triangles in cluster order instead of index
+order differed by 75 pixels; only the cone-kept 25,447 triangles in index order (every dropped one back facing by at
+least 4.5 degrees, checked in double precision) differed by 14; with `exactSize` (no MSAA) all three cases are 0. So no
+cluster cull can match core to the byte under MSAA on this GPU (the scatter entry above saw the same M6 MSAA order
+dependence). The check's 0-pixel requirement was not relaxed; options are comparing without MSAA, or keeping the input
+triangle order and accepting the remaining 14 pixels. On `MARGO_COMPAT=1` the check also fails at step 0 ("clusters drop
+triangles (0)"): the WebGL2 layer draws the whole mesh by design, and the check has no compat branch. The `parts-check.mjs`
+shadows step 2 1-pixel failure is the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it
+stops `test:gpu` before the later scripts, which pass when run one by one.
+
+Open (M6, found reading the code, not yet seen failing): `LodInstances` appends each kept instance to its level's list
+at an `atomicAdd` slot (lod.ts shader), so the order of a level's instances changes from frame to frame. Its doc said
+that shows only between exactly coplanar faces; on the M6 4x MSAA edge pixels also follow draw order (the meshlet
+probe above, and scatter's entry), so overlapping instance edges can change between identical frames. `lod-check.mjs`
+has no frame-repeat assertion. The fix is scatter's and MeshletMesh's: flag, prefix count, compact in instance order.
 

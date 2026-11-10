@@ -55,9 +55,7 @@ async function setup() {
   const material = new PbrMaterial({ color: '#58a860', roughness: 0.5, doubleSided: false });
   core = b.createMesh().setGeometry(geometry).setMaterial(material);
   b.render({ culling: false });
-  mesh = MeshletMesh.attach(a, [
-    { geometry, material, transforms: new Float32Array(core.matrix) },
-  ]);
+  mesh = MeshletMesh.attach(a, [{ geometry, material, transforms: new Float32Array(core.matrix) }]);
 }
 const steps = [
   ['whole ball: the far side drops', () => {}],
@@ -95,12 +93,16 @@ async function instances() {
     places = [spot(-4, 0), spot(0, -2), spot(4, 0)],
     transforms = new Float32Array(places.flat());
   mesh = MeshletMesh.attach(a, [{ geometry, material, transforms }]);
-  for (const m of places)
-    b.createMesh().setGeometry(geometry).setMaterial(material).setPosition([m[12], m[13], m[14]]);
+  for (const m of places) b.createMesh().setGeometry(geometry).setMaterial(material).setPosition([m[12], m[13], m[14]]);
   look([0, 2, 11]);
   await draw();
   await draw();
-  return { label: 'three parts', kept: await mesh.readTriangles(), total: (geometry.indices.length / 3) * 3, clusters: mesh.meshlets.count };
+  return {
+    label: 'three parts',
+    kept: await mesh.readTriangles(),
+    total: (geometry.indices.length / 3) * 3,
+    clusters: mesh.meshlets.count,
+  };
 }
 // A ball with a wall hiding its left half, Hi-Z against none, and the same picture as core.
 async function occlusion() {
@@ -108,7 +110,11 @@ async function occlusion() {
   const material = new PbrMaterial({ color: '#58a860', roughness: 0.5, doubleSided: true }),
     transforms = new Float32Array(spot(0, 0)),
     wall = (e) =>
-      e.createMesh().setGeometry(box(4, 8, 0.2)).setMaterial(new PbrMaterial({ color: '#c04030' })).setPosition([-2, 0, 3]);
+      e
+        .createMesh()
+        .setGeometry(box(4, 8, 0.2))
+        .setMaterial(new PbrMaterial({ color: '#c04030' }))
+        .setPosition([-2, 0, 3]);
   const plain = MeshletMesh.attach(a, [{ geometry, material, transforms }]),
     first = wall(a);
   b.createMesh().setGeometry(geometry).setMaterial(material);
@@ -130,7 +136,12 @@ async function occlusion() {
 async function shadowed() {
   await fresh();
   const material = new PbrMaterial({ color: '#58a860', roughness: 0.5, doubleSided: false }),
-    floor = (e) => e.createMesh().setGeometry(box(40, 0.25, 40)).setMaterial(new PbrMaterial({ color: '#c8c8c8' })).setPosition([0, -3, 0]),
+    floor = (e) =>
+      e
+        .createMesh()
+        .setGeometry(box(40, 0.25, 40))
+        .setMaterial(new PbrMaterial({ color: '#c8c8c8' }))
+        .setPosition([0, -3, 0]),
     near = spot(0, 0),
     far = spot(30, 0);
   mesh = MeshletMesh.attach(a, [{ geometry, material, transforms: new Float32Array([...near, ...far]) }]);
@@ -153,5 +164,7 @@ async function shadowed() {
     clusters: mesh.meshlets.count,
   };
 }
-window.check = { setup, step, steps: steps.length, errors, instances, occlusion, shadowed };
+// The same frame again with nothing changed: the kept clusters must come out in the same order, so the pixels repeat.
+const redraw = () => draw();
+window.check = { setup, step, steps: steps.length, errors, instances, occlusion, shadowed, redraw };
 window.ready = true;

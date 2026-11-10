@@ -1,5 +1,6 @@
 // Real-GPU check for MeshletMesh: one mesh culled by cluster against the same mesh drawn by core.
-// Frames must match to the byte, and triangles must drop.
+// Frames must match to the byte, and triangles must drop. Redrawing an unchanged frame must give the same bytes (batch 132:
+// an atomic cluster reservation changed the draw order, and with it depth ties, from frame to frame).
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/meshlets-check.mjs
 import assert from 'node:assert/strict';
@@ -17,6 +18,16 @@ try {
     if (m.type() === 'error') pageErrors.push(m.text());
   });
   const shot = async (id) => decodePNG(await page.locator(`#${id}`).screenshot());
+  // Redraws both engines with nothing changed; A's new frame must equal its last to the byte.
+  const repeats = async (label) => {
+    const before = await shot('a');
+    await page.evaluate(() => window.check.redraw());
+    const after = await shot('a');
+    assert.ok(
+      Buffer.from(after.data).equals(Buffer.from(before.data)),
+      `${label}: a redraw differs (${differing(before, after)} pixels)`,
+    );
+  };
   const differing = (x, y) => {
     let n = 0;
     for (let k = 0; k < x.data.length; k += 4) {
@@ -33,6 +44,7 @@ try {
         [a, b] = [await shot('a'), await shot('b')],
         n = differing(a, b);
       console.log(`step ${i} ${r.label}: ${n} differ, ${r.kept} of ${r.total} triangles, ${r.clusters} clusters`);
+      await repeats(r.label);
       assert.equal(n, 0, `${r.label}: frame differs from core`);
       assert.ok(r.kept > 0 && r.kept < r.total, `${r.label}: clusters drop triangles (${r.kept})`);
     }
@@ -41,6 +53,7 @@ try {
         [a, b] = [await shot('a'), await shot('b')],
         n = differing(a, b);
       console.log(`${r.label}: ${n} differ, ${r.kept} of ${r.total} triangles, ${r.clusters} clusters`);
+      await repeats(r.label);
       assert.equal(n, 0, `${r.label}: frame differs from core`);
       assert.ok(r.kept > 0 && r.kept < r.total, `${r.label}: clusters drop triangles (${r.kept})`);
     }
