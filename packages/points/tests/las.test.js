@@ -137,7 +137,8 @@ test('the written bytes hold the header fields and records the specification lay
 });
 
 test('LAS header: 1.4 64-bit counts, bounding box, CRS from GeoTIFF keys, partial reads, stride and maxPoints', async () => {
-  const file = writeLAS({ ...survey(1000), epsg: 26918 });
+  // GeoTIFF keys are for formats 0 to 5 only (the LAS 1.4 CRS table), so this 1.4 file uses format 3.
+  const file = writeLAS({ ...survey(1000), pointFormat: 3, epsg: 26918 });
   const { header, records } = readLASHeader(file);
   assert.equal(header.versionMinor, 4);
   assert.equal(header.pointCount, 1000);
@@ -191,4 +192,39 @@ test('decodePoints reads the records a LAZ decoder returns', () => {
   const { header, records } = readLASHeader(file);
   const points = decodePoints(header, records, file.subarray(header.pointDataOffset));
   assert.equal(points.count, 10);
+});
+
+test('batch 132: points by return are filled in, legacy counts win a disagreement, LAS 1.5 headers read', async () => {
+  const data = survey(300);
+  // The survey cycles one, two and three returns per pulse; count each return number.
+  const expected = new Array(15).fill(0);
+  for (const r of data.returnNumber) expected[r - 1]++;
+  const v14 = readLASHeader(writeLAS(data)).header;
+  assert.deepEqual(v14.pointsByReturn, expected, 'LAS 1.4 R16: points by return must always be populated');
+  const legacy = readLASHeader(writeLAS({ ...data, pointFormat: 1, versionMinor: 2 })).header;
+  assert.deepEqual(legacy.pointsByReturn, expected.slice(0, 5));
+  // A 1.4 file whose non-zero legacy count disagrees with the 64-bit one: the reader uses the legacy value.
+  const mixed = writeLAS({ ...data, pointFormat: 1, versionMinor: 4 });
+  new DataView(mixed.buffer).setUint32(107, 250, true);
+  new DataView(mixed.buffer).setBigUint64(255, 999n, true);
+  const read = readLASHeader(mixed).header;
+  assert.equal(read.pointCount, 250);
+  assert.equal(read.pointsByReturn[0], expected[0], 'legacy return 1 count wins over the 64-bit one');
+  assert.equal((await parseLAS(mixed)).count, 250);
+  // GeoTIFF on formats 6 to 10, or in LAS 1.5, is a file error; WKT is the CRS there.
+  assert.throws(() => writeLAS({ ...data, epsg: 26918 }), /wkt/);
+  assert.throws(() => writeLAS({ ...data, pointFormat: 1, versionMinor: 5 }), /LAS 1.5 removed/);
+  // LAS 1.5: a 393-byte header with the GPS time range and the time offset.
+  const v15 = writeLAS({ ...data, versionMinor: 5, wkt: 'GEOGCS["x"]' }),
+    view = new DataView(v15.buffer);
+  view.setUint16(391, 300, true);
+  view.setUint16(6, view.getUint16(6, true) | 1 | 64, true);
+  const las = await parseLAS(v15);
+  assert.equal(las.header.versionMinor, 5);
+  assert.equal(las.header.headerSize, 393);
+  assert.equal(las.header.timeOffset, 300);
+  assert.deepEqual(las.header.gpsTimeRange, [data.gpsTime[0], data.gpsTime[299]]);
+  assert.equal(las.count, 300);
+  assert.equal(las.gpsTime[7], data.gpsTime[7]);
+  assert.equal(lasCrs(las.records).wkt, 'GEOGCS["x"]');
 });

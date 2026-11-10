@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14731657,
+  "total": 14731965,
   "history": [
     {
       "date": "2026-10-24",
@@ -8207,6 +8207,12 @@
       "commit": "0447b769b",
       "reason": "rigging/vrm: lookAt range maps checked against the VRMC_vrm schema and missing fields defaulted one by one (batch 132 audit fix)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "6532cd1c2",
+      "reason": "points/las: LAS 1.5 headers, legacy-count rule and points by return in the writer (batch 132 audit fix)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8894,7 +8900,7 @@
     "@margoengine/points/copc": 15633,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 14148,
-    "@margoengine/points/las base (without LAZ decoder)": 6017,
+    "@margoengine/points/las base (without LAZ decoder)": 6328,
     "@margoengine/points/las lazy LAZ decoder": 8779,
     "@margoengine/points/laz": 8872,
     "@margoengine/points/octree": 9654,
@@ -9239,7 +9245,7 @@
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
     "@margoengine/stage/gltf": 4050,
-    "@margoengine/stage/lights": 1957,
+    "@margoengine/stage/lights": 1954,
     "@margoengine/stage/particles": 761,
     "@margoengine/stage/physics": 1437,
     "@margoengine/stage/scene": 3517,

@@ -215,10 +215,13 @@ cloud.material.clippingPlanes = [[-1, 0, 0, 2]]; // live: drop the z cut
 
 ## LAS and LAZ scans (`margoengine/points/las`)
 
-`parseLAS(bytes)` reads ASPRS LAS 1.0 to 1.4: point formats 0 to 10, extra bytes (scaled, with no-data as NaN), every
+`parseLAS(bytes)` reads ASPRS LAS 1.0 to 1.5: point formats 0 to 10, extra bytes (scaled, with no-data as NaN), every
 VLR and EVLR, and the CRS (OGC WKT record 2112 and the GeoTIFF keys 34735 to 34737, with the EPSG code). Positions come
 back as float32 relative to `origin` (the bounding box centre by default, float64), so a survey 500 km from the CRS
-origin keeps millimetres. LAS is z-up; the engine is y-up, so swap axes when you place it.
+origin keeps millimetres. LAS is z-up; the engine is y-up, so swap axes when you place it. Where a non-zero legacy
+32-bit count disagrees with its 64-bit twin, the legacy value is used, as LAS 1.4 R16 and 1.5 say. A LAS 1.5 header
+also gives `header.timeOffset` and `header.gpsTimeRange`: with global encoding bits 0 and 6 set, a point's standard GPS
+time is `gpsTime + 1e6 * timeOffset`.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -245,7 +248,16 @@ console.log(las.crs?.epsg, las.header.pointFormat, Object.keys(las.extra));
 LAZ files (compressed LAS) are recognised by the header's compression bit and open as they are: the decoder below loads
 the first time a compressed file arrives, so a plain LAS file never pays for it. `options.laz` replaces it with a
 function of your own that returns the uncompressed point records (`LazDecoder`). `writeLAS` writes uncompressed LAS
-(any format, extra bytes, WKT or EPSG) for tools and tests.
+1.0 to 1.5 (extra bytes, WKT or EPSG, points by return always filled in) for tools and tests. An EPSG code alone is
+GeoTIFF, which LAS allows only for formats 0 to 5 before 1.5; formats 6 to 10 and LAS 1.5 take the CRS as `wkt`.
+
+```ts
+import { parseLAS, writeLAS } from 'margoengine/points/las';
+
+const bytes = writeLAS({ positions: [0, 0, 0, 1, 2, 3], versionMinor: 5, wkt: 'GEOGCS["WGS 84"]' });
+const copy = await parseLAS(bytes);
+console.log(copy.header.versionMinor, copy.header.pointsByReturn[0], copy.crs?.wkt);
+```
 
 Formats 4, 5, 9 and 10 carry wave packets: `las.wavePackets` holds the descriptor, offset, size, location and direction
 of each point. `lasWaveDescriptors(records)` reads the descriptors, and `lasWaveform(las, index, source)` reads one

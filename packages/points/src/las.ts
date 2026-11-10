@@ -1,7 +1,7 @@
-// ASPRS LAS 1.0 to 1.4 reader and writer: the public header block, VLRs and EVLRs, point data record formats 0 to 10,
+// ASPRS LAS 1.0 to 1.5 reader and writer: the public header block, VLRs and EVLRs, point data record formats 0 to 10,
 // extra bytes (the LASF_Spec record 4 descriptors) and the coordinate reference system records (OGC WKT 2112 and the
-// GeoTIFF keys 34735 to 34737). Written from the ASPRS LAS specifications 1.2 (2008), 1.3 R11 (2010) and 1.4 R15
-// (2019). Every offset is checked against the bytes: truncated or corrupt files throw a TypeError or RangeError that
+// GeoTIFF keys 34735 to 34737). Written from the ASPRS LAS specifications 1.2 (2008), 1.3 R11 (2010), 1.4 R15 (2019),
+// 1.4 R16 and 1.5 R00 (2025, the ASPRSorg/LAS sources). Every offset is checked against the bytes: truncated or corrupt files throw a TypeError or RangeError that
 // names the problem, and never read out of bounds. LAZ (compressed) files load the decoder of `margoengine/points/laz`
 // when they meet one, so a plain LAS file never pays for it.
 import { MargoError } from '@margoengine/math/errors';
@@ -55,6 +55,13 @@ export interface LASHeader {
   readonly max: readonly [number, number, number];
   /** Where the waveform data record starts in this file (LAS 1.3 and later), 0 when it holds none. */
   readonly waveformDataOffset: number;
+  /**
+   * LAS 1.5: the Time Offset in units of 10^6 s. With global encoding bits 0 and 6 both set, a point's standard GPS time
+   * is its `gpsTime` + 10^6 x `timeOffset`. 0 before LAS 1.5.
+   */
+  readonly timeOffset: number;
+  /** LAS 1.5: the smallest and largest point GPS time as the header states them (both 0 when the writer left them). */
+  readonly gpsTimeRange?: readonly [number, number];
 }
 
 /** What `code` on a reader's RangeError or TypeError says went wrong. */
@@ -204,8 +211,8 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     vlrCount = u32(100),
     formatByte = u8(104),
     pointRecordLength = u16(105);
-  if (versionMajor !== 1 || versionMinor > 4)
-    throw fail('unsupported', `Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.4`, TypeError);
+  if (versionMajor !== 1 || versionMinor > 5)
+    throw fail('unsupported', `Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.5`, TypeError);
   if (headerSize < 227 || headerSize > bytes.byteLength || pointDataOffset < headerSize)
     throw fail('header', `LAS header size ${headerSize} or point offset ${pointDataOffset} is invalid; the file is corrupt`);
   if (pointDataOffset > bytes.byteLength)
@@ -221,11 +228,14 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     );
   let pointCount = u32(107);
   let pointsByReturn = [0, 1, 2, 3, 4].map((i) => u32(111 + i * 4));
-  const v14 = versionMinor >= 4 && headerSize >= 375;
+  const v14 = versionMinor >= 4 && headerSize >= 375,
+    v15 = versionMinor >= 5 && headerSize >= 393;
   if (v14) {
-    const count64 = u64(247);
-    if (count64 || !pointCount) pointCount = count64;
-    pointsByReturn = Array.from({ length: 15 }, (_, i) => u64(255 + i * 8));
+    // LAS 1.4 R16 and 1.5 "Legacy Compatibility": where a non-zero legacy field disagrees with its 64-bit twin, the
+    // reader uses the legacy value, as a LAS 1.1 to 1.3 reader would.
+    if (!pointCount) pointCount = u64(247);
+    const legacy = pointsByReturn;
+    pointsByReturn = Array.from({ length: 15 }, (_, i) => (i < 5 && legacy[i]) || u64(255 + i * 8));
   }
   const header: LASHeader = {
     versionMajor,
@@ -249,6 +259,8 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     max: [f64(179), f64(195), f64(211)],
     min: [f64(187), f64(203), f64(219)],
     waveformDataOffset: versionMinor >= 3 && headerSize >= 235 ? u64(227) : 0,
+    timeOffset: v15 ? u16(391) : 0,
+    ...(v15 ? { gpsTimeRange: [f64(383), f64(375)] as const } : {}),
   };
   if (!header.scale.every((s) => Number.isFinite(s) && s !== 0) || !header.offset.every(Number.isFinite))
     throw fail('range', 'LAS scale or offset is zero or not finite; the file is corrupt');
@@ -712,7 +724,7 @@ export interface LASWriteInput {
   positions: ArrayLike<number>;
   /** Point data record format 0 to 10. Default: 6, or 7 with rgb. */
   pointFormat?: number;
-  /** LAS minor version. Default 4 (formats 6 to 10 need it); 2 or 3 for formats 0 to 5. */
+  /** LAS minor version, 0 to 5. Default 4 (formats 6 to 10 need 4 or 5); 2 or 3 for formats 0 to 5, which LAS 1.5 removed. */
   versionMinor?: number;
   /** Coordinate resolution. Default [0.001, 0.001, 0.001]. */
   scale?: readonly [number, number, number];
@@ -729,7 +741,7 @@ export interface LASWriteInput {
   extra?: Record<string, ArrayLike<number>>;
   /** OGC WKT of the CRS (record 2112; sets the WKT global encoding bit for LAS 1.4). */
   wkt?: string;
-  /** EPSG code stored as GeoTIFF keys (34735). */
+  /** EPSG code stored as GeoTIFF keys (34735). Formats 0 to 5 before LAS 1.5 only: formats 6 to 10 need `wkt`. */
   epsg?: number;
 }
 
@@ -740,7 +752,12 @@ export function writeLAS(input: LASWriteInput): Uint8Array {
   const format = input.pointFormat ?? (input.rgb ? 7 : 6),
     minor = input.versionMinor ?? 4;
   if (!Number.isInteger(format) || format < 0 || format > 10) throw new RangeError('Invalid pointFormat; use 0 to 10');
+  if (!Number.isInteger(minor) || minor < 0 || minor > 5) throw new RangeError('Invalid versionMinor; use 0 to 5');
   if (format >= 6 && minor < 4) throw new RangeError('Point formats 6 to 10 need LAS 1.4; set versionMinor to 4');
+  if (format < 6 && minor >= 5) throw new RangeError('LAS 1.5 removed point formats 0 to 5; use format 6 to 10');
+  // LAS 1.4 CRS table: formats 6 to 10 with the WKT bit clear are a file error; LAS 1.5 removed GeoTIFF.
+  if (input.epsg && !input.wkt && (format >= 6 || minor >= 5))
+    throw new RangeError('A GeoTIFF EPSG code needs point format 0 to 5 before LAS 1.5; pass the CRS as wkt');
   const extraNames = Object.keys(input.extra ?? {}),
     base = LAS_RECORD_SIZES[format],
     recordLength = base + extraNames.length * 8,
@@ -770,11 +787,12 @@ export function writeLAS(input: LASWriteInput): Uint8Array {
     const keys = new Uint16Array([1, 1, 0, 1, 3072, 0, 1, input.epsg]);
     vlrs.push({ user: 'LASF_Projection', id: 34735, data: new Uint8Array(keys.buffer) });
   }
-  const headerSize = minor >= 4 ? 375 : minor === 3 ? 235 : 227,
+  const headerSize = minor >= 5 ? 393 : minor >= 4 ? 375 : minor === 3 ? 235 : 227,
     vlrBytes = vlrs.reduce((s, r) => s + 54 + r.data.byteLength, 0),
     pointOffset = headerSize + vlrBytes,
     out = new Uint8Array(pointOffset + n * recordLength),
     view = new DataView(out.buffer);
+  const get = (a: ArrayLike<number> | undefined, i: number, d = 0) => (a ? a[i] : d);
   out.set([0x4c, 0x41, 0x53, 0x46]);
   view.setUint16(6, minor >= 4 && input.wkt ? 16 : 0, true);
   view.setUint8(24, 1);
@@ -792,7 +810,27 @@ export function writeLAS(input: LASWriteInput): Uint8Array {
     view.setFloat64(179 + i * 16, max[i], true);
     view.setFloat64(187 + i * 16, min[i], true);
   }
-  if (minor >= 4) view.setBigUint64(247, BigInt(n), true);
+  // Points by return must always be filled in (LAS 1.4 R16): returns 1 to 15, the legacy five for formats 0 to 5.
+  const byReturn = new Float64Array(15);
+  let earliest = Infinity,
+    latest = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const r = get(input.returnNumber, i, 1) & (format >= 6 ? 15 : 7);
+    if (r >= 1 && r <= 15) byReturn[r - 1]++;
+    if (input.gpsTime && GPS_OFFSET[format] >= 0) {
+      earliest = Math.min(earliest, input.gpsTime[i]);
+      latest = Math.max(latest, input.gpsTime[i]);
+    }
+  }
+  if (format < 6 && n < 2 ** 32) for (let r = 0; r < 5; r++) view.setUint32(111 + r * 4, byReturn[r], true);
+  if (minor >= 4) {
+    view.setBigUint64(247, BigInt(n), true);
+    for (let r = 0; r < 15; r++) view.setBigUint64(255 + r * 8, BigInt(byReturn[r]), true);
+  }
+  if (minor >= 5 && earliest <= latest) {
+    view.setFloat64(375, latest, true);
+    view.setFloat64(383, earliest, true);
+  }
   let at = headerSize;
   for (const r of vlrs) {
     out.set(new TextEncoder().encode(r.user), at + 2);
@@ -801,7 +839,6 @@ export function writeLAS(input: LASWriteInput): Uint8Array {
     out.set(r.data, at + 54);
     at += 54 + r.data.byteLength;
   }
-  const get = (a: ArrayLike<number> | undefined, i: number, d = 0) => (a ? a[i] : d);
   for (let i = 0; i < n; i++) {
     const p = pointOffset + i * recordLength;
     for (let k = 0; k < 3; k++)

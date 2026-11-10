@@ -75,6 +75,8 @@ interface LASHeader {
     readonly min: readonly [number, number, number];
     readonly max: readonly [number, number, number];
     readonly waveformDataOffset: number;
+    readonly timeOffset: number;
+    readonly gpsTimeRange?: readonly [number, number];
 }
 
 interface LASOptions {
