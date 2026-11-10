@@ -24,6 +24,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isUmbrellaAlias } from './umbrella.mjs';
+import { OUTPUT as ALL_ENTRIES, entriesSource } from './generate-all-entries.mjs';
 import {
   ENTRY_SIZES,
   gzipCell,
@@ -437,6 +438,8 @@ if (update) {
       if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
   for (const [file, text] of expected) writeIfChanged(join(apiDir, file), text);
   writeIfChanged(join(root, 'docs', 'api-surface.md'), summary);
+  // The all-entries type project imports every public entry (scripts/generate-all-entries.mjs): it follows the exports maps.
+  writeIfChanged(join(root, ALL_ENTRIES), entriesSource(root));
   console.log(
     scopedPackage
       ? `API reports: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name} written without changing other packages.`
@@ -466,6 +469,9 @@ if (update) {
       console.log('would fail: docs/api-surface.md changed with watched reports; run api:update');
     else problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
   }
+  const allEntriesPath = join(root, ALL_ENTRIES);
+  if ((existsSync(allEntriesPath) ? readFileSync(allEntriesPath, 'utf8').replaceAll('\r\n', '\n') : '') !== entriesSource(root))
+    problems.push(`${ALL_ENTRIES} no longer matches the exports maps (scripts/generate-all-entries.mjs)`);
   if (problems.length) {
     console.error(problems.join('\n\n'));
     const updateCommand = scopedPackage

@@ -56,6 +56,8 @@ export const PROJECTS = [
     config: 'examples/voxel-sandbox/tsconfig.json',
     entries: () => ['examples/voxel-sandbox/src', 'examples/voxel-sandbox/vite.config.ts'],
   },
+  // Every public entry of every package in one program, library declarations checked (scripts/generate-all-entries.mjs).
+  { id: 'all-entries', config: 'examples/all-entries/tsconfig.json', entries: () => ['examples/all-entries/entries.ts'] },
   {
     id: 'integration-game',
     config: 'examples/integration/game/tsconfig.json',
