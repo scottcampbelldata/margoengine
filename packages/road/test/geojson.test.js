@@ -50,3 +50,14 @@ test('malformed inputs, bounds, cancellation and zero-length diagnostics',()=>{
  let nested=feature([[0,0],[1,0]]);for(let i=0;i<40;i++)nested={type:'GeometryCollection',geometries:[nested]};assert.throws(()=>importGeoJSON(nested,local));
  const reason=new Error('cancel');for(const run of [()=>importGeoJSON(collection([]),{signal:AbortSignal.abort(reason)}),()=>importOSM('<osm/>',{signal:AbortSignal.abort(reason)})])assert.throws(run,e=>e===reason);
 });
+
+test('GeoJSON joins T endpoints whose solved parameter rounds just outside the trunk segment (review 5)',()=>{
+ // Before the fix about a third of these endpoints solved to u = -1e-17 or so and stayed unjoined (4 nodes, 2 roads).
+ let seed=7;const random=()=>(seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32;
+ for(let k=0;k<200;k++){
+  const ax=random()*100-50,az=random()*100-50,bx=random()*100-50,bz=random()*100-50,s=0.2+0.6*random();
+  const m=[ax+(bx-ax)*s,az+(bz-az)*s];
+  const n=importGeoJSON(collection([feature([[ax,az],[bx,bz]],{},'trunk'),feature([m,[m[0]+10,m[1]+20]],{},'branch')]),local);
+  assert.equal(n.roads.length,3,`case ${k}: the branch splits the trunk`);assert.equal(n.nodes.length,4,`case ${k}`);
+ }
+});

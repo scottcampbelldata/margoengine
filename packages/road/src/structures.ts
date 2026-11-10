@@ -67,7 +67,7 @@ export interface StructureMesh {
 export interface TunnelOpening {
   /** Arc-distance of portal. */
   distance: number;
-  /** Inner boundary from left road edge over the roof to right road edge. The floor is open. */
+  /** Inner boundary from the driver's right road edge over the roof to the left road edge. The floor is open. */
   boundary: Point3[];
   /** Normal pointing out of the tunnel. */
   outward: Point3;

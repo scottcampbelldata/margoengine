@@ -83,8 +83,9 @@ export function lanes(curve: Spline, layout: LaneLayout, options: LaneOptions = 
       (elevation!==undefined&&typeof elevation!=='function')||!Array.isArray(exclude)||exclude.length>4096)throw invalid();
   const validRange=(r:readonly number[])=>Array.isArray(r)&&r.length===2&&bounded(r[0],0,curve.length)&&bounded(r[1],r[0],curve.length);
   if(!validRange(range)||!exclude.every(validRange))throw invalid();
-  const widths=[...layout.widths],total=widths.reduce((a,b)=>a+b,0),offsets=[-total/2];
-  for(const width of widths)offsets.push(offsets.at(-1)!+width);
+  // point() offsets along (tz,-tx), the driver's left in Y-up right-handed axes, so left-to-right offsets descend.
+  const widths=[...layout.widths],total=widths.reduce((a,b)=>a+b,0),offsets=[total/2];
+  for(const width of widths)offsets.push(offsets.at(-1)!-width);
   if(layout.lines && (!Array.isArray(layout.lines)||layout.lines.length!==widths.length+1))throw invalid();
   if(layout.arrows && (!Array.isArray(layout.arrows)||layout.arrows.length>4096))throw invalid();
   const clip=(a:number,b:number):[number,number][]=>{
@@ -140,7 +141,7 @@ export function lanes(curve: Spline, layout: LaneLayout, options: LaneOptions = 
     add(-length/2,0,length*0.1,0);
     if(turn.includes('straight')){add(length*0.1,0,length/2,0);add(length*0.25,-width/2,length/2,0);add(length*0.25,width/2,length/2,0);}
     if(turn!=='straight'){
-      const side=turn.includes('left')?-1:1;
+      const side=turn.includes('left')?1:-1;
       add(length*0.1,0,length*0.3,side*width/2);
       add(length*0.3,side*width/2,length*0.05,side*width*0.3);
       add(length*0.3,side*width/2,length*0.45,side*width*0.25);

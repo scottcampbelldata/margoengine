@@ -194,7 +194,11 @@ function splitCrossings(segments:Segment[],height:number,key:(p:Point3,layer:num
   const aliases=new Map<string,string>();
   const resolve=(id:string)=>{const path:string[]=[];while(aliases.has(id)){path.push(id);id=aliases.get(id)!;}for(const p of path)aliases.set(p,id);return id;};
   const interpolate=(s:Segment,t:number):Point3=>s.a.map((v,k)=>v+(s.b[k]-v)*t) as [number,number,number];
+  // A T endpoint solved on another segment's interior lands within rounding of 0 or 1, often just outside 0..1.
+  // Snap parameters within 1 micrometre (the node key precision) of either end so the endpoint still joins.
+  const snap=(s:Segment,t:number)=>{const e=1e-6/Math.hypot(s.b[0]-s.a[0],s.b[2]-s.a[2]);return Math.abs(t)<=e?0:Math.abs(t-1)<=e?1:t;};
   const cut=(a:Segment,b:Segment,t:number,u:number)=>{
+    t=snap(a,t);u=snap(b,u);
     if(t<0||t>1||u<0||u>1)return;const p=interpolate(a,t),q=interpolate(b,u);if(Math.abs(p[1]-q[1])>height)return;
     const at=t===0?a.ka:t===1?a.kb:undefined,bt=u===0?b.ka:u===1?b.kb:undefined;
     const shared=resolve(at??bt??key(p,a.meta.layer)),v=t===0?a.a:t===1?a.b:u===0?b.a:u===1?b.b:p;

@@ -4,11 +4,11 @@ const curve=new Spline([[0,0,0],[0,0,30]]);
 test('lane widths place exact boundaries; dashes clip at authored distances and junction exclusions',()=>{
  const paint=lanes(curve,{widths:[3,4]},{exclude:[[8,12]],range:[1,28]});assert.equal(paint.length,3);
  assert.deepEqual(paint[1].intervals,[[1,3],[12,12+0],[18,21],[27,28]].filter(([a,b])=>b>a));
- for(const p of paint){const lateral=[-3.5,-0.5,3.5][p.index];for(let i=0;i<p.geometry.vertices.length;i+=6){const v=p.geometry.vertices;assert.ok(Math.abs(Math.abs(v[i]-lateral)-0.075)<1e-6);assert.ok(Math.abs(v[i+1]-0.01)<1e-8);assert.ok(v[i+4]>0);}}
+ for(const p of paint){const lateral=[3.5,0.5,-3.5][p.index];for(let i=0;i<p.geometry.vertices.length;i+=6){const v=p.geometry.vertices;assert.ok(Math.abs(Math.abs(v[i]-lateral)-0.075)<1e-6);assert.ok(Math.abs(v[i+1]-0.01)<1e-8);assert.ok(v[i+4]>0);}}
 });
 test('curves, grade and continuous junction route phase follow independent spline/frame equations',()=>{
  const circle={length:20*Math.PI/2,closed:false,atDistance(s,out){out.set([20*Math.cos(s/20),s/10,20*Math.sin(s/20)]);return out;}};
- for(const m of lanes(circle,{widths:[3,3]},{step:0.3}))for(let i=0;i<m.geometry.vertices.length;i+=6){const v=m.geometry.vertices,radius=Math.hypot(v[i],v[i+2]),expected=20+[-3,0,3][m.index];assert.ok(Math.abs(Math.abs(radius-expected)-0.075)<3e-6);}
+ for(const m of lanes(circle,{widths:[3,3]},{step:0.3}))for(let i=0;i<m.geometry.vertices.length;i+=6){const v=m.geometry.vertices,radius=Math.hypot(v[i],v[i+2]),expected=20+[3,0,-3][m.index];assert.ok(Math.abs(Math.abs(radius-expected)-0.075)<3e-6);}
  const c=new Spline([[0,0,0],[6,1,10],[0,2,20]],{divisions:4096});
  const paint=lanes(c,{widths:[3,3]},{elevation:(x,z)=>z*0.1});
  for(const m of paint)for(let i=0;i<m.geometry.vertices.length;i+=6){const v=m.geometry.vertices;assert.ok(Math.abs(v[i+1]-v[i+2]*0.1-0.01)<3e-7);assert.ok(Number.isFinite(v[i+3]+v[i+4]+v[i+5]));}
@@ -28,4 +28,16 @@ test('bad layouts and unrepresentable work reject; junction exclusion suppresses
  assert.equal(lanes(curve,{widths:[3],arrows:[{lane:0,distance:15}]},{exclude:[[12,18]]}).filter(m=>m.kind==='arrow').length,0);
  for(const layout of [{widths:[]},{widths:[NaN]},{widths:[3],lines:[]},{widths:[3],arrows:[{lane:9,distance:10}]},{widths:[3],lines:[{style:'invalid'},{}]}])assert.throws(()=>lanes(curve,layout));
  assert.throws(()=>lanes(new Spline([[0,0,0],[0,0,100]]),{widths:[3]},{step:0.001}));assert.throws(()=>lanes(new Spline([[0,0,0],[0,10,0]]),{widths:[3]}));
+});
+
+test('lanes run left to right for the driver and turn arrows point to their side (review 5)',()=>{
+ // Y-up right-handed: driving +x, the driver's left is -z. Before the fix lane 0 sat on the right (z +3.5) and a
+ // left-turn arrow bent toward +z.
+ const east=new Spline([[0,0,0],[30,0,0]]);
+ const paint=lanes(east,{widths:[3,4],arrows:[{lane:0,distance:15,turn:'left'},{lane:1,distance:15,turn:'right'}]});
+ const zs=part=>{const v=part.geometry.vertices,out=[];for(let i=0;i<v.length;i+=6)out.push(v[i+2]);return out;};
+ const edge=paint.find(p=>p.kind==='line'&&p.index===0);for(const z of zs(edge))assert.ok(Math.abs(z+3.5)<0.08,`left edge at z ${z}`);
+ const [left,right]=paint.filter(p=>p.kind==='arrow');
+ assert.ok(Math.min(...zs(left))< -2-0.5,'a left arrow bends to the driver\'s left (-z) of lane 0 centre z -2');
+ assert.ok(Math.max(...zs(right))>1.5+0.5,'a right arrow bends to the driver\'s right (+z) of lane 1 centre z 1.5');
 });
