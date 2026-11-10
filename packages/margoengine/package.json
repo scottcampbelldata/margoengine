@@ -3070,6 +3070,10 @@
       "types": "./dist/splines/query.d.ts",
       "import": "./dist/splines/query.js"
     },
+    "./splines/offset": {
+      "types": "./dist/splines/offset.d.ts",
+      "import": "./dist/splines/offset.js"
+    },
     "./sprites": {
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"

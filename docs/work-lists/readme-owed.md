@@ -283,3 +283,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/scenery | Native task-local and compatibility queue-complete displayed capture, preset parity and evidence scope. | Batch273 group16 |
 | @margoengine/tiles | tiles/properties loaded-asset attribute/texture queries, raw images/codec callbacks, source barycentric UVs, limits and abortable resource loading | batch 239 job 5 |
 | margoengine | Generated tiles/properties optional alias | batch 239 job 5 |
+
+- @margoengine/splines (batch 225 offset): signed exact point offsets, bounded cubic approximation, source ranges and bevel joins, explicit singular/limit errors, closure and exact reverse; margoengine/splines/offset mirrors the entry.
+- margoengine (batch 225 query/offset): generated splines/query and splines/offset imports and result contracts, with examples deferred until the README phase.

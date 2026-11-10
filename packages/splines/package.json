@@ -53,6 +53,10 @@
     "./query": {
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"
+    },
+    "./offset": {
+      "types": "./dist/offset.d.ts",
+      "import": "./dist/offset.js"
     }
   },
   "files": [

@@ -2870,3 +2870,5 @@ Run node --test packages/scenery/test/presented-frame.test.js and npm test --wor
 
 ### Batch 239 job 5: property reads
 After npm run build:packages, run node --test --test-timeout=120000 packages/tiles/tests/properties.test.js. The licensed CC0 samples and SHA-256 values are in examples/assets/3d-tiles/NOTICE.md. For rendered evidence run node scripts/gpu-lock.mjs run --owner=properties-proof --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs, then the same command with --compat appended. The properties result contains point count/classification, green pixels, and exact texture rows: (13,9,40/255) and (20,13,50/255). These are correctness checks, not timing budgets.
+
+Batch 225 job 3: npm run build --workspace @margoengine/splines, then node --test --test-timeout=120000 packages/splines/test/offset.test.js. Every approximation piece includes a source t range; tests compare dense points in that range to the exact offset evaluator, including points between fitter samples. Work counts are deterministic interval nodes, not timing assertions.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12526956,
+  "total": 12531217,
   "history": [
     {
       "date": "2026-10-24",
@@ -6097,6 +6097,12 @@
       "commit": "85c472e60",
       "reason": "tiles/properties new optional entry 0 to 7359 B min+gzip; lossless attribute and texture queries with validation and lazy image loading; splitting would duplicate metadata setup and complicate the API",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-225",
+      "reason": "New optional splines/offset: absent -> 4005 B gzip; exact cubic geometry and tested public operations justify the optional bytes. Root, core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7211,6 +7217,7 @@
     "@margoengine/math/compat": 10227,
     "@margoengine/exporters/optimize-extra": 6470,
     "@margoengine/wfc/hex": 3552,
-    "@margoengine/tiles/properties": 7615
+    "@margoengine/tiles/properties": 7615,
+    "@margoengine/splines/offset": 4261
   }
 }
