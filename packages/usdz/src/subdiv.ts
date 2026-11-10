@@ -425,6 +425,8 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
     smooth = scheme !== 'none',
     level = smooth ? levelFor(read, wanted) : 0;
   if (read.value('triangleSubdivisionRule') === 'smooth') read.soft(`${read.path} asks for the smooth triangle rule; it refines by the standard one`);
+  if (smooth && read.value('creaseMethod') === 'chaikin')
+    read.soft(`${read.path} asks for the chaikin crease method; semi-sharp creases refine by the uniform one`);
   const { cage, source: kept, cornerOf: cornersKept, dropped } = authored(read, scheme === 'bilinear', scheme === 'loop'),
     boundary = read.value('interpolateBoundary') ?? 'edgeAndCorner',
     { onBoundary, facesAt } = boundaryPoints(cage);

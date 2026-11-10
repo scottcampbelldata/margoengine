@@ -271,6 +271,14 @@ test('the level comes down when the stage would pass maxTriangles, and the issue
   assert.equal(triangles(asset.meshes[0]), 6 * 16 * 2);
 });
 
+test('a chaikin crease method refines by the uniform one and says so', async () => {
+  // Batch 132 audit: creaseMethod was never read, so a chaikin mesh refined by the uniform rule without a word.
+  const asset = await text(cube('uniform token creaseMethod = "chaikin"'), [subdivision({ level: 1 })]);
+  assert.ok(asset.issues.some((i) => /asks for the chaikin crease method; semi-sharp creases refine by the uniform one/.test(i.message)));
+  const plain = await text(cube(), [subdivision({ level: 1 })]);
+  assert.ok(!plain.issues.some((i) => /crease method/.test(i.message)));
+});
+
 test('a level out of range is refused', () => {
   for (const level of [-1, 1.5, 7]) assert.throws(() => subdivision({ level }), RangeError);
 });

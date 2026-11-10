@@ -124,7 +124,7 @@ engine.start();
 
 USD's schema default is `catmullClark`, so a polygon model that forgets `subdivisionScheme = "none"` is smoothed: that is what the file asks for. Refined meshes get normals of their own, as the schema says, and an edge that stays sharp keeps a hard normal. Primvars, UVs, display colours, material subsets, joint influences and blend shape offsets follow the refined faces; a point keeps its 8 strongest influences. Without this entry a subdivided mesh loads as its cage, with an issue.
 
-`loop` takes triangles only; other faces refine as `catmullClark`, with an issue. `triangleSubdivisionRule = "smooth"` refines by the standard rule, with an issue. A face-varying value that repeats at a point joins the faces it touches: equal numbers count as one value, indexed or not.
+`loop` takes triangles only; other faces refine as `catmullClark`, with an issue. `triangleSubdivisionRule = "smooth"` refines by the standard rule, with an issue, and `creaseMethod = "chaikin"` refines semi-sharp creases by the uniform rule (sharpness minus 1 a level), with an issue. A face-varying value that repeats at a point joins the faces it touches: equal numbers count as one value, indexed or not.
 
 ## Lights and cameras
 
