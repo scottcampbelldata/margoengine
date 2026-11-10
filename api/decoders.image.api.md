@@ -5,6 +5,7 @@
 ```ts
 export interface DecodeImageOptions {
     signal?: AbortSignal;
+    maxPixels?: number;
 }
 
 export interface DecodedImage {

@@ -7196,3 +7196,26 @@ Research compared categorical versus continuous interpolation, post-classificati
 - Stefan Lindholm and Alexander Bock, *Poor Man's Rendering Of Segmented Data* (2013), SIGRAD pp.49-54, https://ep.liu.se/ecp/094/007/ecp13094007.pdf. It explains why interpolating integer class IDs creates absent classes. We retain nearest integer lookup and explicit neighbouring-category comparisons, rather than its filtered-label shortcut. IDs are losslessly remapped to dense GPU indices; unknown categories retain distinct boundary IDs and transparent classification.
 - Kitware, *vtk.js VolumeProperty API* (accessed 2026-11-10), https://kitware.github.io/vtk-js/api/Rendering_Core_VolumeProperty.html. Prose contract compared: independent components/weights, RGB/RGBA, label colour/opacity and per-category pixel outlines. Our outline kernel compares eight pixel neighbours at each thickness radius in the ray-perpendicular screen footprint. No source links followed.
 - Michela Antonelli et al., *The Medical Segmentation Decathlon* (2022), Nature Communications 13:4128, https://doi.org/10.1038/s41467-022-30695-9; https://medicaldecathlon.com/dataaws/. Demo uses original BRATS_457 intensity/label samples at strides 4,4,4; dataset.json explicitly CC BY-SA 4.0. Source/output hashes, modalities, category names, affine and changes are recorded in examples/assets/sciviz/msd-brain.json. The existing OpenNeuro T1 remains CC0. No scientific or clinical accuracy, speed or general engine superiority claim.
+
+
+## Batch 203: shared JPEG decoding (2026-11-10)
+
+The existing Margo exporter JPEG reader is now the single implementation in
+packages/shared/jpeg.js, with typed optional entries in decoders/jpeg and
+exporters/jpeg-read. No external implementation was read or copied.
+Research compared Gregory K. Wallace, "The JPEG Still Picture Compression
+Standard" (1991, https://ijg.org/files/Wallace.JPEG.pdf), the overview of DCT
+and coding modes; CCITT Study Group VIII and ISO/IEC JTC1/SC29/WG1,
+"T.81: Digital compression and coding of continuous-tone still images"
+(1992, https://www.w3.org/Graphics/JPEG/itu-t81.pdf), annexes C, F and G for
+Huffman, sequential and progressive scans; and ITU-T, "T.871: JPEG File
+Interchange Format" (2011, https://www.itu.int/rec/T-REC-T.871/en), for
+YCbCr and centered chroma. T.81 determines the byte grammar, Wallace explains
+the transform and mode distinction, and T.871 supplies the color convention.
+This move preserves the algorithm and its independent libjpeg-turbo bounds.
+The ten exporter JPEG/reference PNG pairs cover baseline, progressive,
+restart, optimized tables, RGB and grayscale. They are Margo generated data,
+documented in packages/exporters/tests/fixtures/NOTICE.md. The new decoder
+tests compare those same references, exercise image dispatch and pixel
+limits, and decode a progressive file in a Node worker without image APIs.
+No new CPU loop, Wasm claim or timing claim is introduced.

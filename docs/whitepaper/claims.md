@@ -3985,3 +3985,8 @@ The optional video/dome material covers mono, side-by-side and top-bottom equire
 
 ## Batch 173: categorical and registered volume fusion
 Claim: optional sciviz/labels classifies integer categories, linear RGB/RGBA and independent scalar components in one ray march across independently registered source boxes. Evidence: packages/sciviz/tests/labels.test.js and labels-browser.mjs. Both WebGPU and WebGL2 compatibility give constant optical reference [109,0,109], exact equality between a two-component source and two scalar sources, zero image error for a 90-degree rotated varying field versus its aligned reference, and zero error after restoration. Exact adjacent uint32 IDs above 2^24 produce 2312 red and 2312 blue pixels with zero pixels of an absent green category. One-pixel outlines produce 2380 edge pixels, fewer than filled category pixels. Over gives [255,0,0], maximum [0,133,0]; disjoint depth intervals retain the same output after source order reversal. Real MSD MRI/segmentation and OpenNeuro RGBA demos are provided with separate dataset licences. This supports these defined behaviours only; no timing, clinical or whole-library parity claim.
+
+
+## Batch 203 JPEG dispatch (2026-11-10)
+
+The optional decoders/jpeg entry and decoders/image dispatch expose the same clean-room baseline and progressive JPEG implementation as exporters/jpeg-read. Evidence: packages/decoders/tests/jpeg.test.js and packages/exporters/tests/jpeg-read.test.js compare ten libjpeg-turbo reference pairs with the original bounds and mean error below one channel level. A Node worker test establishes operation without canvas or browser image APIs. This is codec coverage evidence, with the limits in docs/limits.md, and makes no speed claim.

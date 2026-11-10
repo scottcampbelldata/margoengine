@@ -4,13 +4,13 @@
 
 ```ts
 export interface DecodedJPEG {
-    width: number;
-    height: number;
-    data: Uint8Array;
+  width: number;
+  height: number;
+  data: Uint8Array;
 }
 
 export interface JPEGDecodeOptions {
-    maxPixels?: number;
+  maxPixels?: number;
 }
 
 export function decodeJPEG(bytes: Uint8Array, options?: JPEGDecodeOptions): DecodedJPEG;

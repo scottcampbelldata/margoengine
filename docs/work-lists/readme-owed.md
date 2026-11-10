@@ -802,3 +802,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 173 job 2): document labels entry, fusionVolume registered sources, exact category palettes/outlines and legend, RGB/RGBA scale, component functions/weights, three mixing rules, snapshot/rebuild semantics and texture/step limits; add copy-paste examples in the README phase.
 - margoengine (batch 173 job 2): document sciviz/labels alias in the README phase.
+
+
+- @margoengine/decoders: document /jpeg baseline and progressive RGBA8 decoding, /image JPEG dispatch, maxPixels and worker use.
+- @margoengine/exporters: document jpeg-read sharing the decoder implementation with unchanged API.
+- margoengine: expose the generated decoders/jpeg optional facade in the decoder index.

@@ -30,11 +30,16 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:gpu:jpeg": "node tests/jpeg-browser.mjs",
     "test:gpu:node-gltf": "node scripts/test-node-gltf.mjs",
     "prepack": "npm run build"
   },
   "sideEffects": false,
   "exports": {
+    "./jpeg": {
+      "types": "./dist/jpeg.d.ts",
+      "import": "./dist/jpeg.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

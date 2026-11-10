@@ -16,8 +16,10 @@ export interface DecodedImage {
 
 /** Options for {@link decodeImage}. */
 export interface DecodeImageOptions {
-  /** Aborts decoding of a KTX2 file; the promise rejects with the signal's reason. */
+  /** Aborts before decoding, or while a KTX2 decoder waits; rejects with the signal's reason. */
   signal?: AbortSignal;
+  /** Largest JPEG pixel count accepted, default 2^26. Checked before allocating decoded blocks. */
+  maxPixels?: number;
 }
 
 /** The name of a file's image format from its first bytes, or undefined when it is not one {@link decodeImage} knows. */
@@ -32,7 +34,6 @@ export function imageFormat(bytes: Uint8Array): 'png' | 'jpeg' | 'webp' | 'dds' 
   if (text(4, 4) === 'ftyp' && /^avi[fs]$/.test(text(8, 4))) return 'avif';
   return undefined;
 }
-
 
 /** Basis Universal KTX2: a worker in a browser; in Node, which has no Web Worker, the same Wasm in this thread. */
 async function transcodeBasis(bytes: Uint8Array, signal?: AbortSignal): Promise<DecodedImage> {
@@ -90,7 +91,7 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
 }
 
 /**
- * Decodes a stored texture to RGBA8 pixels, top row first, whatever holds it: PNG, WebP, DDS, KTX or KTX2. Compressed
+ * Decodes a stored texture to RGBA8 pixels, top row first, whatever holds it: PNG, JPEG, WebP, DDS, KTX or KTX2. Compressed
  * blocks are decoded on the CPU, Basis Universal through the transcoder this package ships.
  *
  * @example
@@ -99,11 +100,12 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
  * if (file.length) console.log((await decodeImage(file)).width);
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
- * @throws MargoError `unsupported` for a JPEG, which needs no decoding to be written out, and for AVIF.
+ * @throws MargoError `unsupported` for AVIF and unsupported JPEG coding modes.
  * @throws MargoError `failed` when the bytes are not a known image, or are damaged.
  */
 export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions = {}): Promise<DecodedImage> {
   if (!(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Uint8Array; pass the image file's bytes");
+  options.signal?.throwIfAborted();
   const format = imageFormat(bytes);
   switch (format) {
     case 'png':
@@ -117,7 +119,11 @@ export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions
     case 'ktx2':
       if (!readKTX2Index(bytes).vkFormat) return transcodeBasis(bytes, options.signal);
       return textureFileToRGBA(await (await import('./image-ktx2.js')).parseKTX2(bytes, options));
-    case 'jpeg':
+    case 'jpeg': {
+      const { decodeJPEG } = await import('./jpeg.js');
+      options.signal?.throwIfAborted();
+      return decodeJPEG(bytes, options);
+    }
     case 'avif':
       throw deviceUnsupported(`decodeImage does not read ${format} files; use the browser's image decoder`);
     default:

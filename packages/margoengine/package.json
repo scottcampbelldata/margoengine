@@ -874,6 +874,10 @@
       "types": "./dist/cutscene/nested-editor.d.ts",
       "import": "./dist/cutscene/nested-editor.js"
     },
+    "./decoders/jpeg": {
+      "types": "./dist/decoders/jpeg.d.ts",
+      "import": "./dist/decoders/jpeg.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

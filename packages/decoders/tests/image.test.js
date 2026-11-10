@@ -115,7 +115,7 @@ test('decodeImage stops on an aborted signal', async () => {
 
 test('decodeImage refuses what it cannot read, by name', async () => {
   await assert.rejects(decodeImage(new Uint8Array(16)), (e) => e.code === 'failed');
-  await assert.rejects(decodeImage(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), (e) => e.code === 'unsupported');
+  await assert.rejects(decodeImage(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), (e) => e.code === 'failed');
   await assert.rejects(decodeImage(new TextEncoder().encode('\0\0\0\x1cftypavif')), (e) => e.code === 'unsupported');
   await assert.rejects(decodeImage('a.webp'), TypeError);
 });

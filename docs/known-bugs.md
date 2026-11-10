@@ -4725,3 +4725,6 @@ Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The
 - Voxel-net /rooms: reconnecting with a consumed room URL gets 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.
 
 Batch 214 job 2: no new defect found in legal-pose rejection; static-only scope and undefined twist at antipodal swing are documented in limits.md.
+
+
+Batch 203 gate discovery: node scripts/gpu-package-tests.mjs --no-build --only=decoders --list fails before selection because cameras panorama/stereo, splats lod-sog-check and weather parity browser scripts lack registrations. Cause: global plan validation runs before package filtering. Changed-package suites were invoked directly under the shared GPU lock; registration repair belongs to the owning build jobs.
