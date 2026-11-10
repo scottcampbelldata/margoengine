@@ -6378,3 +6378,7 @@ The optional space entry applies the rigid emitter-frame delta to existing local
 ### 5. Batch 235 flow-map evidence
 
 The water/flow entry replaces wind detail with two short advected phases sampled from a world-space flow field. It owns four optional bindings, validates borrowed linear texture formats, preserves geometric ripple/capture contracts and recreates owned resources on restore. Independent GPU flow-vector/normal checks and rendering evidence: packages/water/test/flow-map.browser.mjs, WebGPU and full WebGL2 compatibility. No new compute or core/stage feature.
+
+### 5. Batch 185 volume storage evidence
+
+The shader/compute-volume optional entry owns 3D and 2D-array allocation, views, resources and lifecycle. Core and stage are untouched. Its real-adapter test checks every voxel for 16 formats in each dimension, three ping-pong steps, and filtered 3D sampling on native WebGPU and full WebGL2 compatibility. CPU tests cover independent device images, exact upload pitch, array limits, device-loss reset, disposal and invalid read/write aliasing. Read-write storage is optional r32 and requires the browser language feature. Evidence is RTX A6000 on both backends, without a cross-vendor or speed claim. Reproduce with packages/shader/test/compute-volume-check.mjs, also with --compat.

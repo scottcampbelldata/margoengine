@@ -18,50 +18,8 @@ import {
 import type { BindableTexture } from './texture.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_DST: number; COPY_SRC: number };
 
-/** Formats WebGPU can write from a compute shader on every device. */
-export type StorageFormat =
-  | 'rgba8unorm'
-  | 'rgba8snorm'
-  | 'rgba8uint'
-  | 'rgba8sint'
-  | 'rgba16float'
-  | 'rgba16uint'
-  | 'rgba16sint'
-  | 'r32float'
-  | 'r32uint'
-  | 'r32sint'
-  | 'rg32float'
-  | 'rg32uint'
-  | 'rg32sint'
-  | 'rgba32float'
-  | 'rgba32uint'
-  | 'rgba32sint';
-/** What `load` returns and `store` takes: four components, whatever the format holds (a missing one reads 0, alpha 1). */
-export type Texel<F extends StorageFormat> = F extends `${string}uint`
-  ? 'vec4u'
-  : F extends `${string}sint`
-    ? 'vec4i'
-    : 'vec4f';
-const bytes: Record<StorageFormat, number> = {
-  rgba8unorm: 4,
-  rgba8snorm: 4,
-  rgba8uint: 4,
-  rgba8sint: 4,
-  rgba16float: 8,
-  rgba16uint: 8,
-  rgba16sint: 8,
-  r32float: 4,
-  r32uint: 4,
-  r32sint: 4,
-  rg32float: 8,
-  rg32uint: 8,
-  rg32sint: 8,
-  rgba32float: 16,
-  rgba32uint: 16,
-  rgba32sint: 16,
-};
-const texel = (f: StorageFormat) => (/uint$/.test(f) ? 'vec4u' : /sint$/.test(f) ? 'vec4i' : 'vec4f');
-const sampled = (f: StorageFormat) => ({ vec4f: 'f32', vec4i: 'i32', vec4u: 'u32' })[texel(f)];
+import { bytes, texel, sampled, type StorageFormat, type Texel } from './storage-format.js';
+export type { StorageFormat, Texel } from './storage-format.js';
 /** Options for `storageTexture` and `pingPong`. */
 export interface StorageTextureOptions<F extends StorageFormat = StorageFormat> {
   /** Default `'rgba16float'`: holds values outside 0..1 and can be filtered. */
@@ -75,7 +33,8 @@ export interface StorageTextureOptions<F extends StorageFormat = StorageFormat> 
 }
 type Coord = Node<'vec2u' | 'vec2i'>;
 const coordinate = (c: Coord): Coord => {
-  if (c?.type !== 'vec2u' && c?.type !== 'vec2i') throw new TypeError(`A texture coordinate must be vec2u or vec2i, got ${c?.type}`);
+  if (c?.type !== 'vec2u' && c?.type !== 'vec2i')
+    throw new TypeError(`A texture coordinate must be vec2u or vec2i, got ${c?.type}`);
   return c;
 };
 interface Image {
@@ -134,7 +93,10 @@ export abstract class ComputeTexture<F extends StorageFormat = StorageFormat> im
   /** @internal */ protected abstract readonly reader: Resource;
   /** @internal */ protected abstract readonly writer: Resource;
   /** @internal The image `load` and `texture()` read. */ protected abstract front(device: GPUDevice): Image;
-  /** @internal Called when a node reads (1) or writes (2) this texture. */ protected use(_b: Builder, _how: number): void {}
+  /** @internal Called when a node reads (1) or writes (2) this texture. */ protected use(
+    _b: Builder,
+    _how: number,
+  ): void {}
   constructor(
     readonly width: number,
     readonly height: number,
@@ -179,7 +141,10 @@ export abstract class ComputeTexture<F extends StorageFormat = StorageFormat> im
     const type = texel(this.format);
     return push(
       statement([coordinate(coord), cast(value, type, 'stored texel')], (b, n) => {
-        if (b.stage.kind !== 'compute') throw new TypeError('Storage textures are only written in ComputePass nodes; move the store into a ComputePass body');
+        if (b.stage.kind !== 'compute')
+          throw new TypeError(
+            'Storage textures are only written in ComputePass nodes; move the store into a ComputePass body',
+          );
         this.use(b, 2);
         const [at, v] = n.args.map((a) => b.expr(a));
         b.line(`textureStore(${b.resource(this.writer)}, ${at}, ${v});`);
@@ -278,7 +243,9 @@ export class StorageTexture<F extends StorageFormat = StorageFormat> extends Com
     const passes = (this.passes.get(b.program) ?? 0) | how;
     this.passes.set(b.program, passes);
     if (passes === 3)
-      throw new TypeError('One pass cannot load and store the same storage texture; use pingPong(), or readWrite for r32 formats');
+      throw new TypeError(
+        'One pass cannot load and store the same storage texture; use pingPong(), or readWrite for r32 formats',
+      );
   }
   protected override loaded(name: string, at: string): string {
     return this.readWrite ? `textureLoad(${name}, ${at})` : super.loaded(name, at);

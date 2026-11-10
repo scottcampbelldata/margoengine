@@ -3386,6 +3386,10 @@
       "types": "./dist/shader/serialization.d.ts",
       "import": "./dist/shader/serialization.js"
     },
+    "./shader/compute-volume": {
+      "types": "./dist/shader/compute-volume.d.ts",
+      "import": "./dist/shader/compute-volume.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

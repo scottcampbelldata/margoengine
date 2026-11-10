@@ -3460,3 +3460,7 @@ After building packages, run node --test --test-timeout=60000 packages/water/tes
 
 ### Batch 194 job 2
 See [toon parity](../toon-parity.md) for the CPU and shared-lock GPU commands, repeat GPU with MARGO_COMPAT=1. The screen-outline browser checks measure physical-pixel silhouette bands at two distances for perspective/orthographic core and materials meshes and draw the real animated Fox. Existing model and hatch suites remain in test:gpu.
+
+# Batch 185 volume storage
+
+After build:packages, run `node --test packages/shader/test/compute-volume.test.js`. Under a shared GPU lock, run `node packages/shader/test/compute-volume-check.mjs`, then the same command with `--compat`. Both compare all voxels for 16 storage formats in 3D and arrays, feedback steps and volume sampling; no benchmark or timing assertion runs. Job 1's pre-existing GLSL backend proof is `node packages/shader/test/browser-check.mjs --compat` under the same shared lock.

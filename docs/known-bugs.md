@@ -4741,3 +4741,7 @@ Batch 270 job 1: no new open defects identified in space. The cutscene compatibi
 Dual-phase flow shading is optional and stays out of geometric wave captures, so WaveQuery and caustic capture retain valid layouts. GPU regression: packages/water/test/flow-map.browser.mjs composes flow with ripple geometry and queries, checks independent vector/normal values and fixed-time rendering on both backends. No open defect identified in this job.
 
 - Batch 235 follow-up: force GPUDevice.createBuffer to throw during Ripples.readFrame after a successful render, then read again; the second call reports a pending read because the reading flag is set before staging allocation. Non-rendering allocation-error cleanup gap; fix-phase regression should inject allocation failure and move flag assignment after allocation.
+
+# Batch 185 job 2
+
+The previously missing volume and array storage forms are built in shader/compute-volume. No open defect was found in the new dimension, typed load/store, restoration and ping-pong contract; limits are recorded in limits.md. The small WebGL2 preview still requires escalation to the full compatibility backend.

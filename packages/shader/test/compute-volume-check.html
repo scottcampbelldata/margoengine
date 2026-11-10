@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Volume storage correctness</title></head><body><canvas width="32" height="32"></canvas>
+<script type="module">
+import {ComputePass,storage,vec4,uvec4,ivec4,texture3D,vec3,NodePass} from '/packages/shader/dist/index.js';
+import {storageVolume} from '/packages/shader/dist/compute-volume.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const run=async pass=>{const encoder=device.createCommandEncoder();pass.encode(device,encoder,{width:32,height:32});device.queue.submit([encoder.finish()]);await device.queue.onSubmittedWorkDone();};
+window.check=async()=>{
+  const results=[];
+  for(const dimension of ['3d','2d-array'])for(const format of ['rgba8unorm','rgba8snorm','rgba8uint','rgba8sint','rgba16float','rgba16uint','rgba16sint','r32float','r32uint','r32sint','rg32float','rg32uint','rg32sint','rgba32float','rgba32uint','rgba32sint']){
+    device.pushErrorScope('validation');
+    const t=storageVolume(4,3,2,{dimension,format}),uint=format.endsWith('uint'),sint=format.endsWith('sint'),type=uint?'vec4u':sint?'vec4i':'vec4f';
+    const fill=new ComputePass(t.pixels,i=>{const c=t.coord(i);return t.store(c,uint?uvec4(c,1):sint?ivec4(c.toInt(),1):vec4(c.toFloat().div(4),1));});
+    await run(fill);
+    const out=storage(t.pixels,type),{data}=await computeReadback(device,t.pixels,i=>out.store(i,t.load(t.coord(i))),out);
+    const error=await device.popErrorScope();results.push({dimension,format,data:[...data],error:error?.message??null});
+    fill.dispose();out.dispose();t.dispose();
+  }
+  const pairs=[];
+  for(const dimension of ['3d','2d-array']){
+    const t=storageVolume(3,2,4,{dimension,pingPong:true});
+    const pass=new ComputePass(t.pixels,i=>t.store(t.coord(i),t.load(t.coord(i)).add(vec4(1,2,3,4))));
+    for(let k=0;k<3;k++)await run(pass);
+    const out=storage(t.pixels,'vec4f'),{data}=await computeReadback(device,t.pixels,i=>out.store(i,t.load(t.coord(i))),out);
+    pairs.push([...data]);pass.dispose();out.dispose();t.dispose();
+  }
+  const t=storageVolume(2,2,2,{format:'rgba8unorm',data:new Uint8Array(32).fill(255)});
+  const out=storage(1,'vec4f'),{data}=await computeReadback(device,1,i=>out.store(i,texture3D(t,vec3(.5),0)),out);
+  t.dispose();out.dispose();
+  device.destroy();return {results,pairs,sampled:[...data],errors};
+};
+window.ready=true;
+</script></body></html>

@@ -4009,3 +4009,7 @@ Optional water/flow supports painted encoded RG and generated signed vector text
 
 ### Batch 194 job 2: pixel outline width
 Optional toon/screen-outline keeps core and model hull widths in drawing-buffer pixels using exact homogeneous projection derivatives and the active viewport. Proof: screen-outline.test.js per-view uniforms/ownership and screen-outline.browser.mjs on native WebGPU and full WebGL2 compatibility, core/material spheres at two distances with both projection types (5 px requested, 4..5 px rasterized) and animated CC0 Fox poses. This is the batch width behaviour documented by drei Outlines, retaining existing deformed/instanced model paths; no performance or image-dilation claim. See docs/toon-parity.md and docs/clean-room.md.
+
+# Batch 185 job 2: typed volume and layer writes
+
+Claim: shader/compute-volume writes and loads 3D voxels and array layers using all 16 storage formats, with optional ping-pong state, on native WebGPU and the full WebGL2 layer. Proof: compute-volume-check.mjs compares all 24 voxels in every format/dimension to independent CPU coordinates, checks three feedback steps and normalized 3D sampling. CPU lifecycle and validation proof: compute-volume.test.js. No performance or hardware-portability claim beyond the tested RTX A6000 backends. Exact constraints are in docs/limits.md.

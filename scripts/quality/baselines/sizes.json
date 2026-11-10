@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13717442,
+  "total": 13722403,
   "history": [
     {
       "date": "2026-10-24",
@@ -7168,6 +7168,12 @@
       "commit": "batch-194",
       "reason": "Pixel hull entry: root 1493 to 2155 B for projection hooks and per-view uniform ownership; screen-outline 0 to 5821 B including shared hull renderers. Splitting duplicates draws/resources; core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-185-job-2",
+      "reason": "New optional shader/compute-volume: 0 to 4705 B gzip, ceiling 4961 B. Typed 3D/array storage, ping-pong and lifecycle together avoid duplicated resource ownership. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8464,6 +8470,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/shader/compute-volume": 4961
   }
 }
