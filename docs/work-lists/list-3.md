@@ -13,7 +13,7 @@ For the third account. Starts when Scott is home and opens it.
 | H | loading and interface | 104 | ui | 6 | done |
 | H | loading and interface | 105 | labels | 5 | done |
 | H | loading and interface | 106 | html | 4 | done |
-| H | loading and interface | 107 | inspector | 4 | Beelink lane H (list 3) |
+| H | loading and interface | 107 | inspector | 4 | list 2 (Mac, from Beelink) |
 | H | loading and interface | 108 | selection | 3 | done |
 | H | loading and interface | 109 | viewcube | 5 | done |
 | I | sky and land | 57 | sky | 8 | done |
@@ -23,10 +23,10 @@ For the third account. Starts when Scott is home and opens it.
 | I | sky and land | 61 | terrain | 8 | done |
 | I | sky and land | 62 | terrain | 4 | done |
 | I | sky and land | 63 | biomes | 6 | done, but job 2 waits for batch 66 |
-| I | sky and land | 64 | scatter | 6 | todo |
+| I | sky and land | 64 | scatter | 6 | list 2 (Mac, from Beelink) |
 | I | sky and land | 65 | road | 6 | done |
-| J | water, generation, audio | 66 | water | 8 | todo |
-| J | water, generation, audio | 67 | water | 3 | todo |
+| J | water, generation, audio | 66 | water | 8 | list 2 (Mac, from Beelink) |
+| J | water, generation, audio | 67 | water | 3 | list 2 (Mac, from Beelink) |
 | J | water, generation, audio | 68 | procedural | 8 | done |
 | J | water, generation, audio | 69 | wfc | 5 | done |
 | J | water, generation, audio | 110 | audio | 6 | done |
