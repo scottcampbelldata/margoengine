@@ -98,7 +98,7 @@ export function restoreSceneState(state: SavedSceneState, bindings: SceneStateBi
         const before = portable(target) as object;
         const replace = (settings: object) => {
           for (const key of Object.keys(target)) Reflect.deleteProperty(target, key);
-          Object.assign(target, settings);
+          Object.defineProperties(target, Object.getOwnPropertyDescriptors(settings));
         };
         actions.push({ apply: () => replace(saved), undo: () => replace(before) });
       }

@@ -720,6 +720,18 @@ mutex, and a live claimant is allowed to finish without interference.
 
 Research guiding the remaining queue and phase work, read before implementation:
 
+The save scene-state browser regression now fences the batch-building first
+frame through `engine.gpu.queue.onSubmittedWorkDone()` before its existing final
+render and immediate bitmap capture. Compatibility had otherwise captured a
+stale animation frame while lazy replay was pending. Its exact layered-fade,
+new-engine restoration and failed-load pixel assertions are unchanged; native
+and compatibility pass. `packages/save/tests/capture-readiness.test.js` executes
+the actual helper against a deferred queue and fails on the old capture path.
+This follows Kai Ninomiya, Brandon Jones and Jim Blandy, [WebGPU, queue completion
+(2026)](https://gpuweb.github.io/gpuweb/#dom-gpuqueue-onsubmittedworkdone): a frame
+callback alone does not establish completion of prior queue submissions. The
+three protected browser/shutdown support files remain unchanged.
+
 GPU package-suite requests now derive their owner prefix from SHA-256 of the
 canonical worktree identity, shared by serial and parallel paths. A suite label
 follows the prefix so labels cannot merge unrelated worktrees into the old

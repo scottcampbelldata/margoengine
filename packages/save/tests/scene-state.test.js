@@ -2,6 +2,43 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { captureSceneState, restoreSceneState } from '../dist/scene-state.js';
 const clone = (v) => structuredClone(v);
+
+test('shadow setting names stay own data properties without changing the bound prototype', () => {
+  for (const target of [{ resolution: 512 }, Object.assign(Object.create(null), { resolution: 512 })]) {
+    const prototype = Object.getPrototypeOf(target);
+    const settings = JSON.parse(
+      '{"__proto__":{"polluted":true},"constructor":{"value":1},"toString":false,"resolution":32}',
+    );
+    const state = { version: 1, animations: {}, lights: {}, shadows: { sun: settings } };
+    restoreSceneState(state, { shadows: { sun: target } });
+    assert.equal(Object.getPrototypeOf(target), prototype);
+    assert.deepEqual(captureSceneState({ shadows: { sun: target } }), state);
+    for (const key of Object.keys(settings)) {
+      assert.deepEqual(Object.getOwnPropertyDescriptor(target, key), {
+        value: settings[key],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+    assert.equal(Object.hasOwn(target, 'polluted'), false);
+    assert.equal(target.polluted, undefined);
+  }
+});
+
+test('shadow rollback restores values and prototypes after a later settings allocation fails', () => {
+  const sun = { resolution: 512 };
+  const denied = Object.preventExtensions({});
+  const bindings = { shadows: { sun, denied } };
+  const before = captureSceneState(bindings);
+  const state = clone(before);
+  state.shadows.sun = JSON.parse('{"__proto__":{"polluted":true},"resolution":32}');
+  state.shadows.denied = { resolution: 32 };
+  assert.throws(() => restoreSceneState(state, bindings), TypeError);
+  assert.equal(Object.getPrototypeOf(sun), Object.prototype);
+  assert.equal(Object.getPrototypeOf(denied), Object.prototype);
+  assert.deepEqual(captureSceneState(bindings), before);
+});
 test('point, spot, area, directional shadow objects and layered playback round trip detached', () => {
   let playback = {
     state: 'run',

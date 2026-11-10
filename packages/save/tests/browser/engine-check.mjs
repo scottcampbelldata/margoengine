@@ -32,6 +32,7 @@ try {
     /** Two frames (the first bakes batches), then the second's pixels, read before the frame is presented. */
     const picture = async (engine) => {
       engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
       await new Promise((resolve) => requestAnimationFrame(resolve));
       engine.render({ delta: 0 });
       const bitmap = await createImageBitmap(engine.canvas),
