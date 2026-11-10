@@ -4077,5 +4077,13 @@
     "sha256": "7876dec881e6909f76c47d631cfd0b9daed66e520a77d3ad016a6b9a490b9420",
     "licence": "BSD-3-Clause (VTKData Copyright.txt); Apache-2.0 (PyVista collection LICENSE)",
     "licenceUrl": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Copyright.txt"
+  },
+  {
+    "file": "video/flower.webm",
+    "url": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm",
+    "sha256": "c6f8a348953395598a9a73b9bab1676436410797bce9f398f4be1531d6e76dda",
+    "size": 554058,
+    "licence": "CC0-1.0",
+    "licenceUrl": "https://github.com/mdn/interactive-examples/blob/main/LICENSE"
   }
 ]

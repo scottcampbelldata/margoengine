@@ -4238,6 +4238,10 @@
       "types": "./dist/video/dome.d.ts",
       "import": "./dist/video/dome.js"
     },
+    "./video/demux": {
+      "types": "./dist/video/demux.d.ts",
+      "import": "./dist/video/demux.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

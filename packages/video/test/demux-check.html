@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>Real fragmented MP4 and WebM seek check</title>
+<script type="module">
+import {openDemuxedVideo} from '/packages/video/dist/demux.js';
+import {encodeVideo} from '/packages/headless/dist/video.js';
+import {fragmentFixture} from './demux-fixtures.js';
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+const digest=async f=>{try{const data=new Uint8Array(f.allocationSize());await f.copyTo(data);return {pts:f.timestamp,hash:[...new Uint8Array(await crypto.subtle.digest('SHA-256',data))].join(','),format:f.format,width:f.displayWidth,height:f.displayHeight};}finally{f.close();}};
+window.check=async()=>{
+ const results=[];
+ for(const format of ['mp4','webm']){
+  const [buffer,ref]=await Promise.all([fetch('/__demux-'+format).then(r=>r.arrayBuffer()),fetch(format==='mp4'?'./flower-ffprobe.json':'./webm-ffprobe.json').then(r=>r.json())]);
+  const source=new Uint8Array(buffer),[num,den]=ref.timeBase,shift=format==='mp4'?-Math.min(...ref.packets.map(p=>p.dts)):0,us=t=>Math.round(t*num*1000000/den),
+    packets=ref.packets.map(p=>({...p,pts:p.pts+shift,data:source.subarray(p.offset,p.offset+p.size)})),
+    bytes=format==='mp4'?fragmentFixture({samples:packets.map(p=>({...p,dts:p.dts+shift})),description:ref.config.description,scale:den/num,edit:true}):buffer,
+    expected=new Map(),pending=[];
+  let failed;const decoder=new VideoDecoder({output:f=>{const pts=f.timestamp;pending.push(digest(f).then(value=>expected.set(pts,value)));},error:e=>{failed=e;}});
+  try{decoder.configure({...ref.config,...(ref.config.description?{description:new Uint8Array(ref.config.description)}:{})});
+   for(const p of packets)decoder.decode(new EncodedVideoChunk({type:p.key?'key':'delta',timestamp:us(p.pts),data:p.data}));
+   await decoder.flush();await Promise.all(pending);if(failed)throw failed;
+  }finally{decoder.close();}
+  const video=await openDemuxedVideo(bytes);try{
+   const times=[...expected.keys()].sort((a,b)=>a-b);assert(video.frameCount===150,'real frame count');
+   const indices=[149,0,75,1,100,20];
+   for(const i of indices){assert(video.timestamp(i)===times[i]/1000000,'real timestamp '+i);const actual=await digest(await video.seek(video.timestamp(i)));assert(JSON.stringify(actual)===JSON.stringify(expected.get(times[i])),'independent real frame '+i);}
+   results.push({format,frames:video.frameCount,checked:indices.length,comparison:'FFprobe packet demux and same-browser decoded SHA-256 exact'});
+  }finally{video.dispose();}
+ }
+ for(const codec of ['vp09.00.10.08','av01.0.04M.08']){
+  const palette=[[255,0,0],[0,255,0],[0,0,255],[255,255,0]],frames=palette.map(rgb=>{const data=new Uint8Array(16*16*4);for(let i=0;i<data.length;i+=4)data.set([...rgb,255],i);return {width:16,height:16,data};});
+  const file=await encodeVideo(frames,{format:'webm',codec,fps:10}),video=await openDemuxedVideo(file.bytes.buffer.slice(file.bytes.byteOffset,file.bytes.byteOffset+file.bytes.byteLength));
+  try{assert(video.frameCount===4,'generated frame count');for(let i=3;i>=0;i--){const f=await video.frame(i);try{const ctx=new OffscreenCanvas(16,16).getContext('2d');ctx.drawImage(f,0,0);const pixel=ctx.getImageData(8,8,1,1).data;palette[i].forEach((v,c)=>assert(Math.abs(v-pixel[c])<=5,'codec colour '+codec));}finally{f.close();}}results.push({codec,checked:4});}finally{video.dispose();}
+ }
+ return results;
+};
+</script>

@@ -1,9 +1,23 @@
 import { fault } from '../../shared/errors.js';
 
-interface Box {
+export interface Box {
+  offset: number;
   type: string;
   start: number;
   end: number;
+}
+/** Internal ISO reader passed only to the optional fragmented-container entry. */
+export interface FragmentInput {
+  bytes: Uint8Array;
+  roots: Box[];
+  moov: Box[];
+  trackID: number;
+  boxes(start: number, end: number): Box[];
+  children(box: Box): Box[];
+  one(boxes: Box[], type: string): Box;
+  uint(p: number, end: number): number;
+  wide(p: number, end: number): number;
+  version(box: Box, allowed: number[]): number;
 }
 export interface Sample {
   offset: number;
@@ -30,7 +44,7 @@ const unsupported = (): never => {
 };
 
 // ISO box lengths and QuickTime sample-table layouts, written from the published format description.
-export function readMP4(bytes: Uint8Array): Movie {
+export function readMP4(bytes: Uint8Array, fragments?: (input: FragmentInput) => Sample[]): Movie {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const uint = (p: number, end: number): number => (p < 0 || p + 4 > end ? invalid() : view.getUint32(p));
   const wide = (p: number, end: number): number => {
@@ -49,7 +63,7 @@ export function readMP4(bytes: Uint8Array): Movie {
         head = 16;
       } else if (size === 0) size = end - p;
       if (size < head || size > end - p) invalid();
-      out.push({ type: text(p + 4), start: p + head, end: p + size });
+      out.push({ type: text(p + 4), offset: p, start: p + head, end: p + size });
       p += size;
     }
     return out;
@@ -71,9 +85,9 @@ export function readMP4(bytes: Uint8Array): Movie {
     return v;
   };
   const roots = boxes(0, bytes.length);
-  if (roots.some((b) => b.type === 'moof')) unsupported();
   const moov = children(one(roots, 'moov'));
-  if (moov.some((b) => b.type === 'mvex')) unsupported();
+  const fragmented = roots.some((b) => b.type === 'moof') || moov.some((b) => b.type === 'mvex');
+  if (fragmented && !fragments) unsupported();
   const tracks = moov.filter((b) => b.type === 'trak').map(children);
   const video = tracks.find((track) => {
     const mdia = children(one(track, 'mdia')),
@@ -106,95 +120,103 @@ export function readMP4(bytes: Uint8Array): Movie {
   if (avcc.end - avcc.start < 7 || bytes[avcc.start] !== 1) invalid();
   const codec =
     'avc1.' + [...bytes.subarray(avcc.start + 1, avcc.start + 4)].map((v) => v.toString(16).padStart(2, '0')).join('');
-  const stsz = one(stbl, 'stsz'),
-    constant = uint(stsz.start + 4, stsz.end),
-    count = uint(stsz.start + 8, stsz.end);
-  // Every nonempty sample occupies at least one byte in this in-memory file.
-  if (!count || count > bytes.length || (!constant && count > (stsz.end - stsz.start - 12) / 4)) invalid();
-  const samples: Sample[] = Array.from({ length: count }, (_, i) => ({
-    offset: 0,
-    size: constant || uint(stsz.start + 12 + i * 4, stsz.end),
-    pts: 0,
-    duration: 0,
-    key: true,
-  }));
-  const stts = one(stbl, 'stts');
-  let index = 0,
-    dts = 0;
-  for (let j = 0, n = table(stts, 8); j < n; j++) {
-    const p = stts.start + 8 + j * 8,
-      run = uint(p, stts.end),
-      delta = uint(p + 4, stts.end);
-    if (!run || !delta || run > count - index) invalid();
-    for (let k = 0; k < run; k++) {
-      const sample = samples[index++]!;
-      sample.pts = dts;
-      sample.duration = delta;
-      dts += delta;
-      if (!Number.isSafeInteger(dts)) invalid();
+  let samples: Sample[];
+  if (fragmented) {
+    const tkhd = one(video, 'tkhd'),
+      trackID = uint(tkhd.start + (version(tkhd, [0, 1]) ? 20 : 12), tkhd.end);
+    samples = fragments!({ bytes, roots, moov, trackID, boxes, children, one, uint, wide, version });
+  } else {
+    const stsz = one(stbl, 'stsz'),
+      constant = uint(stsz.start + 4, stsz.end),
+      count = uint(stsz.start + 8, stsz.end);
+    // Every nonempty sample occupies at least one byte in this in-memory file.
+    if (!count || count > bytes.length || (!constant && count > (stsz.end - stsz.start - 12) / 4)) invalid();
+    samples = Array.from({ length: count }, (_, i) => ({
+      offset: 0,
+      size: constant || uint(stsz.start + 12 + i * 4, stsz.end),
+      pts: 0,
+      duration: 0,
+      key: true,
+    }));
+    const stts = one(stbl, 'stts');
+    let index = 0,
+      dts = 0;
+    for (let j = 0, n = table(stts, 8); j < n; j++) {
+      const p = stts.start + 8 + j * 8,
+        run = uint(p, stts.end),
+        delta = uint(p + 4, stts.end);
+      if (!run || !delta || run > count - index) invalid();
+      for (let k = 0; k < run; k++) {
+        const sample = samples[index++]!;
+        sample.pts = dts;
+        sample.duration = delta;
+        dts += delta;
+        if (!Number.isSafeInteger(dts)) invalid();
+      }
     }
-  }
-  if (index !== count) invalid();
-  const ctts = stbl.find((b) => b.type === 'ctts');
-  if (ctts) {
-    const signed = version(ctts, [0, 1]) === 1;
+    if (index !== count) invalid();
+    const ctts = stbl.find((b) => b.type === 'ctts');
+    if (ctts) {
+      const signed = version(ctts, [0, 1]) === 1;
+      index = 0;
+      for (let j = 0, n = table(ctts, 8); j < n; j++) {
+        const p = ctts.start + 8 + j * 8,
+          run = uint(p, ctts.end),
+          raw = uint(p + 4, ctts.end);
+        const offset = signed ? raw | 0 : raw;
+        if (!run || run > count - index) invalid();
+        for (let k = 0; k < run; k++) samples[index++]!.pts += offset;
+      }
+      if (index !== count) invalid();
+    }
+    const stss = stbl.find((b) => b.type === 'stss');
+    if (stss) {
+      samples.forEach((s) => {
+        s.key = false;
+      });
+      let previous = 0;
+      for (let j = 0, n = table(stss, 4); j < n; j++) {
+        const value = uint(stss.start + 8 + j * 4, stss.end);
+        if (value <= previous || value > count) invalid();
+        samples[value - 1]!.key = true;
+        previous = value;
+      }
+    }
+    if (!samples[0]!.key) unsupported();
+    const offsets = stbl.filter((b) => b.type === 'stco' || b.type === 'co64');
+    if (offsets.length !== 1) invalid();
+    const co = offsets[0]!,
+      stride = co.type === 'co64' ? 8 : 4,
+      chunks = table(co, stride);
+    const sc = one(stbl, 'stsc'),
+      runs = table(sc, 12);
+    if (!runs || !chunks) invalid();
+    const chunkRuns: { first: number; size: number }[] = [];
+    for (let j = 0; j < runs; j++) {
+      const p = sc.start + 8 + j * 12,
+        first = uint(p, sc.end),
+        size = uint(p + 4, sc.end);
+      if ((!j && first !== 1) || first > chunks || (j && first <= chunkRuns[j - 1]!.first) || !size) invalid();
+      if (uint(p + 8, sc.end) !== 1) unsupported();
+      chunkRuns.push({ first, size });
+    }
+    const media = roots.filter((b) => b.type === 'mdat');
     index = 0;
-    for (let j = 0, n = table(ctts, 8); j < n; j++) {
-      const p = ctts.start + 8 + j * 8,
-        run = uint(p, ctts.end),
-        raw = uint(p + 4, ctts.end);
-      const offset = signed ? raw | 0 : raw;
-      if (!run || run > count - index) invalid();
-      for (let k = 0; k < run; k++) samples[index++]!.pts += offset;
+    for (let j = 1, run = 0; j <= chunks; j++) {
+      if (run + 1 < runs && j === chunkRuns[run + 1]!.first) run++;
+      let offset =
+        stride === 8 ? wide(co.start + 8 + (j - 1) * stride, co.end) : uint(co.start + 8 + (j - 1) * stride, co.end);
+      if (chunkRuns[run]!.size > count - index) invalid();
+      for (let k = 0; k < chunkRuns[run]!.size; k++) {
+        const sample = samples[index++]!;
+        if (!sample.size || !media.some((b) => offset >= b.start && offset + sample.size <= b.end)) invalid();
+        sample.offset = offset;
+        offset += sample.size;
+      }
     }
     if (index !== count) invalid();
   }
-  const stss = stbl.find((b) => b.type === 'stss');
-  if (stss) {
-    samples.forEach((s) => {
-      s.key = false;
-    });
-    let previous = 0;
-    for (let j = 0, n = table(stss, 4); j < n; j++) {
-      const value = uint(stss.start + 8 + j * 4, stss.end);
-      if (value <= previous || value > count) invalid();
-      samples[value - 1]!.key = true;
-      previous = value;
-    }
-  }
-  if (!samples[0]!.key) unsupported();
-  const offsets = stbl.filter((b) => b.type === 'stco' || b.type === 'co64');
-  if (offsets.length !== 1) invalid();
-  const co = offsets[0]!,
-    stride = co.type === 'co64' ? 8 : 4,
-    chunks = table(co, stride);
-  const sc = one(stbl, 'stsc'),
-    runs = table(sc, 12);
-  if (!runs || !chunks) invalid();
-  const chunkRuns: { first: number; size: number }[] = [];
-  for (let j = 0; j < runs; j++) {
-    const p = sc.start + 8 + j * 12,
-      first = uint(p, sc.end),
-      size = uint(p + 4, sc.end);
-    if ((!j && first !== 1) || first > chunks || (j && first <= chunkRuns[j - 1]!.first) || !size) invalid();
-    if (uint(p + 8, sc.end) !== 1) unsupported();
-    chunkRuns.push({ first, size });
-  }
-  const media = roots.filter((b) => b.type === 'mdat');
-  index = 0;
-  for (let j = 1, run = 0; j <= chunks; j++) {
-    if (run + 1 < runs && j === chunkRuns[run + 1]!.first) run++;
-    let offset =
-      stride === 8 ? wide(co.start + 8 + (j - 1) * stride, co.end) : uint(co.start + 8 + (j - 1) * stride, co.end);
-    if (chunkRuns[run]!.size > count - index) invalid();
-    for (let k = 0; k < chunkRuns[run]!.size; k++) {
-      const sample = samples[index++]!;
-      if (!sample.size || !media.some((b) => offset >= b.start && offset + sample.size <= b.end)) invalid();
-      sample.offset = offset;
-      offset += sample.size;
-    }
-  }
-  if (index !== count) invalid();
+  if (!samples.length || !samples[0]!.key) unsupported();
   let mediaStart = 0,
     lead = 0,
     duration = 0,
@@ -219,7 +241,7 @@ export function readMP4(bytes: Uint8Array): Movie {
         ? uint(timeAt, elst.end) === 0xffffffff && uint(timeAt + 4, elst.end) === 0xffffffff
         : uint(timeAt, elst.end) === 0xffffffff;
       const time = empty ? -1 : v ? wide(timeAt, elst.end) : uint(timeAt, elst.end);
-      if (uint(p + width - 4, elst.end) !== 65536 || !length) unsupported();
+      if (uint(p + width - 4, elst.end) !== 65536 || (!length && !fragmented)) unsupported();
       if (empty) {
         if (j !== 0 || n !== 2) unsupported();
         leadTicks = length;
@@ -227,8 +249,8 @@ export function readMP4(bytes: Uint8Array): Movie {
       } else {
         if (j !== n - 1) unsupported();
         mediaStart = time;
-        mediaLength = length;
-        duration = lead + length / movieScale;
+        mediaLength = length || undefined;
+        if (length) duration = lead + length / movieScale;
       }
     }
   }

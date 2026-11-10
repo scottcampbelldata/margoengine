@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13737555,
+  "total": 13744000,
   "history": [
     {
       "date": "2026-10-24",
@@ -7197,6 +7197,12 @@
       "commit": "batch-271",
       "reason": "New optional orbital atmosphere entry: 0 to 3121 B gzip plus a generated alias. Reuses sky transport; a second implementation would duplicate physical tables and validation.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "911de66c4",
+      "reason": "Batch 269 buffered fragment and WebM index entry, shared exact decoder ownership, optional-only size growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8499,6 +8505,7 @@
     "@margoengine/vfx/over-life": 1831,
     "@margoengine/tonemap/hue": 2421,
     "@margoengine/creative/planet-atmosphere": 3377,
-    "margoengine/creative/planet-atmosphere": 329
+    "margoengine/creative/planet-atmosphere": 329,
+    "@margoengine/video/demux": 6445
   }
 }
