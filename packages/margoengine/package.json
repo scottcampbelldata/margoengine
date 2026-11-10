@@ -798,6 +798,10 @@
       "types": "./dist/creative/grass-terrain.d.ts",
       "import": "./dist/creative/grass-terrain.js"
     },
+    "./creative/paint-aniso": {
+      "types": "./dist/creative/paint-aniso.d.ts",
+      "import": "./dist/creative/paint-aniso.js"
+    },
     "./culling": {
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13884623,
+  "total": 13888948,
   "history": [
     {
       "date": "2026-10-24",
@@ -7316,6 +7316,12 @@
       "commit": "bc76eff07",
       "reason": "Batch 214 job 3 adds an isolated multi-goal IK entry, 0 to 3375 gzip bytes, for simultaneous goals, closed loops and bounded revolute/prismatic joints. Core and stage stay unchanged at 24209 bytes; splitting the dense solve would complicate a single optional feature.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-271-aniso",
+      "reason": "New optional anisotropic paint: 0 to 3746 B gzip plus alias. Tensor, smoothing and eight-sector filter share one per-view lifecycle; splitting would add resource coordination without removing shader work. Core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8643,6 +8649,8 @@
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/post/mask": 6262,
     "@margoengine/materials/transmission-layers": 5500,
-    "@margoengine/kinematics-constraints/multi-goal": 3631
+    "@margoengine/kinematics-constraints/multi-goal": 3631,
+    "@margoengine/creative/paint-aniso": 4002,
+    "margoengine/creative/paint-aniso": 323
   }
 }

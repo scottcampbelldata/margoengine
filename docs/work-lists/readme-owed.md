@@ -901,3 +901,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/kinematics-constraints (batch 214 job 3): document /multi-goal MultiGoalIKSolver, joint forests and rest frames, simultaneous weighted/masked goals, point/full-pose closures, scalar bounds and DOF composition, warm starts, physical error/status outputs, cancellation and bounded-search limits.
 - margoengine (batch 214 job 3): document generated kinematics-constraints/multi-goal forwarding.
+
+- @margoengine/creative and margoengine (batch 271 job 4): document /paint-aniso AnisotropicPainterly defaults, LDR ordering, tensor/elliptical sector controls, smooth radial support, 32 B/pixel intermediate budget, exact bypass/alpha, views and both GPU backends; examples deferred.

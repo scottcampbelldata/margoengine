@@ -77,6 +77,10 @@
     "./grass-terrain": {
       "types": "./dist/grass-terrain.d.ts",
       "import": "./dist/grass-terrain.js"
+    },
+    "./paint-aniso": {
+      "types": "./dist/paint-aniso.d.ts",
+      "import": "./dist/paint-aniso.js"
     }
   },
   "files": [
