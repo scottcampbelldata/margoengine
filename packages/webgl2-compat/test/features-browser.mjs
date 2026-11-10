@@ -8,7 +8,8 @@
 // array view of a cube, copyTextureToBuffer of depth, stencil, packed and snorm formats, occlusion queries, render
 // bundles, textureGather in every address mode and textureGatherCompare, an external texture from a VideoFrame, and
 // two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve), and a depth texture
-// sampled by the pass it is attached to read-only.
+// sampled by the pass it is attached to read-only, and 3D texture slices drawn beside a depth attachment (ANGLE's
+// Direct3D 11 back end drops such draws; the layer draws them in a 2D stand-in).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
@@ -64,6 +65,12 @@ try {
       for (const filter of ['nearest', 'linear'])
         for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard'])
           assert.deepEqual(r[`${filter}/${mode}`], [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1], `${filter}/${mode}: each argument evaluated once`);
+    }
+    if (name === 'volumeSliceDepth') {
+      // Rows top first: the wedge covers one texel of the top row and two of the bottom; slice 1 is only cleared.
+      const [G, Bl, Y] = [[0, 255, 0, 255], [0, 0, 255, 255], [255, 255, 0, 255]];
+      const drawn = [Bl, G, G, G, Bl, Bl, G, G].flat();
+      assert.deepEqual(r, [drawn, Array(8).fill(Y).flat(), drawn], 'volumeSliceDepth: draws reach 3D slices with depth');
     }
     if (name === 'mipFiltering') {
       for (const filter of ['nearest', 'linear'])

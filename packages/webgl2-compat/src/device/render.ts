@@ -897,6 +897,8 @@ interface Sub {
 interface PassState {
   readonly desc: PassDescriptor;
   readonly fbo: WebGLFramebuffer;
+  /** Per colour attachment: the 3D slice and the 2D stand-in drawn in its place (see Replayer.standIn), or null. */
+  readonly standIns: readonly ([Sub, Sub] | null)[];
   readonly width: number;
   readonly height: number;
   pipeline: CompatRenderPipeline | null;
@@ -978,6 +980,27 @@ export class Replayer {
         attach: (point) => gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, point, gl.RENDERBUFFER, t.renderbuffer),
       };
     return this.sub(t.attached(v), v.baseMipLevel, t.dimension === '3d' ? (slice ?? 0) : v.baseArrayLayer);
+  }
+
+  /**
+   * The 2D stand-in a pass draws in place of a 3D slice when it also attaches depth or stencil: ANGLE's Direct3D 11
+   * back end clears such a slice but drops every draw into it, with a complete framebuffer and no GL error (measured on
+   * an NVIDIA RTX A6000, Chrome; the same draw into a 2D or array layer, or into the slice with no depth, lands). It
+   * has the attached storage's format and level sizes; beginPass loads it from the slice and endPass stores it back.
+   */
+  private standIn(v: CompatTextureView): Sub {
+    const gl = this.gl,
+      t = v.texture,
+      s = t.attached(v),
+      level = v.baseMipLevel,
+      texture = t.sliceStandIn(s);
+    return {
+      key: `z${s.id}.${level}`,
+      owner: t,
+      info: s.info,
+      level,
+      attach: (point) => gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, texture, level),
+    };
   }
 
   private depthPoint(info: FormatInfo): number {
@@ -1189,7 +1212,16 @@ export class Replayer {
         t.read(t.attached(v), v.baseMipLevel, 1, t.dimension === '3d' ? 0 : v.baseArrayLayer, 1, this.sync);
       return this.viewSub(v, slice);
     };
-    const colors = desc.colors.map((c) => (c ? prepare(c.view, c.depthSlice) : null));
+    const standIns = desc.colors.map((c): [Sub, Sub] | null =>
+      c && desc.depth && c.view.texture.dimension === '3d' ? [prepare(c.view, c.depthSlice), this.standIn(c.view)] : null,
+    );
+    const colors = desc.colors.map((c, i) => {
+      if (!c) return null;
+      const standIn = standIns[i];
+      if (!standIn) return prepare(c.view, c.depthSlice);
+      if (c.loadOp === 'load' && c.view.texture.initialized) this.blit(standIn[0], standIn[1]);
+      return standIn[1];
+    });
     const depth = desc.depth ? prepare(desc.depth.view, 0) : undefined;
     for (const c of desc.colors) if (c?.resolveTarget?.texture.primary) prepare(c.resolveTarget, 0);
     const fbo = this.framebuffer(colors, depth);
@@ -1198,6 +1230,7 @@ export class Replayer {
     this.pass = {
       desc,
       fbo,
+      standIns,
       width,
       height,
       pipeline: null,
@@ -1261,7 +1294,9 @@ export class Replayer {
     };
     pass.desc.colors.forEach((c, i) => {
       if (!c) return;
-      const t = c.view.texture;
+      const t = c.view.texture,
+        standIn = pass.standIns[i];
+      if (standIn && c.storeOp === 'store') this.blit(standIn[1], standIn[0]);
       t.initialized = true;
       wrote(c.view);
       if (t.renderbuffer && t.resolved) t.stale = true;

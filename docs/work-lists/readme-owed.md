@@ -1054,3 +1054,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/compute (batch 274 job 4): document /nn-extra, all defaults/layouts, train/eval and nested normalization state, grouped transpose/output size, recurrent run states/lengths/gradients, upsampling modes/coordinates, and table/tape storage. Add examples only in the README phase.
 
 - margoengine (batch 274 job 4): document the generated compute/nn-extra subpath in the README phase.
+- @margoengine/webgl2-compat (batch 271 job 1 fix): note that a 3D texture slice drawn beside a depth or stencil attachment goes through a 2D stand-in (two blits per such pass; ANGLE Direct3D 11 drops those draws otherwise).

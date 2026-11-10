@@ -409,6 +409,8 @@ export class CompatTexture {
   private copies: Map<string, TextureStorage> | null = null;
   /** Current data version per subresource and the storage holding it; null while the primary is the only storage. */
   private ver: Uint32Array | null = null;
+  /** 2D stand-ins for slices of a 3D storage drawn beside depth or stencil, by storage id (Replayer.standIn). */
+  private standIns: Map<number, WebGLTexture> | null = null;
   private owner: TextureStorage[] | null = null;
 
   constructor(
@@ -619,6 +621,16 @@ export class CompatTexture {
       }
   }
 
+  /** The 2D texture a pass draws in place of a slice of 3D storage `s` when it also attaches depth or stencil. */
+  sliceStandIn(s: TextureStorage): WebGLTexture {
+    let t = this.standIns?.get(s.id);
+    if (!t) {
+      t = this.allocate(this.device.gl.TEXTURE_2D, s.info, this.mipLevelCount, this.width, this.height, 1);
+      (this.standIns ??= new Map()).set(s.id, t);
+    }
+    return t;
+  }
+
   /** Size of a mip level. */
   levelSize(level: number): [number, number, number] {
     const d = this.dimension === '3d' ? Math.max(1, this.depthOrArrayLayers >> level) : this.depthOrArrayLayers;
@@ -645,7 +657,12 @@ export class CompatTexture {
     this.destroyed = true;
     const gl = this.device.gl;
     this.device.dropFramebuffers(this);
-    for (const t of [this.texture, this.resolved, ...[...(this.copies?.values() ?? [])].map((c) => c.gl)])
+    for (const t of [
+      this.texture,
+      this.resolved,
+      ...[...(this.copies?.values() ?? [])].map((c) => c.gl),
+      ...(this.standIns?.values() ?? []),
+    ])
       if (t) {
         this.device.state.forgetTexture(t);
         gl.deleteTexture(t);

@@ -1382,6 +1382,16 @@ silently install itself and changes no globals at import time.
 
 ### 3.2 WebGL2 compatibility architecture
 
+**3D slices drawn beside depth (2026-11-10, batch 271 job 1).** ANGLE's Direct3D 11 back end drops every draw into a
+slice of a 3D texture when the framebuffer also attaches depth or stencil (complete framebuffer, clears land, no GL error;
+measured in raw WebGL2 on the RTX A6000: 8 of 30 probe rows fail, all of them 3D with depth). The layer's render pass
+draws such a slice in a 2D stand-in of the attached storage's format and level size (`Replayer.standIn` in
+`device/render.ts`, kept per storage by `CompatTexture.sliceStandIn`): one blit from the slice when the colour loads,
+one blit back when it stores. Passes without depth, 2D and array layers keep attaching directly. Evidence:
+`volumeSliceDepth` in `packages/webgl2-compat/test/features.html` (native and layer bytes equal) and
+`packages/creative/scripts/test-targets-depth.js --compat` (164 surfaces). Missing: the other ANGLE back ends and
+non-NVIDIA drivers were not probed; the stand-in is used on all of them, which costs two blits per such pass.
+
 **XR route (2026-11-06).** `installXR()` in `@margoengine/webgl2-compat/xr` replaces `XRGPUBinding` with a binding on an
 `XRWebGLLayer`, so `@margoengine/xr` keeps one renderer: each eye resolves into its own texture and `present` draws it
 into the opaque framebuffer after the submit, and the view's projection is remapped to z in [0, 1]. Evidence:

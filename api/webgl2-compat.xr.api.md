@@ -487,6 +487,7 @@ class CompatTexture {
     attached(v: CompatTextureView): TextureStorage;
     read(s: TextureStorage, level: number, levels: number, layer: number, layers: number, sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void): void;
     wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void;
+    sliceStandIn(s: TextureStorage): WebGLTexture;
     levelSize(level: number): [number, number, number];
     createView(descriptor?: GPUTextureViewDescriptor): CompatTextureView;
     dispose(): void;
