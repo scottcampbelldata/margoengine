@@ -122,6 +122,7 @@ interface CutsceneTrackType {
     validate(track: Record<string, unknown>, check: TrackCheck): void;
     instants?(track: Record<string, unknown>): readonly TrackInstant[];
     evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+    sampleKey?(track: Record<string, unknown>, time: number): Record<string, unknown>;
 }
 
 type EaseSpec = string | readonly [number, number, number, number];

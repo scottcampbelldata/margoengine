@@ -3944,3 +3944,8 @@ Claim: optional N-link CCD/FABRIK obstacle search preserves link lengths and fix
 
 ### Batch 238 GPU modifiers
 The optional modify entry performs procedural per-splat position, opacity and evaluated-colour effects each frame on WebGPU and the WebGL2 compatibility layer. Evidence: modify.test.js validates API/cancellation; test/gpu/modify-check.mjs runs in the full splats GPU suite. Independent formulas compare sine displacement and highlight applied to analytic degree-4 SH, reveal retains opacity 1.5, repeated seeks are exactly equal, disable/disposal restore canonical geometry, setRest survives restoration callbacks, and duplicate ownership rejects without altering the active modifier. The real MIT capture changes 25,718 channels under the combined effects on native; disposal restores its baseline pixel for pixel. This is correctness evidence, not a timing, learned-deformation or covariance-warp claim.
+
+
+### Batch 217 job 4: nested authoring and discrete keys
+
+The optional nested editor opens nested timeline clips inline, keys boolean/string properties with step sampling, shares root undo/redo and maps playheads through speed/offset. Evidence: nested-editor.test.js checks exact nested boundaries, seek order, duplicate times, validation refusal, shared history and literal names; nested-browser.mjs opens two levels with actual double-clicks, edits with keyboard, authors both primitive types, checks local/global playheads and reopens saved edits. This is the requested feature-row coverage, with no whole-editor or speed superiority claim.

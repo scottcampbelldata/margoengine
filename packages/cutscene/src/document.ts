@@ -160,7 +160,9 @@ export interface TimelineTrack {
   clips: TimelineClip[];
   muted?: boolean;
 }
-/** Any track. */
+/** Optional entries extend this map with their track interfaces, without loading their runtime into the root. */
+export interface CustomTrackTypes {}
+/** Any built-in track or a type registered by an imported optional entry. */
 export type Track =
   | CameraTrack
   | TransformTrack
@@ -169,7 +171,8 @@ export type Track =
   | AudioTrack
   | SubtitleTrack
   | EventTrack
-  | TimelineTrack;
+  | TimelineTrack
+  | CustomTrackTypes[keyof CustomTrackTypes];
 
 /** A named point in time (a chapter, a beat); the player reports markers it passes. */
 export interface Marker {

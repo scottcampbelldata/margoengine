@@ -160,6 +160,9 @@ interface CueEvent {
     data?: unknown;
 }
 
+interface CustomTrackTypes {
+}
+
 class Cutscene {
     readonly document: CutsceneDocument;
     readonly instants: readonly CutsceneEvent[];
@@ -207,6 +210,7 @@ interface CutsceneTrackType {
     validate(track: Record<string, unknown>, check: TrackCheck): void;
     instants?(track: Record<string, unknown>): readonly TrackInstant[];
     evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+    sampleKey?(track: Record<string, unknown>, time: number): Record<string, unknown>;
 }
 
 type EaseSpec = string | readonly [number, number, number, number];
@@ -275,7 +279,7 @@ interface TimelineTrack {
     muted?: boolean;
 }
 
-type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack;
+type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack | CustomTrackTypes[keyof CustomTrackTypes];
 
 interface TrackCheck {
     path: string;

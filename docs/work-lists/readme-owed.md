@@ -763,3 +763,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 214 job 1): document kinematics-constraints/chain alias.
 
 - @margoengine/splats and margoengine (batch 238 job 4): document /modify async create/attach, position/opacity/color WGSL bodies, helper declarations, 64 live floats, seek/clock defaults, canonical setRest, abort, single ownership, SH/fog/relighting order and restore/disposal semantics; examples remain owed.
+
+
+
+- @margoengine/cutscene (batch 217 job 4): document nested-editor registration, discrete step state/extras, inline local/global playheads, shared definitions/history, TimelineModel.nested/setTimeline, passing a model to TimelineEditor, key forms and cleanup; examples deferred.
+- margoengine (batch 217 job 4): document generated cutscene/nested-editor alias.

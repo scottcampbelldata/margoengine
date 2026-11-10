@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Nested cutscene editing proof</title><div id="host"></div>
+<script type="module">
+import{TimelineEditor}from'../src/editor.ts';import{NestedTimelineEditor,discreteTrack,discreteOf}from'../src/nested-editor.ts';import{CurveEditor}from'../src/curve-editor.ts';
+const document_={format:'margo-cutscene',version:1,duration:10,tracks:[{type:'timeline',id:'nest',clips:[{start:2,duration:4,timeline:'child',speed:2,offset:1}]}],timelines:{child:{duration:10,tracks:[
+ {type:'property',id:'value',target:'box',property:'x',keys:[{time:0,value:0},{time:10,value:10}]},
+ {type:'discrete',id:'flag',target:'box',property:'visible',keys:[{time:0,value:false},{time:3,value:true}]},
+ {type:'discrete',id:'label',target:'box',property:'text',keys:[{time:0,value:'start'},{time:4,value:'middle'}]},
+ {type:'timeline',id:'inner',clips:[{start:1,duration:4,timeline:'leaf'}]},
+ {type:'audio',id:'tone',clips:[{start:1,duration:2,sound:'tone'}]}
+]},leaf:{duration:4,tracks:[{type:'property',id:'leafValue',target:'box',property:'y',keys:[{time:0,value:0},{time:4,value:4}]}]}}};
+const editor=new TimelineEditor(document_,{parent:document.querySelector('#host'),tracks:[discreteTrack()]});
+const nested=new NestedTimelineEditor(editor);const graph=new CurveEditor(editor);
+window.proof={editor,nested,graph,discreteOf};window.ready=true;
+</script>

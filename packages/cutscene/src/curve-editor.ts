@@ -316,6 +316,7 @@ export class CurveEditor {
     if (e.button !== 0 || this.drag) return;
     const target = e.target as Element,
       graph = target.closest('[data-kind][data-index]');
+    if (target.closest('.mtl') && target.closest('.mtl') !== this.editor.element) return;
     let drag: Drag | undefined;
     if (graph && this.svg.contains(graph) && this.current)
       drag = {

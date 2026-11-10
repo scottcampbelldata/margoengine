@@ -4689,3 +4689,19 @@ Batch 214 unrelated GPU planner repro: node scripts/gpu-package-tests.mjs --no-b
 Batch 238 job 4: no open modifier defect found by independent SH/position/opacity probes, repeated seek, lifecycle and real-image restoration checks. Source centre/opacity changes require explicit setRest, as documented; RGB, SH and covariance remain live inputs.
 
 Batch 238 finish-phase validation gap: a streamed manifest with top-level model "2dgs" and chunk metadata omitting model is treated as ordinary 3D. Repro: add model:"2dgs" only to a valid lod-meta.json and open it. Cause: the adapter currently validates the per-chunk SOG model, but ignores the manifest model; propagate/reject that unsupported model before loading images. This does not add 2D Gaussian rendering to the requested 3D reader.
+
+
+
+### Batch 217 reserved browser shutdown blocker
+
+The scroll job remains local on batch-217-scroll (6660e0bb7): its required package GPU run passed render/VFX/editor/curve interactions, then browser.mjs:344 raised SHUTDOWN_TIMEOUT for Chromium PID 109224; browser host recorded it still present 677 ms after termination. Repro: private/batch217/scroll-gpu.log, main includes 919fdc09e. Cause is an owned process still reported alive during native teardown, not a failed rendering assertion. Scott reserved browser.mjs, browser-host.mjs and shutdown.mjs, so no lane workaround, timeout change or retry was made. Browser owner needs to resolve the remaining teardown state before that job lands.
+
+
+### Fixed: batch 217 nested gesture and focus ownership
+
+The base editor cancels pointerdown, so the browser suppresses native mouse/dblclick events, and its broad contains(focused) redraw check also treated focused child items as its own. This prevented native nested opening and moved keyboard focus to the parent after a child edit. The optional editor recognizes stationary pointer pairs after the native pointerup transaction; the base editor restores only its own nearest-panel focus. nested-browser.mjs verifies actual double-click opening, one child key nudge, shared undo, subsequent primitive authoring and two-level playheads without bypassing input handlers.
+
+
+Build-phase follow-up outside batch 217: numeric property targets named __proto__ (or constructor) use inherited dictionary entries in cutscene/src/cutscene.ts evaluate, unlike the new discrete handler's null-prototype maps. Repro: evaluate a numeric property track targeting __proto__, property x, value 1 at time 0; the inherited Object.prototype receives x because state.properties is {} and target lookup uses ??=. Replace numeric state dictionaries with own-key maps in the fix phase; do not change the discrete step semantics.
+
+Build-phase documentation follow-up: current main already contains orphan >>>>>>> scatter merge-marker lines in clean-room.md, limits.md, whitepaper claims/reproduce and readme-owed.md (28bc61377, 654098cc1, d70b0d2eb). Their originating shared-doc merge left closing markers after content was combined. These do not alter batch 217 implementation or its generated API checks; clean the document merge artifacts in the fix phase.

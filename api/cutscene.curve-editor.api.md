@@ -136,6 +136,9 @@ interface CueEvent {
     data?: unknown;
 }
 
+interface CustomTrackTypes {
+}
+
 class Cutscene {
     readonly document: CutsceneDocument;
     readonly instants: readonly CutsceneEvent[];
@@ -183,6 +186,7 @@ interface CutsceneTrackType {
     validate(track: Record<string, unknown>, check: TrackCheck): void;
     instants?(track: Record<string, unknown>): readonly TrackInstant[];
     evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+    sampleKey?(track: Record<string, unknown>, time: number): Record<string, unknown>;
 }
 
 type EaseSpec = string | readonly [number, number, number, number];
@@ -265,6 +269,7 @@ class TimelineEditor {
     on<K extends keyof TimelineEditorEvents>(event: K, listener: (value: TimelineEditorEvents[K]) => void): () => void;
     dispose(): void;
     [Symbol.dispose](): void;
+    seek(time: number): void;
 }
 
 interface TimelineEditorEvents {
@@ -290,6 +295,8 @@ interface TimelineItem extends ItemRef {
 
 class TimelineModel {
     readonly history: EditHistory;
+    private get doc();
+    private set doc(value);
     constructor(document: CutsceneDocument | string | unknown, _arg0?: TimelineModelOptions);
     get duration(): number;
     get document(): CutsceneDocument;
@@ -297,6 +304,8 @@ class TimelineModel {
     save(): string;
     cutscene(): Cutscene;
     on(event: 'change', listener: Listener): () => void;
+    nested(name: string): TimelineModel;
+    setTimeline(name: string, timeline: TimelineSpec): boolean;
     get rows(): TimelineRow[];
     addKey(track: string, time: number, fields?: Record<string, unknown>): ItemRef;
     addItem(track: string, item: Record<string, unknown>): ItemRef;
@@ -339,7 +348,7 @@ interface TimelineTrack {
     muted?: boolean;
 }
 
-type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack;
+type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack | CustomTrackTypes[keyof CustomTrackTypes];
 
 interface TrackCheck {
     path: string;

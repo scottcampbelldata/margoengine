@@ -91,6 +91,12 @@ export interface CueEvent {
     data?: unknown;
 }
 
+export interface CustomTrackTypes {
+}
+export interface CustomTrackTypes {
+    discrete: DiscreteTrack;
+}
+
 export class Cutscene {
     readonly document: CutsceneDocument;
     readonly instants: readonly CutsceneEvent[];
@@ -179,6 +185,7 @@ export interface CutsceneTrackType {
     validate(track: Record<string, unknown>, check: TrackCheck): void;
     instants?(track: Record<string, unknown>): readonly TrackInstant[];
     evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+    sampleKey?(track: Record<string, unknown>, time: number): Record<string, unknown>;
 }
 
 export const EASING_NAMES: ReadonlySet<string>;
@@ -255,7 +262,7 @@ export interface TimelineTrack {
     muted?: boolean;
 }
 
-export type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack;
+export type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack | CustomTrackTypes[keyof CustomTrackTypes];
 
 export interface TrackCheck {
     path: string;
@@ -312,4 +319,20 @@ export function evaluate(document: CutsceneDocument | string | unknown, t: numbe
 export function parseCutscene(input: string | unknown, easings?: ReadonlySet<string>, types?: ReadonlyMap<string, TrackValidator>): CutsceneDocument;
 
 export function validateCutscene(input: unknown, easings?: ReadonlySet<string>, types?: ReadonlyMap<string, TrackValidator>): CutsceneIssue[];
+
+// Not exported from this entry, but used by the exports above:
+
+interface DiscreteKey {
+    time: number;
+    value: boolean | string;
+}
+
+interface DiscreteTrack {
+    type: 'discrete';
+    id: string;
+    target: string;
+    property: string;
+    keys: DiscreteKey[];
+    muted?: boolean;
+}
 ```

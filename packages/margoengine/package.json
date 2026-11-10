@@ -870,6 +870,10 @@
       "types": "./dist/cutscene/viewport.d.ts",
       "import": "./dist/cutscene/viewport.js"
     },
+    "./cutscene/nested-editor": {
+      "types": "./dist/cutscene/nested-editor.d.ts",
+      "import": "./dist/cutscene/nested-editor.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

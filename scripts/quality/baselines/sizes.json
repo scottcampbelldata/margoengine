@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13560505,
+  "total": 13574905,
   "history": [
     {
       "date": "2026-10-24",
@@ -7038,6 +7038,12 @@
       "commit": "batch-238-job4",
       "reason": "Batch238 job4: optional WGSL per-splat modifiers keep canonical geometry, lifecycle, parameters and both effect passes together; splitting adds ownership and initialization complexity. Measured 0 to 20174 B gzip, ceiling 20780 B; core plus stage 24209 B unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-217",
+      "reason": "Optional cutscene authoring entry with lazy gizmo attachment and cancellation, no feature split or quality loss.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7248,8 +7254,9 @@
     "@margoengine/culling/webgl2": 3284,
     "@margoengine/cutscene": 7115,
     "@margoengine/cutscene/curve-editor": 3793,
-    "@margoengine/cutscene/editor": 11360,
+    "@margoengine/cutscene/editor": 11860,
     "@margoengine/cutscene/lipsync": 3364,
+    "@margoengine/cutscene/nested-editor": 13900,
     "@margoengine/cutscene/record": 3415,
     "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
@@ -7463,6 +7470,7 @@
     "@margoengine/inspector/tools": 3440,
     "@margoengine/inspector/tweak": 4276,
     "@margoengine/kinematics-constraints": 11751,
+    "@margoengine/kinematics-constraints/chain": 2160,
     "@margoengine/kinematics-constraints/sdf": 7229,
     "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 5806,
@@ -7759,6 +7767,7 @@
     "@margoengine/react/lines": 1758,
     "@margoengine/react/lod": 3020,
     "@margoengine/react/materials": 6961,
+    "@margoengine/react/offscreen": 1423,
     "@margoengine/react/performance": 5769,
     "@margoengine/react/physics": 6167,
     "@margoengine/react/points": 1460,
@@ -7769,6 +7778,7 @@
     "@margoengine/react/sky": 1052,
     "@margoengine/react/splats": 2114,
     "@margoengine/react/taa": 1153,
+    "@margoengine/react/test": 6200,
     "@margoengine/react/text": 1665,
     "@margoengine/react/textures": 4940,
     "@margoengine/react/tonemap": 1156,
@@ -7919,6 +7929,7 @@
     "@margoengine/splats/lighting": 3606,
     "@margoengine/splats/lod": 30687,
     "@margoengine/splats/lod-sog": 20981,
+    "@margoengine/splats/modify": 20780,
     "@margoengine/splats/pick": 3573,
     "@margoengine/splats/progressive": 31818,
     "@margoengine/splats/set": 29421,
@@ -8310,10 +8321,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/react/test": 6200,
-    "@margoengine/react/offscreen": 1423,
-    "@margoengine/kinematics-constraints/chain": 2160,
-    "@margoengine/splats/modify": 20780
+    "margoengine/web": 577
   }
 }

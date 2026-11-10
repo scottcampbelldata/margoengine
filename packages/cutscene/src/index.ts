@@ -17,6 +17,7 @@ export {
   type CueEvent,
   type CutsceneDocument,
   type CutsceneIssue,
+  type CustomTrackTypes,
   type EaseSpec,
   type EventTrack,
   type Marker,

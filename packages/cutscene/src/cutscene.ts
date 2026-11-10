@@ -146,6 +146,8 @@ export interface CutsceneTrackType {
   instants?(track: Record<string, unknown>): readonly TrackInstant[];
   /** Sets what the track does at `time` on its own timeline. `path` is the track's path. */
   evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+  /** Fields for an editor key at time. Default no fields; optional track entries can supply step-sampled values. */
+  sampleKey?(track: Record<string, unknown>, time: number): Record<string, unknown>;
 }
 
 /** Options of {@link Cutscene}. */

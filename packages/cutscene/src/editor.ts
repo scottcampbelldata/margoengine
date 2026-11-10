@@ -4,7 +4,7 @@
 import { EditHistory } from '@margoengine/inspector/history';
 import { MargoError } from '@margoengine/math/errors';
 import { Cutscene, EASING_NAMES, type CutsceneTrackType } from './cutscene.js';
-import { type CutsceneDocument, type Track, validateCutscene } from './document.js';
+import { type CutsceneDocument, type TimelineSpec, type Track, validateCutscene } from './document.js';
 
 /** The `track` of the row that holds the document's markers. */
 export const MARKERS = '@markers';
@@ -85,7 +85,22 @@ const clipName = (clip: Data): string =>
 export class TimelineModel {
   /** The undo stack. */
   readonly history: EditHistory;
-  private doc: CutsceneDocument;
+  private data: CutsceneDocument;
+  private root?: TimelineModel;
+  private scopeName?: string;
+  private get doc(): CutsceneDocument {
+    if (!this.root) return this.data;
+    const root = this.root.doc, spec = root.timelines && Object.hasOwn(root.timelines, this.scopeName!) ? root.timelines[this.scopeName!] : undefined;
+    if (!spec) throw new MargoError('state', 'Nested timeline was removed; reopen an existing timeline');
+    return { format: 'margo-cutscene', version: 1, ...spec, timelines: root.timelines };
+  }
+  private set doc(value: CutsceneDocument) {
+    if (!this.root) this.data = value;
+    else {
+      const { duration, tracks, markers } = value;
+      this.root.doc.timelines![this.scopeName!] = { duration, tracks, ...(markers ? { markers } : {}) };
+    }
+  }
   private readonly types: readonly CutsceneTrackType[];
   private readonly checks: ReadonlyMap<string, CutsceneTrackType>;
   private readonly listeners = new Set<Listener>();
@@ -94,7 +109,7 @@ export class TimelineModel {
   constructor(document: CutsceneDocument | string | unknown, { tracks = [], history = new EditHistory(200, 0) }: TimelineModelOptions = {}) {
     this.types = tracks;
     this.checks = new Map(tracks.map((type) => [type.type, type]));
-    this.doc = JSON.parse(JSON.stringify(new Cutscene(document, { tracks }).document)) as CutsceneDocument;
+    this.data = JSON.parse(JSON.stringify(new Cutscene(document, { tracks }).document)) as CutsceneDocument;
     this.history = history;
   }
   /** Length of the timeline, seconds. */
@@ -120,8 +135,23 @@ export class TimelineModel {
   /** Calls `listener` with the edit's label after every change, undo and redo included. Returns an unsubscribe function. */
   on(event: 'change', listener: Listener): () => void {
     if (event !== 'change') throw new RangeError(`TimelineModel has no '${String(event)}' event; use 'change'`);
+    if (this.root) return this.root.on(event, label => { const timelines = this.root!.doc.timelines; if (timelines && Object.hasOwn(timelines, this.scopeName!)) listener(label); });
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
+  }
+  /** A live editing view of a named nested definition. It shares root validation, subscriptions and undo history. */
+  nested(name: string): TimelineModel {
+    const root = this.root ?? this, timelines = root.doc.timelines, spec = timelines && Object.hasOwn(timelines, name) ? timelines[name] : undefined;
+    if (!spec) throw new RangeError(`No nested timeline '${name}'; choose a timeline clip's definition`);
+    const child = new TimelineModel({ ...root.document, ...spec }, { tracks: this.types, history: root.history });
+    child.root = root; child.scopeName = name; return child;
+  }
+  /** Sets a named definition atomically, validating all its placements and refusing cycles. */
+  setTimeline(name: string, timeline: TimelineSpec): boolean {
+    const root = this.root ?? this, value = JSON.parse(JSON.stringify(timeline)) as TimelineSpec;
+    return root.edit('Set nested timeline', false, () => {
+      Object.defineProperty(root.doc.timelines ??= {}, name, { value, writable: true, enumerable: true, configurable: true });
+    });
   }
   /** Every top-level track, then the markers. A timeline clip moves as one clip; what is inside it is not shown. */
   get rows(): TimelineRow[] {
@@ -260,15 +290,17 @@ export class TimelineModel {
   /** Sets the length of the timeline. False when something would fall outside it, which is then not done. */
   setDuration(seconds: number): boolean {
     finite(seconds, 'Duration');
-    return this.edit('Set duration', false, () => void ((this.doc as { duration: number }).duration = seconds));
+    return this.edit('Set duration', false, () => { this.doc = { ...this.doc, duration: seconds }; });
   }
   /** Starts a run of edits that undo as one, such as a drag; {@link commit} ends it. */
   begin(label: string): void {
+    if (this.root) { this.root.begin(label); return; }
     if (this.open) throw new MargoError('state', 'An edit is already open; call commit() before begin()');
     this.open = { label, before: this.snapshot() };
   }
   /** Ends the run {@link begin} started. A run that changed nothing leaves no undo step. */
   commit(): void {
+    if (this.root) { this.root.commit(); return; }
     if (!this.open) throw new MargoError('state', 'No edit is open; call begin() first');
     const { label, before } = this.open;
     this.open = null;
@@ -315,7 +347,7 @@ export class TimelineModel {
   }
   private list(track: string, create = false): Data[] {
     if (track === MARKERS) {
-      if (create) this.doc.markers ??= [];
+      if (create && !this.doc.markers) this.doc = { ...this.doc, markers: [] };
       return (this.doc.markers ?? []) as unknown as Data[];
     }
     const [list] = listOf(this.track(track));
@@ -335,7 +367,7 @@ export class TimelineModel {
     }
     if (track.type === 'transform') return { ...state.transforms[track.target as string] };
     if (track.type === 'property') return { value: state.properties[track.target as string]?.[track.property as string] };
-    return {};
+    return this.checks.get(track.type)?.sampleKey?.(track, time) ?? {};
   }
   private snapshot(): string {
     return JSON.stringify(this.doc);
@@ -358,21 +390,21 @@ export class TimelineModel {
   }
   /** Runs one change; keeps it only if the document stays valid. `strict` reports a refusal as a RangeError. */
   private edit(label: string, strict: boolean, change: () => void): boolean {
-    const before = this.snapshot();
+    const owner = this.root ?? this, before = owner.snapshot();
     try {
       change();
     } catch (error) {
-      this.doc = JSON.parse(before) as CutsceneDocument;
+      owner.doc = JSON.parse(before) as CutsceneDocument;
       throw error;
     }
-    const issues = validateCutscene(this.doc, EASING_NAMES, this.checks);
+    const issues = validateCutscene(owner.doc, EASING_NAMES, owner.checks);
     if (issues.length) {
-      this.doc = JSON.parse(before) as CutsceneDocument;
+      owner.doc = JSON.parse(before) as CutsceneDocument;
       if (strict) throw new RangeError(`${label} refused: ${issues[0].path}: ${issues[0].message}; use a value the document allows`);
       return false;
     }
-    if (!this.open) this.remember(label, before);
-    this.changed(label);
+    if (!owner.open) owner.remember(label, before);
+    owner.changed(label);
     return true;
   }
 }
@@ -489,7 +521,7 @@ export class TimelineEditor {
     const { parent, zoom = 100, step = 0.1, snap = true, fileName = 'cutscene.json', ...model } = options;
     if (!(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM)) throw new RangeError(`Timeline zoom must be ${MIN_ZOOM} to ${MAX_ZOOM}; pass pixels a second`);
     if (!(step > 0) || !Number.isFinite(step)) throw new RangeError('Timeline step must be above 0; pass seconds');
-    this.model = new TimelineModel(document, model);
+    this.model = document instanceof TimelineModel ? document : new TimelineModel(document, model);
     this.pixels = zoom;
     this.step = step;
     this.snapping = snap;
@@ -620,7 +652,7 @@ export class TimelineEditor {
   private draw(): void {
     const { rows, duration } = this.model,
       focused = window.document.activeElement as HTMLElement | null,
-      keep = focused?.dataset?.track !== undefined && this.element.contains(focused),
+      keep = focused?.dataset?.track !== undefined && focused.closest('.mtl') === this.element,
       names = window.document.createDocumentFragment(),
       lanes = window.document.createDocumentFragment(),
       picked = new Set(this.picked.map((ref) => `${ref.track}\0${ref.index}`));
@@ -689,9 +721,9 @@ export class TimelineEditor {
     // Eight pixels of pull, however far in or out the view is.
     return this.model.snap(time, { step: this.step, reach: 8 / this.pixels, ignore, times: ignore.length ? [this.playhead] : [] });
   }
-  private seek(time: number): void {
-    this.playhead = Math.min(this.model.duration, Math.max(0, time));
-    this.place();
+  /** Seeks the playhead and emits seek, as a ruler gesture does. Setting time alone emits no event. */
+  seek(time: number): void {
+    this.time = time;
     this.emit('seek', this.playhead);
   }
   private press(event: PointerEvent): void {

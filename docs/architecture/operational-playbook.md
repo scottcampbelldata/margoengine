@@ -6324,3 +6324,8 @@ Ordinary React DOM component mounts run against the headless null stage; frame a
 
 ### Section 5 evidence: batch 214 chain avoidance
 CPU cases cover N-link CCD/FABRIK, capsule/hull/SDF obstacles, fixed lengths/endpoints, unreachable and occluded requests, invalid custom query outputs and full-body atomic rollback. The Animator optional fbik entry accepts a per-limb avoidance hook without importing the constraint package. packages/animator/test/avoidance-browser.mjs renders the existing licensed RiggedFigure on both WebGPU and WebGL2 and independently measures the two accepted link gaps. No core, stage, rigging, physics solver or shader math changed. GPU planner registration gaps on main are tracked in known-bugs.md; direct changed-package leaves retain the shared lock and hard limit.
+
+
+### Section 5 evidence: batch 217 nested editor
+
+Nested/discrete authoring adds no renderer or GPU arithmetic. It extends CPU timeline validation and undo sharing; root snapshots validate every changed nested definition and all existing placements. Browser proofs exercise two nested levels, input isolation with the curve editor present, exact primitive keys and cleanup on both backend configurations. The reserved native-process shutdown failure from the separate scroll gate is documented in known-bugs; no timeout, assertion or browser lifecycle code was changed.

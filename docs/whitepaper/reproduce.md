@@ -3395,3 +3395,8 @@ After build:packages, run node --test --test-timeout=120000 packages/kinematics-
 
 ### Batch 238 modifiers
 Build packages, then node --test --test-timeout=120000 packages/splats/test/modify.test.js. Shared GPU gate: node scripts/gpu-lock.mjs run --owner=codex-batch238 --gpu=splats --max=2 --wait-max=60 -- node packages/splats/test/gpu/check.mjs, normally and with --compat. The full suite includes modify-check.mjs and the earlier streamed-SOG checks. A focused diagnostic can run modify-check.mjs with the same shared lock. CPU tests for dependents run only after api:update, which can rebuild dependent dist trees; overlapping them produces transient missing chunks rather than a source defect. No benchmarks or paired timings.
+
+
+### Batch 217 job 4: nested authoring
+
+After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/nested-editor.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-nested --wait-max=60 --max=2 -- node packages/cutscene/tests/nested-browser.mjs, and repeat with MARGO_COMPAT=1 for compatibility browser behavior. The package test:gpu includes this proof and existing render/editor suites. No benchmark, timing assertion, README check or example execution is required during build phase.

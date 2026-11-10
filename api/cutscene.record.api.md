@@ -138,6 +138,9 @@ interface CueEvent {
     data?: unknown;
 }
 
+interface CustomTrackTypes {
+}
+
 interface CutsceneDocument extends TimelineSpec {
     format: 'margo-cutscene';
     version: 1;
@@ -204,7 +207,7 @@ interface TimelineTrack {
     muted?: boolean;
 }
 
-type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack;
+type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack | CustomTrackTypes[keyof CustomTrackTypes];
 
 interface TransformKey {
     time: number;
