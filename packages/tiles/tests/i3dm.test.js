@@ -251,3 +251,23 @@ test('i3dm: the real TilesetWithTreeBillboards sample (Cesium, CC0) places all 2
   }
   renderer.dispose();
 });
+
+test('i3dm: SCALE and SCALE_NON_UNIFORM together apply both scalings (3D Tiles i3dm, Instance scaling)', () => {
+  const content = parseI3dm(
+    writeI3dm(boxGLB(), {
+      positions: [10, 20, 30, -1, -2, -3],
+      scale: [2, 0.5],
+      scaleNonUniform: [1, 3, 5, 4, 4, 2],
+    }),
+  );
+  const m = content.matrices,
+    expected = [
+      [2, 6, 10],
+      [2, 2, 1],
+    ];
+  for (let i = 0; i < 2; i++) {
+    const columns = [0, 4, 8].map((c) => Math.hypot(m[i * 16 + c], m[i * 16 + c + 1], m[i * 16 + c + 2]));
+    for (let k = 0; k < 3; k++) close(columns[k], expected[i][k], 1e-12, `instance ${i} axis ${k} scale`);
+  }
+  assert.deepEqual(Array.from(m.subarray(12, 15)), [10, 20, 30]);
+});

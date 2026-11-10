@@ -398,9 +398,9 @@ export async function settle(rounds = 20) {
 
 /**
  * An i3dm around a GLB (gltfFormat 1) or a glTF URI string (gltfFormat 0): float POSITION (relative to RTC_CENTER
- * when given), optional NORMAL_UP and NORMAL_RIGHT, uniform SCALE and EAST_NORTH_UP.
+ * when given), optional NORMAL_UP and NORMAL_RIGHT, uniform SCALE, SCALE_NON_UNIFORM and EAST_NORTH_UP.
  */
-export function i3dm(gltf, { positions, up, right, scale, rtcCenter, eastNorthUp } = {}) {
+export function i3dm(gltf, { positions, up, right, scale, scaleNonUniform, rtcCenter, eastNorthUp } = {}) {
   const n = positions.length / 3,
     parts = [],
     json = { INSTANCES_LENGTH: n };
@@ -415,6 +415,7 @@ export function i3dm(gltf, { positions, up, right, scale, rtcCenter, eastNorthUp
   if (up) add('NORMAL_UP', up);
   if (right) add('NORMAL_RIGHT', right);
   if (scale) add('SCALE', scale);
+  if (scaleNonUniform) add('SCALE_NON_UNIFORM', scaleNonUniform);
   if (rtcCenter) json.RTC_CENTER = rtcCenter;
   if (eastNorthUp) json.EAST_NORTH_UP = true;
   const body = typeof gltf === 'string' ? encoder.encode(gltf) : gltf;

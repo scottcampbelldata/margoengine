@@ -553,11 +553,9 @@ export function parseI3dm(
       y = [frame[4], frame[5], frame[6]];
     }
     z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
-    const s = scales
-      ? [scales[i * 3], scales[i * 3 + 1], scales[i * 3 + 2]]
-      : uniform
-        ? [uniform[i], uniform[i], uniform[i]]
-        : [1, 1, 1];
+    // With both SCALE and SCALE_NON_UNIFORM, both scalings apply (3D Tiles i3dm, "Instance scaling").
+    const k = uniform ? uniform[i] : 1,
+      s = scales ? [scales[i * 3] * k, scales[i * 3 + 1] * k, scales[i * 3 + 2] * k] : [k, k, k];
     m.set([
       x[0] * s[0],
       x[1] * s[0],
