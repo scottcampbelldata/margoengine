@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14499911,
+  "total": 14501554,
   "history": [
     {
       "date": "2026-10-24",
@@ -7697,6 +7697,12 @@
       "commit": "ef35e7070",
       "reason": "landed with push-anyway: feat(clustered): cache shadow atlas faces, redraw only what moved",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "808c36400",
+      "reason": "landed with push-anyway: feat(scatter): automatic LOD rings from one mesh (new entry @margoengine/scatter/simplify)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8526,6 +8532,7 @@
     "@margoengine/scatter/occlusion": 1433,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
+    "@margoengine/scatter/simplify": 1643,
     "@margoengine/scatter/surface": 1515,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/scatter/tiles": 3606,

@@ -3295,6 +3295,10 @@
       "types": "./dist/scatter/attributes.d.ts",
       "import": "./dist/scatter/attributes.js"
     },
+    "./scatter/simplify": {
+      "types": "./dist/scatter/simplify.d.ts",
+      "import": "./dist/scatter/simplify.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

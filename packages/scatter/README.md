@@ -568,6 +568,21 @@ engine.start();
   far ring still casts shadows with its mesh. A disposed imposter, or one with no device yet, draws the far mesh again.
 - Real-GPU proof: `npm run test:browser:imposter --workspace @margoengine/scatter` (build the packages first).
 
+## Automatic LOD rings: `@margoengine/scatter/simplify`
+
+`scatterLODs(mesh, { ratios })` turns one near mesh into the three ring meshes `Scatter` takes. Ring 0 is the mesh
+itself; rings 1 and 2 keep `ratios` of its triangles (default 0.4 and 0.12) by quadric-error edge collapses, the
+second simplified from the first. It loads `@margoengine/lod/auto` and `@margoengine/mesh-edit` on first use (optional
+peers: install both with this entry) and takes an `AbortSignal`.
+
+- Every ring vertex is a source vertex with its own normal, so hard edges and blade shading stay as authored, and the
+  rings nest.
+- `deviation` gives each ring's largest distance from a source vertex to its surface in mesh units; `ringDistance(
+  deviation * maxScale, pixels, screenHeight, fov)` turns that into the camera distance past which the ring's error
+  is under `pixels`, a starting point for the `lod` distances.
+- A mesh with nothing to spare (a box, a crossed card) keeps its shape, so a ring may keep more than its ratio.
+- Limits: positions and normals only (core Geometry has nothing else); up to 200,000 vertices.
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 
