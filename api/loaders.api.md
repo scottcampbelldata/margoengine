@@ -397,6 +397,7 @@ export interface LoadedGroup {
     name?: string;
     objectId?: string;
     color?: [number, number, number, number];
+    properties?: Record<string, number | number[]>;
 }
 
 export interface LoadedMeshes {

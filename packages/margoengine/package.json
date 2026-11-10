@@ -1626,6 +1626,14 @@
       "types": "./dist/lines/hidden.d.ts",
       "import": "./dist/lines/hidden.js"
     },
+    "./loaders/ply": {
+      "types": "./dist/loaders/ply.d.ts",
+      "import": "./dist/loaders/ply.js"
+    },
+    "./loaders/off": {
+      "types": "./dist/loaders/off.d.ts",
+      "import": "./dist/loaders/off.js"
+    },
     "./loaders": {
       "types": "./dist/loaders.d.ts",
       "import": "./dist/loaders.js"

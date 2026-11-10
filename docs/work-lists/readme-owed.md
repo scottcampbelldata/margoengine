@@ -364,3 +364,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated mesh-edit/boolean-batch alias and upstream exporters/sparse alias in the README phase (batch 224 job 2).
 - @margoengine/scene (batch 226 tags): document TagSet and DOM events, OR/AND arrays, boolean query grammar/limits, cloned tags, explicit SceneEvents installation/restoration, event ordering, transactional compound operations, errors and abortable subscriptions, with examples in the README phase.
 - margoengine (batch 226 tags): document generated scene/tags alias in the README phase.
+- @margoengine/loaders (batch 202 job 1): document /ply and /off, face RGBA and scalar/list group properties, binary OFF and external colormap indices; correct stale Limits claims for VTK XML and 3MF textures (batch job 5).
+- margoengine (batch 202 job 1): document loaders/ply and loaders/off aliases.
+- margoengine (batch 202 rebase): document the generated exporters/sparse alias for the already-landed optional exporter.

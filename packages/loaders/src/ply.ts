@@ -1,4 +1,4 @@
-import { LoaderError, type LoadedGeometry, type ParseLimits } from './types.js';
+import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, toBytes, triangulate, uints, type BinaryInput, TextScanner } from './util.js';
 
 const F = 'PLY';
@@ -239,6 +239,32 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
     : -1;
   if (faceElement && faceElement.count > 0 && faceList < 0)
     throw new LoaderError(F, 'header', 'face element has no vertex_indices list');
+  const groups: LoadedGroup[] = [];
+  let faceStart = 0;
+  let faceProperties: Record<string, number | number[]> = Object.create(null);
+  const faceProps = faceElement?.properties ?? [];
+  const faceRGB = [
+    ['red', 'diffuse_red', 'r'],
+    ['green', 'diffuse_green', 'g'],
+    ['blue', 'diffuse_blue', 'b'],
+  ].map((names) => find(faceProps, names));
+  const faceAlpha = find(faceProps, ['alpha', 'opacity', 'a']);
+  const storeFace = (): void => {
+    if (faceProps.length <= 1) return;
+    for (let p = 0; p < faceProps.length; p++) {
+      if (!faceProps[p].list) faceProperties[faceProps[p].name] = row[p];
+    }
+    const group: LoadedGroup = { start: faceStart, count: indices.length - faceStart, properties: faceProperties };
+    if (faceRGB.every((p) => p >= 0)) {
+      const rgba = [...faceRGB, faceAlpha].map((p) => (p < 0 ? 1 : row[p] / (UNIT[faceProps[p].type] ?? 1)));
+      if (rgba.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
+        throw new LoaderError(F, 'range', 'face color must be in its declared type range');
+      group.color = rgba as [number, number, number, number];
+    }
+    groups.push(group);
+    faceStart = indices.length;
+    faceProperties = Object.create(null);
+  };
   const at = (corner: number): number => polygon[corner];
   const checkCorners = (count: number): void => {
     if (!Number.isSafeInteger(count) || count < 0 || count > MAX_POLYGON)
@@ -291,8 +317,10 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
           checkCorners(count);
           for (let k = 0; k < count; k++) polygon[k] = number(name, i, ' list');
           if (isFace && p === faceList) triangulate(indices, count, at, vertexCount, F, limit.maxTriangles);
+          if (isFace && p !== faceList) faceProperties[properties[p].name] = Array.from(polygon.subarray(0, count));
         }
         if (isVertex) storeVertex(i);
+        if (isFace) storeFace();
       }
     }
   } else {
@@ -312,7 +340,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
       if (element.count * minimum > end - offset) truncated(`the "${element.name}" element`);
       const fixed = properties.every((p) => !p.list);
       // Fixed-size rows of other elements are never looked at, and the check above already proved they fit.
-      if (fixed && !isVertex) {
+      if (fixed && !isVertex && !isFace) {
         offset += element.count * minimum;
         continue;
       }
@@ -336,15 +364,17 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
           offset += countSize;
           checkCorners(count);
           if (offset + count * itemSize > end) truncated(`${element.name} ${i}`);
-          if (isFace && p === faceList) {
+          if (isFace) {
             for (let k = 0; k < count; k++) {
               polygon[k] = read(view, offset, code, little);
               offset += itemSize;
             }
-            triangulate(indices, count, at, vertexCount, F, limit.maxTriangles);
+            if (p === faceList) triangulate(indices, count, at, vertexCount, F, limit.maxTriangles);
+            else faceProperties[properties[p].name] = Array.from(polygon.subarray(0, count));
           } else offset += count * itemSize;
         }
         if (isVertex) storeVertex(i);
+        if (isFace) storeFace();
       }
     }
   }
@@ -353,5 +383,6 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   if (colors) result.colors = colors;
   if (uvs) result.uvs = uvs;
   if (indices.length) result.indices = indices.result();
+  if (groups.length) result.groups = groups;
   return result;
 }

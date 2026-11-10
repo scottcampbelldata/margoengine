@@ -495,7 +495,7 @@ test('OFF: plain, COFF with 0-255 colors, NOFF, STOFF, comments and counts on th
 
 test('OFF: errors and LGPL Geomview files', () => {
   rejects(() => parseOFF(text('PLY\n')), 'header');
-  rejects(() => parseOFF(text('OFF BINARY\n')), 'unsupported');
+  rejects(() => parseOFF(text('OFF BINARY\n')), 'truncated');
   rejects(() => parseOFF(text('4OFF\n')), 'unsupported');
   rejects(() => parseOFF(text('OFF\n3 1 0\n0 0 0\n1 0 0\n')), 'truncated');
   rejects(() => parseOFF(text('OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 3\n')), 'range');
@@ -1641,6 +1641,8 @@ test('createMeshes: one mesh per colored group with shared PbrMaterials (mock en
   assert.equal(merged.geometries[0].indices.length, result.indices.length);
   const cube = parsePLY(writePLY('ascii', plyCube().elements)),
     colored = createMeshes(engine, cube);
+  assert.equal(cube.groups.length, 7, 'all source face flags survive in metadata groups');
+  assert.equal(colored.meshes.length, 1, 'metadata alone does not split a visual material');
   const expected = [0, 1, 2].map(
     (a) => [...cube.indices].reduce((sum, i) => sum + linear(((i * 30 + a * 7) % 256) / 255), 0) / cube.indices.length,
   );

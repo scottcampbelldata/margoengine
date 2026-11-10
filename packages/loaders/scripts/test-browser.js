@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -23,6 +24,7 @@ try {
     args,
   });
   const page = await browser.newPage({ viewport: { width: 400, height: 400 }, deviceScaleFactor: 1 });
+  if (compatRun()) await page.addInitScript(compatShim, compatUrl());
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {

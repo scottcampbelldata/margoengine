@@ -2,6 +2,8 @@ import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { createMeshes, load, parse3MF, LoaderError } from '@margoengine/loaders';
 import { parseLottie } from '@margoengine/loaders/lottie';
+import { parsePLY } from '@margoengine/loaders/ply';
+import { parseOFF } from '@margoengine/loaders/off';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -30,6 +32,22 @@ window.runLoaderTests = async () => {
   device.pushErrorScope('validation');
 
   const empty = snapshot(engine);
+  const faceFiles = [
+    [parseOFF, 'OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2 255 0 0\n'],
+    [
+      parsePLY,
+      'ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nelement face 1\nproperty list uchar int vertex_indices\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2 255 0 0\n',
+    ],
+  ];
+  for (const [parse, source] of faceFiles) {
+    const model = parse(new TextEncoder().encode(source));
+    assert(model.groups[0].color[0] === 1 && model.groups[0].count === 3, 'source face group survives');
+    const scene = createMeshes(engine, model);
+    assert(scene.meshes.length === 1, 'face group creates its own mesh');
+    engine.render();
+    scene.dispose();
+  }
+  checks.push('PLY and OFF face color groups create and render engine meshes');
   const result = await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 1 << 20 });
   assert(result.groups.length === 5, `expected 5 color groups, got ${result.groups.length}`);
   checks.push('load() + parse3MF in the browser (DecompressionStream deflate-raw)');

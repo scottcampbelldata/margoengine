@@ -10,6 +10,8 @@ export interface LoadedGroup {
   objectId?: string;
   /** Uniform sRGB color in [0,1], `[r, g, b, a]`, when the file gives this group one color. */
   color?: [number, number, number, number];
+  /** Raw source face properties, including scalar values and owned lists (PLY/OFF). */
+  properties?: Record<string, number | number[]>;
 }
 
 /** The common output of every loader in this package. */

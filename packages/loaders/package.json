@@ -35,6 +35,14 @@
   },
   "sideEffects": false,
   "exports": {
+    "./ply": {
+      "types": "./dist/ply.d.ts",
+      "import": "./dist/ply.js"
+    },
+    "./off": {
+      "types": "./dist/off.d.ts",
+      "import": "./dist/off.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

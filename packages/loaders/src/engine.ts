@@ -88,7 +88,11 @@ export function createMeshes(
   };
   const parts: { geometry: Geometry; color: string | readonly number[]; name?: string }[] = [];
   if (loaded.kind === 'points') parts.push({ geometry: pointsToGeometry(loaded, options), color: colorFor(undefined) });
-  else if (options.merge || !loaded.groups?.length) {
+  else if (
+    options.merge ||
+    !loaded.groups?.length ||
+    loaded.groups.every((group) => group.properties && !group.color && !group.name && !group.objectId)
+  ) {
     const group = !options.merge ? undefined : loaded.groups?.length === 1 ? loaded.groups[0] : undefined;
     parts.push({
       geometry: toGeometry(loaded, { normals: options.normals }),

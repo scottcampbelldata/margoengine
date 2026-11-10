@@ -83,6 +83,7 @@ interface LoadedGroup {
     name?: string;
     objectId?: string;
     color?: [number, number, number, number];
+    properties?: Record<string, number | number[]>;
 }
 
 interface LoadedOBJ extends LoadedGeometry {

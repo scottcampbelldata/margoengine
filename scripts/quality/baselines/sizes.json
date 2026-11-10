@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12714572,
+  "total": 12722412,
   "history": [
     {
       "date": "2026-10-24",
@@ -6304,6 +6304,12 @@
       "commit": "batch-226",
       "reason": "Batch 226 tags: measured {\"@margoengine/scene/graph\":2098,\"margoengine/scene/graph\":58,\"@margoengine/scene/clone\":1144,\"margoengine/scene/clone\":58,\"@margoengine/scene/tags\":2676,\"margoengine/scene/tags\":57} B gzip; prior ceilings {\"@margoengine/scene/graph\":2254,\"margoengine/scene/graph\":314,\"@margoengine/scene/clone\":1295,\"margoengine/scene/clone\":314,\"@margoengine/scene/tags\":0,\"margoengine/scene/tags\":0}. New or exceeded optional entries use measured +256 B. Per-engine lifecycle, complete tag queries and shared commit-time notifications are worth the bytes; splitting would duplicate transaction/rollback ownership. Core and stage source unchanged, root combined 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-202",
+      "reason": "Optional loader entries loaders:ply, loaders:off preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
+      "grew": 4
     }
   ],
   "items": {
@@ -7453,6 +7459,10 @@
     "leak @margoengine/animation/mixer -> @margoengine/gltf-pro/model": 1,
     "@margoengine/mesh-edit/boolean-batch": 10775,
     "@margoengine/scene/tags": 2932,
-    "margoengine/scene/tags": 313
+    "margoengine/scene/tags": 313,
+    "@margoengine/loaders/ply": 4220,
+    "margoengine/loaders/ply": 314,
+    "@margoengine/loaders/off": 2992,
+    "margoengine/loaders/off": 314
   }
 }
