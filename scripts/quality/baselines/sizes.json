@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14107229,
+  "total": 14111287,
   "history": [
     {
       "date": "2026-10-24",
@@ -7435,6 +7435,12 @@
       "date": "2026-11-10",
       "commit": "batch-203-job-3",
       "reason": "New optional clean-room HDR6 entry: 0 to 43292 B gzip; ceiling 44540 B. Complete 75-mode codec and portable workers, with no vendor runtime. Core + stage stays 24209 B. Splitting the entry would add asset and API plumbing without reducing the required codec."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f428a581f",
+      "reason": "Batch 177 contour2d: absent (0 B) to 3802 B gzip, 4058 B initial ceiling; grid/scattered topology, exact predicates, bands and vector SVG stay together without duplicate orchestration; core+stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8783,6 +8789,7 @@
     "@margoengine/post/stylize": 7202,
     "@margoengine/quality/events": 1223,
     "@margoengine/gltf-pro/dds": 7076,
-    "@margoengine/decoders/ktx2-hdr6": 44540
+    "@margoengine/decoders/ktx2-hdr6": 44540,
+    "@margoengine/sciviz/contour2d": 4058
   }
 }

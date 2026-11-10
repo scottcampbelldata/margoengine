@@ -1,5 +1,6 @@
 # Clean room
 
+
 ## Batch 190 job 2: float32 weighted accumulation
 
 Research combined: Morgan McGuire and Louis Bavoil, *Weighted Blended Order-Independent Transparency*, JCGT 2(2), 2013, [equations 7 to 10 and precision discussion](https://jcgt.org/published/0002/02/09/paper-lowres.pdf); Louis Bavoil and Kevin Myers, *Order Independent Transparency with Dual Depth Peeling*, 2008, [weighted-average and blending discussion](https://developer.download.nvidia.com/SDK/10/opengl/src/dual_depth_peeling/doc/DualDepthPeeling.pdf); W3C GPU for the Web Working Group, *WebGPU*, 2026, [float32-blendable and plain colour format capabilities](https://www.w3.org/TR/webgpu/#plain-color-formats); Khronos WebGL Working Group, *EXT_float_blend*, 2019, [float32 blend enablement](https://registry.khronos.org/webgl/extensions/EXT_float_blend/). Papers and specifications only, no companion or rival source code.
@@ -7454,3 +7455,16 @@ The new optional decoders/ktx2-hdr6 entry uses only Margo-authored Rust/Wasm and
 
 Independent black-box evidence: 14 frozen KTX2 fixtures and SHA-256 outputs from the official Basis Universal v2_1_0r prebuilt encoder/transcoder, covering every configuration in both versions, real HDR image data, ramps, noise and solids. Each mip matches exact ASTC block bytes, RGBA half-float bytes and RGB9E5 bytes. No companion implementation source was used to write the decoder. The partial final trit-group regression is retained in Rust and the real-image corpus. Tests and provenance: packages/decoders/tests/ktx2-hdr6.test.js and tests/fixtures/ktx2-hdr6/NOTICE.md.
 
+# Batch 177 job 1: optional 2D contour plots
+
+New `/contour2d` is independent of the mesh `/contour` entry and the root. No rival implementation or companion code was read. Research compared bilinear marching squares with triangulated linear interpolation and combined the following public descriptions:
+
+- G. M. Nielson and B. Hamann, 1991, *The Asymptotic Decider: Resolving the Ambiguity in Marching Cubes*, [DOI](https://doi.org/10.1109/VISUAL.1991.175782). A square's saddle uses the sign of `(v0-t)(v2-t)-(v1-t)(v3-t)`, with a documented 0-2 tie. Each band is the even-odd difference of adjacent superlevel polygon rings, so holes and saddle connectivity agree with isolines.
+- A. Bowyer, 1981, *Computing Dirichlet Tessellations*, [DOI](https://doi.org/10.1093/comjnl/24.2.162), and D. F. Watson, 1981, *Computing the n-dimensional Delaunay tessellation with application to Voronoi polytopes*, [DOI](https://doi.org/10.1093/comjnl/24.2.167). Incremental circumcircle cavities construct the scattered interpolation; all coordinates and values remain caller data.
+- C. L. Lawson, 1977, *Software for C1 Surface Interpolation*, [NASA record](https://ntrs.nasa.gov/citations/19770025881). Convex hull fan legalization supplies the initial triangulation, avoiding finite supertriangle errors on thin domains.
+- J. R. Shewchuk, 1997, *Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates*, [paper](https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf). We use conservative floating determinant filters followed by our own exact BigInt dyadic determinant, rather than copying expansion code. Cocircular ties use insertion order.
+- W3C SVG Working Group, 2018, *Scalable Vector Graphics (SVG) 2*, [painting](https://www.w3.org/TR/SVG2/painting.html) and [text](https://www.w3.org/TR/SVG2/text.html). Even-odd polygon filling, paths and rotated halo labels remain vectors with escaped attributes and title text.
+
+The published [Plotly contour reference](https://plotly.com/javascript/reference/contour/) supplies the black-box behaviour checklist: rectilinear x/y, explicit levels, missing values, fills, isolines and labels. Added beyond that trace: scattered Delaunay input and owned polygon coordinates. Tests independently prove all 16 cell cases, both saddle sides, band area, thin triangulation coverage and empty circumcircles, rather than deriving expected output from a rival. No speed claim or Rust/Wasm gain is asserted; the speed phase retains timing work.
+
+Real demo data are reduced NOAA OISST (US public domain) and ECMWF ERA5 via WeatherBench 2 (Copernicus terms and CC BY 4.0 attribution). Exact sources, reductions, units and SHA-256 are beside the frozen JSON, with a reproducible preparation script. The scattered demo intentionally interpolates across missing sites inside the convex hull; the grid demo masks all incident missing cells.

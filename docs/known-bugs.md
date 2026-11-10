@@ -2,6 +2,7 @@
 
 Batch 186 job 1: disk/sphere shadows use the existing centre-map PCSS approximation and guard band (limits.md); no exact extended-emitter visibility claim. Native WebGPU and full WebGL2 production-shader visibility checks pass.
 
+
 Batch 190 job 2: no open defect found in float32 weighted accumulation. The entry deliberately retains the original weighted-depth approximation and sorted paths for transmission/custom blending; finite f32 sums and final HDR target range are recorded in limits.md.
 
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
@@ -4845,3 +4846,7 @@ Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails 
 quality/events (batch 195 job 3): no open defect found in motion policy, queued-input coalescing, asynchronous pick serialization, rejection or cancellation tests. Explicit notification of programmatic movement and no stationary-pointer polling are documented contracts in limits.md.
 
 Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallback are built. No new DDS defect identified. The separately assigned batch-273 composed compatibility sampler overflow is repaired in the same lane, with its strict assertions unchanged.
+
+Batch 177 job 1: the finite-supertriangle design was replaced before landing by convex hull initialization plus Delaunay legalization. Thin-domain coverage and empty-circumcircle tests retain the regression; no open contour2d correctness defect is known. Inline label collision avoidance is a future layout quality improvement documented in limits.md.
+
+Batch 177 out-of-scope gate finding: `node scripts/gpu-package-tests.mjs --list --only=sciviz --no-build` rejects `packages/water/package.json` because `test:gpu` contains `npm run build` after browser commands. Cause: planner validates every package before applying selection. Sciviz's own GPU commands run directly through the shared lock for this job; water script ordering belongs to its owner during the build phase.

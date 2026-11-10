@@ -3587,3 +3587,7 @@ Build packages, then run gltf-pro CPU tests. Under the shared GPU lock run `node
 ### Batch 203 HDR6
 
 Build packages, then run node --test packages/decoders/tests/ktx2-hdr6.test.js and cargo test --offline --locked --manifest-path packages/decoders/native/hdr6/Cargo.toml, with a hard process-tree timeout. Golden records and fixture attribution are in packages/decoders/tests/fixtures/ktx2-hdr6. The clean-room crate has no dependencies. Run node scripts/gpu-lock.mjs run --owner=hdr6-correctness --wait-max=60 --max=3 -- node packages/decoders/tests/hdr6-browser.mjs for both backends. Production asset emission is covered by packages/decoders/scripts/test-browser.js. No README run or full verify is a lane gate.
+
+## Batch 177 job 1
+
+Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/contour2d.test.js`. Render with `node scripts/gpu-lock.mjs run --owner=codex-batch177 --wait-max=60 --max=3 -- node packages/sciviz/tests/contour2d-browser.mjs`. Open `/examples/sciviz-contour2d.html` using the examples server and switch both fields/modes; the download stays SVG paths/text with polygon holes. Frozen data hashes and reductions are in `examples/assets/sciviz/contour2d/source.json`. Regenerate with `packages/sciviz/scripts/prepare-contour2d.py` using the dependencies listed in its header. No rival source, benchmarks or timing-only tests are needed.

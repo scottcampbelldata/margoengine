@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Climate contours | Margo Engine</title>
+<style>
+  body { margin: 0 auto; max-width: 1100px; padding: 28px; font: 16px/1.5 system-ui; color: #203342; background: #fafcfd; }
+  h1 { margin-bottom: 0; } p { max-width: 80ch; } svg { width: 100%; height: auto; background: white; border: 1px solid #dae2e6; }
+  button, select { padding: 8px 12px; font: inherit; } label { margin-right: 20px; } #status { min-height: 24px; }
+</style>
+<h1>Climate contours</h1>
+<p>NOAA OISST daily sea surface temperature and ERA5 500 hPa geopotential. Lines, polygon bands and inline labels export as vector SVG. Longitude runs horizontally and latitude vertically. Missing ocean cells remain empty.</p>
+<label>Field <select id="field"><option value="oisst">North Atlantic OISST, degrees C</option><option value="era5">ERA5 global geopotential, m2/s2</option></select></label>
+<label><input id="scattered" type="checkbox"> Delaunay sites</label>
+<button id="download">Download SVG</button>
+<p id="status" role="status">Loading climate data</p>
+<div id="plot"></div>
+<p>OISST: NOAA, US government public domain, 2024-01-01, every twelfth grid cell. ERA5: ECMWF / Copernicus Climate Change Service, 2020-01-01 00 UTC, WeatherBench 2 conservative 64x32 reduction. Contains modified Copernicus Climate Change Service information 2020. Neither the European Commission nor ECMWF is responsible for any use of this information. <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. <a href="./assets/sciviz/contour2d/source.json">Sources, transformations and hashes</a>.</p>
+<script type="module" src="./sciviz-contour2d.ts"></script>
+</html>

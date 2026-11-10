@@ -3398,6 +3398,10 @@
       "types": "./dist/sciviz/volume-quality.d.ts",
       "import": "./dist/sciviz/volume-quality.js"
     },
+    "./sciviz/contour2d": {
+      "types": "./dist/sciviz/contour2d.d.ts",
+      "import": "./dist/sciviz/contour2d.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

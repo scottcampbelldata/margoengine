@@ -1,0 +1,34 @@
+{
+  "sources": [
+    {
+      "file": "oisst.json",
+      "source": "https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/202401/oisst-avhrr-v02r01.20240101.nc",
+      "license": "US government public domain",
+      "reduction": "2024-01-01 daily mean, North Atlantic 20-55 N 280-335 E; every 12th 0.25 degree cell, no interpolation; land is null",
+      "sha256": "0bbc73aae910ddaf3bf38186c60d3dffd4eca1fc874692a69dd84957b8d61b85",
+      "source_sha256": "fd2f772cbe1633b20ab0c53ed76b874406f933bbd97062d611827c5d8a73bc4c",
+      "units": "Celsius",
+      "shape": [
+        12,
+        19
+      ]
+    },
+    {
+      "file": "era5.json",
+      "source": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
+      "license": "ECMWF / Copernicus Climate Change Service, CC BY 4.0",
+      "reduction": "500 hPa geopotential, 2020-01-01 00 UTC; WeatherBench 2 conservative 64x32 regridding; m2 s-2 retained, no height conversion",
+      "sha256": "d77172ceb893fcc92844fa946f02ab168bdeb7f648fffce5fe49eade6e727d1a",
+      "source_sha256": null,
+      "units": "m**2 s**-2",
+      "shape": [
+        32,
+        64
+      ]
+    }
+  ],
+  "attribution": "Contains modified Copernicus Climate Change Service information 2020, ECMWF, via WeatherBench 2. Neither the European Commission nor ECMWF is responsible for any use of this information.",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "era_reference": "https://weatherbench2.readthedocs.io/en/latest/data-guide.html",
+  "ecmwf_license": "https://apps.ecmwf.int/datasets/licences/general/"
+}

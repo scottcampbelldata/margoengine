@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'examples/assets/sciviz/contour2d/source.json',
+    'Batch 177 climate contour demo: reduced NOAA OISST 2024-01-01 (US government public domain, https://www.ncei.noaa.gov/products/optimum-interpolation-sst) and ECMWF ERA5 500 hPa geopotential 2020-01-01 via WeatherBench 2 (https://weatherbench2.readthedocs.io/en/latest/data-guide.html, Copernicus terms https://storage.googleapis.com/weatherbench2/datasets/era5/LICENSE, CC BY 4.0 https://apps.ecmwf.int/datasets/licences/general/). Frozen JSON hashes, units, source URLs, transformations and the required Copernicus attribution are beside the data. No implementation files copied; reduced standard scientific data only, excluded from package tarballs.',
+  ],
+  [
     'packages/xr/tests/fixtures/hands/LICENSE',
     '`packages/xr/tests/fixtures/hands/{left,right}.glb` are standard WebXR Input Profiles model data, permitted by the standard-file exception. Pinned source: https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0.20/dist/profiles/generic-hand/left.glb and https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0.20/dist/profiles/generic-hand/right.glb. Licence: MIT, Copyright (c) 2019 Amazon, full text beside the models in LICENSE. Licence declaration: https://github.com/immersive-web/webxr-input-profiles/blob/main/packages/assets/README.md and https://github.com/immersive-web/webxr-input-profiles/blob/main/packages/assets/LICENSE.md. SHA256 left bc67783144944ea1cda54d9247885825ea5fb9d4651469fe7d00be517a5c2b87; right 291790c14f7f88a7f9bd35330c47392ed8e8d395ae6728f4bb7089f1bc1f2b96. Assets are test data only; no external implementation code is included or read.',
   ],

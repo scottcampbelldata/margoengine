@@ -135,6 +135,10 @@
     "./volume-quality": {
       "types": "./dist/volume-quality.d.ts",
       "import": "./dist/volume-quality.js"
+    },
+    "./contour2d": {
+      "types": "./dist/contour2d.d.ts",
+      "import": "./dist/contour2d.js"
     }
   },
   "files": [
@@ -170,6 +174,7 @@
     "test:flow-kernel": "node scripts/build-flow.mjs --test",
     "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
     "test:webgl2": "npm run build && node tests/webgl2-browser.mjs",
-    "test:browser:atmosphere": "node tests/atmosphere-browser.mjs"
+    "test:browser:atmosphere": "node tests/atmosphere-browser.mjs",
+    "test:browser:contour2d": "node tests/contour2d-browser.mjs"
   }
 }

@@ -972,3 +972,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - margoengine: document the generated decoders/ktx2-hdr6 alias and retain the environment/prefiltered alias emitted by the umbrella generator.
+
+- @margoengine/sciviz and margoengine/sciviz/contour2d (batch 177 job 1): grid and scattered contours, saddle ties, polygon bands/holes, inline labels, SVG options/defaults, cancellation, climate demo and limits.

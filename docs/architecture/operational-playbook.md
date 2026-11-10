@@ -6509,3 +6509,7 @@ Batch 191 Stylize samples the shared LDR capture. A compact annular backward war
 
 ### 5. Adaptive event evidence (batch 195 job 3)
 quality/events sits before caller-owned hover picking/raycast work. Unit clocks prove exact throttle deadlines, latest arguments, inactivity reset, forced flush, nonoverlap, thrown/rejected errors, abort and timer/listener removal. events-browser.mjs runs actual engine.pick on native WebGPU and full WebGL2 compatibility: 200 suppressed hover requests become one final centre hit at rest, followed by an immediate stationary hit; peak active picks is one. These are deterministic invocation counts, not a speed measurement. No backend, protected browser helper or core modification.
+
+## Batch 177 contour2d evidence (section 5 supplement)
+
+The new CPU-only optional contour entry introduces no GPU kernel, rendering backend or hardware-tier requirement. Analytical tests prove saddle topology, empty-circumcircle triangulation, thin domains, affine fields, polygon area, masking, snapshot ownership and cancellation. Both browser launch backends check rasterization and download of the vector climate SVG. Existing sciviz GPU suites remain the package's renderer evidence; dependent GPU suites are left to scheduled CI under the current fast-gate rule. Entry min+gzip is 3,802 B; core + stage stays 24,209 B. No speed claim or timing gate was run.
