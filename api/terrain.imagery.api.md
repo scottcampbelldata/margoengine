@@ -84,7 +84,7 @@ export interface WMTSImageryOptions extends Omit<TiledImagerySource, 'url'> {
     dimensions?: Readonly<Record<string, string>>;
 }
 
-export function imageryTiles(center: readonly [number, number], level: number, capacity?: number, columns?: number, minLevel?: number): ImageryTile[];
+export function imageryTiles(center: readonly [number, number], level: number, capacity?: number, columns?: number, minLevel?: number, wrap?: boolean): ImageryTile[];
 
 export function wmtsImagery(options: WMTSImageryOptions): TiledImagerySource;
 

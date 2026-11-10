@@ -263,7 +263,7 @@ test('imagery virtualTexture refreshes changing layer declarations and uses expl
       'fn terrainVirtualSurface(color:vec3f,position:vec2f,footprint:f32)->vec3f {var terrainSurfaceColor=color;return terrainSurfaceColor;}',
       group,
     );
-    assert.match(code, /let gx=terrainDx.xz/);
+    assert.match(code, /let dx=terrainDx\.xz\/vec2f/);
     assert.doesNotMatch(code, /dpdx\(/);
   }
   imagery.dispose();

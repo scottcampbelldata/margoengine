@@ -227,3 +227,33 @@ test('imagery patches lit clipmap, RVT and planet surfaces before lighting, and 
   imagery.dispose();
   planet.dispose();
 });
+
+test('R5: the minLevel fallback is the center tile when level zero has two columns', () => {
+  // Capacity 4 with two columns leaves two fine tiles; the level-1 parent of center 0.9 is column 3 of 4.
+  const tiles = imageryTiles([0.9, 0.5], 3, 4, 2, 1);
+  assert.ok(
+    tiles.some((t) => t.level === 1 && t.x === 3 && t.y === 1),
+    `center parent 1/3/1 missing: ${JSON.stringify(tiles)}`,
+  );
+});
+
+test('R5: a clipmap camera past the east edge loads the east edge tiles, not the west side', async () => {
+  const f = fixture({ maxTiles: 64 }),
+    loaded = [];
+  f.imagery.add({
+    source: {
+      ...source(),
+      load: async (tile) => {
+        loaded.push(tile);
+        return new Uint8Array([1, 2, 3, 255]);
+      },
+    },
+  });
+  await f.imagery.ready;
+  loaded.length = 0;
+  await f.imagery.update([1.1, 0.5], 5);
+  const fine = loaded.filter((t) => t.level === 5).map((t) => t.x);
+  assert.ok(fine.includes(31), `level-5 columns ${fine} miss the east edge column 31`);
+  assert.ok(!fine.includes(0), `level-5 columns ${fine} wrapped to the west edge`);
+  f.imagery.dispose();
+});

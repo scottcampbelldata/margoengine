@@ -6811,6 +6811,14 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Audio listener direct disposal (2026-11-10)
+Disposing an attached AudioListener unregisters its owning scene's plugin name
+and frame passes before resource teardown, allowing same-name replacement. A
+stale handle cannot detach the replacement or a listener in another scene.
+Detaching a lazy listener creates no audio context. Existing owned-context close
+and caller-owned context behavior are unchanged. Regressions: audio.test.js and
+listener-disposal-browser.mjs in packages/audio/tests.
+
 ## Figure legend visibility (2026-11-10)
 Legends retain their native hidden-state rendering and three-pixel row/title
 separation. The default Figure hides the legend below two named layers; adding a
@@ -14521,7 +14529,7 @@ Repro: `MARGO_COMPAT=1` then `node packages/quality/test/features-browser.mjs` u
 
 - Batch 188 static review, prefiltered IBL: encodePrefilteredIBL accepts source edges 8192/16384 although their embedded full source mip chain makes the KTX2 u32 key/value lengths overflow. Repro: encode a valid 8192-edge cube and inspect the wrapped kvdByteLength; do not allocate multi-GiB fixtures in the gate. Cause: edge checks do not validate total metadata byte length before allocation. Fix phase: reject metadata exceeding 0xffffffff before allocating, with a dimension-only regression. Ordinary tested 16-edge round trips are unaffected; no runtime fix in the unrelated EXR job under lane rule 21.
 
-Batch 201 job 3: audio emitter loading, audio-only scenes and positional source attachment are built with CPU and real Web Audio/frame regressions. Inherited fix-phase issue outside this job: AudioListener.attach(engine), followed by listener.dispose() and another attach with the same name, rejects as a duplicate plugin because direct disposal does not remove the engine's named plugin registration (audio/src/listener.ts dispose). Use the engine's removePlugin ownership operation; the new browser fixture does so.
+Fixed 2026-11-10: batch 201 AudioListener direct disposal registration. A registered listener now delegates to its owning Scene.removePlugin, which releases its name and frame passes before calling the existing resource teardown. Same-name replacement works immediately, stale handles retain replacement ownership, and another scene's same-name listener remains attached. Regression: packages/audio/tests/audio.test.js has two cases that fail on the parent; listener-disposal-browser.mjs checks the real engine on native WebGPU and WebGL2. Engine-driven cleanup and lazy audio-context creation are preserved; core is unchanged.
 Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
 
 

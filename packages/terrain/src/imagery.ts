@@ -129,13 +129,17 @@ function tiled(source: ImagerySource): source is TiledImagerySource {
 function tileKey(t: ImageryTile): string {
   return `${t.level}/${t.x}/${t.y}`;
 }
-/** Bounded nested tile windows with coarse parents first; longitude wraps and rows clamp at the poles. */
+/**
+ * Bounded nested tile windows with coarse parents first; rows clamp at the poles. Columns wrap in longitude, or with
+ * `wrap` false (a clipmap rectangle) clamp at the east and west edges.
+ */
 export function imageryTiles(
   center: readonly [number, number],
   level: number,
   capacity = 64,
   columns = 1,
   minLevel = 0,
+  wrap = true,
 ): ImageryTile[] {
   if (
     center.length !== 2 ||
@@ -153,26 +157,28 @@ export function imageryTiles(
   for (let z = level; z >= minLevel; z--) {
     const rows = 2 ** z,
       cols = rows * columns;
-    const cx = Math.floor(center[0] * cols),
+    const cx = wrap ? Math.floor(center[0] * cols) : Math.min(cols - 1, Math.max(0, Math.floor(center[0] * cols))),
       cy = Math.min(rows - 1, Math.max(0, Math.floor(center[1] * rows)));
     const offsets = z === level ? [0, -1, 1, -2, 2] : [0, -1, 1];
     for (const dy of offsets)
       for (const dx of offsets) {
         const y = cy + dy,
-          x = (((cx + dx) % cols) + cols) % cols;
-        if (y < 0 || y >= rows) continue;
+          x = wrap ? (((cx + dx) % cols) + cols) % cols : cx + dx;
+        if (y < 0 || y >= rows || x < 0 || x >= cols) continue;
         const tile = { level: z, x, y },
           key = tileKey(tile);
         if (!out.has(key) && out.size < capacity - columns) out.set(key, tile);
       }
   }
-  for (let x = 0; x < columns; x++) {
-    const t = {
-      level: minLevel,
-      x: Math.floor(center[0] * 2 ** minLevel) + x,
-      y: Math.min(2 ** minLevel - 1, Math.max(0, Math.floor(center[1] * 2 ** minLevel))),
-    };
-    t.x = ((t.x % (columns * 2 ** minLevel)) + columns * 2 ** minLevel) % (columns * 2 ** minLevel);
+  // The center's own minLevel tile (minLevel has columns * 2^minLevel columns), then a neighbour: east, or west at
+  // a clipmap's east edge.
+  const cols = columns * 2 ** minLevel,
+    floor = Math.floor(center[0] * cols),
+    cx = wrap ? floor : Math.min(cols - 1, Math.max(0, floor)),
+    cy = Math.min(2 ** minLevel - 1, Math.max(0, Math.floor(center[1] * 2 ** minLevel)));
+  for (let k = 0; k < columns; k++) {
+    const x = !wrap && cx + k >= cols ? cx - k : cx + k,
+      t = { level: minLevel, x: ((x % cols) + cols) % cols, y: cy };
     out.set(tileKey(t), t);
   }
   return [...out.values()].sort((a, b) => a.level - b.level || a.y - b.y || a.x - b.x);
@@ -428,6 +434,23 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
         ],
         at + 4,
       );
+      // A GPU source is one tile spanning its bounds, in the same pyramid space as tiled sources, so both paths
+      // sample through identical arithmetic (a separate geographic formula rounded differently on Metal).
+      if (!tiled(o.source)) {
+        const b = o.bounds,
+          c = this.#options.bounds;
+        values.set(
+          this.#planet
+            ? [(b[0] + 180) / 360, (90 - b[3]) / 180, (b[2] - b[0]) / 360, (b[3] - b[1]) / 180]
+            : [
+                (b[0] - c[0]) / (c[2] - c[0]),
+                (b[1] - c[1]) / (c[3] - c[1]),
+                (b[2] - b[0]) / (c[2] - c[0]),
+                (b[3] - b[1]) / (c[3] - c[1]),
+              ],
+          at + 8,
+        );
+      }
       for (const { tile: t, slot } of l.cache.values()) {
         const rows = 2 ** t.level,
           cols = rows * ((o.source as TiledImagerySource).columns ?? 1);
@@ -476,7 +499,15 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
         const lat = (Math.max(-85.05112878, Math.min(85.05112878, 90 - center[1] * 180)) * Math.PI) / 180;
         selected[1] = (1 - Math.log(Math.tan(Math.PI / 4 + lat / 2)) / Math.PI) / 2;
       }
-      const tiles = imageryTiles(selected, z, this.#options.maxTiles, source.columns ?? 1, source.minLevel ?? 0);
+      // Only planets wrap in longitude: a clipmap camera past an edge selects that edge's tiles, not the far side.
+      const tiles = imageryTiles(
+        selected,
+        z,
+        this.#options.maxTiles,
+        source.columns ?? 1,
+        source.minLevel ?? 0,
+        this.#planet,
+      );
       const wanted = new Set(tiles.map(tileKey));
       for (const key of l.cache.keys()) if (!wanted.has(key)) l.cache.delete(key);
       const free = Array.from({ length: this.#options.maxTiles }, (_, k) => k).filter(
@@ -622,23 +653,22 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     this.#layers.forEach((_, i) => {
       code += `@group(${group}) @binding(${100 + i}) var imagery${i}:texture_2d_array<f32>;\n`;
     });
-    code += `fn terrainImagery(base:vec3f,position:vec3f)->vec3f {${coordinate}let dx=dpdx(pyramid);let dy=dpdy(pyramid);let gx=dpdx(geographic);let gy=dpdy(geographic);var result=base;`;
+    code += `fn terrainImagery(base:vec3f,position:vec3f)->vec3f {${coordinate}let dx=dpdx(pyramid);let dy=dpdy(pyramid);var result=base;`;
     this.#layers.forEach((_, i) => {
       const at = i * stride;
       code += `{let box=imageryRules[${at}];let style=imageryRules[${at + 1}];var uv=pyramid;var sx=dx;var sy=dy;
         if(style.w>0.5&&${this.#planet ? 'true' : 'false'}){let lat=clamp(geographic.y,-85.05112878,85.05112878)*0.01745329252;uv.y=(1.0-log(tan(0.7853981634+lat*0.5))/3.14159265359)*0.5;let scale=1.0/max(cos(lat),0.086);sx.y*=scale;sy.y*=scale;}
         if(style.x>0.0&&all(geographic>=box.xy)&&all(geographic<=box.zw)){
-          var slot=0;var tile=vec4f(0,0,1,1);var found=style.z<0.5;var smallest=2.0;
+          var slot=0;var tile=imageryRules[${at + 2}];var found=style.z<0.5;var smallest=2.0;
           if(style.z>0.5){for(var k=0;k<${this.#options.maxTiles};k++){let p=imageryRules[${at + 2}+k];if(p.z>0.0&&p.z<smallest&&all(uv>=p.xy)&&all(uv<=p.xy+p.zw)){slot=k;tile=p;smallest=p.z;found=true;}}}
-          else{uv=(geographic-box.xy)/(box.zw-box.xy);sx=gx/(box.zw-box.xy);sy=gy/(box.zw-box.xy);${this.#planet ? 'uv.y=(box.w-geographic.y)/(box.w-box.y);sx.y=-sx.y;sy.y=-sy.y;' : ''}}
           if(found){let d=vec2f(textureDimensions(imagery${i}));let tuv=clamp((uv-tile.xy)/tile.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);let sample=textureSampleGrad(imagery${i},imagerySampler,tuv,slot,sx/tile.zw,sy/tile.zw);result=mix(result,sample.rgb*style.y,sample.a*style.x);}
         }} `;
     });
     code += 'return result;}\n';
     if (this.#virtual)
       code = code.replace(
-        'let dx=dpdx(pyramid);let dy=dpdy(pyramid);let gx=dpdx(geographic);let gy=dpdy(geographic);',
-        `let gx=terrainDx.xz;let gy=terrainDy.xz;let dx=gx/vec2f(${span[0]},${span[1]});let dy=gy/vec2f(${span[0]},${span[1]});`,
+        'let dx=dpdx(pyramid);let dy=dpdy(pyramid);',
+        `let dx=terrainDx.xz/vec2f(${span[0]},${span[1]});let dy=terrainDy.xz/vec2f(${span[0]},${span[1]});`,
       );
     code += patched;
     this.#code.set(key, code);

@@ -6,7 +6,7 @@ prompts are in `list-4-prompts.md`.
 | Stream | Work | Batch | Package | Jobs | Status |
 | --- | --- | --- | --- | --- | --- |
 | K | Apple proofs first | 121 | proof audit | 4 | done |
-| L | review | R5 | list 2 and 3 packages | 22 | running (Mac) |
+| L | review | R5 | list 2 and 3 packages | 22 | done |
 | M | research audit | 132 | every package except sciviz (still building on the dev PC) | 6 | running (Mac) |
 
 Why the Mac: it is the only Apple machine, so batch 121's proofs that only pass on real Safari, WebKit, Metal and

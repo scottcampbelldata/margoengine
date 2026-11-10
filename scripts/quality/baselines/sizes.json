@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14659671,
+  "total": 14659936,
   "history": [
     {
       "date": "2026-10-24",
@@ -8039,6 +8039,12 @@
       "commit": "371c2d07e",
       "reason": "batch 132 bvh audit: watertight fallback in the CPU ray/triangle test (bvh +294 B, bvh/tree +190 B)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fcc2238f5",
+      "reason": "R5 terrain imagery fixes and R5 done",
+      "grew": 1
     }
   ],
   "items": {
@@ -9104,7 +9110,7 @@
     "@margoengine/terrain/deform": 5192,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,
-    "@margoengine/terrain/imagery": 6241,
+    "@margoengine/terrain/imagery": 6506,
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
