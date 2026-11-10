@@ -17,10 +17,44 @@ alternating view sizes and restoration each upload the uncached reference's
 exact bytes. All other GPU commands match the forced-upload negative control.
 The package browser test compares every pixel byte for cached and forced-upload
 point frames on native WebGPU and WebGL2 compatibility (native 1x and 4x MSAA).
-Run it through `node scripts/gpu-lock.mjs run --max=15 --wait-max=15
---owner=bp-163 -- node packages/points/scripts/test-browser.js`, then with
-`--compat` appended. No timings or claim of winning the historical rows.
+Run both backends in PowerShell:
+
+```powershell
+$env:MARGO_GPU_SLOTS='3'
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163 -- node packages/points/scripts/test-browser.js
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163 -- node packages/points/scripts/test-browser.js --compat
+```
+ No timings or claim of winning the historical rows.
 Timing pending the quiet rerun; the original point/block/draw work is unchanged.
+
+
+## Job 2: live light-helper circles
+
+`p-light-helpers` moves point lights each frame. The old CPU circle builder
+recomputed sine and cosine for both endpoints in all three coordinate lanes
+for each of 32 edges in each of three circles: 1,152 calls per moving helper.
+`perf(lines): retain light-helper circle samples` lazily stores the same 33
+angles' sine/cosine results in Float64 (528 bytes), plus two three-number
+coordinate arrays. Three circles share this per-helper state. Initial work is
+66 trig calls; each subsequent moving-helper rebuild uses zero circle trig
+calls and no per-edge endpoint arrays (192 arrays before). Segment order,
+position arithmetic, colour selection, 32 edges and GPU drawing stay intact.
+No state is allocated until a circle is used; import has no new work.
+
+Run `node --test --test-timeout=120000 packages/lines/tests/helper-work.test.js`
+after `npm run build:packages`. The independent uncached reference produces
+byte-identical Float32 geometry at ordinary, tiny, signed-zero and large finite
+positions. The first-use and moving-frame call counts fail with the old builder.
+Existing spot and hemisphere tests retain their original geometry assertions.
+GPU checks in PowerShell:
+
+```powershell
+$env:MARGO_GPU_SLOTS='3'
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163-lines -- node packages/lines/scripts/test-browser.js
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163-lines -- node packages/lines/scripts/test-browser.js --compat
+```
+
+Timing pending the quiet rerun; the historical slower status remains.
 
 ## Clean-room research
 
@@ -42,3 +76,12 @@ precision, reordered points and polyline tessellation can change exact output
 or touch unrelated code. Reusing unchanged uniform bytes preserves all existing
 point order, precision, coverage and shader work. Only papers, specifications
 and Margo's own code were read; no companion or rival source was used.
+
+For job 2, Rougier's 2013 analysis distinguishes geometry preparation from
+fragment dash/coverage work. This change keeps the preparation's exact geometry
+and avoids repeated evaluation, rather than changing its tessellation. Ecma
+International, TC39 (2025), [ECMAScript Language Specification, Math.sin and
+Math.cos](https://tc39.es/ecma262/2025/multipage/numbers-and-dates.html#sec-math.sin)
+specifies implementation-approximated Number results. Values are retained at
+runtime in Float64, never rounded to Float32, precomputed offline or derived
+through a recurrence, so each runtime retains its own original results.

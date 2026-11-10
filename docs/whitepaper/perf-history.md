@@ -26,6 +26,8 @@ The controls cover standalone SSAO, stacked SSAO and GTAO at 1x/4x.
 Timing pending the quiet rerun; the
 historical rival loss is retained. [Reproduce](reproduce.md#batch-164-ssao-resolve-work).
 
+
+
 ## Verify cache metadata work
 
 The post-build pause repeated a full synchronous archive stat/sort per newly
@@ -3226,6 +3228,10 @@ complete historical predictor-3 streams with intact position/float canaries
 are accepted in versions 1.0/1.1/1.2; native rejects method 3. These are
 concrete gaps, not skips or unavailable-feature conclusions. Historical KD
 and the remaining prediction/transform/quantization cross product remain open.
+
+## Batch 163 job 2: light-helper circle work (2026-11-10)
+
+A moving point-light helper recomputed 1,152 sine/cosine calls and allocated 192 endpoint arrays for its three circles. `perf(lines): retain light-helper circle samples` retains a 528-byte Float64 table lazily and two coordinate arrays, reducing moving-frame circle calls and endpoint allocations to zero. The independent reference is byte-identical. No timing result; timing pending the quiet rerun. [Reproduce and sources](bp-163-workcounts.md#job-2-live-light-helper-circles).
 
 ## Batch 163 job 1: identical points frame uploads (2026-11-10)
 

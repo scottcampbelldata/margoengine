@@ -39,6 +39,11 @@ The packed React 18.3.1 consumer runs its component lifecycle assertions against
 
 PointsPlugin queues no frame uniform write when all 144 bytes equal its last queued write. `packages/points/tests/frame-work.test.js` checks 100 unchanged frames, original bytes, all other commands, changed camera/dimensions/format and restored buffers. `packages/points/tests/points-browser.js` compares cached and forced-upload pixel bytes. This claims fewer queue writes only; timing pending the quiet rerun. [Method and clean-room sources](bp-163-workcounts.md).
 
+
+### Batch 163 job 2: retained circle samples
+
+Live point-light helpers perform zero repeated circle trig calls and allocate no per-edge endpoint arrays after their first circle table. `packages/lines/tests/helper-work.test.js` checks the first-use count of 66 and subsequent count of zero against exact uncached geometry bytes, without changing edges or GPU work. [Method and sources](bp-163-workcounts.md#job-2-live-light-helper-circles).
+
 ## Batch 187: lightmap visibility
 
 Opaque back faces block area-light visibility and diffuse gathers. Front-side emission cannot pass through their

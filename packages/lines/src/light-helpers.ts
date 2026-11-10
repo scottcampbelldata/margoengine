@@ -98,6 +98,7 @@ class Segments {
   readonly positions: number[] = [];
   readonly colors: number[] = [];
   color: number[] = [1, 1, 1];
+  private circleData?: { trig: Float64Array; p: number[]; q: number[] };
   clear(): void {
     this.positions.length = this.colors.length = 0;
   }
@@ -108,11 +109,22 @@ class Segments {
   /** A circle about `c` in the plane of unit `u`, `v`; `colorAt(point)` may colour each segment (hemisphere halves). */
   circle(c: ArrayLike<number>, u: number[], v: number[], r: number, colorAt?: (y: number) => number[]): void {
     const steps = 32;
+    let data = this.circleData;
+    if (!data) {
+      const trig = new Float64Array((steps + 1) * 2);
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        trig[i * 2] = Math.cos(angle);
+        trig[i * 2 + 1] = Math.sin(angle);
+      }
+      this.circleData = data = { trig, p: [0, 0, 0], q: [0, 0, 0] };
+    }
+    const { trig, p, q } = data;
     for (let i = 0; i < steps; i++) {
-      const a = (i / steps) * Math.PI * 2,
-        b = ((i + 1) / steps) * Math.PI * 2,
-        p = [0, 1, 2].map((k) => c[k] + (u[k] * Math.cos(a) + v[k] * Math.sin(a)) * r),
-        q = [0, 1, 2].map((k) => c[k] + (u[k] * Math.cos(b) + v[k] * Math.sin(b)) * r);
+      for (let k = 0; k < 3; k++) {
+        p[k] = c[k] + (u[k] * trig[i * 2] + v[k] * trig[i * 2 + 1]) * r;
+        q[k] = c[k] + (u[k] * trig[(i + 1) * 2] + v[k] * trig[(i + 1) * 2 + 1]) * r;
+      }
       this.line(p, q, colorAt ? colorAt((p[1] + q[1]) / 2 - c[1]) : this.color);
     }
   }

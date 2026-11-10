@@ -40,6 +40,29 @@ dashed.dashOffset += 0.01;
 // On teardown: engine.removePlugin('lines') or engine.dispose().
 ```
 
+
+## Live light helpers
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Lines, PointLightHelper} from '@margoengine/lines';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+const light = {position: [0, 1, 0] as [number, number, number], color: [1, 0.5, 0] as [number, number, number]};
+const helper = lines.add(new PointLightHelper(light, {size: 0.25}));
+engine.render();
+light.position[0] = 2; // The helper follows live positions on the next render.
+engine.render();
+helper.dispose();
+engine.dispose();
+```
+
+Point, spot and hemisphere helpers retain the original 33 circle samples on
+first use, including the closing endpoint, and reuse two coordinate arrays.
+Moving a point-light helper then needs zero circle sine/cosine calls instead
+of 1,152, with identical geometry bytes. Helpers without circles allocate no
+circle table. This is a work-count result; timing pending the quiet rerun.
+
 ## How it works
 
 - **Instanced screen-space quads.** Each segment is one instance of 78 vertices drawn from a storage buffer of points; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.

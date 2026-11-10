@@ -16,6 +16,11 @@
 
 - Batch 163 points frame reuse retains a 144-byte snapshot per PointsPlugin plus a typed view and flag. It removes unchanged camera uploads only; point culling, sorting, quads and draw counts remain as before. Timing pending the quiet rerun; historical slower rows are not reclassified. See [work-count proof](whitepaper/bp-163-workcounts.md).
 
+
+### Batch 163 light-helper circle retention
+
+A light helper retains 528 bytes of Float64 circle samples and two three-number coordinate arrays only after it draws a circle. This removes repeated geometry preparation work; it changes no precision, edge count or raster work. Timing pending the quiet rerun. [Proof](whitepaper/bp-163-workcounts.md#job-2-live-light-helper-circles).
+
 ## K2 rendering and test limits
 
 K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass must use a linear HDR target for the exact sum; its display-target snapshot hook remains on the finish-later list. The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.
