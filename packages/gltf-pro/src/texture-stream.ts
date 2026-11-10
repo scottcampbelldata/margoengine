@@ -1,7 +1,7 @@
 // Texture mip streaming for @margoengine/gltf-pro/progressive, loaded only with the `textures` option: KTX2 images open
 // through @margoengine/decoders/ktx2-stream with just their smallest levels, and finer levels load by the size each texture
 // has on screen. Files keep the smallest mip first, so a stream starts from a small read of the head of each image.
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { KTX2Streamer, colorTwin } from '@margoengine/decoders/ktx2-stream';
 import type { KTX2StreamerOptions, StreamedKTX2 } from '@margoengine/decoders/ktx2-stream';
@@ -121,6 +121,8 @@ export class GLTFTextureStream implements GLTFTextureOpener {
   private streamer!: KTX2Streamer;
   private since = 0;
   private closed = false;
+  // The plugin registered for refreshes and device restore.
+  private plugin!: EnginePlugin;
 
   /** Creates the stream on `engine` (preferred over the constructor); the `textures` option of `/progressive` calls this. */
   static attach(engine: EngineKernel, options: GLTFTextureStreamOptions = {}, signal?: AbortSignal): GLTFTextureStream {
@@ -134,17 +136,19 @@ export class GLTFTextureStream implements GLTFTextureOpener {
     this.engine = engineRuntime(instance);
     this.start();
     const self = this;
-    this.engine.use({
-      name: this.name,
-      setup() {},
-      onPreUpdate(delta) {
-        self.since += delta;
-        if (self.since >= REFRESH) self.update();
-      },
-      onDeviceRestored() {
-        self.restart();
-      },
-    });
+    this.engine.use(
+      (this.plugin = {
+        name: this.name,
+        setup() {},
+        onPreUpdate(delta) {
+          self.since += delta;
+          if (self.since >= REFRESH) self.update();
+        },
+        onDeviceRestored() {
+          self.restart();
+        },
+      }),
+    );
   }
   private start(): void {
     this.streamer = new KTX2Streamer({
@@ -275,6 +279,7 @@ export class GLTFTextureStream implements GLTFTextureOpener {
     for (const image of this.images) image.drop();
     this.images.clear();
     this.streamer.dispose();
-    this.engine.removePlugin(this.name);
+    // The scene the stream was attached to, not whichever scene is active now.
+    this.engine.sceneOf(this.plugin)?.removePlugin(this.name);
   }
 }
