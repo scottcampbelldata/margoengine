@@ -3671,6 +3671,10 @@
       "types": "./dist/sciviz/density.d.ts",
       "import": "./dist/sciviz/density.js"
     },
+    "./sciviz/notebook": {
+      "types": "./dist/sciviz/notebook.d.ts",
+      "import": "./dist/sciviz/notebook.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

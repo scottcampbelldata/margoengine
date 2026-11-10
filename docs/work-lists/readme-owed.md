@@ -1323,3 +1323,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 274 job 5): document the compute/onnx optional alias after its generated umbrella entry lands; examples remain deferred to the README phase.
 
 - @margoengine/game and @margoengine/viz (batch 274 job 5): document generated compute/onnx profile aliases in the README phase.
+- @margoengine/sciviz: document /notebook AFM, named binary spec attachments, camera/selection traits and static export after build phase.
+- margoengine and @margoengine/viz: document generated sciviz/notebook forwarding entries after build phase.
+- Python margoengine: document NotebookFigure, local notebook extra, private wheel build, NumPy/Arrow borrowing, refresh and host/static HTML integration after build phase.

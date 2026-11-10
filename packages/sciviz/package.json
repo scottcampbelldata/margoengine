@@ -311,6 +311,10 @@
     "./density": {
       "types": "./dist/density.d.ts",
       "import": "./dist/density.js"
+    },
+    "./notebook": {
+      "types": "./dist/notebook.d.ts",
+      "import": "./dist/notebook.js"
     }
   },
   "files": [
@@ -384,6 +388,7 @@
     "test:browser:progressive": "node scripts/browser-root.mjs tests/progressive-browser.mjs",
     "test:browser:temporal": "node scripts/browser-root.mjs tests/temporal-browser.mjs",
     "test:browser:density": "node scripts/browser-root.mjs tests/density-browser.mjs",
-    "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs"
+    "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs",
+    "test:browser:notebook": "node scripts/browser-root.mjs tests/notebook-browser.mjs"
   }
 }

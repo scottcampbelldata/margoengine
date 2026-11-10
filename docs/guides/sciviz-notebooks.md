@@ -1,0 +1,35 @@
+# Portable sciviz figures in notebooks
+
+The optional `@margoengine/sciviz/notebook` entry implements the Anywidget Front-End Module (AFM) render contract. The thin `margoengine.notebook.NotebookFigure` Python class hands version-1 figure specs and binary attachments to that code. Python does no rendering. The existing Python plotting API remains available independently.
+
+Build the web packages with `npm run build:packages`, then run `node python/build-notebook.mjs`. Install this private checkout locally with `python -m pip install -e "./python[notebook,numpy,arrow]"`. Build a private wheel with `python -m pip wheel ./python --no-deps --wheel-dir test-results` after building the AFM. No PyPI publication is part of this workflow. The wheel includes the local AFM and the `py.typed` marker.
+
+Open `examples/notebooks/sciviz-portable.ipynb` from the repository root, or set `MARGO_REPO` to that directory. It draws the existing CC0 OpenNeuro T1 volume using a NumPy uint16 buffer and the existing public NASA Exoplanet table using Arrow columns. Their unchanged provenance is in `examples/assets/sciviz/head.json` and `examples/assets/sciviz/stats/source.json`.
+
+`NotebookFigure(spec)` accepts a complete web FigureSpec. Without a spec it starts an empty 3D figure. `options` defaults to `{}`, `limits` to `[0, 1, 0, 1, 0, 1]` in plot coordinates, and `height` to 480 CSS pixels (100 to 4000). Set limits for the dataset, as the notebook does. `add(kind, *args, layer=True)` appends a web recipe; arguments and options are the same as that web method. Use `layer=False` for a colorbar or another non-layer resource. All portable resource kinds remain available through a full spec; application codecs and pipeline implementations are supplied explicitly by a custom AFM host's `load` option.
+
+Numeric NumPy arrays and Arrow arrays/columns travel in `buffers`, separately from JSON. Contiguous little-endian supported arrays and null-free single Arrow chunks retain their original CPU storage. Aligned received views also retain their comm storage. Noncontiguous/endian inputs, nullable or multiple-chunk Arrow columns and misaligned browser views require a conversion or aligned copy. Network framing, widget managers, the spec recorder and GPU uploads can make their own copies; this is not an end-to-end zero-copy claim. Supported native storage is 8/16/32-bit signed or unsigned integers, booleans as uint8, and float16/32/64. Float16 needs browser Float16Array support. Int64/uint64 convert to float64 only within the exact JavaScript integer range; larger values reject with conversion guidance. String/category columns use ordinary declarative values or an application codec, not numeric buffer coercion.
+
+Borrowed arrays must remain stable while a view loads. After in-place mutation, call `refresh()` to rehash and resend the buffers. A stale hash rejects visibly. Replacing `spec` and `buffers` together uses the normal `hold_sync()` transaction. The aggregate decode budget defaults to 256 MiB and can be changed explicitly in the JS host's `load.maxBytes`. Every binary array carries SHA-256, including its exact slice; unknown or missing attachments reject before layer creation.
+
+`camera` defaults to `None`, preserving the spec camera; assign a full web camera state (position, target, up, fov, near, far) to drive every view. `selection` defaults to `None`; assign `{region, points: [{layer: 0, indices: uint32_array}]}` with a figure layer index and a rectangle or polygon region. Browser selection events return binary uint32 indices. Observe either trait with `widget.observe(handler, names="camera")` or `names="selection"`. Setting selection to `None` clears it. `error` is empty after a successful load; asynchronous invalid updates show the error in the view and this trait. Each displayed view owns its figure, cancellation scope and listeners; closing a view aborts pending work and disposes late results.
+
+`backend` defaults to `auto`: native WebGPU when available, otherwise the bundled WebGL2 compatibility device. Explicit `webgpu` and `webgl2` values select one path. GPU support still depends on the browser and host policy. No CDN, separate Lab extension, Node service or remote renderer is required by this widget.
+
+## Notebook hosts
+
+JupyterLab, VS Code's Jupyter extension and Colab use the normal anywidget display protocol: put the widget at the end of a cell. Install the local wheel in that kernel's environment with the notebook extra. Colab may require `from google.colab import output; output.enable_custom_widget_manager()` before displaying custom widgets. In marimo, use `mo.ui.anywidget(widget)` to expose trait changes as reactive state. These hosts share the same bundled AFM and binary comm contract; no host-specific engine adapter is required.
+
+The automated real-host evidence is JupyterLab with both real datasets and Python/browser camera and selection updates. The AFM contract tests cover shared model state, binary views, replacement, cancellation and disposal. VS Code and Colab interactive session acceptance and marimo's reactive cell scheduling remain host acceptance checks, not claims of separately measured sessions.
+
+## Static Quarto and Observable output
+
+`widget.save_html("figure.html")` writes one offline interactive page containing the spec, inline data and local browser runtime. `to_spec()` returns portable JSON; `to_html(title="...")` returns the page as text. Camera and selection are included. Static HTML needs no kernel and does not execute Python callbacks.
+
+For Quarto HTML, save the file beside the document and use an HTML iframe with `src="figure.html"`, `width="100%"` and `height="480"`. Include the HTML file in the project's resources. This works independently of Quarto's live-widget manager. For Observable, attach that HTML file and return an iframe whose `src` is `await FileAttachment("figure.html").url()`. Alternatively use `srcdoc` with `await FileAttachment("figure.html").text()`. Allow scripts in the iframe; browsers can restrict GPU access in sandboxed frames. Do not enable a Python callback expectation for these static pages.
+
+## Reproducing the evidence
+
+Run the Node tests of `packages/sciviz/tests/notebook*.test.js` with `--experimental-test-module-mocks` after building sciviz. Run `test-results/.venv-data/Scripts/python.exe -m pytest python/tests/test_notebook.py` in the prepared notebook environment (with anywidget and pyarrow installed). `python/tests/notebook-fixtures.py` executes the shipped notebook and freezes its comm payloads under `test-results/sciviz-notebook`.
+
+Run `packages/sciviz/tests/notebook-browser.mjs` and `python/tests/sciviz-jupyter-browser.mjs` through `node scripts/gpu-lock.mjs run --owner=<lane> --wait-max=60 --max=6 -- node <script>`. The first checks both rendering backends, two-way state, full spec reload, replacement, disposal and actual offline file navigation with zero HTTP requests. The second opens a real JupyterLab kernel and checks real widget comm in both directions. Every check has a hard timeout. No timings or performance advantage are claimed.

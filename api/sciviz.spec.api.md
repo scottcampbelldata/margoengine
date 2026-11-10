@@ -497,6 +497,7 @@ export interface SpecDataURL {
 export interface SpecIOOptions {
     readonly signal?: AbortSignal;
     readonly maxBytes?: number;
+    readonly buffers?: ReadonlyMap<string, ArrayBufferView>;
 }
 
 export type SpecValue = null | boolean | number | string | readonly SpecValue[] | {

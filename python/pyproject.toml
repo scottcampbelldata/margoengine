@@ -25,6 +25,8 @@ numpy = ["numpy>=1.22"]
 pandas = ["pandas>=1.5"]
 polars = ["polars>=1.0", "numpy>=1.22"]
 xarray = ["xarray>=2023.1"]
+notebook = ["anywidget>=0.9.22,<1"]
+arrow = ["pyarrow>=14"]
 test = ["pytest>=7"]
 
 [project.urls]
@@ -32,6 +34,9 @@ Homepage = "https://margoengine.com"
 
 [tool.hatch.build.targets.wheel]
 packages = ["margoengine"]
+
+[tool.hatch.build]
+artifacts = ["margoengine/static/sciviz-notebook.js"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "margoengine/labextension" = "share/jupyter/labextensions/@margoengine/jupyter"

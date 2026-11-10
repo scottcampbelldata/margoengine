@@ -29,6 +29,8 @@ export interface SpecDataURL {
 export interface SpecIOOptions {
   readonly signal?: AbortSignal;
   readonly maxBytes?: number;
+  /** Hash-checked binary comm attachments, addressed by an array value's $buffer key. Borrowed until loading settles. */
+  readonly buffers?: ReadonlyMap<string, ArrayBufferView>;
 }
 const halfArray = (globalThis as unknown as { Float16Array?: typeof Float32Array }).Float16Array;
 const arrays = {
@@ -341,7 +343,15 @@ export class ValueIO {
       return ref;
     }
     if ('$array' in v) {
-      const bytes = specUnbase64(v.bytes as string, this.max - this.used);
+      let bytes: Uint8Array;
+      if ('$buffer' in v) {
+        const buffer = this.options.buffers?.get(v.$buffer as string);
+        if (typeof v.$buffer !== 'string' || !buffer || !ArrayBuffer.isView(buffer))
+          throw typeError('Missing binary figure attachment; supply the named buffers with the spec', 'sciviz');
+        bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        const alignment = this.constructorOf(v.$array as string).BYTES_PER_ELEMENT;
+        if (!endian || bytes.byteOffset % alignment) bytes = bytes.slice();
+      } else bytes = specUnbase64(v.bytes as string, this.max - this.used);
       this.check(bytes.length);
       if ((await specHash(bytes)) !== v.sha256)
         throw fault('failed', 'Inline data hash mismatch; restore the original bytes', 'sciviz');

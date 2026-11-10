@@ -7931,6 +7931,12 @@
       "date": "2026-11-10",
       "commit": "batch-274-job5",
       "reason": "New optional ONNX entry: 0 to 10139 B gzip, isolated lazy Wasm. Keeping graph ownership and schema dispatch together avoids duplicated lifecycle bridges."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-179-notebook",
+      "reason": "New optional AFM notebook entry 0 to 1831 B gzip, ceiling 2095 B. Named hash-checked binary buffers, per-view cancellation/disposal and two-way camera/selection share one view owner; splitting duplicates that lifecycle. Existing spec entry 27550 B remains under its 27920 B ceiling. Core plus stage stays 24209 B. Python frontend is bundled locally, never loaded by core/stage.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9359,7 +9365,8 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/sciviz/density": 5071,
-    "@margoengine/compute/onnx": 10444
+    "@margoengine/compute/onnx": 10444,
+    "@margoengine/sciviz/notebook": 2095
   },
-  "total": 15354736
+  "total": 15356831
 }
