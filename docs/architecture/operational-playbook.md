@@ -1,5 +1,16 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: compatibility compute validation
+
+Batch 273 failure 18 belongs to compatibility pipeline creation. Count resources
+across compute-visible layouts before planning or executing a CPU or GPU route.
+The five compute-limits regressions cover boundary and overflow cases and async
+render/compute error identity. The unchanged shader readback GPU leaf passes
+natively and on full compat: 4,194,304 exact u32 values, recovery, abort, disposal
+and device loss. This does not close other package parity or hardware-tier gaps.
+Core and stage stay unchanged at 23,950 B combined gzip. Research and reproduction
+are in `docs/clean-room.md` and `docs/whitepaper/reproduce.md`.
+
 ### Section 5 evidence: verify cache settlement
 
 After the build prints sizes and the catalog, verify settles the shadow result

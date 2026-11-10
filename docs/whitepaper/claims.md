@@ -1,5 +1,16 @@
 # Claims and evidence
 
+Batch 273 failure 18: compatibility compute pipelines enforce device binding
+limits across groups before any compute route executes. Five regressions in
+`packages/webgl2-compat/test/compute-limits.test.js` cover automatic and explicit
+layouts, exact limits and overflow, stage visibility, external textures, sparse
+groups, asynchronous rejection and recovery. Async render and compute pipeline
+errors preserve `GPUPipelineError` without writing DOMException's read-only name.
+The unchanged shader readback GPU check passes on native WebGPU and the full
+compatibility layer, including 4,194,304 exact u32 results, abort, disposal,
+device loss, failed validation and recovery. This closes that readback failure;
+other shader and compatibility parity coverage retains its existing scope.
+
 Verify cache bookkeeping: for 128 existing archives and 12 new package outputs,
 `tests/result-cache.test.js` proves 1,614 versus zero per-archive stats under cap
 and 1,548 versus zero at cap on Windows, with identical retained bytes, zero

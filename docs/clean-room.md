@@ -1,5 +1,27 @@
 # Clean room
 
+## Compatibility compute binding validation (batch 273 failure 18)
+
+Sources compared: W3C GPU for the Web Working Group, *WebGPU* (2026),
+https://www.w3.org/TR/webgpu/, supported limits, binding slot limits, default
+pipeline layouts and asynchronous pipeline creation; W3C, *WebGPU Shading
+Language* (2026), https://www.w3.org/TR/WGSL/, entry-point resource interfaces.
+The implementation combines entry reachability for automatic layouts with full
+compute visibility for explicit layouts and validates the aggregate across
+groups. External textures consume four sampled textures, one sampler and one
+uniform buffer. A CPU compute route honors the same declared device limits.
+
+Research comparison: Lukas Bernhard, Nico Schiller, Moritz Schloegel, Nils Bars
+and Thorsten Holz, *DarthShader: Fuzzing WebGPU Shader Translators & Compilers*
+(2024), https://arxiv.org/abs/2409.01824, motivates testing distinct compilation
+stages; Matthew K. L. Wong and Alastair F. Donaldson, *WebGlitch: A Randomised
+Testing Tool for the WebGPU API* (2025),
+https://www.doc.ic.ac.uk/~afd/papers/2025/ECOOP-WebGlitch.pdf, motivates pairing
+invalid calls with valid boundary cases and recovery. The regression uses
+handwritten valid WGSL, automatic and explicit layouts, all compute resource
+categories and both asynchronous error paths. Papers and public standards only;
+no companion code or rival implementation was read.
+
 ## Verify cache settlement: repeated metadata work
 
 Research reviewed before implementation, using papers' abstracts and the

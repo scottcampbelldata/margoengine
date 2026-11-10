@@ -435,9 +435,11 @@ passes. The following additional failures remain with batch 273:
 - `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
   prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
   The awaited operation after that marker remains unisolated.
-- `shader/test:gpu`: noise and earlier readback cases pass; the validation case
-  lacks the expected `failed` error. Its assertion's undefined message masks the
-  mismatch with `ERR_INVALID_ARG_TYPE` at `readback-check.mjs:67`.
+- Resolved failure 18, shader readback: compatibility compute pipelines did not
+  enforce advertised binding limits. Resource counts now reject overflow before
+  either compute route runs; asynchronous pipeline errors also avoid assigning
+  DOMException's read-only name. Five regressions and the unchanged full readback
+  leaf pass on native WebGPU and full compat, including validation and recovery.
 - `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
   4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
   those timing values are not accepted evidence during the build phase.

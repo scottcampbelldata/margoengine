@@ -1,5 +1,15 @@
 # Design envelope
 
+Compatibility compute pipeline binding counts obey `device.limits` on every
+compute route. Explicit layouts count all compute-visible entries across groups,
+even unused entries; external textures consume four sampled-texture slots, one
+sampler and one uniform. Overflow is a validation error and async creation
+rejects with `GPUPipelineError`. The complete shader readback leaf, including
+validation and recovery, passes on native WebGPU and full compat. Lower-tier and
+other package gaps remain separately listed. Batch 273 failure 18 entry gzip:
+root 105,454 B, device 105,996 B, XR 105,896 B, tiers 105,955 B. Core + stage
+remain 23,950 B; no ceiling was increased.
+
 Verify's shadow archive store retains its 5 GiB cap and per-write oldest-first
 eviction. Windows reads fresh enumeration metadata through its system .NET
 runtime rather than individually statting every ordinary archive; a helper

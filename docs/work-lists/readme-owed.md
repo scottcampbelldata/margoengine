@@ -4,3 +4,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | Package | What its README must cover | Added by |
 |---|---|---|
+| `@margoengine/webgl2-compat` | Compute binding limits across automatic/explicit layouts, validation scopes, async `GPUPipelineError` and recovery example. | Batch 273 failure 18 |

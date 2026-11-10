@@ -531,8 +531,7 @@ export class CompatDevice extends EventTarget {
     }
     return pipeline.whenLinked().then(() => {
       if (pipeline.failure)
-        throw Object.assign(new DOMException(pipeline.failure, 'OperationError'), {
-          name: 'GPUPipelineError',
+        throw Object.assign(new DOMException(pipeline.failure, 'GPUPipelineError'), {
           reason: 'validation',
         });
       return pipeline;
@@ -591,8 +590,7 @@ export class CompatDevice extends EventTarget {
       const pipeline = new CompatComputePipeline(this, descriptor);
       await pipeline.readyAsync();
       if (pipeline.failure)
-        throw Object.assign(new DOMException(pipeline.failure, 'OperationError'), {
-          name: 'GPUPipelineError',
+        throw Object.assign(new DOMException(pipeline.failure, 'GPUPipelineError'), {
           reason: 'validation',
         });
       return pipeline;

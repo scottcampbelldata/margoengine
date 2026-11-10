@@ -135,6 +135,40 @@ export class CompatComputePipeline {
     }
     this.entry = entry;
     this.layouts = this.explicit ? [...this.explicit.bindGroupLayouts] : autoLayouts(entry);
+    // Count the complete layout, including unused explicit bindings, across all groups.
+    // CPU execution is an implementation route, not permission to exceed the device's contract.
+    const counts = new Map<string, number>();
+    for (const layout of this.layouts)
+      for (const binding of layout?.entries ?? []) {
+        if (!(binding.visibility & 4)) continue;
+        const limit = binding.buffer
+          ? binding.buffer.type === 'uniform'
+            ? 'maxUniformBuffersPerShaderStage'
+            : 'maxStorageBuffersPerShaderStage'
+          : binding.storageTexture
+            ? 'maxStorageTexturesPerShaderStage'
+            : binding.texture
+              ? 'maxSampledTexturesPerShaderStage'
+              : binding.sampler
+                ? 'maxSamplersPerShaderStage'
+                : null;
+        if (limit) counts.set(limit, (counts.get(limit) ?? 0) + 1);
+        if (binding.externalTexture)
+          for (const [limit, slots] of [
+            ['maxSampledTexturesPerShaderStage', 4],
+            ['maxSamplersPerShaderStage', 1],
+            ['maxUniformBuffersPerShaderStage', 1],
+          ] as const)
+            counts.set(limit, (counts.get(limit) ?? 0) + slots);
+      }
+    if (this.layouts.length > device.limits.maxBindGroups)
+      counts.set('maxBindGroups', this.layouts.length);
+    for (const [limit, count] of counts)
+      if (count > device.limits[limit]) {
+        this.failure = `createComputePipeline: ${count} bindings exceed ${limit} (${device.limits[limit]}); use fewer bindings or request a supported higher device limit`;
+        device.validationError(this.failure);
+        return;
+      }
   }
 
   getBindGroupLayout(index: number): CompatBindGroupLayout {

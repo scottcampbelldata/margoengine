@@ -1,5 +1,13 @@
 # Reproducing Margo's numbers
 
+Batch 273 failure 18: build packages, then run
+`node --test packages/webgl2-compat/test/compute-limits.test.js`.
+Run `node packages/shader/test/readback-check.mjs` in a shared GPU slot, first
+with `MARGO_COMPAT` unset, then with `MARGO_COMPAT=1`. Keep all original
+assertions, the full 4,194,304-element workload and every lifecycle case.
+Compatibility validation must return `failed`, then recover with `[5,6,7,8]`,
+without uncaptured errors or retained job buffers.
+
 For verify cache metadata counts and progress ordering, run
 `node --experimental-test-module-mocks --test --test-timeout=120000 tests/result-cache.test.js tests/archive-metadata.test.js tests/verify-cache-progress.test.js`.
 The 128-archive/12-output fixture compares stat and native enumeration paths:
