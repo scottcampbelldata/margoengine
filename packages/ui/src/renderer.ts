@@ -7,10 +7,11 @@ import { UiPainter } from './painter.js';
 import { attachInput, type AttachOptions, type Detach } from './dom.js';
 import { attachMirror, type MirrorOptions } from './mirror.js';
 import type { Ui } from './ui.js';
+import type { GlUiPainter } from './gl.js';
 
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
 type GlContext = Extract<PassContext, { backend: 'webgl2' }>;
-type GlModule = typeof import('./gl.js');
+type GlModule = typeof import('./gl-load.js');
 
 /** Options for {@link UiRenderer}. */
 export interface UiRendererOptions {
@@ -60,7 +61,7 @@ export class UiRenderer implements EnginePlugin {
   private readonly inputOptions: AttachOptions | false;
   private readonly mirrorOptions: MirrorOptions | false;
   private gl?: GlModule;
-  private glPainter?: InstanceType<GlModule['GlUiPainter']>;
+  private glPainter?: GlUiPainter;
   private detach?: Detach;
   private detachMirror?: Detach;
   private disposed = false;
@@ -109,7 +110,7 @@ export class UiRenderer implements EnginePlugin {
       this.detachMirror = attachMirror(this.ui, canvas, this.mirrorOptions);
     if (engine.backend !== 'webgpu' || !engine.gpu) {
       if (!this.gl)
-        void import('./gl.js').then((module) => {
+        void import('./gl-load.js').then((module) => {
           if (!this.disposed) this.gl = module;
         });
       return;
@@ -158,7 +159,7 @@ export class UiRenderer implements EnginePlugin {
     if (!this.gl || !this.engine || context.gl.isContextLost()) return;
     if (this.glPainter?.gl !== context.gl) {
       this.glPainter?.dispose();
-      this.glPainter = new this.gl.GlUiPainter(context.gl, this.options, this.stats);
+      this.glPainter = this.gl.glPainter(context.gl, this.options, this.stats);
     }
     const ratio = this.pixelRatio(context.width);
     this.ui.resize(context.width / ratio, context.height / ratio, ratio);

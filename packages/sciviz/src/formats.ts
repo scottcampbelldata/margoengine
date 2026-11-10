@@ -1541,10 +1541,7 @@ export async function openZarr(store: ZarrStore, path = '', options: ZarrOptions
       encoded += 4;
     } else if (name === 'blosc' || name === 'zstd') {
       steps.unshift(async (b, signal) => {
-        const codecs = await import('./cloud-codecs.js');
-        const out = await (name === 'blosc'
-          ? codecs.decodeBlosc(b, decoded, signal)
-          : codecs.decodeCloudCodec('zstd', b, decoded, signal));
+        const out = await (await import('./zarr-codecs.js')).decodeZarrChunk(name, b, decoded, signal);
         if (out.length > decoded)
           throw rangeError(`Zarr: a ${name} chunk decodes past ${decoded} bytes; ${ZARR_LIMIT_HINT}`, 'sciviz');
         return out;

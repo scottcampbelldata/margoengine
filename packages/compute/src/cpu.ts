@@ -1426,6 +1426,3 @@ export class CpuContext extends ComputeContext {
     return { counts: this.#result([bins], 'u32', counts), edges: this.#result([bins + 1], 'f32', edges) };
   }
 }
-
-/** Makes the CPU context (createCompute's fallback). */
-export const cpuContext = (): ComputeContext => new CpuContext();

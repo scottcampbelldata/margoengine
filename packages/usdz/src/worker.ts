@@ -55,7 +55,7 @@ export async function loadUSDZInWorker(
   url: string | URL,
   options: USDOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker()) return (await import('./index.js')).loadUSDZ(engine, url, options);
+  if (!canUseWorker()) return (await import('./any.js')).loadUSDZ(engine, url, options);
   if (options.fetch)
     return parseUSDInWorker(
       engine,

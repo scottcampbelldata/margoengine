@@ -1035,7 +1035,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
 
 // The CPU backend, loaded only when it is used.
 const cpu = async (signal: AbortSignal | undefined): Promise<ComputeContext> => {
-  const { cpuContext } = await import('./cpu.js');
+  const { cpuContext } = await import('./cpu-load.js');
   aborted(signal);
   return cpuContext();
 };

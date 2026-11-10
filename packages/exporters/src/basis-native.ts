@@ -1,7 +1,8 @@
 // One optional, lazy Rust/Wasm encoder. Public API and image decoding stay TS.
 import { MargoError } from '@margoengine/math/errors';
 import { fault, wasmError } from '../../shared/errors.js';
-import { imageForBasisJob, type BasisJob, type BasisResult, type RGBAImage } from './ktx2-encode.js';
+import { imageForBasisJob } from './basis-image.js';
+import type { BasisJob, BasisResult, RGBAImage } from './ktx2-encode.js';
 import { encodeBasisLZ, packKTX2, type EncodedLevel } from './basis-wire.js';
 
 export interface NativeBasis extends WebAssembly.Exports {
