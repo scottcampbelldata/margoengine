@@ -1,5 +1,11 @@
 # Reproducing Margo's numbers
 
+Batch 256 job 3: with rustc on PATH, build packages, then run
+`node --test --test-timeout=120000 packages/netcode/tests/generate-rust.test.js`.
+The test generates Rust and TypeScript into its own worktree test-results folder,
+compiles two standalone native programs and compares their outputs. No downloaded
+crate, GPU, benchmark or README execution is used.
+
 Batch 256 job 2: after building packages, run
 `node --test --test-timeout=30000 packages/netcode/tests/presence.test.js`.
 It creates a temporary SQLite file and two Node processes within the worktree's

@@ -65,3 +65,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated behavior/fuzzy alias | batch-251 job 3 |
 | @margoengine/fsm | scxml: importSCXML/exportSCXML, browser DOMParser and explicit Node parser, supported subset, named bindings, namespace extensions, limits and extensions:false rejection | batch-250 job 5 |
 | margoengine | Generated fsm/scxml alias | batch-250 job 5 |
+| @margoengine/netcode | generate-rust: schema.json input, Msg types and f_ fields, enum indices, boxed optionals, full/delta methods, errors, native Rust toolchain and nesting limit | batch-256 job 3 |
+| margoengine | Generated netcode/generate-rust alias | batch-256 job 3 |

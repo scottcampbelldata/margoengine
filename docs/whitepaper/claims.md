@@ -1,5 +1,13 @@
 # Claims and evidence
 
+Batch 256 job 3: `packages/netcode/tests/generate-rust.test.js` compiles and runs
+standalone generated Rust. One hundred full/delta pairs and 1,000 corrupted or
+truncated full/delta inputs agree with both the runtime codec and TypeScript
+generator. Native Rust values independently reproduce 25 full/delta encodings.
+Explicit hostile scalar, length, mask, map id/overlap, quantization, recursive
+schema and keyword-name checks also pass. This establishes the batch's same-byte
+Rust generator row within its documented recursion limit; no speed claim.
+
 Batch 256 job 2: `packages/netcode/tests/presence.test.js` covers two RoomServer
 instances, detached/filterable listings, remote owner refusal after capacity is
 reserved, lease expiry, atomic claims, namespace isolation, cancellation/timeouts,

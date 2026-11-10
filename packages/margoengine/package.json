@@ -1998,6 +1998,10 @@
       "types": "./dist/netcode/presence.d.ts",
       "import": "./dist/netcode/presence.js"
     },
+    "./netcode/generate-rust": {
+      "types": "./dist/netcode/generate-rust.d.ts",
+      "import": "./dist/netcode/generate-rust.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"

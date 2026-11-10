@@ -86,6 +86,10 @@
     "./presence": {
       "types": "./dist/presence.d.ts",
       "import": "./dist/presence.js"
+    },
+    "./generate-rust": {
+      "types": "./dist/generate-rust.d.ts",
+      "import": "./dist/generate-rust.js"
     }
   },
   "files": [

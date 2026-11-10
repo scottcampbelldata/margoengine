@@ -1,5 +1,21 @@
 # Design envelope
 
+Batch 256 Rust generation: `@margoengine/netcode/generate-rust` exports
+generateRust(schema.json or compiledSchema, { source? }). Output is standalone
+Rust 2021 requiring Rust 1.82 or newer, with no crate dependencies. Each schema
+type becomes Msg<Name>, each field f_<name>, maps BTreeMap<u32, T>, enums u32
+wire indices and optionals Option<Box<T>>. Native methods encode, decode,
+encode_delta, decode_delta and same use the runtime codec's wire contract and
+normalized SCHEMA_HASH. f32 fields use native f32; quantized values use f64.
+Encoding and decoding return margo_wire::Result, validate limits and reject
+trailing bytes, invalid UTF-8, non-finite floats and malformed map/mask data.
+Nesting above 256 codec calls returns an error to bound untrusted recursion.
+This is a generator and native protocol codec, not a new engine Wasm bundle.
+New entry gzip is 9,827 B (previously absent), ceiling 10,122 B. Schema validation,
+complete codec emission and native data conversion stay together; a split would
+force generator consumers to assemble a second template entry without saving
+runtime application bytes. Core and stage remain unchanged.
+
 Batch 256 presence: `@margoengine/netcode/presence` exposes RoomPresence,
 PresenceStore, MemoryPresence, StorePresence, openSqlitePresence and RoomNode.
 Run each node's `run({ signal })` promise and handle its rejection; `close()` or

@@ -1,5 +1,24 @@
 # Clean room
 
+## Batch 256 job 3: standalone Rust schema generator
+
+Research sources for this implementation: DWARF Committee, Michael Eager editor,
+*DWARF Debugging Information Format Version 5* (2017), https://dwarfstd.org/doc/DWARF5.pdf
+(LEB128); Francois Yergeau, *UTF-8, a transformation format of ISO 10646*, RFC
+3629 (2003), https://www.rfc-editor.org/rfc/rfc3629 (strict UTF-8); W3C, John
+Schneider, Takuki Kamiya, Daniel Peintner and Rumen Kyusakov editors, *Efficient
+XML Interchange (EXI) Format 1.0*, second edition (2014), https://www.w3.org/TR/exi/
+(schema-informed serialization); Rust project, *f64 primitive reference*
+(accessed 2026-11-10), https://doc.rust-lang.org/std/primitive.f64.html
+(IEEE bytes and rounding); Colyseus team, *Schema Definition* (accessed
+2026-11-10), https://docs.colyseus.io/state/schema (public cross-language schema
+contract). Combined design uses Margo's existing normalized schema and wire
+format, little-endian scalars, gap-coded ordered ids, field masks, nested deltas
+and checked native Rust data. Enum indices preserve even labels that cannot be
+Rust identifiers. Explicit f64-to-f32 conversion in test literals matches the
+JavaScript input domain rather than decimal-to-f32 parsing. All generated code
+is original, standard-library-only; no companion or rival source read.
+
 ## Batch 256 job 2: multi-process room presence
 
 Sources compared before implementation: Leslie Lamport, *Time, Clocks, and the
