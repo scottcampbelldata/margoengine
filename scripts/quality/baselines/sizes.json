@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13040383,
+  "total": 13047227,
   "history": [
     {
       "date": "2026-10-24",
@@ -6527,6 +6527,12 @@
       "commit": "1cd5069bd",
       "reason": "Batch 233 job 3: new optional road/geojson entry 0 to 5125 B gzip, ceiling 5381 B. Shared projection/topology/metadata form one bounded network import; splitting would duplicate policy and node ownership.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "8af2669d3",
+      "reason": "Batch 172 job 4: new optional sciviz/probe 0 to 6588 B min+gzip, ceiling 6844 B. Owns snapshot locator, direct images, barycentric/trilinear sampling, exact declared-cell integrals, profile/chart linkage, masks, resampling and pipeline adapter. A split would duplicate tuple and lifecycle ownership; linked rendering imports remain caller-provided figures. Shared line/vertex opt-in changes contour 3067 to 3101 B and clip 5140 to 5176 B within existing ceilings. Core + stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7735,6 +7741,7 @@
     "@margoengine/react/textures": 4940,
     "@margoengine/usdz/shapes": 1457,
     "@margoengine/fbx/large": 795,
-    "@margoengine/road/geojson": 5381
+    "@margoengine/road/geojson": 5381,
+    "@margoengine/sciviz/probe": 6844
   }
 }

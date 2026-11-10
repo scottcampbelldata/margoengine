@@ -504,3 +504,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/road (batch 233 job 3): GeoJSON/OSM imports, tags/width/lane defaults, source identity, grade-separated network topology, coordinate projection, bounds and runnable render/graph example after build phase.
 - margoengine (batch 233 job 3): road/geojson alias after build phase.
+- @margoengine/sciviz: document /probe locator ownership, barycentric/trilinear cell models, integration dimensions, masks/resampling, profile/chart linkage, pipeline params, precision/conditioning limits and NASA/OpenNeuro demo.
+- margoengine: document generated sciviz/probe alias alongside the owning optional entry.

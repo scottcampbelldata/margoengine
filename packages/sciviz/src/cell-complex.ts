@@ -10,17 +10,17 @@ const cellFaces: Readonly<Record<number, readonly (readonly number[])[]>> = {
   13: [[0, 2, 1], [3, 4, 5], [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5]],
   14: [[0, 3, 2, 1], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]],
 };
-const widths: Readonly<Record<number, number>> = { 5: 3, 9: 4, 10: 4, 12: 8, 13: 6, 14: 5 };
+const widths: Readonly<Record<number, number>> = { 1: 1, 3: 2, 5: 3, 9: 4, 10: 4, 12: 8, 13: 6, 14: 5 };
 
 /** @internal Validation shared by optional scientific filters, without changing the grid renderer. */
-export function checkComplex(grid: UnstructuredGrid): void {
+export function checkComplex(grid: UnstructuredGrid, lowerDimensions = false): void {
   if (!grid || !grid.points || !grid.connectivity || !grid.offsets || !grid.types ||
     grid.points.length % 3 || grid.types.length !== grid.offsets.length)
     throw rangeError('Analysis grid needs xyz points, connectivity, cell end offsets and VTK types', 'sciviz');
   let start = 0;
   for (let c = 0; c < grid.types.length; c++) {
     const end = grid.offsets[c];
-    if (!widths[grid.types[c]] || end - start !== widths[grid.types[c]])
+    if (!widths[grid.types[c]] || (!lowerDimensions && grid.types[c] < 5) || end - start !== widths[grid.types[c]])
       throw rangeError(`Analysis cell ${c} must be a triangle, quad, tetrahedron, hexahedron, wedge or pyramid`, 'sciviz');
     const seen = new Set<number>();
     for (let k = start; k < end; k++) {
@@ -48,7 +48,9 @@ export function* simplices(grid: UnstructuredGrid): Generator<{ ids: number[]; c
   for (let cell = 0; cell < grid.types.length; cell++) {
     const ids = Array.from({ length: grid.offsets[cell] - start }, (_, k) => grid.connectivity[start + k]);
     start = grid.offsets[cell];
-    if (grid.types[cell] === 5 || grid.types[cell] === 9) {
+    if (grid.types[cell] === 1 || grid.types[cell] === 3) {
+      yield { ids, cell };
+    } else if (grid.types[cell] === 5 || grid.types[cell] === 9) {
       for (const tri of faceTriangles(ids)) yield { ids: tri, cell };
     } else {
       const apex = Math.min(...ids);

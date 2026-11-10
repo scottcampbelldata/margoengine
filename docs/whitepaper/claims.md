@@ -3669,3 +3669,6 @@ The large binary mesh is also attached as a real PBRModel on a CPU-only engine a
 
 ### Batch 233 job 3: road network input
 GeoJSON lines and OSM XML/Overpass ways produce source-tagged local metre road networks, lane/width metadata, direction and grade separation. GeoJSON intersections split; OSM node identity governs connectivity. Proof: road/test/geojson.test.js with analytic WGS84 equations, topology/metadata/schema checks and real attributed Times Square ways; road/test/browser-check.mjs renders a real imported road on both backends with exact reboot and disposal. No complete GIS/routing-restriction or speed claim. [Limits and sources](../road-design.md).
+
+### Batch 172 job 4: probes and field integrals
+The optional probe entry supplies a reusable locator, barycentric and true trilinear sampling, linked polyline profiles, exact cell-model integrals and image/dataset resampling. probe.test.js checks affine and distorted-hexa sampling, source tuples/IDs, signed images, line/area/volume integrals, a varying-Jacobian trilinear oracle, masks, ownership, empty input and pipeline cancellation. probe-browser.mjs exercises real NASA and OpenNeuro data, chart pointer events and 3D markers, coverage, exact dataset/profile agreement and disposal on both GPU backends. No exact-predicate, conservative-remapping or speed claim.

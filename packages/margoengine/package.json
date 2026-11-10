@@ -3030,6 +3030,10 @@
       "types": "./dist/sciviz/clip.d.ts",
       "import": "./dist/sciviz/clip.js"
     },
+    "./sciviz/probe": {
+      "types": "./dist/sciviz/probe.d.ts",
+      "import": "./dist/sciviz/probe.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -206,3 +206,76 @@ not claimed bit-identical to the publisher's float32 encoding. CC BY 3.0 citatio
 transformation, orientation, physical bounds and hashes are in source.json.
 
 Job 3 rendered evidence: both backends retain 3349 CT cells at 300 HU and 106 at 1000 HU; the before/after renders contain 35385 and 3833 non-background pixels. The lower NASA slice cut contains 27594 triangles and 51982 non-background pixels. CT display colour is the maximum vertex HU in each selected cell; this is derived display data and leaves the retained point arrays unchanged. The NASA data plane is viewed along scene +y because figure data x/y maps to scene x/-z.
+
+## Probe, integrate and resample (batch 172 job 4)
+
+The optional sciviz/probe entry provides an owned CellLocator snapshot with using /
+Symbol.dispose, probeGrid for a one-off query, plotOverLine, integrateGrid,
+resampleDataset, resampleToImage, linkProbePlot and probeOperator. All building or
+batch work accepts AbortSignal; exact reasons propagate and partially created plot
+layers are removed on failure. Figures and caller arrays remain caller-owned.
+Snapshot copying, image materialization and individual cell solves are synchronous;
+index construction and sample/integration batches yield between bounded groups.
+Inputs are limited to 8000000 points, line profiles to 1000000 samples.
+
+Regular images keep implicit topology and sample by direct index arithmetic,
+including signed bounds, bilinear planes and singleton axes. Unstructured and
+curvilinear grids use uniform spatial buckets (up to 32 per axis). A cell spanning
+more than 128 buckets stays in a separate candidate list. Only that bucket's cells
+and spanning cells are tested, in ascending current cell order. Shared boundaries
+choose the lowest current cell ID; sourceCell retains original provenance. Outside
+queries return null, with no extrapolation. Rebuild a locator after changing input;
+its arrays and topology are snapshots, so later caller mutations have no effect.
+
+Tetrahedra, triangles and line cells use barycentric/affine coordinates. Quads,
+wedges and pyramids use the same globally ordered piecewise-linear simplices as
+contours/clipping. Hexahedra use genuine trilinear shape functions in a unit cube,
+with a 24-step bounded Newton inversion of the physical isoparametric mapping.
+Regular image samples use tensor-product interpolation directly. Named vector
+and scalar point tuples are interpolated component by component; cell tuples are
+copied from the containing cell. Missing values propagate only from nonzero-weight
+vertices. Geometry is finite, convex and nonfolded; exact predicates and arbitrary
+ill-conditioned inverse maps are not claimed. Barycentric membership allows 64 f64
+machine epsilons in reference coordinates. Surface/line residual and hexa convergence
+use 128 epsilons times max(1, maximum absolute coordinate). This is an arithmetic
+membership envelope, not a physical extrapolation distance or discretization bound.
+
+plotOverLine samples the entire polyline at equal arc-length positions, including
+both endpoints (default 101). It returns physical distance, xyz, containing cell
+IDs, valid masks, all named tuples and default scalar arrays. Missing tuples are
+NaN and their cells -1. linkProbePlot renders valid contiguous runs as separate
+2D chart lines, avoiding artificial connections across holes, plus a 3D path and
+marker. Chart pointer hover moves that marker; moveTo(index) also supports keyboard
+or external controls. dispose removes its own layers and listener, leaving both
+figures alive. The profile and its arrays must remain unchanged while linked.
+
+integrateGrid returns separate length, area and volume records, each with measure
+and point/cell field integrals. Different physical dimensions are never added.
+Line lengths, triangle areas and tetra volumes use analytical geometric measures;
+linear simplex field integrals use their exact barycentric means. A hexahedron
+uses 3x3x3 Gauss-Legendre quadrature of trilinear shape functions times the physical
+Jacobian determinant. This exactly integrates the polynomial field/Jacobian product
+for a nonfolded trilinear cell, to f64 arithmetic precision. Jacobian signs must
+agree at quadrature points; degenerate or inconsistent samples reject. Quads,
+wedges and pyramids integrate their pulling-linear fields. Point cells contribute
+no length, area or volume. Empty named arrays infer width one and integrate to zero.
+All other tuple widths are inferred from associated counts.
+
+resampleDataset copies target geometry, provenance and target cell arrays, replacing
+its point fields with source fields sampled at each target point. valid/cells mark
+coverage. sampledCellData and sampledCellArrays separately retain source cell fields
+at those target points, preventing collisions with identically named point arrays.
+resampleToImage supplies regular target geometry from dims/bounds; its dimensions
+span first/last samples and preserve signed spacing. No conservative remapping of
+cell averages, extrapolation outside coverage or interpolated categorical labels
+is implied. probeOperator adapts probe, line, integrate, image and resample to lazy
+pipeline operations; a locator is created and disposed inside each execution.
+
+The real-data demo probes the NASA bump slice along a 101-sample path, integrates
+its original surface and resamples onto a line dataset. It also loads the existing
+CC0 OpenNeuro T1, resamples to a 32x32x32 image for the volume view, and plots the
+original T1 along its physical-mm centre line. Both profiles link chart hover to
+3D markers. Source data/attribution are shared with the preceding entries and the
+existing head.nrrd/head.json assets; no new downloaded implementation is used.
+The browser checks actual pointer events, marker positions, dataset/profile sample
+identity, resampled coverage, visible data and owned-layer disposal on both backends.

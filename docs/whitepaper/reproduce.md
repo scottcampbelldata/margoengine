@@ -3143,3 +3143,5 @@ package test:gpu command, then with `--compat`, through the shared GPU lock. No 
 
 ### Batch 233 job 3: road import
 After build: node --test --test-timeout=120000 packages/road/test/geojson.test.js, then the shared-lock road browser gate above. Real data source/license is packages/road/test/fixtures/osm-source.json. Both backends render a source road in local WGS84 metres, restore identical pixels and dispose it. No timing assertion.
+
+Batch 172 probes: build packages, run node --test packages/sciviz/tests/probe.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=5 --wait-max=60 -- node packages/sciviz/tests/probe-browser.mjs. Serve examples/sciviz-probe.html; hover either chart. The test reports four data-view pixel counts, 32768 MRI target points, 101 valid NASA profile samples and zero difference between profile and dataset resampling. CPU oracles include the warped trilinear cell with volume 1.25 and field integral 1/6, rather than a triangulation-derived expectation. No timing run.
