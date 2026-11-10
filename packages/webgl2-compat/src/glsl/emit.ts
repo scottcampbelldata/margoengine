@@ -1943,6 +1943,19 @@ export class StageEmitter {
     return entry;
   }
 
+  /**
+   * An array layer argument as GLSL `int` or `float`, clamped while still an integer. WGSL clamps array_index to the
+   * layer range for sampling and gathering; GLSL clamps a float layer too, but a u32 above 2^31 turns into a negative
+   * int and a float near 2^32 overflows the int conversion the driver makes (layer 0 on Metal, not the last layer).
+   * 65535 is above every WebGPU maxTextureArrayLayers, so the driver's own clamp still picks the last layer.
+   */
+  private layerIndex(e: IRExpr, as: 'int' | 'float'): string {
+    const unsigned = e.type.kind === 'scalar' && e.type.name === 'u32',
+      value = this.value(e),
+      index = unsigned ? `int(min(${value}, 65535u))` : `clamp(int(${value}), 0, 65535)`;
+    return as === 'int' ? index : `float(${index})`;
+  }
+
   protected texture(name: string, args: readonly IRExpr[], result: Type): string {
     let k = 0,
       component: string | undefined;
@@ -2018,7 +2031,7 @@ export class StageEmitter {
         const n = Math.max(2, coordDims);
         let i = 1;
         let coord = coords1d(v(rest[i++]));
-        if (arrayed) coord = `vec3(${coord}, float(${v(rest[i++])}))`;
+        if (arrayed) coord = `vec3(${coord}, ${this.layerIndex(rest[i++], 'float')})`;
         let extra = '';
         let parameterExtra = '';
         let localExtra = '';
@@ -2082,14 +2095,14 @@ export class StageEmitter {
         const t = this.combined(texArg, rest[0]);
         let i = 1;
         const c = v(rest[i++]);
-        const layer = arrayed || tt.dimension === 'cube_array' ? v(rest[i++]) : undefined;
+        const layer = arrayed || tt.dimension === 'cube_array' ? this.layerIndex(rest[i++], 'float') : undefined;
         const ref = v(rest[i++]);
         const offset = rest[i] ? v(rest[i]) : undefined;
         const p =
           tt.dimension === '2d'
             ? `vec3(${c}, ${ref})`
             : tt.dimension === '2d_array'
-              ? `vec4(${c}, float(${layer}), ${ref})`
+              ? `vec4(${c}, ${layer}, ${ref})`
               : `vec4(${c}, ${ref})`;
         // Level 0 (CompareLevel) and implicit derivatives (Compare) both as explicit gradients: GLSL ES 3.00 has
         // textureLod only for sampler2DShadow, and textureGrad for every shadow sampler.
@@ -2135,7 +2148,7 @@ export class StageEmitter {
       depth = tt.shape === 'depth';
     let i = 1;
     const coord = this.value(rest[i++]);
-    const layer = arrayed ? `int(${this.value(rest[i++])})` : '';
+    const layer = arrayed ? this.layerIndex(rest[i++], 'int') : '';
     const ref = compare ? this.value(rest[i++]) : '';
     const offset = rest[i] ? this.value(rest[i]) : 'ivec2(0)';
     const c = depth ? 'x' : (SWIZZLE[Number(component ?? 0)] ?? 'x');

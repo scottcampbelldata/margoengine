@@ -239,9 +239,27 @@ ${V}
   const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
   const types = f.textures.map((t) => `${t.glslType} ${t.binding}${t.sampler ? `/${t.sampler.binding}` : ''}`).sort();
   assert.deepEqual(types, ['sampler2D 0', 'sampler2D 0/1', 'sampler2DArrayShadow 2/3']);
-  assert.match(f.source, /textureGrad\(_sf\d+, vec4\(.*float\(1\), 0\.5\), vec2\(0\.0\), vec2\(0\.0\)\)/);
+  assert.match(
+    f.source,
+    /textureGrad\(_sf\d+, vec4\(.*float\(clamp\(int\(1\), 0, 65535\)\), 0\.5\), vec2\(0\.0\), vec2\(0\.0\)\)/,
+  );
   assert.match(f.source, /texelFetch\(t, clamp\(p, ivec2\(0\), s\), m\)/);
   assert.match(f.source, /precision highp sampler2DArrayShadow;/);
+});
+
+test('array layers clamp as integers: a u32 near 2^32 picks the last layer, not layer 0 (WGSL clamps array_index)', () => {
+  const source = `@group(0) @binding(0) var t: texture_2d_array<f32>;
+@group(0) @binding(1) var s: sampler;
+${V}
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  return textureSampleLevel(t, s, p.xy, 4294967295u, 0.0) + textureSampleLevel(t, s, p.xy, -1, 0.0) + textureGather(0, t, s, p.xy, 4294967295u);
+}`;
+  const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment.source;
+  // float(4294967295u) is 2^32, which the driver's own float-to-int clamp overflows (layer 0 on Metal through ANGLE).
+  assert.match(f, /vec3\([^;]*, float\(int\(min\(4294967295u, 65535u\)\)\)\)/);
+  assert.match(f, /float\(clamp\(int\(\(-1\)\), 0, 65535\)\)/);
+  assert.match(f, /, int\(min\(4294967295u, 65535u\)\), ivec2\(0\)/);
+  assert.doesNotMatch(f, /float\(4294967295u\)|int\(4294967295u\)/);
 });
 
 test('refusals are coded: storage buffers, compute stages and cube gathers name what is missing', () => {
