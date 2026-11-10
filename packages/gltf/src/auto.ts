@@ -5,6 +5,7 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
 import { glbChunks, isGLB } from '../../shared/glb.js';
 import { parseJSON } from '../../shared/json.js';
+import { rejectLFSPointer } from '../../shared/lfs.js';
 import { readResponse } from '../../shared/loading.js';
 import type { GLTFDocument } from '../../shared/gltf.js';
 import { loadGLTF, type GLTFExtension, type GLTFOptions, type Model } from './index.js';
@@ -98,6 +99,7 @@ export async function loadAuto(
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
   const data = await readResponse(await cached(target, { signal }), { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' }),
     options = { signal, fetch: cached, maxNodes, allowedURLs };
+  rejectLFSPointer(data, target.href);
   const doc = documentOf(data);
   try {
     const extensions = await entriesFor(doc);

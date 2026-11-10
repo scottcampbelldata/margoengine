@@ -86,3 +86,23 @@ test('a missing advanced loader names the material feature and its package with 
     globalThis.fetch = previous;
   }
 });
+
+test('a glTF URL that returns a Git LFS pointer throws a coded error naming git lfs pull, not invalid JSON', async () => {
+  // A clone without Git LFS serves this stub in place of the model; the route used to fail parsing it as JSON.
+  const pointer = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 12345\n';
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => new Response(pointer);
+  try {
+    for (const url of ['https://test.invalid/lfs.gltf', 'https://test.invalid/lfs.glb'])
+      await assert.rejects(addGLTF({ engine: {}, signal: new AbortController().signal }, url), (error) => {
+        assert.equal(error.name, 'MargoError');
+        assert.equal(error.code, 'failed');
+        assert.ok(error.message.startsWith(`${url} is a Git LFS pointer file`), error.message);
+        assert.match(error.message, /git lfs pull/);
+        assert.ok(error.message.endsWith('; see https://margoengine.com/errors#git-lfs'), error.message);
+        return true;
+      });
+  } finally {
+    globalThis.fetch = previous;
+  }
+});

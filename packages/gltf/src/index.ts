@@ -6,6 +6,7 @@ import { splitTRS } from '@margoengine/math/quat';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
+import { rejectLFSPointer } from '../../shared/lfs.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { entry, integer, readAccessor } from './accessor.js';
@@ -39,12 +40,14 @@ function bytes(input: ArrayBuffer | ArrayBufferView): Uint8Array {
 }
 function container(input: string | object | ArrayBuffer | ArrayBufferView): { doc: Document; binary?: Uint8Array } {
   if (typeof input === 'string') {
+    rejectLFSPointer(input, 'The glTF input');
     if (input.length > limit || new TextEncoder().encode(input).length > limit)
       throw new RangeError('glTF JSON exceeds 64 MiB; load a smaller file or split it');
     return { doc: json(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as Document };
   const data = bytes(input);
+  rejectLFSPointer(data, 'The glTF input');
   if (data.length > limit) throw new RangeError('GLB exceeds 64 MiB; load a smaller file or split it');
   const chunks = glbChunks(data);
   return { doc: json(text(chunks[0].data)), binary: chunks[1]?.type === GLB_BIN ? chunks[1].data : undefined };
@@ -473,6 +476,8 @@ export async function loadGLTF(
     if (root && response.url) base = new URL(response.url);
     else if (!root) checkRedirect(response, base, allowedURLs, 'glTF buffer');
     const data = await readResponse(response, { maxBytes: limit - total, signal, label: 'glTF download' });
+    // Root, buffers and images: a pointer from a clone without Git LFS would fail later as bad JSON or a short buffer.
+    rejectLFSPointer(data, target.href);
     total += data.byteLength;
     return data;
   }

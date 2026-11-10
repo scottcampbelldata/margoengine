@@ -129,6 +129,10 @@ Use `fit: false` to preserve camera framing and `signal` to cancel. Fits use the
 
 `app.fit()` also reads registered meshes from the optional `@margoengine/gltf-pro` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `addGLTF` continues to use the basic glTF loader.
 
+A URL that returns a Git LFS pointer file (text starting `version https://git-lfs`, served by a repository cloned
+without Git LFS) rejects with a `MargoError` (code `failed`) that names the URL and links to
+https://margoengine.com/errors#git-lfs, not with invalid JSON. Run `git lfs pull` where the files are served.
+
 Feature entries load the narrow entry of their package and its required dependencies rather than the entire domain pack. A feature whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
 
 `addGLTF` returns the exported `LoadedModel` type:

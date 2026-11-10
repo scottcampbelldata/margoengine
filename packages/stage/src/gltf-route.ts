@@ -3,6 +3,7 @@ import { glbChunks, isGLB } from '../../shared/glb.js';
 import { parseJSON } from '../../shared/json.js';
 import { readResponse } from '../../shared/loading.js';
 import { fault, typeError } from '../../shared/errors.js';
+import { rejectLFSPointer } from '../../shared/lfs.js';
 import { optionalPackage } from './feature.js';
 
 /** Inspect the container's feature declarations; the selected loader owns validation and external resources. */
@@ -10,8 +11,10 @@ export async function gltfRoute(target: URL, signal: AbortSignal) {
   if (!['http:', 'https:'].includes(target.protocol)) throw typeError('glTF URL must use HTTP(S)', 'arguments');
   const get = globalThis.fetch,
     response = await get(target, { signal }),
-    bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' }),
-    doc = parseJSON<GLTFDocument>(
+    bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' });
+  // A pointer from a clone without Git LFS would otherwise fail below as invalid JSON.
+  rejectLFSPointer(bytes, target.href);
+  const doc = parseJSON<GLTFDocument>(
       new TextDecoder('utf-8', { fatal: true }).decode(isGLB(bytes) ? glbChunks(bytes)[0].data : bytes),
     );
   let feature = '',

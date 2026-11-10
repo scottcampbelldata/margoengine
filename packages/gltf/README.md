@@ -185,6 +185,13 @@ This ESM package includes TypeScript declarations and requires `@margoengine/cor
 
 Apache-2.0 licensed.
 
+### Git LFS pointer files
+
+A repository cloned without Git LFS serves small pointer files (text starting `version https://git-lfs`) in place of
+its models. `loadGLTF` and `loadAuto` check every .gltf, .glb, external .bin and image they fetch, and `parseGLTF`
+the bytes or text it is given; a pointer rejects with a `MargoError` (code `failed`) that names the URL and links to
+https://margoengine.com/errors#git-lfs. Run `git lfs pull` where the files are served, then reload.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
