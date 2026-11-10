@@ -62,6 +62,10 @@
     "./pan": {
       "types": "./dist/pan.d.ts",
       "import": "./dist/pan.js"
+    },
+    "./binaural": {
+      "types": "./dist/binaural.d.ts",
+      "import": "./dist/binaural.js"
     }
   },
   "files": [

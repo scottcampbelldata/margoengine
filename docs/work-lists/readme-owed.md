@@ -131,3 +131,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/inspector | Scene primitives and lights, delete/duplicate/reparent, tree dragging, retained history handles and disposal. | Batch 262 job 3 |
 | margoengine | Optional inspector/edit import and undoable scene editing. | Batch 262 job 3 |
 | @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3 |
+
+- @margoengine/audio/binaural: BinauralAudio first/second/third order AmbiX, inherited Audio transport, field rotation, HRTF graph costs and browser-dependent localization.

@@ -3920,3 +3920,6 @@ limits remain unchanged. External disposal of retained history handles is unsupp
 Finalizer validation adds 28 B to history (897 -> 925), 28 B to inspector root
 (9156 -> 9184) and 24 B to tweak (4069 -> 4093), within existing ceilings.
 The command rejects a non-callable discard before changing either stack.
+
+### Batch 254 binaural AmbiX
+Optional @margoengine/audio/binaural: 1809 B minified gzip, new entry from 0 B. ACN/SN3D complete channel sets only (4/9/16); loop defaults true and all Audio transport/filter options are inherited. 32 native HRTF PannerNodes and 32*(order+1)^2 gain paths per bed; no per-sample JavaScript. World field rotation uses a normalized quaternion; listener translation moves the distant sphere, listener orientation drives native HRTFs. ambixBasis returns real SN3D harmonics for a unit [front,left,up] direction. Native HRTF datasets/interpolation/latency depend on the browser. No SOFA parsing, personalized HRIRs, mixed-order input, format inference, headphone EQ or spectral compensation. Finite-order coloration and individual front/back confusion remain possible. CPU orthogonality through degree three and browser offline PCM against independently decoded virtual speakers are the correctness bars; device output and listening quality unmeasured. Core/stage unchanged.

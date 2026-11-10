@@ -3193,3 +3193,5 @@ The invalid-finalizer regression fails against the unvalidated implementation an
 proves rejection preserves pending redo and retained resources.
 
 Batch 262 React material proof uses current attached plugin identities. Historical name reuse cannot satisfy readiness; the native after-scene test still requires exactly one material installation and a visible transmission pixel change. Regression: packages/react/tests/plugin-state.test.js.
+
+Batch 254 binaural: optional audio/binaural decodes first/second/third-order ACN/SN3D to native HRTFs with full world field rotation and listener orientation. A 32-point weighted sphere reconstructs all 16 modes in CPU tests. Real browser Web Audio offline rendering compares the production graph to separately computed polynomial speaker signals for all orders and yaw rotations. The rain stimulus is CC BY 4.0 (audio fixture NOTICE); added HOA signals are analytic test tones. No listening, device-output or perceptual-quality claim.

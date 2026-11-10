@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12302327,
+  "total": 12304392,
   "history": [
     {
       "date": "2026-10-24",
@@ -5599,6 +5599,11 @@
       "commit": "batch-262-job3",
       "reason": "Optional inspector/edit absent to 4451 B; inspector root 9073 to 9156 B. Existing clustered lighting remains an intentional static dependency of the explicitly imported editor. Keeping complete scene operations together avoids duplicated lifecycle/undo ownership. Core plus stage unchanged at 23950 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-254",
+      "reason": "Binaural optional entry 0 -> 1809 B: all 16 AmbiX modes, HRTF graph and inherited transport; splitting would complicate the single coherent decoder."
     }
   ],
   "items": {
@@ -6658,6 +6663,7 @@
     "@margoengine/input/lock": 1616,
     "@margoengine/save/scene-state": 1267,
     "@margoengine/inspector/edit": 4707,
-    "leak @margoengine/inspector/edit -> @margoengine/clustered": 1
+    "leak @margoengine/inspector/edit -> @margoengine/clustered": 1,
+    "@margoengine/audio/binaural": 2065
   }
 }

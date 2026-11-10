@@ -2694,3 +2694,5 @@ packages/inspector/test/edit-browser.mjs, then the same command with --compat ap
 The browser tests use real HTML tree dragging and form input, plus rendered native
 point/spot/directional lights and preview ambient. All assertions are correctness
 checks, never time budgets. README coverage is tracked in docs/work-lists/readme-owed.md.
+
+Batch 254 binaural: after build:packages, node --test --test-timeout=60000 packages/audio/tests/binaural.test.js proves modal reconstruction and lifecycle. Shared-lock node packages/audio/scripts/test-browser.js runs binaural-browser.js, comparing 32 native HRTFs driven by the gain graph against independent polynomial speaker PCM. Test-results report records max error/energy, channels and rotation; tolerance 1e-6 is for float32 summation, not listening quality.
