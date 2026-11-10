@@ -201,7 +201,9 @@ export class MSFTMaterialLOD implements EnginePlugin {
     if (!this.model.disposed)
       this.model.setPrimitiveMaterials(this.slots.map(({ primitive }) => ({ primitive, material: undefined })));
     this.disposed = true;
+    const engine = this.engine;
     this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

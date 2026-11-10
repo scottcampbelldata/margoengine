@@ -420,6 +420,7 @@ export class ClusterLOD implements EnginePlugin {
   }
   /** Frees only the renderer's meshes and buffers; the input anchor and hierarchy remain caller-owned. */
   dispose(): void {
+    const engine = this.engine;
     if (this.engine) renderers.get(this.engine)?.delete(this);
     for (const meshes of this.meshes) for (const mesh of meshes) mesh.dispose();
     this.meshes = [];
@@ -427,6 +428,7 @@ export class ClusterLOD implements EnginePlugin {
     this.buffer?.destroy();
     this.buffer = undefined;
     this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -1159,3 +1159,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/lines (batch 178 job 3): document /tiles full-image line construction, removable camera state and subpixel capture grid; examples deferred.
 - @margoengine/headless (batch 178 job 3): document video provenance and maxBytes payload budget; examples deferred.
 - margoengine (batch 178 job 3): document generated sciviz/export-media and lines/tiles aliases; examples deferred.
+
+
+- @margoengine/lod (review 3 L1): document direct MSFTMaterialLOD/ClusterLOD disposal removing scene registrations and frame passes while retaining caller-owned inputs.

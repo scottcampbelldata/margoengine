@@ -7851,3 +7851,8 @@ Compared Kai Ninomiya, Brandon Jones and Jim Blandy (editors), W3C *WebGPU* (202
 Review 3 dependent gate repair: sciviz engineering browser launch already changes cwd itself, but its newly added package command bypassed the established browser-root contract. Reuse that existing package wrapper rather than loosening browser-root.test.js. No reader or rendering algorithm changed. Existing Node process.chdir and URL-based entry resolution conventions are retained. The original guard failed on this command before the repair.
 ## Batch 178 job 3: media publication (2026-11-10)
 Primary specifications, paper titles, authors, years and links are in [the media record](sciviz-media.md#clean-room-basis). PNG, WebP/Exif, PKWARE ZIP, WebCodecs, RFC 9559 and ISO BMFF are combined with subfrustum sampling and a common subpixel grid. Existing Margo headless encoding is extended, not duplicated. No rival or companion implementation was read. NOAA assets are the existing public-domain data.
+
+
+## Review 3 L1: LOD controller registration lifetime (2026-11-10)
+
+Reused the ownership research for review 3 M1: Kai Ninomiya, Brandon Jones and Jim Blandy (editors), W3C *WebGPU* (2026), https://www.w3.org/TR/webgpu/, explicit resource destruction; GPU for the Web contributors, *WebGPU Headers: Ownership* (accessed 2026-11-10), https://webgpu-native.github.io/webgpu-headers/Ownership.html, owned versus borrowed references. These specifications do not define engine plugin registrations. Margo already provides sceneOf(plugin), so both controllers use that authoritative identity after local cleanup. Source models and hierarchy geometry are borrowed. No external implementation or companion code was read; the LOD algorithms are unchanged.
