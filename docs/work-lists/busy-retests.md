@@ -1,5 +1,22 @@
 # Timing tests to rerun on a quiet machine
 
+## Batch 21 job 5: integrated GPU frame budget owed
+
+Deferred by Scott's build-phase instruction on 2026-11-10. No timing run was
+attempted and no passing integrated-GPU result is claimed. Baseline inspected:
+`7fbcb762f`; target hardware: AMD Radeon 680M integrated GPU. CPU load and measured
+frame time: not sampled, because measurement is deferred.
+
+After Scott ends the build phase, run `npm run visual:compat:budget -- --chunk=8`
+on the integrated GPU on a quiet machine, retaining all demos, native/compat
+pairs and the existing failure predicate: median main-thread frame work above
+50 ms AND above twice the native frame; missing/nonfinite frame measurements
+also fail. Build the site first as the runner requires. Record the exact commit, browser/ANGLE
+backend, GPU identity, CPU load, per-demo results and any accepted differences.
+This budget gates main-thread work; the frame interval is recorded separately. Keep this item owed until
+the actual integrated-GPU record passes; see `speed-phase.md` and
+`docs/webgl2-compat-roadmap.md`, M8 frame budget.
+
 Scott, 2026-11-07: every PC is busy with the batches. A test that fails only on time while its machine is loaded goes here and the work moves on. Rules are in `AGENTS.md` (Working rules, busy machines). Budgets are never raised and tests are never skipped or edited. Every row is rerun on a quiet machine before release; this list must be empty then. A miss of more than 2 times its budget, or one that a side-by-side run against the parent commit shows as a real slowdown, is a bug to fix now and never goes here.
 
 | Test | Commit | Machine | Measured against budget | CPU load | Date | Rerun result |

@@ -22,6 +22,15 @@ never a replacement passing number, and never a raised budget.
 
 ## Retained cases and budgets
 
+Batch 21 job 5: the integrated-GPU `visual:compat:budget` record remains owed,
+explicitly deferred on 2026-11-10. Use the AMD Radeon 680M, all existing demos
+and native/compat pairs, in chunks of 8. Preserve the existing failure predicate
+(median main-thread work above 50 ms AND above twice native, with missing or
+nonfinite measurements failing), and record GPU
+identity, browser/ANGLE backend, commit, CPU load and every result. No run or
+measurement is claimed during the build phase. Details: `busy-retests.md`,
+"Batch 21 job 5: integrated GPU frame budget owed".
+
 Batch 134 ETC2/EAC continuation retains cold/warm per-file/per-target timing,
 startup, peak memory and final optional-entry proof for the quiet phase.
 The initial unmasked EAC campaign was deliberately interrupted before its
