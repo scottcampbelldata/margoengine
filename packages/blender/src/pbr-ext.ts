@@ -41,10 +41,19 @@ export async function parseMargoPBR(
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
   const asset = decodeMargo(input, { maxNodes });
-  const [{ extendedMaterials }, images] = await Promise.all([
+  // Both settle before either error is thrown: images decoded while the shader import fails must still be closed.
+  const [shader, decoded] = await Promise.allSettled([
     import("@margoengine/gltf-pro/extended"),
     decodeImages(asset.images, signal),
   ]);
+  if (shader.status === "rejected") {
+    if (decoded.status === "fulfilled") for (const image of decoded.value) image.close();
+    throw shader.reason;
+  }
+  // decodeImages closes what it decoded before it rejects.
+  if (decoded.status === "rejected") throw decoded.reason;
+  const { extendedMaterials } = shader.value;
+  const images = decoded.value;
   let model: PBRModel | undefined;
   try {
     signal?.throwIfAborted();

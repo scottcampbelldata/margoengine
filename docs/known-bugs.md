@@ -64,6 +64,16 @@ Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
 
+### Fixed 2026-11-10: blender parseMargoPBR leaked decoded images when the physical shader failed to load
+
+- **What:** `parseMargoPBR` (`@margoengine/blender/pbr-ext`) awaited the physical shader import and the PNG decode with
+  `Promise.all`. When the import rejected (a failed chunk download, for example), the decode kept running and its
+  ImageBitmaps were never closed.
+- **Repro:** make the shader chunk fail to resolve and call `parseMargoPBR` on a .margo file with images; every
+  decoded bitmap stays open.
+- **Fix:** both promises settle before either error is thrown; a failed import closes every decoded image. The success
+  path is unchanged. Regression: packages/blender/tests/pbr-ext-close.test.js (fails on the old code: closed 0 of 1).
+
 ### Fixed 2026-11-10: a shadowed frame allocated 1,688 B against its 512 B budget
 
 - **What:** `tests/frame-alloc.test.js` failed on main from local CI run 2026-11-10 13:00 on (bd92fa67b): eight
