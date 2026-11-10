@@ -63,10 +63,27 @@ const share = async (light, options) => {
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   const results = [];
-  for (const light of [0.25, 0.5, 0.75]) {
+  // A disc of radius r (in cells) centred in its unit cell covers pi r^2 until r = 0.5; past that the four sides cut a
+  // circular segment each, until the corners are reached at r = sqrt(0.5).
+  const cellShare = (r) =>
+    r <= 0.5
+      ? Math.PI * r * r
+      : r >= Math.SQRT1_2
+        ? 1
+        : Math.PI * r * r - 4 * (r * r * Math.acos(0.5 / r) - 0.5 * Math.sqrt(r * r - 0.25));
+  const dotRadius = (share) => {
+    let lo = 0,
+      hi = Math.SQRT1_2;
+    for (let k = 0; k < 60; k++) if (cellShare((lo + hi) / 2) < share) lo = (lo + hi) / 2;
+    else hi = (lo + hi) / 2;
+    return (lo + hi) / 2;
+  };
+  // Dark tones (light below 1 - pi/4) need the clipped disc: a dot sized by pi r^2 alone left the cell corners bare,
+  // 91 percent ink at light 0.
+  for (const light of [0.05, 0.1, 0.25, 0.5, 0.75]) {
     const { got, margin: m } = await share(light, { style: 'halftone', spacing: 16, angle: 30 }),
-      radius = 16 * Math.sqrt((1 - light) / Math.PI);
-    results.push({ style: 'halftone', light, got, want: (Math.PI * (radius + m) ** 2) / 256, area: 1 - light });
+      radius = 16 * dotRadius(1 - light);
+    results.push({ style: 'halftone', light, got, want: cellShare((radius + m) / 16), area: 1 - light });
   }
   for (const [light, layers] of [
     [0.8, 0],

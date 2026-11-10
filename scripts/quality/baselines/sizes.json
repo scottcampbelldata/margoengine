@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14693003,
+  "total": 14693266,
   "history": [
     {
       "date": "2026-10-24",
@@ -8135,6 +8135,12 @@
       "commit": "63ececab8",
       "reason": "sciviz gaps 2026-11-10: formats reaches the lazy Blosc and Zstandard chunk for Zarr (loaded only by a blosc or zstd chunk), the readers worker bundles it, clip adds connectivity regions and threshold components; sciviz/bench was missing from the baseline since batch 182",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "8221e9422",
+      "reason": "toon/hatch +7 B: halftone dots sized by the clipped disc area so dark tones reach full ink (batch 132 audit)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9246,7 +9252,7 @@
     "@margoengine/tonemap/hue": 2421,
     "@margoengine/tonemap/local": 2386,
     "@margoengine/toon": 2411,
-    "@margoengine/toon/hatch": 1998,
+    "@margoengine/toon/hatch": 2261,
     "@margoengine/toon/hatch-models": 4558,
     "@margoengine/toon/models": 4843,
     "@margoengine/toon/screen-outline": 6077,

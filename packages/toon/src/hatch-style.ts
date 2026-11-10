@@ -14,6 +14,9 @@ export interface HatchingOptions {
   ink?: readonly [number, number, number];
 }
 
+// Halftone: the dot's share of its cell is c = 1 - light. Up to pi/4 the dot is a whole disc (r = sqrt(c / pi)); past it
+// the cell's sides cut four circular segments off, so r is found by bisection from that clipped area, which grows
+// monotonically on [0.5, sqrt(0.5)].
 /** WGSL pattern with a selectable binding group. Shape, angle and ink occupy three vec4 uniform rows. */
 export const hatchWGSL = (binding: number, group = 0): string => `struct Hatch {shape:vec4f,angle:vec4f,ink:vec4f}
 @group(${group}) @binding(${binding}) var<uniform> hatch:Hatch;
@@ -21,7 +24,15 @@ fn hatchInk(pixel:vec2f,light:f32)->f32{
   let s=hatch.shape.y;
   if(hatch.shape.x>0.5){
     let a=hatch.angle.x;let r=mat2x2f(cos(a),sin(a),-sin(a),cos(a))*pixel/s;let d=length(fract(r)-0.5)*s;
-    let radius=s*sqrt(clamp(1.0-light,0.0,1.0)/3.14159265);
+    let c=clamp(1.0-light,0.0,1.0);
+    if(c>=1.0){return 1.0;}
+    var cell=sqrt(c/3.14159265);
+    if(c>0.78539816){
+      var lo=0.5;var hi=0.70710678;
+      for(var k=0;k<20;k++){let m=0.5*(lo+hi);let q=m*m;if(3.14159265*q-4.0*(q*acos(0.5/m)-0.5*sqrt(q-0.25))<c){lo=m;}else{hi=m;}}
+      cell=0.5*(lo+hi);
+    }
+    let radius=s*cell;
     return clamp(radius-d+0.5,0.0,1.0);
   }
   let n=hatch.shape.w;var ink=0.0;
