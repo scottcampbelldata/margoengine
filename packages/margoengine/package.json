@@ -3523,6 +3523,14 @@
       "types": "./dist/sciviz/pointcloud.d.ts",
       "import": "./dist/sciviz/pointcloud.js"
     },
+    "./sciviz/format": {
+      "types": "./dist/sciviz/format.d.ts",
+      "import": "./dist/sciviz/format.js"
+    },
+    "./sciviz/categorical": {
+      "types": "./dist/sciviz/categorical.d.ts",
+      "import": "./dist/sciviz/categorical.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

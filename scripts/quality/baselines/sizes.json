@@ -7601,6 +7601,12 @@
       "commit": "a331427a0",
       "reason": "Batch 175 job 2: optional pointcloud figure adapter, typed octree columns and stable row identities; preserve all unrelated ceilings. Measured before/after in limits.md; no core/stage growth.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-177-job4",
+      "reason": "Optional chart polish/categorical entries and small Figure integration for axis chrome, mappings and native rectangles. Size evidence {\"@margoengine/sciviz\":{\"beforeCeiling\":56635,\"after\":56161},\"@margoengine/sciviz/format\":{\"beforeCeiling\":0,\"after\":7306},\"@margoengine/sciviz/categorical\":{\"beforeCeiling\":0,\"after\":21719}}. Core + stage unchanged 24209 B. Keeping complete controller/data layouts avoids splitting and duplicated SVG helpers.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8984,7 +8990,9 @@
     "@margoengine/sciviz/hdf5": 9260,
     "@margoengine/sciviz/openfoam": 10883,
     "@margoengine/sciviz/xdmf": 19832,
-    "@margoengine/sciviz/pointcloud": 21685
+    "@margoengine/sciviz/pointcloud": 21685,
+    "@margoengine/sciviz/format": 7562,
+    "@margoengine/sciviz/categorical": 22371
   },
-  "total": 14449484
+  "total": 14479417
 }

@@ -211,6 +211,14 @@
     "./pointcloud": {
       "types": "./dist/pointcloud.d.ts",
       "import": "./dist/pointcloud.js"
+    },
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "import": "./dist/format.js"
+    },
+    "./categorical": {
+      "types": "./dist/categorical.d.ts",
+      "import": "./dist/categorical.js"
     }
   },
   "files": [
@@ -259,6 +267,7 @@
     "test:browser:charts-extra": "node scripts/browser-root.mjs tests/charts-extra-browser.mjs",
     "test:browser:table": "node scripts/browser-root.mjs tests/table-browser.mjs",
     "test:browser:pdf": "node scripts/browser-root.mjs tests/pdf-browser.mjs",
-    "test:browser:pointcloud": "node tests/pointcloud-browser.mjs"
+    "test:browser:pointcloud": "node tests/pointcloud-browser.mjs",
+    "test:browser:chart-polish": "node scripts/browser-root.mjs tests/chart-polish-browser.mjs"
   }
 }

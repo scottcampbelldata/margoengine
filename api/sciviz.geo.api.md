@@ -205,6 +205,16 @@ class Figure extends EventTarget {
     static create(canvas: HTMLCanvasElement, options?: CreateFigureOptions): Promise<Figure>;
     constructor(engine: EngineKernel, options?: FigureOptions, renderer?: SciRenderer);
     get is2d(): boolean;
+    get plotArea(): {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+    };
+    get axisScales(): readonly [Scale, Scale, Scale];
+    setAxes(options: AxesOptions | false, signal?: AbortSignal): Promise<void>;
+    setAxisScales(scales: readonly [Scale, Scale, Scale]): void;
+    addChartLayer<L extends RectsLayer>(layer: L): L;
     setLimits(limits?: Bounds | readonly [number, number, number, number]): void;
     render(): void;
     get dragMode(): DragMode;
@@ -458,6 +468,13 @@ interface SVGOptions {
     readonly vector?: boolean;
 }
 
+interface Scale {
+    readonly type: ScaleType;
+    forward(value: number): number;
+    inverse(value: number): number;
+    ticks(min: number, max: number, count?: number): Ticks;
+}
+
 type ScaleType = 'linear' | 'log' | 'date';
 
 type ScatterData = {
@@ -619,6 +636,12 @@ interface Theme {
     readonly axis: string;
     readonly grid: string;
     readonly text: string;
+}
+
+interface Ticks {
+    readonly values: readonly number[];
+    readonly step: number;
+    readonly labels: readonly string[];
 }
 
 class Timeline extends EventTarget {

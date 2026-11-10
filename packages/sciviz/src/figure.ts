@@ -281,6 +281,13 @@ export interface CustomLayer {
 /** Any layer a figure holds. */
 export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
 
+const layerVisible = (layer: Layer): boolean =>
+  'cloud' in layer
+    ? layer.cloud.visible
+    : 'line' in layer
+      ? layer.line.visible
+      : !('visible' in layer) || layer.visible !== false;
+
 const read = async (data: DataSource | undefined): Promise<ArrayLike<number> | undefined> =>
   data === undefined ? undefined : isGpuArray(data) ? await data.read() : data;
 
@@ -504,6 +511,57 @@ export class Figure extends EventTarget {
     return this.#flat;
   }
 
+  /** The 2D plot rectangle in CSS pixels, updated as the canvas resizes. */
+  get plotArea(): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+    const { width, height } = this.#canvasSize();
+    return {
+      x: this.#margin.left,
+      y: this.#margin.top,
+      width: width - this.#margin.left - this.#margin.right,
+      height: height - this.#margin.top - this.#margin.bottom,
+    };
+  }
+
+  /** Current data-to-plot axis mappings, for optional chart controllers. */
+  get axisScales(): readonly [Scale, Scale, Scale] {
+    return [...this.#scales];
+  }
+
+  /** Replace axis chrome, or hide it for an optional chart controller. Waits for pending axis work. */
+  async setAxes(options: AxesOptions | false, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    const pending = this.#pending.then(async () => {
+      signal?.throwIfAborted();
+      this.#check();
+      this.#axes?.dispose();
+      this.#axes =
+        options === false ? undefined : new Axes(this.engine, this.theme, options, () => this.#linesPlugin());
+      await this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
+    });
+    this.#pending = pending;
+    await pending;
+  }
+
+  /** Set mappings supplied by an optional entry. Existing layer coordinates are not changed; the caller owns remapping them. */
+  setAxisScales(scales: readonly [Scale, Scale, Scale]): void {
+    this.#check();
+    this.#need2d('Custom axis mappings');
+    for (let i = 0; i < 3; i++) {
+      this.#scales[i] = scales[i];
+      this.#dated[i] = true;
+    }
+    this.#refit();
+  }
+
+  /** Add a ready 2D rectangle trace, including images and clustered heatmaps from optional entries. */
+  addChartLayer<L extends RectsLayer>(layer: L): L {
+    this.#check();
+    this.#need2d('Chart rectangles');
+    this.#linear('Chart rectangles');
+    this.renderer.add(layer);
+    return this.#add(layer);
+  }
+
   // 2D: a camera straight down on the plot box, an off-centre orthographic projection that maps the box onto the
   // canvas inside the margins, and a canvas view whose scissor clips drawing to that rectangle.
   #setup2d(): void {
@@ -680,6 +738,7 @@ export class Figure extends EventTarget {
     let best: PickResult | null = null,
       bestDistance = Infinity;
     for (const layer of this.#layers) {
+      if (!layerVisible(layer)) continue;
       if (!('kind' in layer) || (layer.kind !== 'scatter' && layer.kind !== 'line')) continue;
       const near = nearestPoint(matrix, layer.positions, width, height, x, y, radius);
       if (near && near.distance < bestDistance) {
@@ -700,7 +759,9 @@ export class Figure extends EventTarget {
     const ray = screenRay(matrix, width, height, x, y);
     if (!ray) return null;
     // Bars and cells: the rectangle under the pointer's data position (a 2D chart looks straight down).
-    const rects = [...this.#layers].filter((l): l is RectsLayer => l instanceof RectsLayer).reverse();
+    const rects = [...this.#layers]
+      .filter((l): l is RectsLayer => l instanceof RectsLayer && layerVisible(l))
+      .reverse();
     for (const layer of rects) {
       const k = layer.indexAt(ray.origin[0], ray.origin[1]);
       if (k < 0) continue;
@@ -716,6 +777,7 @@ export class Figure extends EventTarget {
     }
     let nearest = Infinity;
     for (const layer of this.#layers) {
+      if (!layerVisible(layer)) continue;
       if (!(layer instanceof SurfaceLayer)) continue;
       const hit = layer.raycast(ray.origin, ray.direction);
       if (hit && hit.t < nearest) {
@@ -738,7 +800,7 @@ export class Figure extends EventTarget {
     const { matrix, width, height } = this.#view();
     const points: { layer: ScatterLayer | LineLayer; indices: Uint32Array }[] = [];
     for (const layer of this.#layers)
-      if ('kind' in layer && (layer.kind === 'scatter' || layer.kind === 'line'))
+      if (layerVisible(layer) && 'kind' in layer && (layer.kind === 'scatter' || layer.kind === 'line'))
         points.push({ layer, indices: selectPoints(matrix, layer.positions, width, height, region) });
     const selection: PointSelection = { region, points };
     this.#selection = selection;
@@ -846,7 +908,7 @@ export class Figure extends EventTarget {
       this.#axesQueued = true;
       this.#pending = this.#pending.then(() => {
         this.#axesQueued = false;
-        return this.#axes!.update(this.#bounds, this.#model, this.#flat, this.#scales);
+        return this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
       });
     }
   }
@@ -1487,7 +1549,7 @@ export class Figure extends EventTarget {
       out.push(`<path d="${grid.join('')}" stroke="${this.theme.grid}" stroke-width="1" fill="none"/>`);
     }
     out.push('<g clip-path="url(#sciviz-plot)">');
-    const layers = [...this.#layers],
+    const layers = [...this.#layers].filter(layerVisible),
       rgb = (c: number) => hex((c & 255) / 255, ((c >>> 8) & 255) / 255, ((c >>> 16) & 255) / 255);
     for (const layer of layers.filter((l): l is RectsLayer => l instanceof RectsLayer)) {
       const r = layer.rects,

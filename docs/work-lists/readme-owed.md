@@ -1094,3 +1094,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/points: OctreeNodeData typed attributes/rowIds, MemoryOctree column preservation and COPC attributes.
 - margoengine: generated sciviz/pointcloud alias and synchronized environment/exr-codecs alias.
 - @margoengine/tilemap (review 4): describe Wang weights as finite nonnegative relative values, zero exclusions and deterministic normalized selection; README examples deferred.
+- @margoengine/sciviz (batch 177 job 4): document /format ChartPolish lifecycle, normalized vs original coordinates, supported existing traces, secondary/broken/inset axes, hover and controller SVG; /categorical bands/jitter/RGB/clustering and limits; Figure axis chrome/mappings/rectangle integration APIs. README examples owed.
+- margoengine (batch 177 job 4): document optional sciviz/format and sciviz/categorical aliases in README phase.
