@@ -3467,3 +3467,5 @@ After build:packages, run `node --test packages/shader/test/compute-volume.test.
 
 
 - Batch 242 WebRTC: after building, node --test --test-timeout=30000 packages/voxel-net/tests/webrtc.test.js and node packages/voxel-net/tests/webrtc-browser.mjs. The latter uses two real peers in a GPU-disabled browser, a 60-second suite limit and the existing bounded shutdown helper. No GPU lock or external asset.
+
+Batch 270 job 2: build packages, node --test --test-timeout=120000 packages/vfx/test/over-life.test.js; under the shared GPU lock run node packages/vfx/test/parity.mjs --over-life and add --compat for WebGL2. The runner compares every sampled step with analytic speed, size and angle, including reset replay and local-frame rotation.

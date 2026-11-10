@@ -6382,3 +6382,6 @@ The water/flow entry replaces wind detail with two short advected phases sampled
 ### 5. Batch 185 volume storage evidence
 
 The shader/compute-volume optional entry owns 3D and 2D-array allocation, views, resources and lifecycle. Core and stage are untouched. Its real-adapter test checks every voxel for 16 formats in each dimension, three ping-pong steps, and filtered 3D sampling on native WebGPU and full WebGL2 compatibility. CPU tests cover independent device images, exact upload pitch, array limits, device-loss reset, disposal and invalid read/write aliasing. Read-write storage is optional r32 and requires the browser language feature. Evidence is RTX A6000 on both backends, without a cross-vendor or speed claim. Reproduce with packages/shader/test/compute-volume-check.mjs, also with --compat.
+
+### 5. Lifetime dynamics evidence (batch 270 job 2)
+VFX over-life uses storage binding 26 and uniform binding 27; the original 64-byte particle record remains unchanged. The current size/velocity and accumulated spin are written into that record so billboard, mesh, ribbon, event and culling consumers agree. GPU readback checks growth, zero-speed recovery, trapezoidal spin integration, limit projection, exact reset replay and local-frame rotation on both backends. CPU tests validate limits and packed curves. No core/stage change or speed claim.

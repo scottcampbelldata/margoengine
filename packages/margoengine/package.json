@@ -4198,6 +4198,10 @@
       "types": "./dist/vfx/space.d.ts",
       "import": "./dist/vfx/space.js"
     },
+    "./vfx/over-life": {
+      "types": "./dist/vfx/over-life.d.ts",
+      "import": "./dist/vfx/over-life.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

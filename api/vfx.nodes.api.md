@@ -175,6 +175,7 @@ interface VFXOptions {
     curves?: VFXCurves;
     emitter?: VFXEmitter;
     space?: import('./space.js').VFXSpace;
+    overLife?: import('./over-life.js').VFXOverLife;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13729597,
+  "total": 13731428,
   "history": [
     {
       "date": "2026-10-24",
@@ -7179,6 +7179,12 @@
       "date": "2026-11-10",
       "commit": "batch-242",
       "reason": "New optional voxel-net/webrtc: absent (0 B) -> 6938 B gzip; reuses the existing netcode channel implementation and voxel unreliable-message handling, with bounded cancellable setup."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "aba617d0f",
+      "reason": "Batch 270 job 2: new over-life entry 0 to 1575 B gzip, ceiling 1831 B. Root 32530 to 33476 B and base 11311 to 11317 B remain inside existing ceilings. Keeping lifecycle state with the feature avoids cross-entry synchronization; core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8477,6 +8483,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/shader/compute-volume": 4961,
-    "@margoengine/voxel-net/webrtc": 7194
+    "@margoengine/voxel-net/webrtc": 7194,
+    "@margoengine/vfx/over-life": 1831
   }
 }

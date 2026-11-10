@@ -833,3 +833,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-net: document /webrtc accept/connect, two-channel configuration, setup before SDP/ICE, server RTC provider, timeout/abort, reliable/datagram routing and peer disposal.
 
 - margoengine: document generated voxel-net/webrtc alias.
+- @margoengine/vfx (batch 270 job 2): document /over-life, sampled spin/speed/growth/limit defaults, force composition, zero recovery, local-frame interaction, memory and replay; examples deferred.
+- margoengine (batch 270 job 2): document generated vfx/over-life alias; examples deferred.

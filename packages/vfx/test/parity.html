@@ -23,5 +23,12 @@ window.checkSpace=async()=>{
  await ready(e);e.burst(1);step(e);transform.splice(0,16,0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1);step(e);results.rotated=(await read(e)).slice(0,8);e.dispose();
  return {results,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
 };
+window.checkOverLife=async()=>{
+ device.pushErrorScope('validation');const e=new VFX({...still,capacity:4,lifetime:[1,1],velocity:[2,0,0],size:0.1,overLife:{speed:[0,2],size:[1,3],spin:[0,4]}});
+ await ready(e);e.burst(1);const states=[];for(let i=0;i<5;i++){step(e);states.push(await read(e));}const first=states[0];e.reset();e.burst(1);step(e);const replay=await read(e);e.dispose();
+ const limit=new VFX({...still,capacity:1,velocity:[3,4,0],overLife:{velocityLimit:2}});await ready(limit);limit.burst(1);step(limit);const capped=await read(limit);limit.dispose();
+ const transform=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],rot=new VFX({...still,capacity:1,lifetime:[1,1],velocity:[2,0,0],space:{mode:'local',transform},overLife:{speed:[0,2]}});await ready(rot);rot.burst(1);step(rot);transform.splice(0,16,0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1);step(rot);const rotated=await read(rot);rot.dispose();
+ return {states,first,replay,capped,rotated,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
 window.ready=true;
 </script></body></html>

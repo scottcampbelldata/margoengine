@@ -137,6 +137,7 @@ interface VFXFeatures {
     shadows?: VFXExtension<VFXShadows>;
     nodes?: VFXExtension<VFXNodes>;
     space?: VFXExtension<import('./space.js').VFXSpace>;
+    overLife?: VFXExtension<import('./over-life.js').VFXOverLife>;
 }
 
 interface VFXFields {
@@ -218,6 +219,7 @@ interface VFXOptions {
     curves?: VFXCurves;
     emitter?: VFXEmitter;
     space?: import('./space.js').VFXSpace;
+    overLife?: import('./over-life.js').VFXOverLife;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;

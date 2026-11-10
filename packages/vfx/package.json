@@ -117,6 +117,10 @@
     "./space": {
       "types": "./dist/space.d.ts",
       "import": "./dist/space.js"
+    },
+    "./over-life": {
+      "types": "./dist/over-life.d.ts",
+      "import": "./dist/over-life.js"
     }
   },
   "files": [

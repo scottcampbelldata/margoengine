@@ -4748,3 +4748,5 @@ The previously missing volume and array storage forms are built in shader/comput
 
 
 - Fixed in batch 242 WebRTC test setup: the browser driver passed an array to closeAll, whose contract is an object, so successful assertions left handles open until the 90-second process-tree hard limit. The driver now supplies { browser, servers }; real RTC assertions and natural process exit both pass. Shared browser/shutdown code was untouched.
+
+Batch 270 job 2: no new open defects identified in lifetime dynamics; exact reset and rotated zero-speed recovery have regression coverage.

@@ -4016,3 +4016,5 @@ Claim: shader/compute-volume writes and loads 3D voxels and array layers using a
 
 
 - Batch 242 job 3: voxel-net/webrtc carries the same authoritative codec over reliable and unordered zero-retransmit RTC channels without WebTransport. Proof: tests/webrtc.test.js for real server/chunks/routing and tests/webrtc-browser.mjs for native browser RTC welcome/app/input bytes. No GPU rendering, hosted signalling or server RTC-stack claim.
+
+Batch 270 job 2: vfx/over-life covers the requested spin, speed, growth and velocity-limit curves; proof is over-life.test.js and parity.mjs --over-life on WebGPU and WebGL2. Spin uses an analytic piecewise-linear integral, growth reaches simulation and culling, and speed can cross zero and recover. This is a behavioural claim, with no speed claim.
