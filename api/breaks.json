@@ -7,5 +7,1076 @@
     "reason": "Scene cameras carry up (c6dd876b1): a target straight below threw every frame and rolled cameras rendered unrolled. The field is added; existing readers keep working.",
     "date": "2026-11-10",
     "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/bricks",
+    "symbol": "BrickedVolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/bricks",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/bricks",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/colormaps",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/colormaps",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/formats",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/formats",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/graph",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/graph",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/grids",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/grids",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/nrrd",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/nrrd",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/fallback",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/fallback",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/webgl2",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/webgl2",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/flow",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/flow",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/lic",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/lic",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/atmosphere",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/atmosphere",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/glyph",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/glyph",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/probe",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/probe",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/transfer",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/transfer",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/labels",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/labels",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/cinematic",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/cinematic",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/volume-quality",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/volume-quality",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/link",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/link",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/export-vector",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/export-vector",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/curvilinear",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/curvilinear",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-lod",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-lod",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/table",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/table",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/math",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/math",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pdf",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pdf",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pointcloud",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pointcloud",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/format",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/format",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/categorical",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/categorical",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/tetvolume",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/tetvolume",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/parcoords",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/parcoords",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/monitor",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/monitor",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-time",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-time",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-vector",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/geo-vector",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/spec",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/spec",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/export-media",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/export-media",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/stream",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/stream",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/fits",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/fits",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/mrc",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/mrc",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/ometiff",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/ometiff",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/query",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/query",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pick-gpu",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/pick-gpu",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/annotate",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/annotate",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/provenance",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/provenance",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/amr",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/amr",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/aggregate",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/aggregate",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/views",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/views",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/share",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/share",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/a11y",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/a11y",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/progressive",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/progressive",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/temporal",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/temporal",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/density",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/density",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/notebook",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/notebook",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/graph-gpu",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/graph-gpu",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/cf",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/cf",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/series",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/series",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/themes",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/themes",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/tensor",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/tensor",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/molecule",
+    "symbol": "VolumeLayer.mode",
+    "change": "signature",
+    "was": "36fa2966",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/molecule",
+    "symbol": "VolumeLayerOptions.mode",
+    "change": "signature",
+    "was": "4e647cc5",
+    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
   }
 ]

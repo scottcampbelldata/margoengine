@@ -774,7 +774,7 @@ class VolumeLayer implements Drawable {
     readonly bounds: Bounds;
     readonly range: readonly [number, number];
     readonly colormap: Colormap;
-    mode: 'composite' | 'mip';
+    mode: VolumeMode;
     density: number;
     quality: number;
     shading: boolean;
@@ -815,9 +815,11 @@ interface VolumeLayerOptions {
     readonly range?: readonly [number, number];
     readonly opacity?: readonly (readonly [number, number])[] | ((t: number) => number);
     readonly density?: number;
-    readonly mode?: 'composite' | 'mip';
+    readonly mode?: VolumeMode;
     readonly quality?: number;
     readonly shading?: boolean;
     readonly clip?: readonly ClipPlane[];
 }
+
+type VolumeMode = 'composite' | 'mip' | 'minip';
 ```

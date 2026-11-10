@@ -160,7 +160,7 @@ fn kept(p: vec3f) -> bool {
   var t = enter + stride * hash(in.clip.xy);
   var colour = vec3f(0.0);
   var alpha = 0.0;
-  var peak = 0.0;
+  var peak = select(0.0, 1.0, volume.params.y > 1.5);
   let toEye = -normalize((volume.normalModel * vec4f(dir, 0.0)).xyz);
   var i = 0u;
   loop {
@@ -174,7 +174,7 @@ fn kept(p: vec3f) -> bool {
     i += width;
     if (!kept(p)) { continue; }
     let v = sample(p);
-    if (volume.params.y > 0.5) { peak = max(peak, v); continue; }
+    if (volume.params.y > 0.5) { peak = select(max(peak, v), min(peak, v), volume.params.y > 1.5); continue; }
     let tf = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0);
     let a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride * span / voxel);
     if (a < 0.002) { continue; }
@@ -196,7 +196,8 @@ fn kept(p: vec3f) -> bool {
   }
   if (volume.params.y > 0.5) {
     let tf = textureSampleLevel(transfer, linearSampler, vec2f(peak, 0.5), 0.0);
-    return vec4f(toOutput(tf.rgb), clamp(max(tf.a, peak) * volume.params.z, 0.0, 1.0));
+    let shown = select(max(tf.a, peak), tf.a, volume.params.y > 1.5);
+    return vec4f(toOutput(tf.rgb), clamp(shown * volume.params.z, 0.0, 1.0));
   }
   if (alpha < 0.002) { discard; }
   return vec4f(toOutput(colour / alpha), alpha);
@@ -257,8 +258,8 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
   readonly plan: BrickPlan;
   /** The atlas and page table sizes the memory budget gave. */
   readonly budget: BrickBudget;
-  /** `'composite'` or `'mip'`. */
-  mode: 'composite' | 'mip';
+  /** `'composite'`, `'mip'` or `'minip'`. */
+  mode: 'composite' | 'mip' | 'minip';
   /** Overall opacity scale. */
   density: number;
   /** Samples per voxel along a ray. */
@@ -330,8 +331,8 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
     this.colormap = resolveColormap(options.colormap);
     this.#opacity = options.opacity;
     this.mode = options.mode ?? 'composite';
-    if (this.mode !== 'composite' && this.mode !== 'mip')
-      throw typeError(`Volume mode must be 'composite' or 'mip', got ${String(this.mode)}`, 'sciviz');
+    if (this.mode !== 'composite' && this.mode !== 'mip' && this.mode !== 'minip')
+      throw typeError(`Volume mode must be 'composite', 'mip' or 'minip', got ${String(this.mode)}`, 'sciviz');
     this.density = options.density ?? 1;
     this.quality = options.quality ?? 1.5;
     this.shading = options.shading ?? true;
@@ -798,7 +799,7 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
     v.set(
       [
         this.quality * (this.#renderer.samplingScale ?? 1),
-        this.mode === 'mip' ? 1 : 0,
+        this.mode === 'mip' ? 1 : this.mode === 'minip' ? 2 : 0,
         this.density,
         this.shading ? 1 : 0,
       ],

@@ -127,7 +127,7 @@ export class TetrahedralVolume implements Drawable {
         this.#reference,
         this.source.quality * (this.#figure.renderer.samplingScale ?? 1),
         this.source.density,
-        this.source.mode === 'mip' ? 1 : 0,
+        this.source.mode === 'mip' ? 1 : this.source.mode === 'minip' ? 2 : 0,
       ],
       32,
     );

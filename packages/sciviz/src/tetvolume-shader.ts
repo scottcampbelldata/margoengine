@@ -52,7 +52,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
  // Clip in physical-bounds box coordinates before locating cells.
  for(var k=0u;k<u32(u.size.y);k++){let plane=u.planes[k];let f=dot(plane.xyz,origin)+plane.w;let slope=dot(plane.xyz,d);if(abs(slope)<1e-20){if(f<0.0){discard;}}else if(slope>0.0){start=max(start,-f/slope);}else{limit=min(limit,-f/slope);}}
  if(limit<=start){discard;}
- let physicalSpeed=length(d*u.span.xyz);var cursor=start;var cell=-1;var total=vec4f(0.0);var peak=-1.0;var peakCell=0u;var peakPoint=vec3f(0.0);
+ let physicalSpeed=length(d*u.span.xyz);var cursor=start;var cell=-1;var total=vec4f(0.0);var peak=-1.0;var found=false;var peakCell=0u;var peakPoint=vec3f(0.0);
  // A convex tetrahedron is crossed at most once. Re-entry uses the tree; ordinary faces use adjacency.
  for(var visit=0u;visit<u32(u.size.x)+1u && cursor<limit;visit++) {
   if(cell<0){cell=closest(origin,d,cursor,limit);if(cell<0){break;}}
@@ -61,7 +61,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
   if(load(cells,id*6u+5u).w>0.5){
    if(u.options.w>0.5){
     let p0=origin+d*enter;let p1=origin+d*hit.high;let v0=scalar(id,p0);let v1=scalar(id,p1);
-    if(max(v0,v1)>peak){peak=max(v0,v1);peakCell=id;peakPoint=select(p0,p1,v1>v0);}
+    let low=u.options.w>1.5;let e=select(max(v0,v1),min(v0,v1),low);if(!found||select((e>peak),(e<peak),low)){peak=e;found=true;peakCell=id;peakPoint=select(select(p0,p1,v1>v0),select(p0,p1,(v1<v0)),low);}
    }else {
     let distance=(hit.high-enter)*physicalSpeed;let count=max(1u,min(2048u,u32(ceil(distance/u.options.x*u.options.y))));let ds=(hit.high-enter)/f32(count);
     for(var i=0u;i<count;i++) {
@@ -77,7 +77,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
   cursor=hit.high;if(total.a>0.999){break;}
   cell=-1;if(hit.face>=0){let neighbour=i32(load(cells,id*6u+4u)[u32(hit.face)]);if(neighbour>=0){let h=interval(u32(neighbour),origin,d,limit);if(h.valid && h.high>max(cursor,h.low)){cell=neighbour;}}}
  }
- if(u.options.w>0.5){if(peak<0.0){discard;}let tf=classify(peakCell,peakPoint,peakPoint);return vec4f(toOutput(tf.rgb),clamp(tf.a*u.options.z,0.0,1.0));}
+ if(u.options.w>0.5){if(!found){discard;}let tf=classify(peakCell,peakPoint,peakPoint);return vec4f(toOutput(tf.rgb),clamp(tf.a*u.options.z,0.0,1.0));}
  if(total.a<1e-8){discard;}return vec4f(toOutput(total.rgb/total.a),total.a);
 }
 `;

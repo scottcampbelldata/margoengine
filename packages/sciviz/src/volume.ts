@@ -4,7 +4,8 @@ import { colorLookupWGSL, colorTextureData } from './color-lookup.js';
 // half-float texture normalised to the colour range; a transfer function texture gives colour (from a colour map) and
 // opacity per value. Each fragment of the volume's box marches its ray through the box at a fixed step with a jittered
 // start (no banding), corrects opacity for the step length, lights samples by the data gradient, and stops once nearly
-// opaque. Clip planes cut the volume away; `mode: 'mip'` shows the maximum along each ray instead. Slices are planes
+// opaque. Clip planes cut the volume away; `mode: 'mip'` shows the maximum along each ray instead and `mode: 'minip'` the
+// minimum (minimum intensity projection, as used for airways in CT; Wallis et al., Radiology 181(1), 1991). Slices are planes
 // through the volume coloured by the same map.
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -50,8 +51,11 @@ export interface VolumeLayerOptions {
   readonly opacity?: readonly (readonly [number, number])[] | ((t: number) => number);
   /** Overall opacity scale; above 1 makes the volume denser. Default 1. */
   readonly density?: number;
-  /** `'composite'` (default) blends along the ray; `'mip'` shows the maximum value along it. */
-  readonly mode?: 'composite' | 'mip';
+  /**
+   * `'composite'` (default) blends along the ray; `'mip'` shows the maximum value along it and `'minip'` the minimum,
+   * each coloured and made opaque by the transfer function at that value (MIP also keeps the value as opacity).
+   */
+  readonly mode?: VolumeMode;
   /** Samples per voxel along a ray. Default 1.5. */
   readonly quality?: number;
   /** Light samples by the data gradient. Default true. */
@@ -59,6 +63,9 @@ export interface VolumeLayerOptions {
   /** Up to four clip planes. Default none. */
   readonly clip?: readonly ClipPlane[];
 }
+
+/** How a volume combines the samples along a ray. */
+export type VolumeMode = 'composite' | 'mip' | 'minip';
 
 const MAX_PLANES = 4;
 
@@ -196,7 +203,7 @@ fn kept(p: vec3f) -> bool {
     let v = sample(p);
     if (volume.params.y > 0.5) {
       if ((bitcast<u32>(v)&0x7fffffffu)<=0x7f800000u) {
-        if(hasPeak){peak=max(peak,v);}else{peak=v;hasPeak=true;}
+        if(hasPeak){peak=select(max(peak,v),min(peak,v),volume.params.y>1.5);}else{peak=v;hasPeak=true;}
       }else if(!hasPeak){peak=v;}
       continue;
     }
@@ -226,7 +233,8 @@ fn kept(p: vec3f) -> bool {
   }
   if (volume.params.y > 0.5) {
     let tf = classify(peak, select(0.5, peak, volume.classification.x == 2.0), volume.classification.x);
-    return vec4f(toOutput(tf.rgb), clamp(max(tf.a, peak) * volume.params.z, 0.0, 1.0));
+    let shown = select(max(tf.a, peak), tf.a, volume.params.y > 1.5);
+    return vec4f(toOutput(tf.rgb), clamp(shown * volume.params.z, 0.0, 1.0));
   }
   if (alpha < 0.002) { discard; }
   return vec4f(toOutput(colour / alpha), alpha);
@@ -263,7 +271,8 @@ struct Out { @builtin(position) clip: vec4f, @location(0) box: vec3f }
 }`;
 
 // Normalised half-float voxels for a CPU array, x fastest.
-function halfVoxels(values: ArrayLike<number>, lo: number, hi: number): Uint16Array<ArrayBuffer> {
+/** @internal Half-float voxels normalised from [lo, hi] to [0, 1], for the volume entries. */
+export function halfVoxels(values: ArrayLike<number>, lo: number, hi: number): Uint16Array<ArrayBuffer> {
   const out = new Uint16Array(values.length),
     scale = 1 / (hi - lo);
   for (let i = 0; i < values.length; i++) {
@@ -371,8 +380,8 @@ export class VolumeLayer implements Drawable {
   readonly range: readonly [number, number];
   /** The colour map. */
   readonly colormap: Colormap;
-  /** `'composite'` or `'mip'`. */
-  mode: 'composite' | 'mip';
+  /** `'composite'`, `'mip'` or `'minip'`. */
+  mode: VolumeMode;
   /** Overall opacity scale. */
   density: number;
   /** Samples per voxel along a ray. */
@@ -434,8 +443,8 @@ export class VolumeLayer implements Drawable {
     this.colormap = resolveColormap(options.colormap);
     this.#opacity = options.opacity;
     this.mode = options.mode ?? 'composite';
-    if (this.mode !== 'composite' && this.mode !== 'mip')
-      throw typeError(`Volume mode must be 'composite' or 'mip', got ${String(this.mode)}`, 'sciviz');
+    if (this.mode !== 'composite' && this.mode !== 'mip' && this.mode !== 'minip')
+      throw typeError(`Volume mode must be 'composite', 'mip' or 'minip', got ${String(this.mode)}`, 'sciviz');
     this.density = options.density ?? 1;
     this.quality = options.quality ?? 1.5;
     this.shading = options.shading ?? true;
@@ -731,7 +740,7 @@ export class VolumeLayer implements Drawable {
     v.set(
       [
         this.quality * (this.#renderer.samplingScale ?? 1),
-        this.mode === 'mip' ? 1 : 0,
+        this.mode === 'mip' ? 1 : this.mode === 'minip' ? 2 : 0,
         this.density,
         this.shading ? 1 : 0,
       ],

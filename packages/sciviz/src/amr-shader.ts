@@ -51,7 +51,7 @@ struct Out {@builtin(position) position:vec4f,@location(0) ndc:vec2f}
   let voxel=min(min((hi.x-lo.x)*u.span.x/dims.x,(hi.y-lo.y)*u.span.y/dims.y),(hi.z-lo.z)*u.span.z/dims.z);
   let count=max(1u,min(2048u,u32(ceil((finish-best)*physicalSpeed/voxel*u.options.y))));let ds=(finish-best)/f32(count);
   for(var i=0u;i<count;i++) {
-   let p=origin+d*(best+(f32(i)+0.5)*ds);let v=scalar(id,p);if(missing(v)){continue;}if(hasPeak){peak=max(peak,v);}else{peak=v;hasPeak=true;}
+   let p=origin+d*(best+(f32(i)+0.5)*ds);let v=scalar(id,p);if(missing(v)){continue;}if(hasPeak){peak=select(max(peak,v),min(peak,v),u.options.w>1.5);}else{peak=v;hasPeak=true;}
    if(u.options.w>0.5){continue;}let tf=colourLookup(transfer,v);let alpha=1.0-pow(1.0-clamp(tf.a*u.options.z,0.0,1.0),ds*physicalSpeed/u.scalar.z);
    var rgb=tf.rgb;
    if(u.span.w>0.5){let delta=(hi-lo)/dims;let g=vec3f(scalar(id,p+vec3f(delta.x,0.0,0.0))-scalar(id,p-vec3f(delta.x,0.0,0.0)),scalar(id,p+vec3f(0.0,delta.y,0.0))-scalar(id,p-vec3f(0.0,delta.y,0.0)),scalar(id,p+vec3f(0.0,0.0,delta.z))-scalar(id,p-vec3f(0.0,0.0,delta.z)))/delta;

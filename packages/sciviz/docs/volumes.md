@@ -238,3 +238,24 @@ loading its Wasm lazily; abort/dispose preserves normal ownership and restoratio
 Dispose figures before uninstalling the shared layer. The real-data demos support
 `?backend=webgl2`. Importing `/fallback` alone installs nothing. This full compatibility
 route is distinct from the limited native `/webgl2` drawing entry in the main README.
+
+## Projection modes
+
+`fig.volume(data, { mode })` and `brickedVolume` take `'composite'` (default), `'mip'` (maximum intensity) or
+`'minip'` (minimum intensity, the projection used to show airways in CT; Wallis et al., Radiology 181(1), 1991).
+MinIP colours each ray by the transfer function at the smallest finite sample and takes its opacity from the transfer
+function alone; MIP also keeps the value as opacity, as before. Mapped, curvilinear, tetrahedral, AMR and quality
+volumes follow their source volume's mode. `tests/volume-modes-browser.mjs` checks MinIP and MIP against the exact
+grey of a hidden block on both backends, `tests/minip-kinds-browser.mjs` does the same for AMR (low region in a
+refined level), curvilinear, tetrahedral and quality volumes, and `tests/bricks-browser.js` checks bricked MinIP
+against the whole volume.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+const n = 24, data = new Float32Array(n * n * n).fill(0.8);
+for (let z = 6; z < 18; z++) for (let y = 6; y < 18; y++) for (let x = 6; x < 18; x++) data[(z * n + y) * n + x] = 0.2;
+const volume = fig.volume(data, { dims: [n, n, n], colormap: 'gray', range: [0, 1], opacity: [[0, 1], [1, 1]], mode: 'minip' });
+volume.mode = 'mip'; // switch at any time
+```

@@ -151,6 +151,9 @@ window.runBrickTests = async () => {
         ['composite', { shading: false }],
         ['lit', { shading: true }],
         ['mip', { mode: 'mip' }],
+        // The smallest sample of each ray lies near the box faces, about 0.005 to 0.05 here, where the shared look is
+        // transparent black: MinIP takes an opaque map with a coloured low end, over the same [0, 1] range as the rest.
+        ['minip', { mode: 'minip', colormap: 'viridis', opacity: () => 0.9 }],
         ['clipped', { clip: [{ normal: [-1, 0, 0], offset: 0.5 }] }],
       ]) {
         const a = await whole(data, options),

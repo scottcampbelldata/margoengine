@@ -405,6 +405,8 @@
     "test:browser:chart-polish": "node scripts/browser-root.mjs tests/chart-polish-browser.mjs",
     "test:browser:parcoords": "node scripts/browser-root.mjs tests/parcoords-browser.mjs",
     "test:browser:splom": "node scripts/browser-root.mjs tests/splom-browser.mjs",
+    "test:browser:volume-modes": "node scripts/browser-root.mjs tests/volume-modes-browser.mjs",
+    "test:browser:minip-kinds": "node scripts/browser-root.mjs tests/minip-kinds-browser.mjs",
     "test:browser:monitor": "node scripts/browser-root.mjs tests/monitor-browser.mjs",
     "test:browser:geo-time": "node scripts/browser-root.mjs tests/geo-time-browser.mjs",
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",

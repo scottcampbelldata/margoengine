@@ -88,7 +88,7 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
  let base=max(u.params.w/u.params.x,(exit-enter)/2048.0);
  let grid=vec3i(ceil((u.dims.xyz-1.0)/u.adaptive.z));
  var t=enter;var total=vec4f(0.0);var previous=scalar(origin+d*t);var previousT=t;
- var depth=0.0;var peak=-1e30;var peakPoint=origin+d*enter;
+ var depth=0.0;var peak=select(-1e30,1e30,u.blocks.y>1.5);var peakPoint=origin+d*enter;
  let jitter=select(0.5,textureLoad(noise,vec2i(in.position.xy)%vec2i(32),0).r,u.options.w>0.5);
  for(var k=0u;k<4096u && t<exit;k++) {
   let p=origin+d*(t+u.params.w*1e-5);
@@ -117,7 +117,7 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
    }
    previous=value;previousT=sampleT;
   }else if(kept(sampleP)){
-   if(u.blocks.y>0.5){let v=scalar(sampleP);if(v>peak){peak=v;peakPoint=sampleP;}t+=ds;continue;}
+   if(u.blocks.y>0.5){let v=scalar(sampleP);if(select((v>peak),(v<peak),(u.blocks.y>1.5))){peak=v;peakPoint=sampleP;}t+=ds;continue;}
    let c=classify(sampleP,origin+d*min(t+ds,exit));
    var sigma=-log(max(1.0-c.a,1e-6))*u.params.y/u.params.w;
    if(u.classification.x==2.0){sigma/=u.classification.z*u.classification.w;}
@@ -126,7 +126,7 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
   }
   t+=ds;
  }
- if(u.blocks.y>0.5 && u.options.z<0.0){let c=classify(peakPoint,peakPoint);total=vec4f(c.rgb*clamp(max(c.a,peak)*u.params.y,0.0,1.0),clamp(max(c.a,peak)*u.params.y,0.0,1.0));}
+ if(u.blocks.y>0.5 && u.options.z<0.0){let c=classify(peakPoint,peakPoint);let shown=clamp(select(max(c.a,peak),c.a,u.blocks.y>1.5)*u.params.y,0.0,1.0);total=vec4f(c.rgb*shown,shown);}
  if(total.a<=0.0){discard;}
  var out:Result;out.colour=vec4f(toOutput(total.rgb/total.a),total.a);out.depth=depth;return out;
 }`;

@@ -89,11 +89,11 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
  for(var axis=0u;axis<3u;axis++){if(abs(d[axis])<1e-20){if(origin[axis]<0.0||origin[axis]>1.0){discard;}}else{let lo=-origin[axis]/d[axis];let hi=(1.0-origin[axis])/d[axis];enter=max(enter,min(lo,hi));exit=min(exit,max(lo,hi));}}
  let opaque=opaquePoint(in.position.xy,in.ndc);if(opaque.w>0.0){exit=min(exit,dot(opaque.xyz-world,worldDir)*speed);}
  if(exit<=enter){discard;}
- let physicalSpeed=length(d*u.span.xyz);let step=max(u.options.x/physicalSpeed/u.options.y,(exit-enter)/4096.0);var t=enter;var total=vec4f(0.0);var peak=-1.0;var peakPoint=vec3f(0.0);var peakQ=vec3f(0.0);
+ let physicalSpeed=length(d*u.span.xyz);let step=max(u.options.x/physicalSpeed/u.options.y,(exit-enter)/4096.0);var t=enter;var total=vec4f(0.0);var peak=-1.0;var found=false;var peakPoint=vec3f(0.0);var peakQ=vec3f(0.0);
  for(var i=0u;i<4096u && t<exit;i++) {
   let ds=min(step,exit-t);let p=origin+d*(t+ds*0.5);t+=ds;
   let q=inverseMap(p);if(q.w==0.0 || !kept(q.xyz)){continue;}let v=scalar(q.xyz);if(v.y==0.0){continue;}
-  if(u.options.w>0.5){if(v.x>peak){peak=v.x;peakPoint=p;peakQ=q.xyz;}continue;}
+  if(u.options.w>0.5){if(!found||select((v.x>peak),(v.x<peak),(u.options.w>1.5))){peak=v.x;found=true;peakPoint=p;peakQ=q.xyz;}continue;}
   let tf=classify(p,q.xyz,v.x,origin+d*min(t+step*0.5,exit));
   var alpha=1.0-pow(1.0-clamp(tf.a*u.options.z,0.0,0.999999),ds*physicalSpeed/u.options.x);
   if(u.classification.x==2.0){alpha=1.0-pow(max(1.0-tf.a,0.0),ds*physicalSpeed/u.options.x/u.classification.z*u.options.z/u.classification.w);}
@@ -101,7 +101,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
   if(u.span.w>0.5){let g=gradient(p,v.x)*u.span.xyz;if(dot(g,g)>1e-14){let normal=vec3f(dot(u.inverse[0].xyz,g),dot(u.inverse[1].xyz,g),dot(u.inverse[2].xyz,g));rgb=shade(rgb,normalize(normal),-worldDir);}}
   total+=vec4f(rgb*alpha,alpha)*(1.0-total.a);if(total.a>0.999){break;}
  }
- if(u.options.w>0.5){if(peak<0.0){discard;}let tf=classify(peakPoint,peakQ,peak,peakPoint);return vec4f(toOutput(tf.rgb),clamp(tf.a*u.options.z,0.0,1.0));}
+ if(u.options.w>0.5){if(!found){discard;}let tf=classify(peakPoint,peakQ,peak,peakPoint);return vec4f(toOutput(tf.rgb),clamp(tf.a*u.options.z,0.0,1.0));}
  if(total.a<1e-6){discard;}return vec4f(toOutput(total.rgb/total.a),total.a);
 }
 struct SliceOut { @builtin(position) position:vec4f,@location(0) p:vec3f,@location(1) q:vec3f }

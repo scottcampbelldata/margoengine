@@ -281,7 +281,7 @@ export class QualityVolume implements Drawable {
     const adaptive = o.adaptive === false ? false : (o.adaptive ?? {});
     v.set([adaptive ? (adaptive.maxStep ?? 4) : 1, adaptive ? (adaptive.tolerance ?? 0.01) : 0, side, 0], 84);
     v.set([...(o.color ?? [0, 0, 0]), o.color ? 1 : 0], 88);
-    v.set([this.#width, volume.mode === 'mip' ? 1 : 0, 0, 0], 92);
+    v.set([this.#width, volume.mode === 'mip' ? 1 : volume.mode === 'minip' ? 2 : 0, 0, 0], 92);
     d.queue.writeBuffer(this.#uniform, 0, v);
   }
   /** @internal */

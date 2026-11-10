@@ -168,7 +168,7 @@ export class AMRVolume implements Drawable {
       d = this.#figure.renderer.device!;
     v.set(this.source.model);
     invertMatrix(this.source.model, v.subarray(16, 32));
-    v.set([0, this.source.quality, this.source.density, this.source.mode === 'mip' ? 1 : 0], 32);
+    v.set([0, this.source.quality, this.source.density, this.source.mode === 'mip' ? 1 : this.source.mode === 'minip' ? 2 : 0], 32);
     v.set([0, 0, this.#reference / max, this.#linear ? 1 : 0], 36);
     v.set([...spans.map((n) => n / max), this.source.shading ? 1 : 0], 40);
     v.set([this.data.nodes.length, this.source.clip.length, 0, 0], 44);
