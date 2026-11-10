@@ -1144,3 +1144,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 183 job 2): document the generated stage/lights alias during the README phase.
 
 - @margoengine/gltf-pro (review 4): cover independent non-mip min/mag filtering on ordinary and packed physical textures and unchanged native interpolation differences; examples deferred.
+- margoengine (batch 180 integration): cover the generated sciviz/monitor alias with its owning monitor entry in the README phase; no README example work now.
