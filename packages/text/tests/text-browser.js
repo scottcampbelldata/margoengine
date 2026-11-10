@@ -278,6 +278,13 @@ window.runTextTests = async () => {
   report.colors = colors;
   report.checks.push('Fill, outline and drop shadow colors render; opacity blends');
 
+  const { getSelectionRects } = await import('@margoengine/text/selection');
+  const selectionBlock = new Text({ text: 'Hello world\n\u05d0\u05d1\u05d2 abc', font, maxWidth: 4 });
+  const highlights = getSelectionRects(selectionBlock.layout, 2, selectionBlock.text.length - 1);
+  assert(highlights.length >= 2 && highlights.every(r => r.right > r.left && r.top > r.bottom),
+    'Real font multiline bidi selection must produce valid rectangles');
+  report.checks.push('Selection rectangles span wrapped real-font text and bidi runs');
+
   // Optional fitted text uses the same renderer; clipping must include every style layer.
   const { FittedText } = await import('@margoengine/text/fit');
   label.visible = false;

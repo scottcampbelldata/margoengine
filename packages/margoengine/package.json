@@ -3726,6 +3726,10 @@
       "types": "./dist/text/fit.d.ts",
       "import": "./dist/text/fit.js"
     },
+    "./text/selection": {
+      "types": "./dist/text/selection.d.ts",
+      "import": "./dist/text/selection.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"

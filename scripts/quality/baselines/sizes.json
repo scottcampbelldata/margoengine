@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13420347,
+  "total": 13421305,
   "history": [
     {
       "date": "2026-10-24",
@@ -6906,6 +6906,12 @@
       "commit": "batch-213-vrma",
       "reason": "VRMA optional entry with lazy checked glTF accessors and retargeting; VRM pose source and explicit gaze inputs preserve update order. New entry 0 bytes before; measurements in docs/rigging-vrma.md.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "801f70e3d",
+      "reason": "Batch 248 job 2: new optional text/selection entry, pure source-range boxes over existing visual layout. No existing ceiling raised; root and core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8160,6 +8166,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/lod/msft": 2266,
-    "@margoengine/rigging/vrma": 6295
+    "@margoengine/rigging/vrma": 6295,
+    "@margoengine/text/selection": 958
   }
 }

@@ -692,3 +692,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro (batch 222 job 2): document setPrimitiveMaterials validation, texture refresh, later UV preparation, geometry retention, restore and progressive completion requirement.
 - `@margoengine/rigging` (batch 213 job 4): document vrma read/load/play, clip selection, limits/cancellation, retarget/rest frames, playback controls, native pose-source and explicit gaze inputs, lifecycle; add runnable README examples in README phase.
 - `margoengine` (batch 213 job 4): document generated rigging/vrma alias in README phase.
+- @margoengine/text (batch 248 job 2): document /selection getSelectionRects, UTF-16 ranges, bidi holes, shaped carets, clipping and newline semantics.
+- margoengine (batch 248 job 2): document text/selection forwarding.
