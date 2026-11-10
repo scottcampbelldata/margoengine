@@ -125,3 +125,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/navmesh | build/tiles borderSize now pads grids, rounds up, combines with automatic clearance and counts toward the padded cell budget; remove former no-effect statement | batch-252 job 6 |
 | @margoengine/input | lock: request/release, raw negotiation, legacy raw null, activation, timeouts/AbortSignal, x/y and control publication | batch-253 job 3 |
 | margoengine | Generated input/lock alias | batch-253 job 3 |
+- @margoengine/animation: document captureState/restoreState clip identity, time, pause, loop and speed.
+- @margoengine/animator: document playback snapshots, fade/layer replacement, same model definitions and paired stateful-clock hooks.
+- @margoengine/save: document optional scene-state stable bindings, light/shadow capture and transactional restoration.

@@ -62,11 +62,17 @@ export function addSyncGroup(animator: Animator, group: SyncGroup): SyncGroupHan
     if (cycle) return cycle;
     const clip = animator.animation.clips.find((c) => c.name === name)!,
       duration = clip.duration;
-    if (!(duration > 0)) throw new RangeError(`Sync group clip "${name}" has no length; pass clips with a duration above 0`);
+    if (!(duration > 0))
+      throw new RangeError(`Sync group clip "${name}" has no length; pass clips with a duration above 0`);
     cycle = {
       duration,
       marks: names.length
-        ? cycleMarks(name, group.clipMarkers?.[name] ?? (clip as { markers?: readonly ClipMarker[] }).markers ?? [], names, duration)
+        ? cycleMarks(
+            name,
+            group.clipMarkers?.[name] ?? (clip as { markers?: readonly ClipMarker[] }).markers ?? [],
+            names,
+            duration,
+          )
         : Float64Array.of(0, duration),
     };
     clips.set(name, cycle);
@@ -74,9 +80,13 @@ export function addSyncGroup(animator: Animator, group: SyncGroup): SyncGroupHan
   };
   for (const state of states) {
     if (!Object.hasOwn(animator.options.states, state))
-      throw new RangeError(`Sync group state "${state}" is not one of this Animator's states; pass a key of options.states`);
+      throw new RangeError(
+        `Sync group state "${state}" is not one of this Animator's states; pass a key of options.states`,
+      );
     if (animator.hasStateClock(state))
-      throw new RangeError(`Sync group state "${state}" already has a clock; dispose the group or warp that drives it first`);
+      throw new RangeError(
+        `Sync group state "${state}" already has a clock; dispose the group or warp that drives it first`,
+      );
     const tree = animator.options.states[state],
       list = typeof tree === 'string' ? [tree] : tree.samples.map((sample) => sample.clip);
     longest.set(state, Math.max(...list.map((name) => cycleOf(name).duration)));
@@ -100,6 +110,12 @@ export function addSyncGroup(animator: Animator, group: SyncGroup): SyncGroupHan
   const clock = (state: string): StateClock => {
     const scale = longest.get(state)!;
     return {
+      captureState: () => phase,
+      restoreState(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+          throw new RangeError('Invalid sync phase; restore a finite phase of zero or more');
+        phase = value;
+      },
       advance(time, step) {
         let at = time / scale,
           left = step;

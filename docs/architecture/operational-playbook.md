@@ -5537,3 +5537,4 @@ Evidence is packages/sciviz/tests/atmosphere.test.js (independent NREL solar fix
 ## Batch 252 border evidence (section 5 supplement)
 
 Whole-level grids and tile contexts honor ceil(borderSize), retain their world lattice and crop tile output after filtering/erosion. Padded grids are checked against the existing 16,000,000-cell budget before allocation; the tile check also covers deferred builds. Evidence: packages/navmesh/test/border.test.js and the padded worker parity case in wasm.test.js. This changes the optional CPU build pipeline only, with no rendering/core/stage change.
+Batch 255 job 2 evidence (section 5): no rendering math/backend changes. Owner playback snapshots preserve interrupted fades and ordered layers. CPU continuation/sync/rollback assertions and the save engine browser exact-pixel check cover capture and restore; changed-package native and compatibility GPU checks are required. No wall-clock performance assertion.

@@ -20,6 +20,8 @@ export class Animation implements EnginePlugin {
     constructor(model: PBRModel, options?: AnimationOptions);
     static attach(model: PBRModel, options?: AnimationOptions): Animation;
     play(clip?: string | number): this;
+    captureState(): AnimationState;
+    restoreState(state: AnimationState): this;
     seek(time: number): this;
     setMorph(name: string, weight: number): void;
     setMorph(node: number, target: number, weight: number): void;
@@ -81,6 +83,15 @@ export interface AnimationOptions {
     pointers?: PointerChannels;
     skinning?: SkinningMode;
     skeleton?: PBRModel;
+}
+
+export interface AnimationState {
+    version: 1;
+    clip: number;
+    time: number;
+    playing: boolean;
+    loop: boolean;
+    speed: number;
 }
 
 export interface BakedChannel<N> {

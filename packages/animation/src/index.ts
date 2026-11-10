@@ -105,6 +105,15 @@ interface Deformation {
   joints: number[];
   inverseBind: Float32Array[];
 }
+/** Portable clip playback; clip index disambiguates repeated names. */
+export interface AnimationState {
+  version: 1;
+  clip: number;
+  time: number;
+  playing: boolean;
+  loop: boolean;
+  speed: number;
+}
 /** Options for {@link Animation}. */
 export interface AnimationOptions {
   /** Wrap time at the end of the clip. Default true; false holds the last frame. */
@@ -458,6 +467,40 @@ export class Animation implements EnginePlugin {
     this.time = 0;
     this.playing = true;
     this.apply(0);
+    return this;
+  }
+  captureState(): AnimationState {
+    if (this.disposed) throw new MargoError('disposed', 'Cannot capture a disposed Animation; use a live player');
+    return {
+      version: 1,
+      clip: this.clip,
+      time: this.time,
+      playing: this.playing,
+      loop: this.options.loop ?? true,
+      speed: this.options.speed ?? 1,
+    };
+  }
+  restoreState(state: AnimationState): this {
+    if (
+      this.disposed ||
+      !state ||
+      state.version !== 1 ||
+      !Number.isInteger(state.clip) ||
+      state.clip < 0 ||
+      state.clip >= Math.max(1, this.clips.length) ||
+      !Number.isFinite(state.time) ||
+      state.time < 0 ||
+      typeof state.playing !== 'boolean' ||
+      typeof state.loop !== 'boolean' ||
+      !Number.isFinite(state.speed) ||
+      state.speed < 0
+    )
+      throw new MargoError('state', 'Invalid Animation state; restore a snapshot of this model');
+    this.clip = state.clip;
+    this.options.loop = state.loop;
+    this.options.speed = state.speed;
+    this.seek(state.time);
+    this.playing = state.playing;
     return this;
   }
   seek(time: number): this {

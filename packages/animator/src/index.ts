@@ -137,6 +137,9 @@ export interface FootIK {
 }
 /** @internal A state's own clock, for time that does not run at one second a second. */
 export interface StateClock {
+  /** Optional portable private clock state. Supply both hooks for a stateful clock. */
+  captureState?(): unknown;
+  restoreState?(state: unknown): void;
   /** The state's time after `step` seconds from `time`. */
   advance(time: number, step: number): number;
   /** Seconds along `clip`, counted over its loops, at the state's `time`. */
@@ -151,6 +154,36 @@ export interface Pose {
   scale: number[][];
   weights: Map<number, Float32Array>;
 }
+/** Portable pose values, in glTF node order. */
+export interface SavedPose {
+  position: number[][];
+  rotation: number[][];
+  scale: number[][];
+  weights: [number, number[]][];
+}
+/** Playback only: install the same states, clocks and procedural solvers before restoring. */
+export interface AnimatorState {
+  version: 1;
+  state: string;
+  time: number;
+  playing: boolean;
+  clipRate: number;
+  entry: number;
+  entered: boolean;
+  parameters: Record<string, number>;
+  triggers: string[];
+  clocks: Record<string, unknown>;
+  layers: AnimatorLayer[];
+  rest: SavedPose;
+  current: SavedPose;
+  fade?: { pose: SavedPose; elapsed: number; duration: number; from: string };
+}
+const savePose = (p: Pose): SavedPose => ({
+  position: p.position.map((v) => [...v]),
+  rotation: p.rotation.map((v) => [...v]),
+  scale: p.scale.map((v) => [...v]),
+  weights: [...p.weights].map(([id, v]) => [id, [...v]]),
+});
 const clone = (p: Pose): Pose => {
   const weights = new Map<number, Float32Array>();
   for (const [k, v] of p.weights) weights.set(k, v.slice());
@@ -343,6 +376,153 @@ export class Animator implements EnginePlugin {
     const engine = animation.model.root.engine;
     engine.use(animator, engine.sceneOf(animation) ?? animation.model.root.scene);
     return animator;
+  }
+  /** Detached playback snapshot, including an interrupted fade and independent layer times. */
+  captureState(): AnimatorState {
+    if (this.disposed) throw new MargoError('disposed', 'Cannot capture a disposed Animator; create a live Animator');
+    return {
+      version: 1,
+      state: this.state,
+      time: this.time,
+      playing: this.playing,
+      clipRate: this.clipRate,
+      entry: this.entry,
+      entered: this.entered,
+      parameters: { ...this.parameters },
+      triggers: [...this.triggers],
+      clocks: Object.fromEntries(
+        [...this.clocks].map(([name, clock]) => {
+          if (!!clock.captureState !== !!clock.restoreState)
+            throw new MargoError('state', 'Stateful clocks need both captureState and restoreState hooks');
+          return [name, clock.captureState ? structuredClone(clock.captureState()) : null];
+        }),
+      ),
+      layers: [...this.layers].map((layer) => ({ ...layer, mask: [...layer.mask] })),
+      rest: savePose(this.rest),
+      current: savePose(this.current),
+      ...(this.fade ? { fade: { ...this.fade, pose: savePose(this.fade.pose) } } : {}),
+    };
+  }
+  /** Restores playback without firing events, advancing clocks or running procedural solvers. */
+  restoreState(state: AnimatorState): this {
+    const fail = (): never => {
+      throw new MargoError(
+        'state',
+        'Invalid Animator state; restore a snapshot of the same model and state definitions',
+      );
+    };
+    const nonnegative = (n: number) => Number.isFinite(n) && n >= 0;
+    if (
+      this.disposed ||
+      this.rotationWriteActive ||
+      !state ||
+      state.version !== 1 ||
+      !Object.hasOwn(this.options.states, state.state) ||
+      !nonnegative(state.time) ||
+      !nonnegative(state.clipRate) ||
+      !nonnegative(state.entry) ||
+      typeof state.entered !== 'boolean' ||
+      typeof state.playing !== 'boolean' ||
+      !state.parameters ||
+      Object.values(state.parameters).some((v) => !Number.isFinite(v)) ||
+      !Array.isArray(state.triggers) ||
+      state.triggers.some((v) => typeof v !== 'string' || !v) ||
+      !Array.isArray(state.layers)
+    )
+      fail();
+    const loadPose = (p: SavedPose): Pose => {
+      if (!p) return fail();
+      for (const [key, width] of [
+        ['position', 3],
+        ['rotation', 4],
+        ['scale', 3],
+      ] as const) {
+        if (
+          !Array.isArray(p[key]) ||
+          p[key].length !== this.rest[key].length ||
+          p[key].some(
+            (v) =>
+              !Array.isArray(v) ||
+              v.length !== width ||
+              v.some((n) => !Number.isFinite(Math.fround(n))) ||
+              (key === 'rotation' && !v.some((n) => n !== 0)),
+          )
+        )
+          fail();
+      }
+      if (!Array.isArray(p.weights) || p.weights.length !== this.rest.weights.size) fail();
+      const weights = new Map<number, Float32Array>();
+      for (const [id, values] of p.weights) {
+        if (
+          weights.has(id) ||
+          !this.rest.weights.has(id) ||
+          !Array.isArray(values) ||
+          values.length !== this.rest.weights.get(id)!.length ||
+          values.some((n) => !Number.isFinite(Math.fround(n)))
+        )
+          fail();
+        weights.set(id, new Float32Array(values));
+      }
+      return {
+        position: p.position.map((v) => [...v]),
+        rotation: p.rotation.map((v) => [...v]),
+        scale: p.scale.map((v) => [...v]),
+        weights,
+      };
+    };
+    if (
+      !state.clocks ||
+      Object.keys(state.clocks).length !== this.clocks.size ||
+      [...this.clocks.keys()].some((name) => !Object.hasOwn(state.clocks, name))
+    )
+      fail();
+    const rest = loadPose(state.rest),
+      current = loadPose(state.current);
+    const layers = state.layers.map((layer) => {
+      this.clip(layer.clip);
+      this.validateLayer(layer);
+      return { ...layer, mask: [...layer.mask] };
+    });
+    let fade: Animator['fade'];
+    if (state.fade) {
+      const f = state.fade;
+      if (
+        !Object.hasOwn(this.options.states, f.from) ||
+        !nonnegative(f.elapsed) ||
+        !nonnegative(f.duration) ||
+        f.duration === 0 ||
+        f.elapsed >= f.duration
+      )
+        fail();
+      fade = { ...f, pose: loadPose(f.pose) };
+    }
+    for (const [name, clock] of this.clocks) {
+      if (clock.restoreState) clock.restoreState(structuredClone(state.clocks[name]));
+      else if (state.clocks[name] !== null) fail();
+    }
+    this.state = state.state;
+    this.time = state.time;
+    this.playing = state.playing;
+    this.clipRate = state.clipRate;
+    this.entry = state.entry;
+    this.entered = state.entered;
+    for (const key of Object.keys(this.parameters)) delete this.parameters[key];
+    Object.assign(this.parameters, state.parameters);
+    this.triggers.clear();
+    for (const trigger of state.triggers) this.triggers.add(trigger);
+    this.layers = new Set(layers);
+    this.fade = fade;
+    copyPose(rest, this.rest, this.weightNodes);
+    this.current = current;
+    for (let i = 0; i < this.applied.length; i++) {
+      this.applied[i].fill(NaN);
+      this.applyNode(this.animation.model.nodes[i], current, i);
+    }
+    for (const p of this.animation.model.primitives) {
+      const values = current.weights.get(p.nodeIndex);
+      if (values && this.morphed.has(p.nodeIndex)) p.weights.set(values);
+    }
+    return this;
   }
   private clip(name: string) {
     const clips = this.animation.clips;

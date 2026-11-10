@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12293018,
+  "total": 12297619,
   "history": [
     {
       "date": "2026-10-24",
@@ -5587,6 +5587,12 @@
       "commit": "batch-253",
       "reason": "New optional @margoengine/input/lock: absent to 1360 B gzip, ceiling 1616 B. Cohesive device/action lifecycle stays together; splitting would add coordination without saving consumer bytes. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "656a40199",
+      "reason": "Batch 255 job 2: @margoengine/animation/interactivity 21540 to 24983 B, ceiling 24902 to 25733; @margoengine/animator 19150 to 20041 B, ceiling 19297 to 20643; @margoengine/animator/graph 8527 to 9416 B, ceiling 8542 to 9699; @margoengine/save/scene-state None to 1011 B, ceiling None to 1267. Exact fade poses, layer and sync clocks and transactional save state justify optional bytes. Keeping owner methods avoids a private-field shim or duplicated animator implementation. Core plus stage unchanged at 23950 B.",
+      "grew": 4
     }
   ],
   "items": {
@@ -5595,7 +5601,7 @@
     "@margoengine/animation/dqs": 3792,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9634,
-    "@margoengine/animation/interactivity": 24902,
+    "@margoengine/animation/interactivity": 25733,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/point-cache": 1241,
@@ -5603,9 +5609,9 @@
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,
     "@margoengine/animation/vat": 8512,
-    "@margoengine/animator": 19297,
+    "@margoengine/animator": 20643,
     "@margoengine/animator/fbik": 5618,
-    "@margoengine/animator/graph": 8542,
+    "@margoengine/animator/graph": 9699,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7250,
@@ -6643,6 +6649,7 @@
     "@margoengine/sky/planet": 4943,
     "@margoengine/ui/image": 2700,
     "leak @margoengine/ui/image -> @margoengine/text": 1,
-    "@margoengine/input/lock": 1616
+    "@margoengine/input/lock": 1616,
+    "@margoengine/save/scene-state": 1267
   }
 }

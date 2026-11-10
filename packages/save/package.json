@@ -58,6 +58,10 @@
     "./signed": {
       "types": "./dist/signed.d.ts",
       "import": "./dist/signed.js"
+    },
+    "./scene-state": {
+      "types": "./dist/scene-state.d.ts",
+      "import": "./dist/scene-state.js"
     }
   },
   "files": [

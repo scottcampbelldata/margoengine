@@ -31,6 +31,8 @@ export class Animator implements EnginePlugin {
     clipRate: number;
     constructor(animation: Animation, options: AnimatorOptions);
     static attach(animation: Animation, options: AnimatorOptions): Animator;
+    captureState(): AnimatorState;
+    restoreState(state: AnimatorState): this;
     transition(state: string, duration?: number): this;
     get normalizedTime(): number;
     setTrigger(name: string): this;
@@ -93,6 +95,28 @@ export interface AnimatorOptions {
     transitions?: readonly AnimatorTransition[];
     events?: readonly AnimatorEvent[];
     writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
+}
+
+export interface AnimatorState {
+    version: 1;
+    state: string;
+    time: number;
+    playing: boolean;
+    clipRate: number;
+    entry: number;
+    entered: boolean;
+    parameters: Record<string, number>;
+    triggers: string[];
+    clocks: Record<string, unknown>;
+    layers: AnimatorLayer[];
+    rest: SavedPose;
+    current: SavedPose;
+    fade?: {
+        pose: SavedPose;
+        elapsed: number;
+        duration: number;
+        from: string;
+    };
 }
 
 export interface AnimatorTransition {
@@ -264,7 +288,16 @@ export interface RootMotionOptions {
     smoothing?: number;
 }
 
+export interface SavedPose {
+    position: number[][];
+    rotation: number[][];
+    scale: number[][];
+    weights: [number, number[]][];
+}
+
 export interface StateClock {
+    captureState?(): unknown;
+    restoreState?(state: unknown): void;
     advance(time: number, step: number): number;
     clipTime(clip: string, time: number): number;
     follow?(from: string, time: number): number | undefined;

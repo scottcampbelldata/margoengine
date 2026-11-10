@@ -51,6 +51,8 @@ class Animation implements EnginePlugin {
     constructor(model: PBRModel, options?: AnimationOptions);
     static attach(model: PBRModel, options?: AnimationOptions): Animation;
     play(clip?: string | number): this;
+    captureState(): AnimationState;
+    restoreState(state: AnimationState): this;
     seek(time: number): this;
     setMorph(name: string, weight: number): void;
     setMorph(node: number, target: number, weight: number): void;
@@ -78,6 +80,15 @@ interface AnimationOptions {
 }
 
 type AnimationPath = 'translation' | 'rotation' | 'scale' | 'weights';
+
+interface AnimationState {
+    version: 1;
+    clip: number;
+    time: number;
+    playing: boolean;
+    loop: boolean;
+    speed: number;
+}
 
 interface Clip {
     name: string;

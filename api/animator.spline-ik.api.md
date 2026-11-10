@@ -49,6 +49,8 @@ class Animator implements EnginePlugin {
     clipRate: number;
     constructor(animation: Animation, options: AnimatorOptions);
     static attach(animation: Animation, options: AnimatorOptions): Animator;
+    captureState(): AnimatorState;
+    restoreState(state: AnimatorState): this;
     transition(state: string, duration?: number): this;
     get normalizedTime(): number;
     setTrigger(name: string): this;
@@ -102,6 +104,8 @@ interface AnimatorEventMap {
     };
 }
 
+type AnimatorLayer = AdditiveLayer;
+
 interface AnimatorOptions {
     states: Record<string, BlendTree>;
     initial: string;
@@ -109,6 +113,28 @@ interface AnimatorOptions {
     transitions?: readonly AnimatorTransition[];
     events?: readonly AnimatorEvent[];
     writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
+}
+
+interface AnimatorState {
+    version: 1;
+    state: string;
+    time: number;
+    playing: boolean;
+    clipRate: number;
+    entry: number;
+    entered: boolean;
+    parameters: Record<string, number>;
+    triggers: string[];
+    clocks: Record<string, unknown>;
+    layers: AnimatorLayer[];
+    rest: SavedPose;
+    current: SavedPose;
+    fade?: {
+        pose: SavedPose;
+        elapsed: number;
+        duration: number;
+        from: string;
+    };
 }
 
 interface AnimatorTransition {
@@ -156,7 +182,16 @@ interface Pose {
     weights: Map<number, Float32Array>;
 }
 
+interface SavedPose {
+    position: number[][];
+    rotation: number[][];
+    scale: number[][];
+    weights: [number, number[]][];
+}
+
 interface StateClock {
+    captureState?(): unknown;
+    restoreState?(state: unknown): void;
     advance(time: number, step: number): number;
     clipTime(clip: string, time: number): number;
     follow?(from: string, time: number): number | undefined;

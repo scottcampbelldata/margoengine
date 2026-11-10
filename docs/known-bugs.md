@@ -4102,7 +4102,6 @@ text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 ### Batch 255 save capture blockers
 
 - Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
-- Job 2 remains unbuilt: captureScene omits light lists and model playback; exact weighted playback restoration also requires Animator's private fade pose/elapsed and layer/clock state (packages/animator/src/index.ts). Repro: capture during a layered crossfade and restore; the playing clips/time/weights cannot be recovered through the current public save API. That owning-package serialization is outside this lane's scope. No partial scene-state entry is shipped.
 
 ### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
 

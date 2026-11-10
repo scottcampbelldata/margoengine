@@ -42,7 +42,10 @@ try {
     const engine = await open(),
       knight = await loadGLTF(engine, url),
       copy = await cloneModel(knight);
-    const shoe = await loadGLTF(engine, new URL('/examples/assets/khronos/MaterialsVariantsShoe/MaterialsVariantsShoe.glb', location.href));
+    const shoe = await loadGLTF(
+      engine,
+      new URL('/examples/assets/khronos/MaterialsVariantsShoe/MaterialsVariantsShoe.glb', location.href),
+    );
     shoe.root.setPosition([0, 0.2, 2]).setScale([4, 4, 4]);
     shoe.selectVariant(1);
     knight.root.setPosition([-1, 0, 0]);
@@ -50,15 +53,56 @@ try {
     const hand = knight.nodes.findIndex((node) => /hand/i.test(node.name)),
       arm = knight.nodes[Math.max(hand, 0)];
     arm.setPosition([arm.position.x, arm.position.y + 0.2, arm.position.z + 0.3]);
-    const sword = engine.createMesh(arm).setGeometry(box(0.1, 1, 0.1)).setPosition([0, 0.5, 0]);
+    const sword = engine
+      .createMesh(arm)
+      .setGeometry(box(0.1, 1, 0.1))
+      .setPosition([0, 0.5, 0]);
     sword.name = 'sword';
     sword.material.set({ color: [0.8, 0.1, 0.1], metalness: 0.5 });
-    const floor = engine.createMesh().setGeometry(box(6, 0.1, 6)).setPosition([0, -0.05, 0]);
+    const floor = engine
+      .createMesh()
+      .setGeometry(box(6, 0.1, 6))
+      .setPosition([0, -0.05, 0]);
     floor.name = 'floor';
-    engine.use({ name: 'score', value: 41, setup() {}, saveState() { return this.value; }, loadState(v) { this.value = v; } });
+    engine.use({
+      name: 'score',
+      value: 41,
+      setup() {},
+      saveState() {
+        return this.value;
+      },
+      loadState(v) {
+        this.value = v;
+      },
+    });
     Object.assign(engine.camera, { position: [0, 2, 6], target: [0, 1, 0], near: 0.1, far: 50, fov: 45 });
     engine.scene.lighting.direction.set([0.3, 0.8, 0.5, 2]);
     engine.scene.background = '#203040';
+    const { Animation } = await import('/packages/animation/dist/index.js');
+    const { Animator } = await import('/packages/animator/dist/index.js');
+    const { captureSceneState, restoreSceneState } = await import('/packages/save/dist/scene-state.js');
+    const animated = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb');
+    animated.root.setScale([0.02,0.02,0.02]);
+    const player = Animation.attach(animated);
+    if (!player.clips.length) throw Error('Fox fixture needs animation clips');
+    const clip = player.clips[0].name;
+    const animator = Animator.attach(player, { initial: 'a', states: { a: clip, b: clip } });
+    animator.onPreUpdate(0.2);
+    animator.transition('b', 1);
+    animator.addLayer({ clip, weight: 0.35, mask: [0], time: 0.4 });
+    animator.onPreUpdate(0.1);
+    const bindings = { animations: { knight: animator, player } };
+    const playback = JSON.parse(JSON.stringify(captureSceneState(bindings)));
+    const poseBefore = await picture(engine);
+    animator.onPreUpdate(0.2);
+    restoreSceneState(playback, bindings);
+    const poseAfter = await picture(engine);
+    if (poseBefore.some((v, i) => v !== poseAfter[i])) throw Error('restored layered fade pixels differ');
+    if (JSON.stringify(captureSceneState(bindings)) !== JSON.stringify(playback))
+      throw Error('playback snapshot differs');
+    animator.dispose();
+    player.dispose();
+    animated.dispose();
     const before = await picture(engine),
       extra = shoe.ownedMeshes.length - shoe.nodes.length - 1,
       storage = indexedDBStorage({ database: 'save-engine-check' }),
@@ -66,7 +110,17 @@ try {
     await saveGame(storage, 'slot', saved);
     const bytes = (await storage.read('slot')).length,
       target = await open(),
-      score = { name: 'score', value: 0, setup() {}, saveState() { return this.value; }, loadState(v) { this.value = v; } };
+      score = {
+        name: 'score',
+        value: 0,
+        setup() {},
+        saveState() {
+          return this.value;
+        },
+        loadState(v) {
+          this.value = v;
+        },
+      };
     target.use(score);
     const restored = await restoreScene(target, await loadGame(storage, 'slot')),
       after = await picture(target);
@@ -74,7 +128,7 @@ try {
       lit = 0;
     for (let i = 0; i < before.length; i++) {
       if (before[i] !== after[i]) different++;
-      if (i % 4 === 0 && (Math.abs(before[i] - 0x20) > 8)) lit++;
+      if (i % 4 === 0 && Math.abs(before[i] - 0x20) > 8) lit++;
     }
     // A save with a file that is not there: the scene keeps drawing the same frame.
     const broken = structuredClone(saved);
