@@ -221,13 +221,16 @@ test('play, pause and resume track the playhead with playback rate, offset and d
   assert.equal(node.playbackRate.value, 2);
   assert.equal(node.detune.value, 100);
   context.currentTime = 1.5;
-  assert.equal(audio.currentTime, 4);
+  // Detune speeds a buffer up too: 1.5 s at 2 * 2^(100/1200) plays 3.178 buffer seconds past the offset.
+  const played = 1.5 * 2 * 2 ** (100 / 1200);
+  assert.ok(close(audio.currentTime, 1 + played), `playhead ${audio.currentTime}`);
   audio.pause();
   assert.equal(audio.isPlaying, false);
   assert.ok(node.stopped);
   audio.play();
   node = audio.source;
-  assert.deepEqual(node.started, { when: 1.5, offset: 4, duration: 2 });
+  assert.equal(node.started.when, 1.5);
+  assert.ok(close(node.started.offset, 1 + played) && close(node.started.duration, 5 - played), 'resume offset');
   audio.stop();
   audio.play(0.5);
   assert.deepEqual(audio.source.started, { when: 2, offset: 1, duration: 5 });
@@ -264,6 +267,23 @@ test('changing playback rate mid-play keeps the playhead consistent and is smoot
   assert.equal(audio.currentTime, 8);
   audio.detune = -200;
   assert.deepEqual(audio.source.detune.last(), ['target', -200, 4, 0.01]);
+});
+
+test('detune moves the playhead like Web Audio: 1200 cents plays the buffer twice as fast', () => {
+  // Chromium on the M6 Mac mini, OfflineAudioContext, ramp buffer: detune 1200 at rate 1 reads buffer second 2 at
+  // context second 1. The playhead used to count playbackRate only, so it read 1 and a resume jumped back 1 s.
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context });
+  const audio = new Audio(listener, { detune: 1200 }).setBuffer(buffer(100)).play();
+  context.currentTime = 1;
+  assert.ok(close(audio.currentTime, 2), `playhead ${audio.currentTime}`);
+  audio.pause().play();
+  assert.ok(close(audio.source.started.offset, 2), `resume at ${audio.source.started.offset}`);
+  // A detune change mid-play counts the stretch so far at the old speed.
+  context.currentTime = 2;
+  audio.detune = 0;
+  context.currentTime = 3;
+  assert.ok(close(audio.currentTime, 5), `playhead ${audio.currentTime}`);
 });
 
 test('onEnded fires only on a natural end', () => {
@@ -843,13 +863,18 @@ test('voice pool: overlapping plays sound on separate voices sharing one buffer,
 });
 
 test('voice pool validates every coordinate and play option before stealing or stopping a voice', () => {
-  const context = new FakeAudioContext(), listener = new AudioListener({context});
-  const pool = new AudioVoicePool(listener, buffer(1), {voices: 1});
-  const voice = pool.play([1, 2, 3]), source = voice.source;
+  const context = new FakeAudioContext(),
+    listener = new AudioListener({ context });
+  const pool = new AudioVoicePool(listener, buffer(1), { voices: 1 });
+  const voice = pool.play([1, 2, 3]),
+    source = voice.source;
   for (const [position, options] of [
-    [[, 0, 0], {}], [[0, NaN, 0], {}], [[0, 0], {}],
-    [[0, 0, 0], {volume: NaN}], [[0, 0, 0], {volume: -1}],
-    [[0, 0, 0], {playbackRate: Infinity}],
+    [[, 0, 0], {}],
+    [[0, NaN, 0], {}],
+    [[0, 0], {}],
+    [[0, 0, 0], { volume: NaN }],
+    [[0, 0, 0], { volume: -1 }],
+    [[0, 0, 0], { playbackRate: Infinity }],
   ]) {
     assert.throws(() => pool.play(position, options), RangeError);
     assert.equal(voice.source, source);

@@ -20,6 +20,8 @@ that landed from the evening of 2026-11-09 to 2026-11-10.
 | road | bb024b8db | packages/road/src/structures.ts:70 | Doc only: TunnelOpening.boundary runs from the driver's right edge, not the left | doc corrected | 63f8570af |
 | road | 0344e2b1d | | none found | Mac sweep clean: CPU 51; browser-check (WebGPU and compat) | |
 | procedural | 0c689841e, 6ab64e777 | | none found | Mac sweep clean: CPU 117; poisson, textures, caves, tree-mesh and textures-pbr browser suites on WebGPU and WebGL2 (mip area filter checked by hand for NPOT 3, 5, 7 to 1, 2, 3) | |
+| audio | 9b98d25e2 (playhead, reached by d9d8e4223 seeks and the R5 commits) | packages/audio/src/audio.ts:261, :441, :454, :500 | A buffer's playhead counted playbackRate only, but AudioBufferSourceNode plays at playbackRate * 2^(detune/1200), so with detune set currentTime, pause/resume, seeks and timeline sync were wrong | `new Audio(listener, { detune: 1200 })` on a 100 s buffer, 1 s of context time: currentTime 1 (Web Audio reads buffer second 2), and pause().play() restarted at offset 1, jumping back 1 s. Fix: the playhead counts the computed rate, and a detune change mid-play folds the elapsed stretch at the old speed like a rate change | see audio fix commit |
+| audio | 2a6b582d2, f045b6d6b, e7f23249e, bae4fcbf8, 2999d7f11 | | none further (voice registration failure fixed on main in fcea33620 by another lane) | AmbiX decode checked: Gauss-Legendre nodes and weights, ACN/SN3D basis without Condon-Shortley phase, (2n+1) sampling weights. Mac sweep: CPU 119; browser suite pass on Metal | |
 
 
 ## Lane E

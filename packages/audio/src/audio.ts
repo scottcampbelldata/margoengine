@@ -170,7 +170,9 @@ export class Audio implements ListenerSource {
     return this.playing;
   }
   /** True after dispose; controllers use this without inferring lifecycle from the source kind. */
-  get isDisposed(): boolean { return this.disposed; }
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
   get sourceType(): SourceKind {
     return this.kind;
   }
@@ -258,7 +260,7 @@ export class Audio implements ListenerSource {
     this.clearTimer();
     if (this.kind === 'buffer') {
       // Fold this stretch into the stored progress, wrapped so long loops keep their precision.
-      this.progress += Math.max(this.context.currentTime - this.startedAt, 0) * this.rateValue;
+      this.progress += Math.max(this.context.currentTime - this.startedAt, 0) * this.speed;
       this.progress = this.playhead(this.buffer!.duration) - this.offsetValue;
       this.stopNode();
     } else this.haltOther(false);
@@ -441,11 +443,7 @@ export class Audio implements ListenerSource {
     checkFinite(value, 'playbackRate');
     value = playbackRateModifiers.get(this)?.apply(value) ?? value;
     if (this.kind === 'buffer' && this.playing && this.source) {
-      // Keep the position continuous: count the time so far at the old rate, then restart the clock (a delayed
-      // start keeps its future start time).
-      const now = this.context.currentTime;
-      this.progress += Math.max(now - this.startedAt, 0) * this.rateValue;
-      this.startedAt = Math.max(now, this.startedAt);
+      this.foldProgress();
       smoothParam((this.source as AudioBufferSourceNode).playbackRate, value, this.context, this.listener.smoothing);
     }
     this.rateValue = value;
@@ -454,10 +452,29 @@ export class Audio implements ListenerSource {
   get detune(): number {
     return this.detuneValue;
   }
+  /** Detune in cents. It changes speed as well as pitch: a buffer plays at playbackRate * 2^(detune/1200). */
   set detune(value: number) {
-    this.detuneValue = checkFinite(value, 'detune');
+    checkFinite(value, 'detune');
     const node = this.kind === 'buffer' ? (this.source as AudioBufferSourceNode | null) : null;
+    if (node && this.playing) this.foldProgress();
+    this.detuneValue = value;
     if (node?.detune) smoothParam(node.detune, value, this.context, this.listener.smoothing);
+  }
+  /**
+   * Buffer seconds per context second: AudioBufferSourceNode's computed playback rate, playbackRate times
+   * 2^(detune/1200). Detune speeds the buffer up like playbackRate does, so the playhead counts it too.
+   */
+  private get speed(): number {
+    return this.rateValue * 2 ** (this.detuneValue / 1200);
+  }
+  /**
+   * Keeps the position continuous across a speed change: counts the time so far at the old speed, then restarts the
+   * clock (a delayed start keeps its future start time).
+   */
+  private foldProgress(): void {
+    const now = this.context.currentTime;
+    this.progress += Math.max(now - this.startedAt, 0) * this.speed;
+    this.startedAt = Math.max(now, this.startedAt);
   }
   get offset(): number {
     return this.offsetValue;
@@ -482,7 +499,7 @@ export class Audio implements ListenerSource {
   get currentTime(): number {
     if (this.media) return this.media.currentTime;
     if (!this.buffer) return 0;
-    const elapsed = this.playing ? Math.max(this.context.currentTime - this.startedAt, 0) * this.rateValue : 0;
+    const elapsed = this.playing ? Math.max(this.context.currentTime - this.startedAt, 0) * this.speed : 0;
     return this.playhead(this.buffer.duration, this.progress + elapsed);
   }
 

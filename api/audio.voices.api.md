@@ -103,6 +103,7 @@ class Audio implements ListenerSource {
     set playbackRate(value: number);
     get detune(): number;
     set detune(value: number);
+    private get speed();
     get offset(): number;
     set offset(value: number);
     get duration(): number | undefined;
