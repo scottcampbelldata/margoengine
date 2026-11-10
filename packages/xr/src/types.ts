@@ -96,6 +96,8 @@ export interface XRNativeSession extends EventTarget {
     /** The projection layer, and with the WebXR Layers module any composition layers around it. */
     layers?: readonly object[];
     baseLayer?: unknown;
+  /** Runtime foveation, from zero to one; null or absent when unsupported. */
+  fixedFoveation?: number | null;
     depthNear?: number;
     depthFar?: number;
   }): void;
@@ -115,6 +117,8 @@ export interface XRSystem {
 export interface XRProjectionLayer {
   /** The XRWebGLLayer to show instead of this layer, on a binding that draws through one. */
   baseLayer?: unknown;
+  /** Runtime foveation, from zero to one; null or absent when unsupported. */
+  fixedFoveation?: number | null;
   destroy(): void;
 }
 /** The texture and viewport of one eye in a projection layer. */
@@ -130,6 +134,8 @@ export interface XRBinding {
   createProjectionLayer(init: {
     colorFormat: GPUTextureFormat;
     depthStencilFormat: GPUTextureFormat;
+    /** Projection scale, defaults to the runtime recommendation. */
+    scaleFactor?: number;
   }): XRProjectionLayer;
   getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
   /** The view's projection, where the session's differs from clip space with z in [0, 1]. */

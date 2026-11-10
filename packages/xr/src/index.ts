@@ -62,6 +62,8 @@ export interface XRSessionOptions {
    * `{ depthSensing: DEPTH_SENSING }` from `@margoengine/xr/ar`. The feature lists above win over any given here.
    */
   init?: Record<string, unknown>;
+  /** Projection resolution relative to the runtime recommendation. Default native 1, or installXR's setting on compatibility. */
+  framebufferScale?: number;
   /** Abort while the browser negotiates the session or the layer is set up: the session is ended and the request rejects with the reason. */
   signal?: AbortSignal;
   /** Called once per XR frame with reused state; copy anything you keep. */
@@ -268,6 +270,8 @@ export class XR implements EnginePlugin {
       );
     this.space = space;
   }
+  /** The active immersive projection layer, including its baseLayer on compatibility; undefined otherwise. */
+  get projectionLayer(): XRProjectionLayer | undefined { return this.layer; }
   /** The immersive session's WebGPU binding and the device its layers use; undefined otherwise. For `XRLayers`. */
   get layerBinding(): { binding: XRBinding; device: GPUDevice } | undefined {
     return this.session && this.binding && this.layer ? { binding: this.binding, device: this.device } : undefined;
@@ -321,6 +325,8 @@ export class XR implements EnginePlugin {
       throw new TypeError(
         "Unknown XR reference space; use 'viewer', 'local', 'local-floor', 'bounded-floor' or 'unbounded'",
       );
+    if (options.framebufferScale !== undefined && (!Number.isFinite(Math.fround(options.framebufferScale)) || Math.fround(options.framebufferScale) <= 0))
+      throw new RangeError('framebufferScale must be finite and positive; pass 1 for the runtime recommendation');
     this.pending = true;
     let session: XRNativeSession | undefined;
     try {
@@ -366,7 +372,7 @@ export class XR implements EnginePlugin {
       }
       this.binding = new (platform().XRGPUBinding!)(session, this.device);
       const colorFormat = this.binding.getPreferredColorFormat();
-      this.layer = this.binding.createProjectionLayer({ colorFormat, depthStencilFormat: 'depth24plus' });
+      this.layer = this.binding.createProjectionLayer({ colorFormat, depthStencilFormat: 'depth24plus', ...(options.framebufferScale === undefined ? {} : { scaleFactor: options.framebufferScale }) });
       session.updateRenderState({
         ...(this.layer.baseLayer ? { baseLayer: this.layer.baseLayer } : { layers: [this.layer] }),
         depthNear: this.engine.camera.near,

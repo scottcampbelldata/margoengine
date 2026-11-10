@@ -94,9 +94,12 @@ export class CompatXRBinding {
    * Makes the session's XRWebGLLayer. No multisampling there, because the eyes are multisampled and resolved before
    * they arrive, and no depth, because the framebuffer's depth cannot be filled from another texture.
    */
-  createProjectionLayer(init: { colorFormat: GPUTextureFormat }): CompatXRProjectionLayer {
+  createProjectionLayer(init: { colorFormat: GPUTextureFormat; scaleFactor?: number }): CompatXRProjectionLayer {
     if (init.colorFormat !== 'rgba8unorm')
       throw new TypeError(`An XRWebGLLayer takes rgba8unorm, not '${init.colorFormat}'; use getPreferredColorFormat()`);
+    const factor = init.scaleFactor ?? scale;
+    if (factor !== undefined && (!Number.isFinite(Math.fround(factor)) || Math.fround(factor) <= 0))
+      throw new RangeError('XR projection scaleFactor must be finite and positive; pass 1 for the runtime recommendation');
     const Layer = (globalThis as unknown as { XRWebGLLayer?: WebGLLayerClass }).XRWebGLLayer;
     if (!Layer) throw fault('unsupported', 'This browser has no XRWebGLLayer', 'compatibility-layer');
     return new CompatXRProjectionLayer(
@@ -106,7 +109,7 @@ export class CompatXRBinding {
         stencil: false,
         alpha: true,
         ignoreDepthValues: true,
-        ...(scale === undefined ? {} : { framebufferScaleFactor: scale }),
+        ...(factor === undefined ? {} : { framebufferScaleFactor: factor }),
       }),
     );
   }
@@ -201,6 +204,8 @@ export function installXR({ framebufferScale }: CompatXROptions = {}): CompatXR 
       'compatibility-layer',
     );
   if (active) throw fault('state', 'installXR is already in place; dispose the first call', 'compatibility-layer');
+  if (framebufferScale !== undefined && (!Number.isFinite(Math.fround(framebufferScale)) || Math.fround(framebufferScale) <= 0))
+    throw new RangeError('framebufferScale must be finite and positive; pass 1 for the runtime recommendation');
   const own = Object.getOwnPropertyDescriptor(globalThis, 'XRGPUBinding');
   Object.defineProperty(globalThis, 'XRGPUBinding', { value: CompatXRBinding, configurable: true, writable: true });
   scale = framebufferScale;

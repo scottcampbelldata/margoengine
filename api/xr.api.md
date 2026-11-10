@@ -58,6 +58,7 @@ export class XR implements EnginePlugin {
     onEye(callback: (target: XREyeTarget) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     useReferenceSpace(space: XRSpace): void;
+    get projectionLayer(): XRProjectionLayer | undefined;
     get layerBinding(): {
         binding: XRBinding;
         device: GPUDevice;
@@ -80,6 +81,7 @@ export interface XRBinding {
     createProjectionLayer(init: {
         colorFormat: GPUTextureFormat;
         depthStencilFormat: GPUTextureFormat;
+        scaleFactor?: number;
     }): XRProjectionLayer;
     getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
     projection?(view: XRView): ArrayLike<number>;
@@ -165,6 +167,7 @@ class XR implements EnginePlugin {
     onEye(callback: (target: XREyeTarget) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     useReferenceSpace(space: XRSpace): void;
+    get projectionLayer(): XRProjectionLayer | undefined;
     get layerBinding(): {
         binding: XRBinding;
         device: GPUDevice;
@@ -205,6 +208,7 @@ export interface XRNativeSession extends EventTarget {
     updateRenderState(state: {
         layers?: readonly object[];
         baseLayer?: unknown;
+        fixedFoveation?: number | null;
         depthNear?: number;
         depthFar?: number;
     }): void;
@@ -237,6 +241,7 @@ export interface XRPose {
 
 export interface XRProjectionLayer {
     baseLayer?: unknown;
+    fixedFoveation?: number | null;
     destroy(): void;
 }
 
@@ -260,6 +265,7 @@ export interface XRSessionOptions {
     requiredFeatures?: string[];
     optionalFeatures?: string[];
     init?: Record<string, unknown>;
+    framebufferScale?: number;
     signal?: AbortSignal;
     onFrame?: (state: XRFrameState) => void;
 }

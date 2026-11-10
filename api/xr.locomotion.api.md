@@ -147,6 +147,7 @@ interface XRNativeSession extends EventTarget {
     updateRenderState(state: {
         layers?: readonly object[];
         baseLayer?: unknown;
+        fixedFoveation?: number | null;
         depthNear?: number;
         depthFar?: number;
     }): void;

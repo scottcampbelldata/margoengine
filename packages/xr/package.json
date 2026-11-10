@@ -32,7 +32,8 @@
     "test:gpu:pointers": "cd ../.. && node packages/xr/tests/pointer.browser.mjs",
     "test:gpu:locomotion": "cd ../.. && node packages/xr/tests/locomotion.browser.mjs",
     "test:gpu:hands": "cd ../.. && node packages/xr/tests/hands.browser.mjs",
-    "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs"
+    "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs",
+    "test:gpu:performance": "cd ../.. && node packages/xr/tests/performance.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -75,6 +76,10 @@
     "./ar-extra": {
       "types": "./dist/ar-extra.d.ts",
       "import": "./dist/ar-extra.js"
+    },
+    "./performance": {
+      "types": "./dist/performance.d.ts",
+      "import": "./dist/performance.js"
     }
   },
   "files": [
@@ -110,7 +115,8 @@
       "test:gpu:pointers": 3,
       "test:gpu:locomotion": 3,
       "test:gpu:hands": 3,
-      "test:gpu:ar-extra": 3
+      "test:gpu:ar-extra": 3,
+      "test:gpu:performance": 3
     }
   }
 }

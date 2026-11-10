@@ -14,6 +14,7 @@ export class CompatXRBinding {
     getPreferredColorFormat(): GPUTextureFormat;
     createProjectionLayer(init: {
         colorFormat: GPUTextureFormat;
+        scaleFactor?: number;
     }): CompatXRProjectionLayer;
     getViewSubImage(layer: CompatXRProjectionLayer, view: View): {
         colorTexture: CompatTexture;

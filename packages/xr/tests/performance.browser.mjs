@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';import {readFile,writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';import {openBrowser} from '../../../scripts/browser.js';
+process.chdir(fileURLToPath(new URL('../../..',import.meta.url)));
+const fixture=await readFile('packages/webgl2-compat/test/xr.html','utf8');const replace=(s,from,to)=>{assert.ok(s.includes(from),from);return s.replace(from,to);};
+let html=replace(fixture,'const mode =',`import {XRPerformance,performanceSessionOptions} from '/packages/xr/dist/performance.js';import {loadGLTF} from '/packages/gltf-pro/dist/index.js';const mode =`);
+html=replace(html,'this.gl = gl;','this.fixedFoveation=.2; this.gl = gl;');
+html=replace(html,'createProjectionLayer({ colorFormat, depthStencilFormat })','createProjectionLayer({ colorFormat, depthStencilFormat,scaleFactor })');
+html=replace(html,'nativeLayer = {','nativeLayer = { fixedFoveation:.2,scaleFactor,');
+html=replace(html,'const xr = await XR.create(engine);',`const licensed=await loadGLTF(engine,'/packages/exporters/tests/fixtures/Box.glb');licensed.root.setPosition([0,1,0]);const xr = await XR.create(engine);`);
+html=replace(html,"await xr.requestSession('immersive-vr');",`await xr.requestSession('immersive-ar',performanceSessionOptions({framebufferScale:.625,cameraAccess:'required'}));session.enabledFeatures=session.features;
+ const layer=xr.projectionLayer.baseLayer??xr.projectionLayer;
+ if((mode==='compat'?layer.init.framebufferScaleFactor:layer.scaleFactor)!==.625)throw new Error('per-session scale not forwarded');
+ const performance=XRPerformance.attach(xr,{fixedFoveation:.75});if(performance.fixedFoveation!==.75)throw new Error('foveation not applied');
+ let cameraProof='native unsupported',borrowed;
+ if(mode==='compat'){
+ globalThis.XRWebGLBinding=class{constructor(owner,gl){if(owner!==session||gl!==xr.device.gl)throw new Error('camera context mismatch');const saved=gl.getParameter(gl.TEXTURE_BINDING_2D);this.texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([17,83,199,255]));gl.bindTexture(gl.TEXTURE_2D,saved);}getCameraImage(camera){return this.texture;}};
+ borrowed=performance.cameraImage({camera:{width:1,height:1}});const gl=borrowed.context,read=gl.getParameter(gl.READ_FRAMEBUFFER_BINDING),fbo=gl.createFramebuffer(),pixels=new Uint8Array(4);gl.bindFramebuffer(gl.READ_FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.READ_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,borrowed.texture,0);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);gl.bindFramebuffer(gl.READ_FRAMEBUFFER,read);gl.deleteFramebuffer(fbo);if(String(pixels)!=='17,83,199,255')throw new Error('camera texture pixels differ: '+pixels);cameraProof=Array.from(pixels);
+ }else{let refused=false;try{performance.cameraImage({camera:{width:1,height:1}});}catch(error){if(error.code!=='unsupported')throw error;refused=true;}if(!refused)throw new Error('native camera capability not reported');}
+`);
+html=replace(html,'const pixels =','await xr.device.queue.onSubmittedWorkDone(); const pixels =');
+html=replace(html,'vendor: device.adapterInfo?.vendor ?? null,',`vendor:device.adapterInfo?.vendor??null,performance:{scale:.625,foveation:performance.fixedFoveation,camera:cameraProof},`);
+html=replace(html,'await xr.end();',`performance.dispose();if(layer.fixedFoveation!==.2)throw new Error('foveation not restored');if(borrowed){if(!borrowed.context.isTexture(borrowed.texture))throw new Error('borrowed texture was deleted');borrowed.context.deleteTexture(borrowed.texture);}await xr.end();`);
+const browser=await openBrowser({startPath:'/tests/modern-extension.html',port:'free',compat:false}),origin=new URL(browser.page.url()).origin,checks=[];
+try{await browser.page.route('**/packages/webgl2-compat/test/xr.html*',route=>route.fulfill({status:200,contentType:'text/html',body:html}));for(const backend of ['native','compat'])for(const route of ['separate','engine']){await browser.page.goto(`${origin}/packages/webgl2-compat/test/xr.html?mode=${backend}&route=${route}`);await browser.page.waitForFunction(()=>window.ready,null,{timeout:60000});const result=await browser.page.evaluate(()=>window.check);assert.deepEqual(result.errors,[],`${backend}/${route}`);assert.equal(result.gl,0);assert.ok(result.eyes.every(eye=>Buffer.from(eye,'base64').some((value,i)=>i%4<3&&value>8)));checks.push({backend,route,...result.performance});}await writeFile('test-results/xr-performance-browser.json',JSON.stringify({checks},null,2));console.log('XR performance PASS',JSON.stringify(checks));}finally{await browser.close();}

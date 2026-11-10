@@ -186,6 +186,7 @@ interface XRNativeSession extends EventTarget {
     updateRenderState(state: {
         layers?: readonly object[];
         baseLayer?: unknown;
+        fixedFoveation?: number | null;
         depthNear?: number;
         depthFar?: number;
     }): void;
@@ -236,6 +237,7 @@ interface XRSessionOptions {
     requiredFeatures?: string[];
     optionalFeatures?: string[];
     init?: Record<string, unknown>;
+    framebufferScale?: number;
     signal?: AbortSignal;
     onFrame?: (state: XRFrameState) => void;
 }

@@ -195,7 +195,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 | margoengine | Review the generated save/scene-state alias with its owning feature in the README phase. | Batch 171 metadata repair |
-=======
 - @margoengine/wfc: document /assemble loaded glTF templates, variants, default placement, template visibility, shared-resource ownership, cleanup and limits (batch 237 job 1).
 - margoengine: document generated wfc/assemble alias and pre-existing audio/voices and xr/hands aliases (batch 237 job 1).
->>>>>>> 750023e89 (feat(wfc): assemble solved grids from loaded tile models)
+- @margoengine/xr: document xr/performance negotiation, per-session framebufferScale, fixedFoveation, runtime capability checks, frame-owned camera textures and disposal.
+- @margoengine/webgl2-compat: document xr createProjectionLayer scaleFactor overriding installXR framebufferScale for one session, with defaults and float validation.

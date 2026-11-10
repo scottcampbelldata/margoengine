@@ -5640,3 +5640,7 @@ tests/generated-metadata-conflicts.test.js checks the generated API summary, pub
 Scoped API updates now reject inherited unresolved boundaries before interpreting a table. tests/api-report-scope.test.js covers conflicts in the headline, table header and package row, with LF and CRLF. This prevents the truncated-table path from inserting duplicate package rows and inflating summary totals.
 ## Section 5 evidence: batch 237 assembly
 The optional wfc/assemble entry creates ordinary core meshes sharing template geometry and materials; no changes to core/stage or rendering backends. Native WebGPU and WebGL2 compatibility tests assert four rendered instances in one draw. CPU tests verify 24 cube orientations plus a reflection, nested TRS, and rollback. Static glTF models are supported; animated controllers are not cloned.
+
+### 5. XR projection scale, foveation and camera controls
+
+Optional XR transports a validated per-session projection scale, with the compatibility bridge translating it into framebufferScaleFactor while retaining its global default when unset. Foveation writes are range checked and restored only before session end. Raw camera textures stay owned by the browser and use its XR-compatible GL context; the native WebGPU unsupported path is explicit. CPU and real-GPU stand-in coverage exists for option transport and texture ownership, while device quality/performance and actual sensor frames remain unmeasured. Core/stage bytes are unchanged.

@@ -826,3 +826,4 @@ test('disposing XR in an eye hook stops later hooks and GPU submission', async (
   f.session.tick(10,viewer);
   assert.deepEqual(seen,['dispose']);assert.deepEqual(f.errors,[]);
 });
+test('framebuffer scale reaches native layer creation and rejects invalid values before negotiation',async t=>{const f=await fixture(t),xr=await XR.create(f.engine);for(const framebufferScale of [0,-1,NaN,Infinity,1e308,1e-100])await assert.rejects(xr.requestSession('immersive-vr',{framebufferScale}),RangeError);assert.equal(f.requests.length,0);await xr.requestSession('immersive-vr',{framebufferScale:.625});assert.equal(xr.projectionLayer.init.scaleFactor,.625);await xr.end();assert.equal(xr.projectionLayer,undefined);});

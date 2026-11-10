@@ -3281,7 +3281,8 @@ GPU-written command buffers. Regression: shadow-cull-fixture.test.js fails
 without the owning-route selection. No new speed or whole-package parity claim.
 ### Self-contained foreignObject resources (batch 260 job 3)
 html/inline embeds same-origin/CORS images, computed CSS image URLs and matching document/adopted/imported font faces into data URLs before foreignObject drawing. packages/html/test/inline-browser.js validates 1,893 real image pixels and exact 92 px live/embedded font width, using a separate CORS server and existing licensed assets. packages/html/test/inline.test.js covers URL resolution, deduplication, form-state regression, import cycles, error rejection and abort/deadline semantics. Texture preparation is opt-in via resourceInliner(), with cancellation on surface removal. No claim is made to bypass CORS or discover binary sources of script-created FontFace objects.
-=======
 ## Batch 237: WFC assembly
 assembleWFC converts solved IDs and source/orientation metadata into shared-geometry tile meshes from loaded glTF models. CPU tests cover every proper cube rotation, reflection, nested transforms, ownership, invalid inputs and rollback. assemble-browser.mjs checks four placed instances in one draw on native WebGPU and the WebGL2 compatibility layer. This is deterministic instancing evidence, with no speed claim.
->>>>>>> ca315a537 (feat(wfc): assemble solved grids from loaded tile models)
+### XR performance controls
+
+The optional xr/performance entry forwards per-session scale on native and compatibility routes, controls runtime foveation and exposes frame-owned compatibility camera textures. CPU tests prove validation, defaults, restoration, session end and permissions. Real GPU/browser checks verify four route/backend combinations, a 0.625 scale forwarded to layer creation, 0.75 foveation and exact readback of a borrowed WebGL camera fixture. This proves API transport and texture ownership, without headset quality, sensor accuracy or speed claims.

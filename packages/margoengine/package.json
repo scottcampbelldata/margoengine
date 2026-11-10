@@ -3977,6 +3977,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./xr/performance": {
+      "types": "./dist/xr/performance.d.ts",
+      "import": "./dist/xr/performance.js"
     }
   },
   "dependencies": {

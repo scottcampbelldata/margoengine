@@ -2774,7 +2774,8 @@ then the same driver with MARGO_COMPAT=1. Do not forward a Firefox executable
 override into these Chromium runs. All original assertions and scene work stay.
 ### Batch 260 foreignObject resources
 The HTML browser commands above now also start a local CORS-only resource fixture server, serve the existing Noto Emoji donut and Source Sans 3 font with their recorded licences, and exercise an imported stylesheet. Inspect measurements.resources: matchedImagePixels = 1893, fontWidth = referenceWidth = 92. Both native and --compat invocations run it. CPU coverage is inline.test.js; the texture hook accepts prepare: resourceInliner() from @margoengine/html/inline. No README example or benchmark runs in this build-phase change.
-=======
 ## Batch 237 assembly
 Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch237 --max=5 --wait-max=60 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
->>>>>>> ca315a537 (feat(wfc): assemble solved grids from loaded tile models)
+### XR performance controls
+
+Build packages, run packages/xr/tests/performance.test.js and packages/webgl2-compat/test/xr.test.js with node --test, then run the registered xr test:gpu:performance and the existing compatibility test/xr-browser.mjs through the shared GPU lock. The performance leaf uses the existing stereo fixture and licensed Khronos/Cesium Box, writes test-results/xr-performance-browser.json, checks scale forwarding and foveation restoration, and reads known pixels from a browser-owned stand-in camera texture on the actual compatibility context. Real camera/headset proof remains separate.
