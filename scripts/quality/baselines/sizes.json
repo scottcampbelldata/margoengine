@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13526604,
+  "total": 13529576,
   "history": [
     {
       "date": "2026-10-24",
@@ -7014,6 +7014,12 @@
       "commit": "192bff291",
       "reason": "batch241-generation-new-optional-entry-before-0-after-2479B-font-and-image-coverage",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d43bfabf5",
+      "reason": "new entry @margoengine/clustered/stochastic (StochasticLights, batch 52 job 8) and the Clustered.stochastic hook in @margoengine/clustered",
+      "grew": 2
     }
   ],
   "items": {
@@ -7146,6 +7152,7 @@
     "@margoengine/cameras/panini": 3289,
     "@margoengine/cameras/panorama": 2742,
     "@margoengine/cameras/physical": 1349,
+    "@margoengine/cameras/stereo": 3400,
     "@margoengine/cameras/wide-cube": 4031,
     "@margoengine/cinematic": 2076,
     "@margoengine/cinematic/brain": 3262,
@@ -7157,7 +7164,7 @@
     "@margoengine/cinematic/noise": 1612,
     "@margoengine/cinematic/ortho": 3133,
     "@margoengine/cinematic/physical-lens": 845,
-    "@margoengine/clustered": 13989,
+    "@margoengine/clustered": 14448,
     "@margoengine/clustered/area": 10652,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/directional": 2535,
@@ -7167,6 +7174,7 @@
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadows": 11769,
     "@margoengine/clustered/shapes": 12255,
+    "@margoengine/clustered/stochastic": 2513,
     "@margoengine/clustered/units": 1089,
     "@margoengine/compute": 40233,
     "@margoengine/compute/autodiff": 5845,
@@ -7587,8 +7595,10 @@
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 7340,
     "@margoengine/mixer/analyser": 3167,
+    "@margoengine/mixer/dynamics": 3112,
     "@margoengine/mixer/fx": 3936,
     "@margoengine/mixer/loudness": 2362,
+    "@margoengine/mixer/pitch": 2622,
     "@margoengine/mixer/reflections": 3483,
     "@margoengine/mixer/sidechain": 1815,
     "@margoengine/mixer/snapshots": 1956,
@@ -7829,6 +7839,7 @@
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/probe": 6844,
+    "@margoengine/sciviz/transfer": 6252,
     "@margoengine/sciviz/tubes": 2789,
     "@margoengine/sciviz/vtk": 6201,
     "@margoengine/sciviz/webgl2": 4667,
@@ -7955,6 +7966,7 @@
     "@margoengine/terrain/stream": 12291,
     "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
+    "@margoengine/text/curve": 10802,
     "@margoengine/text/extrude": 11160,
     "@margoengine/text/fit": 10636,
     "@margoengine/text/msdf": 4494,
@@ -8070,6 +8082,7 @@
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
     "@margoengine/voxel-edit/formats": 9294,
+    "@margoengine/voxel-edit/generate": 2735,
     "@margoengine/voxel-edit/gpu": 6177,
     "@margoengine/voxel-edit/history": 1330,
     "@margoengine/voxel-edit/library": 1255,
@@ -8132,6 +8145,7 @@
     "@margoengine/weather/drive": 1714,
     "@margoengine/weather/gltf": 5203,
     "@margoengine/weather/hail": 5489,
+    "@margoengine/weather/lens": 3815,
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
@@ -8278,13 +8292,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/cameras/stereo": 3400,
-    "@margoengine/text/curve": 10802,
-    "@margoengine/mixer/dynamics": 3112,
-    "@margoengine/sciviz/transfer": 6252,
-    "@margoengine/weather/lens": 3815,
-    "@margoengine/mixer/pitch": 2622,
-    "@margoengine/voxel-edit/generate": 2735
+    "margoengine/web": 577
   }
 }

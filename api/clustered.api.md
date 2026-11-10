@@ -37,6 +37,8 @@ export class Clustered implements EnginePlugin {
     set projector(hook: ClusteredLightTerm | undefined);
     get shapes(): ClusteredShapes | undefined;
     set shapes(hook: ClusteredShapes | undefined);
+    get stochastic(): ClusteredStochastic | undefined;
+    set stochastic(hook: ClusteredStochastic | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
@@ -117,6 +119,10 @@ export interface ClusteredSamplingHooks {
     shapes?: {
         declarations(group: number): string;
     };
+    stochastic?: {
+        declarations(group: number): string;
+        lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
+    };
 }
 
 export interface ClusteredShadow {
@@ -128,6 +134,12 @@ export interface ClusteredShadow {
 
 export interface ClusteredShapes {
     declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
+export interface ClusteredStochastic {
+    declarations(group: number): string;
+    lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
     bindings(): GPUBindGroupEntry[];
 }
 
@@ -215,5 +227,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     readonly areaShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes }?: ClusteredSamplingHooks): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic }?: ClusteredSamplingHooks): string;
 ```

@@ -80,6 +80,8 @@ class Clustered implements EnginePlugin {
     set projector(hook: ClusteredLightTerm | undefined);
     get shapes(): ClusteredShapes | undefined;
     set shapes(hook: ClusteredShapes | undefined);
+    get stochastic(): ClusteredStochastic | undefined;
+    set stochastic(hook: ClusteredStochastic | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
@@ -158,6 +160,12 @@ interface ClusteredShadow {
 
 interface ClusteredShapes {
     declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
+interface ClusteredStochastic {
+    declarations(group: number): string;
+    lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
     bindings(): GPUBindGroupEntry[];
 }
 

@@ -31,3 +31,7 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 | 54.3 | @margoengine/lightmap | apply: core mesh textures (base colour, ORM) are not copied to the stand-in; colour, roughness, metalness and sidedness only |
 | 54.3 | @margoengine/lightmap | apply: glTF-pro records with a material extension already (clearcoat) are refused; needs a way to chain two extensions |
 | 54.3 | @margoengine/lightmap | apply: glTF-pro models need WebGPU (the extension hook binds a GPU texture); no WebGL2 path yet |
+| 52.8 | @margoengine/clustered | Stochastic lights: sample the unshadowed loop too (RIS over a few candidates of the cluster list) so thousands of lights in one cluster cost a handful of BRDF evaluations, not only of shadow lookups. |
+| 52.8 | @margoengine/clustered | Stochastic lights: temporal reservoir reuse with motion vectors (ReSTIR section 3) and a screen-space denoiser; today only the 2 x 2 quad sum and @margoengine/taa average the noise. |
+| 52.8 | @margoengine/clustered | Stochastic lights: GPU timing against the exact loop at 16, 64 and 256 shadowed lights; skip lights whose LocalShadows slot is beyond maxLights (they are sampled with visibility 1). |
+| 52.8 | @margoengine/clustered | Stochastic lights: physical lobes (clearcoat, sheen) of sampled lights stay unshadowed; scale clusterLobeLight by the same ratio. |

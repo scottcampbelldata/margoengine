@@ -191,6 +191,16 @@ side its `direction` faces, or `twoSided`) and fluorescent tubes (`'tube'`, a ca
 with the same Linearly Transformed Cosines as the rectangle lights. `intensity` is the surface radiance;
 `radianceFromPower(light, lumens)` converts a total power. Shaped lights do not cast shadows yet (docs/limits.md).
 
+## Many shadowed lights
+
+`StochasticLights` from `@margoengine/clustered/stochastic` keeps the shadow cost of a pixel at `samples` lookups (default
+2, at most 8) however many shadowed point and spot lights reach it. Each light's unshadowed light stays exact; the
+shadows of a few lights, picked in proportion to the light each brings, give the visibility that scales the shadowed
+lights' sum (a ratio estimator). A pixel reached by `samples` shadowed lights or fewer is exact. Estimates are shared
+across each 2 x 2 pixel quad (`quad`, default on) and the pattern changes every frame (`temporal`), so
+`@margoengine/taa` averages the remaining noise. It needs `LocalShadows` or `ClusteredOptions.shadows`; without shadows it
+changes nothing. Attach it with `StochasticLights.attach(engine, {lights})`.
+
 ## IES profiles
 
 `@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type B and C photometry) and

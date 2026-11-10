@@ -63,6 +63,14 @@ export interface ClusteredSamplingHooks {
   terms?: readonly { declarations(group: number): string; readonly term: string }[];
   /** WGSL defining `clusterShapeLighting` (sphere, disc and tube lights), added to the result like the area lights. */
   shapes?: { declarations(group: number): string };
+  /**
+   * `StochasticLights` (`@margoengine/clustered/stochastic`): shadows of sampled lights only. Used only with shadows;
+   * `lighting` gets the cluster lookup, the loop body's head, the radiance, the shadow factor and the shadowed test.
+   */
+  stochastic?: {
+    declarations(group: number): string;
+    lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
+  };
 }
 // BRDF: GGX D and separable Smith-GGX G (Walter et al. 2007 eq. 33-34), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
@@ -87,14 +95,28 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
-  { directional, terms = [], shapes }: ClusteredSamplingHooks = {},
+  { directional, terms = [], shapes, stochastic }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
     // A core mesh with receiveShadow false sets clusterReceive false before calling clusterLighting.
     term = (call: string) => (receive ? `*select(1.0,${call},clusterReceive)` : '*' + call),
     directionalShadow = hook?.directionalShadow,
-    areaShadow = hook?.areaShadow;
+    areaShadow = hook?.areaShadow,
+    sampled = !!(hook || shadows) && stochastic,
+    visibility =
+      (hook ? term('clusterShadow(light,position,n)') : '') +
+      (shadows ? term('clusterShadowVisibility(light,position,n)') : ''),
+    head = `${terms.length || sampled ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
+    if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
+    let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
+    let d=${ggxD};
+    let g=${smithG};
+    let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
+    ${decay ? decayTerms : legacyTerms}`,
+    start =
+      '\n  let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;',
+    radiance = `${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}`;
   const code =
     declarations(group) +
     (hook ? hook.declarations(group) : '') +
@@ -102,22 +124,26 @@ export function clusteredSampling(
     (directional ? directional.declarations(group) : '') +
     terms.map((t) => t.declarations(group)).join('') +
     (shapes ? shapes.declarations(group) : '') +
+    (sampled ? sampled.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
-${/* @__PURE__ */ clusterCell('position')}
-  let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
+${
+  sampled
+    ? sampled.lighting(
+        clusterCell('position') + start,
+        head,
+        radiance,
+        visibility,
+        `(${hook ? 'light.params.z>=1.0' : 'false'}||${shadows ? 'light.params.w>=1.0' : 'false'})${receive ? '&&clusterReceive' : ''}`,
+      )
+    : `${/* @__PURE__ */ clusterCell('position')}${start}
   for(var j=0u;j<count;j++){
-    ${terms.length ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
-    if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
-    let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-    let d=${ggxD};
-    let g=${smithG};
-    let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
-    ${decay ? decayTerms : legacyTerms}
-    result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
-  }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
+    ${head}
+    result+=${radiance}${visibility};
+  }`
+}${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
   return ${area || shapes ? `(result${area ? '+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${shapes ? '+clusterShapeLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''})` : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;

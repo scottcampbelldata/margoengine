@@ -622,6 +622,10 @@
       "types": "./dist/clustered/shapes.d.ts",
       "import": "./dist/clustered/shapes.js"
     },
+    "./clustered/stochastic": {
+      "types": "./dist/clustered/stochastic.d.ts",
+      "import": "./dist/clustered/stochastic.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
