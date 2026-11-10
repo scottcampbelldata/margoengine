@@ -432,6 +432,104 @@ test('encodeVideo writes an MP4 with moov first, whose tables find every sample'
   assert.equal(at, bytes.length, 'the tables account for every byte');
 });
 
+// The SPS of the avcC Chromium's H.264 encoder gave on the Radeon 680M (docs/work-lists/amd-gpu-hunt.md row 11): VUI
+// with video_full_range_flag 0, while its decoderConfig.colorSpace said fullRange true and its samples were full range.
+const RADEON_AVCC = [
+  1, 100, 4, 21, 255, 225, 0, 32, 103, 100, 4, 21, 172, 209, 65, 1, 155, 255, 0, 1, 0, 1, 66, 2, 2, 2, 128, 0, 0, 3, 0,
+  128, 0, 0, 30, 71, 132, 66, 50, 192, 1, 0, 4, 104, 238, 60, 128, 253, 248, 248, 0,
+];
+
+/** The fields of a High profile SPS NAL unit (H.264 7.3.2.1.1, E.1.1), read independently of the muxer. */
+function readSps(nal) {
+  const rbsp = [];
+  for (let i = 1, zeros = 0; i < nal.length; i++) {
+    if (zeros >= 2 && nal[i] === 3) {
+      zeros = 0;
+      continue;
+    }
+    rbsp.push(nal[i]);
+    zeros = nal[i] === 0 ? zeros + 1 : 0;
+  }
+  let at = 0;
+  const bit = () => (rbsp[at >> 3] >> (7 - (at++ & 7))) & 1,
+    bits = (n) => Array.from({ length: n }, bit).reduce((v, b) => v * 2 + b, 0),
+    ue = () => {
+      let zeros = 0;
+      while (!bit()) zeros++;
+      return 2 ** zeros - 1 + bits(zeros);
+    };
+  const head = { profile: bits(8), constraints: bits(8), level: bits(8), id: ue() };
+  Object.assign(head, { chroma: ue(), luma: ue(), chromaDepth: ue(), bypass: bit(), scaling: bit() });
+  Object.assign(head, { frameNum: ue(), order: ue(), orderLsb: ue(), refs: ue(), gaps: bit() });
+  Object.assign(head, { width: ue(), height: ue(), frames: bit(), direct: bit(), crop: bit(), vui: bit() });
+  if (!head.vui) return { head, stop: bit(), rest: rbsp.length * 8 - at };
+  const vui = { aspect: bit() ? [bits(8), bits(16), bits(16)] : null, overscan: bit() };
+  vui.signal = bit() ? { format: bits(3), full: bit(), colour: bit() ? [bits(8), bits(8), bits(8)] : null } : null;
+  vui.chroma = bit();
+  vui.timing = bit() ? [bits(32), bits(32), bit()] : null;
+  vui.hrd = [bit(), bit()];
+  vui.picStruct = bit();
+  vui.restriction = bit() ? [bit(), ue(), ue(), ue(), ue(), ue(), ue()] : null;
+  return { head, vui, stop: bit(), rest: rbsp.length * 8 - at };
+}
+
+/** Each SPS of the avcC in an MP4. */
+function muxedSps(bytes) {
+  const stsd = path(bytes, 'moov', 'trak', 'mdia', 'minf', 'stbl', 'stsd'),
+    entry = readBoxes(bytes, stsd.start + 8, stsd.end)[0],
+    avcC = readBoxes(bytes, entry.start + 78, entry.end)[0],
+    record = bytes.subarray(avcC.start, avcC.end),
+    out = [];
+  for (let i = 0, at = 6; i < (record[5] & 31); i++) {
+    const size = (record[at] << 8) | record[at + 1];
+    out.push(record.subarray(at + 2, at + 2 + size));
+    at += 2 + size;
+  }
+  return out;
+}
+
+test('an H.264 MP4 states the range the encoder reported in its SPS, as its colr box does', async () => {
+  const source = readSps(Uint8Array.from(RADEON_AVCC.slice(8, 40)));
+  assert.equal(source.vui.signal.full, 0, 'the recorded SPS says limited');
+  for (const fullRange of [true, false]) {
+    const { webCodecs } = fakeCodecs({
+        description: Uint8Array.from(RADEON_AVCC),
+        colorSpace: { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: 'bt709', fullRange },
+      }),
+      { bytes } = await encodeVideo(frames(3), { format: 'mp4', fps: 10, webCodecs }),
+      list = muxedSps(bytes),
+      read = readSps(list[0]);
+    assert.equal(list.length, 1);
+    assert.equal(read.vui.signal.full, fullRange ? 1 : 0, `fullRange ${fullRange}`);
+    // Every other field of the parameter set is unchanged, and it still ends in its stop bit.
+    assert.deepEqual({ ...read, vui: { ...read.vui, signal: { ...read.vui.signal, full: 0 } } }, source);
+    if (!fullRange) assert.deepEqual([...list[0]], RADEON_AVCC.slice(8, 40), 'already limited: the bytes as given');
+  }
+});
+
+test('an SPS without VUI gains a video signal type only when the encoder reported full range', async () => {
+  // The recorded SPS cut at its vui_parameters_present_flag (bit 62 of the RBSP), which is then 0, and its stop bit.
+  const rbsp = RADEON_AVCC.slice(9, 40),
+    kept = Array.from({ length: 62 }, (_, i) => (rbsp[i >> 3] >> (7 - (i & 7))) & 1),
+    all = [...kept, 0, 1, 0],
+    plain = [103, ...Array.from({ length: all.length / 8 }, (_, i) => all.slice(i * 8, i * 8 + 8).reduce((v, b) => v * 2 + b, 0))],
+    record = [...RADEON_AVCC.slice(0, 6), 0, plain.length, ...plain, ...RADEON_AVCC.slice(40)],
+    before = readSps(Uint8Array.from(plain));
+  assert.equal(before.head.vui, 0);
+  for (const fullRange of [true, false]) {
+    const { webCodecs } = fakeCodecs({ description: Uint8Array.from(record), colorSpace: { fullRange } }),
+      { bytes } = await encodeVideo(frames(2), { format: 'mp4', fps: 10, webCodecs }),
+      [sps] = muxedSps(bytes);
+    if (fullRange) {
+      const read = readSps(sps);
+      assert.deepEqual(read.head, { ...before.head, vui: 1 });
+      assert.deepEqual(read.vui.signal, { format: 5, full: 1, colour: null });
+      assert.equal(read.stop, 1);
+      assert.ok(read.rest < 8, 'then only the alignment zeros');
+    } else assert.deepEqual([...sps], plain, 'limited is the default: the bytes as given');
+  }
+});
+
 test('MP4 records offsets for frames that arrive out of order, and decode times stay in order', async () => {
   const { webCodecs } = fakeCodecs({ description: Uint8Array.of(1), reorder: true }),
     { bytes } = await encodeVideo(frames(4), { format: 'mp4', fps: 10, webCodecs }),

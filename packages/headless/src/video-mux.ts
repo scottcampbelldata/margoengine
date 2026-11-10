@@ -3,6 +3,8 @@
 // patched afterwards. The VP9 and AV1 configuration records follow their codecs' published ISOBMFF bindings; the colour
 // code points are those of ISO/IEC 23091-2.
 
+import { avcConfigurationWithRange, avcSampleWithRange } from './avc-range.js';
+
 /** One encoded frame in decode order. Times are microseconds. */
 export interface VideoSample {
   data: Uint8Array;
@@ -481,9 +483,29 @@ function soundTrak(sound: SoundTrack, position: number, milliseconds: number): U
   );
 }
 
+/**
+ * An H.264 track whose parameter sets state the sample range the encoder reported, so the stream and the `colr` box
+ * agree: players follow the SPS, and an encoder can report full range while its SPS says limited (Chromium's on the
+ * Radeon 680M; docs/work-lists/amd-gpu-hunt.md row 11). Other codecs, and tracks with no reported range, stay as they are.
+ */
+function rangeAgreed(track: VideoTrack, samples: readonly VideoSample[]) {
+  const full = track.colorSpace?.fullRange,
+    record = track.description;
+  if (!track.codec.startsWith('avc1') || typeof full !== 'boolean' || !record || record.length < 5 || record[0] !== 1)
+    return { track, samples };
+  const lengthSize = (record[4] & 3) + 1;
+  return {
+    track: { ...track, description: avcConfigurationWithRange(record, full) },
+    samples: samples.map((sample) =>
+      sample.key ? { ...sample, data: avcSampleWithRange(sample.data, lengthSize, full) } : sample,
+    ),
+  };
+}
+
 /** A progressive MP4: `moov` first so playback can start before the end arrives, each track's samples in one chunk. */
-export function muxMP4(track: VideoTrack, samples: readonly VideoSample[], sound?: SoundTrack): Uint8Array {
-  const family = track.codec.split('.')[0],
+export function muxMP4(video: VideoTrack, frames: readonly VideoSample[], sound?: SoundTrack): Uint8Array {
+  const { track, samples } = rangeAgreed(video, frames),
+    family = track.codec.split('.')[0],
     timescale = Math.round(track.fps * 1000),
     ticks = (time: number) => Math.round((time * timescale) / 1e6),
     shown = samples.map((sample) => ticks(sample.timestamp)),
