@@ -633,7 +633,7 @@ export class ViewCube {
       u = this.local(c.up),
       a = angles(d);
     if (!d[0] && !d[2] && d[1])
-      if (this.upSet && u === this.upSet) a[0] = this.az;
+      if (this.upSet && c.up === this.upSet) a[0] = this.az;
       else if (Math.hypot(u[0], u[2])) a[0] = d[1] > 0 ? Math.atan2(-u[0], -u[2]) : Math.atan2(u[0], u[2]);
     return a;
   }

@@ -52,3 +52,30 @@ test('projection preserves Z-up front and uses the widget front at its exact pol
   cube.view('front'); engine.frame(); near(engine.camera.up, [0, 0, 1]);
   cube.view('top'); engine.frame(); near(engine.camera.up, [0, 1, 0]);
 });
+
+test('owned pole up retains azimuth across repeated quarter rolls in every world frame', () => {
+  for (const up of ['y', 'z', [1, 2, 3]]) {
+    for (const [view, sign] of [['top', 1], ['bottom', -1]]) {
+      const { engine, dom } = setup();
+      const cube = new UpViewCube(engine, { up, duration: 0 });
+      try {
+        cube.view(view);
+        engine.frame();
+        const position = [...engine.camera.position];
+        for (const direction of [1, -1]) {
+          for (let step = 1; step <= 4; step++) {
+            cube.roll(direction, 0);
+            engine.frame();
+            const angle = direction * step * Math.PI / 2;
+            near(engine.camera.up, cube.world([Math.sin(angle), 0, -sign * Math.cos(angle)]));
+            near(engine.camera.position, position);
+            assert.equal(cube.turns, ((direction * step) % 4 + 4) % 4);
+          }
+        }
+      } finally {
+        cube.dispose();
+        dom.window.close();
+      }
+    }
+  }
+});
