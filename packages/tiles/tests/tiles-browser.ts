@@ -9,6 +9,7 @@ import { i3dm } from '../dist/i3dm.js';
 import { splats, tileSplats } from '../dist/splats.js';
 import { terrain } from '../dist/terrain.js';
 import { TilesStyle } from '../dist/style.js';
+import { readPropertyMetadata, loadPropertyMetadata } from '../dist/properties.js';
 import { terrainImagery, wms, wmts, compositeImagery } from '../dist/imagery.js';
 import { PointCloud, PointsPlugin } from '../../points/dist/index.js';
 import { Splats, transformSplats } from '../../splats/dist/index.js';
@@ -184,6 +185,44 @@ async function run(name: string): Promise<unknown> {
       polarRequests,
       wms: requests.some((url) => url.includes('SERVICE=WMS')),
       wmts: requests.some((url) => url.includes('SERVICE=WMTS')),
+      errors: errors.slice(from),
+    };
+  }
+  if (name === 'properties') {
+    const from = errors.length;
+    const base = '/examples/assets/3d-tiles/EXT_structural_metadata/';
+    const doc = await (await fetch(base + 'PropertyAttributesPointCloud/PropertyAttributesPointCloudTree.gltf')).json();
+    const bytes = new Uint8Array(
+      await (await fetch(base + 'PropertyAttributesPointCloud/PropertyAttributesPointCloudTree.bin')).arrayBuffer(),
+    );
+    const schema = await (await fetch(base + 'PropertyAttributesPointCloud/MetadataSchema.json')).json();
+    const asset = new GLTFAsset(doc, [bytes]);
+    const attributes = readPropertyMetadata(asset, { schema }).primitives[0][0].attributes[0];
+    const positions = asset.accessor(doc.meshes[0].primitives[0].attributes.POSITION);
+    const colors = new Float32Array(attributes.count * 4);
+    let classified = 0;
+    for (let i = 0; i < attributes.count; i++) {
+      if (attributes.get(i, 'classification') === 'MediumVegetation') classified++;
+      colors[i * 4 + 1] = 0.2 + 1.6 * Number(attributes.get(i, 'intensity'));
+      colors[i * 4 + 3] = 1;
+    }
+    const points = PointsPlugin.attach(engine, { name: 'property-attribute-proof' });
+    points.add(new PointCloud({ positions, colors, material: { size: 3, sizeAttenuation: false } }));
+    engine.camera.position = [2.5, 3.7, 15];
+    engine.camera.target = [2.5, 3.7, 0];
+    await frame();
+    const image = pixels();
+    let green = 0;
+    for (let i = 0; i < image.length; i += 4) if (image[i + 1] > 30 && image[i] < 5 && image[i + 2] < 5) green++;
+    points.dispose();
+    const textureDoc = await (await fetch(base + 'SimplePropertyTexture/SimplePropertyTexture.gltf')).json();
+    const metadata = await loadPropertyMetadata(new GLTFAsset(textureDoc, []));
+    const texture = metadata.propertyTextures[0];
+    return {
+      count: attributes.count,
+      classified,
+      green,
+      rows: [texture.row([0, 0]), texture.row([0.25, 0.25])],
       errors: errors.slice(from),
     };
   }

@@ -2805,7 +2805,6 @@ Run `npm run measure:size` for the unchanged 25000 B core/stage limit.
 
 ## Batch 237 assembly
 Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch237 --max=5 --wait-max=60 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
-=======
 
 
 
@@ -2848,7 +2847,6 @@ Batch 249 job 3: build then node --test --test-timeout=120000 packages/ecs/test/
 
 ### Batch 273 Firefox
 After build:packages, supply the shipped Firefox executable through BROWSER_EXECUTABLE in the process environment; never commit the value. Run node packages/webgl2-compat/test/firefox-matrix.mjs for the eleven-driver sweep, which preserves failures and returns nonzero if any remain. Under a shared correctness GPU lock run node packages/webgl2-compat/test/firefox-compat-cases.mjs for the46 cross-browser cases. To isolate a changed cell, use --fixtures=compute.html?strict and retain the selected receipt alongside the original. Run firefox-matrix.mjs --leaf=corpus-draw-browser.mjs under a shared lock for all recorded corpus work. The corpus separately checks the intended over-limit negative pipeline; all legal pipelines must dispatch. Run node --test packages/webgl2-compat/test/firefox-bidi.test.js packages/webgl2-compat/test/corpus-validation.test.js tests/integration-json.test.js. Forced tiers never replace physical lower-tier evidence.
-<<<<<<< HEAD
 ## Batch 237 3D overlapping
 Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapping3d.test.js. Run the changed wfc package test:gpu through the shared GPU lock; assemble-browser.mjs checks all 64 pinned checkerboard values on native WebGPU and WebGL2 compatibility. Tests use authored numerical volumes and independent window extraction, not third-party implementations.
 
@@ -2863,13 +2861,12 @@ Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages
 After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs through the shared GPU lock; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.
 
 Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs outside any GPU lock (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/gpu-lock.mjs run --owner=assets-proof --max=5 --wait-max=60 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
->>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)
 
 ## Batch 237 hex layouts
 After building, run node --test --test-timeout=60000 packages/wfc/test/hex.test.js. Run wfc test:gpu through the shared lock for native WebGPU and WebGL2 compatibility evidence: assemble-browser.mjs solves a 6x6x2 periodic odd-r prism and checks each edge while retaining the assembly draw-count assertion. No benchmark required or run.
->>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)
-=======
 
 ### Batch273 scenery capture
 Run node --test packages/scenery/test/presented-frame.test.js and npm test --workspace @margoengine/scenery after build:packages. Under a shared correctness lock run node packages/scenery/test/scenery-check.mjs, then the same complete driver with MARGO_COMPAT=1. The scenes selector isolates displayed capture after changing its scheduling; keep all other existing assertions and both sample counts.
->>>>>>> 68ad4f497 (fix(scenery): capture compatibility scenes after submitted work)
+
+### Batch 239 job 5: property reads
+After npm run build:packages, run node --test --test-timeout=120000 packages/tiles/tests/properties.test.js. The licensed CC0 samples and SHA-256 values are in examples/assets/3d-tiles/NOTICE.md. For rendered evidence run node scripts/gpu-lock.mjs run --owner=properties-proof --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs, then the same command with --compat appended. The properties result contains point count/classification, green pixels, and exact texture rows: (13,9,40/255) and (20,13,50/255). These are correctness checks, not timing budgets.

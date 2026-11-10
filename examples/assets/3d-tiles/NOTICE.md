@@ -20,3 +20,10 @@ READMEs state; the tests check them against the property values those READMEs li
 
 Only the `city` sub-tileset of TilesetWithRequestVolume is kept; its building model (by Richard Edwards) and point cloud
 are left out for their size.
+
+Additional CC0 1.0 standard samples, byte for byte from the same pinned source commit a30bfdf2d6cc55f4c3078e8aea3a793af6ebfd56, downloaded 2026-11-10. Source folders: https://github.com/CesiumGS/3d-tiles-samples/tree/a30bfdf2d6cc55f4c3078e8aea3a793af6ebfd56/glTF/EXT_structural_metadata/PropertyAttributesPointCloud and the adjacent SimplePropertyTexture. Each source sample's README states CC0. No source code or README file is copied.
+
+| Folder | Files (sha256 as downloaded) |
+| --- | --- |
+| EXT_structural_metadata/PropertyAttributesPointCloud | PropertyAttributesPointCloudTree.bin 83307690b7406d2758006e246e9d44c02fe5fadec6c50551bcbcde64bbfb7a07; PropertyAttributesPointCloudTree.gltf a459285737e3fd48f6726d51879a5ab2b384bcd95a0f57e84dcea90bfe180603; MetadataSchema.json 43fd8b5c9633237819c335044fd5bf1d5b7335002d25b50a07d882df61be84f1 |
+| EXT_structural_metadata/SimplePropertyTexture | SimplePropertyTexture.gltf a2a282a39f62378d306d805235a1ef955277d4fc01fec60fbb8bd3fe38b41d26 |

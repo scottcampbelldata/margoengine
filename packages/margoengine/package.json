@@ -3310,6 +3310,10 @@
       "types": "./dist/tilemap/fov.d.ts",
       "import": "./dist/tilemap/fov.js"
     },
+    "./tiles/properties": {
+      "types": "./dist/tiles/properties.d.ts",
+      "import": "./dist/tiles/properties.js"
+    },
     "./tiles/imagery": {
       "types": "./dist/tiles/imagery.d.ts",
       "import": "./dist/tiles/imagery.js"

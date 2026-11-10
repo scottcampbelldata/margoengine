@@ -26,6 +26,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./properties": {
+      "types": "./dist/properties.d.ts",
+      "import": "./dist/properties.js"
+    },
     "./imagery": {
       "types": "./dist/imagery.d.ts",
       "import": "./dist/imagery.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12519341,
+  "total": 12526956,
   "history": [
     {
       "date": "2026-10-24",
@@ -6091,6 +6091,12 @@
       "commit": "batch-237",
       "reason": "New optional wfc/hex 0 -> 3296 B min+gzip plus 256 B headroom; five layouts, masks, prisms, socket orientations and shared bounded graph search remain optional.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "85c472e60",
+      "reason": "tiles/properties new optional entry 0 to 7359 B min+gzip; lossless attribute and texture queries with validation and lazy image loading; splitting would duplicate metadata setup and complicate the API",
+      "grew": 1
     }
   ],
   "items": {
@@ -7204,6 +7210,7 @@
     "leak @margoengine/inspector/gl -> @margoengine/lines": 1,
     "@margoengine/math/compat": 10227,
     "@margoengine/exporters/optimize-extra": 6470,
-    "@margoengine/wfc/hex": 3552
+    "@margoengine/wfc/hex": 3552,
+    "@margoengine/tiles/properties": 7615
   }
 }

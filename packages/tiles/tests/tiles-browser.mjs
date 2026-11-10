@@ -133,6 +133,18 @@ try {
     style,
   );
 
+  const properties = (results.properties = await call((n) => window.tilesFixture.run(n), 'properties'));
+  assert.deepEqual(properties.errors, [], 'properties: GPU or metadata errors');
+  assert.deepEqual(properties.rows, [
+    { insideTemperature: 13, outsideTemperature: 9, insulation: 40 / 255 },
+    { insideTemperature: 20, outsideTemperature: 13, insulation: 50 / 255 },
+  ]);
+  check(
+    'properties: real CC0 point attributes colour all 6876 classified points and raw texture channels match their golden values',
+    properties.count === 6876 && properties.classified === 6876 && properties.green > 500,
+    properties,
+  );
+
   const memory = (results.gpuMemory = await call((n) => window.tilesFixture.run(n), 'gpu-memory'));
   assert.deepEqual(memory.errors, [], 'gpu-memory: WebGPU or engine errors');
   check(

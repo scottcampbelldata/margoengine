@@ -255,7 +255,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/webgl2-compat | Shipped Firefox BiDi matrix, environment-only executable, cross-browser oracle scope and native-adapter refusals. | Batch273 job2 |
 | margoengine | Retained XR AR extras alias after concurrent manifest integration. | Batch273 landing blocker |
-<<<<<<< HEAD
 - @margoengine/wfc: document /overlapping3d sample layout, N, input/output wrapping, rotations/reflections, pins, default budgets, stats, limits and synchronous cancellation (batch 237 job 3).
 - margoengine: document generated wfc/overlapping3d alias (batch 237 job 3).
 
@@ -277,13 +276,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mcp: document assets library/search/variant/download/wire tools, manifests, provider limits, assets-page installer, public URL/material targets and disposal (batch 267 job 2).
 - margoengine: document generated mcp/assets and mcp/assets-page aliases (batch 267 job 2).
-=======
->>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
 
 - @margoengine/wfc: document /hex layouts, side directions, prism faces, masks/sentinel, periodic parity, pins, budgets, hexCellCenter, socket rotation/reflection metadata and weight splitting (batch 237 job 4).
 - margoengine: document generated wfc/hex alias (batch 237 job 4).
->>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)
-=======
 
 | @margoengine/scenery | Native task-local and compatibility queue-complete displayed capture, preset parity and evidence scope. | Batch273 group16 |
->>>>>>> 68ad4f497 (fix(scenery): capture compatibility scenes after submitted work)
+| @margoengine/tiles | tiles/properties loaded-asset attribute/texture queries, raw images/codec callbacks, source barycentric UVs, limits and abortable resource loading | batch 239 job 5 |
+| margoengine | Generated tiles/properties optional alias | batch 239 job 5 |
